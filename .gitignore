@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+cache/
+*.log
+*.sqlite3-journal
+**/runs/
+**/state.json
+**/baseline.json
+/tmp/
+.env
+*.token
+*.secret

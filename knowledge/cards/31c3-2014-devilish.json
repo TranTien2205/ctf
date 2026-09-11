@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "id": "31c3-2014-devilish",
+  "challenge": {
+    "name": "Devilish",
+    "event": "31C3 CTF",
+    "year": 2014,
+    "category": "web",
+    "points": 30,
+    "difficulty": null
+  },
+  "classification": {
+    "primary": "sql-injection",
+    "secondary": [
+      "error-based-sqli",
+      "path-traversal",
+      "session-mass-assignment",
+      "vhost"
+    ],
+    "confidence": 0.98
+  },
+  "signals": [
+    "PROFILE endpoint exposes SQL error behavior",
+    "filtered SQL keywords require an error-based column-discovery bypass",
+    "authenticated ACCESS endpoint accepts directory traversal",
+    "two virtual sites share session state"
+  ],
+  "target": {
+    "interface": "HTTP",
+    "endpoints": [
+      "/PROFILE/<id>",
+      "/ACCESS",
+      "/LOGIN"
+    ],
+    "parameters": [
+      "action",
+      "dir",
+      "user",
+      "pass"
+    ],
+    "flag_location": "private portal response after the documented session transition"
+  },
+  "flow": [
+    {
+      "stage": "input",
+      "value": "PROFILE identifier/path input"
+    },
+    {
+      "stage": "sink",
+      "value": "SQL query with error-based extraction behavior"
+    },
+    {
+      "stage": "impact",
+      "value": "discover account data, then authenticate"
+    },
+    {
+      "stage": "pivot",
+      "value": "authenticated directory traversal reveals private site/source"
+    },
+    {
+      "stage": "flag",
+      "value": "private portal response"
+    }
+  ],
+  "first_probe": {
+    "payload": "a single quote or another harmless syntax marker appropriate to the PROFILE input",
+    "expected": "database/error behavior is reflected in the response",
+    "purpose": "confirm error-based SQL injection before attempting extraction"
+  },
+  "exploit": {
+    "payloads": [
+      "error-based extraction adapted to the observed DBMS and endpoint",
+      "duplicate-column error technique to reveal an unknown column",
+      "authenticated traversal using a normalized relative path"
+    ],
+    "conditions": [
+      "the endpoint returns distinguishable database errors",
+      "keyword filtering can be bypassed with equivalent syntax",
+      "the first site's session state is accepted by the private site"
+    ]
+  },
+  "verification": {
+    "proof": "source writeup reports access to the private portal and a flag-like response",
+    "status": "writeup-claimed"
+  },
+  "pitfalls": [
+    "custom font hides database errors in the rendered page; inspect source/response",
+    "the writeup contains historical credentials and a flag; they are intentionally redacted from this card",
+    "the challenge infrastructure is historical and must not be treated as a live target"
+  ],
+  "source": {
+    "url": "https://raw.githubusercontent.com/ctfs/write-ups-2014/b02bcbb2737907dd0aa39c5d4df1d1e270958f54/31c3-ctf-2014/web/devilish/README.md",
+    "author": "boogy",
+    "retrieved_at": "2026-09-04T15:21:33Z",
+    "evidence_spans": [
+      {
+        "text": "The web page reveals ... a SQL injection vulnerability in the PROFILE endpoint.",
+        "location": "normalized lines 8-10"
+      },
+      {
+        "text": "there’s an annoying filter that prevents us from enumerating columns",
+        "location": "normalized lines 19-20"
+      },
+      {
+        "text": "After logging in, we found a directory traversal vulnerability",
+        "location": "normalized line 72"
+      },
+      {
+        "text": "The source code for its INDEX page contains",
+        "location": "normalized lines 115-119"
+      }
+    ]
+  },
+  "quality": {
+    "verified_live": false,
+    "review_status": "reviewed",
+    "extraction_confidence": 0.94
+  }
+}

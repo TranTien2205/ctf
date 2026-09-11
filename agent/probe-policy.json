@@ -1,0 +1,14 @@
+{
+  "web": [
+    {"technique": "ssrf", "probe": "controlled URL", "expected": "fetch/PDF/timing difference", "falsifier": "URL is never processed"},
+    {"technique": "ssti", "probe": "{{7*7}}", "expected": "49 evaluated", "falsifier": "literal reflection/escaping"},
+    {"technique": "sqli", "probe": "syntax marker then boolean contrast", "expected": "error or response difference", "falsifier": "identical validated response"},
+    {"technique": "xss", "probe": "unique harmless marker", "expected": "reflection/context change", "falsifier": "encoded or absent marker"},
+    {"technique": "idor", "probe": "adjacent authorized identifier", "expected": "ownership boundary change", "falsifier": "consistent authorization"}
+  ],
+  "pwn": [{"technique": "memory-corruption", "probe": "checksec + bounded cyclic input", "expected": "controlled crash", "falsifier": "input is safely bounded"}],
+  "crypto": [{"technique": "parameter weakness", "probe": "collect sizes, nonce/key reuse, n/e/c", "expected": "structural weakness", "falsifier": "independent random parameters"}],
+  "reverse": [{"technique": "validation path", "probe": "strings/imports then trace input", "expected": "comparison/check function", "falsifier": "input is not validated locally"}],
+  "forensics": [{"technique": "artifact container", "probe": "file/metadata/strings", "expected": "embedded or anomalous content", "falsifier": "clean recognized format"}],
+  "misc": [{"technique": "encoding/constraint", "probe": "normalize and decode one layer", "expected": "reduced alphabet/grammar", "falsifier": "no transformation"}]
+}

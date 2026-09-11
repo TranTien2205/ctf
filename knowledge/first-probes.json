@@ -1,0 +1,9 @@
+{
+  "ssrf-pdf-fetch": {"probe": "controlled short URL", "expected": "PDF response or timing difference", "next": "test renderer-supported schemes and internal-only targets"},
+  "ssti": {"probe": "{{7*7}}", "expected": "49 evaluated", "next": "identify template engine and flag sink"},
+  "sqli": {"probe": "' OR 1=1-- -", "expected": "response/row difference", "next": "fingerprint DBMS"},
+  "xss-admin-bot": {"probe": "harmless HTML marker", "expected": "reflection or bot callback", "next": "confirm execution context"},
+  "jwt": {"probe": "inspect header/payload without modifying token", "expected": "algorithm/claims", "next": "test only a documented weakness"},
+  "buffer-overflow": {"probe": "checksec and bounded cyclic input", "expected": "controlled crash", "next": "calculate offset"},
+  "rsa": {"probe": "collect n/e/c and key size", "expected": "weak parameter pattern", "next": "run deterministic attack"}
+}
