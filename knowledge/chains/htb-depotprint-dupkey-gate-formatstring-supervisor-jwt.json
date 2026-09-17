@@ -1,0 +1,105 @@
+{
+  "id": "htb-depotprint-dupkey-gate-formatstring-supervisor-jwt",
+  "source_note": "solved/depotprint.md",
+  "challenge": {
+    "name": "DepotPrint",
+    "platform": "HackTheBox",
+    "event": "Lab",
+    "category": "web",
+    "solved_at": "2026-09-17",
+    "assistance": "white-box"
+  },
+  "stack": ["php", "python", "flask", "selenium", "chromium", "sqlite"],
+  "classification": {
+    "primary": "web-ssrf",
+    "secondary": ["file-read-primitives", "web-logic-flaw"],
+    "confidence": 0.9
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-depotprint-dupkey-gate-formatstring-supervisor-jwt.json",
+    "retrieved_at": "2026-09-17",
+    "evidence_spans": [
+      "first_confirming_probe: GET /render.php?target=http://127.0.0.1:5000/status&target=https://example.com the PDF contains 'depotprint render worker online'"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.9
+  },
+  "preconditions": {
+    "all_of": [
+      "a gateway builds an upstream URL by concatenating the raw query string",
+      "the gateway validator and the internal worker read the same duplicated parameter with different parser semantics",
+      "a report formatter calls .format on a row that stores attacker text"
+    ],
+    "any_of": [
+      "an internal chrome/worker that renders and stores the fetched page",
+      "a manifest endpoint protected by a locally signed JWT"
+    ]
+  },
+  "signals": [
+    "parse_url",
+    "QUERY_STRING",
+    "gethostbyname",
+    "duplicate target",
+    "format string",
+    "spool",
+    "supervisor ticket",
+    "HS256 signing key",
+    "print spool",
+    "render worker",
+    "dup key"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "place the internal URL as the FIRST target and a clean external URL as the LAST duplicate: ?target=http://127.0.0.1:5000/status&target=https://example.com",
+      "why": "PHP reads the last occurrence for the gate; Werkzeug's args.get returns the first, so the worker chrome fetches the loopback URL"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "render the internal /queue route through the same trick and read the spool report the snapshot PDF prints",
+      "why": "the /queue page is loopback-only but runs spool_line, whose .format substitutes placeholders that reached the stored row"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "store a braced target containing {spool_line.__globals__[app].config[SIGNING_KEY]} first, then render /queue as the second job so the format-string substitution lands inside the next snapshot",
+      "why": "format supports attribute access and string-key lookup without quotes, and a callable in the namespace becomes a read primitive"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "forge a supervisor:true HS256 ticket with the leaked signing key and render /console?ticket=<JWT> through the same dup-key trick",
+      "why": "the manifest table holds the seeded flag row and console is supervisor-only"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET /render.php?target=http://127.0.0.1:5000/status&target=https://example.com&label=D&note=x and read the produced PDF",
+    "expected": "the PDF contains the text 'depotprint render worker online'",
+    "falsifier": "both targets are rejected, or the PDF shows the external page only"
+  },
+  "blast_radius": "arbitrary request forgery through a behind-the-gate chrome; the leaked signing key impersonates supervisors until the container restarts",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "manifest depot-master-record note read from the rendered /console PDF on 192.168.223.1:9000",
+    "proof": "the depot-master-record manifest note (the flag) read from a rendered /console PDF"
+  },
+  "reuse_when": [
+    "a reverse-proxy or gateway quotes the same parameter twice through two stacks",
+    "a report renderer formats user text with a callable in its format namespace",
+    "a loopback-only JSON API is protected by a JWT signed with a key stored in app.config"
+  ],
+  "known_traps": [
+    "the raw QUERY_STRING forwarding means percent-encoded bytes reach the worker unchanged; werkzeug decodes them once",
+    "a stored {format} payload only explodes the NEXT time /queue is rendered, not at insert time",
+    "Chrome percent-encodes braces in the displayed URL; the same_document comparison survives via unquote",
+    "httpbin-style redirect chains die against same_document; the parser split does not need a redirector",
+    "the PDF text layer is glyph-IDs mapped by ToUnicode; decode bfchar and bfrange or the text reads as garbage"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

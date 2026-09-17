@@ -40,3 +40,32 @@ Falsifier: the field is validated to an allowlist and never reaches a client
 **Blast radius**: eval on the shared Redis instance affects every player's session; prefer read-only Lua first
 
 - status: proposed
+
+## 2026-09-17 · DepotPrint · proposed
+
+- source note: `solved/depotprint.md`
+- chain card: `knowledge/chains/htb-depotprint-dupkey-gate-formatstring-supervisor-jwt.json`
+- verification: verified_live — manifest depot-master-record note read from the rendered /console PDF on 192.168.223.1:9000
+- classified as: `web-ssrf` (score 5.5, 5 signals matched)
+- also matched: `web-auth-session` (2.5), `web-open-redirect` (2.0), `web-race-condition` (1.5)
+- signals that fired: 127.0.0.1, Headless, render, ssrf, webhook
+
+**Confirming probe that worked**
+
+> GET /render.php?target=http://127.0.0.1:5000/status&target=https://example.com&label=D&note=x and read the produced PDF
+
+Expected: the PDF contains the text 'depotprint render worker online'
+
+Falsifier: both targets are rejected, or the PDF shows the external page only
+
+**Traps recorded on this solve**
+
+- the raw QUERY_STRING forwarding means percent-encoded bytes reach the worker unchanged; werkzeug decodes them once
+- a stored {format} payload only explodes the NEXT time /queue is rendered, not at insert time
+- Chrome percent-encodes braces in the displayed URL; the same_document comparison survives via unquote
+- httpbin-style redirect chains die against same_document; the parser split does not need a redirector
+- the PDF text layer is glyph-IDs mapped by ToUnicode; decode bfchar and bfrange or the text reads as garbage
+
+**Blast radius**: arbitrary request forgery through a behind-the-gate chrome; the leaked signing key impersonates supervisors until the container restarts
+
+- status: proposed
