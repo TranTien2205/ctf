@@ -69,7 +69,8 @@
   "blast_radius": "conditional sleeps hold a worker per matching row; keep the row count and the sleep short on a shared instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "extracted value confirmed by a HEX equality probe"
+    "evidence": "extracted value confirmed by a HEX equality probe",
+    "proof": "the escaped form is accepted while the literal form is rejected"
   },
   "reuse_when": [
     "any filter scans a raw body before a decoder normalises it",
@@ -83,5 +84,21 @@
     "compare hex strings as strings, not as a numeric literal, or the comparison silently fails"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-sqli",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli.json",
+    "retrieved_at": "2026-09-07",
+    "evidence_spans": [
+      "first_confirming_probe: send one blocked keyword as unicode escapes and compare the response with the same keyword sent literally"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

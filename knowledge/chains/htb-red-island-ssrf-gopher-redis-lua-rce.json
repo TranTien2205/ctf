@@ -78,7 +78,8 @@
   "blast_radius": "eval on the shared Redis instance affects every player's session; prefer read-only Lua first",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag returned by the helper binary through the Lua channel"
+    "evidence": "flag returned by the helper binary through the Lua channel",
+    "proof": "content or an error that proves the server performed the fetch"
   },
   "reuse_when": [
     "an SSRF exists and a line-protocol service listens on loopback",
@@ -89,5 +90,21 @@
     "always read error bodies: this app leaked the fetched file inside a non-200 message"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-red-island-ssrf-gopher-redis-lua-rce.json",
+    "retrieved_at": "2026-09-07",
+    "evidence_spans": [
+      "first_confirming_probe: submit a loopback URL in the fetch field and read the full response body, including error text"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

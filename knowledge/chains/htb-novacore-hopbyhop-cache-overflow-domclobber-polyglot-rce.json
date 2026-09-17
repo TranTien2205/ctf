@@ -83,7 +83,8 @@
   "blast_radius": "overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag file read by the executed plugin"
+    "evidence": "flag file read by the executed plugin",
+    "proof": "the second request is accepted without a token"
   },
   "reuse_when": [
     "an application trusts a header a proxy is expected to set",
@@ -94,5 +95,21 @@
     "the polyglot only works when the archive bytes are overlaid at the offset the scanner reads"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-request-smuggling",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce.json",
+    "retrieved_at": "2026-09-07",
+    "evidence_spans": [
+      "first_confirming_probe: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

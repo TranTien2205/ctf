@@ -83,7 +83,8 @@
   "blast_radius": "a fresh instance is required; an already-running instance is permanently consumed because the flag is submitted once at startup into an account with an unknown random password",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag string read from /submission/:id as the owning author on a fresh instance"
+    "evidence": "flag string read from /submission/:id as the owning author on a fresh instance",
+    "proof": "the registration succeeds and your credentials work at /api/login"
   },
   "reuse_when": [
     "an OAuth SSO provider has a token cookie with no SameSite and a JSON binder that ignores Content-Type",
@@ -99,5 +100,21 @@
     "an instance that already ran its startup is consumed: student has a random password and the flag is unreachable"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-csrf",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-ssos-oauth-registration-race-cookie-swap-json-csrf.json",
+    "retrieved_at": "2026-09-15",
+    "evidence_spans": [
+      "first_confirming_probe: hammer POST /api/register for the fixed bot account with your own password and confirm it returns 200 before the bot reaches its registerUser step"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

@@ -80,7 +80,8 @@
   "blast_radius": "the upsert changes an existing account's password on a shared instance; other players lose access to that account",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag returned in the login response"
+    "evidence": "flag returned in the login response",
+    "proof": "the parser accepts the folded character, showing the field is not encoded"
   },
   "reuse_when": [
     "a loopback-only route exists and the backend can be made to call itself",
@@ -91,5 +92,21 @@
     "a trailing request fragment is needed so the smuggled request is terminated"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-weather-app-ssrf-crlf-request-smuggling-upsert.json",
+    "retrieved_at": "2026-09-11",
+    "evidence_spans": [
+      "first_confirming_probe: put a harmless marker with one folded space character into the interpolated field and compare the error with an ordinary hostname"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

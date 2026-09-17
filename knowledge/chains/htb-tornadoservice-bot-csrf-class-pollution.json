@@ -77,7 +77,8 @@
   "blast_radius": "the pollution changes a global application setting; other players on a shared instance lose their sessions",
   "verification": {
     "status": "verified_live",
-    "evidence": "HTTP 200 from /stats with the forged cookie"
+    "evidence": "HTTP 200 from /stats with the forged cookie",
+    "proof": "403 that names a local-only restriction, and a readable object id"
   },
   "reuse_when": [
     "a trust check reads a value the request cannot set, and some other client can",
@@ -88,5 +89,21 @@
     "firing two payload routes at once makes the success unattributable: fire one, wait, then the other"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-csrf",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-tornadoservice-bot-csrf-class-pollution.json",
+    "retrieved_at": "2026-09-06",
+    "evidence_spans": [
+      "first_confirming_probe: fetch a public read endpoint to obtain a valid object id, then confirm the write endpoint answers 403 for a direct request"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

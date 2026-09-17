@@ -47,6 +47,8 @@ def main():
     ap.add_argument("--category")
     ap.add_argument("--target")
     ap.add_argument("--hypothesis")
+    ap.add_argument("--bug-class", dest="bug_class",
+                    help="tag the selected hypothesis with a bug class id")
     ap.add_argument("--probe")
     ap.add_argument("--result")
     ap.add_argument("--next")
@@ -111,9 +113,13 @@ def main():
     if args.hypothesis:
         created = {"id": uuid.uuid4().hex, "name": args.hypothesis,
                    "status": "open", "priority": DEFAULT_PRIORITY, "time": time.time()}
+        if args.bug_class:
+            created["bug_class"] = args.bug_class
         state["hypotheses"].append(created)
         if selected is None:
             selected = created
+    elif args.bug_class and selected is not None:
+        selected["bug_class"] = args.bug_class
     if args.probe:
         state["probes"].append({"request": args.probe, "result": args.result or "unknown", "time": time.time()})
         if selected is not None:

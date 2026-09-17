@@ -74,7 +74,8 @@
   "blast_radius": "a broad filter with content fields overwrites every document in the collection and destroys other players' data; always pin the filter to your own object id",
   "verification": {
     "status": "verified_live",
-    "evidence": "HTTP 200 from the gated flag endpoint"
+    "evidence": "HTTP 200 from the gated flag endpoint",
+    "proof": "the matched documents are returned unchanged, proving the filter is attacker-shaped and the call is read-safe"
   },
   "reuse_when": [
     "an update object is attacker-shaped and strict mode blocks only direct assignment",
@@ -85,5 +86,21 @@
     "test update semantics on your own object with the content fields omitted first"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-prototype-pollution",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-secnotes-mongoose-rename-prototype-pollution-local-gate.json",
+    "retrieved_at": "2026-09-10",
+    "evidence_spans": [
+      "first_confirming_probe: send an update containing only your own note's filter and no content fields, and read the response"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

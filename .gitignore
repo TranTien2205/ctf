@@ -52,6 +52,3 @@ id_rsa*
 # file deliberately with `git add -f` if it must be shared.
 solved/
 knowledge/raw/
-
-# Regenerable sqlite state: working-tree cache, never history
-*.sqlite3

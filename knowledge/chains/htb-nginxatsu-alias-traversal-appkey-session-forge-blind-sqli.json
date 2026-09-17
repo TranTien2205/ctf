@@ -80,7 +80,8 @@
   "blast_radius": "read-only extraction; the forged session affects only the attacker's own requests",
   "verification": {
     "status": "verified_live",
-    "evidence": "extracted value confirmed by a HEX equality probe against the database row"
+    "evidence": "extracted value confirmed by a HEX equality probe against the database row",
+    "proof": "a file outside the static root is returned"
   },
   "reuse_when": [
     "a framework key leaks and the session lives client-side",
@@ -92,5 +93,21 @@
     "a string replace applied after formatting cannot match the placeholder it was meant to replace"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "file-read-primitives",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli.json",
+    "retrieved_at": "2026-09-06",
+    "evidence_spans": [
+      "first_confirming_probe: request the static prefix with a single trailing dot-dot segment and compare the response with the normal static path"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

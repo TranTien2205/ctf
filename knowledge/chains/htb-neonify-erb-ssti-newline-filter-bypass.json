@@ -9,7 +9,12 @@
     "solved_at": "2026-09-12",
     "assistance": "self-solved"
   },
-  "stack": ["ruby", "sinatra", "webrick", "erb"],
+  "stack": [
+    "ruby",
+    "sinatra",
+    "webrick",
+    "erb"
+  ],
   "preconditions": {
     "all_of": [
       "a request parameter is interpolated into a Ruby template without encoding",
@@ -71,7 +76,8 @@
   "blast_radius": "read-only primitive; no shared-state writes observed, only file reads on the challenge instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag returned inside the glow span from the live endpoint"
+    "evidence": "flag returned inside the glow span from the live endpoint",
+    "proof": "the glow output renders 49"
   },
   "reuse_when": [
     "a Ruby/Sinatra template reflects a single request parameter",
@@ -83,5 +89,21 @@
     "encode payload internals with base64 because parentheses, quotes and dots are blocked"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssti",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-neonify-erb-ssti-newline-filter-bypass.json",
+    "retrieved_at": "2026-09-12",
+    "evidence_spans": [
+      "first_confirming_probe: POST / with neon=abc\\n<%= 7*7 %>"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }

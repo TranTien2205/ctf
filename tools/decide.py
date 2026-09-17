@@ -59,11 +59,14 @@ def compute_budget(probes, now=None):
     for probe in probes:
         cls = probe.get("class") or "?"
         when = probe.get("time") or now
-        entry = table.setdefault(cls, {"probes": 0, "first": when})
+        entry = table.setdefault(cls, {"probes": 0, "first": when, "last": when})
         entry["probes"] += 1
         entry["first"] = min(entry["first"], when)
+        entry["last"] = max(entry.get("last", when), when)
     for cls, entry in table.items():
-        minutes = (now - entry["first"]) / 60.0
+        # Wall minutes BETWEEN the first and the last probe of the class — idle
+        # time between a probe and the next decision must not accumulate.
+        minutes = (entry["last"] - entry["first"]) / 60.0
         entry["minutes"] = round(minutes, 1)
         entry["exhausted"] = (entry["probes"] >= PROBE_BUDGET
                               or minutes >= MINUTE_BUDGET)
@@ -248,6 +251,29 @@ def decide(name, taxonomy_path=None, now=None):
             "python3 tools/state.py %s --hypothesis '<class hypothesis>' "
             "--next '<the class first probe>'" % name,
         ]
+        return result
+
+    # Rule 6a: a confirmed hypothesis without a verified flag means the
+    # exploit is proven but the flag is not yet in hand — keep exploiting
+    # toward the flag instead of stopping.
+    confirmed = [h for h in hypotheses
+                 if h.get("status") == "confirmed"]
+    if confirmed and not current.get("flag"):
+        top = sorted(confirmed,
+                     key=lambda h: (-(h.get("priority") or 0),
+                                    h.get("time") or 0))[0]
+        result["action"] = "exploit_confirmed"
+        result["rationale"] = ("%s is confirmed: run the confirmed chain toward "
+                               "the flag, then verify it through "
+                               "hooks.py pre-flag" % (top.get("bug_class")
+                                                      or top.get("name")))
+        result["next_probe"] = {
+            "hypothesis_id": top.get("id"),
+            "class": top.get("bug_class"),
+            "request": current.get("next_action")
+            or "carry the confirmed primitive to the flag path the source "
+               "or pipeline showed, then record the flag",
+        }
         return result
 
     # Rule 7: highest-priority open hypothesis.

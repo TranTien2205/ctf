@@ -80,7 +80,8 @@
   "blast_radius": "overwriting server configuration or an imported module can permanently break the instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag rendered in the page by the overwritten template"
+    "evidence": "flag rendered in the page by the overwritten template",
+    "proof": "a token belonging to one address arrives at the other"
   },
   "reuse_when": [
     "a commit and a dependent read are split across functions",
@@ -94,5 +95,21 @@
     "the bot re-logs in per visit, so stolen cookies expire quickly; verify immediately"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-xss",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce.json",
+    "retrieved_at": "2026-09-07",
+    "evidence_spans": [
+      "first_confirming_probe: send two interleaved profile updates and observe which address receives which token"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
 }
