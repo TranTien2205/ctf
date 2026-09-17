@@ -428,6 +428,25 @@ class ChainReuseTests(unittest.TestCase):
             self.assertIn(card["verification"]["status"],
                           ("verified_live", "writeup-claimed", "unverified"))
 
+    def test_every_chain_card_passes_validate_card(self):
+        """The v3 card schema (classification/source/quality) must hold for
+        every stored card. knowledge/schema.json and tools/validate_card.py
+        drifted apart from the stored cards once; this catches the next
+        drift at the gate instead of during a solve."""
+        try:
+            from tools import validate_card as validator
+        except ImportError:
+            self.skipTest("validate_card unavailable")
+        all_cards = sorted((ROOT / "knowledge/chains").glob("*.json"))
+        self.assertTrue(all_cards, "no chain cards on disk")
+        for path in all_cards:
+            with self.subTest(card=path.name):
+                with open(path, encoding="utf-8") as handle:
+                    errors = validator.validate(json.load(handle))
+                self.assertEqual(errors, [],
+                                 "%s fails the card schema: %s"
+                                 % (path.name, errors[:3]))
+
     def test_chain_cards_carry_no_flags(self):
         for card in chain_match.load_chains():
             blob = json.dumps(card, ensure_ascii=False)

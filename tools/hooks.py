@@ -78,13 +78,30 @@ def hook_pre_probe(args, current, path):
             "duplicate probe request: a new probe must change the mechanism, "
             "not the syntax; --allow-repeat exists only for a legitimate "
             "repeat such as a timing baseline")
+    near = None
+    if not args.allow_repeat:
+        best = 0.0
+        for probe in current["probes"]:
+            past = set(probe.get("request", "").split())
+            curr = set(args.request.split())
+            if past and curr:
+                ratio = len(past & curr) / len(past | curr)
+                if ratio > best:
+                    best = ratio
+        if 0.66 <= best < 1.0:
+            near = ("near-duplicate (%.0f%%): probes this close usually only "
+                    "change syntax, not mechanism — confirm this probe "
+                    "changes the LAYER, not the payload" % (best * 100))
     if WRITE_SHAPED.search(args.request) and not args.write_ack:
         raise Refused(
             "write-shaped probe: read blast_radius on the matching chain card "
             "and test on an object you created, then pass --write-ack")
-    return emit({"ok": True, "hook": "pre-probe",
-                 "note": "prefer a read-only oracle; omit fields that cause a "
-                         "write and read what the endpoint returns"})
+    payload = {"ok": True, "hook": "pre-probe",
+               "note": "prefer a read-only oracle; omit fields that cause a "
+                       "write and read what the endpoint returns"}
+    if near:
+        payload["warning"] = near
+    return emit(payload)
 
 
 def hook_post_probe(args, current, path):
