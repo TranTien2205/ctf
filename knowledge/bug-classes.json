@@ -253,6 +253,8 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
       "observation_signals": [
+        "raw query forward|query passthrough|concatenate upstream",
+        "dup[- .]?key|duplicate [tp]arget|first[- ]value vs last[- ]value",
         "traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
         "x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
         "hop-by-hop",
@@ -261,7 +263,10 @@
       "source_signals": [
         "headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded)",
         "request\\.headers\\[[\\\"']x-",
-        "if not .*header.*:\\s*\\n\\s*.*local"
+        "if not .*header.*:\\s*\\n\\s*.*local",
+        "\\\\$_SERVER\\\\['QUERY_STRING'\\\\]",
+        "upstream\\\\s*\\\\+=\\\\s*\\\\.\\\\s*\\\\$_SERVER",
+        "\\\\.\\\\$_SERVER\\\\['QUERY_STRING'\\\\]"
       ],
       "first_probe": "send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
       "falsifier": "both forms are rejected, so the trust check does not depend on that header",
@@ -274,7 +279,8 @@
       ],
       "category": "web",
       "skill": "skills/web-parser-differential/SKILL.md",
-      "blast_radius": null
+      "blast_radius": null,
+      "signals_updated": "parser-differential: PHP last-value vs Werkzeug first-value on a shared parameter"
     },
     {
       "id": "web-xss",
@@ -526,13 +532,21 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "observation_signals": [
+        "imagemath|make_alpha|render daemon",
+        "spool report|format string|format\\(\\)",
         "registration|signup|checkout|coupon|workflow|approval",
-        "role|is_?admin|privilege|status"
+        "role|is_?admin|privilege|status",
+        "sandbox.{0,20}escape"
       ],
       "source_signals": [
+        "f['\\\"][^\\\\r\\\\n]{0,90}\\\\[-\\\\[\\\\]]{0,30}",
         "(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\)",
         "\\*\\*(?:request|data)\\b",
-        "setattr\\s*\\(\\s*\\w+\\s*,\\s*k"
+        "setattr\\s*\\(\\s*\\w+\\s*,\\s*k",
+        "ImageMath\\.eval\\s*\\(",
+        "\\.format\\s*\\(\\s*\\w+\\s*=\\s*\\w+\\s*\\)",
+        "\\bline\\.format\\s*\\([^)]*=\\w+\\)",
+        "__globals__\\\\b"
       ],
       "first_probe": "one extra field the model has but the form does not send, or one step of the flow skipped",
       "falsifier": "the handler reads an explicit allowlist of fields and ignores everything else",
@@ -545,7 +559,8 @@
       ],
       "category": "web",
       "skill": "skills/web-logic-flaw/SKILL.md",
-      "blast_radius": null
+      "blast_radius": null,
+      "signals_updated": "sandbox-escape + format-string leaves added after Amidst Us / DepotPrint sessions"
     },
     {
       "id": "web-auth-session",
