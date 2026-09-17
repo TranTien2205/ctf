@@ -1,15 +1,55 @@
+# Build and interpreter artifacts
 __pycache__/
 *.pyc
 .venv/
 venv/
+
+# Disposable caches and logs
 cache/
 *.log
 *.sqlite3-journal
+
+# Per-run and per-challenge working state; regenerated, and can hold target data
 **/runs/
 **/state.json
 **/baseline.json
+!test/baseline.json
+build/
+
+# Large vendored binaries: keep them out of history
+tools/ghidra-dist/
+*.zip
+*.tar.gz
+*.iso
+*.vmdk
+
+# Challenge inputs and artifacts. They are large, often redistributable only by
+# the event, and can contain flags. Track one deliberately with
+#   git add -f "challenges/<name>"
+# scripts/repo_init.sh does exactly that for the Weather App regression fixture.
+challenges/
+# Media never belongs in history, even inside a force-added challenge
+*.gif
+*.jpg
+*.jpeg
+*.png
+*.mp4
+*.pcap
+*.raw
+*.dmp
+
+# Secrets: never commit, not even to a private repository
 /tmp/
 .env
 *.token
 *.secret
-tools/ghidra-dist/
+*.pem
+*.key
+id_rsa*
+
+# Solved notes carry real flags; knowledge/raw is bulk third-party writeup
+# material; sqlite state is a regenerable cache. Working-tree context only,
+# never history.
+solved/
+knowledge/raw/
+*.sqlite3

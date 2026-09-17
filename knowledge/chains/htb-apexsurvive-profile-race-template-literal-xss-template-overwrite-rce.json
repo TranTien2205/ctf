@@ -1,0 +1,98 @@
+{
+  "id": "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+  "source_note": "solved/apexsurvive.md",
+  "challenge": {
+    "name": "ApexSurvive",
+    "platform": "HackTheBox",
+    "event": "Cyber Apocalypse 2024",
+    "category": "web",
+    "solved_at": "2026-09-07",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "flask",
+    "jinja2",
+    "uwsgi"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a profile update commits before a second function re-reads the stored value"
+    ],
+    "any_of": [
+      "a stored field is rendered inside a template literal",
+      "an admin file-write accepts a validated file type and a joined path"
+    ]
+  },
+  "signals": [
+    "race condition",
+    "profile",
+    "verification token",
+    "sendEmail",
+    "stored xss",
+    "template literal",
+    "dompurify",
+    "bleach",
+    "admin bot",
+    "uwsgi",
+    "jinja",
+    "arbitrary file write",
+    "pdf",
+    "polyglot"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "race the profile update so an interleaved commit lands between the update and the token re-read, delivering another address's token to a mailbox you can read",
+      "why": "the token is fetched after the profile is committed, in a different function"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "store a note whose value is rendered inside a template literal; a single interpolation expression plus a closing backtick runs before the sanitiser",
+      "why": "the sanitiser operates on the DOM after the literal has already been evaluated"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "have the bot's script create an item whose note field carries the admin cookie, then read that item back as a normal user",
+      "why": "the application itself is the exfiltration channel when outbound access is unavailable"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "use the admin file write with a joined path; the validator requires a parseable PDF, so carry the payload bytes inside the content stream",
+      "why": "a dirty write must still satisfy the validator"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "overwrite an already-cached template with one containing a template-injection expression, then add a new module file that is not imported to force a worker reload and reset the template cache",
+      "why": "the reload resets the cache without bricking the service"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "send two interleaved profile updates and observe which address receives which token",
+    "expected": "a token belonging to one address arrives at the other",
+    "falsifier": "the token is read inside the same transaction as the update"
+  },
+  "blast_radius": "overwriting server configuration or an imported module can permanently break the instance",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag rendered in the page by the overwritten template"
+  },
+  "reuse_when": [
+    "a commit and a dependent read are split across functions",
+    "stored content is interpolated into JavaScript before sanitisation"
+  ],
+  "known_traps": [
+    "a partial configuration overwrite loses the socket and bricks the instance permanently",
+    "a trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker",
+    "the HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime",
+    "base64url decoding in the browser fails without manual padding",
+    "the bot re-logs in per visit, so stolen cookies expire quickly; verify immediately"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

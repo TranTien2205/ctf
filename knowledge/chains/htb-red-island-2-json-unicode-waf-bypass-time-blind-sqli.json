@@ -1,0 +1,87 @@
+{
+  "id": "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli",
+  "source_note": "solved/red-island-2.md",
+  "challenge": {
+    "name": "red-island-2",
+    "platform": "HTB-style",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-07",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "php",
+    "mysql"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a filter inspects the raw request body",
+      "the body is JSON-decoded after that filter runs"
+    ],
+    "any_of": [
+      "the decoded value reaches a query",
+      "responses are identical so only timing can answer"
+    ]
+  },
+  "signals": [
+    "waf",
+    "json_decode",
+    "vsprintf",
+    "blocked words",
+    "sleep",
+    "time-based",
+    "blind sqli",
+    "\\u",
+    "unicode escape",
+    "php"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the source published on the index page: body passes through a filter, then JSON decoding, then a formatted SQL string",
+      "why": "the order of filter and decode is the whole bug"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "escape every character of the payload as a unicode escape so no blocked character or keyword appears in the raw body",
+      "why": "the filter scans bytes before decoding, so escaped text passes and decodes back to the blocked text"
+    },
+    {
+      "step": 3,
+      "stage": "sink",
+      "action": "confirm a timing oracle with a conditional sleep and compare against a measured baseline",
+      "why": "the response body never changes, so timing is the only channel"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "binary-search each character sequentially, ordering any grouped output explicitly",
+      "why": "unordered results across queries corrupt the extraction"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "send one blocked keyword as unicode escapes and compare the response with the same keyword sent literally",
+    "expected": "the escaped form is accepted while the literal form is rejected",
+    "falsifier": "both forms are rejected, so the filter runs after decoding"
+  },
+  "blast_radius": "conditional sleeps hold a worker per matching row; keep the row count and the sleep short on a shared instance",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "extracted value confirmed by a HEX equality probe"
+  },
+  "reuse_when": [
+    "any filter scans a raw body before a decoder normalises it",
+    "a blind oracle is the only available channel"
+  ],
+  "known_traps": [
+    "grouped concatenation needs an explicit ordering or rows arrive in a different order each query",
+    "parallel timing probes contend on the worker pool and corrupt the oracle; extract sequentially",
+    "measure the baseline before choosing a threshold; jitter can cross a threshold set too close",
+    "end of string reads as a space in a numeric binary search; test for a non-zero character code before appending",
+    "compare hex strings as strings, not as a numeric literal, or the comparison silently fails"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

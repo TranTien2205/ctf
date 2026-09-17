@@ -1,0 +1,649 @@
+{
+  "schema_version": 1,
+  "generated_from": "real directory listing of ~/ctf/skills on 2026-09-11",
+  "token_estimate_method": "file bytes / 4; approximate, not measured by a tokenizer",
+  "load_policy": {
+    "order": [
+      "entry",
+      "router",
+      "depth",
+      "reference"
+    ],
+    "max_open_at_once": {
+      "entry": 1,
+      "router": 1,
+      "depth": 1,
+      "reference": 2
+    },
+    "rules": [
+      "Open exactly one entry skill (ctf-playbook) per challenge.",
+      "Open exactly one router for the selected category.",
+      "Do not open a depth skill before the first probe has produced a signal, unless the input format itself is unrecognised.",
+      "Open one depth reference file, not a whole depth directory.",
+      "If the router and the depth skill disagree, the router wins and the disagreement is recorded as an observation.",
+      "Never open a second category's router to 'check'; re-run tools/skill_select.py instead."
+    ]
+  },
+  "layers": {
+    "entry": "Classifies the challenge and manages contest time. Never solves.",
+    "router": "Maps one observed signal to one bug class and one cheapest probe. Short by design.",
+    "depth": "Large technique corpus. Opened only to answer a specific question the router raised.",
+    "reference": "A single file inside a depth or router directory."
+  },
+  "skills": [
+    {
+      "id": "ctf-playbook",
+      "path": "skills/ctf-playbook/SKILL.md",
+      "layer": "entry",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1197,
+      "depth_files": 2,
+      "depth_tokens": 1312,
+      "use_when": [
+        "a new challenge starts and the category is not yet fixed",
+        "several challenges compete for time in a timed contest"
+      ],
+      "do_not_use_when": [
+        "the category is already established by ctf.py or by given source",
+        "a probe is already running and only needs interpretation"
+      ],
+      "routes_to": [
+        "web-triage",
+        "pwn-binary-triage",
+        "rev-triage",
+        "crypto-triage",
+        "forensics-triage",
+        "osint-triage",
+        "ai-iot-triage",
+        "ctf-misc",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "web-triage",
+      "path": "skills/web-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 996,
+      "depth_files": 4,
+      "depth_tokens": 2336,
+      "use_when": [
+        "an HTTP target, a web framework, or web source code is supplied",
+        "a route, request parameter, cookie, or template is under discussion"
+      ],
+      "do_not_use_when": [
+        "the artifact is a binary, capture, or ciphertext with no HTTP surface",
+        "the bug class is already confirmed by a probe: open that depth skill instead"
+      ],
+      "routes_to": [
+        "web-sqli",
+        "web-ssrf",
+        "web-ssti",
+        "web-xss",
+        "web-idor",
+        "web-file-upload",
+        "web-auth-session",
+        "web-deserialization",
+        "file-read-primitives",
+        "ctf-web"
+      ]
+    },
+    {
+      "id": "pwn-binary-triage",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 101,
+      "depth_files": 7,
+      "depth_tokens": 4846,
+      "use_when": [
+        "an ELF/PE binary accepts input and the goal is memory corruption",
+        "a crash, checksec output, or libc version is part of the evidence"
+      ],
+      "do_not_use_when": [
+        "the binary only has to be understood, not corrupted: use rev-triage",
+        "the binary is firmware to be unpacked: use rev-triage firmware reference"
+      ],
+      "routes_to": [
+        "pwn-rop",
+        "ctf-pwn"
+      ]
+    },
+    {
+      "id": "rev-triage",
+      "path": "skills/rev-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "rev"
+      ],
+      "skill_tokens": 670,
+      "depth_files": 5,
+      "depth_tokens": 3863,
+      "use_when": [
+        "a binary, bytecode, managed assembly, packed sample, or firmware image must be understood",
+        "a check function or embedded algorithm has to be replicated"
+      ],
+      "do_not_use_when": [
+        "a memory-corruption primitive is the goal: use pwn-binary-triage",
+        "the sample is live malware with C2 behaviour: use ctf-malware"
+      ],
+      "routes_to": [
+        "ctf-reverse",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "crypto-triage",
+      "path": "skills/crypto-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "crypto"
+      ],
+      "skill_tokens": 423,
+      "depth_files": 6,
+      "depth_tokens": 3808,
+      "use_when": [
+        "ciphertext, a modulus, a nonce, a key, or a hash is supplied",
+        "a custom encryption routine must be broken rather than reversed"
+      ],
+      "do_not_use_when": [
+        "the algorithm only has to be recovered from a binary: use rev-triage first",
+        "the data is an encoding rather than encryption: use ctf-misc"
+      ],
+      "routes_to": [
+        "ctf-crypto"
+      ]
+    },
+    {
+      "id": "forensics-triage",
+      "path": "skills/forensics-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "forensics"
+      ],
+      "skill_tokens": 409,
+      "depth_files": 7,
+      "depth_tokens": 4796,
+      "use_when": [
+        "a PCAP, disk image, memory dump, log set, document, or media file is supplied",
+        "something is believed to be hidden inside a container format"
+      ],
+      "do_not_use_when": [
+        "the capture is only used to read a protocol you already understand",
+        "the sample must be executed or decompiled: use rev-triage"
+      ],
+      "routes_to": [
+        "ctf-forensics",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "osint-triage",
+      "path": "skills/osint-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "osint"
+      ],
+      "skill_tokens": 696,
+      "depth_files": 8,
+      "depth_tokens": 7486,
+      "use_when": [
+        "the challenge supplies a name, handle, photo, domain, or document and the answer lives in public sources"
+      ],
+      "do_not_use_when": [
+        "the challenge has a reachable target to probe: OSINT is not recon for an owned host",
+        "you would query a real person's data outside the challenge's stated scope"
+      ],
+      "routes_to": [
+        "ctf-osint"
+      ]
+    },
+    {
+      "id": "ai-iot-triage",
+      "path": "skills/ai-iot-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "ai"
+      ],
+      "skill_tokens": 628,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "an LLM/chatbot endpoint, a model file, or an embedded/IoT firmware or protocol capture is supplied"
+      ],
+      "do_not_use_when": [
+        "the model file is only a pickle to be weaponised: use web-deserialization",
+        "the firmware is a plain binary to reverse: use rev-triage"
+      ],
+      "routes_to": [
+        "ctf-ai-ml",
+        "web-deserialization",
+        "rev-triage"
+      ]
+    },
+    {
+      "id": "web-sqli",
+      "path": "skills/web-sqli/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 617,
+      "depth_files": 11,
+      "depth_tokens": 5655,
+      "use_when": [
+        "a request value is concatenated into a query, or a probe produced an SQL error, boolean delta, or timing delta"
+      ],
+      "do_not_use_when": [
+        "no query-shaped sink has been observed in source or response"
+      ],
+      "routes_to": [
+        "ctf-web"
+      ],
+      "unlock_signals": "sql|sqli|query|select |insert |where |order by|sqlite|mysql|postgres|mssql|oracle|database error|boolean delta|timing delta|concat|\\$ne\\b|\\$gt\\b|\\$where\\b|\\$rename\\b|mongo|nosql|orderby|order by"
+    },
+    {
+      "id": "web-ssrf",
+      "path": "skills/web-ssrf/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 128,
+      "depth_files": 5,
+      "depth_tokens": 2273,
+      "use_when": [
+        "the server fetches a URL the request controls, or a bot/renderer visits a supplied address"
+      ],
+      "do_not_use_when": [
+        "the fetch target is fixed in source and not influenced by the request"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "ctf-web"
+      ],
+      "unlock_signals": "ssrf|fetch\\(|requests\\.get|urlopen|http\\.get|webhook|pdf|render|screenshot|admin bot|headless|url param|endpoint param|curl_exec"
+    },
+    {
+      "id": "web-ssti",
+      "path": "skills/web-ssti/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 498,
+      "depth_files": 6,
+      "depth_tokens": 2831,
+      "use_when": [
+        "a request value is rendered by a template engine, or an arithmetic marker evaluated"
+      ],
+      "do_not_use_when": [
+        "the marker was reflected literally: that is XSS-shaped, not SSTI"
+      ],
+      "routes_to": [
+        "ctf-web"
+      ],
+      "unlock_signals": "ssti|template|jinja|twig|freemarker|velocity|mako|erb|render_template_string|\\{\\{|\\$\\{|49 evaluated"
+    },
+    {
+      "id": "web-xss",
+      "path": "skills/web-xss/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 586,
+      "depth_files": 6,
+      "depth_tokens": 2665,
+      "use_when": [
+        "a marker reaches an HTML, attribute, JS, or DOM context, and a bot or admin view can fire it"
+      ],
+      "do_not_use_when": [
+        "nothing consumes the injected markup: without a viewer there is no flag path"
+      ],
+      "routes_to": [
+        "ctf-web"
+      ],
+      "unlock_signals": "xss|innerhtml|document\\.write|reflect|dangerouslysetinnerhtml|\\|safe|mark_safe|admin bot|csp|dompurify|bleach"
+    },
+    {
+      "id": "web-idor",
+      "path": "skills/web-idor/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 507,
+      "depth_files": 5,
+      "depth_tokens": 3073,
+      "use_when": [
+        "object identifiers appear in a path, body, or token and ownership may not be enforced"
+      ],
+      "do_not_use_when": [
+        "only one identity is available: an ownership claim needs two"
+      ],
+      "routes_to": [
+        "web-auth-session",
+        "ctf-web"
+      ],
+      "unlock_signals": "idor|object id|ownership|/users/|/orders/|user_id|account_id|sequential id|uuid"
+    },
+    {
+      "id": "web-file-upload",
+      "path": "skills/web-file-upload/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 773,
+      "depth_files": 6,
+      "depth_tokens": 4315,
+      "use_when": [
+        "the app stores a supplied file and something later reads, renders, or executes it"
+      ],
+      "do_not_use_when": [
+        "the stored file is never served or parsed again"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "ctf-web"
+      ],
+      "unlock_signals": "upload|multipart|filename|mime|extension|avatar|import file|attachment|zip|tar"
+    },
+    {
+      "id": "web-auth-session",
+      "path": "skills/web-auth-session/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 1100,
+      "depth_files": 3,
+      "depth_tokens": 2214,
+      "use_when": [
+        "a session token, JWT, signed cookie, reset flow, or role boundary decides access to the flag"
+      ],
+      "do_not_use_when": [
+        "the boundary is per-object rather than per-role: use web-idor"
+      ],
+      "routes_to": [
+        "web-idor",
+        "ctf-web"
+      ],
+      "unlock_signals": "jwt|session|cookie|login|password reset|oauth|saml|mfa|role|signed cookie|app_key|cookie_secret|alg|_peername|remoteaddress|remote_ip|only localhost|access denied|forge|signed value"
+    },
+    {
+      "id": "web-deserialization",
+      "path": "skills/web-deserialization/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web",
+        "ai"
+      ],
+      "skill_tokens": 691,
+      "depth_files": 6,
+      "depth_tokens": 3204,
+      "use_when": [
+        "a serialized blob crosses a trust boundary, or source calls a deserializer on request data or on a supplied model file"
+      ],
+      "do_not_use_when": [
+        "the blob is signed and the key is unknown and unreachable"
+      ],
+      "routes_to": [
+        "ctf-web",
+        "ctf-ai-ml"
+      ],
+      "unlock_signals": "pickle|unserialize|readobject|marshal|yaml\\.load|binaryformatter|viewstate|serialized|rO0AB|O:[0-9]+:|joblib|torch\\.load|__proto__|prototype pollution|class pollution|__globals__|setattr merge"
+    },
+    {
+      "id": "file-read-primitives",
+      "path": "skills/file-read-primitives/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 1446,
+      "depth_files": 3,
+      "depth_tokens": 2363,
+      "use_when": [
+        "an arbitrary or partial file read has been proven and source, config, or the flag path must be located"
+      ],
+      "do_not_use_when": [
+        "the read primitive is still a hypothesis: prove it from the router first"
+      ],
+      "routes_to": [
+        "ctf-web"
+      ],
+      "unlock_signals": "file read|traversal|\\.\\./|lfi|php://filter|include\\(|file_get_contents|readfile|/proc/self|xxe|arbitrary read|source disclosure"
+    },
+    {
+      "id": "pwn-rop",
+      "path": "skills/pwn-rop/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 861,
+      "depth_files": 2,
+      "depth_tokens": 1472,
+      "use_when": [
+        "control of the instruction pointer is proven and NX forces code reuse"
+      ],
+      "do_not_use_when": [
+        "the offset or the crash is not yet established"
+      ],
+      "routes_to": [
+        "ctf-pwn"
+      ],
+      "unlock_signals": "rop|ret2libc|gadget|nx enabled|pop rdi|no pie|leak libc|instruction pointer"
+    },
+    {
+      "id": "ctf-web",
+      "path": "skills/ctf-web/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2557,
+      "depth_files": 20,
+      "depth_tokens": 109784,
+      "use_when": [
+        "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
+      ],
+      "do_not_use_when": [
+        "a narrower web-* depth skill covers the class: open that instead",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "a narrower web-* depth skill did not contain the needed variant"
+    },
+    {
+      "id": "ctf-pwn",
+      "path": "skills/ctf-pwn/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 4660,
+      "depth_files": 18,
+      "depth_tokens": 109578,
+      "use_when": [
+        "the primitive is known and a specific heap, kernel, format-string, or sandbox technique is needed"
+      ],
+      "do_not_use_when": [
+        "the crash has not been reproduced yet",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the crash is reproduced and a named heap/kernel/format technique is needed"
+    },
+    {
+      "id": "ctf-reverse",
+      "path": "skills/ctf-reverse/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev"
+      ],
+      "skill_tokens": 3132,
+      "depth_files": 18,
+      "depth_tokens": 97067,
+      "use_when": [
+        "a specific language runtime, packer, VM obfuscator, or anti-analysis trick has been identified"
+      ],
+      "do_not_use_when": [
+        "static triage has not yet named the runtime or the packer",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the runtime or packer is named and a specific technique is needed"
+    },
+    {
+      "id": "ctf-crypto",
+      "path": "skills/ctf-crypto/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "skill_tokens": 9695,
+      "depth_files": 16,
+      "depth_tokens": 89092,
+      "use_when": [
+        "the primitive and its parameters are collected and a named attack has to be implemented"
+      ],
+      "do_not_use_when": [
+        "parameters such as n, e, c, nonce, or key size are still unknown",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the primitive parameters are collected and a named attack must be implemented"
+    },
+    {
+      "id": "ctf-forensics",
+      "path": "skills/ctf-forensics/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "skill_tokens": 9112,
+      "depth_files": 14,
+      "depth_tokens": 77635,
+      "use_when": [
+        "the artifact type is identified and a container-specific extraction is required"
+      ],
+      "do_not_use_when": [
+        "file/strings/metadata triage has not been run",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the artifact type is identified and a container-specific extraction is required"
+    },
+    {
+      "id": "ctf-misc",
+      "path": "skills/ctf-misc/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "misc"
+      ],
+      "skill_tokens": 5754,
+      "depth_files": 11,
+      "depth_tokens": 44556,
+      "use_when": [
+        "the challenge is a jail, an encoding chain, a game or VM, a DNS puzzle, or a programming constraint"
+      ],
+      "do_not_use_when": [
+        "the challenge fits a named category: misc is the last resort, not the first"
+      ],
+      "routes_to": []
+    },
+    {
+      "id": "ctf-osint",
+      "path": "skills/ctf-osint/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "skill_tokens": 2275,
+      "depth_files": 3,
+      "depth_tokens": 12786,
+      "use_when": [
+        "one unique pivot has been extracted and a specific source has to be worked"
+      ],
+      "do_not_use_when": [
+        "no pivot has been extracted yet"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "one unique pivot is extracted and a specific source must be worked"
+    },
+    {
+      "id": "ctf-ai-ml",
+      "path": "skills/ctf-ai-ml/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "ai"
+      ],
+      "skill_tokens": 1721,
+      "depth_files": 3,
+      "depth_tokens": 16099,
+      "use_when": [
+        "the sink is a model, a prompt pipeline, or a serialised model format and the sub-type is already identified"
+      ],
+      "do_not_use_when": [
+        "the AI/IoT sub-type has not been decided by the router"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the AI/IoT sub-type is decided by the router"
+    },
+    {
+      "id": "ctf-malware",
+      "path": "skills/ctf-malware/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev",
+        "forensics"
+      ],
+      "skill_tokens": 2003,
+      "depth_files": 3,
+      "depth_tokens": 7388,
+      "use_when": [
+        "an obfuscated script, a PE/.NET sample, or captured C2 traffic has to be understood"
+      ],
+      "do_not_use_when": [
+        "the sample is a plain CTF crackme: use rev-triage"
+      ],
+      "routes_to": [],
+      "unlock_signals": ".",
+      "manual_gate": "the sample is obfuscated script, PE/.NET, or captured C2 traffic"
+    },
+    {
+      "id": "ctf-writeup",
+      "path": "skills/ctf-writeup/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1198,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "a flag has been verified and the chain must be written down as a reusable card"
+      ],
+      "do_not_use_when": [
+        "the flag is still a hypothesis"
+      ],
+      "routes_to": []
+    }
+  ]
+}

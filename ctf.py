@@ -24,15 +24,17 @@ SKILLS = {
     "misc": "skills/ctf-misc/SKILL.md", "ai": "skills/ai-iot-triage/SKILL.md",
 }
 SIGNALS = (
-    ("web-ssrf", r"ssrf|server-side fetch|url fetch|fetch|url parameter|pdf generator|pdf fetch|webhook|admin bot"),
+    ("web-ssrf", r"ssrf|server-side fetch|url fetch|fetch|url parameter|pdf generator|pdf fetch|webhook|admin bot|headless|render url"),
     ("web", r"react server action|next\.js|server action|rsc|\$action_id"),
     ("web", r"web challenge|https?|endpoint|login|cookie|xss|sqli|sql injection|ssti|upload|idor|jwt"),
-    ("pwn", r"elf|buffer overflow|format string|rop|heap|shellcode|checksec"),
-    ("crypto", r"rsa|aes|ecc|cipher|encrypted|modulus|ciphertext|lattice|prng|hash"),
-    ("rev", r"rev|reverse engineering|decompil\w*|disassembl\w*|packed|firmware|bytecode"),
-    ("forensics", r"pcap|memory dump|disk image|stego|steganography|forensics|wireshark|event log"),
+    # Stack and datastore names observed in real challenge banners and source.
+    ("web", r"express|mongoose|mongodb|nosql|flask|django|laravel|rails|spring|tornado|fastapi|nest|graphql|php|nginx|apache|csrf|cors|session|prototype pollution|class pollution|deserialization|template injection|request smuggling|cache poisoning"),
+    ("pwn", r"elf|buffer overflow|format string|rop|heap|shellcode|checksec|got|plt|libc|canary|use-after-free|double free"),
+    ("crypto", r"rsa|aes|ecc|cipher|encrypted|modulus|ciphertext|lattice|prng|hash|nonce|oracle padding|padding oracle|diffie|elgamal"),
+    ("rev", r"rev|reverse engineering|decompil\w*|disassembl\w*|packed|firmware|bytecode|ghidra|ida pro|crackme|obfuscated binary"),
+    ("forensics", r"pcap|memory dump|disk image|stego|steganography|forensics|wireshark|event log|volatility|carving|exiftool"),
     ("osint", r"osint|geolocation|reverse image|whois|social media"),
-    ("ai", r"llm|prompt injection|machine learning|model weights|iot|firmware"),
+    ("ai", r"llm|prompt injection|machine learning|model weights|iot|firmware|system prompt|pickle model|mqtt|coap|modbus"),
     ("misc", r"pyjail|bashjail|sandbox|encoding|sdr|radio|game vm|programming"),
 )
 SOURCE_RULES = (
@@ -44,6 +46,9 @@ SOURCE_RULES = (
     (r"file_get_contents|readfile\s*\(|include\s*\(|require\s*\(|\.\./", "web", "file read/traversal"),
     (r"innerHTML|document\.write|mark_safe|\|safe|dangerouslySetInnerHTML", "web", "XSS"),
     (r"__proto__|Object\.assign|\.merge\s*\(", "web", "prototype pollution"),
+    (r"\$rename|\$ne\b|\$gt\b|\$where\b|findOne\s*\(\s*req\.|mongoose\.model", "web", "NoSQL injection"),
+    (r"jwt\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value|cookie_secret|APP_KEY|SECRET_KEY", "web", "auth/session secret"),
+    (r"multer|\.save\s*\(\s*(?:path|filename)|move_uploaded_file|request\.files", "web", "file upload"),
     (r"gets\s*\(|strcpy\s*\(|sprintf\s*\(|printf\s*\([^\"\n]", "pwn", "memory/format string"),
     (r"RSA|Crypto\.PublicKey|modulus|ciphertext|pow\s*\(", "crypto", "RSA/custom crypto"),
     (r"pcap|tshark|wireshark|steghide|exiftool", "forensics", "forensics/stego"),

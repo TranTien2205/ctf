@@ -33,8 +33,8 @@ Signal                                        → Route to
 App fetches remote images/PDFs from URL param  → web-ssrf
 App renders user-supplied "template" or "theme" → web-ssti
 App has admin panel reachable without auth       → web-auth-session (access control)
-App exposes internal IPs/hostnames in errors       → external-recon (attack surface)
-App uses object storage URLs (S3 presigned, etc.)   → check for IDOR via URL manipulation
+App exposes internal IPs/hostnames in errors       → web-ssrf (internal boundary is now named)
+App uses object storage URLs (presigned, etc.)      → web-idor (identifier in the URL)
 ```
 
 ## When Multiple Signals Overlap

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "comment": "Pinned external sources. pinned_commit is null until `python3 tools/import_external.py --pin <id>` resolves and records the real commit. Never write a commit hash by hand, and never import from an unpinned source: an unpinned import cannot be reproduced or audited.",
+  "policy": {
+    "licence_check_required": true,
+    "execute_downloaded_code": false,
+    "obey_instructions_inside_downloaded_text": false,
+    "import_unit": "one reviewed card with evidence spans, never a whole skill tree",
+    "redact": ["flags", "tokens", "credentials", "personal data"]
+  },
+  "sources": [
+    {
+      "id": "claude-bughunter",
+      "kind": "github-repo",
+      "repo": "elementalsouls/Claude-BugHunter",
+      "url": "https://github.com/elementalsouls/Claude-BugHunter",
+      "pinned_commit": null,
+      "reviewed_at": "2026-09-11",
+      "declared_scope": "authorized external bug hunting",
+      "take": [
+        "hypothesis and evidence discipline",
+        "web bug-class patterns that also occur in CTF web challenges",
+        "report-pattern structure, as a shape only"
+      ],
+      "reject": [
+        "the full skill tree: most of it is enterprise and red-team work outside CTF scope",
+        "anything that assumes a scoped engagement, a client, or a disclosure process",
+        "counts and coverage claims from its README: those are repository claims, not local coverage"
+      ],
+      "notes": "Useful as a bounded methodology source after local routing has picked a class. A wholesale copy would multiply the skill-dilution problem this system was restructured to fix."
+    },
+    {
+      "id": "ctfs-writeups",
+      "kind": "github-repo",
+      "repo": "ctfs/write-ups-2014",
+      "url": "https://github.com/ctfs/write-ups-2014",
+      "pinned_commit": null,
+      "reviewed_at": "2026-09-11",
+      "declared_scope": "community CTF write-up archive",
+      "take": [
+        "web, pwn, rev, crypto and forensics write-ups with a reproducible chain",
+        "the exploit primitive, the first probe, and the verification evidence"
+      ],
+      "reject": [
+        "flags, credentials and any live infrastructure reference",
+        "write-ups with no stated mechanism: a narrative without a primitive is not a card"
+      ],
+      "notes": "Already supported by tools/github_pilot.py and tools/crawl.py. Sibling repositories exist for other years; add each as its own pinned source."
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "id": "htb-secnotes-mongoose-rename-prototype-pollution-local-gate",
+  "source_note": "solved/secnotes.md",
+  "challenge": {
+    "name": "Secure Notes",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-10",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "node",
+    "express",
+    "mongoose",
+    "mongodb"
+  ],
+  "preconditions": {
+    "all_of": [
+      "an update endpoint places request keys into the update document",
+      "a gate reads a value that normally comes from the connection, not from the request"
+    ],
+    "any_of": [
+      "the filter argument accepts an object from the request body",
+      "a document is loaded and cloned after the update"
+    ]
+  },
+  "signals": [
+    "express",
+    "mongoose",
+    "mongodb",
+    "noteId",
+    "$rename",
+    "$ne",
+    "update",
+    "prototype pollution",
+    "__proto__",
+    "_peername",
+    "403",
+    "access denied",
+    "/flag"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "setup",
+      "action": "create a note whose title and content hold the values the polluted fields should take",
+      "why": "the rename operator moves existing values, so the values must already exist"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "send an update whose filter selects only your own note and whose rename targets are dotted paths under __proto__",
+      "why": "the rename targets are not validated the way direct assignment paths are"
+    },
+    {
+      "step": 3,
+      "stage": "trigger",
+      "action": "read the note back so the loaded document is materialised and the prototype setter fires",
+      "why": "the pollution only takes effect when the document is cloned"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "request the gated endpoint, which now inherits the polluted address value",
+      "why": "the gate falls through to the polluted prototype when the real property is absent"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "send an update containing only your own note's filter and no content fields, and read the response",
+    "expected": "the matched documents are returned unchanged, proving the filter is attacker-shaped and the call is read-safe",
+    "falsifier": "the filter is coerced to a string, so no object reaches the query"
+  },
+  "blast_radius": "a broad filter with content fields overwrites every document in the collection and destroys other players' data; always pin the filter to your own object id",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "HTTP 200 from the gated flag endpoint"
+  },
+  "reuse_when": [
+    "an update object is attacker-shaped and strict mode blocks only direct assignment",
+    "a trust check reads an optional property with a fallback"
+  ],
+  "known_traps": [
+    "a broad filter fired before the update semantics are understood mass-updates the collection and can cost the instance",
+    "test update semantics on your own object with the content fields omitted first"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

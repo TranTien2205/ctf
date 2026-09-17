@@ -10,6 +10,10 @@ import uuid
 from pathlib import Path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# A new hypothesis starts mid-scale so an explicit raise or a park is visible.
+DEFAULT_PRIORITY = 50
+# A revived branch comes back below a fresh one until new evidence raises it.
+REVIVE_PRIORITY = 40
 
 
 def path_for(name):
@@ -53,6 +57,9 @@ def main():
     ap.add_argument("--priority", type=int, choices=range(0, 101),
                     help="set selected hypothesis priority from 0 to 100")
     ap.add_argument("--deprioritize", help="keep selected hypothesis open at priority 0")
+    ap.add_argument("--revive", help="reopen a parked or closed hypothesis with this reason")
+    ap.add_argument("--show", action="store_true",
+                    help="print the hypothesis ledger by priority and change nothing")
     args = ap.parse_args()
     try:
         path = path_for(args.name)
@@ -83,13 +90,30 @@ def main():
         ap.error("--close/--status requires --hypothesis-id")
     if args.close and args.status:
         ap.error("choose --close or --status")
+    if args.revive and selected is None:
+        ap.error("--revive requires --hypothesis-id")
+    if args.revive and (args.close or args.deprioritize):
+        ap.error("--revive cannot be combined with --close or --deprioritize")
+    if args.show:
+        ledger = sorted(state["hypotheses"], key=lambda h: (-(h.get("priority") or 0), h.get("time", 0)))
+        print(json.dumps({"path": path, "name": state.get("name"),
+                          "next_action": state.get("next_action"),
+                          "hypotheses": [{"id": h["id"], "name": h.get("name"),
+                                          "status": h.get("status"),
+                                          "priority": h.get("priority"),
+                                          "reason": h.get("reason") or h.get("deprioritized_reason")}
+                                         for h in ledger]}, ensure_ascii=False))
+        return
     if args.category:
         state["category"] = args.category
     if args.target:
         state["target"] = args.target
     if args.hypothesis:
-        state["hypotheses"].append({"id": uuid.uuid4().hex, "name": args.hypothesis,
-                                    "status": "open", "priority": 50, "time": time.time()})
+        created = {"id": uuid.uuid4().hex, "name": args.hypothesis,
+                   "status": "open", "priority": DEFAULT_PRIORITY, "time": time.time()}
+        state["hypotheses"].append(created)
+        if selected is None:
+            selected = created
     if args.probe:
         state["probes"].append({"request": args.probe, "result": args.result or "unknown", "time": time.time()})
         if selected is not None:
@@ -100,6 +124,15 @@ def main():
         selected.setdefault("history", []).append({"status": selected.get("status"), "reason": selected.get("reason"), "time": time.time()})
         selected["status"] = "closed" if args.close else args.status
         selected["reason"] = args.close
+    if args.revive:
+        selected.setdefault("history", []).append({"status": selected.get("status"),
+                                                   "reason": selected.get("reason"),
+                                                   "priority": selected.get("priority"),
+                                                   "time": time.time()})
+        selected["status"] = "open"
+        selected["priority"] = REVIVE_PRIORITY if args.priority is None else args.priority
+        selected["revived_reason"] = args.revive
+        selected.pop("deprioritized_reason", None)
     if args.priority is not None or args.deprioritize:
         if selected is None:
             ap.error("--priority/--deprioritize requires --hypothesis-id")

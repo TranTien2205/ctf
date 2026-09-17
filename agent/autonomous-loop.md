@@ -13,11 +13,13 @@ observation -> attack surface -> hypotheses -> cheapest discriminating probe
 
 Rules:
 
-- Keep at most three open hypotheses.
+- Keep at most three hypotheses above priority 0; parked ones do not count.
 - Every hypothesis must cite an observation and have a falsifier.
 - Prefer a probe that distinguishes two hypotheses over a payload that merely
   attempts exploitation.
-- After three probes without new signal, close the hypothesis and switch class.
+- After three probes without new signal, PARK the hypothesis at priority 0 and
+  switch class. Close it only when an observation falsifies it. See
+  ../HYPOTHESIS_PROTOCOL.md.
 - Do not load depth references before the first useful probe unless the input
   format itself is unknown.
 - A timeout is evidence about availability/processing, not proof of a bug.
@@ -31,6 +33,6 @@ FALSIFIER: observation that would close it
 PROBE: one reversible action
 EXPECTED: distinguishing signal
 RESULT: observed response
-UPDATE: confidence up/down/closed
+UPDATE: confidence up/down, or parked at 0 with the reason
 NEXT: one action
 ```

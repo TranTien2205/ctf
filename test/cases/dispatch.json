@@ -1,0 +1,73 @@
+{
+  "comment": "skill_select and chain_match golden cases. expect_router is the single router that must be opened. forbid_open lists skills that must NOT appear in open_now or as the depth candidate for this input. expect_chain is the id chain_match must rank first.",
+  "skill_select": [
+    {
+      "observation": "Express mongoose POST /update noteId extra keys GET /flag 403 access denied",
+      "expect_router": "web-triage",
+      "forbid_open": ["ctf-web", "ctf-pwn", "crypto-triage"],
+      "origin": "solved/secnotes.md"
+    },
+    {
+      "observation": "ELF 64-bit dynamically linked NX enabled checksec buffer overflow",
+      "expect_router": "pwn-binary-triage",
+      "forbid_open": ["web-triage", "ctf-pwn"],
+      "origin": "pwn category"
+    },
+    {
+      "observation": "RSA public key modulus n small exponent e ciphertext c",
+      "expect_router": "crypto-triage",
+      "forbid_open": ["web-triage", "ctf-crypto"],
+      "origin": "crypto category"
+    },
+    {
+      "observation": "pcap capture with http objects and an exiftool artifact",
+      "expect_router": "forensics-triage",
+      "forbid_open": ["web-triage", "ctf-forensics"],
+      "origin": "forensics category"
+    },
+    {
+      "observation": "packed binary UPX ghidra decompile crackme validation routine",
+      "expect_router": "rev-triage",
+      "forbid_open": ["pwn-binary-triage", "ctf-reverse"],
+      "origin": "rev category"
+    },
+    {
+      "source": "challenges/Weather App/web_weather_app/challenge",
+      "expect_router": "web-triage",
+      "forbid_open": ["ctf-web", "pwn-binary-triage"],
+      "origin": "white-box path"
+    }
+  ],
+  "chain_match": [
+    {
+      "observation": "Express app with mongoose, POST /update takes noteId and extra keys, GET /flag returns 403 access denied",
+      "expect_chain": "htb-secnotes-mongoose-rename-prototype-pollution-local-gate",
+      "origin": "solved/secnotes.md"
+    },
+    {
+      "source": "challenges/Weather App/web_weather_app/challenge",
+      "expect_chain": "htb-weather-app-ssrf-crlf-request-smuggling-upsert",
+      "origin": "solved/weather_app.md"
+    },
+    {
+      "observation": "tornado service report bot visits our url, update_tornado answers 403 only localhost, signed cookie",
+      "expect_chain": "htb-tornadoservice-bot-csrf-class-pollution",
+      "origin": "solved/tornadoservice.md"
+    },
+    {
+      "observation": "nginx laravel app, /assets alias, .env leak of APP_KEY, session cookie, orderBy from session",
+      "expect_chain": "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+      "origin": "solved/nginxatsu.md"
+    },
+    {
+      "observation": "php waf blocks keywords on the raw body then json_decode, vsprintf into SQL, no echo channel",
+      "expect_chain": "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli",
+      "origin": "solved/red-island-2.md"
+    },
+    {
+      "observation": "RSA modulus n and exponent e with a short ciphertext",
+      "expect_chain": null,
+      "origin": "must not match any web chain"
+    }
+  ]
+}

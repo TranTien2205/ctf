@@ -1,0 +1,11 @@
+{
+  "metrics": {
+    "skills_registered": 28,
+    "routers": 8,
+    "chain_cards": 8,
+    "routing_cases": 13,
+    "routing_correct": 13,
+    "solved_notes": 8
+  },
+  "note": "Floor for test/regression.py CapabilityTests. Raise it only after run_all.sh passes."
+}

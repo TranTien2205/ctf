@@ -1,0 +1,92 @@
+{
+  "id": "htb-tornadoservice-bot-csrf-class-pollution",
+  "source_note": "solved/tornadoservice.md",
+  "challenge": {
+    "name": "TornadoService",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-06",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "tornado 6.4.1"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a write endpoint refuses non-local requests",
+      "a bot or renderer visits an attacker-supplied address"
+    ],
+    "any_of": [
+      "python framework holds a module-level app object",
+      "the update handler merges request JSON into an object"
+    ]
+  },
+  "signals": [
+    "tornado",
+    "only localhost",
+    "remote_ip",
+    "report",
+    "bot",
+    "cookie_secret",
+    "__class__",
+    "__init__",
+    "__globals__",
+    "signed cookie",
+    "class pollution",
+    "csrf"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "enumerate /get_tornados, /update_tornado, /report_tornado?ip=, /login, /stats",
+      "why": "the write endpoint answers 403 'Only localhost' and the report endpoint drives a headless browser"
+    },
+    {
+      "step": 2,
+      "stage": "falsified",
+      "action": "header IP spoofing via XFF, X-Real-IP, Forwarded, Host",
+      "why": "remote_ip is the socket peer, so header spoofing does not pass the local check"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "host a page on a tunnel and submit it to the bot; the page posts a text/plain CSRF form to http://127.0.0.1:1337/update_tornado",
+      "why": "the bot is the only client whose socket peer is local"
+    },
+    {
+      "step": 4,
+      "stage": "pivot",
+      "action": "body carries Python class pollution: machine_id plus __class__.__init__.__globals__.APP.settings.cookie_secret",
+      "why": "a recursive setattr merge reaches the module-level APP object"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "forge a Tornado v2 signed cookie with the new secret and request /stats",
+      "why": "the flag is behind the signed-cookie identity check"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "fetch a public read endpoint to obtain a valid object id, then confirm the write endpoint answers 403 for a direct request",
+    "expected": "403 that names a local-only restriction, and a readable object id",
+    "falsifier": "the write endpoint accepts a direct request, so no bot relay is needed"
+  },
+  "blast_radius": "the pollution changes a global application setting; other players on a shared instance lose their sessions",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "HTTP 200 from /stats with the forged cookie"
+  },
+  "reuse_when": [
+    "a trust check reads a value the request cannot set, and some other client can",
+    "a Python merge routine accepts attacker-shaped keys"
+  ],
+  "known_traps": [
+    "ngrok inserts an interstitial that headless bots cannot pass; a plain SSH reverse tunnel does not",
+    "firing two payload routes at once makes the success unattributable: fire one, wait, then the other"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

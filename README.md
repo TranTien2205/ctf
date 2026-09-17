@@ -1,89 +1,102 @@
 # CTF Toolkit
 
-This is an independent toolkit for CTF jeopardy and attack-defense challenges.
-It does not import or read the red-team machine toolkit under
+An independent toolkit for CTF jeopardy and attack-defense challenges, white-box
+and black-box. It does not read or import the red-team machine toolkit under
 `~/security-toolkit`.
 
-## Fast entry point
+## Start a session
 
 ```bash
-python3 ~/ctf/ctf.py ./challenge-src       # whitebox
-python3 ~/ctf/ctf.py "JWT login admin bot"  # blackbox
-python3 ~/ctf/ctf.py --web "Challenge Event" # public writeups
+# 1. classify
+python3 ~/ctf/ctf.py --json ./challenge-src        # white-box: source scan
+python3 ~/ctf/ctf.py --json "JWT login admin bot"  # black-box: observation route
+
+# 2. dispatch: one router, at most one depth skill
+python3 ~/ctf/tools/skill_select.py --source ./challenge-src
+python3 ~/ctf/tools/skill_select.py "JWT login admin bot"
+
+# 3. reuse a chain already solved here
+python3 ~/ctf/tools/chain_match.py --source ./challenge-src
+python3 ~/ctf/tools/chain_match.py "Express mongoose /update flag 403"
+
+# 4. open the ledger
+python3 ~/ctf/tools/state.py <id> --category web --target http://host:port
 ```
 
-For a new session, load [PROMPT.md](PROMPT.md) and use
-[SKILL_GUIDE.md](SKILL_GUIDE.md). Run the offline update gate from
-`test/README.md` before accepting changes.
+Load `PROMPT.md` at the start of every new session. It is the session contract:
+context, role, goal, instructions, constraints, output format, examples.
 
-The observation router returns one primary category and a local skill path
-(a thin router where available). Source scanning returns heuristic findings,
-not a category verdict or proof of exploitability. Do not open all
-skills: open the selected router, run its cheapest probe, and only then load a
-depth reference.
+## Read these in this order
+
+| File | What it settles |
+|---|---|
+| `PROMPT.md` | the session contract and the output format |
+| `CLAUDE.md` | the always-loaded operating rules |
+| `skills/INDEX.md` | which skill to open, and when to stop opening |
+| `HYPOTHESIS_PROTOCOL.md` | changing direction without losing a branch |
+| `EVIDENCE_POLICY.md` | what may be claimed, and what may not |
+| `test/README.md` | the gate every change passes before it is accepted |
+| `VERSIONING.md` | saving and restoring a working version |
+| `EXTERNAL_SOURCES.md` | importing outside material without importing noise |
 
 ## Layout
 
-- `ctf.py`: independent fast router
-- `skills/`: CTF-only skill library
-- `challenges/`: local challenge inputs and artifacts
-- `solved/`: verified solutions and notes
-- `cache/`: disposable web/search cache
-- `tools/`: CTF helper tools only
-- `test/`: offline regression checks for routing, source contracts, state, and skill paths
-
-Flags are hypotheses until verified from the challenge target or supplied
-artifact. This toolkit is for authorized CTF/lab use.
-
-## Foundation Tools
-
-- `tools/plan.py`: offline `first-probe-plan` suggestions, ranked by keyword evidence, at most three. Uses canonical first-probe registry keys where available; fallback probes remain generic.
-- `tools/query_index.py`: literal-token FTS search, not a raw FTS expression interface. Missing/broken indexes report errors without creating a database; router retrieval degrades to an empty list.
-- `tools/state.py`: safe challenge IDs, atomic state replacement, explicit hypothesis selection. Existing fields are retained and legacy hypotheses acquire IDs on a successful update. Invalid JSON/structure is never reset automatically. This is a single-writer tool; simultaneous updates can lose changes.
-- `tools/validate_card.py`: requires `jsonschema` (tested with 4.19.2), validates the local Draft 2020-12 schema with URI formats and evidence/secret checks. Missing dependency fails closed. Validation does not verify source truth or strengthen constraints absent from the schema.
-- `tools/promote_card.py`: requires critic acceptance and validation; destinations must resolve inside this toolkit. Publishes atomically without overwriting existing names. Critic acceptance is supplied input, not independent proof.
-- `tools/web_probe.py`: retains HTTP error status, headers, final URL, and the same bounded body-derived observations as successful responses. It does not retain raw response bodies; transport failures remain errors.
-
-State example (use the hypothesis ID returned by the first command):
-
-```bash
-python3 tools/state.py example --hypothesis "input reaches template"
-python3 tools/state.py example --hypothesis-id <id> --probe "baseline" --result "no difference"
-python3 tools/state.py example --hypothesis-id <id> --close "falsified"
+```
+ctf.py                 fast router: source scan, observation route, writeup search
+skills/                INDEX.md + registry.json + one directory per skill
+knowledge/chains/      chains verified here, matchable, flags redacted
+knowledge/cards/       reviewed writeup cards and the FTS index
+tools/                 dispatcher, chain matcher, ledger, probe and import tools
+test/                  the update gate
+scripts/               repository setup and version saving
+challenges/            challenge inputs and artifacts (git-ignored)
+solved/                the full prose notes each chain card was derived from
+cache/                 disposable web and search cache
 ```
 
-IDs are 1-100 ASCII characters, starting alphanumeric, followed by letters,
-digits, dots, underscores or hyphens; uppercase folds to lowercase as before.
-Names are no longer silently sanitized or truncated. For previously sanitized
-names, use the existing directory ID explicitly. No existing state is migrated
-until explicitly updated.
+## The three rules
 
-## Command Logging
+1. **One router, one depth skill.** The depth corpus is roughly 622,000 tokens
+   across 190 files. Opening it early both burns the context window and anchors
+   the next hypothesis. `tools/skill_select.py` enforces the order.
+2. **Park, do not delete.** A direction that looks wrong is usually unfinished.
+   `--deprioritize` keeps it open at priority 0; `--revive` brings it back when
+   new evidence arrives. `HYPOTHESIS_PROTOCOL.md` has the scale.
+3. **Nothing is invented.** No endpoint, function, field, credential, payload,
+   path, CVE or number that was not observed. Unknown stays unknown. A timeout is
+   not a success. A flag is a hypothesis until it is read from a live response or
+   a supplied artifact.
 
-```bash
-python3 tools/run.py --timeout 5 --cwd /home/kali/ctf example -- python3 -c 'print("baseline")'
-```
-
-Options go before the challenge ID. This records explicit argv, cwd, timestamps,
-exit code, timeout status, and binary stdout/stderr artifacts under
-`challenges/<id>/runs/<run-id>/`. A timeout kills the launched process group.
-Execution uses no shell interpolation. It is not a sandbox: commands can access
-files/network or spawn detached processes. Output files have no size quota,
-and external interruption can leave a `running` record. It does not select
-commands, automatically link hypotheses, discover extra artifacts, or verify flags.
-Only run commands you have inspected and authorized.
-
-## Offline Checks
+## Before accepting any change
 
 ```bash
-python3 -m unittest discover -s tests -v
-python3 selfcheck.py
-python3 tools/evaluate.py
+bash ~/ctf/test/run_all.sh
+bash ~/ctf/scripts/save_version.sh "what changed"
 ```
 
-Tests use temporary fixtures inside this toolkit and mocked HTTP responses.
-Only controlled Python snippets are executed, never challenge artifacts.
-The golden evaluator is a small routing smoke test, not a solving benchmark.
-There is no autonomous solving agent or automatic flag submission here. The
-operator must execute probes and verify the flag from a real response or
-artifact.
+The gate checks that the registry, the index and `ctf.py` still agree; that
+`PROMPT.md` keeps its seven sections and the no-invention rule; that the control
+plane stays English; that documentation never names a tool that does not exist;
+that routing and dispatch still produce the expected answers for shapes this
+toolkit has already met; that every chain card still matches the evidence that
+produced it and carries no flag; that a parked hypothesis survives a redirect;
+and that no count regressed below `test/baseline.json`.
+
+## Honest limits
+
+- Routing is heuristic. Keyword scores are not proof of exploitability, and a
+  generic term can still outrank a specific one.
+- A chain match is a candidate, never proof. Preconditions are plain language and
+  no tool checks them for you.
+- Source scanning finds candidate sinks; it cannot prove a sink is reachable.
+- `tools/run.py` logs commands with timeouts. It is not a sandbox: a command can
+  reach the filesystem and the network.
+- There is no autonomous solver and no automatic flag submission. The operator
+  runs the probes and verifies the flag.
+- `tests/test_foundation.py` needs `jsonschema` and `tornado`; without them the
+  gate reports SKIPPED rather than failing, so a missing package is never
+  mistaken for a broken system.
+- Writeup search depends on network access and on search-engine quality.
+
+Authorized CTF and lab use only. If an event forbids AI assistance, this system
+is for practice beforehand, not for use during the event.

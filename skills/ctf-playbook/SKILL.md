@@ -1,76 +1,96 @@
 ---
 name: ctf-playbook
 description: >
-  Top-level jeopardy router. Use at the START of any CTF challenge to classify
-  it and route to the category skill, and to manage time across a timed contest.
-  Reference card — routes, does not solve.
+  Entry skill for any CTF challenge. Classifies the challenge, routes to exactly
+  one category router, and manages time across a timed contest. Routes; never
+  solves.
 tags: [ctf, general, triage, strategy, playbook]
 environment: [ctf, lab]
 ---
 
-# CTF Jeopardy — Playbook (router tổng)
+# CTF Jeopardy — Entry Playbook
 
-## Step 0 — mỗi challenge
-1. Phân loại → route sang skill category (bảng dưới). Playbook này KHÔNG tự giải.
-2. Ghi state: flag ở đâu, dữ kiện, giả thuyết, next action (dùng `state()` nếu có MCP server).
-3. Ước lượng độ khó → time-box.
-4. **Writeup-FIRST khi blackbox thuộc platform đã biết** (HTB/HTB-Uni/TFC/VulnHub…):
-   sau fingerprint (title, meta author, banner, route shape), chạy
-   `python3 tools/writeup_search.py "<fingerprint>" --fresh` và websearch trước khi
-   fuzz mù. Bài HTB ~luôn có writeup; bằng chứng 2/2 bài thắng 2026-09 đều đến từ
-   writeup (nginxatsu, TornadoService), còn fuzz mù trước đó chỉ đốt thời gian.
-   Ghi rõ vào solved card: tự giải hay tái hiện writeup.
+This skill classifies and time-boxes. It does not solve. The routing table it
+defers to is `../INDEX.md` and `../registry.json`.
 
-## Signal → skill
+## Step 0 — every challenge
 
-Hai tầng. **Mở router mỏng trước** — nó thường đã đủ. Chỉ mở depth khi router không đưa
-được kỹ thuật khớp: depth dài 150–500 dòng, tốn nhiều ngàn token và dễ đóng hộp tư duy
-trên bài mới.
+```bash
+python3 ~/ctf/ctf.py --json "<observation>"            # or a source path
+python3 ~/ctf/tools/skill_select.py "<observation>"    # or --source <path>
+python3 ~/ctf/tools/chain_match.py "<observation>"     # or --source <path>
+python3 ~/ctf/tools/state.py <id> --category <cat> --target <target>
+```
 
-| Thấy | 1. Router mỏng | 2. Depth (chỉ khi thiếu) |
+1. Classify, then open exactly one router. Never open two to compare.
+2. Record where the flag lives, what is given, the first hypothesis and the next
+   action in the ledger.
+3. Estimate difficulty and set a time-box before the first probe.
+4. Check chain reuse before opening any depth skill. A verified local chain with
+   matching preconditions is the cheapest path there is.
+5. Search public writeups once the challenge name and event are known, or when
+   local evidence stops producing new hypotheses. On a known platform this is
+   usually faster than blind enumeration. Record in the solved note whether the
+   chain was self-derived or reproduced from a writeup.
+
+## Signal to router
+
+Open the thin router first; it is usually enough. A depth skill is 2,000–10,000
+tokens for its index alone and its directory can exceed 100,000 — opening one
+early both burns context and anchors the next hypothesis.
+
+| Observed | Router | Depth, only after a signal |
 |---|---|---|
-| HTTP/source web, endpoint, login | `web-triage/` | `ctf-web`, `web-sqli`/`ssti`/`ssrf`/`xss`/`idor`/`file-upload`/`deserialization`/`auth-session` |
-| ELF/binary + input, checksec | `pwn-binary-triage/` | `ctf-pwn`, `pwn-rop` |
-| Binary cần đảo ngược logic / packed | `rev-triage/` | `ctf-reverse` |
-| Dữ liệu mã hoá, RSA/AES/hash/cipher | `crypto-triage/` | `ctf-crypto` |
-| PCAP / memory / disk / stego / log | `forensics-triage/` | `ctf-forensics` |
-| AI chatbot/model · IoT firmware/protocol | `ai-iot-triage/` | `ctf-ai-ml` |
-| OSINT / người / ảnh / tên miền | `osint-triage/` | `ctf-osint` |
-| Jail, encoding, SDR, game VM, lập trình | — | `ctf-misc` |
-| Script/PE bị obfuscate, C2 traffic | — | `ctf-malware` |
+| HTTP target or web source, endpoint, login | `../web-triage/` | one `web-*`, else `../ctf-web/` |
+| Binary plus input, crash, checksec | `../pwn-binary-triage/` | `../pwn-rop/`, `../ctf-pwn/` |
+| Binary whose logic must be understood, packed, firmware | `../rev-triage/` | `../ctf-reverse/` |
+| Ciphertext, RSA, AES, hash, nonce | `../crypto-triage/` | `../ctf-crypto/` |
+| PCAP, memory, disk, stego, logs | `../forensics-triage/` | `../ctf-forensics/` |
+| LLM or chatbot, model file, IoT firmware or protocol | `../ai-iot-triage/` | `../ctf-ai-ml/` |
+| Person, photo, domain, handle in public sources | `../osint-triage/` | `../ctf-osint/` |
+| Jail, encoding chain, game or VM, programming task | `../ctf-misc/` | one misc reference |
+| Obfuscated script, PE or .NET sample, C2 traffic | `../rev-triage/` | `../ctf-malware/` |
 
-Không chắc → **đừng đoán, đừng mở nhiều cái**: `python3 solver/recognize.py "<quan sát>"`,
-mục SKILL chỉ đúng một cái. Mục PATTERN có thể cho luôn solver deterministic ra đáp án thật.
+Unsure? Do not guess and do not open several. Re-run
+`python3 ~/ctf/tools/skill_select.py` with one more observation.
 
-## Time management (Sơ khảo 8h tính giờ, đội 4 người)
-- 30% đầu: quét hết bài DỄ, ăn điểm nhanh trước.
-- 50% giữa: bài trung bình + bài khó đã có ý tưởng.
-- 20% cuối: verify flag, KHÔNG mở hướng mới.
-- Time-box: easy 15-30' · medium 30-60' · hard 60-120'.
-- **Stuck >15': re-read đề → có hint bỏ sót? → đổi HẲN hướng → skip, quay lại sau.** Đừng cắm 1 bài.
-- Chia category theo thế mạnh; không chụm cùng 1 bài trừ khi bế tắc.
+## Time management in a timed contest
+
+- First 30 percent: sweep every easy challenge and bank the points.
+- Middle 50 percent: medium challenges, plus hard ones where an idea already
+  exists.
+- Last 20 percent: verify and submit. Do not open a new direction.
+- Time-box: easy 15–30 min, medium 30–60 min, hard 60–120 min.
+- Stuck past 15 minutes: re-read the brief for a missed hint, change mechanism
+  layer, then park and return. Do not sit on one challenge.
+- Split categories by strength. Do not put two people on one challenge unless
+  both are otherwise blocked.
 
 ## Flag format
-`CTF{} FLAG{} flag{} HTB{} <brand>{}` — xác nhận format của đề trước khi nộp. `references/flag-formats.md`.
 
-## One-liner hay dùng
-- base64 `echo X|base64 -d` · hex `echo X|xxd -r -p` · rot13 `tr 'A-Za-z' 'N-ZA-Mn-za-m'`
-- url-decode `python3 -c "import urllib.parse;print(urllib.parse.unquote('X'))"`
-- cyclic `python3 -c "from pwn import *;print(cyclic(200))"` · offset `cyclic_find(b'aaXX')`
-- Thêm: `references/common-tools.md`.
+`CTF{} FLAG{} flag{} HTB{} <brand>{}` — confirm the format the brief states
+before submitting. More in `references/flag-formats.md`.
 
-## Escalation ladder (khi bế tắc — ĐỌC KỸ)
-Gom probe theo **lớp cơ chế**, không theo biến thể. Ngân sách/lớp: **≤5 probe hoặc ≤15'**.
-Hết ngân sách mà không có tín hiệu mới → **leo thang, không thử biến thể tiếp**:
-1. Re-read đề+artifact (bỏ sót hint/field? regex unanchored? `contains` vs `eq`?).
-2. Đổi TẦNG cơ chế: parser → state machine → auth/session → response-side → framing → logic.
-3. Reverse HÀM quyết định (đừng để lại đúng đoạn khả nghi nhất "chưa đọc").
-4. Kéo tri thức ngoài: bài live hay cũ? dùng writeup được không? → `tools/writeup_search.py`.
-5. Skip, quay lại sau. Chi tiết đầy đủ: `../LOOP_DISCIPLINE.md`.
+## Frequently used one-liners
+
+```bash
+echo X | base64 -d                                    # base64
+echo X | xxd -r -p                                    # hex
+tr 'A-Za-z' 'N-ZA-Mn-za-m'                            # rot13
+python3 -c "import urllib.parse;print(urllib.parse.unquote('X'))"
+python3 -c "from pwn import *;print(cyclic(200))"     # pattern
+python3 -c "from pwn import *;print(cyclic_find(b'aaXX'))"
+```
+
+More in `references/common-tools.md`.
 
 ## Discipline
-- Route đúng category rồi để skill đó dẫn — không tự giải ở đây.
-- Một giả thuyết → **test quyết định** (giết/xác nhận cả lớp) → "tín hiệu mới?" → không thì leo thang.
-- Dấu hiệu quẫy (STOP): "wait wait", >2 giả thuyết mới/lượt không test, lặp ý đã bác bỏ.
-- Ghi ledger qua `tools/state.py` (`--probe/--result/--close`) — ledger DẪN quyết định.
-- LUẬT GIẢI: nếu BTC cấm AI, hệ thống chỉ để LUYỆN trước, KHÔNG dùng trong lúc thi.
+
+- Route to the right category, then let that router lead. Do not solve here.
+- One hypothesis, one decisive test, then ask whether a new signal appeared. If
+  not, escalate — see `../LOOP_DISCIPLINE.md`.
+- Park a class at priority 0 rather than closing it; see
+  `../../HYPOTHESIS_PROTOCOL.md`.
+- Keep the ledger current with `../../tools/state.py`.
+- Contest rules first: if AI assistance is forbidden, this system is for practice
+  beforehand, not for use during the event.

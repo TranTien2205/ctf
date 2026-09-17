@@ -1,0 +1,95 @@
+{
+  "id": "htb-weather-app-ssrf-crlf-request-smuggling-upsert",
+  "source_note": "solved/weather_app.md",
+  "challenge": {
+    "name": "Weather App",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-11",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "node",
+    "express",
+    "sqlite"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a request field is interpolated into a URL the server fetches",
+      "a privileged route is restricted to the loopback address"
+    ],
+    "any_of": [
+      "the interpolated field is not encoded",
+      "a registration query concatenates values into SQL"
+    ]
+  },
+  "signals": [
+    "express",
+    "ssrf",
+    "endpoint",
+    "http.get",
+    "template literal url",
+    "127.0.0.1",
+    "remoteAddress",
+    "register",
+    "crlf",
+    "request smuggling",
+    "INSERT INTO",
+    "ON CONFLICT",
+    "upsert",
+    "sqlite"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the routes: registration is loopback-only, the weather route interpolates a request field into a fetched URL, and the login route returns the flag file for one username",
+      "why": "the flag path is a privileged account, not a file read"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "place unicode characters that the URL parser folds into space, carriage return and line feed inside the interpolated field",
+      "why": "the field is not encoded, so the request line can be terminated and a second request appended"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "append a full registration request to the loopback origin with an exact content length, then a trailing request fragment so the second request is closed",
+      "why": "the backend calls itself, so the loopback restriction is satisfied"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "carry an upsert payload in the registration password so the existing privileged row's password is replaced instead of inserting a duplicate",
+      "why": "the registration query concatenates values, and the username is unique"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "log in as the privileged account with the password just set",
+      "why": "that route returns the flag file"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "put a harmless marker with one folded space character into the interpolated field and compare the error with an ordinary hostname",
+    "expected": "the parser accepts the folded character, showing the field is not encoded",
+    "falsifier": "the field is encoded or validated, so no control characters survive"
+  },
+  "blast_radius": "the upsert changes an existing account's password on a shared instance; other players lose access to that account",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag returned in the login response"
+  },
+  "reuse_when": [
+    "a loopback-only route exists and the backend can be made to call itself",
+    "a fetched URL is built by interpolation without encoding"
+  ],
+  "known_traps": [
+    "the injected content length must count the body bytes exactly",
+    "a trailing request fragment is needed so the smuggled request is terminated"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

@@ -383,5 +383,5 @@ aws s3api get-bucket-acl --bucket target-backup --no-sign-request
 ## Cross-Reference
 
 - OSINT workflow: `../SKILL.md`
-- Secret scanning: `../credential-hygiene/references/secret-scanning.md`
+- Secret handling: `../../../EVIDENCE_POLICY.md`
 - Technology fingerprinting: `email-pattern-detection.md`
