@@ -1,0 +1,96 @@
+{
+  "id": "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+  "source_note": "solved/nginxatsu.md",
+  "challenge": {
+    "name": "nginxatsu",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-06",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "nginx",
+    "php 7.4",
+    "laravel",
+    "mysql"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a static path is served through an nginx alias",
+      "the session driver stores state in an encrypted cookie"
+    ],
+    "any_of": [
+      "a controller passes a session value into orderBy or another query fragment",
+      "the response status differs between a true and a false condition"
+    ]
+  },
+  "signals": [
+    "nginx",
+    "laravel",
+    "alias",
+    "traversal",
+    "assets",
+    ".env",
+    "APP_KEY",
+    "session cookie",
+    "orderBy",
+    "direction",
+    "blind sqli",
+    "500",
+    "php"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "fingerprint nginx, PHP 7.4 and Laravel error pages",
+      "why": "the app generates nginx configs, so an alias misconfiguration is plausible"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "read source through the alias traversal path /assets../.env and /assets../app/Http/Controllers/API/ConfigController.php",
+      "why": "an alias without a trailing slash lets the prefix be escaped"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "use the leaked APP_KEY to forge the AES-CBC session cookie; the payload is a JSON envelope containing a PHP-serialized session",
+      "why": "SESSION_DRIVER=cookie means the whole session is attacker-controlled once the key is known"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "set the session order key to a query fragment and read the boolean oracle on GET /api/configs",
+      "why": "orderBy takes the session value, and a true condition returns 200 while a false one returns 500"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "binary-search the flag column ASCII value by value, then verify with a HEX comparison",
+      "why": "there is no echo channel, only the status-code oracle"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "request the static prefix with a single trailing dot-dot segment and compare the response with the normal static path",
+    "expected": "a file outside the static root is returned",
+    "falsifier": "the traversal path 404s or is normalised away"
+  },
+  "blast_radius": "read-only extraction; the forged session affects only the attacker's own requests",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "extracted value confirmed by a HEX equality probe against the database row"
+  },
+  "reuse_when": [
+    "a framework key leaks and the session lives client-side",
+    "a query fragment such as a sort column comes from session state"
+  ],
+  "known_traps": [
+    "MySQL case-insensitive collations make 't' equal 'T'; case-exact extraction needs a binary comparison",
+    "a linear charset scan is far too slow; binary search costs about seven probes per character",
+    "a string replace applied after formatting cannot match the placeholder it was meant to replace"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

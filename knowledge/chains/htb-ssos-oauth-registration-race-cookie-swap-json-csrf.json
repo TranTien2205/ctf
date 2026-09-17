@@ -1,0 +1,103 @@
+{
+  "id": "htb-ssos-oauth-registration-race-cookie-swap-json-csrf",
+  "source_note": "solved/ssos.md",
+  "challenge": {
+    "name": "SSOS",
+    "platform": "HackTheBox",
+    "event": "HackTheBox",
+    "category": "web",
+    "solved_at": "2026-09-15",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "nodejs",
+    "express",
+    "ejs",
+    "passport-oauth2",
+    "go",
+    "gin",
+    "gorm",
+    "nginx",
+    "puppeteer"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a SSO login function ignores its credential arguments and authorizes using whatever token cookie is in the shared browser jar",
+      "a JSON-binding API parses the raw request body as JSON regardless of Content-Type",
+      "an SSO token cookie is HttpOnly with no SameSite attribute",
+      "a registration endpoint allows the attacker to pre-register a fixed account the bot later tries to register"
+    ],
+    "any_of": [
+      "a bot that visits user-supplied URLs while holding the shared cookie jar",
+      "a flag that is submitted once into a student assignment at bot startup"
+    ]
+  },
+  "signals": [
+    "oauth2",
+    "sso",
+    "single sign on",
+    "jsessionid",
+    "connect.sid",
+    "registration race",
+    "cookie swap",
+    "text/plain json csrf",
+    "shouldbindjson",
+    "puppeteer",
+    "bot",
+    "submit-url",
+    "samesite missing",
+    "loginSSO",
+    "shared cookie jar"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "win a registration race on a fixed account (e.g. student@domain) by hammering POST /api/register with your own password before the bot's startup sequence reaches its own registerUser for the same account",
+      "why": "owning the account makes the bot's own student login fail, so its shared token cookie stays on the account you control"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "spray the bot's visit-url endpoint (here POST /submit-url) with a data:text/html URL whose form performs a text/plain cross-site JSON login to the SSO login API for your owned account",
+      "why": "Gin's ShouldBindJSON parses the raw body as JSON regardless of Content-Type, so a text/plain form whose input name is the JSON prefix and value is the closing brace submits a valid JSON login and overwrites the shared SSO token cookie via Set-Cookie (no SameSite)"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "let the bot's loginSSO step, which ignores its credentials and authorizes using the current shared token cookie, turn the client session into your owned account",
+      "why": "the parameter-confusion bug means the token cookie swap is enough to hijack the OAuth flow"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "when the bot submits the flag into the first assignment at startup, it now writes into your owned account; log in as that account and read GET /submission/:id as the author",
+      "why": "submission reads are gated on author email or teacher role, and you are now the author"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "hammer POST /api/register for the fixed bot account with your own password and confirm it returns 200 before the bot reaches its registerUser step",
+    "expected": "the registration succeeds and your credentials work at /api/login",
+    "falsifier": "the account is already registered with an unknown random password (instance already consumed)"
+  },
+  "blast_radius": "a fresh instance is required; an already-running instance is permanently consumed because the flag is submitted once at startup into an account with an unknown random password",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag string read from /submission/:id as the owning author on a fresh instance"
+  },
+  "reuse_when": [
+    "an OAuth SSO provider has a token cookie with no SameSite and a JSON binder that ignores Content-Type",
+    "a bot shares one cookie jar across pages and has a loginSSO bug that uses the current cookie",
+    "the flag is written once at startup into a fixed account that can be race-registered"
+  ],
+  "known_traps": [
+    "the registration race alone is dead: if you pre-register the student but never swap the cookie, the bot authorizes as teacher and the flag is written to an unreadable teacher account",
+    "the CSRF must use enctype=text/plain with the JSON-name trick, not url-encoded form data, because the binder requires a raw JSON body",
+    "the internal nginx port the bot resolves to (1337) differs from the external mapped port; the data URL must target the internal host:port",
+    "redirect_uri validation is strict on hostname; Host header must include the external port for the port check to pass",
+    "the authorize code exchange still requires the client_secret, so you cannot exchange a stolen code yourself; the swap works because the bot does the exchange",
+    "an instance that already ran its startup is consumed: student has a random password and the flag is unreachable"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

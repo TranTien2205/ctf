@@ -1,44 +1,87 @@
 ---
 name: rev-triage
 description: >
-  Reverse engineering triage. Use when given a binary/firmware/obfuscated code
-  for a CTF RE challenge: identify, decompile, spot the check/crypto, replicate.
-  Reference card — pull references/ for packer/crypto/VM/managed depth.
+  Reverse engineering router. Use when a binary, bytecode, managed assembly,
+  packed sample or firmware image must be understood: identify, decompile, find
+  the deciding check, replicate it. Routes to references/ for packer, crypto, VM
+  and managed-code depth.
 tags: [rev, reverse-engineering, decompiler, analysis]
 environment: [ctf, lab]
 ---
 
-# Reverse Engineering — Triage Card
+# Reverse Engineering — Router
 
-## Triage (nhận diện nhanh)
-`file ./bin` · `strings -n8 ./bin | grep -iE "flag|CTF\{|key|correct|wrong"` · `binwalk ./bin`
-Packed? `strings|grep -iE "upx|themida|vmprotect|aspack"` + `binwalk -E` (entropy cao).
-UPX: `upx -d ./bin`. Packer khác → `references/packer-analysis.md`.
+Goal: understand the logic well enough to produce the accepted input. Memory
+corruption is a different job — use `../pwn-binary-triage/`.
 
-## Static (decompile)
-- r2: `r2 -A bin` → `afl` → `pdf @sym.<f>` (disasm) → `axt @sym.<f>` (xref) → `iz`/`izz` (strings).
-- **Decompile ra C giả, ĐỪNG đọc hex/offset bằng mắt** (dễ đọc nhầm → kết luận sai,
-  vd loop-stride vs counter-step). Local: r2 `pdc`/`pdcc @sym.<f>` (pseudo-C). Nếu cần
-  chuẩn hơn: cài `r2pm -ci r2ghidra` rồi `pdg @sym.<f>`, hoặc Ghidra headless
-  `analyzeHeadless <proj> tmp -import bin -postScript DecompileScript` (kiểm tra tồn tại trước).
-- Hàm cần soi: `main win flag check verify encrypt decrypt transform`. UTF-16: `strings -e l`.
-- **Reverse hàm QUYẾT ĐỊNH trước, đủ sâu** — đừng để lại đúng đoạn khả nghi nhất
-  (state machine, vòng lặp so khớp, auth gate) "chưa đọc" rồi đi brute biến thể rẻ.
+## Identify first
 
-## Dynamic
-`ltrace ./bin` (library call — hay lộ `strcmp` so sánh flag) · `strace` (syscall) · `gdb` (break tại hàm check).
+```bash
+file ./bin
+strings -n8 ./bin | grep -iE "flag|CTF\{|key|correct|wrong"
+strings -e l ./bin | head          # UTF-16 strings
+binwalk ./bin                      # embedded archives or filesystems
+binwalk -E ./bin                   # entropy: a flat high curve means packed
+```
 
-## Pattern CTF hay gặp
-- Input so với giá trị tính sẵn → tìm chỗ so sánh, trích expected HOẶC replicate phép tính với input đúng.
-- XOR loop (key ngắn) / base64 / caesar / substitution → `references/crypto-recognition.md`.
-- Anti-debug (`ptrace`,`IsDebuggerPresent`) → patch check hoặc `LD_PRELOAD`.
+Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
+with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
 
-## Route to depth (references/)
-packed → `packer-analysis.md` · crypto trong bin → `crypto-recognition.md` · VM obfuscation →
-`vm-analysis.md` · .NET/Java (dnSpy/jadx) → `managed-code.md` · firmware/IoT → `firmware-analysis.md`.
+## Dynamic before static
 
-## Discipline (../LOOP_DISCIPLINE.md)
-- `ltrace`/`strace` TRƯỚC khi lao vào decompile — thường lộ ngay `strcmp`/flag.
-- Hiểu thuật toán check rồi mới viết solver; có thể đảo ngược thì đừng brute mù.
-- Nghi đọc nhầm asm (hex/offset/stride)? → verify bằng decompiler hoặc replica, đừng suy diễn.
-- Binary + input? Dựng replica cục bộ để fuzz không giới hạn (xem LOOP_DISCIPLINE §6).
+`ltrace ./bin` often exposes the comparison directly; `strace` shows the syscall
+shape; `gdb` breaks on the check function. Run these before committing to a
+decompile — they are minutes, not hours.
+
+## Static
+
+```bash
+r2 -A ./bin
+# afl              list functions
+# pdf @sym.<name>  disassemble
+# pdc @sym.<name>  pseudo-C
+# axt @sym.<name>  cross references
+# iz / izz         strings in data / everywhere
+```
+
+Read decompiled C, not raw hex. Misreading an offset or a loop stride is the most
+common source of a wrong conclusion. If the pseudo-C is not good enough, install
+a decompiler plugin or run Ghidra headless — verify the tool exists before
+relying on it, and never report output from a tool that was not run.
+
+Functions worth reading first: `main`, and anything named for the decision —
+check, verify, validate, encrypt, decrypt, transform, win.
+
+**Read the deciding function completely.** Leaving the most suspicious routine
+unread while brute-forcing around it is the failure mode this router exists to
+prevent.
+
+## Common CTF shapes
+
+- Input compared against a precomputed value: find the comparison, then either
+  extract the expected value or replicate the computation in reverse.
+- A short-key XOR loop, base64, a Caesar or substitution table →
+  `references/crypto-recognition.md`.
+- Anti-debug checks such as a ptrace self-attach or a debugger-present query:
+  patch the check or preload a stub → `../ctf-reverse/anti-analysis.md`.
+
+## Route to depth
+
+| Finding | File |
+|---|---|
+| Packed or protected | `references/packer-analysis.md` |
+| Crypto inside the binary | `references/crypto-recognition.md` |
+| VM or bytecode obfuscation | `references/vm-analysis.md` |
+| .NET or Java assembly | `references/managed-code.md` |
+| Firmware or IoT image | `references/firmware-analysis.md` |
+| Anything narrower | one named file in `../ctf-reverse/` |
+
+## Discipline
+
+- Trace before you decompile.
+- Understand the check before writing a solver; if it can be inverted, do not
+  brute-force it.
+- Suspect a misread? Verify with a decompiler or a local replica rather than
+  reasoning from the guess.
+- A binary that takes input deserves a local replica so fuzzing costs nothing.
+  See `../LOOP_DISCIPLINE.md`.

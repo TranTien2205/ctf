@@ -1,0 +1,770 @@
+{
+  "schema_version": 1,
+  "description": "Bug-class taxonomy. observation_signals match black-box evidence; source_signals match code. evidence_level is verified only when a chain card in knowledge/chains/ proves the class was solved here.",
+  "evidence_levels": {
+    "verified": "at least one verified chain card names this class; verified_by lists them",
+    "catalogue": "standard published class, no local solve yet; the skill is a starting point, not proven local knowledge"
+  },
+  "rules": [
+    "A signal match is a candidate, never proof. Run the class's first_probe.",
+    "A class whose falsifier is observed is closed for this challenge, with the observation recorded.",
+    "evidence_level is raised to verified only by tools/classify_solve.py after a flag is verified.",
+    "confusable_with names classes that share signals; check those before committing to one."
+  ],
+  "classes": [
+    {
+      "id": "web-sqli",
+      "name": "SQL injection",
+      "skill_dir": "web-sqli",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
+      ],
+      "observation_signals": [
+        "\\bsql\\b",
+        "sqlite|mysql|mariadb|postgres|mssql|oracle",
+        "\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b",
+        "vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update)",
+        "syntax error|sqlstate|you have an error in your sql",
+        "order\\s*by|union\\s+select",
+        "boolean.{0,12}(?:delta|difference)",
+        "time.?based|sleep\\(|pg_sleep|waitfor delay"
+      ],
+      "source_signals": [
+        "SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"'])",
+        "(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{)",
+        "(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{",
+        "cursor\\.execute"
+      ],
+      "first_probe": "one syntax marker, then a matched true/false pair against the same input",
+      "falsifier": "identical validated response for the true and the false form",
+      "depth_refs": [
+        "skills/ctf-web/sql-injection.md"
+      ],
+      "confusable_with": [
+        "web-nosqli"
+      ],
+      "category": "web",
+      "skill": "skills/web-sqli/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-nosqli",
+      "name": "NoSQL / operator injection",
+      "skill_dir": "web-nosqli",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
+      ],
+      "observation_signals": [
+        "mongo|mongoose|couch|elasticsearch|redis\\b",
+        "\\$ne\\b|\\$gt\\b|\\$where\\b|\\$regex\\b|\\$rename\\b",
+        "[0-9a-f]{24}\\b",
+        "__v\\b"
+      ],
+      "source_signals": [
+        "mongoose\\.model|findOne\\s*\\(\\s*req\\.|find\\s*\\(\\s*req\\.(?:body|query)",
+        "updateMany|updateOne\\s*\\(\\s*req\\.",
+        "\\$where"
+      ],
+      "first_probe": "send the filter pinned to an object you created, with every write field omitted, and read what comes back",
+      "falsifier": "the value is coerced to a string, so no object reaches the query",
+      "depth_refs": [
+        "skills/web-sqli/references/nosql.md"
+      ],
+      "confusable_with": [
+        "web-sqli",
+        "web-prototype-pollution"
+      ],
+      "blast_radius": "a broad filter combined with write fields rewrites the whole collection",
+      "category": "web",
+      "skill": "skills/web-nosqli/SKILL.md"
+    },
+    {
+      "id": "web-command-injection",
+      "name": "OS command injection",
+      "skill_dir": "web-command-injection",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "command injection",
+        "\\bping\\b.{0,20}(?:host|ip|target)",
+        "uid=\\d+\\(|gid=\\d+\\(",
+        "sh: \\d+:|/bin/sh"
+      ],
+      "source_signals": [
+        "os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True",
+        "shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$",
+        "require\\s*\\(\\s*[\\\"']child_process|from subprocess import",
+        "(?:execSync|spawnSync|execFileSync)\\s*\\(",
+        "child_process[^\\n]{0,40}exec\\s*\\("
+      ],
+      "first_probe": "one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
+      "falsifier": "the value is passed as a single argv element, never through a shell",
+      "depth_refs": [
+        "skills/ctf-web/server-side-exec.md",
+        "skills/ctf-web/server-side-2.md"
+      ],
+      "confusable_with": [
+        "web-ssti"
+      ],
+      "category": "web",
+      "skill": "skills/web-command-injection/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-ssti",
+      "name": "Server-side template injection",
+      "skill_dir": "web-ssti",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-neonify-erb-ssti-newline-filter-bypass",
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+      ],
+      "observation_signals": [
+        "\\{\\{|\\$\\{|#\\{|<%=",
+        "jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b",
+        "template",
+        "\\b49\\b"
+      ],
+      "source_signals": [
+        "render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params)",
+        "eval\\s*\\(\\s*(?:template|tpl)"
+      ],
+      "first_probe": "one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
+      "falsifier": "the marker is reflected literally, which is an XSS shape rather than template evaluation",
+      "depth_refs": [
+        "skills/ctf-web/server-side-exec.md"
+      ],
+      "confusable_with": [
+        "web-xss",
+        "web-command-injection"
+      ],
+      "category": "web",
+      "skill": "skills/web-ssti/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-xxe",
+      "name": "XML external entity",
+      "skill_dir": "web-xxe",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "<\\?xml|application/xml|text/xml|soap|wsdl",
+        "\\.docx|\\.xlsx|\\.svg\\b",
+        "doctype|entity"
+      ],
+      "source_signals": [
+        "etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder",
+        "simplexml_load|libxml_disable_entity_loader",
+        "resolve_entities\\s*=\\s*True"
+      ],
+      "first_probe": "one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed",
+      "falsifier": "the parser is configured with entity resolution disabled",
+      "depth_refs": [
+        "skills/ctf-web/server-side-2.md"
+      ],
+      "confusable_with": [
+        "file-read-primitives",
+        "web-ssrf"
+      ],
+      "category": "web",
+      "skill": "skills/web-xxe/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-ssrf",
+      "name": "Server-side request forgery",
+      "skill_dir": "web-ssrf",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-red-island-ssrf-gopher-redis-lua-rce",
+        "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "observation_signals": [
+        "\\bssrf\\b",
+        "url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input)",
+        "server.?side (?:fetch|request)|fetches? (?:the |a )?url",
+        "pdf|screenshot|render|thumbnail|preview|import from url",
+        "127\\.0\\.0\\.1|localhost|169\\.254|metadata",
+        "admin bot|headless"
+      ],
+      "source_signals": [
+        "requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url)",
+        "urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`)",
+        "curl_setopt|file_get_contents\\s*\\(\\s*\\$",
+        "http://\\$\\{|https://\\$\\{"
+      ],
+      "first_probe": "one address you control, then the same request against an internal-only address, comparing status and timing",
+      "falsifier": "the fetch target is fixed in source and the request never influences it",
+      "depth_refs": [
+        "skills/web-ssrf/references/protocol-smuggling.md",
+        "skills/ctf-web/server-side-advanced.md"
+      ],
+      "confusable_with": [
+        "file-read-primitives",
+        "web-request-smuggling"
+      ],
+      "category": "web",
+      "skill": "skills/web-ssrf/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-request-smuggling",
+      "name": "Request smuggling / CRLF injection",
+      "skill_dir": "web-request-smuggling",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "observation_signals": [
+        "smuggl|desync|crlf",
+        "content-length|transfer-encoding",
+        "%0d%0a|\\\\r\\\\n|\\\\u010d|\\\\u010a",
+        "proxy|gateway|load balancer|nginx|haproxy|traefik"
+      ],
+      "source_signals": [
+        "http://\\$\\{[^}]*\\}|https://\\$\\{[^}]*\\}",
+        "(?:url|endpoint|host)\\s*[+]\\s*(?:req|request|params)",
+        "setHeader\\s*\\([^)]*(?:req|request|params)"
+      ],
+      "first_probe": "one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
+      "falsifier": "the value is percent-encoded or validated, so no control character survives into the outbound request",
+      "depth_refs": [
+        "skills/ctf-web/client-side.md",
+        "skills/web-triage/references/http-parser-differential.md"
+      ],
+      "confusable_with": [
+        "web-ssrf",
+        "web-parser-differential"
+      ],
+      "blast_radius": "a smuggled request executes against the backend as a trusted client; it can change state for everyone",
+      "category": "web",
+      "skill": "skills/web-request-smuggling/SKILL.md"
+    },
+    {
+      "id": "web-parser-differential",
+      "name": "Parser differential / proxy trust",
+      "skill_dir": "web-parser-differential",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "observation_signals": [
+        "traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
+        "x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
+        "hop-by-hop",
+        "403.{0,40}(?:only|internal|local)"
+      ],
+      "source_signals": [
+        "headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded)",
+        "request\\.headers\\[[\\\"']x-",
+        "if not .*header.*:\\s*\\n\\s*.*local"
+      ],
+      "first_probe": "send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
+      "falsifier": "both forms are rejected, so the trust check does not depend on that header",
+      "depth_refs": [
+        "skills/web-triage/references/http-parser-differential.md"
+      ],
+      "confusable_with": [
+        "web-request-smuggling",
+        "web-auth-session"
+      ],
+      "category": "web",
+      "skill": "skills/web-parser-differential/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-xss",
+      "name": "Cross-site scripting",
+      "skill_dir": "web-xss",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "observation_signals": [
+        "\\bxss\\b",
+        "admin bot|bot visits|report (?:url|link)",
+        "content-security-policy|nonce-",
+        "dompurify|sanitiz"
+      ],
+      "source_signals": [
+        "innerHTML|outerHTML|document\\.write|insertAdjacentHTML",
+        "dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{",
+        "res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{",
+        "(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{",
+        "v-html|\\bunescape\\b|autoescape\\s*=\\s*False"
+      ],
+      "first_probe": "one unique harmless marker; find which context it lands in before choosing any payload",
+      "falsifier": "nothing renders the injected markup, so there is no viewer and no flag path",
+      "depth_refs": [
+        "skills/ctf-web/client-side.md",
+        "skills/ctf-web/client-side-advanced.md"
+      ],
+      "confusable_with": [
+        "web-ssti",
+        "web-csrf"
+      ],
+      "category": "web",
+      "skill": "skills/web-xss/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-csrf",
+      "name": "Cross-site request forgery",
+      "skill_dir": "web-csrf",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "observation_signals": [
+        "\\bcsrf\\b|xsrf",
+        "samesite|sameorigin",
+        "admin bot|bot visits",
+        "text/plain|enctype"
+      ],
+      "source_signals": [
+        "csrf.{0,20}(?:disable|exempt|false)",
+        "@csrf_exempt",
+        "samesite\\s*[=:]\\s*[\\\"']?none"
+      ],
+      "first_probe": "a cross-origin form whose content type the endpoint still accepts, submitted by the viewer you control",
+      "falsifier": "the endpoint requires a token the attacker page cannot read or a content type a form cannot produce",
+      "depth_refs": [
+        "skills/ctf-web/client-side.md"
+      ],
+      "confusable_with": [
+        "web-xss",
+        "web-cors"
+      ],
+      "category": "web",
+      "skill": "skills/web-csrf/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-cors",
+      "name": "CORS misconfiguration",
+      "skill_dir": "web-cors",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "access-control-allow-origin|access-control-allow-credentials",
+        "\\bcors\\b",
+        "origin:"
+      ],
+      "source_signals": [
+        "Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*",
+        "origin.{0,30}(?:reflect|echo)",
+        "cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true"
+      ],
+      "first_probe": "repeat an authenticated request with a foreign Origin and read whether the origin is reflected alongside credentials",
+      "falsifier": "the allowed origin is a fixed allowlist, or credentials are not permitted",
+      "depth_refs": [
+        "skills/ctf-web/auth-infra.md"
+      ],
+      "confusable_with": [
+        "web-csrf"
+      ],
+      "category": "web",
+      "skill": "skills/web-cors/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-open-redirect",
+      "name": "Open redirect",
+      "skill_dir": "web-open-redirect",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "redirect|next=|returnurl|callback=|continue=",
+        "\\b30[1237]\\b"
+      ],
+      "source_signals": [
+        "redirect\\s*\\(\\s*(?:req|request|params|\\$_)",
+        "Location:\\s*[\\\"']?\\s*\\+"
+      ],
+      "first_probe": "one external destination in the redirect parameter, following the response Location header exactly",
+      "falsifier": "the destination is validated against an allowlist or forced to a relative path",
+      "depth_refs": [
+        "skills/ctf-web/auth-and-access.md"
+      ],
+      "confusable_with": [
+        "web-ssrf",
+        "web-oauth-sso"
+      ],
+      "category": "web",
+      "skill": "skills/web-open-redirect/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-cache-poisoning",
+      "name": "Cache poisoning / deception",
+      "skill_dir": "web-cache-poisoning",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "x-cache|cf-cache-status|age:|vary:",
+        "cache",
+        "cdn|varnish|cloudfront"
+      ],
+      "source_signals": [
+        "Cache-Control|s-maxage",
+        "cache\\.(?:set|get)\\s*\\(\\s*(?:req|request)"
+      ],
+      "first_probe": "send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
+      "falsifier": "the header is part of the cache key, so the poisoned copy is never served to anyone else",
+      "depth_refs": [
+        "skills/ctf-web/client-side.md"
+      ],
+      "confusable_with": [
+        "web-parser-differential"
+      ],
+      "blast_radius": "a poisoned entry is served to every other player until it expires",
+      "category": "web",
+      "skill": "skills/web-cache-poisoning/SKILL.md"
+    },
+    {
+      "id": "web-prototype-pollution",
+      "name": "Prototype / class pollution",
+      "skill_dir": "web-prototype-pollution",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-secnotes-mongoose-rename-prototype-pollution-local-gate",
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "observation_signals": [
+        "__proto__|prototype pollution|class pollution",
+        "constructor|__class__|__globals__|__init__",
+        "merge|deep.?(?:assign|copy|merge)"
+      ],
+      "source_signals": [
+        "__proto__",
+        "Object\\.assign\\s*\\(\\s*\\{\\}?\\s*,\\s*(?:req|body)",
+        "(?:_\\.)?merge\\s*\\(|extend\\s*\\(\\s*true",
+        "setattr\\s*\\(",
+        "\\$rename"
+      ],
+      "first_probe": "pollute one harmless property, then read it back through a path that should not have it",
+      "falsifier": "the merge rejects reserved keys, or nothing reads the polluted property with a fallback",
+      "depth_refs": [
+        "skills/ctf-web/node-and-prototype.md"
+      ],
+      "confusable_with": [
+        "web-nosqli",
+        "web-deserialization"
+      ],
+      "blast_radius": "pollution is global to the process: every later request inherits it until restart",
+      "category": "web",
+      "skill": "skills/web-prototype-pollution/SKILL.md"
+    },
+    {
+      "id": "web-deserialization",
+      "name": "Unsafe deserialization",
+      "skill_dir": "web-deserialization",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "rO0AB|aced0005|gAN|O:\\d+:\\\"|BAhJ|AAEAAAD",
+        "deserial|unserial|pickle|marshal|viewstate"
+      ],
+      "source_signals": [
+        "pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject",
+        "Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load"
+      ],
+      "first_probe": "identify the format from the blob's own magic before touching any gadget",
+      "falsifier": "the blob is signed with a key that is not leaked and not reachable",
+      "depth_refs": [
+        "skills/ctf-web/server-side-deser.md"
+      ],
+      "confusable_with": [
+        "web-prototype-pollution"
+      ],
+      "category": "web",
+      "skill": "skills/web-deserialization/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-race-condition",
+      "name": "Race condition / TOCTOU",
+      "skill_dir": "web-race-condition",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "observation_signals": [
+        "race condition|toctou",
+        "balance|coupon|voucher|one.?time|redeem",
+        "verification token|confirm",
+        "limit|quota"
+      ],
+      "source_signals": [
+        "(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit)",
+        "await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count)"
+      ],
+      "first_probe": "two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
+      "falsifier": "the read and the write happen inside one transaction or behind one lock",
+      "depth_refs": [
+        "skills/ctf-web/server-side-deser.md"
+      ],
+      "confusable_with": [
+        "web-logic-flaw"
+      ],
+      "blast_radius": "racing a shared resource can corrupt it for other players; race an object you own",
+      "category": "web",
+      "skill": "skills/web-race-condition/SKILL.md"
+    },
+    {
+      "id": "web-logic-flaw",
+      "name": "Business logic / mass assignment",
+      "skill_dir": "web-logic-flaw",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "registration|signup|checkout|coupon|workflow|approval",
+        "role|is_?admin|privilege|status"
+      ],
+      "source_signals": [
+        "(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\)",
+        "\\*\\*(?:request|data)\\b",
+        "setattr\\s*\\(\\s*\\w+\\s*,\\s*k"
+      ],
+      "first_probe": "one extra field the model has but the form does not send, or one step of the flow skipped",
+      "falsifier": "the handler reads an explicit allowlist of fields and ignores everything else",
+      "depth_refs": [
+        "skills/ctf-web/auth-and-access.md"
+      ],
+      "confusable_with": [
+        "web-idor",
+        "web-race-condition"
+      ],
+      "category": "web",
+      "skill": "skills/web-logic-flaw/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-auth-session",
+      "name": "Authentication and session",
+      "skill_dir": "web-auth-session",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "observation_signals": [
+        "\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,}",
+        "session|jsessionid|connect\\.sid|phpsessid|laravel_session",
+        "cookie_secret|app_key|secret_key|signed cookie",
+        "alg\\b|hs256|rs256|none"
+      ],
+      "source_signals": [
+        "jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value",
+        "APP_KEY|SECRET_KEY|cookie_secret|secure_cookie",
+        "verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none"
+      ],
+      "first_probe": "decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
+      "falsifier": "the signature is verified with a key that is neither leaked nor guessable",
+      "depth_refs": [
+        "skills/web-auth-session/references/jwt-attacks.md",
+        "skills/ctf-web/auth-jwt.md"
+      ],
+      "confusable_with": [
+        "web-oauth-sso",
+        "web-idor"
+      ],
+      "category": "web",
+      "skill": "skills/web-auth-session/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-oauth-sso",
+      "name": "OAuth / SSO flow",
+      "skill_dir": "web-oauth-sso",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "observation_signals": [
+        "oauth|openid|oidc|saml|single sign|sso\\b",
+        "redirect_uri|client_id|response_type|authorization_code",
+        "state=|nonce=",
+        "/authorize|/token|/callback"
+      ],
+      "source_signals": [
+        "client_secret|redirect_uri",
+        "state\\s*(?:!=|==)\\s*",
+        "\\.well-known/openid"
+      ],
+      "first_probe": "walk the whole flow once and record every redirect, parameter and cookie set, before changing any of them",
+      "falsifier": "the state parameter is bound to the session and the redirect target is a strict allowlist",
+      "depth_refs": [
+        "skills/web-auth-session/references/oauth-flow-issues.md",
+        "skills/ctf-web/auth-infra.md"
+      ],
+      "confusable_with": [
+        "web-auth-session",
+        "web-open-redirect"
+      ],
+      "category": "web",
+      "skill": "skills/web-oauth-sso/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-idor",
+      "name": "Broken object-level authorization",
+      "skill_dir": "web-idor",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\bidor\\b",
+        "/(?:users?|orders?|files?|notes?|invoices?)/\\d+",
+        "user_?id|account_?id|object_?id",
+        "[0-9a-f]{8}-[0-9a-f]{4}-"
+      ],
+      "source_signals": [
+        "findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params)",
+        "get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*="
+      ],
+      "first_probe": "create an object as one identity, then request its identifier as a second identity",
+      "falsifier": "the handler scopes the lookup by the authenticated owner",
+      "depth_refs": [
+        "skills/web-idor/references/api-idor.md"
+      ],
+      "confusable_with": [
+        "web-logic-flaw",
+        "web-auth-session"
+      ],
+      "category": "web",
+      "skill": "skills/web-idor/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "file-read-primitives",
+      "name": "Arbitrary file read / source disclosure",
+      "skill_dir": "file-read-primitives",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-red-island-ssrf-gopher-redis-lua-rce"
+      ],
+      "observation_signals": [
+        "\\.\\./|%2e%2e|traversal|\\blfi\\b",
+        "\\bfile://",
+        "\\?(?:file|page|path|download|doc|template)=",
+        "/proc/self",
+        "\\balias\\b|/assets\\.\\.",
+        "\\.env\\b|source (?:leak|disclosure)|leaked source",
+        "php://filter"
+      ],
+      "source_signals": [
+        "(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE)",
+        "file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$",
+        "open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params)",
+        "(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{)",
+        "path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params)",
+        "php://filter|\\.\\./\\.\\./"
+      ],
+      "first_probe": "an absolute path to a file the target certainly has, before trying any traversal",
+      "falsifier": "the path is resolved and confined to a fixed directory",
+      "depth_refs": [
+        "skills/file-read-primitives/references/traversal-and-wrappers.md"
+      ],
+      "confusable_with": [
+        "web-ssrf",
+        "web-xxe"
+      ],
+      "category": "web",
+      "skill": "skills/file-read-primitives/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-file-upload",
+      "name": "Unrestricted file upload",
+      "skill_dir": "web-file-upload",
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+      ],
+      "observation_signals": [
+        "upload|multipart/form-data|filename=",
+        "avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b",
+        "image/|mime|magic byte"
+      ],
+      "source_signals": [
+        "multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path)",
+        "os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename)"
+      ],
+      "first_probe": "a benign marker file first; the question is where it is stored and what later reads or executes it",
+      "falsifier": "the stored file is renamed, served with a fixed type, and never parsed again",
+      "depth_refs": [
+        "skills/web-file-upload/references/content-bypass.md"
+      ],
+      "confusable_with": [
+        "file-read-primitives"
+      ],
+      "category": "web",
+      "skill": "skills/web-file-upload/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-graphql",
+      "name": "GraphQL abuse",
+      "skill_dir": "web-graphql",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "graphql|/gql\\b",
+        "__schema|__typename|introspection",
+        "\\bquery\\s*\\{|\\bmutation\\s*\\{"
+      ],
+      "source_signals": [
+        "graphql|apollo|graphene|strawberry",
+        "introspection\\s*[=:]\\s*True"
+      ],
+      "first_probe": "one introspection query; if it is disabled, one field-suggestion error to recover names",
+      "falsifier": "introspection is off and errors reveal no field names",
+      "depth_refs": [
+        "skills/ctf-web/server-side-2.md"
+      ],
+      "confusable_with": [
+        "web-idor",
+        "web-logic-flaw"
+      ],
+      "category": "web",
+      "skill": "skills/web-graphql/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "web-web3",
+      "name": "Smart contract / web3",
+      "skill_dir": "web-web3",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat",
+        "0x[0-9a-f]{40}\\b",
+        "setup\\(\\)|isSolved\\(\\)"
+      ],
+      "source_signals": [
+        "pragma solidity|contract \\w+\\s*\\{",
+        "delegatecall|selfdestruct|tx\\.origin"
+      ],
+      "first_probe": "read the setup contract and the solved condition first; that names the exact state you must reach",
+      "falsifier": "the solved condition depends on state no external caller can change",
+      "depth_refs": [
+        "skills/ctf-web/web3.md"
+      ],
+      "confusable_with": [],
+      "category": "web",
+      "skill": "skills/web-web3/SKILL.md",
+      "blast_radius": null
+    }
+  ]
+}

@@ -43,3 +43,12 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 - `references/log-analysis.md` - Log file analysis
 - `references/malware-analysis.md` - Basic malware triage
 - `references/document-analysis.md` - PE and document (Office/PDF) analysis
+
+## Discipline
+
+- Collect every parameter and size before choosing an attack; a named attack on
+  guessed parameters wastes the budget.
+- One technique class at a time. Budget and escalation as in
+  `../LOOP_DISCIPLINE.md`.
+- A recovered value is a hypothesis until it decrypts or validates against the
+  supplied artifact.

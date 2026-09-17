@@ -1,0 +1,66 @@
+{
+  "comment": "Documented exceptions to two gate checks in test/regression.py. An exception is only legitimate when removing the thing would make a document factually wrong. Every entry needs a reason, the test fails on an empty one, and it also fails on a stale entry whose condition no longer applies. Vietnamese has no exception list at all: VIETNAMESE_ONLY is checked across the whole authored tree and must never match. tree_root_mentions covers the third check: no command may hardcode a tree root such as ~/ctf/tools, because the tree must run wherever it is checked out. AGENTS.md may name the tree's location in prose; it is the bootstrap file and the one place to update when the tree moves.",
+  "scan_roots": [
+    "skills",
+    "knowledge",
+    "solved",
+    "tools",
+    "build",
+    "test",
+    "agent",
+    "scripts"
+  ],
+  "scan_suffixes": [
+    ".md",
+    ".py",
+    ".json",
+    ".sh",
+    ".txt"
+  ],
+  "skipped_prefixes": {
+    "challenges/": "third-party handout source; not written here and not an instruction surface",
+    "fixtures/": "synthetic and third-party inputs the classifier is measured against",
+    "test/fixtures/": "the benign-express precision guard and friends",
+    "external/": "the lock file for sources this tree does not author"
+  },
+  "foreign_script": [
+    {
+      "path": "skills/ctf-osint/social-media.md",
+      "scripts": [
+        "Cyrillic"
+      ],
+      "reason": "the homoglyph table is the technique: it pairs ASCII letters with the Cyrillic codepoints that render identically (U+0430, U+043E, U+0435, U+0455, U+0440). Replacing them with ASCII would make every row of the table state something false."
+    }
+  ],
+  "reference_links": [
+    {
+      "path": "skills/ctf-writeup/SKILL.md",
+      "target": "writeup.md",
+      "reason": "the name of the file the agent is told to WRITE at the end of a solve, not a file in this tree to read."
+    },
+    {
+      "path": "skills/INDEX.md",
+      "target": "SKILL.md",
+      "reason": "generic: the instructions for adding a skill say the new directory needs a SKILL.md, naming the kind of file rather than one particular file."
+    },
+    {
+      "path": "skills/INDEX.md",
+      "target": "field-notes.md",
+      "reason": "generic: names the per-skill field-notes file that build/make_class_skills.py generates for every bug class, not one particular file."
+    }
+  ],
+  "tree_root_mentions": [
+    {
+      "path": "AGENTS.md",
+      "reason": "the bootstrap file, and the one place allowed to say where the tree lives on disk. Everything else is relative to the root, so moving the tree means editing exactly this file."
+    },
+    {
+      "path": "V2_CHANGES.md",
+      "reason": "a migration note about moving between two trees on one machine; it must name both by their real paths, and it is not an instruction the agent runs inside the tree."
+    },
+    {
+      "path": "test/gate-exemptions.json",
+      "reason": "this file states the rule, so it quotes the pattern it forbids."
+    }
+  ]
+}

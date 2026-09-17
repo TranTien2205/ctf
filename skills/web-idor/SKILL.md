@@ -1,42 +1,75 @@
 ---
 name: web-idor
 description: >
-  Insecure Direct Object Reference. Use when the app exposes object IDs
-  (sequential/UUID) in URL, API, body, or hidden fields and may not check
-  ownership. Reference card — pull references/ for enumeration/UUID depth.
+  Insecure direct object reference. Use when object identifiers appear in a path,
+  query, body, token or hidden field and ownership may not be enforced. Routes to
+  references/ for enumeration and identifier-analysis depth.
 tags: [web, idor, access-control, authorization, broken-auth]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3
   on_stuck: pivot
   stop_conditions:
-    - "no privilege delta between roles"
-    - "ID sweep >200, no pattern, no new signal"
+    - "no privilege difference between identities"
+    - "identifier sweep past 200 with no pattern and no new signal"
+evidence_level: catalogue
 ---
 
-# IDOR — Reference Card
+# IDOR — Depth Skill
 
-## Recognize
-ID đoán được ở: `?id= /api/users/1 /orders/123 file=report_1.pdf {"user_id":1}` hoặc hidden
-`<input name=account_id value=1001>`. Nghi IDOR khi resource gắn user mà không check ownership.
+**Catalogue class.** This toolkit has never solved one; the content below is
+standard published knowledge, not local experience.
 
-## Confirm (cần 2 context)
-1. Login user A → ghi lại ID resource của A.
-2. Login user B (hoặc bỏ session) → truy cập ID của A. Đọc/ghi được = IDOR.
-3. Sequential: `±1` id. UUID: thu thập id trong response; v1 (timestamp) → đoán được → `references/uuid-analysis.md`.
 
-## Vectors cần thử
-- **API/GraphQL**: `GET /api/v1/orders/1002`; `{"query":"{user(id:2){email}}"}`.
-- **File path**: `download?file=invoice_002.pdf` (+ combine path traversal `../config/db.yml`).
-- **JWT/cookie claim**: đổi `user_id`/`role` trong token.
-- **Mass assignment**: thêm field `{"user_id":2,"role":"admin"}` vào update.
-- **Bypass filter**: đổi method (GET/PUT/DELETE), đổi Content-Type (json↔form), header
-  `X-Original-URL: /admin`, `X-Forwarded-For: 127.0.0.1`.
+## Recognise
 
-## Route to depth (references/)
-sequential → `sequential-enumeration.md` · UUID → `uuid-analysis.md` · API → `api-idor.md` ·
-file → `file-idor.md` · quét hàng loạt → `enumeration.md`.
+Identifiers that address a resource: a numeric path segment, an identifier in a
+query string, a filename that encodes a record number, a field in a JSON body, a
+hidden form field, or a claim inside a token. Suspect IDOR whenever a resource
+belongs to an identity but the handler looks it up by identifier alone.
 
-## Discipline (../LOOP_DISCIPLINE.md)
-- Phải test bằng 2 danh tính (A tạo, B truy cập) mới chứng minh được IDOR — 1 tài khoản không đủ.
-- Không có privilege delta giữa các role → có thể không phải IDOR, đổi hướng.
+## Confirm — two identities are required
+
+1. As identity A, create a resource and record its identifier.
+2. As identity B, or with no session, request A's identifier.
+3. Reading or writing it proves the finding. One account cannot prove it.
+
+Sequential identifiers: step by one. Opaque identifiers: collect the ones the
+application hands out; time-ordered formats are predictable —
+`references/uuid-analysis.md`.
+
+## Vectors worth trying
+
+- API and GraphQL: request another identity's record directly, including through
+  a nested query.
+- File paths: a download parameter naming another record, optionally combined
+  with traversal.
+- Token claims: change the subject or role field and see whether the signature is
+  actually checked — then go to `../web-auth-session/`.
+- Mass assignment: add an owner or role field to an update body.
+- Filter bypass: change the method, change the content type, or try the
+  alternative routing headers the framework honours.
+
+## Route to depth
+
+| Shape | File |
+|---|---|
+| Sequential identifiers | `references/sequential-enumeration.md` |
+| Opaque or time-ordered identifiers | `references/uuid-analysis.md` |
+| API endpoints | `references/api-idor.md` |
+| File-based references | `references/file-idor.md` |
+| Bulk sweeps | `references/enumeration.md` |
+
+## Discipline
+
+- Two identities or it is not proven.
+- No privilege difference between roles usually means this is not the bug —
+  change layer rather than sweeping more identifiers. See
+  `../LOOP_DISCIPLINE.md`.
+- On a shared instance, read another identity's record; do not modify it.
+
+## Field notes
+
+`field-notes.md` in this directory grows every time a challenge of this class
+is solved. Entries marked `proposed` are awaiting review; entries marked
+`confirmed` have been checked. See `../../LEARNING_LOOP.md`.

@@ -1,57 +1,71 @@
-# LOOP_DISCIPLINE — kỷ luật vòng lặp giải bài
+# LOOP_DISCIPLINE — how to not get stuck
 
-File dùng chung, được mọi skill triage tham chiếu. Mục tiêu: **không cắm chết một
-hướng**. Đây là thứ phân biệt "route giỏi" với "giải được".
+Shared by every router. The priority scale, parking and revival commands live in
+`../HYPOTHESIS_PROTOCOL.md`; this file is the reasoning discipline behind them.
 
-## 1. Đơn vị công việc = 1 lớp giả thuyết (không phải 1 probe)
+## 1. The unit of work is a mechanism class, not a probe
 
-Gom probe theo **cơ chế**, không theo biến thể. Ví dụ MCCRAB3: "lách rule bằng
-header trick" là MỘT lớp — dù bạn thử 20 biến thể (dup, tab, >127, split-value…)
-tất cả vẫn là một lớp. Hết ngân sách lớp → **đổi tầng**, không thử biến thể thứ 21.
+Group probes by mechanism, never by payload variant. "Bypass the rule with a
+header trick" is one class whether you try three variants or twenty: duplicate
+headers, tabs, high bytes, split values are all the same idea. When the class
+budget is spent, change layer — do not try the next variant.
 
-Ngân sách mặc định mỗi lớp: **≤ 5 probe** hoặc **≤ 15 phút**. Chạm mốc mà chưa có
-**tín hiệu mới** → dừng lớp, ghi "falsified", leo thang.
+Default budget per class: **five probes or fifteen minutes**. Reaching either
+without a new signal ends the class.
 
-## 2. Decisive-test-first
+## 2. Decisive test first
 
-Trước khi thử N biến thể, hỏi: *"Có MỘT test nào giết hoặc xác nhận cả lớp không?"*
-- Muốn biết proxy có forward byte gốc? → 1 echo-backend test, không cần 20 payload.
-- Muốn biết compare là eq hay contains? → đọc 1 hàm decompile, không brute.
+Before trying N variants, ask: is there one test that kills or confirms the whole
+class?
 
-Ưu tiên test quyết định. Biến thể chỉ dùng khi test quyết định bất khả thi.
+- Does the proxy forward the original bytes? One echo-backend test answers it;
+  twenty payloads do not.
+- Is the comparison equality or containment? Read the deciding function; do not
+  brute-force around it.
 
-## 3. Escalation ladder (khi một lớp chết)
+Variants are for when a decisive test is genuinely impossible.
 
-Leo theo thứ tự, KHÔNG quay lại tầng đã đóng nếu không có bằng chứng mới:
+## 3. Escalation ladder
 
-1. **Re-read đề + artifact** — bỏ sót hint/field/route nào? (rule dùng `contains`
-   hay `eq`? path/method regex unanchored?)
-2. **Đổi tầng cơ chế** — parser → state machine → auth/session → response-side →
-   framing → logic app. Liệt kê các tầng CÒN LẠI trước khi đâm sâu tầng hiện tại.
-3. **Reverse phần quyết định** — nếu là bài rev/binary, đọc HÀM quan trọng nhất
-   bằng decompiler. Đừng để lại đúng đoạn khả nghi nhất "chưa đọc". (Xem rev-triage.)
-4. **Kéo tri thức ngoài** — bài LIVE hay CŨ? Được dùng writeup/source không? Bài
-   ít solve = có người tìm ra bug bạn chưa thấy → `tools/writeup_search.py`.
-5. **Skip, quay lại sau** — trong contest tính giờ, một bài không đáng > time-box.
+Climb in order. Do not return to a closed layer without new evidence.
 
-## 4. Chống độc thoại / flailing
+1. **Re-read the challenge text and the artifact.** A missed hint, field or route
+   is the most common cause. Is the pattern anchored? Is the check equality or
+   containment?
+2. **Change mechanism layer.** Parser, state machine, auth and session, response
+   side, framing, application logic. List the layers still untried before going
+   deeper into the current one.
+3. **Reverse the deciding function.** For binary work, decompile the function
+   that actually decides. Never leave the most suspicious code unread while
+   brute-forcing around it.
+4. **Pull outside knowledge.** `../tools/chain_match.py` first, then
+   `../tools/writeup_search.py` once the name and event are known. Whether a
+   writeup is allowed depends on the contest rules; record that you used one.
+5. **Park it and come back.** In a timed contest, one challenge is not worth more
+   than its share.
 
-Dấu hiệu đang quẫy (STOP ngay khi thấy): chuỗi "wait wait", đặt >2 giả thuyết mới
-trong một lượt mà không test, lặp lại ý đã bác bỏ, tăng độ phức tạp payload mà
-không tăng thông tin.
+## 4. Recognising flailing
 
-Thay bằng: ghi **hypothesis-ledger** có cấu trúc qua `tools/state.py`
-(`--probe`/`--result`/`--close`), mỗi mục = giả thuyết + test quyết định + kết quả
-+ tầng kế tiếp. Ledger DẪN quyết định, không phải log cuối buổi.
+Stop immediately on any of these: repeated self-correction inside one turn; more
+than two new hypotheses in a turn with none tested; restating an idea that was
+already falsified; payload complexity rising while information gained does not.
 
-## 5. Bằng chứng, không niềm tin
+Replace it with a written ledger entry through `../tools/state.py`
+(`--hypothesis`, `--probe`, `--result`, `--deprioritize`, `--close`). The ledger
+leads the decision; it is not a log written afterwards.
 
-- "Đã reverse xong" chỉ đúng khi hàm quyết định đã đọc, không phải "đọc phần lớn".
-- Nghi đọc nhầm (hex/offset)? → verify bằng công cụ (decompiler/replica), đừng suy diễn.
-- Flag là giả thuyết đến khi verify từ target/artifact.
+## 5. Evidence, not belief
 
-## 6. Offline replica khi có thể
+- "Reversing is done" is true only when the deciding function has been read, not
+  most of it.
+- Suspect a misread offset or opcode? Verify with a decompiler or a local
+  replica. Do not reason from a guess.
+- A flag is a hypothesis until it is read from the target or the artifact.
+- A timeout says something about availability, nothing about a bug.
 
-Bài có binary/service + input? Dựng replica cục bộ (như lab MCCRAB3) để fuzz không
-giới hạn thời gian và loại biến nhiễu (LB, instance chết). Test ở replica → chỉ bắn
-live payload đã xác nhận.
+## 6. Build an offline replica when one is possible
+
+If the challenge ships a binary or a service and you control the input, rebuild
+it locally. Fuzz there without a clock and without instance noise, then fire only
+confirmed payloads at the live target. This also protects shared instances from
+destructive experiments.

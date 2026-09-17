@@ -2,7 +2,7 @@
 
 ## Scope boundary
 
-`~/ctf` is for jeopardy and attack-defense CTFs, including whitebox and
+This tree is for jeopardy and attack-defense CTFs, including whitebox and
 blackbox challenges. It does not read or import the red-team machine toolkit,
 its knowledge-base, upstream writeups, or machine triage scripts.
 

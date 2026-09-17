@@ -51,3 +51,12 @@ Hash value → MD5/SHA1/SHA256
 - `references/hash-attacks.md` - Hash collision and extension
 - `references/xor-analysis.md` - XOR cipher analysis
 - `references/ecc-attacks.md` - Elliptic curve attacks
+
+## Discipline
+
+- Collect every parameter and size before choosing an attack; a named attack on
+  guessed parameters wastes the budget.
+- One technique class at a time. Budget and escalation as in
+  `../LOOP_DISCIPLINE.md`.
+- A recovered value is a hypothesis until it decrypts or validates against the
+  supplied artifact.

@@ -16,14 +16,31 @@ budget:
     - "JWT alg confusion fails both variants"
     - "token tamper rejected 3 times"
     - "session fixation not accepted"
+evidence_level: verified
 ---
 
 # Auth & Session CTF Playbook
 
+**Verified here.** Chains that prove this class: `htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli`, `htb-tornadoservice-bot-csrf-class-pollution`, `htb-ssos-oauth-registration-race-cookie-swap-json-csrf`.
+
+
 ## Scope & Safety
-- Only test with accounts you control or are authorized to use
+- CTF and lab scope only. Only test with accounts you created in the challenge
 - Avoid account lockout brute forcing against real user accounts without agreement
 - Document exact token/session values used in testing (redact before sharing)
+
+## First probe
+
+Create two accounts yourself, capture the token or session cookie of each,
+then send account A's request with account B's token. A token that still
+authorises the wrong account is this entire class in one probe — it covers
+session fixation, missing server-side session binding, and JWT
+audience/subject confusion at once. Both accounts are yours, so the probe is
+safe on a shared instance.
+
+**Falsifier** — the observation that closes this class: every swapped token
+is rejected, the server re-binds the session on every request, and the JWT
+verifies signature and audience correctly.
 
 ## Login Flow Analysis
 ```
@@ -113,9 +130,23 @@ print(jwt.encode({'user':'admin'}, key='', algorithm='none'))
 - Enumeration/lockout behavior
 - Token analysis results (entropy, predictability, algorithm)
 - Access control bypass confirmed or denied
-- Recommended remediation-relevant finding summary
+- Whether the boundary actually reaches the flag, and the exact evidence
 
 ## References
 - `references/jwt-attacks.md` - JWT algorithm confusion, none-alg, key confusion
 - `references/session-analysis.md` - Session token entropy and fixation testing
 - `references/oauth-flow-issues.md` - OAuth/SSO common misconfigurations
+
+## Discipline
+
+- Decode and read a token before modifying it; most CTF token bugs are visible
+  in the header or the claims.
+- A leaked signing key turns session forgery into a primitive: look next for a
+  value the session carries into a query or a path.
+- Budget and escalation as in `../LOOP_DISCIPLINE.md`.
+
+## Field notes
+
+`field-notes.md` in this directory grows every time a challenge of this class
+is solved. Entries marked `proposed` are awaiting review; entries marked
+`confirmed` have been checked. See `../../LEARNING_LOOP.md`.

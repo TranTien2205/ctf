@@ -16,15 +16,39 @@ budget:
     - "extension+MIME combos fail 5 times"
     - "upload OK but no execution path found"
     - "upload path discovery exhausted"
+evidence_level: verified
 ---
 
 # File Upload CTF Playbook
+
+**Verified here.** Chains that prove this class: `htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce`, `htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce`.
+
 
 ## Scope & Safety
 - Only upload to authorized targets
 - Use benign test files first (e.g., text with unique marker)
 - Document upload path and access URL
 - Never deploy real backdoors without authorization
+
+## First probe
+
+Upload one benign file with a unique marker in both the filename and the
+content, then retrieve it wherever the app serves uploads. Two facts come out
+of a single probe: where the file lands and whether it is served back
+verbatim. Then upload the same content with one rejected extension — the
+layer that answers (client-side only, MIME sniffing, extension list, content
+inspection) is the layer to attack.
+
+**Falsifier** — the observation that closes this class: no upload becomes
+retrievable through any path you can enumerate, and no server-side parser
+(svg, archive, document importer) ever consumes the uploads.
+
+## Discipline
+
+- One upload surface, one probe round: marker upload, retrieval, then one
+  rejected extension. Exploit only after both answers are known.
+- An upload that succeeds but is never served is storage, not execution;
+  pivot to what parses the stored file before trying more extensions.
 
 ## Detection Phase
 
@@ -82,3 +106,9 @@ curl -s https://target.com/uploads/test.txt
 - `references/path-traversal.md` - Path traversal in upload
 - `references/archive-attacks.md` - Archive-based attacks
 - `references/webshell-templates.md` - Webshell templates per language
+
+## Field notes
+
+`field-notes.md` in this directory grows every time a challenge of this class
+is solved. Entries marked `proposed` are awaiting review; entries marked
+`confirmed` have been checked. See `../../LEARNING_LOOP.md`.

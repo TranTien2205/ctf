@@ -232,7 +232,7 @@ Once credentials found:
 # Use o365spray with found passwords
 python3 o365spray.py --username emails.txt --password passwords.txt --rate 1 --lockout 5
 
-# See: ../credential-hygiene/references/lockout-aware-spraying.md
+# CTF note: do not use leaked credentials against third-party systems.
 ```
 
 **CRITICAL**: Always implement rate limiting and lockout awareness.
@@ -282,6 +282,5 @@ git secrets --add '[A-Za-z0-9]{32}' # API keys
 ## Cross-Reference
 
 - Email enumeration: `email-pattern-detection.md`
-- Password spraying: `../credential-hygiene/references/lockout-aware-spraying.md`
-- Hash cracking: `../credential-hygiene/references/hash-cracking-modes.md`
+- Challenge credential evidence: `../../../EVIDENCE_POLICY.md`
 - OSINT workflow: `../SKILL.md`

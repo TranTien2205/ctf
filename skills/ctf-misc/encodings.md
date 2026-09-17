@@ -413,7 +413,7 @@ Common esoteric chains: Piet → base64 → Malbolge, Brainfuck → Ook → Whit
 ```bash
 # Node.js / npm path
 npm install -g base65536
-echo -n "宝䀈䀋..." | base65536 --decode > out.bin
+base65536 --decode < blob.txt > out.bin   # blob.txt holds the CJK wall verbatim
 
 # Python port
 pip install base65536

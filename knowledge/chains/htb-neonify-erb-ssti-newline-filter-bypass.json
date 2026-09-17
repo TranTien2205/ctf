@@ -1,0 +1,87 @@
+{
+  "id": "htb-neonify-erb-ssti-newline-filter-bypass",
+  "source_note": "solved/neonify.md",
+  "challenge": {
+    "name": "Neonify",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-12",
+    "assistance": "self-solved"
+  },
+  "stack": ["ruby", "sinatra", "webrick", "erb"],
+  "preconditions": {
+    "all_of": [
+      "a request parameter is interpolated into a Ruby template without encoding",
+      "the blacklist check accepts newlines and spaces alongside alphanumerics"
+    ],
+    "any_of": [
+      "the filter blocks template delimiters directly",
+      "an allowlist charset is checked per line rather than the whole string"
+    ]
+  },
+  "signals": [
+    "webrick",
+    "ruby",
+    "erb",
+    "neon",
+    "Glow",
+    "Malicious Input Detected",
+    "ssti",
+    "newline",
+    "eval"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "identify the server stack and the single reflected parameter",
+      "why": "the field that renders the glow output is the injection point"
+    },
+    {
+      "step": 2,
+      "stage": "characterize the filter",
+      "action": "send harmless charset probes one character at a time: newline, space, underscore, dot, dollar, caret, operators",
+      "why": "the accepted charset and the line-based check decide the bypass form"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "send a benign line followed by an ERB arithmetic marker line: abc\\n<%= 7*7 %>",
+      "why": "the benign line satisfies the line-anchored check while the second line reaches the template"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "wrap the payload in eval(Base64.decode64(...)) so the blocklist characters stay out",
+      "why": "base64 encodes everything the filter rejects"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "return the file value directly instead of printing: File.read('flag.txt'), locate via Dir.pwd and Dir.glob",
+      "why": "puts writes to server stdout, so only the expression value reaches the rendered page"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST / with neon=abc\\n<%= 7*7 %>",
+    "expected": "the glow output renders 49",
+    "falsifier": "the filter blocks the payload unchanged or returns literal unrendered text"
+  },
+  "blast_radius": "read-only primitive; no shared-state writes observed, only file reads on the challenge instance",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag returned inside the glow span from the live endpoint"
+  },
+  "reuse_when": [
+    "a Ruby/Sinatra template reflects a single request parameter",
+    "a charset filter rejects template delimiters but accepts newlines"
+  ],
+  "known_traps": [
+    "puts inside eval goes to server stdout, not into the template output",
+    "the benign line must satisfy the per-line charset check",
+    "encode payload internals with base64 because parentheses, quotes and dots are blocked"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

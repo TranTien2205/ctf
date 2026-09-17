@@ -488,7 +488,7 @@ for byte_pos in range(16):
 
 ## AES-CTR Constant Counter / Repeating Keystream (SHA2017)
 
-**Pattern:** When an AES-CTR implementation uses `counter=lambda: secret` (a constant function), the counter never increments. AES-CTR with a fixed counter produces the same 16-byte block on every call — equivalent to Vigenère cipher at the byte level with a 16-byte repeating key.
+**Pattern:** When an AES-CTR implementation uses `counter=lambda: secret` (a constant function), the counter never increments. AES-CTR with a fixed counter produces the same 16-byte block on every call — equivalent to Vigenere cipher at the byte level with a 16-byte repeating key.
 
 ```python
 # Constant counter makes CTR equivalent to repeating-key XOR
@@ -504,7 +504,7 @@ for i, ct_byte in enumerate(ciphertext):
 3. Iteratively extend: use recovered plaintext to guess the next structural keyword (`endobj`, `/Page`, `stream`, etc.), verify XOR produces consistent ASCII, and extend the keystream further
 4. Tool: `otp_pwn` supports interactive block-aligned crib-dragging for this workflow
 
-**Key insight:** Constant AES-CTR counter = repeating 16-byte Vigenère key. Known file format magic bytes bootstrap iterative key recovery via crib-dragging. Any known-plaintext at block-aligned positions reveals the full keystream byte at that position.
+**Key insight:** Constant AES-CTR counter = repeating 16-byte Vigenere key. Known file format magic bytes bootstrap iterative key recovery via crib-dragging. Any known-plaintext at block-aligned positions reveals the full keystream byte at that position.
 
 **References:** SHA2017
 

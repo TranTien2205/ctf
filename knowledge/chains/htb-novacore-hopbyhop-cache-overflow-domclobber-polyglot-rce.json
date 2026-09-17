@@ -1,0 +1,98 @@
+{
+  "id": "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
+  "source_note": "solved/novacore.md",
+  "challenge": {
+    "name": "NovaCore",
+    "platform": "HackTheBox",
+    "event": "Business CTF 2025",
+    "category": "web",
+    "solved_at": "2026-09-07",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "traefik 2.10.4",
+    "python",
+    "flask",
+    "c"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy adds a header the application trusts"
+    ],
+    "any_of": [
+      "a missing header is treated as a local request",
+      "a custom daemon copies request data into a fixed-size buffer"
+    ]
+  },
+  "signals": [
+    "traefik",
+    "x-real-ip",
+    "hop-by-hop",
+    "connection header",
+    "token_required",
+    "strcpy",
+    "cache",
+    "csp",
+    "nonce",
+    "dom clobbering",
+    "prototype pollution",
+    "eval",
+    "exiftool",
+    "tar",
+    "elf",
+    "polyglot",
+    "plugin"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "list the proxy-added header in the Connection header so the proxy strips its own header before forwarding",
+      "why": "the application treats a request with no proxy header as local and skips the token check"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "overflow a fixed-size value in the cache daemon so the write lands in the next entry's key, letting another user's record be addressed",
+      "why": "the API exposes the set operation, so no exploit code is needed"
+    },
+    {
+      "step": 3,
+      "stage": "sink",
+      "action": "poison the admin's feed with markup, then bypass the content policy using the site's own nonce-bearing script: clobber the DOM lookups it uses, redirect its fetch to an attacker-writable store, and pollute the prototype so the value it passes to eval is attacker-controlled",
+      "why": "the policy allows only the site's own scripts, so the site's script must be steered"
+    },
+    {
+      "step": 4,
+      "stage": "exfil",
+      "action": "post the admin cookie into the same same-site store and read it back",
+      "why": "the store is simultaneously the pollution source, the fetch target and the exfiltration channel"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "upload a plugin whose joined filename escapes the upload directory, built as an archive/executable polyglot so the content scanner sees an archive while the loader sees an executable, then run it",
+      "why": "the scanner and the loader read different offsets of the same file"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
+    "expected": "the second request is accepted without a token",
+    "falsifier": "both requests are rejected, so the trust check does not depend on that header"
+  },
+  "blast_radius": "overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag file read by the executed plugin"
+  },
+  "reuse_when": [
+    "an application trusts a header a proxy is expected to set",
+    "a content policy allows the site's own script and that script calls eval on merged JSON"
+  ],
+  "known_traps": [
+    "the bot runs on a fixed schedule; place the poisoned state first, then poll",
+    "the polyglot only works when the archive bytes are overlaid at the offset the scanner reads"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

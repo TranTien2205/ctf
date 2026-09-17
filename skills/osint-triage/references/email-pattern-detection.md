@@ -215,7 +215,8 @@ John2024!
 JDoe123!
 ```
 
-See `../credential-hygiene/references/lockout-aware-spraying.md` for safe testing methodology.
+For CTF use, do not test credentials against third-party accounts. Record only
+challenge-supplied identities and follow `EVIDENCE_POLICY.md`.
 
 ---
 
@@ -244,6 +245,5 @@ Always confirm with client before testing credentials.
 
 ## Cross-Reference
 
-- Password spraying workflow: `../credential-hygiene/references/lockout-aware-spraying.md`
 - Leak database search: `leak-aggregator-sources.md`
 - OSINT workflow: `../SKILL.md`
