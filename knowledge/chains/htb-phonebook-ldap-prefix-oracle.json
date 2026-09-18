@@ -1,0 +1,86 @@
+{
+  "id": "htb-phonebook-ldap-prefix-oracle",
+  "source_note": "solved/phonebook.md",
+  "challenge": {
+    "name": "Phonebook",
+    "platform": "HackTheBox",
+    "event": "HackTheBox",
+    "category": "web",
+    "solved_at": "2026-09-17",
+    "assistance": "writeup-assisted"
+  },
+  "stack": ["go", "ldap", "nginx"],
+  "preconditions": {
+    "all_of": [
+      "a login handler concatenates username and password straight into an LDAP filter string",
+      "the failure branch redirects to a stable, machine-readable URL (message=Authentication failed)"
+    ],
+    "any_of": [
+      "an authenticated area reachable only after a bind, protected by a wildcard bypass",
+      "the same filter built from the raw username and password fields with no escaping"
+    ]
+  },
+  "signals": [
+    "ldap",
+    "directory service",
+    "workstation",
+    "uid=",
+    "userPassword=",
+    "wildcard",
+    "phonebook",
+    "cn",
+    "sn",
+    "mail",
+    "authentication failed",
+    "search bar"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "post user=* pass=* to /login to confirm the LDAP identifier wildcard bypass and read a session cookie",
+      "why": "LDAP * is both presence and substring wildcard, so the existence filter binds a valid entry with any password"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "with the session, open the intuited token-dir search page and use search term '.' or '*' to enumerate people including the admin Reese",
+      "why": "the dumped directory confirms the field names that are behind the authentication filter"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "use the same filter as a blind prefix oracle: username=<admin>, password=<known>+<char>+* match means the candidate extends the prefix",
+      "why": "a trailing * makes the clause a prefix test, so the reject redirect is the one-bit oracle"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "reconstruct the password one character at a time and authenticate with the real wildcard-free value once the closing } forms",
+      "why": "the flag IS the admin password of the seeded directory entry"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /login user=* pass=* and read the Location header",
+    "expected": "a redirect that is not /login?message=Authentication failed, plus a session cookie",
+    "falsifier": "every login attempt lands on the same ?message=Authentication failed URL"
+  },
+  "blast_radius": "full directory enumeration and account takeover for any uid managed by the same database",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "302 / + Set-Cookie mysession after POST /login with the reconstructed password HTB{d1rectory_h4xx0r_is_k00l}"
+  },
+  "reuse_when": [
+    "a login form redirects every failure to a distinguishable URL",
+    "the bar is LDAP and user input reaches a filter with no escaping",
+    "the admin password is the flag itself"
+  ],
+  "known_traps": [
+    "the (!(&(1=0)(userPassword=...)) shape is a blanket bypass, not a character oracle",
+    "the prefix oracle needs username=admin with password=prefix+char+* — the response Location is one bit",
+    "do not forget the {} chars in the flag charset or you stop one character early",
+    "the search page lives under a hashed asset dir that is otherwise unrelated to auth"
+  ],
+  "flag": null,
+  "schema_version": 1
+}
