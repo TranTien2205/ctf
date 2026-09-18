@@ -85,7 +85,8 @@
   "blast_radius": "full directory enumeration and account takeover for any uid managed by the same database",
   "verification": {
     "status": "verified_live",
-    "evidence": "302 / + Set-Cookie mysession after POST /login with the reconstructed password HTB{d1rectory_h4xx0r_is_k00l}"
+    "evidence": "3rd LDAP prefix oracle step confirmed the admin password on 192.168.223.1:31995 by live response",
+    "proof": "302 / + Set-Cookie mysession after POST /login with the reconstructed password (blind LDAP prefix oracle rebuilt it character by character)"
   },
   "reuse_when": [
     "a login form redirects every failure to a distinguishable URL",
