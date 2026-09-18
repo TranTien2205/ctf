@@ -1,0 +1,100 @@
+{
+  "id": "htb-const-flask-jinja2-lipsum-rce",
+  "source_note": "solved/const-flask.md",
+  "challenge": {
+    "name": "Site still under construction",
+    "platform": "HackTheBox",
+    "event": "Lab",
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "white-box"
+  },
+  "stack": ["python", "flask", "jinja2", "werkzeug"],
+  "classification": {
+    "primary": "web-ssti",
+    "secondary": [],
+    "confidence": 0.95
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-const-flask-jinja2-lipsum-rce.json",
+    "retrieved_at": "2026-09-18",
+    "evidence_spans": [
+      "first_confirming_probe: GET /{{7*7}} returns the custom 404 with <str>49</str> and the lipsum.__globals__ namespace reaches os.popen"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.95
+  },
+  "preconditions": {
+    "all_of": [
+      "a custom error page renders the user-controllable path segment through str() into a Jinja2 template",
+      "any payload URL path accepts the full {{ }} namespace without an escaping filter"
+    ],
+    "any_of": [
+      "a renderer config or lipsum.__globals__ reaches os",
+      "the flag sits in a file reachable by the worker user"
+    ]
+  },
+  "signals": [
+    "str(",
+    "custom 404",
+    "under construction",
+    "flask jinja2",
+    "{{7*7}}",
+    "lipsum",
+    "os.popen",
+    "str error template",
+    "path injection"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "send GET /{{7*7}} to test whether the custom 404 page renders the path through Jinja2",
+      "why": "the template calls str() on the input path inside an error output, so the {{ }} namespace is live"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "reach a privileged namespace through lipsum.__globals__.os and confirm with `id` in popen",
+      "why": "lipsum.__globals__ reaches the app module namespace where os is already imported — no import needed"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "use slash-free shell commands (`ls`, `pwd`, `cat flag.txt`) because the URL route pattern <str> rejects unencoded slashes, reading one command per request",
+      "why": "raw / in the payload breaks the path match and hits the plain Werkzeug 404 instead of the injectable template"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "popen('cat flag.txt') with the working directory at /, read the flag out of the str() error template",
+      "why": "the flag lives at filesystem root in the same container"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET /{{7*7}}",
+    "expected": "the custom 404 template renders <str>49</str>",
+    "falsifier": "the raw payload is escaped or filtered, or the page shows a different 404"
+  },
+  "blast_radius": "arbitrary python execution as root inside the single-container app",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "popen cat flag.txt returned the flagged string inside the custom str() call output",
+    "proof": "GET / with a lipsum-based popen payload returned the flagged string inside the custom error template"
+  },
+  "reuse_when": [
+    "an error page names or echoes the input URL through a template that renders it",
+    "Flask/Jinja2 renders a path or a config-owned parameter unescaped",
+    "a string-conversion error template avoids a dedicated sandbox"
+  ],
+  "known_traps": [
+    "a slash in the payload breaks the route pattern (<str> does not match slashes); slash-free shell commands are the easy route",
+    "{{config}} and environ list only environment sections, not the flag",
+    "the lipsum.__globals__ namespace gives os and any module without needing a real subconversation"
+  ],
+  "flag": null,
+  "schema_version": 1
+}
