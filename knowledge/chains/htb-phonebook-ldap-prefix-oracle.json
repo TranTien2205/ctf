@@ -10,6 +10,23 @@
     "assistance": "writeup-assisted"
   },
   "stack": ["go", "ldap", "nginx"],
+  "classification": {
+    "primary": "web-sqli",
+    "secondary": ["web-auth-session", "web-logic-flaw"],
+    "confidence": 0.9
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-phonebook-ldap-prefix-oracle.json",
+    "retrieved_at": "2026-09-17",
+    "evidence_spans": [
+      "first_confirming_probe: POST /login user=* pass=* reads a session cookie without the real password"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.9
+  },
   "preconditions": {
     "all_of": [
       "a login handler concatenates username and password straight into an LDAP filter string",
