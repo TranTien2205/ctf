@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "id": "htb-dusty-alleys-http10-host-vhost-leak-ssrf-to-header-mirror",
+  "source_note": "solved/htb-dusty-alleys-default-vhost-leak-ssrf-key-header.md",
+  "challenge": {
+    "name": "Dusty Alleys",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-19",
+    "assistance": "writeup-assisted"
+  },
+  "stack": ["nginx", "express", "node", "node-fetch"],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy fronts one or more applications and selects them by the host header",
+      "some reachable endpoint reflects request metadata back to the caller"
+    ],
+    "any_of": [
+      "an endpoint mirrors the request headers as a structured response",
+      "a second application is served only under a host name that is not yet known",
+      "a parameter causes the server itself to fetch a url the caller supplies"
+    ]
+  },
+  "signals": [
+    "nginx",
+    "express",
+    "think",
+    "guardian",
+    "host",
+    "x-forwarded-for",
+    "node-fetch",
+    "ssrf",
+    "vhost"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "treat a site that looks entirely static as unenumerated, and repeat directory discovery with a wordlist an order of magnitude larger before concluding it is empty",
+      "why": "the small default wordlist returned nothing here while the medium one found the only dynamic route on its first pass"
+    },
+    {
+      "step": 2,
+      "stage": "map the backend",
+      "action": "establish exactly which paths the proxy forwards and whether it rewrites them, using the framework's own not-found message as an oracle for the path the backend received",
+      "why": "the not-found text repeats the backend path verbatim, which settles prefix-stripping and traversal questions without guessing"
+    },
+    {
+      "step": 3,
+      "stage": "leak the vhost",
+      "action": "send the reflecting endpoint a request with the protocol version that makes the host header optional, and omit that header entirely",
+      "why": "the proxy then serves its default virtual host, and the reflection prints that host name, disclosing the internal domain the rest of the application is keyed on"
+    },
+    {
+      "step": 4,
+      "stage": "reach the hidden app",
+      "action": "replay ordinary requests with a host header built from the disclosed domain, trying the names the application's own vocabulary suggests",
+      "why": "the same port serves a completely different application once the host matches, and that application holds the vulnerable parameter"
+    },
+    {
+      "step": 5,
+      "stage": "ssrf into the mirror",
+      "action": "point the hidden application's url parameter back at the header-mirroring endpoint on the loopback interface",
+      "why": "the server-side fetcher attaches a secret header to its own outbound request, and the mirror prints that header back in the response"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "request the reflecting endpoint using the older protocol version with an empty host header, and compare the reflected host with the one returned by an ordinary request",
+    "expected": "the reflected host is an internal domain name rather than the address that was dialled",
+    "falsifier": "the reflected host is unchanged, or the proxy rejects the request outright"
+  },
+  "blast_radius": "read-only. Every step is a GET, and the server-side fetch should be pointed only at the challenge's own loopback services. Do not aim the url parameter at anything outside the supplied instance, and do not use it as a general relay.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was returned inline by the live target as the value of the key field in the JSON the mirroring endpoint produced for the server-side fetch"
+  },
+  "reuse_when": [
+    "a proxy-fronted target reflects the host header anywhere in a response",
+    "an application exposes both a url-fetching parameter and an endpoint that echoes request metadata",
+    "a site presents as static yet the challenge clearly expects a dynamic surface"
+  ],
+  "known_traps": [
+    "the loopback target must be addressed by the name the application expects: an address literal made the fetcher fail with an invalid status code error, while the name on the same port succeeded",
+    "the proxy normalises dot-dot segments before choosing a location, so traversal from the proxied prefix falls back to the static root instead of reaching another backend path",
+    "combining a content length with a chunked encoding is rejected by the proxy, so smuggling is not the way into the unproxied backend routes",
+    "the reflecting endpoint looks like a harmless debug route; its real value is that it prints credentials attached by a server-side fetcher"
+  ],
+  "flag": null
+}

@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "id": "htb-xxe-content-type-branch-simplexml-noent-file-read",
+  "source_note": "solved/htb-xxe-waffles-simplexml-noent.md",
+  "challenge": {
+    "name": "xxe (WAFfles or Ice Cream)",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["nginx", "php", "php/7.4.15", "alpine", "simplexml"],
+  "preconditions": {
+    "all_of": [
+      "a JSON API endpoint exists whose handler branches on the request content type",
+      "a value submitted in the body is echoed back in the response"
+    ],
+    "any_of": [
+      "the same endpoint accepts an XML document and answers normally",
+      "the application is themed around XML or around a filter, which hints the XML branch exists"
+    ]
+  },
+  "signals": [
+    "xxe",
+    "xml",
+    "php",
+    "nginx",
+    "content-type",
+    "api",
+    "simplexml",
+    "waf"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the front-end JavaScript rather than the visible form, and note the endpoint and content type it actually posts",
+      "why": "the rendered form here posted nothing; the JavaScript redirected it to a JSON API that the HTML never names"
+    },
+    {
+      "step": 2,
+      "stage": "surface",
+      "action": "resend the same logical body to the same endpoint as an XML document with an XML content type",
+      "why": "a handler that branches on content type often has a second, unguarded parser behind the branch"
+    },
+    {
+      "step": 3,
+      "stage": "confirm substitution",
+      "action": "declare a harmless internal entity and place it in the field that is echoed back",
+      "why": "seeing the internal entity expand separates entity substitution from an unreadable file, so a later empty reply is unambiguous"
+    },
+    {
+      "step": 4,
+      "stage": "primitive",
+      "action": "swap the internal entity for an external one naming a world-readable system file",
+      "why": "the echoed field returns the file contents inline, which is a direct read rather than a blind channel"
+    },
+    {
+      "step": 5,
+      "stage": "orient",
+      "action": "read the web server configuration to learn the document root before reading application source",
+      "why": "the root is stated in the config, so no application path has to be guessed"
+    },
+    {
+      "step": 6,
+      "stage": "source",
+      "action": "read the application sources through a base64-encoding stream filter instead of the plain file scheme",
+      "why": "source containing angle brackets breaks the surrounding XML document and reads as a failure rather than as a hit"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "post the same body to the JSON endpoint with an XML content type and an XML document that declares an internal entity in the echoed field",
+    "expected": "the response echoes the entity's value rather than the entity reference, proving substitution is on",
+    "falsifier": "the endpoint rejects the content type, or the entity reference comes back literally or empty"
+  },
+  "blast_radius": "read-only. The request is an ordinary order submission and creates no persistent object here. Read files only inside the challenge container, and never point an external entity at a host outside the supplied scope.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was returned inline in the body of POST /api/order, in the same position where the submitted food value is echoed"
+  },
+  "reuse_when": [
+    "an endpoint documented or observed as JSON also answers to an XML content type",
+    "a submitted field is interpolated into the response text",
+    "a PHP application parses a request body with a call that enables entity substitution"
+  ],
+  "known_traps": [
+    "the challenge theme named a filter and made a WAF-bypass chain the top local match, but there was no filter at all and the plainest payload worked; probe the plain payload before the encoded one",
+    "reading PHP source with the plain file scheme breaks the XML parse because the source contains angle brackets, so a base64 stream filter is required and its absence looks like an unreadable file",
+    "the visible HTML form was not the request path; only the front-end JavaScript named the real endpoint and content type"
+  ],
+  "flag": null
+}

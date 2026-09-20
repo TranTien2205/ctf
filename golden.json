@@ -1,0 +1,7 @@
+[
+  {"text": "web endpoint stored XSS admin bot", "category": "web"},
+  {"text": "RSA ciphertext modulus e", "category": "crypto"},
+  {"text": "ELF buffer overflow checksec", "category": "pwn"},
+  {"text": "pcap steganography", "category": "forensics"},
+  {"text": "Python pyjail sandbox", "category": "misc"}
+]

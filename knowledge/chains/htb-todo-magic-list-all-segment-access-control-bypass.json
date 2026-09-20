@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "htb-todo-magic-list-all-segment-access-control-bypass",
+  "source_note": "solved/htb-todo-or-not-todo-list-all-access-control.md",
+  "challenge": {
+    "name": "broken authentication control (TODO OR NOT TODO)",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "python", "werkzeug"],
+  "preconditions": {
+    "all_of": [
+      "a listing endpoint takes the identity to list as a path segment rather than deriving it from the session",
+      "the caller already holds a valid session and any per-session secret the endpoint requires"
+    ],
+    "any_of": [
+      "a comment, disabled control or dead code in the page names a special value for that segment",
+      "the endpoint accepts a collective value such as all in place of an identity"
+    ]
+  },
+  "signals": [
+    "flask",
+    "session",
+    "api",
+    "list",
+    "all",
+    "secret",
+    "tasks",
+    "assignee",
+    "verify_integrity"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the entry page including its inline script and hidden inputs, not only the linked JavaScript",
+      "why": "the per-session secret, the identity to use and a comment naming the unpatched check were all inline in the page"
+    },
+    {
+      "step": 2,
+      "stage": "surface",
+      "action": "list every API route from the linked JavaScript and note which ones take an identity in the path",
+      "why": "an identity in the path is the bug surface; an identity taken from the session is not"
+    },
+    {
+      "step": 3,
+      "stage": "baseline",
+      "action": "call the listing endpoint for your own identity and record the exact response",
+      "why": "an empty own-listing is what makes a populated response for another value proof rather than a guess"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "replace only the identity segment with the collective value the page hinted at, keeping the same cookie and secret",
+      "why": "the special value is handled upstream of the ownership comparison, so nothing has to be forged or enumerated"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "issue the listing request twice with one cookie and one secret, once for your own identity and once with the identity segment replaced by the collective value",
+    "expected": "your own listing is empty or short while the collective value returns rows owned by another account",
+    "falsifier": "the collective value returns the same rows as your own identity, or is rejected with the same error as an unrelated identity"
+  },
+  "blast_radius": "read-only. Use the listing route only; the same API exposes completion and deletion routes that take an id and would mutate another account's objects, so never point those at an id that is not yours.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was returned as the name field of one object in the JSON array from the listing endpoint on the live target"
+  },
+  "reuse_when": [
+    "a route embeds a username, account id or tenant in the path while the session already identifies the caller",
+    "front-end code or a comment mentions a value for that segment which the interface never sends",
+    "an application provisions a throwaway identity per visit instead of offering a login"
+  ],
+  "known_traps": [
+    "the session cookie, the identity and the per-session secret are issued together on each visit; pairing a stale identity with a fresh cookie returns an authorisation error that looks exactly like the control working, which is a false negative that can kill a correct hypothesis",
+    "capture the cookie, the identity and the secret from one single response before probing",
+    "the session cookie is signed and does not need to be forged; the bug is entirely in the path segment"
+  ],
+  "flag": null
+}

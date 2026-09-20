@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "htb-bonechewercon-method-not-allowed-whoops-env-disclosure",
+  "source_note": "solved/htb-bonechewercon-whoops-env-appkey-disclosure.md",
+  "challenge": {
+    "name": "BonechewerCon",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["nginx", "php", "php/7.4.12", "laravel", "whoops", "symfony"],
+  "preconditions": {
+    "all_of": [
+      "the application is a PHP framework that renders a detailed error page instead of a generic one",
+      "some request the client can make raises an unhandled exception"
+    ],
+    "any_of": [
+      "a form declares a method the route does not support",
+      "the error page renders a table of environment variables or configuration values"
+    ]
+  },
+  "signals": [
+    "laravel",
+    "whoops",
+    "symfony",
+    "php",
+    "nginx",
+    "debug",
+    "methodnotallowed",
+    "app_key",
+    "environment variables"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the entry page and note the form's declared method and action alongside the session cookie's shape",
+      "why": "the declared method is what triggers the exception here, and the cookie shape tells you which session driver is in use"
+    },
+    {
+      "step": 2,
+      "stage": "trigger",
+      "action": "submit the form exactly as declared, even if the route looks unlikely to accept that method",
+      "why": "an unsupported method raises a routing exception, and with debug enabled that exception is rendered as a full diagnostic page"
+    },
+    {
+      "step": 3,
+      "stage": "read",
+      "action": "enumerate the labelled detail sections of the error page before reading the stack trace",
+      "why": "the environment section is the configuration file verbatim, which is a faster and more complete read than the trace"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "take the secret from the configuration table directly",
+      "why": "the application key itself was the objective; no pivot or forgery was required"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "submit the entry form using the method it declares and compare the response size with the normal page",
+    "expected": "a response an order of magnitude larger than the normal page, containing a framework exception name and labelled diagnostic sections",
+    "falsifier": "the request is handled normally, or the error page is the framework's generic production page with no detail sections"
+  },
+  "blast_radius": "read-only. The request raises an exception and reaches no application logic, so nothing is created or modified. Treat every credential in the disclosed configuration as live and do not connect to the services it names; they are usually bound to the container's own loopback and are out of scope.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was read from the body of the error page returned by the live target, inside the environment variables table as the value of the application key"
+  },
+  "reuse_when": [
+    "a form's declared method does not match the route that serves the page",
+    "any response reveals a framework debug or profiler page",
+    "the application advertises a degraded or maintenance state while still answering with normal status codes"
+  ],
+  "known_traps": [
+    "the page's maintenance notice and the maintenance middleware in the stack trace both suggest a maintenance-mode bypass, but the application is not in maintenance mode and returns 200; that is flavour text, not the bug",
+    "the same parameter sent on the supported method is not reflected at all and the response is byte-for-byte identical to the plain page, so there is no injection surface to chase",
+    "a plain fixed-length session id means a server-side session driver, so a leaked application key does not enable a session forge on this target"
+  ],
+  "flag": null
+}

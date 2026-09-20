@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "id": "htb-magicom-argv-injection-phar-jpeg-config-cmdi",
+  "source_note": "solved/htb-magicom-argv-injection-phar-jpeg-config-cmdi.md",
+  "challenge": {
+    "name": "Magicom",
+    "platform": "HackTheBox",
+    "event": "Business CTF 2024",
+    "category": "web",
+    "solved_at": "2026-09-19",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "php",
+    "php-fpm",
+    "nginx",
+    "mysql",
+    "phar",
+    "domdocument",
+    "imagick",
+    "multipart"
+  ],
+  "preconditions": {
+    "all_of": [
+      "A PHP script that is meant to be run from the command line is reachable over HTTP, and refuses with a message such as 'must be run from the command line'.",
+      "That script takes a file path from its arguments and opens it with a function that honours PHP stream wrappers (DOMDocument::load, simplexml_load_file, file_get_contents, file_exists, is_dir).",
+      "The application stores an uploaded file somewhere on local disk at a path the attacker can learn."
+    ],
+    "any_of": [
+      "phpinfo() or another configuration disclosure shows register_argc_argv = On.",
+      "The upload validator demands a genuinely parseable image but preserves bytes appended after the image data.",
+      "A value taken from that opened file is interpolated into a shell command (exec, system, passthru, shell_exec)."
+    ]
+  },
+  "signals": [
+    "register_argc_argv",
+    "argv",
+    "phpinfo",
+    "phar://",
+    "__HALT_COMPILER",
+    "setStub",
+    "DOMDocument",
+    "passthru",
+    "multipart/form-data",
+    "php-fpm",
+    "cli.php",
+    "mysqldump",
+    "phar.readonly",
+    "doc root"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "read the configuration disclosure before probing anything",
+      "action": "Fetch any phpinfo() endpoint and pull four things: register_argc_argv, disable_functions, open_basedir and DOCUMENT_ROOT. Read the System row too - the kernel hostname often carries the challenge and event name.",
+      "why": "register_argc_argv decides whether a CLI-gated script is reachable, DOCUMENT_ROOT gives the absolute path a phar:// URL needs, and the hostname is frequently the fastest route to the published source for that event."
+    },
+    {
+      "step": 2,
+      "stage": "defeat the command-line gate with an argv-shaped query string",
+      "action": "Request the CLI script with a query string that contains no '=' sign, using '+' between the arguments: /path/script.php?+-m+<mode>+-c+<path>+-f+<existing file>. Confirm the refusal message disappears.",
+      "why": "With register_argc_argv = On, PHP fills $_SERVER['argv'] and argc from the raw query string whenever it contains no '=', splitting on '+'. A check like isset($_SERVER['argv'], $_SERVER['argc']) is therefore not an authorisation boundary at all."
+    },
+    {
+      "step": 3,
+      "stage": "build a phar whose stub is a complete valid image",
+      "action": "Locally, with php -d phar.readonly=0, create a Phar, addFromString the data file the target will read, and setStub(<entire valid JPEG bytes> . ' __HALT_COMPILER(); ?>'). Rename it to the accepted extension. Verify with 'file' that it still reports a real image.",
+      "why": "A phar stub may be arbitrary bytes ending in __HALT_COMPILER(); ?>, so one file can be a genuine parseable image and a readable archive at the same time. That satisfies validators which do a real image parse and an extension whitelist, and it does not need phar.readonly off on the target - only locally, because only creation is restricted."
+    },
+    {
+      "step": 4,
+      "stage": "point the path argument at the uploaded archive",
+      "action": "Upload the polyglot, read the stored path back out of the page that renders it, and pass -c phar://<DOCUMENT_ROOT>/<stored path>/<inner file> to the CLI script.",
+      "why": "file_exists, is_dir and every loader built on PHP streams resolve phar:// transparently, so the script reads a file the attacker authored while believing it read a local config. No unserialize() and no object injection is involved - the archive is only a delivery mechanism for a data file."
+    },
+    {
+      "step": 5,
+      "stage": "turn the smuggled data file into command execution",
+      "action": "Put the payload in whatever field of that file reaches a shell. Where the value is interpolated into a command, terminate the intended command with ';', append the real one, and comment out the remainder with '#'. Read the output from the HTTP response body.",
+      "why": "passthru/system print straight into the response, so a blind sink is not needed. The intended command is allowed to fail - execution continues past the ';' regardless, which is why placeholder credentials in a published solver do not have to be correct."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET the CLI-only script twice: once normally, and once with an argv-shaped query string containing no '=' sign, for example /cli/cli.php?+-m+healthcheck (pick whatever harmless mode the script defines).",
+    "expected": "The plain request answers with the command-line refusal message; the argv-shaped one does not, and instead produces the script's own output or a different error. That proves register_argc_argv is On and every argument of the script is attacker-controlled.",
+    "falsifier": "Both requests return the same refusal message. Then register_argc_argv is Off or the gate checks php_sapi_name(), the whole chain is closed, and the next mechanism layer should be tried instead of more query-string spellings."
+  },
+  "blast_radius": "The final step is arbitrary command execution as the web user on a shared instance, so every command must be chosen deliberately: prefer id, ls, cat and the challenge's own setuid flag reader, and never a command that writes outside a directory you created. The upload step adds a real row to the application's database and a real file to its upload directory on every single run, and the exploit needs one upload per command, so an interactive session litters the instance quickly - batch several commands into one payload with ';' rather than running the chain repeatedly. Cleaning up afterwards may be impossible: the application's database account here held SELECT, INSERT and UPDATE but no DELETE, so the uploaded files could be removed but the rows could not. Assume that before starting and keep the number of uploads small.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The flag was printed into the body of a live HTTP response from /cli/cli.php on the supplied instance, after the uploaded phar-JPEG supplied a config whose database value injected the setuid /readflag binary. The same request was repeated with plain curl and the flag appeared under the HTTP/1.1 200 OK and X-Powered-By: PHP/8.1.28 headers."
+  },
+  "reuse_when": [
+    "A PHP endpoint answers that it must be run from the command line.",
+    "phpinfo() or similar shows register_argc_argv = On.",
+    "An upload demands a real parseable image yet keeps whatever is appended after it.",
+    "Any argument, config path or include path reaches a PHP function that reads through stream wrappers.",
+    "A configuration value ends up inside a shell command string."
+  ],
+  "known_traps": [
+    "When the payload is written into a structured data file, the format's own metacharacters break it silently. Here the command sits in an XML attribute, so a literal double quote, '<' or '&' makes DOMDocument fail, the config comes back empty and the response is a blank 200 that looks like the exploit regressed. '2>&1' is the usual casualty - use 2>/dev/null, or 2>/tmp/e followed by cat.",
+    "A published solver's credentials may be decoys. Here root/rootganteng was invalid on the target and it made no difference, because the command it belongs to is meant to fail before the ';'.",
+    "The mysql client in these containers often has no unix socket - pass -h 127.0.0.1 or it exits non-zero with no output.",
+    "Do not chase execution of the uploaded file itself. It is renamed to random hex with a forced extension and served as an image; it is read as data through phar://, never run.",
+    "A few magic bytes are not a valid image. Build real images with a library before drawing conclusions about which formats an upload filter accepts.",
+    "phar.readonly=On on the target does not block this chain. It restricts creating archives, not reading them, and the archive is built on the attacker's own machine.",
+    "Every run of the exploit uploads again. Batch commands into a single payload instead of running the chain once per command."
+  ],
+  "flag": null
+}

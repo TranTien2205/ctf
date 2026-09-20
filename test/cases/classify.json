@@ -1,0 +1,93 @@
+{
+  "comment": "Golden cases for tools/classify.py. Each observation is the evidence that was available BEFORE the solve, not a summary written afterwards — that is what makes this a measurement rather than a tautology. expect_top must be the first candidate; expect_within must appear in the first N. Add a case after every solve. Never delete one to make a change pass.",
+  "cases": [
+    {
+      "observation": "Ruby WEBrick app renders the neon parameter with ERB, filter rejects Malicious Input Detected",
+      "expect_top": "web-ssti",
+      "origin": "solved/neonify.md"
+    },
+    {
+      "observation": "Traefik reverse proxy, app trusts X-Real-Ip, 403 only internal, Connection header",
+      "expect_top": "web-parser-differential",
+      "origin": "solved/novacore.md"
+    },
+    {
+      "observation": "OAuth2 SSO provider, redirect_uri and state, jsessionid and connect.sid cookies, /authorize and /token",
+      "expect_top": "web-oauth-sso",
+      "origin": "solved/ssos.md"
+    },
+    {
+      "observation": "Express mongoose update takes extra keys, __proto__ merge, GET /flag 403 access denied",
+      "expect_top": "web-prototype-pollution",
+      "expect_within": {
+        "class": "web-nosqli",
+        "n": 3
+      },
+      "origin": "solved/secnotes.md"
+    },
+    {
+      "observation": "nginx serving /assets with an alias, Laravel error page, .env leak, session cookie",
+      "expect_within": {
+        "class": "file-read-primitives",
+        "n": 3
+      },
+      "origin": "solved/nginxatsu.md"
+    },
+    {
+      "observation": "picture url field is converted server side, Express X-Powered-By, error body echoes content",
+      "expect_top": "web-ssrf",
+      "origin": "solved/red-island.md"
+    },
+    {
+      "observation": "index page prints the php source: waf() on the raw body then json_decode, vsprintf into SELECT note FROM notes WHERE assignee, response always 200 empty",
+      "expect_within": {
+        "class": "web-sqli",
+        "n": 3
+      },
+      "origin": "solved/red-island-2.md"
+    },
+    {
+      "observation": "profile update then a verification token is re-read in another function, admin bot renders stored notes",
+      "expect_within": {
+        "class": "web-race-condition",
+        "n": 3
+      },
+      "origin": "solved/apexsurvive.md"
+    },
+    {
+      "observation": "SOAP endpoint accepts application/xml with a DOCTYPE and an ENTITY",
+      "expect_top": "web-xxe",
+      "origin": "catalogue class must still route"
+    },
+    {
+      "observation": "multipart/form-data avatar upload, filename kept, image/png mime check",
+      "expect_top": "web-file-upload",
+      "origin": "catalogue-adjacent shape"
+    }
+  ],
+  "source_cases": [
+    {
+      "source": "challenges/Weather App/web_weather_app/challenge",
+      "expect_within": {
+        "class": "web-ssrf",
+        "n": 3
+      },
+      "also_within": [
+        {
+          "class": "web-request-smuggling",
+          "n": 4
+        },
+        {
+          "class": "web-sqli",
+          "n": 4
+        }
+      ],
+      "origin": "solved/weather_app.md — the three classes the real chain used"
+    },
+    {
+      "source": "test/fixtures/benign-express",
+      "expect_none": true,
+      "origin": "precision guard: an ordinary app must match nothing. If this fails, a signal in knowledge/bug-classes.json is too broad. Tighten the signal, never the test."
+    }
+  ]
+}

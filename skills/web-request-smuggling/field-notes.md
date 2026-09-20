@@ -1,0 +1,74 @@
+# Field notes — Request smuggling / CRLF injection
+
+Written by `tools/classify_solve.py` after a flag is verified, then reviewed by a
+human. Nothing here is generated from guesswork: every entry cites the solved note
+and the chain card it came from.
+
+| Status | Meaning |
+|---|---|
+| `proposed` | written automatically after a solve; not yet reviewed |
+| `confirmed` | a human checked it against the evidence and kept it |
+
+Promote an entry by changing its status line to `confirmed`. Delete an entry that
+did not hold up, and say why in the commit message. `test/regression.py` fails if
+an entry has any other status.
+
+---
+
+## 2026-09-11 · Weather App · proposed
+
+- source note: `solved/weather_app.md`
+- chain card: `knowledge/chains/htb-weather-app-ssrf-crlf-request-smuggling-upsert.json`
+- verification: verified_live — flag returned in the login response
+- classified as: `web-request-smuggling` (score 4.5, 4 signals matched)
+- also matched: `web-ssrf` (4.5), `web-sqli` (3.5), `web-ssti` (2.5)
+- signals that fired: Content-Length, \u010D, crlf, http://${endpoint}
+
+**Confirming probe that worked**
+
+> put a harmless marker with one folded space character into the interpolated field and compare the error with an ordinary hostname
+
+Expected: the parser accepts the folded character, showing the field is not encoded
+
+Falsifier: the field is encoded or validated, so no control characters survive
+
+**Traps recorded on this solve**
+
+- the injected content length must count the body bytes exactly
+- a trailing request fragment is needed so the smuggled request is terminated
+
+**Blast radius**: the upsert changes an existing account's password on a shared instance; other players lose access to that account
+
+- status: proposed
+
+## 2026-09-19 · Proxy · proposed
+
+- source note: `solved/htb-proxy-smuggling-exec-stderr-oracle.md`
+- chain card: `knowledge/chains/htb-proxy-smuggling-exec-stderr-oracle.json`
+- verification: verified_live — The complete flag was confirmed by an anchored oracle query over the live instance: grep -q '^HTB{...}$' /flag*.txt returned HTTP/1.1 200 OK with Content-Length: 0 on the smuggled request, while the same query with one extra character appended returned HTTP/1.1 401 Unauthorized {"message":"Error flushing interface"}. Both responses were read off the live socket in the same session.
+- classified as: `web-request-smuggling` (score 4.5, 4 signals matched)
+- also matched: `web-ssrf` (2.5), `web-ssti` (1.5), `web-auth-session` (1.5)
+- signals that fired: CRLF, Content-Length, Proxy, \r\n
+
+**Confirming probe that worked**
+
+> Send a single TCP write to the proxy: an allowed route with body {"a":1} and Content-Length: 7, then \r\n\r\n, then a second full request to a route the proxy's URL filter bans, with Host set to the alternate-encoded internal address. Count the HTTP status lines in the response.
+
+Expected: Two HTTP status lines come back on the one connection, and the second belongs to the banned route (any status from the backend, including its own 4xx) rather than the proxy's 400 Bad Request. That proves the bytes after the second CRLFCRLF were forwarded unfiltered.
+
+Falsifier: Only one status line returns, or the single response is the proxy's own 400/403 for the banned URL. Then the proxy re-serialises the request (or validates the whole buffer) and this chain does not apply — move to a different mechanism layer rather than trying more separator variants.
+
+**Traps recorded on this solve**
+
+- The visible first request must target a route the proxy actually forwards. Routes the proxy serves itself (/, /server-status here) never open an upstream connection, so nothing is smuggled and the probe looks like a clean falsification when it is not.
+- The filler body must satisfy the backend's own body parser. express.json() answers 400 to a non-JSON filler and closes the connection before the smuggled request is read.
+- Do not spend effort routing around the body blocklist once smuggling works. It only inspects bodySplit[1], so $(), backticks, ; and | are all already available in the smuggled half.
+- ${IFS} expands and splits words normally - but not before an fd-numbered redirect. 'x${IFS}2>/dev/null' lexes as the word x${IFS}2 plus a bare '>', which redirects stdout and lets stderr leak; use a literal TAB there. Verified on BusyBox ash and dash.
+- 'x2>/dev/null' with no separator at all is the same failure one step earlier: the word is x2 plus a stdout redirect, stderr still leaks, and a stderr-based oracle then reads false for every candidate.
+- Alpine base images ship no curl. Check wget, nc, nslookup and node before concluding there is no way out.
+- The flag filename may be randomised at container start (entrypoint renaming to /flag<random>.txt). Read through a glob, not a fixed path.
+- Do not trust a single oracle reading. Re-send each query and include a negative control (a pattern one character off) before accepting a result.
+
+**Blast radius**: High if the injected value is careless. The sink here runs as root inside the challenge container. The route's legitimate function flushes addresses off a network interface: passing a real interface name (eth0, lo) severs the container's networking and permanently bricks the shared instance with no way back. Always pass a name that does not exist (a bare 'x') so the legitimate command fails harmlessly, and carry the payload in the injected suffix only. Read-only conditions (grep -q, ls, test) keep the whole extraction non-destructive. Keep concurrency at one connection: the proxy reads with a fixed 1024-byte buffer and pipelining plus load makes responses unreliable. Separately, the out-of-band route sends challenge data to whatever collector is named in the URL: that is a real disclosure to a third party, so use a collector you control and never a public paste or request-bin for anything beyond a test marker. Where disclosure matters more than speed, the blind oracle keeps everything on the wire between you and the target.
+
+- status: proposed

@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "id": "htb-broken-authentication-unsigned-base64-json-cookie-forge",
+  "source_note": "solved/broken-authentication.md",
+  "challenge": {
+    "name": "broken authentication",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["nginx", "php", "php/7.4.12"],
+  "preconditions": {
+    "all_of": [
+      "the application issues a session cookie after a successful login",
+      "the cookie value decodes to readable structured data rather than an opaque identifier",
+      "no signature, MAC or second cookie accompanies the value"
+    ],
+    "any_of": [
+      "an authenticated page states which privilege the current user lacks",
+      "self-registration is open, so a known-plaintext cookie can be obtained"
+    ]
+  },
+  "signals": [
+    "phpsessid",
+    "session cookie",
+    "broken authentication",
+    "login",
+    "register",
+    "not an admin",
+    "php"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "fetch the entry page and the login and register pages, list every form action",
+      "why": "the form actions are the only endpoints; there is no front-end JS calling anything else"
+    },
+    {
+      "step": 2,
+      "stage": "obtain known plaintext",
+      "action": "register an account of your own and log in with it, keeping the Set-Cookie header",
+      "why": "a cookie whose plaintext you chose is what makes the encoding readable in one step"
+    },
+    {
+      "step": 3,
+      "stage": "decode",
+      "action": "URL-decode then base64-decode the cookie value and look for your own username in it",
+      "why": "a structured value containing your username proves the session is client-side state, not a server-side id"
+    },
+    {
+      "step": 4,
+      "stage": "locate the claim",
+      "action": "request the authenticated landing page and read the denial text",
+      "why": "the denial names the field and the value the authorisation check compares against"
+    },
+    {
+      "step": 5,
+      "stage": "forge",
+      "action": "re-encode the same structure with the privileged value and send it as the cookie",
+      "why": "with no MAC there is nothing to defeat; the server trusts the decoded value as-is"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "register your own account, log in, then URL-decode and base64-decode the session cookie returned by Set-Cookie",
+    "expected": "the decoded bytes are readable structured data containing the username you just chose",
+    "falsifier": "the value is opaque, or a signature or MAC segment travels with it and the server rejects an edited value"
+  },
+  "blast_radius": "one self-registered user row on a shared challenge database. The forge itself is a read with a chosen cookie and mutates nothing. Do not spray usernames; register once and reuse that account.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was read from the body of GET / on the live target, inside an <h1> element, with the forged cookie attached"
+  },
+  "reuse_when": [
+    "a cookie named after a framework session but whose value is not the framework's id format",
+    "a cookie value ending in = or %3D, or decoding to JSON, a query string or a serialised object",
+    "an authorisation check that appears to read a username or role rather than a lookup key"
+  ],
+  "known_traps": [
+    "the cookie name lies: PHPSESSID here carried base64 JSON, not a PHP session id, so do not skip decoding because the name looks standard",
+    "curl writes the cookie URL-encoded; %3D must be decoded to = before base64 decoding or the decode looks like it failed",
+    "re-encode with base64 -w0, since a wrapped line breaks the header"
+  ],
+  "flag": null
+}

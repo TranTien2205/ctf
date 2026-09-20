@@ -1,0 +1,18 @@
+{
+  "comment": "Observation -> expected category from ctf.observation_route. Each case is a shape this toolkit has actually met. Add a case whenever a real challenge routes wrongly; never delete one to make a change pass.",
+  "cases": [
+    {"text": "web endpoint stored XSS admin bot", "category": "web", "origin": "golden.json"},
+    {"text": "RSA ciphertext modulus e", "category": "crypto", "origin": "golden.json"},
+    {"text": "ELF buffer overflow checksec", "category": "pwn", "origin": "golden.json"},
+    {"text": "pcap steganography", "category": "forensics", "origin": "golden.json"},
+    {"text": "Python pyjail sandbox", "category": "misc", "origin": "golden.json"},
+    {"text": "web endpoint fetch admin bot", "category": "web-ssrf", "origin": "regression baseline"},
+    {"text": "Express mongoose update noteId flag 403", "category": "web", "origin": "solved/secnotes.md"},
+    {"text": "nginx laravel alias traversal APP_KEY session cookie", "category": "web", "origin": "solved/nginxatsu.md"},
+    {"text": "tornado dashboard report bot cookie_secret signed cookie", "category": "web", "origin": "solved/tornadoservice.md"},
+    {"text": "packed binary UPX ghidra decompile crackme", "category": "rev", "origin": "rev-triage scope"},
+    {"text": "volatility memory dump carving exiftool", "category": "forensics", "origin": "forensics-triage scope"},
+    {"text": "llm chatbot system prompt hidden instructions", "category": "ai", "origin": "ai-iot-triage scope"},
+    {"text": "geolocation reverse image osint", "category": "osint", "origin": "osint-triage scope"}
+  ]
+}

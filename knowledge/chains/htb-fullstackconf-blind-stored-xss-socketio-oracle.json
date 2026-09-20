@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "id": "htb-fullstackconf-blind-stored-xss-socketio-oracle",
+  "source_note": "solved/htb-fullstackconf-stored-xss-innerhtml-socketio-flag.md",
+  "challenge": {
+    "name": "xss (Full Stack Conf)",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "python", "werkzeug", "socket.io", "flask-socketio"],
+  "preconditions": {
+    "all_of": [
+      "a value the player submits is rendered somewhere the player cannot read",
+      "the application offers a push channel or other side channel that reports when the payload executed"
+    ],
+    "any_of": [
+      "the page states that triggering a dialog is the objective",
+      "front-end code subscribes to an event carrying the reward, even if a comment disclaims it",
+      "no route exists that reflects the submitted value back to the submitter"
+    ]
+  },
+  "signals": [
+    "xss",
+    "socket.io",
+    "flask",
+    "werkzeug",
+    "alert",
+    "bot",
+    "register",
+    "email",
+    "flag event"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the inline script for both the submission endpoint and any subscription to a push event, including code a comment disclaims",
+      "why": "the disclaimed socket listener was the only channel the reward is delivered on, so ignoring it leaves success unobservable"
+    },
+    {
+      "step": 2,
+      "stage": "bound the surface",
+      "action": "enumerate routes and confirm the submitted value is not reflected anywhere the submitter can read",
+      "why": "establishing that the sink is invisible turns the side channel from a convenience into the only oracle, and stops a hunt for a reflection that does not exist"
+    },
+    {
+      "step": 3,
+      "stage": "build the oracle",
+      "action": "open the push channel and watch raw frames for a while with no payload in flight",
+      "why": "proving the server holds the connection open until it has data is what makes a silent channel a trustworthy negative rather than an ambiguous one"
+    },
+    {
+      "step": 4,
+      "stage": "probe",
+      "action": "hold the channel open and submit a batch of payloads covering different injection contexts in one pass",
+      "why": "the round trip is dominated by how often the renderer runs, so batching contexts costs one wait instead of one wait per payload"
+    },
+    {
+      "step": 5,
+      "stage": "bisect",
+      "action": "once the event arrives, re-send payloads one at a time on a fresh channel to identify which one executed",
+      "why": "the batch proves the class but not the context; the single-payload runs name the sink and make the note reusable"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "open the push channel, leave it idle briefly to confirm it stays silent, then submit an image element with an error handler as the stored value and keep the channel open for about two minutes",
+    "expected": "a frame arrives on the channel carrying the reward payload",
+    "falsifier": "the channel delivers unrelated traffic while idle, so silence proves nothing, or repeated submissions across contexts produce no frame at all"
+  },
+  "blast_radius": "the submission is an ordinary newsletter registration and each payload stores one row that a shared renderer will execute. Keep the payload to a harmless dialog, never a redirect, a request to an outside host, or anything that changes state, because other players' sessions are rendered by the same component. Do not repeat the batch once it has fired.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag arrived inside an event frame pushed by the live target on its own push channel, in response to a stored payload executing in the renderer"
+  },
+  "reuse_when": [
+    "a stored value is rendered by a bot, an administrator view, or a renderer the player cannot reach",
+    "the application already subscribes to a push event that would report success",
+    "a challenge names a dialog function as the objective"
+  ],
+  "known_traps": [
+    "an element whose handler fires while a plain script element does not is the signature of insertion through an HTML property rather than a parser, so carry the handler-based payload first and do not read a failing script element as the value being escaped",
+    "one silent run is not a negative on a bot-driven target: the first attempt with a payload that was later proven to work saw nothing for ninety seconds, and the difference was never explained, so re-run before discarding a payload",
+    "confirm the channel is one that stays open until the server has data before treating its silence as a result",
+    "a comment declaring the push channel is not part of the challenge is misleading; it is not part of the bug but it is the entire exfiltration path"
+  ],
+  "flag": null
+}

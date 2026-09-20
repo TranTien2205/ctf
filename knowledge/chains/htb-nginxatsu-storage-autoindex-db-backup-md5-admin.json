@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "id": "htb-nginxatsu-storage-autoindex-db-backup-md5-admin",
+  "source_note": "solved/nginxatsu-v2-storage-autoindex-db-backup.md",
+  "challenge": {
+    "name": "nginxatsu (rescue-mission variant)",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["nginx", "php", "php/7.4.12", "laravel", "sqlite"],
+  "preconditions": {
+    "all_of": [
+      "the application generates a file for the user and serves it back from a fixed directory prefix",
+      "that directory prefix is served by nginx directly rather than through the framework"
+    ],
+    "any_of": [
+      "the generated artifact is a server configuration that shows how the directory is served",
+      "requesting the directory itself returns an index listing rather than a 403 or 404"
+    ]
+  },
+  "signals": [
+    "nginx",
+    "laravel",
+    "autoindex",
+    "storage",
+    "config",
+    "backup",
+    "sqlite",
+    "api_token",
+    "nginxatsu"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "register an account, read the dashboard HTML and its JavaScript, and list every endpoint it calls",
+      "why": "the API token and every route are inlined in the page; nothing needs to be guessed"
+    },
+    {
+      "step": 2,
+      "stage": "source read",
+      "action": "generate one artifact with the default values and read it, including its comments",
+      "why": "a generator prints the deployment's own template, so the generated file discloses how the server serves its directories"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "request the serving directory itself with a trailing slash and read the index listing",
+      "why": "an autoindex directory exposes every file written there, including files that are not the generated artifact"
+    },
+    {
+      "step": 4,
+      "stage": "loot",
+      "action": "download the file in that listing that is not a generated artifact, and identify it with file rather than by extension",
+      "why": "the archive here was a plain tar named .tar.gz, so decompressing by extension fails and looks like a dead end"
+    },
+    {
+      "step": 5,
+      "stage": "pivot",
+      "action": "open the database it contains and check the password column width and alphabet before assuming the framework default hasher",
+      "why": "a 32-character hex column in a Laravel app is MD5, which a wordlist attack breaks in seconds"
+    },
+    {
+      "step": 6,
+      "stage": "flag",
+      "action": "log in as the cracked privileged user and read the landing page",
+      "why": "the privileged view renders the flag directly; no further escalation is needed"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "generate one artifact with the default values, follow the link to its raw file, then request that file's parent directory with a trailing slash",
+    "expected": "an index listing of the directory, containing at least one file that no user generated",
+    "falsifier": "the directory returns 403 or 404, or the listing contains only files matching the generated naming pattern"
+  },
+  "blast_radius": "read-only apart from one self-registered account and one generated artifact, both of which are ordinary use of the feature. Do not delete files found in the listing; other players read the same directory. Crack hashes offline, never against the live login form.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was read from the body of GET / on the live target, inside a <p> element in the page header, while authenticated as the cracked privileged account"
+  },
+  "reuse_when": [
+    "an application writes a per-user file and links to it under a fixed path prefix",
+    "a generated configuration file is itself readable by the user who generated it",
+    "an nginx-branded 404 shows a prefix is served by nginx while other paths return framework-branded errors"
+  ],
+  "known_traps": [
+    "this target shares its fingerprint with the 2021 alias-traversal chain and matches it at full signal coverage, yet the traversal probe falsifies: the location uses root, not alias, so nothing traverses",
+    "an nginx-branded 404 means the location matched and the file is absent; a framework-branded 404 means the prefix is not served by nginx at all, which is what decides the traversal question in one request",
+    "nginx normalises dot-dot segments before matching a location, so a multi-level traversal collapses and reaches the application instead of the static prefix",
+    "the archive was a plain tar with a .tar.gz name; identify it with file before trying to decompress it",
+    "sorting parameters supplied in the query string did not reach the query here, so the boolean oracle from the older chain does not exist on this variant"
+  ],
+  "flag": null
+}

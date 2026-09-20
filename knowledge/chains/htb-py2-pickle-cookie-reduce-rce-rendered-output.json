@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "id": "htb-py2-pickle-cookie-reduce-rce-rendered-output",
+  "source_note": "solved/htb-anti-pickle-serum-py2-cookie-unpickle-rce.md",
+  "challenge": {
+    "name": "insecure deserialization (anti_pickle_serum)",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-18",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "python", "python2", "werkzeug", "pickle", "alpine"],
+  "preconditions": {
+    "all_of": [
+      "the client holds a cookie or parameter that decodes to a serialized object graph rather than to plain data",
+      "the value is accepted without a signature or message authentication code"
+    ],
+    "any_of": [
+      "the decoded bytes contain readable module and class names alongside single-letter opcodes",
+      "a value derived from the deserialized object is rendered back into the response"
+    ]
+  },
+  "signals": [
+    "pickle",
+    "python2",
+    "werkzeug",
+    "flask",
+    "cookie",
+    "base64",
+    "deserialization",
+    "copy_reg",
+    "_reconstructor"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "decode every opaque cookie and read the bytes as text before treating the value as opaque",
+      "why": "the lowest pickle protocol is printable ASCII, so the format, the class names and the fact that the server deserializes it are all visible without tooling"
+    },
+    {
+      "step": 2,
+      "stage": "find the channel",
+      "action": "follow the request through and check whether anything derived from the deserialized object appears in the response",
+      "why": "a rendered value turns the bug into a direct output channel, which removes any need for a callback host, a timing oracle or an outbound connection"
+    },
+    {
+      "step": 3,
+      "stage": "craft",
+      "action": "hand-write the serialized payload in the lowest protocol, replacing the object's value with a call to a subprocess helper that returns its output",
+      "why": "generating the payload from a newer interpreter emits opcodes and module paths the target cannot resolve, so the portable route is to write the opcodes directly"
+    },
+    {
+      "step": 4,
+      "stage": "confirm",
+      "action": "run a harmless marker command first and look for its exact output in the rendered position",
+      "why": "the marker proves execution while changing nothing, which is what makes the confirmation safe to run on a shared instance"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "swap the argument vector for a shell invocation, list the application directory, and read the file whose name does not belong to the framework",
+      "why": "the output channel returns command output inline, so locating and reading the objective costs two requests"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "replace the deserialized value with a call that returns the output of a harmless marker command, and request the page that renders it",
+    "expected": "the marker's exact output appears in the position where the object was previously printed",
+    "falsifier": "the response is unchanged, an error page is returned, or the value is rejected because it carries no valid signature"
+  },
+  "blast_radius": "this is command execution on the challenge container, and here that container runs as root. Keep every command read-only, such as listing a directory or printing a file. Never write, delete or restart anything: a single careless command can brick the instance for every player. Confirm with a marker that only prints, and read the objective with one further command.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was rendered inline in the page returned by the live target, in the same element that previously printed the deserialized object"
+  },
+  "reuse_when": [
+    "a cookie decodes to something containing module or class names rather than to plain data",
+    "an application on an older interpreter round-trips state through the client with no integrity check",
+    "the deserialized value is echoed, printed or rendered anywhere in the response"
+  ],
+  "known_traps": [
+    "generating the payload with a newer interpreter than the target emits string opcodes and module paths the target cannot resolve; write the opcodes by hand in the lowest protocol instead",
+    "the class named in the default cookie is usually decorative and carries no behaviour, so time spent reconstructing it is wasted; the value simply has to be replaced",
+    "the deserialization happens before any route logic when it is wired into a pre-request handler, so every path on the site carries the primitive, not only the one that renders it"
+  ],
+  "flag": null
+}

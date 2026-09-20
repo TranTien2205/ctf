@@ -1,0 +1,509 @@
+{
+  "generated_at": "2026-09-18T10:34:31",
+  "thresholds": {
+    "pass": 75,
+    "warn": 60,
+    "review_below": 0
+  },
+  "summary": {
+    "skills": 46,
+    "review": 0,
+    "warn": 0
+  },
+  "review": [],
+  "warn": [],
+  "skills": [
+    {
+      "id": "ctf-playbook",
+      "layer": "entry",
+      "path": "skills/ctf-playbook/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 97
+    },
+    {
+      "id": "ai-iot-triage",
+      "layer": "router",
+      "path": "skills/ai-iot-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 68
+    },
+    {
+      "id": "crypto-triage",
+      "layer": "router",
+      "path": "skills/crypto-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 75
+    },
+    {
+      "id": "ctf-misc",
+      "layer": "router",
+      "path": "skills/ctf-misc/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 123
+    },
+    {
+      "id": "forensics-triage",
+      "layer": "router",
+      "path": "skills/forensics-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 71
+    },
+    {
+      "id": "osint-triage",
+      "layer": "router",
+      "path": "skills/osint-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 77
+    },
+    {
+      "id": "pwn-binary-triage",
+      "layer": "router",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 74
+    },
+    {
+      "id": "rev-triage",
+      "layer": "router",
+      "path": "skills/rev-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 98
+    },
+    {
+      "id": "web-triage",
+      "layer": "router",
+      "path": "skills/web-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "lines": 96
+    },
+    {
+      "id": "ctf-ai-ml",
+      "layer": "depth",
+      "path": "skills/ctf-ai-ml/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 118
+    },
+    {
+      "id": "ctf-crypto",
+      "layer": "depth",
+      "path": "skills/ctf-crypto/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 112
+    },
+    {
+      "id": "ctf-forensics",
+      "layer": "depth",
+      "path": "skills/ctf-forensics/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 107
+    },
+    {
+      "id": "ctf-malware",
+      "layer": "depth",
+      "path": "skills/ctf-malware/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 180
+    },
+    {
+      "id": "ctf-osint",
+      "layer": "depth",
+      "path": "skills/ctf-osint/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 193
+    },
+    {
+      "id": "ctf-pwn",
+      "layer": "depth",
+      "path": "skills/ctf-pwn/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 211
+    },
+    {
+      "id": "ctf-reverse",
+      "layer": "depth",
+      "path": "skills/ctf-reverse/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 168
+    },
+    {
+      "id": "ctf-web",
+      "layer": "depth",
+      "path": "skills/ctf-web/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 153
+    },
+    {
+      "id": "file-read-primitives",
+      "layer": "depth",
+      "path": "skills/file-read-primitives/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 113,
+      "nearest_neighbour": "web-ssti",
+      "overlap": 0.041
+    },
+    {
+      "id": "mcp-agent-security",
+      "layer": "depth",
+      "path": "skills/mcp-agent-security/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 100
+    },
+    {
+      "id": "pwn-rop",
+      "layer": "depth",
+      "path": "skills/pwn-rop/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 148
+    },
+    {
+      "id": "web-auth-session",
+      "layer": "depth",
+      "path": "skills/web-auth-session/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 153,
+      "nearest_neighbour": "file-read-primitives",
+      "overlap": 0.041
+    },
+    {
+      "id": "web-cache-poisoning",
+      "layer": "depth",
+      "path": "skills/web-cache-poisoning/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 66,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.213
+    },
+    {
+      "id": "web-chromedriver",
+      "layer": "depth",
+      "path": "skills/web-chromedriver/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 90
+    },
+    {
+      "id": "web-command-injection",
+      "layer": "depth",
+      "path": "skills/web-command-injection/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 69,
+      "nearest_neighbour": "web-graphql",
+      "overlap": 0.229
+    },
+    {
+      "id": "web-cors",
+      "layer": "depth",
+      "path": "skills/web-cors/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 62,
+      "nearest_neighbour": "web-graphql",
+      "overlap": 0.241
+    },
+    {
+      "id": "web-csrf",
+      "layer": "depth",
+      "path": "skills/web-csrf/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 70,
+      "nearest_neighbour": "web-race-condition",
+      "overlap": 0.181
+    },
+    {
+      "id": "web-deserialization",
+      "layer": "depth",
+      "path": "skills/web-deserialization/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 122,
+      "nearest_neighbour": "web-idor",
+      "overlap": 0.052
+    },
+    {
+      "id": "web-file-upload",
+      "layer": "depth",
+      "path": "skills/web-file-upload/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 115,
+      "nearest_neighbour": "web-ssti",
+      "overlap": 0.048
+    },
+    {
+      "id": "web-graphql",
+      "layer": "depth",
+      "path": "skills/web-graphql/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 61,
+      "nearest_neighbour": "web-xxe",
+      "overlap": 0.244
+    },
+    {
+      "id": "web-idor",
+      "layer": "depth",
+      "path": "skills/web-idor/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 76,
+      "nearest_neighbour": "web-web3",
+      "overlap": 0.055
+    },
+    {
+      "id": "web-logic-flaw",
+      "layer": "depth",
+      "path": "skills/web-logic-flaw/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 63,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.238
+    },
+    {
+      "id": "web-nosqli",
+      "layer": "depth",
+      "path": "skills/web-nosqli/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 76,
+      "nearest_neighbour": "web-request-smuggling",
+      "overlap": 0.166
+    },
+    {
+      "id": "web-oauth-sso",
+      "layer": "depth",
+      "path": "skills/web-oauth-sso/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 72,
+      "nearest_neighbour": "web-csrf",
+      "overlap": 0.175
+    },
+    {
+      "id": "web-open-redirect",
+      "layer": "depth",
+      "path": "skills/web-open-redirect/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 60,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.241
+    },
+    {
+      "id": "web-parser-differential",
+      "layer": "depth",
+      "path": "skills/web-parser-differential/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 69,
+      "nearest_neighbour": "web-oauth-sso",
+      "overlap": 0.169
+    },
+    {
+      "id": "web-prototype-pollution",
+      "layer": "depth",
+      "path": "skills/web-prototype-pollution/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 84,
+      "nearest_neighbour": "web-nosqli",
+      "overlap": 0.163
+    },
+    {
+      "id": "web-race-condition",
+      "layer": "depth",
+      "path": "skills/web-race-condition/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 76,
+      "nearest_neighbour": "web-csrf",
+      "overlap": 0.181
+    },
+    {
+      "id": "web-request-smuggling",
+      "layer": "depth",
+      "path": "skills/web-request-smuggling/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 77,
+      "nearest_neighbour": "web-parser-differential",
+      "overlap": 0.167
+    },
+    {
+      "id": "web-sqli",
+      "layer": "depth",
+      "path": "skills/web-sqli/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 103,
+      "nearest_neighbour": "web-nosqli",
+      "overlap": 0.059
+    },
+    {
+      "id": "web-ssrf",
+      "layer": "depth",
+      "path": "skills/web-ssrf/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 94,
+      "nearest_neighbour": "web-request-smuggling",
+      "overlap": 0.124
+    },
+    {
+      "id": "web-ssti",
+      "layer": "depth",
+      "path": "skills/web-ssti/SKILL.md",
+      "flags": [],
+      "score": 90,
+      "verdict": "pass",
+      "lines": 85,
+      "nearest_neighbour": "web-xss",
+      "overlap": 0.076
+    },
+    {
+      "id": "web-web3",
+      "layer": "depth",
+      "path": "skills/web-web3/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 60,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.229
+    },
+    {
+      "id": "web-xss",
+      "layer": "depth",
+      "path": "skills/web-xss/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 83,
+      "nearest_neighbour": "web-ssti",
+      "overlap": 0.076
+    },
+    {
+      "id": "web-xxe",
+      "layer": "depth",
+      "path": "skills/web-xxe/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "lines": 63,
+      "nearest_neighbour": "web-graphql",
+      "overlap": 0.244
+    },
+    {
+      "id": "ctf-writeup",
+      "layer": "reference",
+      "path": "skills/ctf-writeup/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 140
+    },
+    {
+      "id": "security-skill-evaluation",
+      "layer": "reference",
+      "path": "skills/security-skill-evaluation/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "lines": 97
+    }
+  ]
+}

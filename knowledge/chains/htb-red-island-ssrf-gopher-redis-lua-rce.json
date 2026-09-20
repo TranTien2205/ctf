@@ -1,0 +1,93 @@
+{
+  "id": "htb-red-island-ssrf-gopher-redis-lua-rce",
+  "source_note": "solved/red-island.md",
+  "challenge": {
+    "name": "Red Island",
+    "platform": "HackTheBox",
+    "event": "Cyber Apocalypse 2022",
+    "category": "web",
+    "solved_at": "2026-09-07",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "node",
+    "express",
+    "redis",
+    "connect-redis"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a request field supplies a URL the server fetches"
+    ],
+    "any_of": [
+      "the fetch result or error body is echoed back to the client",
+      "an internal service listens on a loopback port"
+    ]
+  },
+  "signals": [
+    "express",
+    "x-powered-by",
+    "picture url",
+    "convert",
+    "ssrf",
+    "file://",
+    "gopher",
+    "redis",
+    "6379",
+    "lua",
+    "loadlib",
+    "readflag"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "fingerprint Express and the login/register flow, then search writeups by challenge name",
+      "why": "a named platform challenge usually has a published chain"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "POST the URL field and confirm the fetch with a loopback address and with a file scheme",
+      "why": "the fetched content is echoed inside the error message, which makes a read channel"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "read the application source through the file scheme to learn the session store is Redis on loopback",
+      "why": "the next hop must be evidenced, not guessed"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "use a gopher URL to write raw RESP commands to Redis, calling eval with a Lua payload whose length prefix matches the exact byte length",
+      "why": "gopher lets an HTTP client speak a line protocol"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "escape the Lua sandbox with package.loadlib to reach io.popen, list the filesystem, then run the flag-reading helper",
+      "why": "the flag is only readable through a setuid helper"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "submit a loopback URL in the fetch field and read the full response body, including error text",
+    "expected": "content or an error that proves the server performed the fetch",
+    "falsifier": "the field is validated to an allowlist and never reaches a client"
+  },
+  "blast_radius": "eval on the shared Redis instance affects every player's session; prefer read-only Lua first",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag returned by the helper binary through the Lua channel"
+  },
+  "reuse_when": [
+    "an SSRF exists and a line-protocol service listens on loopback",
+    "an error body echoes fetched content"
+  ],
+  "known_traps": [
+    "the gopher payload length prefix must equal the exact byte length of the Lua string",
+    "always read error bodies: this app leaked the fetched file inside a non-200 message"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

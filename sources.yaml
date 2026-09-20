@@ -1,0 +1,56 @@
+sources:
+  - id: ctftime
+    type: event-index
+    url: https://ctftime.org
+    policy: event-pages-and-writeup-links
+    priority: 10
+  - id: github-ctfs-writeups
+    type: repository
+    url: https://github.com/ctfs/writeups
+    policy: markdown-only
+    priority: 10
+  - id: github-topic-ctf-writeup
+    type: topic
+    url: https://github.com/topics/ctf-writeup
+    policy: repository-metadata-and-markdown
+    priority: 8
+  - id: github-topic-web-exploitation
+    type: topic
+    url: https://github.com/topics/web-exploitation
+    policy: repository-metadata-and-markdown
+    priority: 8
+  - id: portswigger
+    type: technique-reference
+    url: https://portswigger.net/web-security
+    policy: article-only
+    priority: 9
+  - id: rootsec
+    type: blog
+    url: https://www.rootsec.in/writeups
+    policy: sitemap-or-archive-then-article
+    priority: 6
+  - id: havocsec
+    type: blog
+    url: https://havocsec.me/ctf/
+    policy: archive-then-article
+    priority: 6
+  - id: appsecmaster
+    type: blog
+    url: https://www.appsecmaster.net/blog/ctf-writeup/
+    policy: article-only
+    priority: 7
+  - id: 0xg10d
+    type: blog
+    url: https://0xg10d.github.io/writeups/
+    policy: archive-then-article
+    priority: 6
+  - id: geetansh-aditya
+    type: blog
+    url: https://geetanshaditya.com/writeups.html
+    policy: archive-then-article
+    priority: 6
+  - id: jameskaois
+    type: blog
+    url: https://jameskaois.com/
+    policy: search-by-title-then-article
+    priority: 5
