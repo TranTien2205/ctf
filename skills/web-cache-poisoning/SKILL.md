@@ -1,7 +1,7 @@
 ---
 name: web-cache-poisoning
 description: >
-  Cache poisoning / deception. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Cache poisoning / deception. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-parser-differential.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, cache-poisoning, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -28,9 +28,15 @@ cache key and which are not.
 
 ## Confirm
 
-Send an unkeyed input carrying a unique marker, then request the same URL cleanly
-from a different session. Finding your marker in the clean response proves the
-poisoned entry is served to others.
+1. Record a clean baseline from a fresh session and note cache headers, age, and
+   the apparent cache key.
+2. Send one harmless unique marker through a suspected unkeyed header, query
+   parameter, or path normalisation boundary.
+3. Request the same URL cleanly from a separate session.
+
+Confirmation requires the marker to persist into the clean response and a cache
+indicator or repeatable response comparison showing that the stored response was
+reused. A marker reflected only in the immediate response is not poisoning.
 
 ## What to look for
 
@@ -46,6 +52,8 @@ poisoned entry is served to others.
   to live in mind, and never poison an entry the whole challenge depends on.
 - A response that varies per user is usually not cached at all; confirm the
   response is cacheable before spending the budget.
+- Use a disposable path or an entry with a short, known lifetime; poisoning a
+  shared flag or login page is an avoidable outage.
 
 ## Routing
 

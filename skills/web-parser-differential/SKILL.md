@@ -1,7 +1,7 @@
 ---
 name: web-parser-differential
 description: >
-  Parser differential / proxy trust. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Parser differential / proxy trust. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-request-smuggling, web-auth-session.
   Verified here by 1 chain card(s).
 tags: [web, parser-differential, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]

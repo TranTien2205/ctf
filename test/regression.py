@@ -35,6 +35,7 @@ from tools import classify_solve  # noqa: E402
 from tools import decide as decide_mod  # noqa: E402
 from tools import hooks as hooks_mod  # noqa: E402
 from tools import skill_audit  # noqa: E402
+from tools import learning_report  # noqa: E402
 
 CASES = ROOT / "test" / "cases"
 BASELINE = ROOT / "test" / "baseline.json"
@@ -416,6 +417,16 @@ class ContractTests(unittest.TestCase):
         self.assertIn("security-toolkit", claude, "CLAUDE.md must restate the scope boundary")
         self.assertIn("hypothesis_protocol.md", claude)
         self.assertIn("prompt.md", claude)
+
+    def test_low_reliability_agent_protocol_is_documented(self):
+        agents = read("AGENTS.md")
+        prompt = read("PROMPT.md")
+        for marker in ("Low-reliability agent protocol", "read its complete JSON output",
+                       "run `tools/decide.py` after every", "post-probe", "stop_report"):
+            self.assertIn(marker, agents, "AGENTS.md lost reliability marker: " + marker)
+        for marker in ("Reliable execution mode", "classify -> dispatch -> chain_match",
+                       "recorded as `inconclusive`"):
+            self.assertIn(marker, prompt, "PROMPT.md lost reliability marker: " + marker)
 
 
 # --------------------------------------------------------------------------- C
@@ -825,6 +836,34 @@ class CapabilityTests(unittest.TestCase):
         for command in required:
             self.assertIn("fail=1", command,
                           "a REQUIRED step in run_all.sh ignores its exit status: %s" % command)
+
+    def test_system_evaluation_is_wired_into_the_gate(self):
+        script = read("test/run_all.sh")
+        self.assertIn("tools/system_eval.py", script)
+        self.assertIn("end-to-end offline system evaluation", script)
+
+    def test_system_evaluation_cases_are_well_formed(self):
+        payload = json.loads((CASES / "system_eval.json").read_text(encoding="utf-8"))
+        self.assertTrue(payload["classification"])
+        self.assertTrue(payload["routing"])
+        self.assertTrue(payload["decisions"])
+        for case in payload["classification"]:
+            for key in ("id", "observation", "expect_top"):
+                self.assertIn(key, case)
+        for case in payload["routing"]:
+            self.assertIn("category", case)
+        for case in payload["decisions"]:
+            self.assertIn("state", case)
+            self.assertIn("action", case)
+
+    def test_learning_report_is_read_only_and_complete(self):
+        payload = learning_report.report()
+        self.assertIn("summary", payload)
+        self.assertIn("review_queue", payload)
+        self.assertEqual(payload["summary"]["field_notes"],
+                         payload["summary"]["proposed_notes"] +
+                         payload["summary"]["confirmed_notes"])
+        self.assertEqual(len(payload["classes"]), len(taxonomy()["classes"]))
 
     def test_routing_cases_all_pass(self):
         current = self.measure()

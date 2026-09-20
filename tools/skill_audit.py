@@ -75,13 +75,15 @@ def audit():
         rel = entry.get("path", "")
         full = os.path.join(ROOT, rel)
         row = {"id": entry.get("id"), "layer": entry.get("layer"),
-               "path": rel, "flags": [], "score": None, "verdict": None}
+               "path": rel, "flags": [], "score": None, "verdict": None,
+               "local_evidence": "not-applicable"}
         rows.append(row)
         if not os.path.isfile(full):
             row["verdict"] = "missing"
             row["flags"].append("skill file does not exist")
             continue
-        text = open(full, encoding="utf-8").read()
+        with open(full, encoding="utf-8") as handle:
+            text = handle.read()
         lines = text.count("\n") + 1
         row["lines"] = lines
         layer = entry.get("layer")
@@ -143,14 +145,20 @@ def audit():
         else:
             row["flags"].append("no traps/pitfalls/discipline")
         notes = os.path.join(os.path.dirname(full), "field-notes.md")
-        notes_lines = (open(notes, encoding="utf-8").read().count("\n")
-                       if os.path.isfile(notes) else -1)
+        if os.path.isfile(notes):
+            with open(notes, encoding="utf-8") as handle:
+                notes_lines = handle.read().count("\n")
+        else:
+            notes_lines = -1
         if notes_lines >= 20:
             score += 10
+            row["local_evidence"] = "present"
         elif notes_lines >= 0:
+            row["local_evidence"] = "stub"
             row["flags"].append("field-notes is a template stub "
                                 "(%d lines)" % notes_lines)
         else:
+            row["local_evidence"] = "missing"
             row["flags"].append("field-notes missing")
         if entry.get("id") in verified and re.search(
                 r"knowledge/chains/|chains that prove", low):
@@ -199,13 +207,21 @@ def audit():
             row["score"] += 15
         row["verdict"] = ("pass" if row["score"] >= PASS
                           else "warn" if row["score"] >= WARN else "review")
+        row["trust"] = ("local-confirmed" if row["local_evidence"] == "present"
+                         else "catalogue-or-unreviewed")
 
     flagged = [r["id"] for r in rows if r["verdict"] == "review"]
     warned = [r["id"] for r in rows if r["verdict"] == "warn"]
     return {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "thresholds": {"pass": PASS, "warn": WARN, "review_below": REVIEW},
             "summary": {"skills": len(rows), "review": len(flagged),
-                        "warn": len(warned)},
+                        "warn": len(warned),
+                        "local_evidence_present": sum(
+                            r.get("local_evidence") == "present" for r in rows),
+                        "local_evidence_stub": sum(
+                            r.get("local_evidence") == "stub" for r in rows),
+                        "local_evidence_missing": sum(
+                            r.get("local_evidence") == "missing" for r in rows)},
             "review": flagged, "warn": warned, "skills": rows}
 
 
@@ -233,9 +249,10 @@ def main():
                  report["summary"]["warn"]))
         for row in report["skills"]:
             if row["verdict"] in ("review", "warn") or row["flags"]:
-                print("[%s] %-28s score=%s lines=%s overlap=%s"
+                print("[%s] %-28s score=%s lines=%s overlap=%s evidence=%s"
                       % (row["verdict"], row["id"], row["score"],
-                         row.get("lines", "-"), row.get("overlap", "-")))
+                         row.get("lines", "-"), row.get("overlap", "-"),
+                         row.get("local_evidence", "-")))
                 for flag in row["flags"]:
                     print("        - %s" % flag)
     return 0

@@ -22,6 +22,12 @@ hr "REQUIRED: routing evaluator"
 hr "REQUIRED: scope boundary (jeopardy CTF only, no machine or AD methodology)"
 "$PY" tools/check_boundary.py || fail=1
 
+hr "REQUIRED: end-to-end offline system evaluation (actionability, dispatch, skills, decisions)"
+if ! "$PY" tools/system_eval.py --json; then fail=1; fi
+
+hr "REQUIRED: learning-loop report"
+if ! "$PY" tools/learning_report.py --json; then fail=1; fi
+
 hr "OPTIONAL: foundation tests (need jsonschema and tornado)"
 if "$PY" -c "import jsonschema, tornado" 2>/dev/null; then
   "$PY" -m unittest discover -s tests || fail=1

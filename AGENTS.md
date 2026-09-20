@@ -61,6 +61,8 @@ Then pick exactly one branch:
 | `skill_select.py` | which skill to open once the class is named |
 | `classify_solve.py` | after a flag: file the solve into the right bug-class skill |
 | `skill_audit.py` | screen out weak skills; run it before trusting one |
+| `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
+| `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
 
 ---
@@ -106,9 +108,33 @@ Hard rules — breaking one breaks the control loop:
   `--write-ack` is passed.
 - The agent never hand-edits verdict or flag fields in `state.json`. `state.py`
   owns hypotheses, parking and revival; verdicts and flags belong to hooks.
+- The offline system evaluator is a required gate. A legacy regression pass does
+  not accept an update when the actionability cases fail.
 
 One question per iteration: *does this probe produce a distinguishing signal?*
 If not, verdict `inconclusive` and change the mechanism — not the syntax.
+
+### Low-reliability agent protocol
+
+Use this exact protocol when the model is small, uncertain, or prone to skipping
+steps. It is also the default protocol for long autonomous runs:
+
+1. Run one documented command at a time and read its complete JSON output.
+2. Do not infer the next action from memory; run `tools/decide.py` after every
+   recorded probe or flag event.
+3. Copy the controller's single `action`, `rationale`, and `commands` into the
+   next plan. Do not invent a replacement command when one is supplied.
+4. Before executing a probe, run `hooks.py pre-probe`; after it returns, run the
+   probe once and immediately submit the exact result to `post-probe`.
+5. If a command errors, times out, or returns empty output, record that exact
+   transport result and mark the probe `inconclusive`; never upgrade it by prose.
+6. Keep a short scratch summary with only observed facts, open hypotheses, the
+   last controller action, and the next command. Do not carry guessed details.
+7. Stop at `verify_flag`, `record_solve`, `switch_class`, or `stop_report` and
+   follow the returned command list before doing anything else.
+
+This protocol is intentionally repetitive: predictable state transitions are
+more reliable for weaker models than a long free-form exploit plan.
 
 ---
 
@@ -119,10 +145,10 @@ If not, verdict `inconclusive` and change the mechanism — not the syntax.
 - **Verified vs catalogue:** a `verified` skill has a chain card proving the class
   was solved here; a `catalogue` skill is published knowledge that nothing here
   has solved. Never say "this technique worked here" about a catalogue skill.
-- **Run `python3 tools/skill_audit.py` when a skill reads as generic.** A weak
-  skill has no First probe, no Falsifier or stop conditions, and no discipline or
-  traps section. The audit scores every skill; anything under 60 is `review`, and
-  the list lives in `knowledge/skill-audit.json`.
+- **Run `python3 tools/skill_audit.py --apply` when a skill reads as generic.**
+  The audit reports structural quality and local evidence separately. A `pass`
+  skill with `local_evidence: stub` is structurally usable but has no local solve
+  history; do not present it as verified experience.
 - The best skill is usually a **chain card plus confirmed field notes**, because
   that is real experience from this machine.
 
@@ -138,6 +164,10 @@ If not, verdict `inconclusive` and change the mechanism — not the syntax.
 5. `python3 tools/classify_solve.py --review` — the operator reviews:
    `--confirm <class> <anchor>`
 6. `bash test/run_all.sh` — the gate must PASS before this counts as done
+
+Use `python3 tools/learning_report.py` during review to see the queue. Confirmed
+notes must be promoted only after checking the chain card and exact evidence; the
+tool never auto-confirms them.
 
 Filing rule: a note belongs to the class whose **first probe opens the chain**,
 not the class of the final payload. When the evidence does not decide between

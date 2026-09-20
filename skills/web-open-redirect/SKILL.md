@@ -1,7 +1,7 @@
 ---
 name: web-open-redirect
 description: >
-  Open redirect. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Open redirect. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-ssrf, web-oauth-sso.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, open-redirect, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -26,8 +26,10 @@ continue URL. The response is a redirect and the parameter is inside its
 
 ## Confirm
 
-One external destination, and read the exact `Location` header rather than
-following it — the browser's final page hides what the server actually said.
+Send one external destination and inspect the exact `Location` header without
+following it. Repeat once with an encoded or parser-boundary form only if the
+first result is inconclusive. Confirmation requires the server to emit a
+redirect to the attacker-controlled destination.
 
 ## Why it matters in a chain
 
@@ -40,6 +42,8 @@ will visit whatever it is handed. See `../web-oauth-sso/` and `../web-ssrf/`.
 - A validator that only checks a prefix is satisfied by a hostname that starts
   with the allowed value. One that only blocks `//` is satisfied by backslashes
   or encoded forms, depending on which parser resolves the URL.
+- A redirect that is immediately followed by a safe allowlist or a fixed
+  relative path is not open; record the exact header before escalating.
 
 ## Routing
 

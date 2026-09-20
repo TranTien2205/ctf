@@ -1,7 +1,7 @@
 ---
 name: web-cors
 description: >
-  CORS misconfiguration. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for CORS misconfiguration. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-csrf.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, cors, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -26,9 +26,14 @@ whether credentials are permitted alongside it.
 
 ## Confirm
 
-Repeat an authenticated request with a foreign `Origin` and read the response
-headers. An origin that is reflected **together with** credentials allowed is the
-finding; either alone is not.
+1. Capture an authenticated baseline response without `Origin`.
+2. Repeat the same request with a unique foreign `Origin`.
+3. Inspect both the actual response and the preflight response, if the browser
+   would preflight.
+
+Confirmation requires the foreign origin to be reflected or accepted **and**
+credentials to be allowed in a browser-usable response. A wildcard alone, or an
+origin header on a public unauthenticated endpoint, is not enough.
 
 ## What to check beyond the wildcard
 
@@ -42,6 +47,8 @@ finding; either alone is not.
 - A wildcard origin cannot be combined with credentials by the browser, so a bare
   wildcard on a public endpoint is usually not exploitable.
 - The preflight response and the actual response can differ; read both.
+- Header presence is not browser exploitability: check whether the requested
+  method/headers and credentials policy line up.
 
 ## Routing
 

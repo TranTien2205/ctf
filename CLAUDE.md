@@ -20,6 +20,8 @@ see `CLAUDE_CODE.md`.
 | The next step, decided outside the agent | `tools/decide.py` |
 | Verifying a probe, a confirm, a flag | `tools/hooks.py` |
 | Which skills are generic or stubs | `tools/skill_audit.py` |
+| Whether the system still produces useful next actions | `tools/system_eval.py` |
+| Proposed versus confirmed local experience | `tools/learning_report.py` |
 | Changing direction without losing a branch | `HYPOTHESIS_PROTOCOL.md` |
 | What counts as evidence | `EVIDENCE_POLICY.md` |
 | Reusing a chain already solved here | `tools/chain_match.py` |
@@ -76,6 +78,10 @@ A timeout is not a success.
 6. The flag must appear in a live response or a supplied artifact. Then write the
    chain card, run `tools/classify_solve.py --chain <id>` so the solve lands in the
    right bug-class skill, and clean up background processes and tunnels.
+
+For system changes, run both the legacy regression gate and the offline
+actionability evaluator. Never raise a capability floor merely to make a failing
+update look compatible.
 
 ## Safety on shared instances
 

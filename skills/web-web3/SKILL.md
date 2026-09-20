@@ -1,7 +1,7 @@
 ---
 name: web-web3
 description: >
-  Smart contract / web3. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Smart contract / web3. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: none listed.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, web3, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -25,9 +25,15 @@ usually ships a `Setup` contract with a solved condition.
 
 ## Confirm
 
-**Read the setup contract and the solved condition first.** It names the exact
-state you must reach, and it is the only definition of success — everything else
-is a route to it.
+1. Read the setup contract and solved condition first. Record the exact state
+   predicate and the instance addresses.
+2. Call read-only view functions and record the starting state.
+3. Identify one state transition reachable by the supplied caller and predict
+   its post-state before sending it.
+
+Confirmation is the on-chain solved predicate changing after the attributable
+transaction. A reverted transaction, a local simulation, or a guessed flag is
+not confirmation.
 
 ## Where the routes usually are
 
@@ -42,6 +48,8 @@ and any function that is reachable before initialisation.
   reusable across instances.
 - Reading the deployed bytecode is often faster than reasoning about the source
   when the two might differ.
+- Never assume a private key, RPC URL, or contract address from another
+  challenge; use only values supplied for this instance.
 
 ## Routing
 

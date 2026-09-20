@@ -1,7 +1,7 @@
 ---
 name: web-request-smuggling
 description: >
-  Request smuggling / CRLF injection. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Request smuggling / CRLF injection. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-ssrf, web-parser-differential.
   Verified here by 1 chain card(s).
 tags: [web, request-smuggling, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]

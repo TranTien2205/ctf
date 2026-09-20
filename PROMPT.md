@@ -167,6 +167,24 @@ from a supplied challenge artifact during this session.
 - Redact tokens, credentials and flags from anything written into
   `knowledge/`.
 
+### Reliable execution mode
+
+When operating as a weaker or instruction-sensitive model, use the following
+state machine without skipping steps:
+
+```text
+classify -> dispatch -> chain_match -> state -> decide
+  -> pre-probe -> execute exactly once -> post-probe -> decide
+  -> pre-confirm/pre-flag when applicable -> decide
+  -> record_solve or switch_class or stop_report
+```
+
+Read JSON output after every command. Copy only observed values into the ledger.
+An error, timeout, connection reset, or empty response is a transport result and
+must be recorded as `inconclusive`, never rewritten as a security finding. If a
+controller command conflicts with a model suggestion, follow the controller and
+record the disagreement as an observation.
+
 **Skill loading**
 
 - One entry skill, one router, at most one depth skill, at most two reference

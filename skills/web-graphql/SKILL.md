@@ -1,7 +1,7 @@
 ---
 name: web-graphql
 description: >
-  GraphQL abuse. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for GraphQL abuse. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-idor, web-logic-flaw.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, graphql, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -25,8 +25,15 @@ query and mutation shape in the body.
 
 ## Confirm
 
-One introspection query. If introspection is disabled, field-suggestion errors
-often rebuild the schema a name at a time.
+1. Identify the endpoint and send one bounded introspection query.
+2. If introspection is disabled, send one deliberately unknown field and record
+   whether the error discloses a type or field suggestion.
+3. Use only the names observed in the schema or error before testing an
+   object-level read or mutation.
+
+Confirmation is a schema/error oracle, not a finding by itself. The exploit
+class is confirmed only when a read or mutation crosses an authorization or
+validation boundary and the result is observed.
 
 ## What the schema buys
 
@@ -41,6 +48,8 @@ single endpoint instead of many routes. Cross-check with `../web-idor/`.
   not authorisation. Do not read that as a defence.
 - Batched queries can bypass per-request rate limits, which matters when the
   finding needs many attempts.
+- A rejected introspection query is not a secure GraphQL implementation; it only
+  closes that discovery channel. Do not invent field names after a silent error.
 
 ## Routing
 

@@ -36,6 +36,7 @@ context, role, goal, instructions, constraints, output format, examples.
 | `HYPOTHESIS_PROTOCOL.md` | changing direction without losing a branch |
 | `EVIDENCE_POLICY.md` | what may be claimed, and what may not |
 | `test/README.md` | the gate every change passes before it is accepted |
+| `test/cases/system_eval.json` | offline actionability cases for every update |
 | `VERSIONING.md` | saving and restoring a working version |
 | `EXTERNAL_SOURCES.md` | importing outside material without importing noise |
 
@@ -73,6 +74,23 @@ cache/                 disposable web and search cache
 bash test/run_all.sh
 bash scripts/save_version.sh "what changed"
 ```
+
+The gate has two layers. The legacy regression suite protects behavior that
+already worked. The required offline system evaluation checks whether the
+classifier, dispatch policy, skill contracts, and decision controller still
+produce useful actions. Both layers must pass; a structural pass alone is not a
+claim that the system solves a challenge.
+
+Review local learning separately:
+
+```bash
+python3 tools/learning_report.py
+python3 tools/classify_solve.py --review
+```
+
+`proposed` notes are unreviewed observations. `confirmed` notes are the only
+local experience an operator should treat as reusable evidence. Catalogue skills
+remain catalogue until a verified chain and human review promote them.
 
 The gate checks that the registry, the index and `ctf.py` still agree; that
 `PROMPT.md` keeps its seven sections and the no-invention rule; that the control

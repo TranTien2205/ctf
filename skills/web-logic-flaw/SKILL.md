@@ -1,7 +1,7 @@
 ---
 name: web-logic-flaw
 description: >
-  Business logic / mass assignment. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Business logic / mass assignment. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-idor, web-race-condition.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, logic-flaw, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -27,9 +27,14 @@ registration.
 
 ## Confirm
 
-One extra field the model has but the form never sends, or one step of the flow
-performed out of order. The confirmation is the state change, read back from the
-account's own view.
+1. Record the account's own state before the request.
+2. Add exactly one field the normal form does not send, or omit exactly one
+   workflow step.
+3. Read the state back through the account's normal view.
+
+Confirmation requires an attributable before/after change caused by that one
+field or skipped step. A success response without a state change is
+inconclusive.
 
 ## Where to look first
 
@@ -43,6 +48,8 @@ account's own view.
   which skipped step produced the change, and show the before and after.
 - An allowlist of assignable fields closes mass assignment completely; read the
   handler before spending the budget.
+- Keep the first test on an account or object you created. Do not change roles,
+  balances, or another player's records until the field boundary is proven.
 
 ## Routing
 

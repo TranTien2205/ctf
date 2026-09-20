@@ -1,7 +1,7 @@
 ---
 name: web-xxe
 description: >
-  XML external entity. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for XML external entity. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: file-read-primitives, web-ssrf.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, xxe, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -26,9 +26,14 @@ older configurations resolve external entities by default.
 
 ## Confirm
 
-One entity pointing at a file the target certainly has. If nothing is echoed, the
-confirmation is out-of-band: an entity that forces the parser to fetch a URL you
-control.
+1. Send a baseline document and record status, body length, and timing.
+2. Send one harmless internal entity that points to a path the challenge
+   definitely supplies. Keep the entity read-only.
+3. If the response is not an echo channel, use an out-of-band URL only when the
+   challenge explicitly provides a callback you control.
+
+Expected confirmation is entity expansion in the response or an attributable
+callback. A generic XML parse error does not prove entity resolution.
 
 ## Where it usually hides
 
@@ -43,6 +48,8 @@ XML parser first.
   local file entities may still resolve.
 - Error-based extraction leaks the file through the parser's own error message
   when the response body does not echo anything.
+- An uploaded document may be parsed by more than one library; identify the
+  parser used by the relevant route before choosing a format-specific reference.
 
 ## Routing
 

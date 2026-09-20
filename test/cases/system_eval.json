@@ -1,0 +1,46 @@
+{
+  "comment": "Offline actionability cases. These are intentionally small and stable: they test whether the system gives a useful next action without contacting a target.",
+  "classification": [
+    {
+      "id": "ssti-arithmetic-marker",
+      "observation": "Jinja2 template renders the name parameter and {{7*7}} becomes 49",
+      "expect_top": "web-ssti"
+    },
+    {
+      "id": "foreign-origin-credentials",
+      "observation": "API reflects Origin and sends Access-Control-Allow-Credentials true on authenticated response",
+      "expect_top": "web-cors"
+    },
+    {
+      "id": "object-level-authorization",
+      "observation": "GET /api/invoices/100 returns another user's invoice when the identifier is changed",
+      "expect_top": "web-idor"
+    },
+    {
+      "id": "ordinary-app-negative",
+      "observation": "A static page serves CSS and a health endpoint returns 200",
+      "expect_top": null
+    }
+  ],
+  "routing": [
+    {"id": "web", "observation": "HTTP endpoint with a cookie and a template", "category": "web"},
+    {"id": "pwn", "observation": "ELF input crashes with NX and checksec output", "category": "pwn"},
+    {"id": "crypto", "observation": "RSA modulus ciphertext and nonce", "category": "crypto"},
+    {"id": "forensics", "observation": "PCAP memory dump and disk image", "category": "forensics"},
+    {"id": "misc", "observation": "Python sandbox jail and encoding chain", "category": "misc"}
+  ],
+  "decisions": [
+    {
+      "id": "empty-state-classifies-first",
+      "name": "eval-empty",
+      "state": {"hypotheses": [], "probes": []},
+      "action": "new_hypothesis"
+    },
+    {
+      "id": "verified-flag-records-solve",
+      "name": "eval-flag",
+      "state": {"hypotheses": [], "probes": [], "flag": {"value": "candidate", "source": "live-response", "evidence": "response excerpt"}},
+      "action": "record_solve"
+    }
+  ]
+}

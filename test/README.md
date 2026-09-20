@@ -1,8 +1,8 @@
 # test/ — the update gate
 
 Every change to this system passes through here before it is committed. The
-suite answers one question: **does the system still do what it did before the
-change?**
+gate answers two questions: **does the system still do what it did before the
+change, and does it still produce useful next actions?**
 
 ```bash
 bash test/run_all.sh
@@ -22,17 +22,22 @@ executed. Only controlled Python snippets run.
 | E. chain reuse | a chain card losing a field, storing a flag, pointing at a deleted note, or no longer matching the evidence that produced it |
 | F. ledger | a redirect deleting a hypothesis instead of parking it; revival losing the history |
 | G. capability | a change that quietly reduces the number of skills, routers, chain cards or passing routing cases |
+| H. actionability | classification, category routing, skill contracts, controller decisions, and negative cases still work offline |
+| I. learning report | proposed and confirmed notes remain internally consistent and the review backlog stays visible |
 
 ## Files
 
 | File | Role |
 |---|---|
-| `regression.py` | the suite itself, 31 checks in seven groups |
+| `regression.py` | the compatibility suite and contracts |
 | `cases/routing.json` | observation to expected category; each case comes from a real challenge shape |
 | `cases/dispatch.json` | expected router, forbidden skills, and expected chain match, black-box and white-box |
 | `baseline.json` | the capability floor the suite refuses to fall below |
 | `capability_report.py` | prints the current snapshot; `--write` records a new floor |
 | `run_all.sh` | the gate: required checks, optional checks, result |
+| `cases/system_eval.json` | stable offline actionability and decision cases |
+| `../tools/system_eval.py` | executes the actionability cases without network access |
+| `../tools/learning_report.py` | reports local evidence and classify-miss backlog without editing state |
 
 ## Adding a case
 
@@ -44,7 +49,8 @@ the commit message and record why.
 ## Raising the baseline
 
 `test/capability_report.py --write` refuses to lower any metric. Record a new
-floor only after `run_all.sh` reports PASS.
+floor only after `run_all.sh` reports PASS. The actionability suite is a required
+behavior gate, not a capability number to raise by hand.
 
 ## Optional dependencies
 

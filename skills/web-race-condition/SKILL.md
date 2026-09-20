@@ -1,7 +1,7 @@
 ---
 name: web-race-condition
 description: >
-  Race condition / TOCTOU. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for Race condition / TOCTOU. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-logic-flaw.
   Verified here by 2 chain card(s).
 tags: [web, race-condition, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]

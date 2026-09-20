@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-18T10:34:31",
+  "generated_at": "2026-09-20T10:46:24",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,7 +8,10 @@
   "summary": {
     "skills": 46,
     "review": 0,
-    "warn": 0
+    "warn": 0,
+    "local_evidence_present": 15,
+    "local_evidence_stub": 9,
+    "local_evidence_missing": 0
   },
   "review": [],
   "warn": [],
@@ -20,6 +23,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 97
     },
     {
@@ -29,6 +33,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 68
     },
     {
@@ -38,6 +43,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 75
     },
     {
@@ -47,6 +53,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 123
     },
     {
@@ -56,6 +63,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 71
     },
     {
@@ -65,6 +73,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 77
     },
     {
@@ -74,6 +83,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 74
     },
     {
@@ -83,6 +93,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 98
     },
     {
@@ -92,6 +103,7 @@
       "flags": [],
       "score": null,
       "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
       "lines": 96
     },
     {
@@ -101,6 +113,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 118
     },
     {
@@ -110,6 +123,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 112
     },
     {
@@ -119,6 +133,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 107
     },
     {
@@ -128,6 +143,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 180
     },
     {
@@ -137,6 +153,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 193
     },
     {
@@ -146,6 +163,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 211
     },
     {
@@ -155,6 +173,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 168
     },
     {
@@ -164,6 +183,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 153
     },
     {
@@ -173,9 +193,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 113,
       "nearest_neighbour": "web-ssti",
-      "overlap": 0.041
+      "overlap": 0.041,
+      "trust": "local-confirmed"
     },
     {
       "id": "mcp-agent-security",
@@ -184,6 +206,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 100
     },
     {
@@ -193,20 +216,21 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 148
     },
     {
       "id": "web-auth-session",
       "layer": "depth",
       "path": "skills/web-auth-session/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 153,
       "nearest_neighbour": "file-read-primitives",
-      "overlap": 0.041
+      "overlap": 0.041,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-cache-poisoning",
@@ -217,9 +241,11 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 66,
-      "nearest_neighbour": "web-cors",
-      "overlap": 0.213
+      "local_evidence": "stub",
+      "lines": 74,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.192,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-chromedriver",
@@ -228,6 +254,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 90
     },
     {
@@ -239,9 +266,11 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 69,
+      "local_evidence": "stub",
+      "lines": 79,
       "nearest_neighbour": "web-graphql",
-      "overlap": 0.229
+      "overlap": 0.196,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-cors",
@@ -252,48 +281,50 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 62,
-      "nearest_neighbour": "web-graphql",
-      "overlap": 0.241
+      "local_evidence": "stub",
+      "lines": 69,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.22,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-csrf",
       "layer": "depth",
       "path": "skills/web-csrf/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 70,
       "nearest_neighbour": "web-race-condition",
-      "overlap": 0.181
+      "overlap": 0.198,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-deserialization",
       "layer": "depth",
       "path": "skills/web-deserialization/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 122,
       "nearest_neighbour": "web-idor",
-      "overlap": 0.052
+      "overlap": 0.052,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-file-upload",
       "layer": "depth",
       "path": "skills/web-file-upload/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 115,
       "nearest_neighbour": "web-ssti",
-      "overlap": 0.048
+      "overlap": 0.048,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-graphql",
@@ -304,9 +335,11 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 61,
-      "nearest_neighbour": "web-xxe",
-      "overlap": 0.244
+      "local_evidence": "stub",
+      "lines": 70,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.209,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-idor",
@@ -317,9 +350,11 @@
       ],
       "score": 80,
       "verdict": "pass",
+      "local_evidence": "stub",
       "lines": 76,
-      "nearest_neighbour": "web-web3",
-      "overlap": 0.055
+      "nearest_neighbour": "web-ssti",
+      "overlap": 0.052,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-logic-flaw",
@@ -330,9 +365,11 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 63,
+      "local_evidence": "stub",
+      "lines": 70,
       "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.238
+      "overlap": 0.218,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-nosqli",
@@ -343,9 +380,11 @@
       ],
       "score": 80,
       "verdict": "pass",
+      "local_evidence": "stub",
       "lines": 76,
       "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.166
+      "overlap": 0.183,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-oauth-sso",
@@ -354,9 +393,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 72,
       "nearest_neighbour": "web-csrf",
-      "overlap": 0.175
+      "overlap": 0.194,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-open-redirect",
@@ -367,9 +408,11 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 60,
+      "local_evidence": "stub",
+      "lines": 64,
       "nearest_neighbour": "web-cors",
-      "overlap": 0.241
+      "overlap": 0.22,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-parser-differential",
@@ -378,9 +421,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 69,
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.169
+      "overlap": 0.187,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-prototype-pollution",
@@ -389,9 +434,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 84,
       "nearest_neighbour": "web-nosqli",
-      "overlap": 0.163
+      "overlap": 0.181,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-race-condition",
@@ -400,9 +447,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 76,
       "nearest_neighbour": "web-csrf",
-      "overlap": 0.181
+      "overlap": 0.198,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-request-smuggling",
@@ -411,9 +460,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 77,
       "nearest_neighbour": "web-parser-differential",
-      "overlap": 0.167
+      "overlap": 0.184,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-sqli",
@@ -422,9 +473,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 103,
       "nearest_neighbour": "web-nosqli",
-      "overlap": 0.059
+      "overlap": 0.057,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-ssrf",
@@ -433,9 +486,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 94,
       "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.124
+      "overlap": 0.12,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-ssti",
@@ -444,9 +499,11 @@
       "flags": [],
       "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 85,
       "nearest_neighbour": "web-xss",
-      "overlap": 0.076
+      "overlap": 0.076,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-web3",
@@ -457,35 +514,37 @@
       ],
       "score": 80,
       "verdict": "pass",
-      "lines": 60,
-      "nearest_neighbour": "web-cors",
-      "overlap": 0.229
+      "local_evidence": "stub",
+      "lines": 68,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.204,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-xss",
       "layer": "depth",
       "path": "skills/web-xss/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
+      "local_evidence": "present",
       "lines": 83,
       "nearest_neighbour": "web-ssti",
-      "overlap": 0.076
+      "overlap": 0.076,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-xxe",
       "layer": "depth",
       "path": "skills/web-xxe/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
-      "lines": 63,
+      "local_evidence": "present",
+      "lines": 70,
       "nearest_neighbour": "web-graphql",
-      "overlap": 0.244
+      "overlap": 0.203,
+      "trust": "local-confirmed"
     },
     {
       "id": "ctf-writeup",
@@ -494,6 +553,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 140
     },
     {
@@ -503,6 +563,7 @@
       "flags": [],
       "score": null,
       "verdict": "reference",
+      "local_evidence": "not-applicable",
       "lines": 97
     }
   ]

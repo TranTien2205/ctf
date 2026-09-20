@@ -1,7 +1,7 @@
 ---
 name: web-command-injection
 description: >
-  OS command injection. Open after the router or tools/classify.py named this class.
+  Action-oriented depth skill for OS command injection. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-ssti.
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, command-injection, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
@@ -20,34 +20,44 @@ one benign separator with a command whose output is unmistakable, and a timing v
 **Falsifier** — the observation that closes this class: the value is passed as a single argv element, never through a shell
 ## Recognise
 
-A request value reaches a shell. In source that is a shell-enabled subprocess
-call, a PHP execution function, or a Node `child_process` call built by
-concatenation. In a response it is command output leaking into the page, or an
-error from `/bin/sh`.
-
-Distinguish from template injection: template engines evaluate expressions, not
-shell syntax. If an arithmetic marker evaluates, it is `../web-ssti/`.
+First prove the **sink and shell boundary**. In source, distinguish
+`execFile`/argument-array execution from `shell=True`, `system`, `popen`, or a
+string passed to a shell. In black-box evidence, look for command output or a
+shell-specific error, not merely a slow response.
 
 ## Confirm
 
-One separator, one command whose output cannot be mistaken for anything else.
-If nothing is echoed, use a timing command as the channel — the same discipline
-as a blind SQL oracle: measure the baseline first.
+1. Establish one timing baseline with a harmless input.
+2. Use one benign separator and a deterministic, non-destructive identity
+   command available in the challenge's stated environment.
+3. Compare the response body, status, and timing with the baseline.
+4. If output is not returned, use a bounded timing channel and record repeated
+   baseline/variant measurements. One slow request is inconclusive.
 
-## When the obvious separators are filtered
+Expected confirmation is an attributable output marker or a repeatable timing
+delta caused by the command. A parser error, timeout, or generic 500 is not
+confirmation.
 
-The usual escapes are shell features, not tricks: brace and variable expansion,
-positional parameters, quoting that survives the filter, and alternative
-separators. The catalogue is in `../ctf-web/server-side-2.md` and
-`../ctf-web/server-side-exec.md`.
+## Source decision tree
+
+| Sink | Meaning |
+|---|---|
+| argument array / `execFile` without shell | command injection is falsified at this layer |
+| shell-enabled subprocess or concatenated command string | continue with a read-only probe |
+| template expression evaluates | route to `web-ssti`, not shell injection |
+| user input only reaches a filename/API argument | inspect traversal or logic instead |
+
+Use one named reference after the sink is confirmed:
+`../ctf-web/server-side-exec.md` or `../ctf-web/server-side-2.md`.
 
 ## Traps
 
-- A filter that blocks a character list is usually bypassable; one that passes
-  the value as a single argv element is not. Read the source before spending the
-  budget.
-- Output-free injection plus an outbound network block leaves only timing. Say so
-  rather than claiming the injection failed.
+- Do not use destructive commands, filesystem writes, reverse shells, or broad
+  network callbacks for the first probe.
+- Character filtering is not the same as shell isolation; conversely, a single
+  argv element is not a bypass challenge. Read the call boundary first.
+- Output-free injection plus a blocked outbound channel remains inconclusive
+  unless the timing delta is repeatable and attributable.
 
 ## Routing
 

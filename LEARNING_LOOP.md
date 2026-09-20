@@ -117,3 +117,21 @@ log with a growing verified count is what improvement actually looks like.
 That last one matters most. The cheapest way to make a classifier look good is to
 widen its signals until everything matches something. The benign fixture is there
 so that move fails the gate.
+
+## Operational review cadence
+
+After every verified solve:
+
+1. Validate the chain card and redact flags from the card and any committed note.
+2. Run `python3 tools/classify_solve.py --chain <id>`.
+3. Run `python3 tools/learning_report.py` and review only the new queue entries.
+4. Confirm or reject the entry against the exact chain evidence. Do not confirm
+   a note because the exploit sounds plausible.
+5. Add the pre-solve observation to `test/cases/classify.json` and add a replay
+   case to `test/cases/dispatch.json` when routing or chain reuse was involved.
+6. Run `bash test/run_all.sh` before accepting the learning change.
+
+The system evaluator is intentionally offline. It measures whether the library
+still produces a class, a route, a usable skill contract, and a controller action
+without pretending that those outputs prove exploitability. Live success remains
+subject to `hooks.py` evidence gates.
