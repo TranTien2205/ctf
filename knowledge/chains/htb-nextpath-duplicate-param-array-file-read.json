@@ -1,0 +1,96 @@
+{
+  "id": "htb-nextpath-duplicate-param-array-file-read",
+  "source_note": "solved/nextpath.md",
+  "challenge": {
+    "name": "NextPath",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-21",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "nextjs",
+    "node",
+    "javascript"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a Node/Next.js API route reads a query parameter and builds a filesystem path from it",
+      "the route validates the parameter with a string-oriented check",
+      "the route appends a fixed suffix to the path"
+    ],
+    "any_of": [
+      "the id is validated with a multiline regex",
+      "the traversal check uses Array.includes or another exact-match test",
+      "the final path is truncated to a fixed length"
+    ]
+  },
+  "signals": [
+    "next.js",
+    "x-powered-by",
+    "next",
+    "/api/team",
+    "enoent",
+    "open 'team/",
+    "id",
+    "image/png",
+    "invalid format",
+    "directory traversal detected"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "request the id endpoint with a valid and a missing value; the ENOENT error reveals the path template team/<id>.png",
+      "why": "the error text names the exact file path the server tries to open"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "send the parameter twice so the framework turns the query value into an array",
+      "why": "a string check coerces the array while an Array.includes check does not"
+    },
+    {
+      "step": 3,
+      "stage": "bypass",
+      "action": "make the first array element a numeric line so the multiline regex matches, and the second element the traversal path",
+      "why": "the regex sees the comma-joined string, the includes check sees exact elements"
+    },
+    {
+      "step": 4,
+      "stage": "length",
+      "action": "shape the traversal so the joined path reaches the fixed truncation length and ends at the target file",
+      "why": "the forced suffix is appended after the target and is removed by the slice"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "read the flag file and ignore the misleading image content type",
+      "why": "the body is the file contents regardless of the declared type"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET /api/team?id=1 then GET /api/team?id=99999 and read the error",
+    "expected": "a valid id returns image/png; a missing id returns an ENOENT error naming the constructed path",
+    "falsifier": "the parameter is not used to build a filesystem path, or the error is opaque"
+  },
+  "blast_radius": "read-only file disclosure; no writes and no shared state is modified, so the chain is safe to run once per target",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "HTTP 200 from /api/team whose body was the flag read from /flag.txt on the live target"
+  },
+  "reuse_when": [
+    "a Node/Next.js route validates a query parameter as a string but the framework can deliver an array",
+    "a multiline regex or an Array.includes traversal check guards the value",
+    "a fixed-length slice removes a forced path suffix"
+  ],
+  "known_traps": [
+    "a direct traversal string is rejected; the duplicate-parameter array form is required",
+    "path.join prefixes the base directory, so the traversal must climb out of it",
+    "the forced suffix must fall past the truncation offset; use /proc/self/root style links to pad the path length",
+    "the response content type is image/png even when the body is text"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

@@ -97,3 +97,31 @@ Falsifier: the request is handled normally, or the error page is the framework's
 **Blast radius**: read-only. The request raises an exception and reaches no application logic, so nothing is created or modified. Treat every credential in the disclosed configuration as live and do not connect to the services it names; they are usually bound to the container's own loopback and are out of scope.
 
 - status: proposed
+
+## 2026-09-21 · NextPath · confirmed
+
+- source note: `solved/nextpath.md`
+- chain card: `knowledge/chains/htb-nextpath-duplicate-param-array-file-read.json`
+- verification: verified_live — HTTP 200 from /api/team whose body was the flag read from /flag.txt on the live target
+- classified as: `file-read-primitives` (score 3.5, 3 signals matched)
+- also matched: `web-file-upload` (1.5), `web-ssti` (1.5)
+- signals that fired: ../../, /proc/self, traversal
+
+**Confirming probe that worked**
+
+> GET /api/team?id=1 then GET /api/team?id=99999 and read the error
+
+Expected: a valid id returns image/png; a missing id returns an ENOENT error naming the constructed path
+
+Falsifier: the parameter is not used to build a filesystem path, or the error is opaque
+
+**Traps recorded on this solve**
+
+- a direct traversal string is rejected; the duplicate-parameter array form is required
+- path.join prefixes the base directory, so the traversal must climb out of it
+- the forced suffix must fall past the truncation offset; use /proc/self/root style links to pad the path length
+- the response content type is image/png even when the body is text
+
+**Blast radius**: read-only file disclosure; no writes and no shared state is modified, so the chain is safe to run once per target
+
+- status: confirmed
