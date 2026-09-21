@@ -468,8 +468,11 @@
       "id": "web-deserialization",
       "name": "Unsafe deserialization",
       "skill_dir": "web-deserialization",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
+        "htb-py2-pickle-cookie-reduce-rce-rendered-output"
+      ],
       "observation_signals": [
         "rO0AB|aced0005|gAN|O:\\d+:\\\"|BAhJ|AAEAAAD",
         "deserial|unserial|pickle|marshal|viewstate"

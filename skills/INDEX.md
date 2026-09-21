@@ -88,7 +88,7 @@ Open one only after a probe or a source read produced its signal.
 | Open redirect | catalogue | the destination is validated against an allowlist or forced to a relativ | `skills/web-open-redirect/SKILL.md` |
 | Cache poisoning / deception | verified | the header is part of the cache key | `skills/web-cache-poisoning/SKILL.md` |
 | Prototype / class pollution | verified | the merge rejects reserved keys | `skills/web-prototype-pollution/SKILL.md` |
-| Unsafe deserialization | catalogue | the blob is signed with a key that is not leaked and not reachable | `skills/web-deserialization/SKILL.md` |
+| Unsafe deserialization | verified | the blob is signed with a key that is not leaked and not reachable | `skills/web-deserialization/SKILL.md` |
 | Race condition / TOCTOU | verified | the read and the write happen inside one transaction or behind one lock | `skills/web-race-condition/SKILL.md` |
 | Business logic / mass assignment | catalogue | the handler reads an explicit allowlist of fields and ignores everything | `skills/web-logic-flaw/SKILL.md` |
 | Authentication and session | verified | the signature is verified with a key that is neither leaked nor guessabl | `skills/web-auth-session/SKILL.md` |

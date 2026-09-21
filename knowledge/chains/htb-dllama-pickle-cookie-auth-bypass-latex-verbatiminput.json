@@ -1,0 +1,97 @@
+{
+  "id": "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
+  "source_note": "solved/dllama.md",
+  "challenge": {
+    "name": "DLLAMA",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-21",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "flask",
+    "werkzeug",
+    "python",
+    "latex"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a login sets a cookie that is a base64 pickle of an application object",
+      "the server loads that cookie on later requests",
+      "an authenticated feature compiles user-supplied LaTeX"
+    ],
+    "any_of": [
+      "only an attribute such as authenticated is checked for access",
+      "the LaTeX input is filtered by a literal blacklist"
+    ]
+  },
+  "signals": [
+    "werkzeug",
+    "flask",
+    "passwordless",
+    "login",
+    "username",
+    "set-cookie",
+    "gASV",
+    "pickle",
+    "latex",
+    "generate pdf",
+    "blacklisted characters"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "log in and decode the session cookie; a base64 value starting with gASV is a Python pickle",
+      "why": "the cookie is the trust boundary: the server deserialises it on later requests"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "unpickle the cookie, set the authentication attribute to true, re-pickle and send it back",
+      "why": "the server type-checks the object but trusts its attributes, so forging them crosses the auth check"
+    },
+    {
+      "step": 3,
+      "stage": "surface",
+      "action": "map the authenticated feature; here it compiles LaTeX and serves the result at a predictable static path",
+      "why": "the flag lives in a file the LaTeX engine can read"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "if a literal blacklist blocks LaTeX syntax, encode the whole document as ^^xx hex escapes",
+      "why": "TeX expands ^^xx after the filter has run, and the caret is not filtered"
+    },
+    {
+      "step": 5,
+      "stage": "flag",
+      "action": "use the verbatim-input LaTeX command to inline the flag file into the PDF, then fetch the PDF and read its text layer",
+      "why": "verbatim input needs no shell escape or \\input"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "log in with any username and base64-decode the resulting user cookie",
+    "expected": "the decoded bytes start with a pickle protocol header and reference an application class with an authentication attribute",
+    "falsifier": "the cookie is opaque or signed, so no object attributes are attacker-controlled"
+  },
+  "blast_radius": "forging the cookie only changes your own session; the generated PDF is written to a fixed static path and must be overwritten with a benign document afterwards so the flag is not left on the shared instance",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was extracted from the text layer of /static/input.pdf on the live target after the ^^xx LaTeX payload read the flag file"
+  },
+  "reuse_when": [
+    "a session cookie decodes to a pickle (gASV / gAJ prefix)",
+    "a feature compiles LaTeX or another document format from user input",
+    "a filter blocks literal characters but not an encoding the downstream tool expands"
+  ],
+  "known_traps": [
+    "the __reduce__ pickle RCE may be blocked by an object type check; attribute forgery is the working route",
+    "the naive \\input{|cmd} payload is blocked by a literal blacklist; use ^^xx escapes",
+    "the generated PDF persists at a fixed path; overwrite it after reading the flag",
+    "the flag file is relative to the application directory"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

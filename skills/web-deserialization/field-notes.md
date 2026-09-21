@@ -41,3 +41,31 @@ Falsifier: the response is unchanged, an error page is returned, or the value is
 **Blast radius**: this is command execution on the challenge container, and here that container runs as root. Keep every command read-only, such as listing a directory or printing a file. Never write, delete or restart anything: a single careless command can brick the instance for every player. Confirm with a marker that only prints, and read the objective with one further command.
 
 - status: proposed
+
+## 2026-09-21 · DLLAMA · confirmed
+
+- source note: `solved/dllama.md`
+- chain card: `knowledge/chains/htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput.json`
+- verification: verified_live — the flag was extracted from the text layer of /static/input.pdf on the live target after the ^^xx LaTeX payload read flag.txt
+- classified as: `web-deserialization` (score 1.0, 1 signals matched)
+- also matched: `web-auth-session` (1.5), `web-ssrf` (1.5), `web-open-redirect` (1.0)
+- signals that fired: pickle
+
+**Confirming probe that worked**
+
+> log in with any username and base64-decode the resulting user cookie
+
+Expected: the decoded bytes start with a pickle protocol header and reference an application class with an authentication attribute
+
+Falsifier: the cookie is opaque or signed, so no object attributes are attacker-controlled
+
+**Traps recorded on this solve**
+
+- the __reduce__ pickle RCE may be blocked by an object type check; attribute forgery is the working route
+- the naive \input{|cmd} payload is blocked by a literal blacklist; use ^^xx escapes
+- the generated PDF persists at a fixed path; overwrite it after reading the flag
+- the flag file is relative to the application directory (flag.txt)
+
+**Blast radius**: forging the cookie only changes your own session; the generated PDF is written to a fixed static path and must be overwritten with a benign document afterwards so the flag is not left on the shared instance
+
+- status: confirmed

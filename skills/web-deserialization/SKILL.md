@@ -15,13 +15,12 @@ budget:
     - "gadget chain fails 3 times"
     - "no public gadget for target version"
     - "phpggc/ysoserial payload errors twice"
-evidence_level: catalogue
+evidence_level: verified
 ---
 
 # Deserialization CTF Playbook
 
-**Catalogue class.** This toolkit has never solved one; the content below is
-standard published knowledge, not local experience.
+**Verified here.** Chains that prove this class: `htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput`, `htb-py2-pickle-cookie-reduce-rce-rendered-output`.
 
 
 ## Scope & Safety
