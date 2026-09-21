@@ -1,0 +1,118 @@
+{
+  "id": "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce",
+  "source_note": "solved/encodecept.md",
+  "challenge": {
+    "name": "EncoDecept",
+    "platform": "HackTheBox",
+    "event": "HTB University CTF 2024",
+    "category": "web",
+    "solved_at": "2026-09-21",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "nginx",
+    "rails",
+    "ruby",
+    "django",
+    "sqlite",
+    "chromium"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a caching reverse proxy caches responses by URI plus a static extension and the backend treats the dot as a format delimiter",
+      "a response reaches a browser without a charset declaration",
+      "a page renders attacker-controlled markdown that becomes HTML attributes",
+      "a bot with a more privileged role visits an attacker-supplied URL"
+    ],
+    "any_of": [
+      "a Django view calls filter(**request.data) with a foreign key to the user model",
+      "a Rails controller merges params.to_unsafe_h after Marshal.dump into a JSON body"
+    ]
+  },
+  "signals": [
+    "nginx",
+    "proxy_cache",
+    "x-cache-status",
+    "rails",
+    "contract_frontend",
+    "settings",
+    "bio",
+    "markdown",
+    "redcarpet",
+    "report",
+    "contract_manager",
+    "contract_templates",
+    "marshal",
+    "django",
+    "filter",
+    "owner__password__startswith"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "confirm the proxy caches static-looking extensions: request an authenticated page as /path.html?cb=N twice and read X-Cache-Status MISS then HIT, then read it anonymously",
+      "why": "the cache key is the URI plus the extension, so an authenticated page can be stored under a static-looking URL"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "store a markdown bio that uses the JIS X 0208 1978 escape to break out of an attribute and set onerror",
+      "why": "no charset is declared, so Chrome sniffs the encoding and the escaped quote is misread"
+    },
+    {
+      "step": 3,
+      "stage": "trigger",
+      "action": "cache the authenticated settings page and report its internal http://127.0.0.1:<port>/settings.html?cb=N URL to the bot",
+      "why": "the bot is authenticated, and the cached page runs the XSS in its session; .html renders while .ico is treated as an image"
+    },
+    {
+      "step": 4,
+      "stage": "oracle",
+      "action": "from the XSS, brute-force the admin password with GET /contracts/manage?owner__password__startswith=<prefix>&owner__username=admin",
+      "why": "Django filter(**request.data) follows the owner foreign key, so a matching prefix returns rows and the page stops saying 'No contracts found'"
+    },
+    {
+      "step": 5,
+      "stage": "exfil",
+      "action": "have the XSS write the recovered password into the bot's own bio and navigate to a cacheable settings URL, then read it anonymously",
+      "why": "the cookie is HttpOnly, so the payload acts inside the page instead of stealing the session"
+    },
+    {
+      "step": 6,
+      "stage": "rce",
+      "action": "as admin, create a contract template whose data field overrides Marshal.dump via the params merge, using a Ruby 3.4 Gem::RequestSet::Lockfile gadget that runs a shell command through zip",
+      "why": "Marshal.load deserialises the stored data on view; the detection gadget must run first to create the git cache directory"
+    },
+    {
+      "step": 7,
+      "stage": "flag",
+      "action": "run cp /flag.txt into the Rails public directory and fetch it over HTTP",
+      "why": "the flag lives at the container root and the RCE runs in the Rails container"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "authenticated GET /settings.html?cb=1 twice, then anonymous GET /settings.html?cb=1",
+    "expected": "the anonymous request returns 200 with X-Cache-Status HIT and the body of the authenticated page",
+    "falsifier": "the anonymous request is a 302 to /login, so the proxy does not serve an authenticated page anonymously"
+  },
+  "blast_radius": "cache poisoning affects every player who requests the cached URL until it expires; the XSS and RCE act as the privileged bot and can write files inside the container, so use a disposable cachebuster and remove created templates",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was written to the Rails public directory by the Marshal RCE and read back over HTTP 200 on the live target"
+  },
+  "reuse_when": [
+    "an nginx location caches by extension and a Rails-style backend treats the dot as a format delimiter",
+    "a page renders markdown without a charset declaration",
+    "a Django endpoint calls filter(**request.data) with a foreign key to users"
+  ],
+  "known_traps": [
+    "report the internal 127.0.0.1 URL to the bot, not the public address, or the bot session is not used",
+    ".ico is rendered as an image by Chrome, so the cached HTML never executes; use .html",
+    "the Marshal gadget needs the detection step first or it raises Errno::ENOENT on the git cache directory",
+    "the gadget is tied to the exact Ruby and gem build and can fail on a patched image",
+    "the flag file written into the web root may not be removable afterwards; reset the instance"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

@@ -404,8 +404,10 @@
       "id": "web-cache-poisoning",
       "name": "Cache poisoning / deception",
       "skill_dir": "web-cache-poisoning",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
+      ],
       "observation_signals": [
         "x-cache|cf-cache-status|age:|vary:",
         "cache",

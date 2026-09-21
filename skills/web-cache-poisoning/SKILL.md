@@ -2,16 +2,19 @@
 name: web-cache-poisoning
 description: >
   Action-oriented depth skill for Cache poisoning / deception. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-parser-differential.
-  Catalogue class: nothing in this toolkit has solved one yet.
+  Verified here by 1 chain card(s).
 tags: [web, cache-poisoning, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
-evidence_level: catalogue
+evidence_level: verified
 ---
 # Cache poisoning / deception
 
-**Catalogue class.** This toolkit has never solved one. What follows is
-standard published knowledge, not local experience — treat it as a starting
-point and record what actually happens in `field-notes.md`.
+**Verified here.** Chains that prove this class:
+
+- `knowledge/chains/htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce.json`
+
+Run `python3 tools/chain_match.py` before this skill: a matching
+chain gives you the exact confirming probe that already worked.
 
 ## First probe
 

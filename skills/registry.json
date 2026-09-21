@@ -442,7 +442,7 @@
       ],
       "skill_tokens": 1174,
       "depth_files": 4,
-      "depth_tokens": 2798,
+      "depth_tokens": 3822,
       "use_when": [
         "a probe or source read produced this class's signal: an absolute path to a file the target certainly has, before trying any traversal",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-ssrf-gopher-redis-lua-rce"
@@ -518,7 +518,7 @@
       ],
       "skill_tokens": 1457,
       "depth_files": 4,
-      "depth_tokens": 2369,
+      "depth_tokens": 3195,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -541,18 +541,20 @@
       "categories": [
         "web"
       ],
-      "evidence_level": "catalogue",
-      "verified_by": [],
-      "skill_tokens": 644,
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
+      ],
+      "skill_tokens": 810,
       "depth_files": 1,
-      "depth_tokens": 155,
+      "depth_tokens": 570,
       "use_when": [
-        "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker"
+        "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
+        "a chain card already proves this class here: htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the header is part of the cache key, so the poisoned copy is never served to anyone else",
-        "the evidence fits one of these better: web-parser-differential",
-        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+        "the evidence fits one of these better: web-parser-differential"
       ],
       "routes_to": [
         "web-parser-differential"
@@ -594,7 +596,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 659,
+      "skill_tokens": 842,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -620,7 +622,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 563,
+      "skill_tokens": 698,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -649,9 +651,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 672,
+      "skill_tokens": 714,
       "depth_files": 1,
-      "depth_tokens": 154,
+      "depth_tokens": 768,
       "use_when": [
         "a probe or source read produced this class's signal: a cross-origin form whose content type the endpoint still accepts, submitted by the viewer you control",
         "a chain card already proves this class here: htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -678,7 +680,7 @@
       "verified_by": [],
       "skill_tokens": 1040,
       "depth_files": 7,
-      "depth_tokens": 3357,
+      "depth_tokens": 3854,
       "use_when": [
         "a probe or source read produced this class's signal: identify the format from the blob's own magic before touching any gadget"
       ],
@@ -707,7 +709,7 @@
       ],
       "skill_tokens": 1118,
       "depth_files": 7,
-      "depth_tokens": 4470,
+      "depth_tokens": 5413,
       "use_when": [
         "a probe or source read produced this class's signal: a benign marker file first; the question is where it is stored and what later reads or executes it",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
@@ -731,7 +733,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 539,
+      "skill_tokens": 720,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -785,7 +787,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 594,
+      "skill_tokens": 724,
       "depth_files": 1,
       "depth_tokens": 156,
       "use_when": [
@@ -814,7 +816,7 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 746,
+      "skill_tokens": 792,
       "depth_files": 1,
       "depth_tokens": 154,
       "use_when": [
@@ -843,7 +845,7 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 684,
+      "skill_tokens": 730,
       "depth_files": 1,
       "depth_tokens": 638,
       "use_when": [
@@ -870,7 +872,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 552,
+      "skill_tokens": 662,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -899,9 +901,9 @@
       "verified_by": [
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 676,
+      "skill_tokens": 723,
       "depth_files": 1,
-      "depth_tokens": 440,
+      "depth_tokens": 928,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -930,7 +932,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 829,
+      "skill_tokens": 874,
       "depth_files": 1,
       "depth_tokens": 756,
       "use_when": [
@@ -960,7 +962,7 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 723,
+      "skill_tokens": 764,
       "depth_files": 1,
       "depth_tokens": 490,
       "use_when": [
@@ -988,9 +990,9 @@
       "verified_by": [
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 775,
+      "skill_tokens": 820,
       "depth_files": 1,
-      "depth_tokens": 435,
+      "depth_tokens": 1504,
       "use_when": [
         "a probe or source read produced this class's signal: one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
         "a chain card already proves this class here: htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1020,7 +1022,7 @@
       ],
       "skill_tokens": 1020,
       "depth_files": 12,
-      "depth_tokens": 6176,
+      "depth_tokens": 6493,
       "use_when": [
         "a probe or source read produced this class's signal: one syntax marker, then a matched true/false pair against the same input",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
@@ -1104,7 +1106,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 530,
+      "skill_tokens": 676,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -1132,7 +1134,7 @@
       ],
       "skill_tokens": 898,
       "depth_files": 7,
-      "depth_tokens": 2818,
+      "depth_tokens": 3370,
       "use_when": [
         "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1157,9 +1159,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 574,
+      "skill_tokens": 735,
       "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_tokens": 600,
       "use_when": [
         "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed"
       ],

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T02:46:23",
+  "generated_at": "2026-09-21T04:10:58",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -9,8 +9,8 @@
     "skills": 46,
     "review": 0,
     "warn": 0,
-    "local_evidence_present": 15,
-    "local_evidence_stub": 9,
+    "local_evidence_present": 16,
+    "local_evidence_stub": 8,
     "local_evidence_missing": 0
   },
   "review": [],
@@ -236,16 +236,14 @@
       "id": "web-cache-poisoning",
       "layer": "depth",
       "path": "skills/web-cache-poisoning/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 74,
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.192,
-      "trust": "catalogue-or-unreviewed"
+      "local_evidence": "present",
+      "lines": 77,
+      "nearest_neighbour": "web-request-smuggling",
+      "overlap": 0.184,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-chromedriver",
@@ -462,7 +460,7 @@
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 77,
-      "nearest_neighbour": "web-parser-differential",
+      "nearest_neighbour": "web-cache-poisoning",
       "overlap": 0.184,
       "trust": "local-confirmed"
     },

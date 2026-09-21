@@ -86,7 +86,7 @@ Open one only after a probe or a source read produced its signal.
 | Cross-site request forgery | verified | the endpoint requires a token the attacker page cannot read or a content | `skills/web-csrf/SKILL.md` |
 | CORS misconfiguration | catalogue | the allowed origin is a fixed allowlist | `skills/web-cors/SKILL.md` |
 | Open redirect | catalogue | the destination is validated against an allowlist or forced to a relativ | `skills/web-open-redirect/SKILL.md` |
-| Cache poisoning / deception | catalogue | the header is part of the cache key | `skills/web-cache-poisoning/SKILL.md` |
+| Cache poisoning / deception | verified | the header is part of the cache key | `skills/web-cache-poisoning/SKILL.md` |
 | Prototype / class pollution | verified | the merge rejects reserved keys | `skills/web-prototype-pollution/SKILL.md` |
 | Unsafe deserialization | catalogue | the blob is signed with a key that is not leaked and not reachable | `skills/web-deserialization/SKILL.md` |
 | Race condition / TOCTOU | verified | the read and the write happen inside one transaction or behind one lock | `skills/web-race-condition/SKILL.md` |
