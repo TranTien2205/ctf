@@ -39,6 +39,7 @@ context, role, goal, instructions, constraints, output format, examples.
 | `test/cases/system_eval.json` | offline actionability cases for every update |
 | `VERSIONING.md` | saving and restoring a working version |
 | `EXTERNAL_SOURCES.md` | importing outside material without importing noise |
+| `TRAINING.md` | the complete blind/source/guided training and learning protocol |
 
 ## Layout
 
@@ -80,6 +81,11 @@ already worked. The required offline system evaluation checks whether the
 classifier, dispatch policy, skill contracts, and decision controller still
 produce useful actions. Both layers must pass; a structural pass alone is not a
 claim that the system solves a challenge.
+
+The controller is fail-closed: a hypothesis must name a taxonomy class, every
+probe must identify that hypothesis and class, and a recorded response clears
+the previous next action. This keeps a weak model from repeating stale commands
+or upgrading a merely successful HTTP response into proof of the wrong class.
 
 Review local learning separately:
 

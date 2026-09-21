@@ -22,6 +22,7 @@ see `CLAUDE_CODE.md`.
 | Which skills are generic or stubs | `tools/skill_audit.py` |
 | Whether the system still produces useful next actions | `tools/system_eval.py` |
 | Proposed versus confirmed local experience | `tools/learning_report.py` |
+| Agent role, tool trust, and replay discipline | `TRAINING.md` |
 | Changing direction without losing a branch | `HYPOTHESIS_PROTOCOL.md` |
 | What counts as evidence | `EVIDENCE_POLICY.md` |
 | Reusing a chain already solved here | `tools/chain_match.py` |

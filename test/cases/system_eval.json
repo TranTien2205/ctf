@@ -17,6 +17,11 @@
       "expect_top": "web-idor"
     },
     {
+      "id": "cache-deception-extension-cache",
+      "observation": "nginx proxy_cache location regex for css js html json, X-Cache-Status header, authenticated page served from cache by uri",
+      "expect_top": "web-cache-poisoning"
+    },
+    {
       "id": "ordinary-app-negative",
       "observation": "A static page serves CSS and a health endpoint returns 200",
       "expect_top": null
@@ -41,6 +46,29 @@
       "name": "eval-flag",
       "state": {"hypotheses": [], "probes": [], "flag": {"value": "candidate", "source": "live-response", "evidence": "response excerpt"}},
       "action": "record_solve"
+    }
+  ],
+  "evidence_policy": [
+    {
+      "id": "encodecept-surface-is-not-deserialization",
+      "class": "web-deserialization",
+      "verdict": "inconclusive",
+      "evidence_kind": "surface",
+      "evidence": "HTTP/1.1 302 Found; location: /login"
+    },
+    {
+      "id": "encodecept-markdown-render-is-class-signal",
+      "class": "web-xss",
+      "verdict": "confirms",
+      "evidence_kind": "class",
+      "evidence": "bioPreview contains <p>ENCODECEPT_MARKER</p>"
+    },
+    {
+      "id": "encodecept-cache-hit-is-impact",
+      "class": "web-cache-poisoning",
+      "verdict": "confirms",
+      "evidence_kind": "impact",
+      "evidence": "X-Cache-Status: HIT; authenticated marker served to anonymous client"
     }
   ]
 }

@@ -36,6 +36,7 @@ import state as state_mod  # noqa: E402
 from decide import compute_budget, PROBE_BUDGET, MINUTE_BUDGET  # noqa: E402
 
 VERDICTS = ("confirms", "falsifies", "inconclusive")
+EVIDENCE_KINDS = ("surface", "class", "impact", "transport")
 FLAG_SOURCES = ("live-response", "artifact")
 NEVER_CONFIRMATIONS = re.compile(
     r"time.?out|timed?\s*out|connection\s*(reset|refused)|no\s+response|"
@@ -78,6 +79,20 @@ def hook_pre_probe(args, current, path):
             "duplicate probe request: a new probe must change the mechanism, "
             "not the syntax; --allow-repeat exists only for a legitimate "
             "repeat such as a timing baseline")
+    if not args.hypothesis_id:
+        raise Refused("pre-probe needs --hypothesis-id; every probe must belong to one classified branch")
+    matches = [h for h in current["hypotheses"] if h.get("id") == args.hypothesis_id]
+    if len(matches) != 1 or matches[0].get("status") != "open":
+        raise Refused("--hypothesis-id must identify one open hypothesis")
+    hypothesis = matches[0]
+    if not hypothesis.get("bug_class"):
+        raise Refused("selected hypothesis has no bug_class; classify it before probing")
+    if args.probe_class and args.probe_class != hypothesis["bug_class"]:
+        raise Refused("probe class does not match the selected hypothesis")
+    budget = compute_budget(current["probes"])
+    if budget.get(hypothesis["bug_class"], {}).get("exhausted"):
+        raise Refused("probe budget exhausted for %s; run tools/decide.py and switch class"
+                      % hypothesis["bug_class"])
     if WRITE_SHAPED.search(args.request) and not args.write_ack:
         raise Refused(
             "write-shaped probe: read blast_radius on the matching chain card "
@@ -92,6 +107,12 @@ def hook_post_probe(args, current, path):
         raise Refused("a probe needs a request string")
     if args.verdict not in VERDICTS:
         raise Refused("verdict must be one of %s" % ", ".join(VERDICTS))
+    if not args.hypothesis_id:
+        raise Refused("post-probe needs --hypothesis-id; every result must belong to one classified branch")
+    if not getattr(args, "class", None):
+        raise Refused("post-probe needs --class")
+    if args.verdict == "confirms" and args.evidence_kind not in ("class", "impact"):
+        raise Refused("verdict=confirms requires --evidence-kind class or impact; surface evidence is inconclusive")
     if args.verdict == "confirms":
         if not (args.evidence or "").strip():
             raise Refused(
@@ -110,6 +131,8 @@ def hook_post_probe(args, current, path):
         value = getattr(args, key)
         if value:
             probe[key] = value
+    if args.evidence_kind:
+        probe["evidence_kind"] = args.evidence_kind
     if args.hypothesis_id:
         matches = [h for h in current["hypotheses"]
                    if h.get("id") == args.hypothesis_id]
@@ -117,7 +140,10 @@ def hook_post_probe(args, current, path):
             raise Refused("--hypothesis-id must identify exactly one "
                           "existing hypothesis")
         probe["hypothesis_id"] = args.hypothesis_id
+        if getattr(args, "class", None) and matches[0].get("bug_class") != getattr(args, "class"):
+            raise Refused("confirming class does not match the hypothesis bug_class")
     current["probes"].append(probe)
+    current["next_action"] = None
     current["updated_at"] = time.time()
     state_mod.atomic_json(path, current)
     budget = compute_budget(current["probes"])
@@ -145,7 +171,8 @@ def hook_pre_confirm(args, current, path):
         raise Refused("only an open hypothesis can be confirmed "
                       "(current status: %s)" % hyp.get("status"))
     supporting = [p for p in current["probes"]
-                  if p.get("verdict") == "confirms" and p.get("evidence")
+                   if p.get("verdict") == "confirms" and p.get("evidence")
+                   and p.get("evidence_kind") in ("class", "impact")
                   and (p.get("hypothesis_id") == hyp.get("id")
                        or (hyp.get("bug_class") and
                            p.get("class") == hyp.get("bug_class")))]
@@ -201,12 +228,15 @@ def build_parser():
     pre.add_argument("--request", default="")
     pre.add_argument("--allow-repeat", action="store_true")
     pre.add_argument("--write-ack", action="store_true")
+    pre.add_argument("--hypothesis-id", dest="hypothesis_id")
+    pre.add_argument("--class", dest="probe_class")
 
     post = sub.add_parser("post-probe")
     post.add_argument("name")
     post.add_argument("--request", default="")
     post.add_argument("--verdict", required=True)
     post.add_argument("--evidence")
+    post.add_argument("--evidence-kind", choices=EVIDENCE_KINDS)
     post.add_argument("--result")
     post.add_argument("--class", dest="class")
     post.add_argument("--chain-card", dest="chain_card")

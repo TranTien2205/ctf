@@ -428,6 +428,16 @@ class ContractTests(unittest.TestCase):
                        "recorded as `inconclusive`"):
             self.assertIn(marker, prompt, "PROMPT.md lost reliability marker: " + marker)
 
+    def test_ai_role_and_checkpoint_discipline_is_documented(self):
+        agents = read("AGENTS.md")
+        training = read("TRAINING.md")
+        for marker in ("AI role discipline", "reader", "writer", "hypothesizer",
+                       "the agent proposes; the machine verifies", "After four tool calls"):
+            self.assertIn(marker, agents, "AGENTS.md lost AI discipline marker: " + marker)
+        for marker in ("Tool layers and permissions", "Harness and replay validation",
+                       "Preserve it verbatim", "After four tool calls"):
+            self.assertIn(marker, training, "TRAINING.md lost training marker: " + marker)
+
 
 # --------------------------------------------------------------------------- C
 WEATHER = ROOT / "challenges/Weather App/web_weather_app/challenge"
@@ -581,7 +591,7 @@ class LedgerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT) as directory:
             root = Path(directory)
             (root / "challenges").mkdir()
-            self.ledger(root, "sample", "--hypothesis", "old path")
+            self.ledger(root, "sample", "--hypothesis", "old path", "--bug-class", "web-ssti")
             data = json.loads((root / "challenges/sample/state.json").read_text())
             hid = data["hypotheses"][0]["id"]
             self.assertEqual(data["hypotheses"][0]["priority"], state.DEFAULT_PRIORITY)
@@ -596,7 +606,7 @@ class LedgerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT) as directory:
             root = Path(directory)
             (root / "challenges").mkdir()
-            self.ledger(root, "sample", "--hypothesis", "parked path")
+            self.ledger(root, "sample", "--hypothesis", "parked path", "--bug-class", "web-ssti")
             path = root / "challenges/sample/state.json"
             hid = json.loads(path.read_text())["hypotheses"][0]["id"]
             self.ledger(root, "sample", "--hypothesis-id", hid, "--deprioritize", "no new signal")
@@ -855,6 +865,9 @@ class CapabilityTests(unittest.TestCase):
         for case in payload["decisions"]:
             self.assertIn("state", case)
             self.assertIn("action", case)
+        for case in payload.get("evidence_policy", []):
+            self.assertIn(case["evidence_kind"], ("surface", "class", "impact", "transport"))
+            self.assertIn(case["verdict"], ("confirms", "falsifies", "inconclusive"))
 
     def test_learning_report_is_read_only_and_complete(self):
         payload = learning_report.report()
@@ -935,9 +948,8 @@ class OrchestratorTests(unittest.TestCase):
                    "time": 1000.0 + i, "verdict": "inconclusive",
                    "class": "web-ssti"} for i in range(5)]
         self.write_state("t3", {
-            "hypotheses": [{"id": "h1", "name": "ssti", "status": "open",
-                            "priority": 50, "time": 1000.0,
-                            "bug_class": "web-ssti"}],
+            "hypotheses": [{"id": "h1", "name": "ssti", "status": "open", "bug_class": "web-ssti",
+                            "priority": 50, "time": 1000.0}],
             "probes": probes, "classes_considered": ["web-ssti", "web-ssrf"]})
         decision = decide_mod.decide("t3", now=1000.0 + 60)
         self.assertEqual(decision["action"], "switch_class")
@@ -948,7 +960,7 @@ class OrchestratorTests(unittest.TestCase):
     def test_decide_prefers_an_unprobed_chain_card(self):
         self.write_state("t4", {
             "hypotheses": [{"id": "h1", "name": "fresh idea", "status": "open",
-                            "priority": 50, "time": 1}],
+                            "priority": 50, "time": 1, "bug_class": "web-ssti"}],
             "probes": [],
             "chain_candidates": [{"id": "card-1",
                                   "first_confirming_probe": "the card probe"}]})
@@ -961,7 +973,8 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(decide_mod.decide("t5")["action"], "new_hypothesis")
 
     def test_hooks_reject_evidence_free_confirmations(self):
-        self.write_state("t6", {"hypotheses": [], "probes": []})
+        self.write_state("t6", {"hypotheses": [{"id": "h1", "name": "ssti",
+                                                  "status": "open", "bug_class": "web-ssti"}], "probes": []})
         self.assertEqual(self.hooks("post-probe", "t6", "--request", "GET /a",
                                     "--verdict", "confirms"), 2)
         self.assertEqual(self.hooks("post-probe", "t6", "--request", "GET /b",
@@ -969,18 +982,53 @@ class OrchestratorTests(unittest.TestCase):
                                     "--evidence", "timed out after 30s"), 2)
         self.assertEqual(self.hooks("post-probe", "t6", "--request", "GET /c",
                                     "--verdict", "confirms",
-                                    "--evidence", "49 appeared in the page"), 0)
+                                    "--evidence", "49 appeared in the page",
+                                    "--evidence-kind", "class",
+                                    "--hypothesis-id", "h1", "--class", "web-ssti"), 0)
         recorded = self.read_state("t6")["probes"][-1]
         self.assertEqual(recorded["verdict"], "confirms")
         self.assertIn("49", recorded["evidence"])
 
     def test_hooks_reject_duplicate_and_write_shaped_probes(self):
-        self.write_state("t7", {"hypotheses": [], "probes": [
+        self.write_state("t7", {"hypotheses": [{"id": "h1", "name": "ssti",
+                                                  "status": "open", "bug_class": "web-ssti"}], "probes": [
             {"request": "GET /a", "result": "inconclusive", "time": 1}]})
-        self.assertEqual(self.hooks("pre-probe", "t7", "--request", "GET /a"), 2)
+        self.assertEqual(self.hooks("pre-probe", "t7", "--request", "GET /a",
+                                    "--hypothesis-id", "h1", "--class", "web-ssti"), 2)
         self.assertEqual(self.hooks("pre-probe", "t7",
-                                    "--request", "POST /mass-update"), 2)
-        self.assertEqual(self.hooks("pre-probe", "t7", "--request", "GET /b"), 0)
+                                    "--request", "POST /mass-update", "--hypothesis-id", "h1",
+                                    "--class", "web-ssti"), 2)
+        self.assertEqual(self.hooks("pre-probe", "t7", "--request", "GET /b",
+                                    "--hypothesis-id", "h1", "--class", "web-ssti"), 0)
+
+    def test_hooks_reject_unlinked_probes_and_mismatched_confirms(self):
+        self.write_state("t7b", {"hypotheses": [{"id": "h1", "name": "ssti",
+                                                   "status": "open", "bug_class": "web-ssti"}],
+                                  "probes": []})
+        self.assertEqual(self.hooks("pre-probe", "t7b", "--request", "GET /a"), 2)
+        self.assertEqual(self.hooks("pre-probe", "t7b", "--request", "GET /a",
+                                    "--hypothesis-id", "h1", "--class", "web-ssrf"), 2)
+        self.assertEqual(self.hooks("post-probe", "t7b", "--request", "GET /a",
+                                    "--verdict", "confirms", "--evidence", "49 rendered"), 2)
+
+    def test_post_probe_clears_stale_next_action(self):
+        self.write_state("t7c", {"next_action": "repeat the old request",
+                                  "hypotheses": [{"id": "h1", "name": "ssti",
+                                                   "status": "open", "bug_class": "web-ssti"}],
+                                  "probes": []})
+        self.assertEqual(self.hooks("post-probe", "t7c", "--request", "GET /?t=49",
+                                    "--verdict", "inconclusive", "--evidence", "response was literal",
+                                    "--hypothesis-id", "h1", "--class", "web-ssti"), 0)
+        self.assertIsNone(self.read_state("t7c").get("next_action"))
+
+    def test_state_hypothesis_keeps_bug_class(self):
+        with patch.object(state, "ROOT", str(self.root)), patch.object(sys, "argv",
+                                                                       ["state", "t7d", "--hypothesis", "ssti path",
+                                                                        "--bug-class", "web-ssti"]), \
+                contextlib.redirect_stdout(io.StringIO()):
+            state.main()
+        data = json.loads((self.root / "challenges/t7d/state.json").read_text())
+        self.assertEqual(data["hypotheses"][0]["bug_class"], "web-ssti")
 
     def test_hooks_gate_confirmations_and_flags(self):
         self.write_state("t8", {"hypotheses": [
@@ -993,6 +1041,7 @@ class OrchestratorTests(unittest.TestCase):
                                     "--request", "GET /?t=49",
                                     "--verdict", "confirms",
                                     "--evidence", "49 rendered",
+                                    "--evidence-kind", "class",
                                     "--class", "web-ssti",
                                     "--hypothesis-id", "h1"), 0)
         self.assertEqual(self.hooks("pre-confirm", "t8",

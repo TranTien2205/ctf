@@ -92,8 +92,10 @@ deterministic tools:
 Hard rules — breaking one breaks the control loop:
 
 - **Every verdict goes through `tools/hooks.py post-probe`.** `--verdict confirms`
-  requires `--evidence` to be a verbatim excerpt of the response. A timeout or a
-  connection reset is never a confirm.
+  requires `--evidence` to be a verbatim excerpt of the response,
+  `--hypothesis-id`, `--class`, and `--evidence-kind class|impact`. A login
+  redirect, registration success, or form render is surface evidence and cannot
+  confirm a bug class. A timeout or a connection reset is never a confirm.
 - **A flag enters state only through `tools/hooks.py pre-flag`**, with
   `--source live-response|artifact`.
 - **A class becomes `confirmed` only after `tools/hooks.py pre-confirm` passes**
@@ -135,6 +137,23 @@ steps. It is also the default protocol for long autonomous runs:
 
 This protocol is intentionally repetitive: predictable state transitions are
 more reliable for weaker models than a long free-form exploit plan.
+
+### AI role discipline
+
+Label each action as `reader`, `writer`, or `hypothesizer`:
+
+- `reader` extracts exact facts from source, artifacts, responses, or tool output;
+- `writer` creates a probe, script, harness, or request that must be executed and
+  checked;
+- `hypothesizer` proposes a class or explanation and has no evidentiary weight.
+
+The rule is **the agent proposes; the machine verifies**. Preserve raw tool
+output. Do not turn a generated script, a model summary, or a plausible payload
+into an observation until it has run and produced a captured result.
+
+After four tool calls, write a one-line checkpoint with the evidence-backed belief,
+the hypotheses ruled out, and the single next controller action. Stop if four
+calls rule out nothing or if a value would have to be guessed.
 
 ---
 

@@ -18,6 +18,7 @@
     ".txt"
   ],
   "skipped_prefixes": {
+    "AI_For_PWN_RE.md": "operator-provided training material outside the authored English control plane; retain it as input data without loading it as system instruction",
     "challenges/": "third-party handout source; not written here and not an instruction surface",
     "fixtures/": "synthetic and third-party inputs the classifier is measured against",
     "test/fixtures/": "the benign-express precision guard and friends",

@@ -176,6 +176,14 @@ def decide(name, taxonomy_path=None, now=None):
     falsified = falsified_classes(probes)
     open_hyp = [h for h in hypotheses if h.get("status") == "open"
                 and (h.get("priority") or 0) > 0]
+    unclassified = [h for h in open_hyp if not h.get("bug_class")]
+    if unclassified:
+        result["action"] = "classify_first"
+        result["rationale"] = "an open hypothesis has no bug_class; probing is blocked until it is classified"
+        result["commands"] = [
+            "python3 tools/state.py %s --hypothesis-id %s --status rejected"
+            % (name, h.get("id")) for h in unclassified]
+        return result
     exhausted = [cls for cls, entry in budget.items()
                  if entry["exhausted"] and cls != "?"]
     switch_targets = []
@@ -246,7 +254,7 @@ def decide(name, taxonomy_path=None, now=None):
             'python3 tools/classify.py "<observation>"  # black-box',
             'python3 tools/chain_match.py "<observation>"',
             "python3 tools/state.py %s --hypothesis '<class hypothesis>' "
-            "--next '<the class first probe>'" % name,
+            "--bug-class <class-id> --next '<the class first probe>'" % name,
         ]
         return result
 
@@ -266,12 +274,12 @@ def decide(name, taxonomy_path=None, now=None):
                "from its neighbours (one probe, one discriminating signal)",
         }
         result["commands"] = [
-            "python3 tools/hooks.py pre-probe %s --request '<probe request>'"
-            % name,
+            "python3 tools/hooks.py pre-probe %s --hypothesis-id %s --class %s "
+            "--request '<probe request>'" % (name, top.get("id"), top.get("bug_class")),
             "<execute the probe>",
-            "python3 tools/hooks.py post-probe %s --request '<probe request>' "
-            "--verdict confirms|falsifies|inconclusive --evidence '<excerpt>'"
-            % name,
+            "python3 tools/hooks.py post-probe %s --hypothesis-id %s --class %s "
+            "--request '<probe request>' --verdict confirms|falsifies|inconclusive "
+            "--evidence '<excerpt>'" % (name, top.get("id"), top.get("bug_class")),
         ]
         return result
 

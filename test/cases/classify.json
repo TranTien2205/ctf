@@ -63,6 +63,11 @@
       "observation": "multipart/form-data avatar upload, filename kept, image/png mime check",
       "expect_top": "web-file-upload",
       "origin": "catalogue-adjacent shape"
+    },
+    {
+      "observation": "nginx proxy_cache with a location regex for css js html json, X-Cache-Status header, authenticated pages cached by uri and args",
+      "expect_top": "web-cache-poisoning",
+      "origin": "EncoDecept: web cache deception confirmed live; an unauthenticated request received a cached authenticated page (X-Cache-Status: HIT)"
     }
   ],
   "source_cases": [

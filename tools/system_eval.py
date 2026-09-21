@@ -83,6 +83,14 @@ def run_cases():
             results.append({"id": case["id"], "kind": "decision", "ok": actual == case["action"],
                             "actual": actual, "expected": case["action"]})
 
+    for case in cases.get("evidence_policy", []):
+        confirms = case["verdict"] == "confirms"
+        kind_ok = case["evidence_kind"] in ("class", "impact")
+        ok = (not confirms and case["evidence_kind"] == "surface") or (confirms and kind_ok)
+        results.append({"id": case["id"], "kind": "evidence-policy", "ok": ok,
+                        "actual": {"verdict": case["verdict"], "evidence_kind": case["evidence_kind"]},
+                        "expected": "surface cannot confirm; class/impact may confirm"})
+
     passed = sum(1 for item in results if item["ok"])
     return {"cases": len(results), "passed": passed, "failed": len(results) - passed,
             "accuracy": passed / len(results) if results else 1.0, "results": results}

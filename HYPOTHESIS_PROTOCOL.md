@@ -28,7 +28,8 @@ Never delete the branch and never mark it falsified. Run:
 ```bash
 python3 tools/state.py <challenge> --hypothesis-id <id> \
   --deprioritize "operator redirect: no falsifying evidence yet"
-python3 tools/state.py <challenge> --hypothesis "<the new direction>"
+python3 tools/state.py <challenge> --hypothesis "<the new direction>" \
+  --bug-class <taxonomy-class>
 ```
 
 Then state in the reply, in one line: what was parked, why, and what the new

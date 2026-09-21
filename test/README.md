@@ -24,6 +24,7 @@ executed. Only controlled Python snippets run.
 | G. capability | a change that quietly reduces the number of skills, routers, chain cards or passing routing cases |
 | H. actionability | classification, category routing, skill contracts, controller decisions, and negative cases still work offline |
 | I. learning report | proposed and confirmed notes remain internally consistent and the review backlog stays visible |
+| J. fail-closed control loop | probes are linked to a classified hypothesis, confirms carry matching class/evidence, and stale next actions are cleared |
 
 ## Files
 
@@ -38,6 +39,12 @@ executed. Only controlled Python snippets run.
 | `cases/system_eval.json` | stable offline actionability and decision cases |
 | `../tools/system_eval.py` | executes the actionability cases without network access |
 | `../tools/learning_report.py` | reports local evidence and classify-miss backlog without editing state |
+
+The control loop is intentionally strict. `state.py --hypothesis` records a
+`--bug-class`; `hooks.py pre-probe` requires the hypothesis id and matching class;
+`post-probe` requires the same linkage, an evidence kind, and clears the previous next action. This
+prevents a model from confirming a redirect as a vulnerability or repeating a
+stale command after the response has already been recorded.
 
 ## Adding a case
 
