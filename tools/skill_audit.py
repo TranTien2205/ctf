@@ -144,6 +144,11 @@ def audit():
             score += 15
         else:
             row["flags"].append("no traps/pitfalls/discipline")
+        if "## operational probe" in low:
+            row["actionability"] = "operational"
+        else:
+            row["actionability"] = "basic"
+            row["flags"].append("no operational probe contract")
         notes = os.path.join(os.path.dirname(full), "field-notes.md")
         if os.path.isfile(notes):
             with open(notes, encoding="utf-8") as handle:
@@ -221,7 +226,11 @@ def audit():
                         "local_evidence_stub": sum(
                             r.get("local_evidence") == "stub" for r in rows),
                         "local_evidence_missing": sum(
-                            r.get("local_evidence") == "missing" for r in rows)},
+                            r.get("local_evidence") == "missing" for r in rows),
+                        "actionable_skills": sum(
+                            r.get("actionability") == "operational" for r in rows),
+                        "basic_skills": sum(
+                            r.get("actionability") == "basic" for r in rows)},
             "review": flagged, "warn": warned, "skills": rows}
 
 

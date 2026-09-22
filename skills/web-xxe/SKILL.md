@@ -35,6 +35,28 @@ older configurations resolve external entities by default.
 Expected confirmation is entity expansion in the response or an attributable
 callback. A generic XML parse error does not prove entity resolution.
 
+## Operational probe
+
+Use a baseline document, then one internal entity whose value is a harmless
+known file or marker:
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE r [<!ENTITY probe "XXE_PROBE">]>
+<r>&probe;</r>
+```
+
+If the endpoint echoes the field, replace only the internal entity with a local
+file reference that the supplied challenge definitely contains. If there is no
+echo channel, use an out-of-band URL only when the challenge provides a
+controlled callback. Record status, body length, parser error, and callback
+evidence separately. A malformed XML error does not prove external entity
+resolution.
+
+For uploads, keep the first file a valid document of the observed type. Do not
+combine XXE with archive traversal, polyglot content, or an external callback in
+the first request.
+
 ## Where it usually hides
 
 Document formats are ZIP containers with XML inside: replacing one part of a

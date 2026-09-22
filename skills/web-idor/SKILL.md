@@ -34,6 +34,27 @@ belongs to an identity but the handler looks it up by identifier alone.
 2. As identity B, or with no session, request A's identifier.
 3. Reading or writing it proves the finding. One account cannot prove it.
 
+## Operational probe
+
+Use two sessions and keep the object read-only:
+
+```bash
+# identity A creates an object and records the observed id
+curl -i -b a.cookies "$BASE/api/items"
+# identity B requests the exact id, without changing the object
+curl -i -b b.cookies "$BASE/api/items/<id-from-A>"
+```
+
+For sequential ids, test one adjacent id, not a sweep. For opaque ids, use an
+id returned by the application for identity A. Record status, response length,
+and an ownership marker from both sessions. Confirmation requires B to read or
+modify A's object and the response to contain attributable object data. A 200
+empty wrapper, a public object, or a guessed id is not confirmation.
+
+For an update endpoint, first send the same request to A's own object and then
+repeat it against B's object only if the first request is reversible. Do not
+modify another player's data as the first probe.
+
 Sequential identifiers: step by one. Opaque identifiers: collect the ones the
 application hands out; time-ordered formats are predictable —
 `references/uuid-analysis.md`.
@@ -67,6 +88,8 @@ application hands out; time-ordered formats are predictable —
   change layer rather than sweeping more identifiers. See
   `../LOOP_DISCIPLINE.md`.
 - On a shared instance, read another identity's record; do not modify it.
+- A token claim or numeric id is only an identifier signal; ownership must be
+  tested with a second identity.
 
 ## Field notes
 

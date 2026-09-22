@@ -34,6 +34,31 @@ Host a page that issues the request cross-origin and have the viewer load it.
 Confirmation is the state change, observed from your own account or from the
 endpoint's response afterwards.
 
+## Operational probe
+
+Record a same-origin baseline first:
+
+```bash
+curl -i -b "$COOKIE_JAR" "$BASE/profile"
+```
+
+Then use one cross-origin form submission against an object you created:
+
+```html
+<form action="https://TARGET/change" method="POST" enctype="text/plain">
+  <input name='{"name":"csrf-marker","ignore":"' value='"}'>
+</form>
+<script>document.forms[0].submit()</script>
+```
+
+Use only methods, fields, and content types observed in source or the live form.
+A 200 or navigation is surface evidence. The class signal is an attributable
+before/after state change, read back with a separate request. If JSON is required
+and `text/plain` is rejected, record `inconclusive` instead of overclaiming.
+
+For a bot challenge, submit one URL, wait for one bot cycle, then read the object
+you own. Do not combine a state-change form with an XSS payload in one cycle.
+
 ## Reaching a JSON endpoint from a form
 
 A form cannot set an arbitrary content type, but `text/plain` is allowed. The
@@ -50,6 +75,10 @@ encoding applied. Endpoints that parse the body by content sniff, or that accept
   Verify it immediately.
 - Check the cookie's same-site attribute before assuming the browser will attach
   it to a cross-origin request.
+- A CSRF token from the attacker's own session does not prove that a bot session
+  can be acted on.
+- Cross-origin `fetch` may be blocked by CORS or Private Network Access; a form
+  navigation can still send a request without exposing its response body.
 
 ## Routing
 

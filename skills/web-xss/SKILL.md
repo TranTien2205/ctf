@@ -45,6 +45,31 @@ Send one unique harmless marker and find where it lands.
 A value interpolated into a template literal inside a script evaluates **before**
 any DOM sanitiser runs. Treat that as its own context.
 
+## Operational probe
+
+Start with a unique inert marker, not a script:
+
+```text
+XSS_PROBE_<random>
+```
+
+Submit it once, then read the exact response or rendered DOM. Record whether it
+is absent, HTML-escaped, reflected as text, inserted into an attribute, placed
+inside a script string, or transformed by a sanitizer. A literal marker or a
+login redirect is surface evidence only.
+
+Choose one context-specific harmless payload after the marker lands. For an HTML
+body, use a tag that proves markup execution without accessing secrets. For an
+attribute, close the observed quote and add one load/error handler. For a DOM
+sink, use a marker in the source location and inspect the sink after the page
+executes. Confirmation requires a rendered/executed effect attributable to the
+marker and a real viewer; reflection alone is inconclusive.
+
+For an admin-bot chain, first prove the bot reaches the stored page. If the
+session is HttpOnly, do not waste cycles trying to read it; perform a same-origin
+action and return the result through a record, cacheable page, or other observed
+read channel.
+
 ## Exfiltration when the bot fires it
 
 Send the value to a listener you control, or — when the instance has no outbound
@@ -73,10 +98,11 @@ When this file lacks the needed variant, open one named file:
 - Fire one payload route at a time, or a success cannot be attributed.
 - Context unchanged after two variants means the wrong reflection point or full
   encoding — change layer. See `../LOOP_DISCIPLINE.md`.
+- A CSP error, browser console error, or bot visit without a rendered effect is
+  not XSS confirmation.
 
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class
 is solved. Entries marked `proposed` are awaiting review; entries marked
 `confirmed` have been checked. See `../../LEARNING_LOOP.md`.
-

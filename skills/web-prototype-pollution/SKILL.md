@@ -40,6 +40,31 @@ that reads an optional property and treats absence as trusted is the target.
 Pollute one harmless property, then read it back through a path that should not
 have it. Do not jump straight at the gate you actually want.
 
+## Operational probe
+
+Pin every write to an object you created and use a property with no security
+meaning. For a JSON deep merge, the shape is:
+
+```json
+{"profile":{"__proto__":{"training_marker":"unique-value"}}}
+```
+
+For a document-store rename, create the source value first and omit every other
+write field:
+
+```json
+{"filter":{"id":"<own-id>"},"$rename":{"marker":"__proto__.training_marker"}}
+```
+
+Use the exact wrapper and operator observed in the request schema. The class
+signal is the marker appearing on a fresh object or a later object that should
+not inherit it. A successful update response alone is surface evidence. If
+reserved keys are rejected, values are coerced to strings, or no later read
+observes the marker, record the falsifier or `inconclusive` and stop.
+
+For Python class pollution, prove the harmless attribute path before testing a
+security-relevant fallback or command sink.
+
 ## Reaching the write
 
 | Route | Shape |
@@ -64,6 +89,9 @@ sequence is write, then read the object back, then test the gate.
   the narrowest property that reaches your goal.
 - The values you pollute with must already exist somewhere when the write is a
   rename: create them first.
+- Restart or isolate the process after a pollution probe when the challenge
+  permits it; polluted state can persist globally for every player.
+- Never test a broad filter or a role/command property first.
 
 ## Routing
 

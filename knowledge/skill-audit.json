@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-21T04:55:31",
+  "generated_at": "2026-09-22T09:17:46",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -11,7 +11,9 @@
     "warn": 0,
     "local_evidence_present": 16,
     "local_evidence_stub": 8,
-    "local_evidence_missing": 0
+    "local_evidence_missing": 0,
+    "actionable_skills": 10,
+    "basic_skills": 14
   },
   "review": [],
   "warn": [],
@@ -190,11 +192,14 @@
       "id": "file-read-primitives",
       "layer": "depth",
       "path": "skills/file-read-primitives/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 113,
+      "actionability": "basic",
       "nearest_neighbour": "web-ssti",
       "overlap": 0.041,
       "trust": "local-confirmed"
@@ -223,11 +228,14 @@
       "id": "web-auth-session",
       "layer": "depth",
       "path": "skills/web-auth-session/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 153,
+      "actionability": "basic",
       "nearest_neighbour": "file-read-primitives",
       "overlap": 0.041,
       "trust": "local-confirmed"
@@ -236,13 +244,16 @@
       "id": "web-cache-poisoning",
       "layer": "depth",
       "path": "skills/web-cache-poisoning/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 77,
-      "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.184,
+      "actionability": "basic",
+      "nearest_neighbour": "web-parser-differential",
+      "overlap": 0.175,
       "trust": "local-confirmed"
     },
     {
@@ -260,14 +271,16 @@
       "layer": "depth",
       "path": "skills/web-command-injection/SKILL.md",
       "flags": [
+        "no operational probe contract",
         "field-notes is a template stub (16 lines)"
       ],
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
       "lines": 79,
-      "nearest_neighbour": "web-graphql",
-      "overlap": 0.196,
+      "actionability": "basic",
+      "nearest_neighbour": "web-logic-flaw",
+      "overlap": 0.184,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -280,9 +293,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 69,
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.22,
+      "lines": 93,
+      "actionability": "operational",
+      "nearest_neighbour": "web-logic-flaw",
+      "overlap": 0.176,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -293,9 +307,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 70,
+      "lines": 99,
+      "actionability": "operational",
       "nearest_neighbour": "web-race-condition",
-      "overlap": 0.198,
+      "overlap": 0.16,
       "trust": "local-confirmed"
     },
     {
@@ -303,25 +318,29 @@
       "layer": "depth",
       "path": "skills/web-deserialization/SKILL.md",
       "flags": [
-        "no evidence honesty line"
+        "no operational probe contract"
       ],
-      "score": 80,
+      "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 122,
-      "nearest_neighbour": "web-idor",
-      "overlap": 0.052,
+      "lines": 121,
+      "actionability": "basic",
+      "nearest_neighbour": "web-file-upload",
+      "overlap": 0.044,
       "trust": "local-confirmed"
     },
     {
       "id": "web-file-upload",
       "layer": "depth",
       "path": "skills/web-file-upload/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 115,
+      "actionability": "basic",
       "nearest_neighbour": "web-ssti",
       "overlap": 0.048,
       "trust": "local-confirmed"
@@ -336,9 +355,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 70,
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.209,
+      "lines": 107,
+      "actionability": "operational",
+      "nearest_neighbour": "web-logic-flaw",
+      "overlap": 0.161,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -351,9 +371,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 76,
+      "lines": 99,
+      "actionability": "operational",
       "nearest_neighbour": "web-ssti",
-      "overlap": 0.052,
+      "overlap": 0.042,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -361,14 +382,16 @@
       "layer": "depth",
       "path": "skills/web-logic-flaw/SKILL.md",
       "flags": [
+        "no operational probe contract",
         "field-notes is a template stub (16 lines)"
       ],
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
       "lines": 70,
+      "actionability": "basic",
       "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.218,
+      "overlap": 0.187,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -376,27 +399,32 @@
       "layer": "depth",
       "path": "skills/web-nosqli/SKILL.md",
       "flags": [
+        "no operational probe contract",
         "field-notes is a template stub (16 lines)"
       ],
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
       "lines": 76,
-      "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.183,
+      "actionability": "basic",
+      "nearest_neighbour": "web-parser-differential",
+      "overlap": 0.182,
       "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-oauth-sso",
       "layer": "depth",
       "path": "skills/web-oauth-sso/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 72,
-      "nearest_neighbour": "web-csrf",
-      "overlap": 0.194,
+      "actionability": "basic",
+      "nearest_neighbour": "web-race-condition",
+      "overlap": 0.191,
       "trust": "local-confirmed"
     },
     {
@@ -409,20 +437,24 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 64,
-      "nearest_neighbour": "web-cors",
-      "overlap": 0.22,
+      "lines": 83,
+      "actionability": "operational",
+      "nearest_neighbour": "web-logic-flaw",
+      "overlap": 0.187,
       "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-parser-differential",
       "layer": "depth",
       "path": "skills/web-parser-differential/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 69,
+      "actionability": "basic",
       "nearest_neighbour": "web-oauth-sso",
       "overlap": 0.187,
       "trust": "local-confirmed"
@@ -435,22 +467,26 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 84,
+      "lines": 112,
+      "actionability": "operational",
       "nearest_neighbour": "web-nosqli",
-      "overlap": 0.181,
+      "overlap": 0.15,
       "trust": "local-confirmed"
     },
     {
       "id": "web-race-condition",
       "layer": "depth",
       "path": "skills/web-race-condition/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 76,
-      "nearest_neighbour": "web-csrf",
-      "overlap": 0.198,
+      "actionability": "basic",
+      "nearest_neighbour": "web-oauth-sso",
+      "overlap": 0.191,
       "trust": "local-confirmed"
     },
     {
@@ -461,20 +497,24 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 77,
+      "lines": 98,
+      "actionability": "operational",
       "nearest_neighbour": "web-cache-poisoning",
-      "overlap": 0.184,
+      "overlap": 0.16,
       "trust": "local-confirmed"
     },
     {
       "id": "web-sqli",
       "layer": "depth",
       "path": "skills/web-sqli/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 103,
+      "actionability": "basic",
       "nearest_neighbour": "web-nosqli",
       "overlap": 0.057,
       "trust": "local-confirmed"
@@ -483,26 +523,32 @@
       "id": "web-ssrf",
       "layer": "depth",
       "path": "skills/web-ssrf/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 94,
-      "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.12,
+      "actionability": "basic",
+      "nearest_neighbour": "web-oauth-sso",
+      "overlap": 0.109,
       "trust": "local-confirmed"
     },
     {
       "id": "web-ssti",
       "layer": "depth",
       "path": "skills/web-ssti/SKILL.md",
-      "flags": [],
+      "flags": [
+        "no operational probe contract"
+      ],
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
       "lines": 85,
+      "actionability": "basic",
       "nearest_neighbour": "web-xss",
-      "overlap": 0.076,
+      "overlap": 0.059,
       "trust": "local-confirmed"
     },
     {
@@ -515,9 +561,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 68,
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.204,
+      "lines": 87,
+      "actionability": "operational",
+      "nearest_neighbour": "web-logic-flaw",
+      "overlap": 0.164,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -528,9 +575,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 83,
+      "lines": 109,
+      "actionability": "operational",
       "nearest_neighbour": "web-ssti",
-      "overlap": 0.076,
+      "overlap": 0.059,
       "trust": "local-confirmed"
     },
     {
@@ -541,9 +589,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 70,
-      "nearest_neighbour": "web-graphql",
-      "overlap": 0.203,
+      "lines": 92,
+      "actionability": "operational",
+      "nearest_neighbour": "web-command-injection",
+      "overlap": 0.167,
       "trust": "local-confirmed"
     },
     {

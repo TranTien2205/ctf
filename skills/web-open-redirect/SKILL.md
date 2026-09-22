@@ -31,6 +31,23 @@ following it. Repeat once with an encoded or parser-boundary form only if the
 first result is inconclusive. Confirmation requires the server to emit a
 redirect to the attacker-controlled destination.
 
+## Operational probe
+
+Do not follow the redirect. Send one external destination and inspect only the
+response headers:
+
+```bash
+curl -i --max-time 10 \
+  "$BASE/login?next=https%3A%2F%2Fattacker.invalid%2Flanding"
+```
+
+Record the exact `Location` value and status. Then test one parser-boundary
+variant only if the first destination is rejected: a leading `//`, encoded
+slash, backslash, userinfo form, or a scheme-relative URL must be chosen from
+the URL parser behavior observed in the application. Confirmation requires the
+server to emit an attacker-controlled absolute destination; a client-side
+navigation or a safe relative path is not proof.
+
 ## Why it matters in a chain
 
 Alone it is low value. It becomes the chain when it feeds something that trusts
@@ -44,6 +61,8 @@ will visit whatever it is handed. See `../web-oauth-sso/` and `../web-ssrf/`.
   or encoded forms, depending on which parser resolves the URL.
 - A redirect that is immediately followed by a safe allowlist or a fixed
   relative path is not open; record the exact header before escalating.
+- The redirect alone is often low impact. Check whether it feeds an OAuth code,
+  server-side fetch, password reset, or bot visit before claiming impact.
 
 ## Routing
 

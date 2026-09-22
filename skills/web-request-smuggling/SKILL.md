@@ -36,6 +36,25 @@ One folded control character inside the interpolated value. Compare the upstream
 error against an ordinary hostname. If the parser accepts the folded form, the
 value is not encoded and a second request can be appended.
 
+## Operational probe
+
+Compare two requests and preserve the raw status lines:
+
+```text
+baseline: ordinary hostname -> one ordinary upstream response
+variant:  one observed folded control character -> parser error or a second
+          attributable status line
+```
+
+Use only routes observed in source or responses. A class confirmation requires
+the control character to survive into the outbound request, shown by a parser
+differential or a second response. A 302, generic 400, timeout, or reset is not
+confirmation.
+
+After confirmation, calculate body length in bytes and add a trailing fragment.
+Send the first state-changing request only against an object created by the
+solver, with cleanup recorded before execution.
+
 ## Building the smuggled request
 
 Once a control character survives, the outbound stream is yours to shape:
@@ -56,6 +75,8 @@ route: the caller's address is the backend's own.
 - Without the trailing fragment the smuggled request is never completed.
 - A smuggled request executes as a trusted client. On a shared instance it
   changes state for everyone — know what it will do before sending it.
+- Do not use a sixth CRLF spelling after the class budget is exhausted. Change
+  the parser boundary or move to another mechanism layer.
 
 ## Routing
 

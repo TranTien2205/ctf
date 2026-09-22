@@ -438,6 +438,24 @@ class ContractTests(unittest.TestCase):
                        "Preserve it verbatim", "After four tool calls"):
             self.assertIn(marker, training, "TRAINING.md lost training marker: " + marker)
 
+    def test_actionable_web_skills_keep_operational_probe_contracts(self):
+        required = {
+            "web-csrf": ("Operational probe", "before/after state change"),
+            "web-request-smuggling": ("Operational probe", "raw status lines"),
+            "web-prototype-pollution": ("Operational probe", "training_marker"),
+            "web-idor": ("Operational probe", "Two identities"),
+            "web-cors": ("Operational probe", "Access-Control-Allow-Origin"),
+            "web-open-redirect": ("Operational probe", "Location"),
+            "web-xss": ("Operational probe", "XSS_PROBE_", "reflection alone is inconclusive"),
+            "web-xxe": ("Operational probe", "XXE_PROBE", "malformed XML error does not prove"),
+            "web-graphql": ("Operational probe", "__typename", "Schema disclosure is not an exploit"),
+            "web-web3": ("Operational probe", "solved predicate", "receipt/status"),
+        }
+        for skill, markers in required.items():
+            text = read("skills/%s/SKILL.md" % skill)
+            for marker in markers:
+                self.assertIn(marker, text, "%s lost actionable marker: %s" % (skill, marker))
+
 
 # --------------------------------------------------------------------------- C
 WEATHER = ROOT / "challenges/Weather App/web_weather_app/challenge"
