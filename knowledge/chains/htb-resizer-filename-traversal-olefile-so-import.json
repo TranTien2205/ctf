@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "id": "htb-resizer-filename-traversal-olefile-so-import",
+  "source_note": "solved/htb-resizer-filename-traversal-olefile-so-import.md",
+  "challenge": {
+    "name": "Resizer",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "gunicorn", "pillow", "python3.12", "supervisord"],
+  "preconditions": {
+    "all_of": [
+      "An upload handler joins the request-supplied filename onto a directory without sanitising it, so the filename controls where the bytes land.",
+      "The application server puts a directory the attacker can write into on sys.path.",
+      "Some library on the box imports a third-party module that the deployment never installed, and that import happens after start-up."
+    ],
+    "any_of": [
+      "The extension guard is a blacklist rather than a whitelist, so a non-source extension such as .so passes.",
+      "The handler refuses to overwrite existing files, making the write create-only.",
+      "The handler returns a file whose path it derives from the uploaded filename."
+    ]
+  },
+  "signals": [
+    "os.path.join",
+    "file.filename",
+    "file.save",
+    "os.path.exists",
+    "already exists",
+    "BLACKLISTED",
+    ".py",
+    "send_file",
+    "_resized",
+    "PIL",
+    "Image.open",
+    "gunicorn"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "primitive",
+      "action": "Confirm the filename reaches the filesystem: upload once, upload the same name again, and upload a path-equivalent form such as ./name. A duplicate-file rejection on the equivalent form proves the raw filename is used and the check is path-based.",
+      "why": "The rejection message doubles as a file-existence oracle for any path on the box, which is how the target file, the application layout and the writable directories all get mapped without a read primitive."
+    },
+    {
+      "stage": "oracle discipline",
+      "step": 2,
+      "action": "Treat that oracle as a WRITE. On a miss it creates the file it just probed, so never point it at a path the exploit will later need, and never at the payload's own destination.",
+      "why": "Probing whether the payload library was in place overwrote the library with the probe image and silently disabled the exploit."
+    },
+    {
+      "step": 3,
+      "stage": "reachability",
+      "action": "Work out on paper whether the handler's own file-returning path can reach the target before trying to read with it. Derive the exact transformation it applies to the uploaded name and invert it.",
+      "why": "Here the response path is the upload path with its last dot replaced by '_resized.', so only files already containing that marker are reachable; the flag provably was not, which ruled out a whole class of attempts."
+    },
+    {
+      "step": 4,
+      "stage": "module slot",
+      "action": "When source extensions are blacklisted, look for a module some installed library imports but the deployment never installed. Drop a shared object under that name in the directory the app server added to sys.path.",
+      "why": "A missing optional dependency is a free import slot. Blacklists that stop .py and .pyc routinely allow .so, and the app server's working directory is usually sys.path[0]."
+    },
+    {
+      "step": 5,
+      "stage": "payload",
+      "action": "Build the shared object with an ELF constructor rather than a real module init function, and give it several destinations rather than one.",
+      "why": "The constructor runs at dlopen, before the interpreter looks for the module export function, so the payload fires and the resulting import error is swallowed by whatever was probing for the module. Several destinations matter because a destination whose read slot has already been consumed by testing cannot be recovered."
+    },
+    {
+      "step": 6,
+      "stage": "trigger",
+      "action": "Trigger the lazy import with a FRESH filename, and make sure the triggering request is the same one that reads the result back.",
+      "why": "The duplicate check returns before the file is saved and before the library runs, so retrying an existing name exercises nothing. Lazy plugin initialisation also runs once per process, so a worker that already took that path will never import again."
+    },
+    {
+      "step": 7,
+      "stage": "cleanup",
+      "action": "Remove the planted library and any copies of the secret it made. If the write primitive has no delete, forcing the supervisor to restart the container resets the application directory to its image state.",
+      "why": "The planted library is a working remote-code-execution backdoor for anyone else who can reach the instance, which is a worse thing to leave behind than the original bug."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Upload the same filename twice, then upload it once more in a path-equivalent form such as ./name or dir/../name.",
+    "expected": "The second and third uploads are both rejected as duplicates, showing the raw filename reaches os.path.join and the check resolves paths.",
+    "falsifier": "The equivalent forms are accepted or the name is rewritten, meaning the filename is sanitised and there is no traversal to build on."
+  },
+  "blast_radius": "The planted shared object executes as the application user on any later request that triggers the lazy import, so it is a backdoor for every other visitor until removed. The payload's copies of the secret sit in a directory other users of the instance may be able to reach. Forcing the restart that clears them kills in-flight requests and wipes everything else written to the application directory, including other people's uploads. Concurrent oversized decodes are what force that restart; keep them to one burst and only on an instance you own.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "A single POST of a text file named zq1.txt returned HTTP 200 whose body was the flag, copied there moments earlier by the ELF constructor during the same request's failed image open. After the cleanup restart the same request no longer returns a flag and the site still answers 200."
+  },
+  "reuse_when": [
+    "An upload endpoint rejects duplicate filenames but never sanitises the path.",
+    "A Python app server is started with its working directory on sys.path and the app directory is writable.",
+    "An imaging, document or parsing library is present whose optional dependencies were not installed.",
+    "An extension guard blocks .py and .pyc but says nothing about .so."
+  ],
+  "known_traps": [
+    "The duplicate-file message is an existence oracle that WRITES on a miss. Probing a path creates it, which can overwrite the exploit's own payload; use throwaway names.",
+    "The duplicate check short-circuits before the file is saved and before the library runs, so re-uploading an existing name never triggers anything. Retries need fresh names.",
+    "Lazy plugin initialisation happens once per worker process. Workers that already met an unidentifiable file before the payload was planted will never import it again; a fresh worker is required.",
+    "Compile the payload's destinations in plural. A single destination whose read slot was already consumed during testing leaves the secret copied somewhere unreadable.",
+    "Sizing a decode just under the library's decompression-bomb ceiling avoids the guard and still exhausts the worker, which restarts the container and wipes the application directory. That is both the only delete primitive and a destructive act.",
+    "Do not conclude the processing library from the absence of a feature alone; confirm it. Dropped text chunks and a single IDAT in the output identified Pillow and ruled out the ImageMagick profile-read CVE."
+  ],
+  "flag": null
+}

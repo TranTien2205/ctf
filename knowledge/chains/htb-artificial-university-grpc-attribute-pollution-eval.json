@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "htb-artificial-university-grpc-attribute-pollution-eval",
+  "source_note": "solved/htb-artificial-university-grpc-attribute-pollution-eval.md",
+  "challenge": {
+    "name": "ArtificialUniversity",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "werkzeug", "grpc", "protobuf", "selenium", "firefox", "pdf.js", "curl", "sqlite", "fpdf"],
+  "preconditions": {
+    "all_of": [
+      "A recursive merge writes attacker-controlled keys into an object's __dict__, and the destination of that merge is a long-lived service object.",
+      "Some other method on that same object reads one of the attributes the merge can set and passes it to eval, exec, a template, or a subprocess.",
+      "The service holding that merge is not exposed externally, so the call has to be issued from inside the host."
+    ],
+    "any_of": [
+      "An endpoint hands a request-controlled URL to curl, which speaks gopher and can therefore write arbitrary bytes to an arbitrary internal TCP port.",
+      "A privileged browser visits an attacker-controlled URL, so a client-side bug can issue requests that carry the privileged session.",
+      "A payment or order amount is read from the request and compared against a stubbed 'amount paid' that always returns zero."
+    ]
+  },
+  "signals": [
+    "__dict__[key] = value",
+    "hasattr(destination",
+    "eval(",
+    "DebugService",
+    "grpc",
+    "add_insecure_port",
+    "price_formula",
+    "subprocess.run",
+    "curl",
+    "%{http_code}",
+    "bot_runner",
+    "payment_id",
+    "view-pdf",
+    "FontMatrix"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Read every helper module, not only the routes. Look for a recursive merge whose destination is an object rather than a dict, and then grep the same class for eval/exec/system reading an attribute that merge could create.",
+      "why": "The routes here are unremarkable; the whole challenge is one pair of methods in a side service that the web app never calls."
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "Find the privileged-browser trigger and check whether its destination is request-controlled. A stubbed payment check that always returns zero plus a request-supplied price means an order can be made to satisfy the gate.",
+      "why": "The bot logs in as the admin and then opens a URL built from a request parameter, so controlling that parameter is equivalent to steering an authenticated admin browser."
+    },
+    {
+      "step": 3,
+      "stage": "traversal",
+      "action": "When the parameter is concatenated after a fixed prefix, start the value with a slash. A prefix glued to '..' is a literal segment and does not traverse; a leading slash detaches it and normal '../' segments then apply.",
+      "why": "prefix + '../' gives the segment 'prefix..' which no normaliser treats as a parent reference."
+    },
+    {
+      "step": 4,
+      "stage": "client-side",
+      "action": "If the target renders attacker bytes as a PDF in a pinned old browser, use the font-matrix injection: a /FontMatrix entry that is a string escapes into the JavaScript the renderer builds. Blank the embedded font program's own FontMatrix in place, keeping byte length so the stream lengths stay valid.",
+      "why": "The font dictionary's FontMatrix is read first but the font program's parser overwrites it, so an embedded font that declares its own matrix silently defuses the payload."
+    },
+    {
+      "step": 5,
+      "stage": "credential",
+      "action": "Before assuming the payload can act as the privileged user, aim each request vector at a server you control and see which arrive. Then aim the same vectors at the target and see which produce a server-side effect. If only top-level navigations produce effects, use a form submission to issue any POST.",
+      "why": "A payload can run in the right origin and still have every subresource request stripped of the session cookie. Testing the vector and the credential separately is what distinguishes 'blocked' from 'arrived unauthenticated'."
+    },
+    {
+      "step": 6,
+      "stage": "ssrf",
+      "action": "Send the internal service one request through gopher: client preface, SETTINGS, HEADERS with literal HPACK, then DATA with END_STREAM carrying the framed message. Hand-encode the payload rather than importing the generated stubs.",
+      "why": "curl writes the gopher selector as raw bytes to any TCP port, and a request-response protocol still executes its handler when the response is never read. Hand-encoding avoids depending on a matching runtime for the generated code."
+    },
+    {
+      "step": 7,
+      "stage": "flag",
+      "action": "Have the injected expression copy the flag into a directory the application already serves, read it over plain HTTP, then remove it and overwrite the polluted attribute with a harmless idempotent value.",
+      "why": "Using the app as its own exfiltration channel keeps the external host off the critical path. The attribute cannot be deleted through the merge, only overwritten, so leave it evaluating to a valid value."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Create an order whose price is 0 through the branch that takes the price from the request, then call the success endpoint with a payment_id that starts with a slash and navigates the privileged browser to an ordinary, observable endpoint (for example one that creates a record you own).",
+    "expected": "The record appears under your own account, proving the bot ran, that the price gate is satisfiable, and that the leading slash escapes the fixed prefix.",
+    "falsifier": "No record appears. Either the amount check is real, or the parameter is sanitised, or the prefix cannot be escaped — in which case the privileged browser cannot be steered and the rest of the chain does not apply."
+  },
+  "blast_radius": "Moderate and mostly reversible if handled deliberately. The injected expression runs as root inside the container, so anything it writes persists for the life of the instance. Copying the flag into a served directory makes it readable by anyone who can reach the instance, so remove it immediately after reading. The polluted attribute stays set and is evaluated on every product generation: leave it as an expression that returns a valid value of the expected type, or that code path raises for every later visitor. Do not point the injected command at configuration files or imported modules.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "After the two bot visits, GET /static/f.txt returned the flag in the response body; a follow-up run with an idempotent cleanup expression removed the file and the same path then returned 404, with the application still answering 200 on /."
+  },
+  "reuse_when": [
+    "A service object is updated from a request-supplied mapping by a recursive merge that writes into __dict__.",
+    "An internal-only RPC service shares a host with a web app that can be made to issue arbitrary outbound requests.",
+    "An endpoint passes a request-controlled URL to curl or another client that supports gopher, dict, or file schemes.",
+    "A privileged headless browser opens a URL assembled from a request parameter.",
+    "An old browser version is pinned in the build for no stated reason."
+  ],
+  "known_traps": [
+    "An embedded font program's own /FontMatrix overrides the one in the font dictionary, defusing the font-matrix injection with no visible error. Blank it in place and keep the byte length so the stream lengths stay valid.",
+    "Relative URLs inside a PDF viewer context resolve against the viewer's internal base rather than the document URL, so a same-origin-looking fetch fails. Use absolute URLs.",
+    "A prefix glued in front of the parameter makes 'prefix..' a literal segment; the payload has to start with a slash before '../' works.",
+    "Tunnel providers that hand out a random subdomain per reconnect will silently invalidate a payload that has the hostname baked in. Rebuild the delivered file per request from the current hostname and keep the tunnel under a restart loop, or two runs will look like exploit failures when the host was simply dead.",
+    "A flag filename randomised at container start has to be globbed, not named.",
+    "int() over a subprocess's stdout plus a global error handler that returns the exception args leaks that stdout in the response body — a free read channel worth checking for.",
+    "The polluted attribute cannot be removed through the merge. Overwrite it with something that returns a valid value instead of leaving a destructive expression behind."
+  ],
+  "flag": null
+}

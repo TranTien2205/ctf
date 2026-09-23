@@ -138,6 +138,15 @@ def cmd_record(args, taxonomy):
     path = notes_path(primary["class"], taxonomy)
     if not os.path.isfile(path):
         raise SystemExit(json.dumps({"error": "field-notes.md missing", "path": path}))
+    if not os.access(path, os.W_OK):
+        raise SystemExit(json.dumps({
+            "error": "field-notes.md is not writable, so the solve cannot be filed",
+            "path": os.path.relpath(path, ROOT),
+            "mode": oct(os.stat(path).st_mode & 0o777),
+            "why": ("the learning loop stops here silently unless this is fixed; a restored "
+                    "or copied tree often arrives with read-only notes"),
+            "fix": "chmod u+w skills/*/field-notes.md",
+        }, ensure_ascii=False, indent=2))
     existing = open(path, encoding="utf-8").read()
     anchor = card["challenge"].get("solved_at") or "undated"
     if "## %s · %s ·" % (anchor, card["challenge"].get("name", "")) in existing:

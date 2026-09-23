@@ -40,7 +40,8 @@
       "first_probe": "one syntax marker, then a matched true/false pair against the same input",
       "falsifier": "identical validated response for the true and the false form",
       "depth_refs": [
-        "skills/ctf-web/sql-injection.md"
+        "skills/web-sqli/references/README.md",
+        "skills/web-sqli/references/extended-corpus.md"
       ],
       "confusable_with": [
         "web-nosqli"
@@ -577,7 +578,7 @@
       "falsifier": "the signature is verified with a key that is neither leaked nor guessable",
       "depth_refs": [
         "skills/web-auth-session/references/jwt-attacks.md",
-        "skills/ctf-web/auth-jwt.md"
+        "skills/web-auth-session/references/extended-jwt.md"
       ],
       "confusable_with": [
         "web-oauth-sso",
@@ -764,12 +765,45 @@
       "first_probe": "read the setup contract and the solved condition first; that names the exact state you must reach",
       "falsifier": "the solved condition depends on state no external caller can change",
       "depth_refs": [
-        "skills/ctf-web/web3.md"
+        "skills/web-web3/references/extended.md"
       ],
       "confusable_with": [],
       "category": "web",
       "skill": "skills/web-web3/SKILL.md",
       "blast_radius": null
+    },
+    {
+      "id": "web-xs-leaks",
+      "name": "Cross-site leak / browser side channel",
+      "skill_dir": "web-xs-leaks",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "admin bot|report to admin|visit.{0,20}url|headless",
+        "xs-?leak|side.?channel",
+        "window\\.length|frame count|cache probe",
+        "script-src\\s+'none'"
+      ],
+      "source_signals": [
+        "puppeteer|playwright|selenium|chromedriver|google-chrome",
+        "script-src\\s+'none'",
+        "URLBlocklist|URLAllowlist|policies/managed",
+        "setCookie[\\s\\S]{0,120}sameSite",
+        "maxmemory-policy\\s+(?:allkeys|volatile)-lru"
+      ],
+      "first_probe": "decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
+      "falsifier": "the bot can reach no attacker-influenced state at all, and no observable on the target changes as a function of what the victim's browser loaded",
+      "depth_refs": [
+        "skills/ctf-web/client-side.md"
+      ],
+      "confusable_with": [
+        "web-xss",
+        "web-cache-poisoning",
+        "web-csrf"
+      ],
+      "category": "web",
+      "skill": "skills/web-xs-leaks/SKILL.md",
+      "blast_radius": "the read-back channel is often a shared cache or store; filling it to force eviction destroys every other key, so never run it against an instance someone else is using"
     }
   ]
 }

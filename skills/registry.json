@@ -38,9 +38,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1093,
-      "depth_files": 2,
-      "depth_tokens": 1282,
+      "skill_tokens": 1283,
+      "depth_files": 3,
+      "depth_tokens": 1955,
       "use_when": [
         "a new challenge starts and the category is not yet fixed",
         "several challenges compete for time in a timed contest"
@@ -222,7 +222,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1500,
+      "skill_tokens": 1659,
       "depth_files": 4,
       "depth_tokens": 2336,
       "use_when": [
@@ -259,7 +259,11 @@
         "web-xss",
         "web-xxe",
         "web-chromedriver",
-        "ctf-web"
+        "ctf-web",
+        "web-websocket",
+        "web-source-map",
+        "web-xs-leaks",
+        "web-info-disclosure"
       ]
     },
     {
@@ -414,9 +418,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2557,
-      "depth_files": 20,
-      "depth_tokens": 109784,
+      "skill_tokens": 2656,
+      "depth_files": 18,
+      "depth_tokens": 94007,
       "use_when": [
         "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
       ],
@@ -442,7 +446,7 @@
       ],
       "skill_tokens": 1174,
       "depth_files": 4,
-      "depth_tokens": 3822,
+      "depth_tokens": 4610,
       "use_when": [
         "a probe or source read produced this class's signal: an absolute path to a file the target certainly has, before trying any traversal",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-ssrf-gopher-redis-lua-rce"
@@ -516,9 +520,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1457,
-      "depth_files": 4,
-      "depth_tokens": 3195,
+      "skill_tokens": 1471,
+      "depth_files": 5,
+      "depth_tokens": 5489,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -569,7 +573,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 956,
+      "skill_tokens": 959,
       "depth_files": 1,
       "depth_tokens": 635,
       "use_when": [
@@ -596,7 +600,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 842,
+      "skill_tokens": 840,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -622,7 +626,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 698,
+      "skill_tokens": 916,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -651,7 +655,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 714,
+      "skill_tokens": 993,
       "depth_files": 1,
       "depth_tokens": 768,
       "use_when": [
@@ -681,7 +685,7 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1040,
+      "skill_tokens": 1048,
       "depth_files": 7,
       "depth_tokens": 4220,
       "use_when": [
@@ -712,7 +716,7 @@
       ],
       "skill_tokens": 1118,
       "depth_files": 7,
-      "depth_tokens": 5413,
+      "depth_tokens": 6162,
       "use_when": [
         "a probe or source read produced this class's signal: a benign marker file first; the question is where it is stored and what later reads or executes it",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
@@ -736,7 +740,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 720,
+      "skill_tokens": 1055,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -763,7 +767,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 720,
+      "skill_tokens": 970,
       "depth_files": 6,
       "depth_tokens": 3230,
       "use_when": [
@@ -782,6 +786,31 @@
       "bug_class": true
     },
     {
+      "id": "web-info-disclosure",
+      "path": "skills/web-info-disclosure/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 728,
+      "depth_files": 1,
+      "depth_tokens": 153,
+      "use_when": [
+        "the flag or the next step may sit in an exposed file or debug endpoint",
+        "a 403, verbose error, debug header, or a shipped .git or archive is observed"
+      ],
+      "do_not_use_when": [
+        "the finding is a real sink: use the matching injection class",
+        "the target is a shared host and only a wide scan is available"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-auth-session",
+        "web-source-map"
+      ],
+      "unlock_signals": "\\.git/|\\.env|\\.ds_store|backup\\.zip|actuator|swagger|debug|stack trace|server-status|source leak"
+    },
+    {
       "id": "web-logic-flaw",
       "path": "skills/web-logic-flaw/SKILL.md",
       "layer": "depth",
@@ -790,7 +819,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 724,
+      "skill_tokens": 722,
       "depth_files": 1,
       "depth_tokens": 156,
       "use_when": [
@@ -819,7 +848,7 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 792,
+      "skill_tokens": 790,
       "depth_files": 1,
       "depth_tokens": 154,
       "use_when": [
@@ -848,7 +877,7 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 730,
+      "skill_tokens": 728,
       "depth_files": 1,
       "depth_tokens": 638,
       "use_when": [
@@ -875,7 +904,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 662,
+      "skill_tokens": 862,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -904,9 +933,9 @@
       "verified_by": [
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 723,
+      "skill_tokens": 722,
       "depth_files": 1,
-      "depth_tokens": 928,
+      "depth_tokens": 1509,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -935,9 +964,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 874,
+      "skill_tokens": 1151,
       "depth_files": 1,
-      "depth_tokens": 756,
+      "depth_tokens": 1600,
       "use_when": [
         "a probe or source read produced this class's signal: pollute one harmless property, then read it back through a path that should not have it",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate, htb-tornadoservice-bot-csrf-class-pollution, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -965,9 +994,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 764,
+      "skill_tokens": 763,
       "depth_files": 1,
-      "depth_tokens": 490,
+      "depth_tokens": 1051,
       "use_when": [
         "a probe or source read produced this class's signal: two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -993,7 +1022,7 @@
       "verified_by": [
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 820,
+      "skill_tokens": 1033,
       "depth_files": 1,
       "depth_tokens": 1504,
       "use_when": [
@@ -1012,6 +1041,30 @@
       "bug_class": true
     },
     {
+      "id": "web-source-map",
+      "path": "skills/web-source-map/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 653,
+      "depth_files": 1,
+      "depth_tokens": 152,
+      "use_when": [
+        "the front-end is a bundled SPA and the only available source",
+        "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"
+      ],
+      "do_not_use_when": [
+        "source is already supplied: read it directly",
+        "the bundle is a single inline script with no build step"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-auth-session"
+      ],
+      "unlock_signals": "sourceMappingURL|\\.js\\.map|_next/static|/static/js/|webpack|vite|/_buildManifest|/_ssgManifest"
+    },
+    {
       "id": "web-sqli",
       "path": "skills/web-sqli/SKILL.md",
       "layer": "depth",
@@ -1023,9 +1076,9 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1020,
-      "depth_files": 12,
-      "depth_tokens": 9442,
+      "skill_tokens": 1106,
+      "depth_files": 14,
+      "depth_tokens": 17556,
       "use_when": [
         "a probe or source read produced this class's signal: one syntax marker, then a matched true/false pair against the same input",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
@@ -1052,9 +1105,9 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce",
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 940,
+      "skill_tokens": 932,
       "depth_files": 6,
-      "depth_tokens": 2696,
+      "depth_tokens": 3535,
       "use_when": [
         "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
         "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1109,9 +1162,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 676,
-      "depth_files": 1,
-      "depth_tokens": 153,
+      "skill_tokens": 869,
+      "depth_files": 2,
+      "depth_tokens": 4166,
       "use_when": [
         "a probe or source read produced this class's signal: read the setup contract and the solved condition first; that names the exact state you must reach"
       ],
@@ -1122,6 +1175,56 @@
       "routes_to": [],
       "unlock_signals": "(?:solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat)|(?:0x[0-9a-f]{40}\\b)|(?:setup\\(\\)|isSolved\\(\\))|(?:pragma solidity|contract \\w+\\s*\\{)|(?:delegatecall|selfdestruct|tx\\.origin)",
       "bug_class": true
+    },
+    {
+      "id": "web-websocket",
+      "path": "skills/web-websocket/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 770,
+      "depth_files": 1,
+      "depth_tokens": 151,
+      "use_when": [
+        "the target opens a ws:// or wss:// channel, or uses Socket.IO or SockJS",
+        "a live feature carries the flag path and the cookie is HttpOnly"
+      ],
+      "do_not_use_when": [
+        "there is no realtime channel: use the matching HTTP class",
+        "the channel is already confirmed hijackable: fire one probe, do not rebuild"
+      ],
+      "routes_to": [
+        "web-csrf",
+        "web-auth-session",
+        "web-xss"
+      ],
+      "unlock_signals": "websocket|ws://|wss://|socket\\.io|sockjs|upgrade:\\s*websocket|101 switching|realtime|live update"
+    },
+    {
+      "id": "web-xs-leaks",
+      "path": "skills/web-xs-leaks/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 708,
+      "depth_files": 1,
+      "depth_tokens": 151,
+      "use_when": [
+        "an admin bot visits attacker pages and the cookie is HttpOnly",
+        "the goal is to learn a fact about the victim's authenticated state"
+      ],
+      "do_not_use_when": [
+        "the response is readable cross-origin: use the ordinary web class",
+        "no bot or viewer exists to carry the victim session"
+      ],
+      "routes_to": [
+        "web-xss",
+        "web-cache-poisoning",
+        "web-csrf"
+      ],
+      "unlock_signals": "xs-?leak|cross-?site leak|admin bot|bot visits|onerror|onload|cache prob|iframe timing|same-?site"
     },
     {
       "id": "web-xss",
@@ -1135,9 +1238,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 898,
+      "skill_tokens": 1196,
       "depth_files": 7,
-      "depth_tokens": 3370,
+      "depth_tokens": 4193,
       "use_when": [
         "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1162,7 +1265,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 735,
+      "skill_tokens": 931,
       "depth_files": 1,
       "depth_tokens": 600,
       "use_when": [

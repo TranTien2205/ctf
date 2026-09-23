@@ -80,7 +80,7 @@ Shares signals with: `../web-csrf/`. Check those before committing to this one.
 
 Depth, one named file at a time:
 
-- `skills/ctf-web/auth-infra.md`
+- `../ctf-web/auth-infra.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

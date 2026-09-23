@@ -1,6 +1,12 @@
-# CTF Web - SQL Injection Techniques
+# SQL Injection — Extended Corpus
 
-Comprehensive SQL injection techniques for CTF challenges. For other server-side attacks (SSTI, SSRF, XXE, command injection, GraphQL), see [server-side.md](server-side.md).
+This is a supplementary reference corpus, not the routing skill. Open
+`../SKILL.md` first when SQL injection is the confirmed class; it owns
+the first probe, falsifier, evidence level, and routing. Open this file only for
+one named variant or challenge pattern that the canonical skill's local
+references do not cover. Do not read the entire `skills/ctf-web/` directory.
+
+Comprehensive SQL injection techniques for CTF challenges. For other server-side attacks (SSTI, SSRF, XXE, command injection, GraphQL), see [../../ctf-web/server-side.md](../../ctf-web/server-side.md).
 
 ## Table of Contents
 - [Backslash Escape Quote Bypass](#backslash-escape-quote-bypass)

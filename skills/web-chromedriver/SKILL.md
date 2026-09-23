@@ -17,7 +17,7 @@ visits and no error output. Debugging a payload against the live bot burns those
 visits and tells you nothing when it fails. Reproducing the bot locally turns a
 blind channel into a normal debugging loop.
 
-This lesson is recorded in `solved/apexsurvive.md`: payload development happened
+This lesson is recorded in `../../solved/apexsurvive.md`: payload development happened
 against a local headless browser, and only confirmed payloads were fired at the
 bot.
 
@@ -61,7 +61,7 @@ process open.
 
 That last row is worth its own note: some tunnelling services insert an
 interstitial page that a headless browser cannot get past. Check with a
-browser-like request **before** spending a bot visit — `solved/tornadoservice.md`
+browser-like request **before** spending a bot visit — `../../solved/tornadoservice.md`
 records losing attempts to exactly this.
 
 ## When the challenge exposes a WebDriver endpoint

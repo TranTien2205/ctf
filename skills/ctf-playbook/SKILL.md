@@ -71,6 +71,20 @@ Unsure? Do not guess and do not open several. Re-run
 `CTF{} FLAG{} flag{} HTB{} <brand>{}` — confirm the format the brief states
 before submitting. More in `references/flag-formats.md`.
 
+## Agent-assisted flag verification
+
+When using an automated solver, open `references/agent-verification.md` before
+accepting its output. Agent-written `flag.txt`, `evidence.txt`, and `repro.sh`
+are claims until an independent verifier accepts the exact candidate. Prefer a
+manifest hash or supplied `flagCheck`; otherwise preserve a verbatim live
+response or artifact excerpt and pass it through the normal evidence hook.
+
+Keep `live-response` separate from `artifact`/local reproduction. If a verifier
+rejects a candidate, preserve it as rejected, do not call the flag hook, and
+retry only through a bounded feedback loop. Wrapper scripts must keep `HOME`
+and other process configuration variables unchanged; use a repository-specific
+root variable instead.
+
 ## Frequently used one-liners
 
 ```bash

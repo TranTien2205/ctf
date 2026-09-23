@@ -125,3 +125,32 @@ Falsifier: the parameter is not used to build a filesystem path, or the error is
 **Blast radius**: read-only file disclosure; no writes and no shared state is modified, so the chain is safe to run once per target
 
 - status: confirmed
+
+## 2026-09-22 · Notebook Converter Pro · proposed
+
+- source note: `solved/notebook-converter-pro.md`
+- chain card: `knowledge/chains/htb-notebook-converter-pro-embed-images-read-fileswriter-write-rce.json`
+- verification: unverified — chain reproduced end-to-end on a locally built instance of the supplied source: the setuid helper's output was read back from the job download. The supplied source ships a test flag, so no live challenge flag was read and the remote instance was unreachable
+- classified as: `file-read-primitives` (score 1.5, 1 signals matched)
+- also matched: `web-file-upload` (4.5), `web-ssrf` (2.5), `web-ssti` (1.5)
+- signals that fired: traversal
+
+**Confirming probe that worked**
+
+> upload a notebook with a markdown cell '![f](/etc/hostname)' and convert it to html, then download the job
+
+Expected: the returned HTML contains an <img alt="f" src="data:...;base64,..."> whose decoded bytes are the file content
+
+Falsifier: the image is not inlined, or the path is not read from disk
+
+**Traps recorded on this solve**
+
+- the admin password is regenerated on every application start, so a password from an earlier run is stale
+- an already-authenticated session is redirected before the login form is read; log out before switching users
+- the first base64 data URI in the HTML is a template icon; match the specific image alt tag
+- the outputs filename path forces a mime extension and cannot write a python file; use the attachments path
+- the jupyter converter config file is not loaded by the nbconvert python API, so writing it does not trigger execution
+
+**Blast radius**: overwriting the converter script disables the application's conversion feature until the container is rebuilt; the RCE runs as the service user inside the challenge container only. Rebuild or restart the instance afterwards
+
+- status: proposed

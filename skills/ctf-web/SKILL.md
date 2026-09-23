@@ -10,6 +10,16 @@ metadata:
 
 # CTF Web Exploitation
 
+This directory is a shared reference corpus for cross-class techniques. It is
+not a second router or a replacement for a canonical `skills/web-*/SKILL.md`;
+open the class skill first and then one named shared file only when it routes
+there.
+
+This directory is a shared reference corpus for cross-class techniques. It is
+not a second router or a replacement for a canonical `skills/web-*/SKILL.md`;
+open the class skill first and then one named shared file only when it routes
+there.
+
 Use this skill as a routing and execution guide for web-heavy challenges. Keep the first pass short: map the app, confirm the trust boundary, and only then dive into the detailed technique notes.
 
 ## Prerequisites
@@ -39,7 +49,7 @@ go install github.com/ffuf/ffuf/v2@latest
 
 ## Additional Resources
 
-- [sql-injection.md](sql-injection.md) - SQL injection techniques: auth bypass, UNION extraction, filter bypasses, second-order SQLi, truncation, race-assisted leaks, INSERT ON DUPLICATE KEY UPDATE password overwrite, innodb_table_stats WAF bypass
+- [web-sqli](../web-sqli/SKILL.md) - SQL injection class skill and its dedicated references
 - [server-side.md](server-side.md) - PHP type juggling, php://filter LFI, Python str.format traversal, SSTI (Jinja2, Twig, ERB, Mako, EJS, Vue.js, Smarty), SSRF (Host header, DNS rebinding, curl redirect, unescaped-dot regex, SNI FTP smuggling, mod_vhost_alias), PHP hash_hmac NULL
 - [server-side-2.md](server-side-2.md) - XXE (basic, OOB, DOCX upload), XML injection via X-Forwarded-For, PHP variable variables, PHP uniqid predictable filename, sequential regex replacement bypass, command injection (newline, blocklist, sendmail CGI, multi-barcode, git CLI), GraphQL injection (introspection, batching, interpolation)
 - [server-side-exec.md](server-side-exec.md) - Direct code execution paths, upload-to-RCE, deserialization-adjacent execution, LaTeX injection, header and API abuses
@@ -53,10 +63,10 @@ go install github.com/ffuf/ffuf/v2@latest
 - [client-side-advanced.md](client-side-advanced.md) - CSP bypasses, Unicode tricks, XSSI, CSS exfiltration, browser normalization quirks, postMessage null origin bypass
 - [auth-and-access.md](auth-and-access.md) - Auth/authz bypasses, hidden endpoints, IDOR, redirect chains, subdomain takeover, AI chatbot jailbreaks
 - [auth-and-access-2.md](auth-and-access-2.md) - Part 2 (2018-era): `std::unordered_set` bucket collision auth bypass, `nodeprep.prepare` Unicode homograph username collision, SRP A=0/A=N auth bypass, ArangoDB AQL MERGE privilege escalation
-- [auth-jwt.md](auth-jwt.md) - JWT/JWE manipulation, weak secrets, header injection, key confusion, replay
+- [web-auth-session](../web-auth-session/SKILL.md) - JWT/JWE manipulation, weak secrets, header injection, key confusion, replay
 - [auth-infra.md](auth-infra.md) - OAuth/OIDC, SAML, CORS, CI/CD secrets, IdP abuse, login poisoning
 - [node-and-prototype.md](node-and-prototype.md) - Prototype pollution, JS sandbox escape, Node.js attack chains
-- [web3.md](web3.md) - Solidity and Web3 challenge notes
+- [web-web3](../web-web3/SKILL.md) - Solidity and Web3 challenge notes
 - [cves.md](cves.md) - CVE-driven techniques you can match against challenge banners, headers, dependency leaks, or version strings
 - [field-notes.md](field-notes.md) - Long-form exploit notes: quick references for SQLi, XSS, LFI, JWT, SSTI, SSRF, command injection, XXE, deserialization, race conditions, auth bypass, and multi-stage chains
 
@@ -119,12 +129,12 @@ curl -v -X POST https://target.com/api -H "Content-Type: application/json" -d '{
 
 ## Fast Pattern Map
 
-- SQL errors, odd filtering, or state-dependent DB behavior: start with [sql-injection.md](sql-injection.md).
+- SQL errors, odd filtering, or state-dependent DB behavior: start with [web-sqli](../web-sqli/SKILL.md).
 - Templating, file reads, SSRF, command execution, XML, or parser bugs: start with [server-side.md](server-side.md) and [server-side-exec.md](server-side-exec.md).
 - XSS, CSP bypass, admin bot, client routing, DOM issues, or scriptless exfiltration: start with [client-side.md](client-side.md).
-- Session forgery, hidden admin routes, JWT, OAuth, SAML, or weak trust boundaries: start with [auth-and-access.md](auth-and-access.md), [auth-jwt.md](auth-jwt.md), and [auth-infra.md](auth-infra.md).
+- Session forgery, hidden admin routes, JWT, OAuth, SAML, or weak trust boundaries: start with [auth-and-access.md](auth-and-access.md), [web-auth-session](../web-auth-session/SKILL.md), and [auth-infra.md](auth-infra.md).
 - Node.js apps, prototype pollution, VM sandboxes, or SSRF into internal services: add [node-and-prototype.md](node-and-prototype.md).
-- Smart contract frontends or blockchain-integrated apps: add [web3.md](web3.md).
+- Smart contract frontends or blockchain-integrated apps: add [web-web3](../web-web3/SKILL.md).
 
 ## Common Chain Shapes
 

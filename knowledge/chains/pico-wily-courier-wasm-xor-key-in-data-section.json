@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "id": "pico-wily-courier-wasm-xor-key-in-data-section",
+  "source_note": "solved/pico-wily-courier-wasm-xor-key-in-data-section.md",
+  "challenge": {
+    "name": "wily-courier",
+    "platform": "picoCTF",
+    "event": null,
+    "category": "rev",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "apache",
+    "webassembly",
+    "obfuscated-js",
+    "static-page"
+  ],
+  "preconditions": {
+    "all_of": [
+      "The answer is checked entirely on the client, with no server round trip.",
+      "The check is performed by a WebAssembly module the page fetches and instantiates.",
+      "The module exports its linear memory, so its data section can be read from the host."
+    ],
+    "any_of": [
+      "The module also exports pointer globals such as the input buffer and a key.",
+      "The module exports a byte-comparison helper like strcmp, which rules out a hash-based check.",
+      "The expected value is stored encoded rather than in the clear, so a plain string scan finds nothing.",
+      "The module exports no key, so the transform lives in code rather than in the data section.",
+      "check_flag rewrites the input buffer in place, which makes the transform queryable as a black box."
+    ]
+  },
+  "signals": [
+    "WebAssembly.instantiate",
+    "arrayBuffer",
+    "copy_char",
+    "check_flag",
+    "strcmp",
+    "__data_end",
+    "__heap_base",
+    "application/wasm",
+    "charCodeAt",
+    "Incorrect!",
+    "in-place transform",
+    "no key export",
+    "GF(2)"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Deobfuscate the page's script only far enough to learn the module URL and the calling convention: which export receives the input, in what units, and which export returns the verdict.",
+      "why": "String-array obfuscation hides very little here. The only things needed from the JS are the module path and how to drive it, because the decision lives in the module."
+    },
+    {
+      "step": 2,
+      "stage": "introspect",
+      "action": "Instantiate the module in a host runtime and print the export list and the value of every exported global. A language runtime with WebAssembly built in is enough; no disassembler is required.",
+      "why": "Compiled modules routinely export their data pointers and helpers. The export list alone distinguishes a byte comparison from a digest, and the globals name the exact addresses worth reading."
+    },
+    {
+      "step": 3,
+      "stage": "dump",
+      "action": "Read linear memory across the data region the globals delimit, printing both hex and ASCII, and skip all-zero rows.",
+      "why": "This is where the expected value lives. Printing ASCII alongside hex shows immediately whether it is stored in the clear or encoded."
+    },
+    {
+      "step": 4,
+      "stage": "recover",
+      "action": "If the stored bytes are not plaintext, solve the transform from the known answer prefix rather than guessing parameter orderings: XOR each ciphertext byte with the expected plaintext byte to read the key schedule off directly.",
+      "why": "A known flag format supplies several bytes of known plaintext, which recovers a short repeating key outright and exposes any ordering quirk such as the key being consumed in reverse."
+    },
+    {
+      "step": 5,
+      "stage": "verify",
+      "action": "Feed the recovered answer back through the module's own entry points and confirm the verdict export returns success, then confirm a one-character variant returns failure.",
+      "why": "The module is the authority on its own answer. A decode that merely looks plausible is weaker evidence than the checker accepting it and rejecting a near miss."
+    },
+    {
+      "step": 6,
+      "stage": "branch: computed transform",
+      "action": "If no key is exported, check whether the verdict function rewrites the input buffer in place. If it does, query it: write bytes, call it, read the buffer back. Map which input positions affect which output positions, and if the influence is forward-only with no global mixing, TEST linearity by checking that a two-bit flip equals the XOR of the two single-bit results. When it holds, recover one matrix column per input bit and solve M*(x ^ base) = target ^ T(base) over GF(2).",
+      "why": "An in-place transform is a free oracle, and a linear one can be inverted without ever reading the algorithm. Testing linearity rather than assuming it costs three extra probes and is what makes the solve trustworthy."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Instantiate the module in a host runtime and print its export list together with the value of each exported global.",
+    "expected": "Memory is exported along with pointer globals and a byte-comparison helper, which means the expected value is readable out of the data section rather than being derived at runtime.",
+    "falsifier": "Memory is not exported, or the only exports are opaque functions with no data pointers and no comparison helper. The value may then be computed rather than stored, so move to disassembly or to driving the module as an oracle instead of reading memory."
+  },
+  "blast_radius": "None. The module is downloaded once and everything else happens locally in a host runtime. Nothing is sent to the target beyond the initial GETs, no state is changed, and the instance is left exactly as found.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The module was fetched live from the target and instantiated locally. Its exported globals gave input=0x430, key=0x42b, __data_end=0x530; dumping memory showed 41 ciphertext bytes at 0x400 and the 5-byte key f1 a7 f0 07 ed at 0x42b. XORing with the key in reverse byte order produced the answer, and feeding it back through copy_char plus check_flag returned 1, while a one-character variant and a garbage string both returned 0. A second challenge behind the same host was solved with this card's other branch: a 2142-byte module with no key export, whose in-place transform was shown linear over GF(2) by multi-bit flip tests, recovered by 328 single-bit probes and inverted by a rank-328 solve; transform(answer) then matched all 41 stored ciphertext bytes with no differing byte."
+  },
+  "reuse_when": [
+    "A page validates an answer client-side through WebAssembly instead of a server call.",
+    "A compiled client-side checker exports its memory or any data pointers.",
+    "A string scan over the module or its memory finds nothing, suggesting an encoded comparison value.",
+    "The answer has a known fixed prefix, which supplies known plaintext against a short repeating transform."
+  ],
+  "known_traps": [
+    "Do not assume a repeating key is consumed in the order it is stored. Here the bytes at the key pointer had to be applied in reverse; XORing in the stored order yields convincing-looking binary garbage rather than an obvious failure.",
+    "A printable-string scan that finds nothing is easy to misread as the wrong memory region. Read the exported pointer globals and dump exactly the range they delimit instead of widening the scan.",
+    "Missing wasm tooling is not a blocker when the host language already implements WebAssembly; reaching for a disassembler first costs more than instantiating the module and printing its exports.",
+    "Confirm through the module's own verdict function. A decode that produces the right-looking prefix can still be wrong in later bytes, and the checker distinguishes the two for free.",
+    "Instantiate a fresh module for every candidate. An in-place transform means a second call on the same instance operates on already-transformed bytes, which makes a wrong answer look accepted.",
+    "A NUL byte inside the stored comparison value truncates strcmp, so the verdict function stops checking there and accepts many wrong answers. Verify by comparing the full transform output against the full stored value, not by trusting the verdict.",
+    "When comparing memory against a result, slice exactly the same length. A 65-byte slice compared with a 41-byte result reports a mismatch that does not exist."
+  ],
+  "flag": null
+}

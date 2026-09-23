@@ -65,6 +65,10 @@ Run `python3 tools/chain_match.py` before opening any depth skill.
 | Solidity source, an RPC endpoint, a setup contract | Web3 | read the solved condition first | `../web-web3/` |
 | Extra fields accepted, a step that can be skipped | Logic flaw | one field the form never sends | `../web-logic-flaw/` |
 | A custom proxy, gateway or WAF in front of the app | Parser differential | compare how proxy and backend parse the same bytes | `../web-parser-differential/` |
+| A ws:// or wss:// channel, Socket.IO, or a live feature | WebSocket | open the channel from a foreign Origin and read the first message | `../web-websocket/` |
+| A bundled SPA and a `sourceMappingURL` or `/_next/static/` | Source map recon | fetch the bundle and its `.map`, extract endpoints | `../web-source-map/` |
+| An HttpOnly cookie plus a bot that visits your page | XS-Leaks | one error or timing oracle, repeated, with a control | `../web-xs-leaks/` |
+| A 403, verbose error, debug route, or a shipped `.git`/archive | Information disclosure | bounded path list, read the content not the status | `../web-info-disclosure/` |
 
 ## Probe rules
 

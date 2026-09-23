@@ -99,7 +99,7 @@ Shares signals with: `../web-nosqli/`, `../web-deserialization/`. Check those be
 
 Depth, one named file at a time:
 
-- `skills/ctf-web/node-and-prototype.md`
+- `../ctf-web/node-and-prototype.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

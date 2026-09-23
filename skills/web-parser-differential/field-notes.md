@@ -68,3 +68,33 @@ Falsifier: the reflected host is unchanged, or the proxy rejects the request out
 **Blast radius**: read-only. Every step is a GET, and the server-side fetch should be pointed only at the challenge's own loopback services. Do not aim the url parameter at anything outside the supplied instance, and do not use it as a general relay.
 
 - status: proposed
+
+## 2026-09-23 · NovaCore · proposed
+
+- source note: `solved/novacore.md`
+- chain card: `knowledge/chains/htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce.json`
+- verification: verified_live — flag file read by the executed plugin. Re-verified live 2026-09-23 on a second instance: GET /api/trades returned 401 plain and 200 with 'Connection: close, X-Real-Ip', and the recorded solver then produced the flag from run_plugin output with only the HOST/PORT line changed.
+- classified as: `web-parser-differential` (score 4.5, 4 signals matched)
+- also matched: `web-file-upload` (3.5), `web-prototype-pollution` (3.5), `web-xss` (3.5)
+- signals that fired: headers.get("X-Real-IP, hop-by-hop, traefik, x-real-ip
+
+**Confirming probe that worked**
+
+> Send the same token-gated API request twice, once plain and once with the proxy-added header listed in the Connection header. Pick the endpoint out of the source first: a 404 on both arms means the path is wrong, not the technique.
+
+Expected: The plain request is rejected (401) and the hop-by-hop one is accepted (200).
+
+Falsifier: Both arms return the same status. If that status is 401 the trust check does not depend on that header; if it is 404 the endpoint name is wrong and the probe has not tested anything.
+
+**Traps recorded on this solve**
+
+- the bot runs on a fixed schedule; place the poisoned state first, then poll
+- the polyglot only works when the archive bytes are overlaid at the offset the scanner reads
+- The app reads X-Real-IP while the proxy writes X-Real-Ip. Header lookup is case-insensitive so it does not matter, but it makes a hand-written probe easy to mis-copy.
+- A 404 on BOTH arms of the differential probe means the endpoint is wrong, not that the proxy bypass failed. Read the blueprint for the real route names before concluding anything.
+- The Server header shows the app server, not the proxy, so 'no proxy in front' cannot be inferred from it. The 401-vs-200 split is what proves a proxy is adding the header.
+- The overflow corrupts a neighbouring cache record and the plugin step executes code: both are inherent to the chain, so run it only on an instance you own.
+
+**Blast radius**: overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance
+
+- status: proposed

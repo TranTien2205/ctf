@@ -42,3 +42,34 @@ Falsifier: the channel delivers unrelated traffic while idle, so silence proves 
 **Blast radius**: the submission is an ordinary newsletter registration and each payload stores one row that a shared renderer will execute. Keep the payload to a harmless dialog, never a redirect, a request to an outside host, or anything that changes state, because other players' sessions are rendered by the same component. Do not repeat the batch once it has fired.
 
 - status: proposed
+
+## 2026-09-23 · QuickBlog · proposed
+
+- source note: `solved/htb-quickblog-codefence-xss-registration-oracle-pickle-session.md`
+- chain card: `knowledge/chains/htb-quickblog-codefence-xss-registration-oracle-pickle-session.json`
+- verification: verified_live — GET /admin with the recovered cookie returned 200 containing 'admin page, admin_user.', and after the session-store write GET /uploads/res.txt returned the flag in the response body. After the cleanup run the same path returns 404 and re-sending both planted cookies produces nothing.
+- classified as: `web-xss` (score 4.5, 4 signals matched)
+- also matched: `web-ssrf` (3.5), `web-file-upload` (2.5), `web-ssti` (2.5)
+- signals that fired: XSS, admin bot, innerHTML, unescape
+
+**Confirming probe that worked**
+
+> Store a code fence whose language field closes the attribute and adds autofocus with a tabindex and an onfocus that is a percent-encoded eval(unescape(...)), then load the page yourself in a real browser.
+
+Expected: The handler fires on insertion with no interaction, proving both that the attribute sink is reachable through the incomplete escaping and that the case-folding filter does not stop a reconstituted payload.
+
+Falsifier: The attribute is escaped, or the handler never fires without interaction, meaning the sink is not injectable and the privileged browser cannot be made to run anything.
+
+**Traps recorded on this solve**
+
+- A bot that logs in again on every run has a different session id each time, so a shared exfiltration namespace mixes runs into a value that is not any real id. Lock the namespace to one run.
+- The registration oracle WRITES: probing a name creates it, so probing before the privileged visit hands the bot a name it can no longer create and that symbol is lost. Never probe the lock name at all.
+- Registration overwrites the session's own username, so the exfiltration requests have to omit credentials or the stolen session is demoted before it can be used.
+- A template literal cannot be an object key; `{`Content-Type`: ...}` is a SyntaxError. Percent-encoding already makes ordinary double quotes safe inside the attribute.
+- The framework's session loader expects a (data, expiration) tuple. Pickling the bare payload still executes but then raises, which is noisier than pickling the expected shape.
+- A single-threaded http.server deadlocks headless Chrome, which opens several connections; local rehearsals need ThreadingHTTPServer.
+- The flag name is randomised at container start, so it has to be globbed, and a setuid helper is usually the intended reader.
+
+**Blast radius**: The pickled session file executes as the application user for anyone who sets that cookie, so it is a remote backdoor until removed; make the payload delete it in the same command. The exfiltration registers several hundred throwaway accounts and the stored payload keeps firing on every scheduled visit, both of which live in process memory and only clear on restart. Do not point the injected command at configuration or at imported modules. On a shared instance the registration oracle is several hundred sequential writes: keep concurrency low and never probe a namespace the payload has not written yet, because probing creates the name and destroys that symbol.
+
+- status: proposed

@@ -63,7 +63,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~0.9k | `ctf-osint` |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~0.8k | `pwn-rop`, `ctf-pwn` |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~0.9k | `ctf-reverse`, `ctf-malware` |
-| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~1.5k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
+| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~1.7k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
 resort: try a named category first.
@@ -114,10 +114,14 @@ that file and this table would drift.
 | `skills/ctf-osint/SKILL.md` | depth | ~2.3k | one unique pivot is extracted |
 | `skills/ctf-pwn/SKILL.md` | depth | ~4.7k | the crash is reproduced and a named technique is needed |
 | `skills/ctf-reverse/SKILL.md` | depth | ~3.1k | the runtime or packer is named |
-| `skills/ctf-web/SKILL.md` | depth | ~2.6k | a narrower web class lacked the variant; open one named file |
+| `skills/ctf-web/SKILL.md` | depth | ~2.7k | a narrower web class lacked the variant; open one named file |
 | `skills/mcp-agent-security/SKILL.md` | depth | ~1.1k | the target is an LLM, an agent, or a tool server |
 | `skills/pwn-rop/SKILL.md` | depth | ~0.9k | instruction-pointer control is proven and NX forces code reuse |
 | `skills/web-chromedriver/SKILL.md` | depth | ~1.0k | an admin bot exists and a client-side payload needs debugging |
+| `skills/web-info-disclosure/SKILL.md` | depth | ~0.7k | an exposed file, debug route, or verbose error is observed |
+| `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
+| `skills/web-websocket/SKILL.md` | depth | ~0.8k | a ws:// channel or realtime feature carries the flag path |
+| `skills/web-xs-leaks/SKILL.md` | depth | ~0.7k | an HttpOnly cookie blocks XSS and a bot visits attacker pages |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
 

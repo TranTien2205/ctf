@@ -1,4 +1,8 @@
-# CTF Web - JWT & JWE Token Attacks
+# Authentication and JWT — Extended Reference
+
+This file belongs to the canonical `web-auth-session` class. Open
+`../SKILL.md` first for the first probe, falsifier, and evidence policy; use
+this file only for a named JWT/JWE technique.
 
 ## Table of Contents
 - [Algorithm None](#algorithm-none)
@@ -12,7 +16,7 @@
 - [JWE Token Forgery with Exposed Public Key (UTCTF 2026)](#jwe-token-forgery-with-exposed-public-key-utctf-2026)
 - [AES Cookie Length-Field Truncation + CRC32 Swap (DefCamp 2018)](#aes-cookie-length-field-truncation--crc32-swap-defcamp-2018)
 
-For general auth bypass, access control, and session attacks, see [auth-and-access.md](auth-and-access.md). For OAuth/OIDC, SAML, CI/CD credential theft, and infrastructure auth attacks, see [auth-infra.md](auth-infra.md).
+For general auth bypass, access control, and session attacks, see [../../ctf-web/auth-and-access.md](../../ctf-web/auth-and-access.md). For OAuth/OIDC, SAML, CI/CD credential theft, and infrastructure auth attacks, see [../../ctf-web/auth-infra.md](../../ctf-web/auth-infra.md).
 
 ---
 

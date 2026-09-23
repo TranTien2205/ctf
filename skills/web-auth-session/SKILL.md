@@ -80,7 +80,8 @@ curl -s -d "user=nonexistent_XYZ&pass=x" https://target.com/login
 ```
 
 ## JWT Attacks
-See `references/jwt-attacks.md` for detailed technique list.
+See `references/jwt-attacks.md` for common techniques and
+`references/extended-jwt.md` for the extended CTF corpus.
 ```bash
 # Decode JWT header/payload (no verification)
 echo "<jwt>" | cut -d. -f1 | base64 -d

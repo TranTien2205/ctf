@@ -6,8 +6,8 @@
     "platform": "HackTheBox",
     "event": "Cyber Apocalypse 2024",
     "category": "web",
-    "solved_at": "2026-09-07",
-    "assistance": "writeup-assisted"
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
   },
   "stack": [
     "python",
@@ -68,8 +68,8 @@
     {
       "step": 5,
       "stage": "flag",
-      "action": "overwrite an already-cached template with one containing a template-injection expression, then add a new module file that is not imported to force a worker reload and reset the template cache",
-      "why": "the reload resets the cache without bricking the service"
+      "action": "Overwrite the template the target route renders with a file carrying a template-injection expression, then request that route repeatedly. Do NOT overwrite the server config or any imported module to force a reload.",
+      "why": "The template cache is per worker process. With several workers, one that has never rendered the route still loads the file from disk, so the flag arrives without any reload. The config overwrite that the first solve used is not load-bearing and is the step that bricks instances."
     }
   ],
   "first_confirming_probe": {
@@ -80,18 +80,21 @@
   "blast_radius": "overwriting server configuration or an imported module can permanently break the instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag rendered in the page by the overwritten template"
+    "evidence": "flag rendered in the page by the overwritten template. Re-verified live 2026-09-23 on a second instance: the race unlocked isInternal at round 2 (token ee8927bd, 45/45 requests 200), the admin cookie decoded to {'id': 1, ...} with /challenge/settings returning 200, and the overwritten template rendered the flag on the first poll of /challenge/product/1 with no reload forced."
   },
   "reuse_when": [
     "a commit and a dependent read are split across functions",
     "stored content is interpolated into JavaScript before sanitisation"
   ],
   "known_traps": [
-    "a partial configuration overwrite loses the socket and bricks the instance permanently",
-    "a trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker",
-    "the HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime",
-    "base64url decoding in the browser fails without manual padding",
-    "the bot re-logs in per visit, so stolen cookies expire quickly; verify immediately"
+    "A partial configuration overwrite loses the socket and bricks the instance permanently \u2014 and the re-solve proved this step is not needed at all.",
+    "A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.",
+    "The HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime.",
+    "base64url decoding in the browser fails without manual padding.",
+    "The bot re-logs in per visit, so stolen cookies expire quickly; verify with an authenticated page immediately.",
+    "Restoring the overwritten template does not un-cache it: workers that already cached the malicious version keep serving it until the instance restarts. Say so rather than assuming the write was undone.",
+    "The input sanitiser may cover request.args and request.form but not request.files, so an uploaded filename reaches os.path.join unfiltered.",
+    "The handed-over host:port may speak TLS; a plain http request answering '400 The plain HTTP request was sent to HTTPS port' is the tell."
   ],
   "flag": null,
   "schema_version": 1

@@ -3,7 +3,7 @@
 ## Table of Contents
 - [PHP Type Juggling](#php-type-juggling)
 - [PHP File Inclusion / php://filter](#php-file-inclusion--phpfilter)
-- [SQL Injection](#sql-injection) — moved to [sql-injection.md](sql-injection.md)
+- [SQL Injection](../web-sqli/SKILL.md) — moved to the dedicated class skill
 - [Python str.format() Attribute Traversal (PlaidCTF 2017)](#python-strformat-attribute-traversal-plaidctf-2017)
 - [SSTI (Server-Side Template Injection)](#ssti-server-side-template-injection)
   - [Jinja2 RCE](#jinja2-rce)
@@ -121,7 +121,7 @@ php://filter/convert.base64-encode/resource=index  # Source code
 
 ## SQL Injection
 
-SQL injection techniques have been moved to a dedicated file. See [sql-injection.md](sql-injection.md) for all SQL injection techniques.
+SQL injection techniques have been moved to the dedicated class skill and its references. See [web-sqli](../web-sqli/SKILL.md) first.
 
 ---
 

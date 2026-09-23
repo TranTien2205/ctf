@@ -1,11 +1,11 @@
 ---
 name: web-sqli
 description: >
-  SQL and NoSQL injection: detection, DBMS fingerprint, extraction. Use when a
+  SQL injection depth skill: detection, DBMS fingerprint, extraction. Use when a
   request value reaches a datastore query — an SQL error, a login anomaly, a
-  boolean or timing delta, a UNION opportunity, or an object-shaped filter
-  accepted from a JSON body. Routes to references/ per DBMS and technique.
-tags: [web, sqli, nosqli, injection, database, auth-bypass]
+  boolean or timing delta, or a UNION opportunity. NoSQL/operator injection has
+  its own class and skill: use web-nosqli when the value remains an object.
+tags: [web, sqli, injection, database, auth-bypass]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3
@@ -16,7 +16,7 @@ budget:
 evidence_level: verified
 ---
 
-# SQL / NoSQL Injection — Depth Skill
+# SQL Injection — Canonical Depth Skill
 
 **Verified here.** Chains that prove this class: `htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli`, `htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli`.
 
@@ -45,15 +45,16 @@ union    ' ORDER BY N-- -  raising N until it errors, then ' UNION SELECT NULL,.
 Login bypass is worth trying first when the sink is an authentication query:
 `' OR '1'='1'-- -`, `admin'-- -`, `admin'#`, `') OR ('1'='1`.
 
-## NoSQL
+## Do not confuse SQLi with NoSQLi
 
 When the body is JSON and the query takes an object, the injection is a shape,
-not a string. Confirm with a **read-safe** probe: send the filter pinned to an
-object you created, with every write field omitted, and read what comes back.
-Only then test comparison or update operators. A broad filter combined with write
-fields rewrites the whole collection — see `references/nosql.md`.
+not a string. Route to `../web-nosqli/SKILL.md` rather than forcing SQL syntax.
+That skill contains the read-safe probe and the write blast-radius warning.
 
 ## Route to depth
+
+If the needed reference is not obvious, open `references/README.md` and choose
+one named file. Do not load the entire directory.
 
 | Observation | File |
 |---|---|
@@ -82,8 +83,14 @@ comparison against the row, as string to string.
 
 ## Variants and bypasses
 
-When this file lacks the specific bypass, open one named file:
-`../ctf-web/sql-injection.md`.
+When the local references below lack the specific bypass, open one named file
+from the extended corpus:
+`references/extended-corpus.md`.
+
+The extended corpus is supplementary knowledge, not a second routing skill. Do
+not open the whole `skills/ctf-web/` directory. Start with the local reference
+matching the observed channel, then open the extended SQLi file only for a
+named variant or challenge pattern it explicitly covers.
 
 ## Discipline
 

@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "id": "pico-fickle-tempest-column-rotation-png",
+  "source_note": "solved/pico-fickle-tempest-column-rotation-png.md",
+  "challenge": {
+    "name": "fickle-tempest",
+    "platform": "picoCTF",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "apache",
+    "jquery",
+    "static-page",
+    "png",
+    "qr"
+  ],
+  "preconditions": {
+    "all_of": [
+      "The page ships the scrambling algorithm in client-side JavaScript and fetches the scrambled blob from its own endpoint.",
+      "The blob is a known file format whose header bytes are fixed and predictable.",
+      "The scramble is applied per column of a fixed-width interleave, so each column is transformed independently of the others."
+    ],
+    "any_of": [
+      "The per-column transform is a cyclic rotation whose amount comes from one character of a user-supplied key.",
+      "The blob length is an exact multiple of the interleave width, which turns the modulus into a plain row rotation.",
+      "No server-side check exists: submitting the right key only changes what the browser renders."
+    ]
+  },
+  "signals": [
+    "charCodeAt",
+    "% bytes.length",
+    "data:image/png;base64",
+    "btoa(String.fromCharCode",
+    "Uint8Array",
+    "$.get(\"bytes\"",
+    "LEN = 16",
+    "assemble",
+    "result[(j * LEN) + i]"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Read the page's inline script and copy the index arithmetic out verbatim. Fetch the raw blob endpoint and count the values the same way the program counts them.",
+      "why": "The challenge is the algorithm, and the only thing that has to be recovered is its key. Counting the blob wrong changes the modulus and therefore the whole structure, so the count has to match the program's own view of it."
+    },
+    {
+      "step": 2,
+      "stage": "structure",
+      "action": "Check whether the blob length is an exact multiple of the interleave width. If it is, the modulus reduces to a rotation over length/width rows and each column becomes an independent problem with only that many possible shifts.",
+      "why": "This is what turns an apparently huge key space into a handful of per-column choices. When the two are coprime instead, columns really do mix and this shortcut does not apply."
+    },
+    {
+      "step": 3,
+      "stage": "constraint",
+      "action": "Write out the known header of the target file format and match it against the interleave: with a width of N, the first N header bytes give exactly one known byte per column. Keep every shift per column that reproduces its byte.",
+      "why": "A fixed file signature is free plaintext. For a 16-wide interleave a PNG signature plus the first chunk header pins most columns to a single value outright."
+    },
+    {
+      "step": 4,
+      "stage": "disambiguate",
+      "action": "Use the next header row for the columns that kept more than one candidate \u2014 for PNG, the IHDR payload, whose compression and filter bytes are always zero and whose dimension high bytes are zero for any normal image.",
+      "why": "Second-row constraints are weaker but only a few columns still need them, so they cut the remaining space to something exhaustible."
+    },
+    {
+      "step": 5,
+      "stage": "verify",
+      "action": "Enumerate the surviving combinations and accept one only if the reconstructed file really parses \u2014 for PNG, concatenate the IDAT chunks and decompress them.",
+      "why": "Several wrong combinations still produce a correct-looking signature. Decompression is the check that cannot be passed by accident."
+    },
+    {
+      "step": 6,
+      "stage": "flag",
+      "action": "Read the payload out of the recovered file. Recover the key itself by inverting the character arithmetic if the key is wanted as well.",
+      "why": "The flag usually sits inside the reconstructed artifact rather than in the key, but the key is free once the shifts are known."
+    },
+    {
+      "step": 7,
+      "stage": "variant",
+      "action": "Before enumerating, bound each element's shift by what the key read can actually express, not by the number of rows. A one-character numeric read allows 0..9 only, no matter how many rows the blob has.",
+      "why": "The row count sets the period of the rotation, but the key read sets the reachable subset. Enumerating the full period wastes the constraint the challenge handed over, and can make a solvable problem look intractable."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Fetch the raw blob endpoint, count the values, and check whether that count divides evenly by the interleave width named in the page's script.",
+    "expected": "The count is an exact multiple of the width, so the scramble is a per-column rotation over count/width rows and each column can be solved on its own against the known file header.",
+    "falsifier": "The count and the width are coprime, so the modulus genuinely mixes columns and the per-column decomposition does not hold. Solve the index map as a whole instead, and do not trust a per-column candidate list."
+  },
+  "blast_radius": "None. Everything happens on a static page and in local analysis: the only request to the target is a GET of the blob endpoint, and the reassembly runs offline. Nothing is written, no state changes, and the instance is left exactly as found.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The 704 values were fetched live from the target's /bytes endpoint. Solving the columns produced key '1625882204269635' and a 370x370, 695-byte PNG whose IDAT stream decompressed cleanly; decoding the QR inside it printed picoCTF{...} as clean ASCII in the expected shape. A second challenge on the same host was solved with the same card: 736 values = 46 rows, shifts capped at 0..9 by a single-character key read, 12 of 16 columns pinned by the signature alone, 24 combinations checked, yielding a 370x370 PNG whose QR decoded to a different picoCTF flag."
+  },
+  "reuse_when": [
+    "A page hands you an obfuscated blob plus the client-side code that unscrambles it.",
+    "A scramble is described per column, per lane or per stride rather than over the whole buffer.",
+    "The scrambled data is a known file format, so its header is usable as plaintext.",
+    "A key is only checked by whether the output renders, with no server-side validation."
+  ],
+  "known_traps": [
+    "Count the blob the way the program counts it. A quick shell word count reported 703 where the array actually holds 704, and 703 is coprime with 16 while 704 is not \u2014 the wrong count implies a completely different index structure.",
+    "Candidate shifts repeat every length/width values. Reducing them to residues first is the difference between a dozen combinations and an astronomically large product; an early run of this solve reported a search space of 2.2e20 purely because raw candidates were multiplied instead of residues.",
+    "A matching file signature is not proof of a correct reassembly. Validate by decompressing or parsing the payload, because several wrong combinations reproduce the header.",
+    "When no barcode decoder is installed, skipping Reed-Solomon is safe for a generated image but not for a photographed one. A wrong grid or mask then fails as obvious garbage rather than as plausible text, which is its own safety net.",
+    "The instance port changes on every spin-up, so a saved URL goes stale between sessions.",
+    "Read how the key is SLICED, not just how long it is. A sibling of this challenge used a 32-character key but read it with slice(i*2, i*2+1) \u2014 a single character \u2014 which caps every shift at 9 even though the data had 46 rows. The longer key is the weaker one.",
+    "Some characters of the key may be dead. When the read is a single character at a strided index, the untouched positions accept anything, so the recovered key is not unique."
+  ],
+  "flag": null
+}

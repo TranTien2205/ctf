@@ -45,3 +45,33 @@ Falsifier: Both requests return the same refusal message. Then register_argc_arg
 **Blast radius**: The final step is arbitrary command execution as the web user on a shared instance, so every command must be chosen deliberately: prefer id, ls, cat and the challenge's own setuid flag reader, and never a command that writes outside a directory you created. The upload step adds a real row to the application's database and a real file to its upload directory on every single run, and the exploit needs one upload per command, so an interactive session litters the instance quickly - batch several commands into one payload with ';' rather than running the chain repeatedly. Cleaning up afterwards may be impossible: the application's database account here held SELECT, INSERT and UPDATE but no DELETE, so the uploaded files could be removed but the rows could not. Assume that before starting and keep the number of uploads small.
 
 - status: proposed
+
+## 2026-09-23 · Resizer · proposed
+
+- source note: `solved/htb-resizer-filename-traversal-olefile-so-import.md`
+- chain card: `knowledge/chains/htb-resizer-filename-traversal-olefile-so-import.json`
+- verification: verified_live — A single POST of a text file named zq1.txt returned HTTP 200 whose body was the flag, copied there moments earlier by the ELF constructor during the same request's failed image open. After the cleanup restart the same request no longer returns a flag and the site still answers 200.
+- classified as: `web-file-upload` (score 3.5, 3 signals matched)
+- also matched: `web-ssti` (3.5), `web-race-condition` (1.5), `web-prototype-pollution` (1.5)
+- signals that fired: import, os.path.join(app.config['UPLOAD_FOLDER'], file, upload
+
+**Confirming probe that worked**
+
+> Upload the same filename twice, then upload it once more in a path-equivalent form such as ./name or dir/../name.
+
+Expected: The second and third uploads are both rejected as duplicates, showing the raw filename reaches os.path.join and the check resolves paths.
+
+Falsifier: The equivalent forms are accepted or the name is rewritten, meaning the filename is sanitised and there is no traversal to build on.
+
+**Traps recorded on this solve**
+
+- The duplicate-file message is an existence oracle that WRITES on a miss. Probing a path creates it, which can overwrite the exploit's own payload; use throwaway names.
+- The duplicate check short-circuits before the file is saved and before the library runs, so re-uploading an existing name never triggers anything. Retries need fresh names.
+- Lazy plugin initialisation happens once per worker process. Workers that already met an unidentifiable file before the payload was planted will never import it again; a fresh worker is required.
+- Compile the payload's destinations in plural. A single destination whose read slot was already consumed during testing leaves the secret copied somewhere unreadable.
+- Sizing a decode just under the library's decompression-bomb ceiling avoids the guard and still exhausts the worker, which restarts the container and wipes the application directory. That is both the only delete primitive and a destructive act.
+- Do not conclude the processing library from the absence of a feature alone; confirm it. Dropped text chunks and a single IDAT in the output identified Pillow and ruled out the ImageMagick profile-read CVE.
+
+**Blast radius**: The planted shared object executes as the application user on any later request that triggers the lazy import, so it is a backdoor for every other visitor until removed. The payload's copies of the secret sit in a directory other users of the instance may be able to reach. Forcing the restart that clears them kills in-flight requests and wipes everything else written to the application directory, including other people's uploads. Concurrent oversized decodes are what force that restart; keep them to one burst and only on an instance you own.
+
+- status: proposed

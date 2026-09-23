@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "id": "htb-quickblog-codefence-xss-registration-oracle-pickle-session",
+  "source_note": "solved/htb-quickblog-codefence-xss-registration-oracle-pickle-session.md",
+  "challenge": {
+    "name": "QuickBlog",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": ["cherrypy", "python3.11", "selenium", "chromium", "supervisord", "alpine"],
+  "preconditions": {
+    "all_of": [
+      "A stored value is rendered into HTML by client-side JavaScript whose escaping is incomplete, and the page's CSP allows inline script.",
+      "A privileged headless browser visits the page holding a session cookie.",
+      "The session store or some later sink turns an attacker-controlled write into code execution."
+    ],
+    "any_of": [
+      "Outbound traffic is blocked and connect-src is pinned to 'self', so exfiltration has to go through the application itself.",
+      "Exactly one write endpoint lacks the loopback guard that the others carry.",
+      "An upload handler joins the multipart filename onto a directory without sanitising it.",
+      "The framework stores sessions as pickled files named after the session id."
+    ]
+  },
+  "signals": [
+    "innerHTML = markdownToHtml",
+    "&lt;",
+    "toLowerCase()",
+    "<pre language='${",
+    "unsafe-inline",
+    "unsafe-eval",
+    "connect-src 'self'",
+    "cherrypy.request.remote.ip",
+    "127.0.0.1",
+    "username not in users",
+    "os.path.join(uploads_dir, file.filename)",
+    "tools.sessions.storage_type",
+    "file",
+    "BackgroundScheduler",
+    "http_proxy",
+    "readflag"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "sink",
+      "action": "Read the client-side renderer, not the server template, and write down exactly which characters it escapes. If '<' is escaped but '>' is not, the sink is an attribute rather than a tag.",
+      "why": "An attribute sink cannot open a new element, so the payload has to fire by itself: autofocus plus tabindex makes any element focusable and onfocus runs the moment it is inserted."
+    },
+    {
+      "stage": "encoding",
+      "step": 2,
+      "action": "When the value passes through a case-folding or character-class filter before reaching the sink, carry the real payload percent-encoded and rebuild it at runtime with eval(unescape(...)).",
+      "why": "Both of those identifiers survive lowercasing, so a filter that only folds case blocks nothing. Check the same filter on every field: here the title was restricted and the base64 content was not."
+    },
+    {
+      "step": 3,
+      "stage": "exfil channel",
+      "action": "Before designing the exfiltration, check egress and CSP. Then enumerate every write endpoint and note which ones carry a loopback guard. The one that does not is the channel, and a 'this already exists' redirect is a one-bit read primitive.",
+      "why": "With outbound traffic dead and connect-src pinned to 'self', the application is the only channel. A single unguarded endpoint is enough to encode a secret one symbol at a time."
+    },
+    {
+      "step": 4,
+      "stage": "lock",
+      "action": "If the privileged browser re-authenticates on a schedule, its session id differs on every visit. Have the payload claim one name first and write the secret only if it created that name, so exactly one visit writes.",
+      "why": "Without the lock each visit writes its own symbols into the same namespace, first-writer-wins makes the recovered value a per-position minimum across visits, and the result is a well-formed string that is not any real secret."
+    },
+    {
+      "step": 5,
+      "stage": "sanity check",
+      "action": "Check the recovered secret's symbol distribution before spending it. A random identifier is uniform over its alphabet; a recovered value that clusters at one end was assembled wrongly.",
+      "why": "It is a free correctness check that catches a mixed or truncated read before it is blamed on the wrong part of the chain."
+    },
+    {
+      "step": 6,
+      "stage": "write primitive",
+      "action": "With the privileged session, look for an upload handler that joins the multipart filename unsanitised. Confirm the framework does not rewrite the filename before assuming traversal works.",
+      "why": "Most frameworks pass the Content-Disposition filename through untouched, which makes one endpoint an arbitrary write anywhere the process can reach."
+    },
+    {
+      "step": 7,
+      "stage": "write to rce",
+      "action": "Point the write at the framework's own session store when it serialises with pickle. Pickle the exact shape the loader expects, not the bare payload object, then set that session id as a cookie and request any page.",
+      "why": "A pickling session store converts one file write into code execution with no memory work. Matching the expected shape keeps the session machinery from raising after the reduce has already run."
+    },
+    {
+      "step": 8,
+      "stage": "cleanup",
+      "action": "Make the injected command delete its own session file as its last act, then run it once more to remove whatever it wrote. Verify by re-sending the planted cookies and checking that nothing reappears.",
+      "why": "A pickled session file is a working remote-code-execution backdoor for anyone who sets that cookie. Unlinking it while the loader still holds it open is safe on Linux."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Store a code fence whose language field closes the attribute and adds autofocus with a tabindex and an onfocus that is a percent-encoded eval(unescape(...)), then load the page yourself in a real browser.",
+    "expected": "The handler fires on insertion with no interaction, proving both that the attribute sink is reachable through the incomplete escaping and that the case-folding filter does not stop a reconstituted payload.",
+    "falsifier": "The attribute is escaped, or the handler never fires without interaction, meaning the sink is not injectable and the privileged browser cannot be made to run anything."
+  },
+  "blast_radius": "The pickled session file executes as the application user for anyone who sets that cookie, so it is a remote backdoor until removed; make the payload delete it in the same command. The exfiltration registers several hundred throwaway accounts and the stored payload keeps firing on every scheduled visit, both of which live in process memory and only clear on restart. Do not point the injected command at configuration or at imported modules. On a shared instance the registration oracle is several hundred sequential writes: keep concurrency low and never probe a namespace the payload has not written yet, because probing creates the name and destroys that symbol.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "GET /admin with the recovered cookie returned 200 containing 'admin page, admin_user.', and after the session-store write GET /uploads/res.txt returned the flag in the response body. After the cleanup run the same path returns 404 and re-sending both planted cookies produces nothing."
+  },
+  "reuse_when": [
+    "A client-side markdown or template renderer builds HTML with string interpolation and escapes only some of the delimiters.",
+    "A scheduled privileged browser visits attacker-controlled content on a host with no outbound network.",
+    "One write endpoint is missing the loopback guard that its siblings carry.",
+    "An upload handler passes the request-supplied filename to os.path.join.",
+    "A framework is configured to keep sessions as files rather than in memory."
+  ],
+  "known_traps": [
+    "A bot that logs in again on every run has a different session id each time, so a shared exfiltration namespace mixes runs into a value that is not any real id. Lock the namespace to one run.",
+    "The registration oracle WRITES: probing a name creates it, so probing before the privileged visit hands the bot a name it can no longer create and that symbol is lost. Never probe the lock name at all.",
+    "Registration overwrites the session's own username, so the exfiltration requests have to omit credentials or the stolen session is demoted before it can be used.",
+    "A template literal cannot be an object key; `{`Content-Type`: ...}` is a SyntaxError. Percent-encoding already makes ordinary double quotes safe inside the attribute.",
+    "The framework's session loader expects a (data, expiration) tuple. Pickling the bare payload still executes but then raises, which is noisier than pickling the expected shape.",
+    "A single-threaded http.server deadlocks headless Chrome, which opens several connections; local rehearsals need ThreadingHTTPServer.",
+    "The flag name is randomised at container start, so it has to be globbed, and a setuid helper is usually the intended reader."
+  ],
+  "flag": null
+}

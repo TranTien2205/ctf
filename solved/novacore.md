@@ -61,3 +61,56 @@
 - This is the "long-chain" profile: writeup-first found the exact repo+solver.
   Blind-solving this ~20-solve chain without writeup is currently out of reach;
   the individual primitives are all captured in skills/ references.
+
+---
+
+## Re-solved 2026-09-23 — replayed from this repo's own card, no writeup needed
+
+Second instance (`http://154.57.164.82:31729`). Same build: the CSP served on `/`
+still reads `script-src 'self' 'nonce-…' 'unsafe-eval'`, and all four polyglot
+tools (`as`, `ld`, `exiftool`, `dd`) are present on this machine.
+
+The chain card's `first_confirming_probe` ran first and settled the whole thing
+in two requests:
+
+```
+GET /api/trades                                  -> HTTP/1.1 401 Unauthorized
+GET /api/trades  -H 'Connection: close, X-Real-Ip' -> HTTP/1.1 200 OK
+```
+
+That is CVE-2024-45410 confirmed live: Traefik strips its own `X-Real-Ip` when
+the client lists it as hop-by-hop, and `api.py:15` then takes the branch
+
+```python
+client_ip = request.headers.get("X-Real-IP")
+if not client_ip:
+    return f(*args, **kwargs)      # no token check at all
+```
+
+Note the case difference — the app reads `X-Real-IP`, Traefik writes `X-Real-Ip`.
+It does not matter (HTTP header lookup is case-insensitive) but it is the kind of
+detail that makes a hand-written probe fail for the wrong reason.
+
+The recorded solver then replayed steps 2–9 unchanged; the only edit was the
+`HOST, PORT` line. Total runtime under two minutes.
+
+### What was worth re-checking rather than assuming
+
+- **The endpoint names.** The first probe was aimed at `/api/get_trades` and
+  returned 404 for both the plain and the hop-by-hop request, which looks exactly
+  like "the technique does not work here". The real routes are
+  `/api/active_signals`, `/api/trades`, `/api/edit_trade`,
+  `/api/copy_signal_trade` (`blueprints/api.py`). A 404 on both arms of a
+  differential probe means the probe is wrong, not the hypothesis.
+- **Whether a proxy is in front at all.** `Server: Werkzeug` is visible on `/`,
+  which suggests no proxy. The 401-vs-200 split is what proves Traefik is there,
+  because only a proxy could be adding the header the app is reacting to.
+
+### State left on the instance
+
+The chain corrupts one neighbouring cache record by design (the `strcpy`
+overflow writes into the next entry's key) and executes an uploaded plugin. Both
+are inherent to the bug, not incidental. Afterwards `/` still answers 200 and
+`/api/trades` still answers 401 without the hop-by-hop header, so the instance
+remains usable; the poisoned trade row stays visible in the feed and clears on a
+restart.

@@ -277,6 +277,19 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(broken, [],
                          "a skill names a reference file that does not exist: %s" % broken)
 
+    def test_sql_injection_has_one_canonical_owner(self):
+        """SQLi references must live under web-sqli, not a second web corpus."""
+        old = ROOT / "skills" / "ctf-web" / "sql-injection.md"
+        canonical = ROOT / "skills" / "web-sqli"
+        self.assertFalse(old.exists(), "legacy SQLi corpus still creates a second owner")
+        self.assertTrue((canonical / "SKILL.md").is_file())
+        self.assertTrue((canonical / "references" / "README.md").is_file())
+        self.assertTrue((canonical / "references" / "extended-corpus.md").is_file())
+        cls = next(c for c in taxonomy()["classes"] if c["id"] == "web-sqli")
+        self.assertTrue(all(ref.startswith("skills/web-sqli/")
+                            for ref in cls.get("depth_refs", [])),
+                        "SQLi depth references must remain under its canonical owner")
+
     def test_no_command_hardcodes_a_tree_root(self):
         """The tree has to work wherever it is checked out.
 

@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "id": "picoctf-expense-tracker-second-order-sqli-async-report-union",
+  "source_note": "solved/picoctf-expense-tracker-second-order-sqli.md",
+  "challenge": {
+    "name": "Expense Tracker",
+    "platform": "picoCTF",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": ["flask", "werkzeug", "python", "sqlite"],
+  "preconditions": {
+    "all_of": [
+      "a value the attacker chooses at registration is stored and later reused by the application",
+      "some action is handed to a background worker instead of being answered in the request"
+    ],
+    "any_of": [
+      "the deferred result names the stored value in an artifact path or filename",
+      "the worker reports its failure reason somewhere the attacker can read",
+      "the artifact the worker produces has a fixed, visible column count"
+    ]
+  },
+  "signals": [
+    "second order",
+    "background",
+    "worker",
+    "inbox",
+    "report",
+    "asynchronous",
+    "sqlite",
+    "unrecognized token",
+    "csv",
+    "registration"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "list the authenticated routes and note any action whose response defers the work and tells you to come back later",
+      "why": "a deferred action means the sink is in another code path, so probing the request that stores the value proves nothing"
+    },
+    {
+      "step": 2,
+      "stage": "locate the carrier",
+      "action": "read the artifact the deferred job produces and look for a value the attacker chose, such as a name embedded in the path",
+      "why": "seeing the stored value inside the worker's output identifies the carrier before a single payload is sent"
+    },
+    {
+      "step": 3,
+      "stage": "confirm",
+      "action": "register a second account identical to the first except that the chosen value ends in a single quote, run the deferred action for each, and compare the outcomes",
+      "why": "the safe account proves the flow works while the quoted one isolates the concatenation, and the difference is the whole detection step"
+    },
+    {
+      "step": 4,
+      "stage": "read the shape",
+      "action": "take the column count from the artifact's own header rather than probing for it",
+      "why": "every probe costs a full worker cycle here, so a count that is already printed must not be rediscovered"
+    },
+    {
+      "step": 5,
+      "stage": "extract",
+      "action": "register a further account whose stored value carries a union selecting the schema, then download the artifact",
+      "why": "the worker writes query output straight into the artifact, which turns the deferred job into a direct read channel"
+    },
+    {
+      "step": 6,
+      "stage": "flag",
+      "action": "enumerate every table the schema names, including any whose name claims to hold nothing",
+      "why": "the name of a table is attacker-facing text and is not evidence about its contents"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "create two accounts differing only in that one chosen value ends with a single quote, trigger the deferred action for both, and read where each result is reported",
+    "expected": "the plain account produces its artifact while the quoted one reports a database parse failure, naming the doubled quote",
+    "falsifier": "both accounts produce their artifact normally, so the stored value is parameterised in the worker too"
+  },
+  "blast_radius": "read-only. Each payload costs one throwaway account plus one record, and the deferred job only reads. The chosen value is uniqueness-checked, so every payload needs a distinct prefix rather than a retry of the same one. Avoid a path separator in the payload: the value is also used to build the artifact's filename, so a separator breaks file creation instead of reaching the query.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was read from the artifact downloaded from the live target, as the value of a row returned by the injected union"
+  },
+  "reuse_when": [
+    "a response defers work and tells the user to check somewhere else shortly",
+    "a stored registration value appears in a filename, a path, or a generated document",
+    "an insert accepts a quote without complaint but a later screen reports a database error"
+  ],
+  "known_traps": [
+    "the insert is parameterised and accepts the payload silently, so testing the request that stores the value shows nothing and the flow looks safe",
+    "the table whose name decodes to a claim that no flag is present is exactly where the flag was, so enumerate it rather than trusting the label",
+    "the worker's failure reason is rendered back to the attacker, which makes this error-based rather than blind; look for that text before building a boolean oracle",
+    "the chosen value is also used to build the artifact filename, so a payload containing a path separator breaks file creation instead of reaching the query",
+    "omitting a required registration field returns a bare bad-request page with no field named, which reads like a broken request rather than a missing input"
+  ],
+  "flag": null
+}

@@ -1,0 +1,105 @@
+{
+  "id": "htb-notebook-converter-pro-embed-images-read-fileswriter-write-rce",
+  "source_note": "solved/notebook-converter-pro.md",
+  "challenge": {
+    "name": "Notebook Converter Pro",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-22",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "flask",
+    "python",
+    "nbconvert",
+    "sqlite"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a web app converts an uploaded notebook with nbconvert and lets the user download the result",
+      "the converter runs as a non-root service user that can read the application database",
+      "a setuid helper exists that prints the real flag"
+    ],
+    "any_of": [
+      "the HTML exporter is configured with embed_images so markdown image paths are read from disk",
+      "a saved-assets writer path is reachable and its attachment names are not sanitised"
+    ]
+  },
+  "signals": [
+    "flask",
+    "nbconvert",
+    "ipynb",
+    "embed_images",
+    "FilesWriter",
+    "attachment",
+    "asset_storage_enabled",
+    "markdown",
+    "jupyter",
+    "readflag",
+    "setuid",
+    "app.db"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "upload a notebook whose markdown cell references a local path as an image and convert to html",
+      "why": "HTMLExporter.embed_images inlines the referenced file as a base64 data URI in the response"
+    },
+    {
+      "step": 2,
+      "stage": "read",
+      "action": "read the application SQLite database and recover the admin password stored in plaintext",
+      "why": "the converter runs as the service user, which owns the database file"
+    },
+    {
+      "step": 3,
+      "stage": "privilege",
+      "action": "log in as admin and enable the saved-assets setting",
+      "why": "only the saved-assets path reaches FilesWriter, which performs the write"
+    },
+    {
+      "step": 4,
+      "stage": "write",
+      "action": "upload a notebook whose markdown attachment key is an absolute path to a Python file the next conversion will execute",
+      "why": "nbconvert 7.17.0 does not sanitise attachment names and joins them with the build directory, so an absolute key writes anywhere as the service user"
+    },
+    {
+      "step": 5,
+      "stage": "trigger",
+      "action": "run one more conversion so the overwritten converter executes",
+      "why": "the app invokes a fixed converter script as a subprocess on every job"
+    },
+    {
+      "step": 6,
+      "stage": "flag",
+      "action": "run the setuid helper and write its output into the job output directory, then download the job",
+      "why": "the helper is the only path to the real flag; the download endpoint returns the job file"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "upload a notebook with a markdown cell '![f](/etc/hostname)' and convert it to html, then download the job",
+    "expected": "the returned HTML contains an <img alt=\"f\" src=\"data:...;base64,...\"> whose decoded bytes are the file content",
+    "falsifier": "the image is not inlined, or the path is not read from disk"
+  },
+  "blast_radius": "overwriting the converter script disables the application's conversion feature until the container is rebuilt; the RCE runs as the service user inside the challenge container only. Rebuild or restart the instance afterwards",
+  "verification": {
+    "status": "unverified",
+    "evidence": "chain reproduced end-to-end on a locally built instance of the supplied source: the setuid helper's output was read back from the job download. The supplied source ships a test flag, so no live challenge flag was read and the remote instance was unreachable"
+  },
+  "reuse_when": [
+    "a notebook or document converter exposes embed_images or a similar inline-local-file option",
+    "the saved-assets writer path is reachable and attachment or output names are attacker-controlled",
+    "a fixed converter script is invoked as a subprocess and is writable by the service user"
+  ],
+  "known_traps": [
+    "the admin password is regenerated on every application start, so a password from an earlier run is stale",
+    "an already-authenticated session is redirected before the login form is read; log out before switching users",
+    "the first base64 data URI in the HTML is a template icon; match the specific image alt tag",
+    "the outputs filename path forces a mime extension and cannot write a python file; use the attachments path",
+    "the jupyter converter config file is not loaded by the nbconvert python API, so writing it does not trigger execution"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

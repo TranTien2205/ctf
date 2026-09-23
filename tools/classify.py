@@ -76,9 +76,16 @@ def scan_source(target, compiled, limit_per_class=4):
             continue
         for class_id, patterns in compiled.items():
             bucket = hits.setdefault(class_id, [])
-            if len(bucket) >= limit_per_class:
+            # The cap counts DISTINCT signals. Recording the same signal once per
+            # file used to exhaust it before the remaining signals were ever
+            # tried, so a class scored on how many files matched rather than on
+            # how many different signals did.
+            seen = {item["signal"] for item in bucket}
+            if len(seen) >= limit_per_class:
                 continue
             for raw, pattern in patterns:
+                if raw in seen:
+                    continue
                 match = pattern.search(text)
                 if not match:
                     continue
@@ -87,7 +94,8 @@ def scan_source(target, compiled, limit_per_class=4):
                 bucket.append({"signal": raw,
                                "file": os.path.relpath(path, os.path.dirname(target.rstrip("/")) or "."),
                                "line": line, "excerpt": excerpt[:100]})
-                if len(bucket) >= limit_per_class:
+                seen.add(raw)
+                if len(seen) >= limit_per_class:
                     break
     return {k: v for k, v in hits.items() if v}
 

@@ -40,7 +40,7 @@ response. In order of value:
 | Status oracle | open and closed ports differ by status or by timing |
 | Out-of-band only | nothing comes back; you are limited to what the fetch itself achieves |
 
-`solved/red-island.md` records the error-echo case: the app returned the fetched
+`../../solved/red-island.md` records the error-echo case: the app returned the fetched
 file inside the `message` field of a 401. Had the error body gone unread, the
 whole chain would have looked blind.
 
@@ -79,9 +79,9 @@ Check those before committing to this one.
 
 Depth, one named file at a time:
 
-- `skills/web-ssrf/references/protocol-smuggling.md`
-- `skills/web-ssrf/references/cloud-metadata.md`
-- `skills/ctf-web/server-side-advanced.md`
+- `references/protocol-smuggling.md`
+- `references/cloud-metadata.md`
+- `../ctf-web/server-side-advanced.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

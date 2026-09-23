@@ -74,7 +74,7 @@ and any function that is reachable before initialisation.
 
 Depth, one named file at a time:
 
-- `skills/ctf-web/web3.md`
+- `references/extended.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

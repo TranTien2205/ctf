@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "htb-sattrack-client-side-pp-jsfiles-csp-bypass",
+  "source_note": "solved/htb-sattrack-client-side-pp-jsfiles-csp-bypass.md",
+  "challenge": {
+    "name": "Sattrack",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-22",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "nginx",
+    "express",
+    "vanilla-js",
+    "jwt",
+    "headless-chrome",
+    "tailwind"
+  ],
+  "preconditions": {
+    "all_of": [
+      "A client-side script deep-merges attacker-controlled JSON into an object without guarding __proto__.",
+      "Some later code reads a configuration key off a plain object and falls back to a server fetch only when the key is absent, so a polluted prototype wins.",
+      "That configuration key is used to build a script source, a URL, or another executable reference.",
+      "A viewer with privileges (an admin bot, a renderer) can be made to load the polluted URL."
+    ],
+    "any_of": [
+      "CSP restricts script-src to 'self', so the injected script source must be same-origin.",
+      "An unauthenticated endpoint on the same origin reflects a request parameter into its response body.",
+      "Session cookies are not HttpOnly, so document.cookie is readable from the injected script."
+    ]
+  },
+  "signals": [
+    "__proto__",
+    "for (let key in",
+    "mergeObjects",
+    "JS_FILES",
+    "JSON.parse(decodeURIComponent",
+    "URLSearchParams",
+    "createElement(\"script\")",
+    "content-security-policy",
+    "script-src 'self'",
+    "connect-src *",
+    "/api/config",
+    "report"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Read the inline JavaScript of the page that takes the parameter. Note every place a config key is read off a plain object, and note how many times the parameter is decoded before it is parsed.",
+      "why": "Both the pollution sink and the encoding depth are decided here, and the encoding depth is the part that fails silently later."
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "Send the parameter as JSON carrying a __proto__ branch that sets the config key the later code reads, for example {\"text\":\"<allowed value>\",\"__proto__\":{\"<KEY>\":[\"<url>\",\"<original entry>\"]}}. Keep the original entry in the array so page behaviour is unchanged.",
+      "why": "JSON.parse creates __proto__ as an ordinary own enumerable property, so a for-in deep merge assigns straight onto Object.prototype. The polluted key then satisfies the truthiness test that would otherwise trigger the server config fetch."
+    },
+    {
+      "step": 3,
+      "stage": "encoding",
+      "action": "Count the decodes the page performs and percent-encode the whole parameter once per decode. URLSearchParams.get() already decodes once, so a further decodeURIComponent() means the value must be encoded twice.",
+      "why": "A nested URL inside the parameter carries its own percent-encoding. One decode too many strips it, its '&' becomes a real query separator that truncates the nested parameter and its '+' becomes a space. Nothing throws and the page renders normally, so this is invisible without a rehearsal."
+    },
+    {
+      "step": 4,
+      "stage": "csp bypass",
+      "action": "Point the injected script source at a same-origin endpoint that reflects a parameter into its body, closing the surrounding literal and commenting out the tail, for example type=\"}<js>//. Check the response for X-Content-Type-Options before relying on it.",
+      "why": "script-src 'self' forbids an offsite source, but any same-origin endpoint that echoes input is a script source. A text/plain content type still executes when no nosniff header is present."
+    },
+    {
+      "step": 5,
+      "stage": "rehearsal",
+      "action": "Run the identical payload in a local headless browser with the origin swapped from the loopback address to the public one, and watch the collector. Only fire the real bot once the XSS and the exfil channel have both reported.",
+      "why": "A privileged viewer is rate limited and gives no feedback. The rehearsal separates 'the payload is broken' from 'the payload works but I am not the privileged user', which are otherwise indistinguishable."
+    },
+    {
+      "step": 6,
+      "stage": "exfil",
+      "action": "Exfiltrate with fetch(), not with an image or a stylesheet, unless the CSP explicitly widens img-src or style-src. Send document.cookie first, then the privileged page bodies.",
+      "why": "A CSP that omits img-src inherits default-src, so an offsite image is dropped silently, while connect-src * leaves fetch wide open. The directive that is absent is the one that decides the channel."
+    },
+    {
+      "step": 7,
+      "stage": "flag",
+      "action": "Replay the stolen session cookie yourself and enumerate the privileged area's navigation links rather than reading only its index page.",
+      "why": "The index of an admin area is often a dashboard of fake metrics; the flag sits on one of the sub-pages it links to."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Load the page with the parameter set to JSON containing a __proto__ branch that sets the config key to an array holding a harmless same-origin URL, then read the rendered DOM and check whether a script element with that source was appended.",
+    "expected": "A script element carrying the injected source appears in the DOM, proving the prototype write reached the config read and that the polluted value beat the server config fetch.",
+    "falsifier": "No such element appears. Either the merge guards __proto__, or the config is read before the merge runs, or the parameter did not survive the page's decode depth. Re-count the decodes before abandoning the class, because the wrong encoding depth looks exactly like a patched merge."
+  },
+  "blast_radius": "Low on the target itself: the pollution lives in the victim's page instance only and nothing server-side is written. The real exposure is outward. The chain needs a publicly reachable collector, so anything the injected script sends leaves the lab and reaches whatever host is used; keep it to the cookie and the flag, and take the collector and any tunnel down as soon as the flag is read. The stolen session belongs to a shared admin account, so do not issue state-changing requests with it.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The admin bot's own browser exfiltrated its cookie to the collector: {\"tag\":\"hello\",\"cookie\":\"token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"} decoding to role=admin, email=admin@sattrack.htb. Replaying that cookie returned HTTP 200 from the admin area with the flag in the response body: <div class=\"font-medium text-white\">HTB{...}</div>."
+  },
+  "reuse_when": [
+    "A front-end deep merge, extend, or config loader consumes JSON from a URL parameter, a hash, or postMessage.",
+    "A page reads a settings key off a plain object and only fetches real settings when that key is missing.",
+    "CSP allows script-src 'self' and the origin has any endpoint that reflects input into its body.",
+    "An admin bot or renderer visits a URL you submit and the session cookie is not HttpOnly."
+  ],
+  "known_traps": [
+    "Count the decodes, not the encodes. URLSearchParams.get() already percent-decodes; a further decodeURIComponent() is a second decode and a nested URL inside the value needs one extra encoding layer per decode or its '&' and '+' are destroyed. The payload fails silently and the page looks normal.",
+    "A CSP with no img-src inherits default-src, so an offsite new Image().src is dropped. Use fetch() when connect-src is wildcarded. An earlier attempt at this challenge had the whole chain right and still collected nothing for exactly this reason.",
+    "A reflecting endpoint served as text/plain still executes as a script when X-Content-Type-Options: nosniff is absent. Check the header before writing the endpoint off.",
+    "Rehearse the payload in a local headless browser with the origin swapped to the public address before spending a bot cycle; a privileged viewer is rate limited and returns no diagnostics.",
+    "The privileged index page is often a dashboard with no flag. Enumerate its navigation links instead of reading only the index.",
+    "When two ports are supplied, identify them by response content rather than by the order they were given in.",
+    "Keep the application's original script entry inside the polluted array so the page keeps working and the injection stays inconspicuous."
+  ],
+  "flag": null
+}

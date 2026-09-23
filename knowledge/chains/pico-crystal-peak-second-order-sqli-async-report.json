@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "id": "pico-crystal-peak-second-order-sqli-async-report",
+  "source_note": "solved/pico-crystal-peak-second-order-sqli-async-report.md",
+  "challenge": {
+    "name": "crystal-peak",
+    "platform": "picoCTF",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": ["flask", "werkzeug", "sqlite", "pandas", "jinja2"],
+  "preconditions": {
+    "all_of": [
+      "A value the attacker chooses at registration is stored and later reused by a different code path.",
+      "That later code path builds a SQL query by string interpolation rather than parameters.",
+      "The result of that query is returned to the attacker in some artifact, such as a generated file."
+    ],
+    "any_of": [
+      "The consuming job runs asynchronously, so the request that carries the payload answers normally and reveals nothing.",
+      "The stored value also appears in a filename or log line, which confirms it is used raw somewhere.",
+      "An object-id endpoint has no ownership check, so artifacts belonging to other accounts are readable."
+    ]
+  },
+  "signals": [
+    "generate_report",
+    "download_report",
+    "inbox",
+    "check your inbox",
+    "asynchronous",
+    "sqlite_master",
+    "UNION SELECT",
+    "second order",
+    "report_",
+    "pandas"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "map",
+      "action": "List every route, then for each stored value note where it is WRITTEN and separately where it is READ. Pay attention to any job that runs after the request returns.",
+      "why": "Second-order injection lives in the gap between those two places. A value that looks inert at submission time may be interpolated into SQL minutes later by code the request never touches."
+    },
+    {
+      "step": 2,
+      "stage": "evidence of raw use",
+      "action": "Look for the stored value appearing verbatim somewhere else — a filename, an error message, a log entry. Try characters that would be mangled if it were sanitised, such as quotes, spaces and shell metacharacters.",
+      "why": "A value that reaches a filename unescaped is very likely reaching other sinks unescaped too. This is cheap and tells you the input is worth attacking before any payload is written."
+    },
+    {
+      "step": 3,
+      "stage": "pick the right oracle",
+      "action": "Identify the artifact the deferred job produces and read THAT, not the HTTP response of the request that queued it. Status codes and page lengths for the submitting request will look completely normal.",
+      "why": "The whole difficulty of this class is that the usual detection surface is structurally blind to it. Direct probes of the input came back clean here while the injection was already working."
+    },
+    {
+      "step": 4,
+      "stage": "column count",
+      "action": "Read the artifact's own header to learn how many columns the query selects, then build a UNION with exactly that many terms, using a constant marker in one of them.",
+      "why": "A generated CSV or table prints its own column names, so the arity is free. The marker makes it provable later that a given row came from your injection and not from somebody else's."
+    },
+    {
+      "step": 5,
+      "stage": "enumerate",
+      "action": "UNION against the database's schema catalogue to list tables and their definitions, then read the table that holds the target.",
+      "why": "The schema is the shortest path from a working injection to the data, and table names are sometimes obfuscated in a way that is worth decoding rather than trusting."
+    },
+    {
+      "step": 6,
+      "stage": "verify",
+      "action": "Reproduce the result with an injection of your own carrying a unique marker, especially if the instance is shared and other artifacts are visible.",
+      "why": "On a shared instance an unrelated player's artifacts may already contain the answer. Reading it is a lead; only your own marked result proves the chain works."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Register an account whose name contains a single quote plus a UNION selecting constants, with as many terms as the generated artifact has columns, then trigger the job and read the artifact.",
+    "expected": "The artifact contains an extra row made of your constants, proving the stored name was interpolated into the query rather than bound as a parameter.",
+    "falsifier": "The artifact contains only real rows, or the job reports an error that names the stored value as data. The query is then parameterised and this class does not apply; look for the injection where the value is consumed rather than where it is stored."
+  },
+  "blast_radius": "Low but not zero. Reading is harmless, but the injection runs inside a job with database access, so keep every payload to SELECT and never append a second statement. Each attempt also creates a durable account and artifact rows that other players can see, so use distinctive throwaway names and do not delete or modify rows that are not yours. On a shared instance, other players' artifacts are readable through the missing ownership check; read them for orientation but do not disturb them.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "An account named \"v7' UNION SELECT name||'='||value,42,1 FROM aDNyM19uMF9mMTRn-- \" produced the report file report_v7'...csv whose CSV body was flag=picoCTF{...},42,1. The constant 42 was chosen as a marker so the row is provably from this injection rather than from another player's artifact visible through the same instance's missing ownership check."
+  },
+  "reuse_when": [
+    "An application defers work to a background job whose output the attacker can fetch.",
+    "A registration field turns up verbatim in a filename, a log or an error message.",
+    "Direct injection tests on an input come back clean but that input is clearly stored.",
+    "An object-id download endpoint performs no ownership check."
+  ],
+  "known_traps": [
+    "Testing the input only at submission time proves nothing about a second-order bug. Every direct probe of the username here returned a normal page while the injection already worked in the deferred job.",
+    "Choose an oracle the bug can actually speak through. HTTP status and response length cannot see a query whose only output is a file generated ten seconds later.",
+    "A size-filtered parameter fuzz cannot find an ORDER BY parameter, because sorting changes row order and not response length. Compare the sequence of marker rows instead.",
+    "An obfuscated table name may be encoded rather than random; decoding it is free and here it read 'h3r3_n0_f14g', which was a joke and not a reason to skip the table.",
+    "On a shared instance another player's artifacts may already contain the answer. Treat that as a lead only, and reproduce it with a marker of your own before recording it."
+  ],
+  "flag": null
+}

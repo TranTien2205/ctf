@@ -1,4 +1,8 @@
-# CTF Web - Web3 / Blockchain Challenges
+# Web3 — Extended Reference
+
+This file belongs to the canonical `web-web3` class. Open `../SKILL.md` first
+for setup-state triage and the solved-condition probe; use this file only for a
+named Solidity or Web3 technique.
 
 ## Table of Contents
 - [Challenge Infrastructure Pattern](#challenge-infrastructure-pattern)

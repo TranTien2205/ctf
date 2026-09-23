@@ -94,7 +94,7 @@ Shares signals with: `../web-idor/`, `../web-logic-flaw/`. Check those before co
 
 Depth, one named file at a time:
 
-- `skills/ctf-web/server-side-2.md`
+- `../ctf-web/server-side-2.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
