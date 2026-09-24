@@ -1,0 +1,63 @@
+{
+  "schema_version": 1,
+  "id": "htb-nomad-notes-replace-pattern-nonce-reuse-referrer-exfil",
+  "source_note": "solved/htb-nomad-notes-replace-pattern-nonce-reuse-referrer-exfil.md",
+  "challenge": {
+    "name": "Nomad Notes",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "self-solved"
+  },
+  "stack": ["node", "express", "express5", "puppeteer", "csp"],
+  "preconditions": {
+    "all_of": [
+      "a hand-rolled template engine substitutes values with String.replace and a string pattern",
+      "a headless browser can be pointed at a page of the attacker's choosing"
+    ],
+    "any_of": [
+      "a per-response nonce is substituted into the same template before the user-controlled field",
+      "one view reflects a parameter without the escaping the other views apply",
+      "a privileged action is gated on a custom request header"
+    ]
+  },
+  "signals": [
+    "String.replace", "renderTemplate", "nonce-", "require-trusted-types-for",
+    "unsafe-url", "referrer policy", "x-carta-auth-key", "isLoopback",
+    "botVisit", "document.referrer"
+  ],
+  "chain": [
+    {"step": 1, "stage": "recon", "action": "read the template helper before the views: if substitution is done with String.replace(pattern, value) then the $ replacement patterns are live - $-backtick expands to the text before the match and $-apostrophe to the text after", "why": "a replace-based renderer turns any user field into a primitive for copying other parts of the same line into the output"},
+    {"step": 2, "stage": "primitive", "action": "check the substitution ORDER against the object's key order; anything substituted earlier on the same line is now reachable through $-backtick", "why": "the per-response nonce was substituted first, so the user field could copy the live nonce - no markup required, which is why the escaping on that field was irrelevant"},
+    {"step": 3, "stage": "primitive", "action": "land the payload inside the EXISTING nonced script element rather than trying to create one: $-backtick reproduces the prefix (ending in the opening quote of a string literal), so append a terminator, the code, and a line comment", "why": "reusing a legitimate nonce defeats a nonce-based script-src completely, and the escape filter only removes markup characters"},
+    {"step": 4, "stage": "pivot", "action": "respect the escape filter when writing the JS: no angle brackets, ampersand, or either quote - so use backticks, function(){} instead of arrow functions, and carry any markup base64-encoded through atob()", "why": "an arrow function contains a closing angle bracket and would be neutered by the escaper"},
+    {"step": 5, "stage": "pivot", "action": "from inside the bot issue a SAME-ORIGIN fetch to the privileged endpoint with the custom header, and include a urlencoded body plus content-type", "why": "a custom header cannot be set by a form, so the gate is really demanding script execution; and on Express 5 req.body is undefined unless a parser matched, so a bodyless POST makes the handler throw"},
+    {"step": 6, "stage": "flag", "action": "the privileged branch sends the bot to the reflecting view with the secret in the query string: inject a title-closing tag, a referrer meta set to unsafe-url, and a meta refresh, then read the full URL out of the Referer on your listener", "why": "this CSP restricts every subresource to self but nothing restricts navigation, so the victim page's own URL is the exfil channel"}
+  ],
+  "first_confirming_probe": {
+    "request": "request the templated page with the user field set to a single $-backtick and read the raw response",
+    "expected": "the line is duplicated: the text preceding the placeholder (including anything already substituted, such as a nonce) appears inside the value",
+    "falsifier": "the two characters come back literally, meaning the renderer does not use String.replace with a string pattern"
+  },
+  "blast_radius": "negligible. The application has no datastore, no session and no upload - the only side effect is launching a short-lived headless browser per request, and nothing persists between runs. There is nothing to clean up afterwards.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the listener received the navigation with the full victim URL, including the flag parameter, in the Referer header"
+  },
+  "reuse_when": [
+    "a template is rendered with String.replace and user data is the replacement",
+    "a nonce-based CSP is paired with a template that already emits a nonced script element",
+    "a strict CSP blocks subresources but the victim page holds the secret in its own URL",
+    "a privileged branch is gated on a custom header, implying script execution is required"
+  ],
+  "known_traps": [
+    "a free tunnel that shows an abuse interstitial keys on USER-AGENT, so it silently swallows every request a headless browser makes - navigation, script src and images alike. A curl smoke test passes and misleads you into reading 'no callback' as 'exploit failed'. Always re-test the listener with a browser User-Agent before trusting a negative result.",
+    "the default referrer policy is strict-origin-when-cross-origin, which drops path and query - without a referrer meta set to unsafe-url the callback arrives with only the origin and no secret",
+    "Express 5 leaves req.body undefined when no body parser matched, so a fetch without a content-type makes a destructuring handler throw 500 and the chain dies silently; have the payload report the response status back to the listener to find this",
+    "script.src is a TrustedScriptURL sink, so under require-trusted-types-for it throws unless a policy is created; navigation is not a Trusted Types sink, which makes the meta-refresh route the robust one",
+    "an arrow function cannot survive an escaper that strips angle brackets - use function(){} instead",
+    "the reflecting placeholder may sit inside a title element, whose contents parse as text: open with a title end tag or the injected markup is inert"
+  ],
+  "flag": null
+}

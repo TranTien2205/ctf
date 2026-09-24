@@ -78,8 +78,12 @@ def render_entry(card, primary, others):
     if others:
         lines.append("- also matched: " + ", ".join(
             "`%s` (%s)" % (o["class"], o["score"]) for o in others))
-    lines.append("- signals that fired: " + ", ".join(
-        sorted({item.get("matched") or item.get("signal") for item in primary["evidence"]})[:8]))
+    if primary.get("operator_override"):
+        lines.append("- filed by operator override: the matcher did not rank this class; "
+                     "the chain is filed under the class whose first probe opens it")
+    else:
+        lines.append("- signals that fired: " + ", ".join(
+            sorted({item.get("matched") or item.get("signal") for item in primary["evidence"]})[:8]))
     if probe:
         lines += ["", "**Confirming probe that worked**", "",
                   "> " + probe.get("request", "").replace("\n", " "),
@@ -114,10 +118,22 @@ def cmd_record(args, taxonomy):
     if args.into:
         primary = next((r for r in ranked if r["class"] == args.into), None)
         if primary is None:
-            raise SystemExit(json.dumps({
-                "error": "--into names a class that did not match this card",
-                "requested": args.into,
-                "matched": [r["class"] for r in ranked]}))
+            # --into is the operator's decision and outranks the matcher. The
+            # matcher scores the prose of the solved note, so a chain whose first
+            # probe opens one class often ranks under the class of its final
+            # payload; refusing the override there filed solves under the wrong
+            # skill. Any class in the taxonomy is allowed, and the entry records
+            # that no signal matched automatically.
+            known = next((c for c in taxonomy["classes"] if c["id"] == args.into), None)
+            if known is None:
+                raise SystemExit(json.dumps({
+                    "error": "--into names a class that is not in the taxonomy",
+                    "requested": args.into,
+                    "known": sorted(c["id"] for c in taxonomy["classes"])}, indent=2))
+            primary = {"class": args.into, "score": 0.0, "signals_matched": 0,
+                       "coverage": 0.0, "evidence": [],
+                       "evidence_level": known["evidence_level"],
+                       "operator_override": True}
     else:
         top = ranked[0]
         tied = [r for r in ranked

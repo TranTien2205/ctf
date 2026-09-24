@@ -1,0 +1,135 @@
+{
+  "id": "htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read",
+  "source_note": "solved/pod_diagnostics.md",
+  "challenge": {
+    "name": "Pod Diagnostics",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "nginx",
+    "flask",
+    "python",
+    "express",
+    "node",
+    "puppeteer"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy caches a route on a key built from a single query argument",
+      "the backend reflects that argument into a response field the front end writes as HTML",
+      "an unauthenticated route makes a headless browser render the application's own page"
+    ],
+    "any_of": [
+      "the backend framework turns a repeated query argument into an array that fails an allow-list check",
+      "an internal renderer service sends a permissive cross-origin header",
+      "the process supervisor gives no user directive, so the renderer runs as root"
+    ]
+  },
+  "signals": [
+    "proxy_cache_key",
+    "arg_period",
+    "validperiods",
+    "generate-report",
+    "networkidle0",
+    "createincognitobrowsercontext",
+    "period-selector",
+    "errorAlert.innerHTML"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the proxy's cache key before anything else and note every request attribute it leaves out",
+      "why": "a key built from one argument means two requests that differ everywhere else share an entry, which is both a poisoning primitive and, later, a storage channel"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "repeat that argument; the proxy keys on the first value while the backend sees a list that fails its allow-list and is reflected into the error path",
+      "why": "the reflected value is stored under the key the legitimate first value produces, so the victim's own request returns it"
+    },
+    {
+      "step": 3,
+      "stage": "falsify",
+      "action": "wait out the cache validity so the poisoning request is the one that reaches upstream, and compare a timestamp in the body to tell a hit from a miss",
+      "why": "a poisoning request served from the existing entry changes nothing and looks like a failed payload; the first attempt here failed exactly that way"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "check what the front end does with the reflected field; if it assigns it as HTML, use an event handler rather than a script element",
+      "why": "an assignment to innerHTML does not execute a script element, so a payload shaped as one fails silently"
+    },
+    {
+      "step": 5,
+      "stage": "escalate",
+      "action": "trigger the unauthenticated route that makes the renderer open the application's own page, so the poisoned entry is served to it",
+      "why": "the renderer loads the same front-end script and requests the same default key, which is what carries the payload into a privileged browser"
+    },
+    {
+      "step": 6,
+      "stage": "primitive",
+      "action": "from that page, call the internal renderer service directly with a local-file URL and read the response, using the status alone as the oracle",
+      "why": "a permissive cross-origin header makes the response readable, and an unreadable path makes the navigation throw so the service answers with an error instead"
+    },
+    {
+      "step": 7,
+      "stage": "exfil",
+      "action": "return the bytes through the same cache: write under a chosen key, read that key back, and chunk to stay inside the proxy's request-line buffer",
+      "why": "an in-band channel needs no external listener; the triggering request blocks until the render finishes and the renderer waits for the payload's own requests, so every key is populated by the time it returns"
+    },
+    {
+      "step": 8,
+      "stage": "falsify",
+      "action": "never read an exfiltration key before the payload has written it",
+      "why": "the read caches the error body under that key for the whole validity window, during which the payload's write is a hit and is never stored"
+    },
+    {
+      "step": 9,
+      "stage": "flag",
+      "action": "reconstruct the document locally and map its glyph identifiers back through the character map the file itself carries",
+      "why": "a browser-rendered document subsets its font and stores glyph ids, so it contains no searchable text, but the reverse table ships inside the same file"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "after the cache validity has elapsed, request the cached route with the keyed argument given twice, then request it again with only the first value",
+    "expected": "the second request returns the value that was supplied as the duplicate, proving the entry was keyed on the first value alone",
+    "falsifier": "the second request returns the ordinary response, so either the key covers more than that argument or the poisoning request was itself served from cache"
+  },
+  "blast_radius": "nothing persistent is written: no files, no database rows, no accounts. The only state touched is the proxy cache, and every entry expires within its validity window, so the target returns to normal on its own within seconds. The one real hazard is self-inflicted - reading an exfiltration key too early blocks the payload's write for a full window - and the renderer is triggered once per attempt, so keep attempts few because each one launches a browser.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was reassembled from four chunks read back out of the cache channel and decoded locally, and tools/hooks.py pre-flag accepted it as a live response"
+  },
+  "reuse_when": [
+    "a proxy cache key is built from a subset of the request rather than the whole of it",
+    "a backend reflects a rejected parameter into an error message the front end renders as HTML",
+    "an unauthenticated route makes a headless renderer open a page of the same application",
+    "an internal service answers with a permissive cross-origin header and takes a URL",
+    "bytes have to leave a target that has no outbound channel worth trusting"
+  ],
+  "known_traps": [
+    "a poisoning request arriving while the entry is still valid is served from cache and poisons nothing; compare a timestamp in the body to tell a hit from a miss",
+    "the window cannot be widened, so the trigger has to follow the poisoning immediately",
+    "an assignment to innerHTML does not execute a script element",
+    "the renderer's navigation timeout is short and a nested render consumes nearly all of it",
+    "reading an exfiltration key before it is written blocks the write for a whole validity window",
+    "a browser-rendered document holds glyph identifiers rather than text, so a plain search for the flag finds nothing even when the bytes are correct",
+    "a setuid helper in the image can be a decoy when the supervisor gives no user directive and the renderer is already root"
+  ],
+  "classification": {
+    "primary": "web-cache-poisoning",
+    "secondary": [
+      "web-xss",
+      "web-ssrf",
+      "file-read-primitives"
+    ],
+    "confidence": 0.9
+  },
+  "flag": null,
+  "schema_version": 1
+}

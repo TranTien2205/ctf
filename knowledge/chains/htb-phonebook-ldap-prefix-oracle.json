@@ -9,23 +9,18 @@
     "solved_at": "2026-09-17",
     "assistance": "writeup-assisted"
   },
-  "stack": ["go", "ldap", "nginx"],
+  "stack": [
+    "go",
+    "ldap",
+    "nginx"
+  ],
   "classification": {
     "primary": "web-sqli",
-    "secondary": ["web-auth-session", "web-logic-flaw"],
+    "secondary": [
+      "web-auth-session",
+      "web-logic-flaw"
+    ],
     "confidence": 0.9
-  },
-  "source": {
-    "url": "local://knowledge/chains/htb-phonebook-ldap-prefix-oracle.json",
-    "retrieved_at": "2026-09-17",
-    "evidence_spans": [
-      "first_confirming_probe: POST /login user=* pass=* reads a session cookie without the real password"
-    ]
-  },
-  "quality": {
-    "verified_live": true,
-    "review_status": "raw",
-    "extraction_confidence": 0.9
   },
   "preconditions": {
     "all_of": [
@@ -45,8 +40,6 @@
     "userPassword=",
     "wildcard",
     "phonebook",
-    "cn",
-    "sn",
     "mail",
     "authentication failed",
     "search bar"
@@ -85,8 +78,7 @@
   "blast_radius": "full directory enumeration and account takeover for any uid managed by the same database",
   "verification": {
     "status": "verified_live",
-    "evidence": "3rd LDAP prefix oracle step confirmed the admin password on 192.168.223.1:31995 by live response",
-    "proof": "302 / + Set-Cookie mysession after POST /login with the reconstructed password (blind LDAP prefix oracle rebuilt it character by character)"
+    "evidence": "3rd LDAP prefix oracle step confirmed the admin password on 192.168.223.1:31995 by live response Supporting observation: 302 / + Set-Cookie mysession after POST /login with the reconstructed password (blind LDAP prefix oracle rebuilt it character by character)"
   },
   "reuse_when": [
     "a login form redirects every failure to a distinguishable URL",
@@ -95,7 +87,7 @@
   ],
   "known_traps": [
     "the (!(&(1=0)(userPassword=...)) shape is a blanket bypass, not a character oracle",
-    "the prefix oracle needs username=admin with password=prefix+char+* — the response Location is one bit",
+    "the prefix oracle needs username=admin with password=prefix+char+* \u2014 the response Location is one bit",
     "do not forget the {} chars in the flag charset or you stop one character early",
     "the search page lives under a hashed asset dir that is otherwise unrelated to auth"
   ],

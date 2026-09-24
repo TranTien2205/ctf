@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "id": "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite",
+  "source_note": "solved/pachinko-revisited.md",
+  "challenge": {
+    "name": "NAND circuit checker on a custom CPU (Pachinko / Pachinko Revisited)",
+    "platform": "picoCTF",
+    "event": "picoCTF 2025",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "express",
+    "nodejs",
+    "wasm",
+    "custom-cpu-emulator"
+  ],
+  "preconditions": {
+    "all_of": [
+      "user-supplied indices are bounds-checked and then arithmetically transformed before being used as an address",
+      "the transformed address is applied to a memory space that also holds code"
+    ],
+    "any_of": [
+      "the check is against the pre-scaling value rather than the final address",
+      "the address space wraps at a machine word so a large value folds back to a low region",
+      "the interpreter and its program share one flat address space"
+    ]
+  },
+  "signals": [
+    "nand",
+    "circuit",
+    "node offsets",
+    "emulator",
+    "instruction memory",
+    "0x3000",
+    "bounds check",
+    "scaled index"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the client bundle for the submission format and the real goal, and treat unreferenced constants as dead code",
+      "why": "the client referenced GOALS.xor while only GOALS.flip existed; believing the former wastes the whole first flag"
+    },
+    {
+      "step": 2,
+      "stage": "surface",
+      "action": "map the accepted id range from the server's own rejections rather than from the UI",
+      "why": "the boundary (1..65535 at the transport, <0x1000 at the checker) is where the two validators disagree"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "stop probing variants once one mechanism class produces no distinguishing signal, and change layer",
+      "why": "unassigned nodes all read 0; ~50% of ids pass a single oracle trial by chance, which manufactures false leads"
+    },
+    {
+      "step": 4,
+      "stage": "exploit",
+      "action": "pick an index whose post-scaling address wraps into instruction memory and use it as a 2-byte arbitrary write",
+      "why": "0xfff inverted is 0xf000, scaled 0xe000, and 0xe000+0x2000 & 0xffff == 0"
+    },
+    {
+      "step": 5,
+      "stage": "impact",
+      "action": "append the privileged routine's own instructions after the processing loop so the CPU executes them before halting",
+      "why": "the program never calls flag_magic itself; the write supplies the call"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "submit the minimal correct circuit, then the same circuit with one node id just past the checker's documented limit, and compare the two responses",
+    "expected": "the correct circuit returns the success output while the out-of-range id is rejected by a different layer, proving two validators with different limits",
+    "falsifier": "both are rejected identically, meaning a single validator governs the id and no scaling gap exists"
+  },
+  "blast_radius": "read-only against a per-user instance; the checker is invoked per request and a few hundred gates is enough, so there is no need to send large circuits.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "both flags were returned in the flag field of the live POST /check JSON response"
+  },
+  "reuse_when": [
+    "a bounds check is applied before an index is scaled, shifted or multiplied",
+    "an interpreter stores code and data in one address space that wraps at a machine word",
+    "a challenge ships an emulator rather than a native binary"
+  ],
+  "known_traps": [
+    "the client references a goal that does not exist; read which one the server actually checks",
+    "the checker evaluates ONE random input vector per request, so a circuit that is only sometimes correct passes intermittently -- always repeat a trial before believing it",
+    "an oracle with a 50% pass rate manufactures false positives in proportion to how many ids you scan; six confirmation trials still leaves ~1 false positive per 64 candidates"
+  ],
+  "flag": null
+}

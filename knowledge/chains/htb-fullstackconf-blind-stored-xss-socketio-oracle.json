@@ -10,7 +10,13 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["flask", "python", "werkzeug", "socket.io", "flask-socketio"],
+  "stack": [
+    "flask",
+    "python",
+    "werkzeug",
+    "socket.io",
+    "flask-socketio"
+  ],
   "preconditions": {
     "all_of": [
       "a value the player submits is rendered somewhere the player cannot read",
@@ -27,9 +33,6 @@
     "socket.io",
     "flask",
     "werkzeug",
-    "alert",
-    "bot",
-    "register",
     "email",
     "flag event"
   ],

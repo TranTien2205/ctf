@@ -10,7 +10,13 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["nginx", "php", "php/7.4.12", "laravel", "sqlite"],
+  "stack": [
+    "nginx",
+    "php",
+    "php/7.4.12",
+    "laravel",
+    "sqlite"
+  ],
   "preconditions": {
     "all_of": [
       "the application generates a file for the user and serves it back from a fixed directory prefix",
@@ -25,10 +31,7 @@
     "nginx",
     "laravel",
     "autoindex",
-    "storage",
-    "config",
     "backup",
-    "sqlite",
     "api_token",
     "nginxatsu"
   ],

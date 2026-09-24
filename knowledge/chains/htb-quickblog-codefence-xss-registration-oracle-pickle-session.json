@@ -10,7 +10,14 @@
     "solved_at": "2026-09-23",
     "assistance": "self-solved"
   },
-  "stack": ["cherrypy", "python3.11", "selenium", "chromium", "supervisord", "alpine"],
+  "stack": [
+    "cherrypy",
+    "python3.11",
+    "selenium",
+    "chromium",
+    "supervisord",
+    "alpine"
+  ],
   "preconditions": {
     "all_of": [
       "A stored value is rendered into HTML by client-side JavaScript whose escaping is incomplete, and the page's CSP allows inline script.",
@@ -33,11 +40,9 @@
     "unsafe-eval",
     "connect-src 'self'",
     "cherrypy.request.remote.ip",
-    "127.0.0.1",
     "username not in users",
     "os.path.join(uploads_dir, file.filename)",
     "tools.sessions.storage_type",
-    "file",
     "BackgroundScheduler",
     "http_proxy",
     "readflag"

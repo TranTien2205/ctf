@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "id": "htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge",
+  "source_note": "solved/htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge.md",
+  "challenge": {
+    "name": "OmniWatch",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "varnish",
+    "flask",
+    "zig",
+    "httpz",
+    "mysql",
+    "selenium",
+    "supervisord",
+    "debian"
+  ],
+  "preconditions": {
+    "all_of": [
+      "A cache sits in front of the application and its hash function omits the URL, keying only on something the client controls.",
+      "A privileged browser loads a page that the cache is allowed to look up.",
+      "Some backend can be made to emit both attacker-controlled bytes and whatever header the cache uses to decide storability."
+    ],
+    "any_of": [
+      "A VCL branch returns hash for a path even when the request carries a Cookie, overriding the builtin pass.",
+      "A service writes a URL-decoded path segment into a response header without validation.",
+      "The same service reflects another segment into an HTML body.",
+      "A session cookie is set without httponly.",
+      "A file-read endpoint joins a request-supplied path onto a directory.",
+      "A query is built by interpolation and executed with a multi-statement splitter."
+    ]
+  },
+  "signals": [
+    "vcl_hash",
+    "hash_data(req.http.",
+    "return (lookup)",
+    "return (hash)",
+    "beresp.ttl",
+    "req.http.Cookie",
+    "res.header(",
+    "unescapeString",
+    "os.path.join",
+    "multi=True",
+    "query.split(\";\")",
+    "set_cookie",
+    "fetch_signature",
+    "readflag",
+    "webdriver.Chrome"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Read the cache configuration before the application. Write down exactly what the hash function feeds in and which branches override the builtin pass rules.",
+      "why": "A hash that omits the URL means one cacheable response answers every path, across backends, and a Cookie branch that returns hash marks the exact page whose authenticated content the author wants shared."
+    },
+    {
+      "step": 2,
+      "stage": "storability",
+      "action": "Find what the cache requires before it stores a response, then find a backend that will emit that under attacker control. A response header built from a URL-decoded path segment is header injection.",
+      "why": "Poisoning needs two things in the same response: bytes you chose and whatever flag makes the cache keep it. One CRLF injection supplies both."
+    },
+    {
+      "stage": "encoding",
+      "step": 3,
+      "action": "Percent-encode every byte of the injected value that the router might treat as structure. A literal slash adds a path segment and the route stops matching, which reads as a 404 rather than as a failed injection.",
+      "why": "The two failure modes look nothing alike: a 404 means routing broke, while a malformed header line gives the cache a response it cannot parse and yields a 502 or 503 - which is itself proof the injection landed."
+    },
+    {
+      "step": 4,
+      "stage": "keep the bot alive",
+      "action": "Check what the privileged browser loads BEFORE the page being targeted. If an earlier, unauthenticated request shares the same slot, the poisoned page has to keep that page working - usually by carrying a working copy of the form the automation drives.",
+      "why": "Replacing the login page makes the automation fail to find its elements, so it never authenticates and the target page is never requested at all."
+    },
+    {
+      "step": 5,
+      "stage": "exfiltration channel",
+      "action": "Before blaming the payload for silence, verify the channel end to end by writing a synthetic value into it and reading it back with the same code path the payload uses.",
+      "why": "A cache makes a terrible mailbox in three independent ways, and each one makes a working payload look dead. Proving the channel first turns a guessing game into a measurement."
+    },
+    {
+      "step": 6,
+      "stage": "channel rules",
+      "action": "Send the exfiltration request with credentials omitted, never reuse a slot that already holds a live object, and derive slot names from the server's clock rather than your own.",
+      "why": "A cookie on the request makes the response uncacheable under the builtin rules; a slot holding an object turns the write into a hit that stores nothing; and clock drift of a few seconds puts the write and the read in different time buckets."
+    },
+    {
+      "step": 7,
+      "stage": "escalation",
+      "action": "Keep the in-browser payload as small as possible - ideally just handing back the session - and do the cryptography and the injection from your own client.",
+      "why": "SubtleCrypto needs a secure context, so crypto that works on the bot's loopback origin cannot be rehearsed from anywhere else. Moving it out removes a dependency that can only be tested in production."
+    },
+    {
+      "step": 8,
+      "stage": "role forgery",
+      "action": "When a middleware compares a token's signature against a stored row, look for a write primitive that can create that row, and pick an identifier the legitimate user never authenticates as.",
+      "why": "Checking the signature against the database is only as strong as the table's write protection, and choosing an unused id means the next real login does not rotate the row away."
+    },
+    {
+      "step": 9,
+      "stage": "cleanup",
+      "action": "Delete the row that makes the forged role work, using the forged role itself, and let the poisoned objects expire. Confirm the privileged route rejects the token afterwards.",
+      "why": "The forged token is a permanent administrator credential for anyone who has it; the cache entries expire on their own."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Request an oracle URL whose path segment injects the cache's storability header through %0d%0a, then request a completely different path on the other backend with the same CacheKey header.",
+    "expected": "The second request answers X-Cache: HIT with the first response's body, proving the cache key excludes the URL and that the injected header made the response storable.",
+    "falsifier": "The second request is a MISS, or the injected header never appears, meaning the hash includes the URL or the header value is validated."
+  },
+  "blast_radius": "A poisoned slot is served to every visitor, including the privileged bot, for the object's lifetime, and replacing a login page stops the bot working entirely. The forged role is created by writing a row into the table the authentication middleware trusts, so it survives until deleted and is usable by anyone holding the token. The stacked-query primitive runs with whatever grants the application user has; on this target that included DELETE on the signature table. Polling cache slots is itself destructive: an empty slot that is read becomes uncacheable for two minutes.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "GET /controller/home returned the injected body with X-Cache: HIT; the bot's session cookie arrived through a second slot; the firmware endpoint returned the JWT secret; the stacked-query injection answered 200 and GET /controller/admin with the forged token returned the flag. After the cleanup injection the same token redirects to /controller/login and /controller/home answers its real 302 again."
+  },
+  "reuse_when": [
+    "A VCL or edge configuration replaces the default hash with a single client-controlled header.",
+    "A cache branch returns hash for a path that carries a session cookie.",
+    "A service written in a language without header validation echoes a URL-decoded path segment into a response header.",
+    "A scheduled headless browser authenticates and then loads a predictable page.",
+    "An authentication middleware compares a token signature against a database row rather than trusting the signature alone."
+  ],
+  "known_traps": [
+    "Reading an empty cache slot is destructive: a backend response with ttl <= 0 is turned into an uncacheable hit-for-miss object with a 120s lifetime by the builtin VCL, which swallows every later write to that slot.",
+    "A same-origin fetch sends cookies by default, and the builtin VCL passes any request carrying a Cookie, so the response is never stored. Use credentials omitted for anything meant to land in the cache.",
+    "A poison request that HITs does not overwrite the object and does not extend its TTL, so a stale process from an earlier attempt pins the slot and silently serves an old payload.",
+    "Two writes into the same slot within one object lifetime collapse into one; the first wins and the second is lost with a 200 response.",
+    "Slot names derived from the clock need the skew measured from the response Date header.",
+    "A literal slash inside an injected header value adds a path segment and breaks routing, which surfaces as a 404 and not as a failed injection.",
+    "An injected byte that does not form a complete header line makes the cache reject the backend response with a 502 or 503 - which is positive evidence the injection reached the header block.",
+    "SubtleCrypto is undefined outside a secure context, so in-browser crypto works on a loopback origin and nowhere else; it cannot be rehearsed.",
+    "Poisoning the slot before the automation has passed its login page replaces the form it drives and the run aborts, so the poisoned page must carry a working copy of that form."
+  ],
+  "flag": null
+}

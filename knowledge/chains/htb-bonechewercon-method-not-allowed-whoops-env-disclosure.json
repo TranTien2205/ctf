@@ -10,7 +10,14 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["nginx", "php", "php/7.4.12", "laravel", "whoops", "symfony"],
+  "stack": [
+    "nginx",
+    "php",
+    "php/7.4.12",
+    "laravel",
+    "whoops",
+    "symfony"
+  ],
   "preconditions": {
     "all_of": [
       "the application is a PHP framework that renders a detailed error page instead of a generic one",
@@ -27,7 +34,6 @@
     "symfony",
     "php",
     "nginx",
-    "debug",
     "methodnotallowed",
     "app_key",
     "environment variables"

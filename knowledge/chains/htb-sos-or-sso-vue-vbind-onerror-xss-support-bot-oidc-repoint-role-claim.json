@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "id": "htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim",
+  "source_note": "solved/htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim.md",
+  "challenge": {
+    "name": "SOS or SSO",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": ["go", "gin", "gorm", "sqlite", "vue3", "oidc", "oauth2", "chromedp", "ngrok"],
+  "preconditions": {
+    "all_of": [
+      "Stored content is rendered by a front-end framework in a way that lets the author choose element attributes.",
+      "Some privileged account renders that content automatically.",
+      "An identity provider endpoint used for login can be changed by a privilege the payload can reach."
+    ],
+    "any_of": [
+      "A dynamic component binds an attacker-controlled attribute object.",
+      "A reviewer bot authenticates as a role higher than the reporter's.",
+      "CSRF protection is a fixed header value rather than a token.",
+      "The application copies a role, group or tenant field out of the provider's userinfo response.",
+      "The login callback looks the user up by email and issues a token for whoever already exists."
+    ]
+  },
+  "signals": [
+    "<component :is=",
+    "v-bind=\"item.attr\"",
+    "shouldSetAsProp",
+    "nativeOnRE",
+    "chromedp",
+    "network.SetCookie",
+    "GenerateToken",
+    "FindUserWithEmail",
+    "claims.Role",
+    "FindRoleWithName",
+    "oidc.NewProvider",
+    "AuthCodeURL",
+    "ssoSessions",
+    "X-NOTES-CSRF-PROTECTION",
+    "note.Private",
+    "AuthorID == userClaims.UserID"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "target",
+      "action": "Find where the flag actually lives and read the exact access check guarding it. Note whether it compares identity or rank.",
+      "why": "A check on the owner's id means privilege escalation alone never reaches it, and the chain has to end holding that account's session rather than merely its level."
+    },
+    {
+      "step": 2,
+      "stage": "sink",
+      "action": "When a framework renders stored content through a dynamic component that binds an attribute object, test an on-handler attribute. Frameworks that escape interpolation still hand string-valued event-shaped keys to setAttribute.",
+      "why": "Vue's shouldSetAsProp explicitly refuses to set an /^on[a-z]/ key as a property when the value is a string, so it becomes a real inline handler."
+    },
+    {
+      "step": 3,
+      "stage": "bot privilege",
+      "action": "Read which account the reviewer bot authenticates as and enumerate what that role can do, rather than assuming the bot is only a viewer.",
+      "why": "The payload inherits the bot's level, and here that level was exactly what the provider-configuration endpoint required."
+    },
+    {
+      "step": 4,
+      "stage": "provider takeover",
+      "action": "Repoint the faction's or tenant's OIDC endpoint at a provider you control. Check first whether the built-in providers even resolve.",
+      "why": "A login endpoint that returns a bare URL with no state parameter is proof the configured provider is unreachable, so repointing it is the only way the flow can run at all."
+    },
+    {
+      "step": 5,
+      "stage": "minimal IdP",
+      "action": "Stand up only what the library calls: a discovery document whose issuer matches the registered endpoint byte for byte, a JWKS, a POST token endpoint returning a signed id_token whose aud equals the stored client id, and a userinfo endpoint carrying the claims the app copies.",
+      "why": "Static hosting cannot serve the token endpoint because the exchange is a POST, and a mismatched issuer or audience fails verification before any claim is read."
+    },
+    {
+      "step": 6,
+      "stage": "skip the browser",
+      "action": "If the login-initiation endpoint hands back the authorization URL, take the state out of it and call the callback directly with any code.",
+      "why": "The state is the key into the server's session map, so possessing it removes the need to drive a browser through the provider at all."
+    },
+    {
+      "step": 7,
+      "stage": "role claim",
+      "action": "Assert whatever role name the application looks up, using a value that already exists in its role table, and use the resulting session to read whatever the higher level discloses.",
+      "why": "A role taken from userinfo is attacker-controlled once the provider is, and the admin listing is usually where a randomised privileged identifier is disclosed."
+    },
+    {
+      "step": 8,
+      "stage": "takeover",
+      "action": "Log in a second time asserting the privileged account's own address, through the tenant that account belongs to.",
+      "why": "A callback that looks the user up by email and issues a token for an existing match returns that user's identity, which is what an identity-based access check requires."
+    },
+    {
+      "step": 9,
+      "stage": "cleanup",
+      "action": "Delete the account created through the forged claim, remove planted content, and stop the provider and its tunnel. Check whether the original endpoint can even be restored before promising it.",
+      "why": "A live attacker-controlled provider is a standing authentication bypass. An endpoint validated on write cannot be restored to a value that no longer resolves, so say so rather than claiming a clean revert."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Call the login-initiation endpoint for a built-in tenant and read the URL it returns.",
+    "expected": "A bare endpoint string with no state or client_id, showing the configured provider is unreachable and that the flow only works once the endpoint is repointed.",
+    "falsifier": "A full authorization URL with a state parameter, meaning the provider resolves and the configuration does not have to be replaced."
+  },
+  "blast_radius": "Repointing a tenant's identity provider is a standing authentication bypass for every user of that tenant while the attacker's provider is reachable, and a role claim from it can mint accounts at any level the role table defines. An endpoint that is validated before it is stored cannot be set back to an unreachable original, so the change is not fully reversible through the API. The reviewer bot deletes content containing certain words, so a payload carrying them destroys its own note after running.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "The login endpoint for faction 1 first returned a bare endpoint string; after the reported note's handler ran, it returned a full authorization URL naming our provider. The first login produced an admin-level session whose user listing disclosed the seeded admin address, a second login as that address produced a session for that account, and GET /api/note/1 decoded to the flag. After cleanup the forged account is gone and the login endpoint returns a bare endpoint again."
+  },
+  "reuse_when": [
+    "A Vue, React or similar front end renders stored content through a dynamic component with a bound attribute object.",
+    "A report or review feature drives a headless browser authenticated as a staff account.",
+    "An SSO or OIDC provider endpoint is editable by an in-application role.",
+    "An application copies role, group or tenant fields out of an identity provider's userinfo response.",
+    "A login callback resolves the account by email before deciding whether to register."
+  ],
+  "known_traps": [
+    "Reaching the privileged level is not the same as reaching the privileged identity; a check comparing the owner's id forces a second login as that exact account.",
+    "The library refuses the discovery document unless its issuer string matches the registered endpoint exactly, and refuses the id_token unless aud equals the stored client id.",
+    "A static file host cannot serve the identity provider because the code exchange is a POST.",
+    "The reviewer bot clicks a fixed element when the content contains certain words, which on this target was the delete button, so the payload removes its own note.",
+    "Endpoint validation on write makes the original provider value unrestorable once it no longer resolves; do not claim the configuration was reverted.",
+    "A tunnel service's browser interstitial does not apply here because every consumer of the provider is a server-side HTTP client, so the usual warning against it does not hold.",
+    "CSRF enforced as a fixed header value stops nothing scripted; it only blocks form posts and simple cross-origin requests."
+  ],
+  "flag": null
+}

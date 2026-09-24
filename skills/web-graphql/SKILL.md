@@ -5,6 +5,12 @@ description: >
   Catalogue class: nothing in this toolkit has solved one yet.
 tags: [web, graphql, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
+budget:
+  stuck_threshold: 3
+  on_stuck: pivot
+  stop_conditions:
+    - "same probe point: 3 attempts with no new signal"
+    - "the class falsifier is observed"
 evidence_level: catalogue
 ---
 # GraphQL abuse
@@ -37,24 +43,6 @@ validation boundary and the result is observed.
 
 ## Operational probe
 
-Record the endpoint, method, content type, and one baseline query. Then send a
-bounded schema probe:
-
-```json
-{"query":"{__typename}"}
-```
-
-If accepted, use one introspection query limited to types and fields needed for
-the challenge. If introspection is disabled, send one unknown field and preserve
-the exact field-suggestion error. Do not invent names after a silent response.
-
-After schema discovery, test one observed object with two identities or one
-observed mutation with a harmless value. Schema disclosure is not an exploit;
-confirmation requires an attributable authorization or validation boundary
-crossed in the response.
-
-## Operational probe
-
 Start with a bounded schema request against the observed endpoint:
 
 ```bash
@@ -67,10 +55,11 @@ If the endpoint accepts it, request only the observed schema surface. If
 introspection is disabled, use one unknown field and preserve the exact error.
 Do not invent field names after a silent response.
 
-The first useful signal is schema/type disclosure. The vulnerability signal is
-separate: use two identities or roles to request one observed object field or
-mutation, and compare the authorization result. A schema that is merely public
-is not an authorization finding.
+The first useful signal is schema/type disclosure.
+Schema disclosure is not an exploit; the vulnerability signal is separate.
+Use two identities or roles to request one observed object field or mutation,
+and compare the authorization result. A schema that is merely public is not an
+authorization finding.
 
 ## What the schema buys
 

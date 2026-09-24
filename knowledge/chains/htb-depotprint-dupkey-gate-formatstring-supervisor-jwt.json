@@ -7,25 +7,23 @@
     "event": "Lab",
     "category": "web",
     "solved_at": "2026-09-17",
-    "assistance": "white-box"
+    "assistance": "unknown"
   },
-  "stack": ["php", "python", "flask", "selenium", "chromium", "sqlite"],
+  "stack": [
+    "php",
+    "python",
+    "flask",
+    "selenium",
+    "chromium",
+    "sqlite"
+  ],
   "classification": {
     "primary": "web-ssrf",
-    "secondary": ["file-read-primitives", "web-logic-flaw"],
+    "secondary": [
+      "file-read-primitives",
+      "web-logic-flaw"
+    ],
     "confidence": 0.9
-  },
-  "source": {
-    "url": "local://knowledge/chains/htb-depotprint-dupkey-gate-formatstring-supervisor-jwt.json",
-    "retrieved_at": "2026-09-17",
-    "evidence_spans": [
-      "first_confirming_probe: GET /render.php?target=http://127.0.0.1:5000/status&target=https://example.com the PDF contains 'depotprint render worker online'"
-    ]
-  },
-  "quality": {
-    "verified_live": true,
-    "review_status": "raw",
-    "extraction_confidence": 0.9
   },
   "preconditions": {
     "all_of": [
@@ -85,8 +83,7 @@
   "blast_radius": "arbitrary request forgery through a behind-the-gate chrome; the leaked signing key impersonates supervisors until the container restarts",
   "verification": {
     "status": "verified_live",
-    "evidence": "manifest depot-master-record note read from the rendered /console PDF on 192.168.223.1:9000",
-    "proof": "the depot-master-record manifest note (the flag) read from a rendered /console PDF"
+    "evidence": "manifest depot-master-record note read from the rendered /console PDF on 192.168.223.1:9000 Supporting observation: the depot-master-record manifest note (the flag) read from a rendered /console PDF"
   },
   "reuse_when": [
     "a reverse-proxy or gateway quotes the same parameter twice through two stacks",

@@ -10,7 +10,11 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["nginx", "php", "php/7.4.12"],
+  "stack": [
+    "nginx",
+    "php",
+    "php/7.4.12"
+  ],
   "preconditions": {
     "all_of": [
       "the application issues a session cookie after a successful login",
@@ -26,8 +30,6 @@
     "phpsessid",
     "session cookie",
     "broken authentication",
-    "login",
-    "register",
     "not an admin",
     "php"
   ],

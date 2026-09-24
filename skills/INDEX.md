@@ -74,7 +74,7 @@ Open one only after a probe or a source read produced its signal.
 
 | Class | Evidence | Closed when (falsifier) | Skill |
 |---|---|---|---|
-| SQL injection | verified | identical validated response for the true and the false form | `skills/web-sqli/SKILL.md` |
+| SQL injection | verified | for an immediate sink | `skills/web-sqli/SKILL.md` |
 | NoSQL / operator injection | verified | the value is coerced to a string | `skills/web-nosqli/SKILL.md` |
 | OS command injection | catalogue | the value is passed as a single argv element | `skills/web-command-injection/SKILL.md` |
 | Server-side template injection | verified | the marker is reflected literally | `skills/web-ssti/SKILL.md` |
@@ -121,7 +121,7 @@ that file and this table would drift.
 | `skills/web-info-disclosure/SKILL.md` | depth | ~0.7k | an exposed file, debug route, or verbose error is observed |
 | `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
 | `skills/web-websocket/SKILL.md` | depth | ~0.8k | a ws:// channel or realtime feature carries the flag path |
-| `skills/web-xs-leaks/SKILL.md` | depth | ~0.7k | an HttpOnly cookie blocks XSS and a bot visits attacker pages |
+| `skills/web-xs-leaks/SKILL.md` | depth | ~1.8k | an HttpOnly cookie blocks XSS and a bot visits attacker pages |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
 

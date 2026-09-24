@@ -31,13 +31,10 @@
     "alias",
     "traversal",
     "assets",
-    ".env",
     "APP_KEY",
     "session cookie",
     "orderBy",
-    "direction",
     "blind sqli",
-    "500",
     "php"
   ],
   "chain": [

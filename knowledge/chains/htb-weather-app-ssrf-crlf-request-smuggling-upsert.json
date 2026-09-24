@@ -25,20 +25,16 @@
     ]
   },
   "signals": [
-    "express",
     "ssrf",
     "endpoint",
     "http.get",
     "template literal url",
-    "127.0.0.1",
     "remoteAddress",
-    "register",
     "crlf",
     "request smuggling",
     "INSERT INTO",
     "ON CONFLICT",
-    "upsert",
-    "sqlite"
+    "upsert"
   ],
   "chain": [
     {

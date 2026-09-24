@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "pico-secure-email-service-header-colon-differential-utf7-mt19937",
+  "source_note": "solved/secure-email-service.md",
+  "challenge": {
+    "name": "stored XSS behind S/MIME (secure-email-service)",
+    "platform": "picoCTF",
+    "event": "picoCTF (challenge originally corCTF, author @ehhthing)",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "fastapi",
+    "uvicorn",
+    "jinja2",
+    "s-mime",
+    "wasm",
+    "rust-mail-parser",
+    "playwright"
+  ],
+  "preconditions": {
+    "all_of": [
+      "one component generates a message with a strict library and a different component re-parses it with a lenient one",
+      "a value the attacker controls is written into a header AND into the body of the same generated message",
+      "the rendered sink takes parsed output without sanitising it"
+    ],
+    "any_of": [
+      "the generator is CPython older than 3.11.11 / 3.12.8, where email.policy.verify_generated_headers does not exist yet",
+      "the reading parser accepts 'Header : value' with whitespace before the colon",
+      "a template engine autoescapes the value, but the reading parser will honour a charset that re-introduces the escaped bytes"
+    ]
+  },
+  "signals": [
+    "smime",
+    "mail-parser",
+    "multipart",
+    "boundary",
+    "subject",
+    "jinja",
+    "autoescape",
+    "utf-7",
+    "encoded-word",
+    "admin bot",
+    "localStorage"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the front-end JavaScript and list every endpoint plus the exact sink",
+      "why": "the sink was shadow.innerHTML fed by a SECOND parse of the OpenSSL-verified bytes, not by the first parse, which decides where the payload must live"
+    },
+    {
+      "step": 2,
+      "stage": "surface",
+      "action": "pin the generator's language version from the Dockerfile before trusting any local test",
+      "why": "the header guard differs between CPython releases; testing on a newer local interpreter reports a false negative"
+    },
+    {
+      "step": 3,
+      "stage": "differential",
+      "action": "find a header form the generator emits but its own guard does not recognise, and confirm the reading parser accepts it",
+      "why": "'Header : value' with a space before the colon passes re(r'\\n[^ \\t]+:') and is still honoured by mail-parser, overriding the genuine header"
+    },
+    {
+      "step": 4,
+      "stage": "primitive",
+      "action": "use an RFC 2047 encoded-word to carry raw CRLF through the reading parser into a value the app echoes back",
+      "why": "it turns a single reflected field into full header and body injection on the NEXT generated message"
+    },
+    {
+      "step": 5,
+      "stage": "escape-bypass",
+      "action": "encode the payload in a charset the template engine has no opinion about",
+      "why": "UTF-7 spells '<' as '+ADw-', so autoescape is a no-op and the parser decodes it back to real tags"
+    },
+    {
+      "step": 6,
+      "stage": "predict",
+      "action": "recover the generator's PRNG when the structure depends on a random boundary",
+      "why": "each multipart boundary leaks one full 32-bit MT19937 output plus 31 bits of the next, so ~640 observed boundaries reconstruct the state exactly"
+    },
+    {
+      "step": 7,
+      "stage": "exfil",
+      "action": "exfiltrate through the application's own API using the victim's stored token",
+      "why": "no outbound network is required and nothing external has to be hosted"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "send one message whose Subject is 'x\\nFrom : <other identity>', then read back what the application's own parser reports as the sender",
+    "expected": "the parser reports the injected identity, not the genuine From header the generator wrote",
+    "falsifier": "the generator rejects the newline, or the parser still reports the genuine sender, meaning the space-before-colon form is not honoured"
+  },
+  "blast_radius": "read-only against the target's own data, but the bot endpoint is globally serialised behind a lock and each run costs ~15s; the collection phase writes several hundred messages into your own mailbox, so never point it at a shared account.",
+  "known_traps": [
+    "the injected boundary delimiter is itself part of the message text, so email.generator._make_boundary() matches '^--<b>(--)?$', calls it a collision and re-rolls the boundary to '<b>.0' -- the prediction is right and the exploit still fails silently; a single trailing space on the delimiter line defeats the anchored regex and is still a legal RFC 2046 delimiter",
+    "the same attacker string is used for BOTH the Subject header and the template body, so every injected line must also survive the generator's header guard; keep a space before any colon and no colon before the first whitespace on a line",
+    "CPython normalises a lone CR to LF inside a header value, so a bare \\r is not a way around the guard",
+    "verify the generator's version from the Dockerfile: a newer local CPython adds verify_generated_headers and rejects payloads the target accepts",
+    "the recovered PRNG state dies with the process, so collection, recovery and attack must run in one pass",
+    "a boundary that collided reads as '<digits>==.0' and will not match a strict '={15}\\d{19}==' regex, which makes a signed message look unsigned in your own tooling"
+  ],
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was read from the GET /api/emails response body on the live target, delivered there by the admin bot's own browser POSTing localStorage.flag to /api/send"
+  },
+  "reuse_when": [
+    "one library generates a message or document and a different library re-parses it, especially across languages",
+    "a template engine autoescapes a value that a downstream parser will later decode under an attacker-chosen charset",
+    "a structure depends on a boundary or token drawn from a non-cryptographic PRNG whose outputs are observable",
+    "an admin bot replies to attacker-controlled mail and the reply address comes from a parsed header"
+  ],
+  "flag": null
+}

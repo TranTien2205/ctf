@@ -1,0 +1,132 @@
+{
+  "id": "htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab",
+  "source_note": "solved/phantomfeed.md",
+  "challenge": {
+    "name": "PhantomFeed",
+    "platform": "HackTheBox",
+    "event": "University CTF 2023",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "flask",
+    "python",
+    "nuxt",
+    "vue",
+    "nginx",
+    "sqlite"
+  ],
+  "preconditions": {
+    "all_of": [
+      "registration creates the account before it marks it unverified",
+      "a headless browser holds a privileged session and visits a link the attacker stores",
+      "an authorization code is bound to client and redirect values but not to a user"
+    ],
+    "any_of": [
+      "an email or input validator uses a regex with nested quantifiers over overlapping classes",
+      "a token endpoint returns a bare string so the framework serves it as HTML",
+      "a PDF renderer evaluates an attribute expression"
+    ]
+  },
+  "signals": [
+    "phantomfeed",
+    "add_verification",
+    "parse_email",
+    "bot_runner",
+    "orders/html",
+    "reportlab",
+    "oauth2/token",
+    "market_link"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the registration order and check whether the row is written before the flag that disables it",
+      "why": "a create-then-disable sequence with anything slow in between is a race, and the slow step is often a validator on attacker-controlled input"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "measure the validator's cost against input length on the target, not on the attacking host",
+      "why": "an exponential curve confirms the window and gives its real size; a local measurement can be several times off"
+    },
+    {
+      "step": 3,
+      "stage": "race",
+      "action": "fire the slow registration and around a hundred logins at the same instant, and do not try to time a single one",
+      "why": "the regex holds the interpreter lock, so an expensive request makes no progress during the window and is served only after the disabling update commits; the winner is whichever of the queued requests reads first when they all unblock"
+    },
+    {
+      "step": 4,
+      "stage": "falsify",
+      "action": "do not stretch the window instead; check the proxy's read timeout first",
+      "why": "past that timeout both the trigger and the racing request return a gateway error and nothing is learned"
+    },
+    {
+      "step": 5,
+      "stage": "primitive",
+      "action": "check whether the authorization code is bound to a user; if it is bound only to client and redirect values, mint it with your own session and set the redirect value to a script",
+      "why": "the token endpoint then mints for whoever holds the cookie, so the privileged browser redeems a code you created"
+    },
+    {
+      "step": 6,
+      "stage": "bypass",
+      "action": "prefix the stored link with three slashes so the concatenated URL becomes a protocol-relative path and the front-end router navigates to a host you choose",
+      "why": "the link is appended to a fixed origin with no separator, and the privileged cookie is scoped to the host, not the port, so any local port is reachable"
+    },
+    {
+      "step": 7,
+      "stage": "oracle",
+      "action": "confirm that redirect with the authorization code's own consumption rather than by looking for a Location header",
+      "why": "a client-side router redirect leaves no server-side trace, so the only evidence is a side effect at the destination"
+    },
+    {
+      "step": 8,
+      "stage": "exfil",
+      "action": "have the injected script post the token back into the application itself, and write the payload without double quotes or backslashes",
+      "why": "the reflection goes through a JSON serialiser that escapes both, and an in-band channel needs no external listener while the same-site cookie still applies"
+    },
+    {
+      "step": 9,
+      "stage": "rce",
+      "action": "create one record so the export route does not return early, then send the colour expression payload",
+      "why": "the route returns before rendering when the collection is empty, and the renderer evaluates the attribute; the template engine's escaping is undone by the renderer's own parser"
+    },
+    {
+      "step": 10,
+      "stage": "flag",
+      "action": "copy the flag by glob into the static folder the framework registers on the app rather than on the blueprint, and read it without a token",
+      "why": "a blueprint before_request does not guard an app-level static route, and the flag's name is randomised at boot"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /phantomfeed/register with email=a@ + 26 a + ! , timed against a normal email",
+    "expected": "the registration takes several seconds against a baseline near one second, and the cost roughly doubles for each extra character",
+    "falsifier": "the timing is flat with input length, so the validator does not backtrack and the window does not exist"
+  },
+  "blast_radius": "steps 3 and 9 write. The race leaves one extra account per attempt, so keep the attempt count low. The export payload runs a shell command as the application user: copy the flag to a new path, never overwrite an application file, and remove the copy afterwards. The injected script posts into the feed, which triggers another browser run, so keep its link harmless. Around a hundred concurrent logins is what the race needs; more will simply stall the instance, and its proxy gives up at sixty seconds.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "HTTP 200 from GET /backend/static/zz.txt whose body was the flag copied out of /flag<random>.txt on the live target"
+  },
+  "reuse_when": [
+    "an account is created and only afterwards marked unverified, with attacker-controlled input parsed in between",
+    "a regex with nested quantifiers over overlapping character classes validates user input",
+    "a headless browser visits an attacker-supplied path concatenated onto a fixed origin",
+    "an authorization code is validated against client and redirect values but never against a user",
+    "reportlab renders a template whose colour attribute carries user input"
+  ],
+  "known_traps": [
+    "the race cannot be won by timing one request: the regex holds the interpreter lock, so an expensive request is starved for the whole window and served only after the disabling update commits",
+    "a longer backtracking payload makes it worse, because the reverse proxy returns a gateway timeout at sixty seconds",
+    "a client-side router redirect returns 200 with no Location header, so it cannot be confirmed from the response",
+    "the JSON serialiser in the reflection escapes double quotes and backslashes, so the injected script must avoid both",
+    "the template engine escapes the payload's quotes and angle brackets, but the PDF parser decodes character references in the attribute, so no bypass is needed and no unescaping should be attempted",
+    "the export route returns early when the collection is empty, so a record has to be created first",
+    "a detector that assumes no digits between a field name and its value fails, because escaped quotes render as numeric character references"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

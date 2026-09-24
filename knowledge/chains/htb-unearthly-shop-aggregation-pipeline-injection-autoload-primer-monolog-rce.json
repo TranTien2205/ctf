@@ -1,0 +1,110 @@
+{
+  "id": "htb-unearthly-shop-aggregation-pipeline-injection-autoload-primer-monolog-rce",
+  "source_note": "solved/unearthly_shop.md",
+  "challenge": {
+    "name": "UnEarthly Shop",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "php",
+    "nginx",
+    "mongodb",
+    "monolog",
+    "composer"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a decoded request body is passed to the database driver as a whole aggregation pipeline",
+      "a value read out of the database is later unserialized",
+      "an authenticated route writes arbitrary document fields"
+    ],
+    "any_of": [
+      "the application registers its own autoloader that turns part of a class name into a path",
+      "a second application on the same host ships a vendor tree with known gadget chains",
+      "credentials are stored in the collection in plaintext"
+    ]
+  },
+  "signals": [
+    "aggregate(",
+    "spl_autoload_register",
+    "unionwith",
+    "monolog",
+    "readflag",
+    "unserialize($_session",
+    "php-fpm.sock",
+    "mongodb://127.0.0.1:27017"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "check whether the database helper calls an aggregation rather than a find, and whether the request body reaches it whole",
+      "why": "a controlled pipeline is strictly more than a controlled filter: it reads other collections and, through its write stages, modifies them"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "union or look up the user collection and read the stored credential",
+      "why": "an import script that substitutes a placeholder at boot usually stores the value as written, so the credential is often plaintext"
+    },
+    {
+      "step": 3,
+      "stage": "recon",
+      "action": "treat any serialized-looking string in the seed data as a promise that something unserializes it, and find what writes it",
+      "why": "the value travels from the document into the session and back out, so whatever route sets document fields is the injection point"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "when the vendor tree behind the sink has no gadget, read the application's own autoloader for a name-to-path rewrite",
+      "why": "an autoloader that builds an absolute path from the class name can be made to require another application's Composer autoloader, which brings its whole vendor tree into scope"
+    },
+    {
+      "step": 5,
+      "stage": "payload",
+      "action": "put the primer object first in an array and the gadget second, then shift every reference index in the gadget by the number of referenceable values inserted before it",
+      "why": "unserialize resolves classes in order, so the primer must be parsed first; wrapping renumbers the references and an unshifted payload fails silently"
+    },
+    {
+      "step": 6,
+      "stage": "verify",
+      "action": "measure that shift on an equivalent stub object graph rather than reasoning about it",
+      "why": "array keys and scalars do not consume reference ids while the array and each object do, which is easy to get wrong by one"
+    },
+    {
+      "step": 7,
+      "stage": "rce",
+      "action": "write the payload into the document, log in again so the session copies it, then request a route that is not permission-checked",
+      "why": "the gadget runs from a destructor during shutdown, so the command output is appended to whatever response was produced"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST the product listing endpoint with [{\"$limit\":1},{\"$unionWith\":\"users\"},{\"$match\":{\"username\":{\"$exists\":true}}}]",
+    "expected": "documents from the other collection come back, proving the pipeline rather than a filter is controlled",
+    "falsifier": "the body is used as a match document only, so an aggregation stage name is treated as a field and nothing extra is returned"
+  },
+  "blast_radius": "step 7 writes to the user document that the permission check itself reads, and a payload that replaces the permission map locks the writing route behind its own access check. Carry the original permission keys inside the payload so the panel keeps working and the write stays reversible; otherwise the only way back is a write stage on the pipeline injection. Restore before anything else, because the instance can disappear first.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "GET /admin/ returned the flag appended to the login page body by the gadget's system() call on the live target"
+  },
+  "reuse_when": [
+    "a request body reaches a MongoDB aggregate() call as the whole pipeline",
+    "a serialized string is stored in a document and unserialized from the session",
+    "an application registers an autoloader that maps part of a class name onto a filesystem path",
+    "the vendor tree behind the unserialize sink has no usable gadget but another application on the host does"
+  ],
+  "known_traps": [
+    "prepending anything to a generated gadget invalidates its reference indices and the payload then fails with no error",
+    "protected property names contain NUL bytes, which survive JSON and BSON but are lost when a payload is pasted through a terminal",
+    "overwriting the permission field locks the route that writes it, so plan the restore before the write",
+    "the gadget runs from a destructor, so pick a route that is not permission-checked or the redirect will hide the output",
+    "the primer class stays undefined and becomes an incomplete class, which is expected and not an error"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

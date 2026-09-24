@@ -1,0 +1,118 @@
+{
+  "id": "htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce",
+  "source_note": "solved/why_lambda.md",
+  "challenge": {
+    "name": "Why Lambda",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "flask",
+    "python",
+    "vue",
+    "nginx",
+    "keras",
+    "tensorflow"
+  ],
+  "preconditions": {
+    "all_of": [
+      "an authenticated route loads a machine-learning model file the user uploaded",
+      "a headless browser logs into the same origin with credentials the attacker cannot read",
+      "attacker-controlled content reaches that browser's page through an HTML-rendering directive"
+    ],
+    "any_of": [
+      "the upload route checks the filename with a substring test",
+      "the CSRF defence is a fixed header value rather than a per-session token",
+      "no unauthenticated route returns any stored data"
+    ]
+  },
+  "signals": [
+    "load_model",
+    "v-html",
+    "x-space-no-csrf",
+    "check_complaints",
+    "internal/model",
+    "main.h5",
+    "np_utils",
+    "image_data"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "find the deserialising sink first and only then work out what session reaches it",
+      "why": "the sink decides the whole shape of the chain, and here the gate is a password that is generated at boot and never has to be recovered"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "find where the privileged browser renders attacker input, and check the rendering directive rather than the template text",
+      "why": "an interpolation that looks like ordinary text is a script sink when the component passes it to an HTML-rendering directive; only an event handler runs, not a script tag"
+    },
+    {
+      "step": 3,
+      "stage": "bypass",
+      "action": "read the CSRF check before assuming the upload is unreachable",
+      "why": "a fixed header value blocks a form post but not a same-origin fetch, which is what the injected script is"
+    },
+    {
+      "step": 4,
+      "stage": "payload",
+      "action": "build the model file inside the target's own base image, not on the attacking host",
+      "why": "the layer stores a marshalled code object whose format is tied to the interpreter version, so a file built elsewhere fails to load and the failure looks identical to a blocked upload"
+    },
+    {
+      "step": 5,
+      "stage": "verify",
+      "action": "load the crafted file in that same image and assert the side effect before sending it anywhere",
+      "why": "the chain has a single observable at the far end, so every earlier link has to be proven offline or a failure cannot be located"
+    },
+    {
+      "step": 6,
+      "stage": "rce",
+      "action": "give the model an input layer so the graph is built on load; do not rely on the model being evaluated",
+      "why": "the framework calls the layer on a symbolic tensor while deserialising, so the code runs even though the model is uncompiled and evaluation then raises"
+    },
+    {
+      "step": 7,
+      "stage": "exfil",
+      "action": "when no unauthenticated route returns stored data, rebind the function behind one that returns a computed value",
+      "why": "an in-band channel avoids an external listener entirely; pick a function the application documents as meaningless so the rebinding changes nothing that matters"
+    },
+    {
+      "step": 8,
+      "stage": "flag",
+      "action": "call that unauthenticated route and read the command output it now returns",
+      "why": "this is also the only oracle for the chain, since nothing else changes observably when the script, the upload or the deserialisation succeeds"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /api/predict with the static CSRF header, before and after a complaint whose prediction field carries the payload",
+    "expected": "the value changes from an integer to a string carrying command output",
+    "falsifier": "it stays an integer, so one of the render, the fetch or the deserialisation did not happen and each has to be checked on its own"
+  },
+  "blast_radius": "the payload runs arbitrary code in the application process and rebinds one of its functions, so choose a function the source itself calls meaningless and restore it afterwards. Each attempt leaves a complaint file and an uploaded model on disk; remove them by an exact marker rather than by wildcard, because the same directory holds content the application generated. Every complaint also starts a headless browser, so keep the attempt count low. Verify the cleanup before the instance goes away; on this solve the container disappeared first and the cleanup could not be confirmed.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "POST /api/predict returned the flag as the prediction value on the live target"
+  },
+  "reuse_when": [
+    "an upload route hands a user-supplied model file to a framework loader",
+    "a component passes an interpolated string to an HTML-rendering directive",
+    "a CSRF defence compares a constant header value",
+    "a privileged headless browser visits the same origin on a user-triggered action",
+    "no unauthenticated route returns stored data and an external listener is undesirable"
+  ],
+  "known_traps": [
+    "a payload built on the wrong interpreter version fails to load and is indistinguishable from a rejected upload",
+    "the code runs while the graph is being built, so the upload route can answer with an error while the exploit has already succeeded",
+    "an HTML-rendering directive does not run a script tag, only an event handler",
+    "the filename check is a substring test, so the extension proves nothing about the content",
+    "the chain has exactly one observable, so every link must be verified offline first"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

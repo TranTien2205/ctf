@@ -5,6 +5,12 @@ description: >
   Verified here by 1 chain card(s).
 tags: [web, oauth-sso, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
+budget:
+  stuck_threshold: 3
+  on_stuck: pivot
+  stop_conditions:
+    - "same probe point: 3 attempts with no new signal"
+    - "the class falsifier is observed"
 evidence_level: verified
 ---
 # OAuth / SSO flow

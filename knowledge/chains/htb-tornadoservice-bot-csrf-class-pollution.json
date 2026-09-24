@@ -28,7 +28,6 @@
     "only localhost",
     "remote_ip",
     "report",
-    "bot",
     "cookie_secret",
     "__class__",
     "__init__",

@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "id": "pico-noted-internal-origin-named-window-noopener-inband-exfil",
+  "source_note": "solved/noted.md",
+  "challenge": {
+    "name": "self-XSS notes app with an offline report bot (noted)",
+    "platform": "picoCTF",
+    "event": "picoCTF 2022",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "nodejs",
+    "fastify",
+    "ejs",
+    "sqlite",
+    "puppeteer"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a bot renders attacker-influenced pages while holding the secret",
+      "the stored XSS is confined to the attacker's own account",
+      "the bot has no route to the public internet"
+    ],
+    "any_of": [
+      "the login route has no CSRF protection so the session can be swapped mid-visit",
+      "the application accepts a non-HTTP scheme for the reported URL",
+      "the app itself offers a write the attacker can read back"
+    ]
+  },
+  "signals": [
+    "report",
+    "puppeteer",
+    "data:",
+    "window.open",
+    "SameSite",
+    "self-xss",
+    "no internet",
+    "0.0.0.0"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "establish what the bot IS before designing anything: which account it holds and where the secret lives",
+      "why": "the bot registers its own account and stores the flag there, so the payload must reach the bot's own rendering, not yours"
+    },
+    {
+      "step": 2,
+      "stage": "constraint",
+      "action": "resolve every URL in the payload to the application's INTERNAL address",
+      "why": "an offline bot cannot resolve the public hostname, and the failure is completely silent"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "load the victim's secret page into a NAMED window by top-level navigation",
+      "why": "a top-level navigation sends a SameSite=Lax cookie where an iframe does not"
+    },
+    {
+      "step": 4,
+      "stage": "pivot",
+      "action": "swap the session with a form POST to the unprotected login route so the attacker's stored XSS renders",
+      "why": "the XSS then runs on the application origin and is same-origin with the already-rendered secret window"
+    },
+    {
+      "step": 5,
+      "stage": "exfil",
+      "action": "write the secret back through the application's own API instead of out to the network",
+      "why": "no egress exists; a note in the attacker's account is readable afterwards"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "report a page whose only job is to post a fixed marker back through the application's own write API using the internal address",
+    "expected": "the marker appears in your own account, proving the reported page executed and the internal address is correct",
+    "falsifier": "no marker appears, meaning the scheme is not executed by the bot or the address is unreachable"
+  },
+  "blast_radius": "each report spawns a browser and a fresh account server-side; keep reports serial. The stored payload runs in your own account only.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag arrived as the content of a note in our own account and was read from the live GET /notes response"
+  },
+  "reuse_when": [
+    "a headless bot has no internet and the exfiltration channel must be the application itself",
+    "a challenge hinges on which cookie a navigation carries",
+    "a payload must run on the target origin but the only injection is self-XSS"
+  ],
+  "known_traps": [
+    "target=_blank carries implicit noopener, which puts the new window in a SEPARATE browsing-context group so window.open('',name) cannot resolve the name and silently returns a blank window; the symptom is indistinguishable from popup blocking -- use a NAMED target",
+    "a top-level data: URL does not execute when Chrome is given it as a command-line argument but does under the bot's CDP-driven navigation; test the path the bot actually uses",
+    "with no egress, make the payload post its own step-by-step diagnostics back through the app; that converts a silent black box into a debugger"
+  ],
+  "flag": null
+}

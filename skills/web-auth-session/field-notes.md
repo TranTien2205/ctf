@@ -68,3 +68,35 @@ Falsifier: the collective value returns the same rows as your own identity, or i
 **Blast radius**: read-only. Use the listing route only; the same API exposes completion and deletion routes that take an id and would mutate another account's objects, so never point those at an id that is not yours.
 
 - status: proposed
+
+## 2026-09-23 · NeuroSync · proposed
+
+- source note: `solved/htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec.md`
+- chain card: `knowledge/chains/htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec.json`
+- verification: verified_live — GET /api/bci/analytics returned 401 plain and the analytics payload with the subrequest header; pointing sourceUrl at the log endpoint with a doubled-dot path returned the HMAC key base64-encoded; after the signed queue entry, reading the payload's output file back through the same endpoint returned the flag base64-encoded. After cleanup that path no longer exists and the endpoint serves normal analytics again.
+- classified as: `web-auth-session` (score 1.5, 1 signals matched)
+- also matched: `web-race-condition` (2.5), `web-ssrf` (2.5), `file-read-primitives` (2.5)
+- signals that fired: HS256
+
+**Confirming probe that worked**
+
+> Request a protected API route twice, once plain and once carrying the framework's internal-subrequest header with the middleware name repeated to the recursion limit.
+
+Expected: 401 without the header and the route's real response with it, proving the middleware layer is skipped rather than satisfied.
+
+Falsifier: Both requests return 401, meaning the version is patched or the header name is wrong, and the API has to be reached with a real token instead.
+
+**Traps recorded on this solve**
+
+- A gopher request to a datastore never returns, because the datastore does not close the connection and the outbound client has no timeout. The write has already happened: treat the client-side timeout as success and verify with a read, or append a quit command to the payload.
+- RESP length prefixes are byte counts and must match the payload exactly.
+- Both the file read and the flag arrive inside HTTP 500 bodies, never in a 200; a client that only parses successful responses sees nothing.
+- execFile with an argv array is injection-proof, so shell metacharacter probes are wasted budget; the scheme is the degree of freedom.
+- The worker signs the ENCODED payload, so the signature must be computed over the base64 text and not over the plaintext command.
+- Worker output is discarded to a null log, so the payload has to write where the read primitive can reach.
+- A filename randomised at boot has to be globbed, which is why the chain needs execution rather than the read alone.
+- The Next 15 bypass header needs the middleware name repeated up to the recursion limit; a single occurrence does not trip it.
+
+**Blast radius**: The executed command runs as root inside the container and the queue is shared, so anything pushed there runs once for whoever pops it. Copying a secret into a web-readable directory exposes it to every other visitor until removed. The stored sourceUrl is global process state: leaving it pointed at gopher or at a missing file breaks the endpoint for everyone, so restore it. A gopher request to a datastore that does not close the connection leaves the outbound client hanging with no timeout, which ties up a worker on the target.
+
+- status: proposed

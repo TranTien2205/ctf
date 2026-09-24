@@ -10,7 +10,13 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["nginx", "php", "php/7.4.15", "alpine", "simplexml"],
+  "stack": [
+    "nginx",
+    "php",
+    "php/7.4.15",
+    "alpine",
+    "simplexml"
+  ],
   "preconditions": {
     "all_of": [
       "a JSON API endpoint exists whose handler branches on the request content type",
@@ -23,11 +29,9 @@
   },
   "signals": [
     "xxe",
-    "xml",
     "php",
     "nginx",
     "content-type",
-    "api",
     "simplexml",
     "waf"
   ],

@@ -1,0 +1,143 @@
+{
+  "schema_version": 1,
+  "id": "htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec",
+  "source_note": "solved/htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec.md",
+  "challenge": {
+    "name": "NeuroSync",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "nextjs",
+    "node",
+    "express",
+    "redis",
+    "go",
+    "supervisord",
+    "debian",
+    "curl",
+    "jose"
+  ],
+  "preconditions": {
+    "all_of": [
+      "Authentication for the whole API is enforced in one framework middleware layer and no route re-checks it.",
+      "Some endpoint turns a request-controlled value into an outbound request from the server.",
+      "A privileged action exists behind a check whose secret lives somewhere the request can reach."
+    ],
+    "any_of": [
+      "The framework version is below the fix for a published middleware-bypass advisory.",
+      "One handler stores a value and a different handler validates it, so the validation never sees the write.",
+      "A path filter strips a traversal token in a single pass and checks the prefix afterwards.",
+      "An error handler re-reads the file it failed to parse and returns its contents.",
+      "A worker takes commands from a queue that the SSRF can write to."
+    ]
+  },
+  "signals": [
+    "middleware.js",
+    "matcher",
+    "x-middleware-subrequest",
+    "execFile",
+    "curl",
+    "sourceUrl",
+    "new URL(",
+    "hostname",
+    "replaceAll(\"../\"",
+    "startsWith(\"/var/log/\")",
+    "readFileSync",
+    "toString('base64')",
+    "BLPop",
+    "bci_commands",
+    "hmac.Equal",
+    "exec.Command(\"sh\", \"-c\"",
+    "/tmp/secret.key"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "Read the dependency manifest and compare every pinned framework version against its published advisories before probing any application logic.",
+      "why": "When one middleware layer is the only thing guarding an API, a version below its own bypass fix is the entire authentication story and costs one grep to find."
+    },
+    {
+      "step": 2,
+      "stage": "auth bypass",
+      "action": "Send the framework's internal-subrequest header on a protected route and compare against the same route without it. For the Next 15 line the header value must repeat the middleware name up to the recursion limit.",
+      "why": "A single header flips the route from 401 to 200 and every later step depends on it, so confirm it in isolation before building anything on top."
+    },
+    {
+      "step": 3,
+      "stage": "stored-value gap",
+      "action": "When one handler writes a value into module scope and another validates it, attack what the validator never inspects. Check the URL's scheme, port and path, not just the host it was allowed to keep.",
+      "why": "Validation attached to the read path only constrains the properties it actually tests; here only the hostname was checked, leaving every protocol the client supports available."
+    },
+    {
+      "stage": "not injection",
+      "step": 4,
+      "action": "If the outbound call uses an argv array rather than a shell, stop probing shell metacharacters and probe protocol handlers instead.",
+      "why": "execFile and its equivalents are genuinely injection-proof, so probes on ';' and '$()' only burn budget. The exploitable degree of freedom is which protocol the client will speak."
+    },
+    {
+      "step": 5,
+      "stage": "file read",
+      "action": "Against a path filter, test whether the traversal strip runs once by sending the token that reconstitutes itself, and check whether the prefix comparison happens before or after the strip. Then look inside the catch block for a second read of the same file.",
+      "why": "A single-pass strip turns '....//' back into '../', a prefix check placed after the strip validates a string the filesystem never sees, and an error handler that re-reads and encodes the file converts a parse failure into a full read."
+    },
+    {
+      "step": 6,
+      "stage": "sign the command",
+      "action": "Read the worker's key file with the read primitive, then compute the signature over exactly the string the worker concatenates, byte for byte, before encoding.",
+      "why": "The signature check is only as strong as the key's storage. Reproducing the signed string exactly matters because the worker signs the encoded payload, not the decoded one."
+    },
+    {
+      "step": 7,
+      "stage": "queue write",
+      "action": "Push the signed entry into the queue over gopher, url-encoding a RESP array whose length prefixes are byte counts.",
+      "why": "gopher passes a URL's hostname check while letting the client write arbitrary bytes to any loopback port, which is what turns a fetch into a queue producer."
+    },
+    {
+      "step": 8,
+      "stage": "exfiltration",
+      "action": "Have the executed command write its output somewhere the read primitive already reaches, rather than expecting the worker's own output. Glob a filename that boot randomised.",
+      "why": "Worker output usually goes to a null log, and the read primitive is already proven. Globbing is also why execution is needed at all rather than the read alone."
+    },
+    {
+      "step": 9,
+      "stage": "cleanup",
+      "action": "Run one more signed command to delete what the payload wrote, then restore the stored URL to its default and confirm the endpoint answers normally.",
+      "why": "The copied secret is readable by anyone who can reach the instance, and a stored URL left pointing elsewhere breaks the endpoint for every later visitor."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "Request a protected API route twice, once plain and once carrying the framework's internal-subrequest header with the middleware name repeated to the recursion limit.",
+    "expected": "401 without the header and the route's real response with it, proving the middleware layer is skipped rather than satisfied.",
+    "falsifier": "Both requests return 401, meaning the version is patched or the header name is wrong, and the API has to be reached with a real token instead."
+  },
+  "blast_radius": "The executed command runs as root inside the container and the queue is shared, so anything pushed there runs once for whoever pops it. Copying a secret into a web-readable directory exposes it to every other visitor until removed. The stored sourceUrl is global process state: leaving it pointed at gopher or at a missing file breaks the endpoint for everyone, so restore it. A gopher request to a datastore that does not close the connection leaves the outbound client hanging with no timeout, which ties up a worker on the target.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "GET /api/bci/analytics returned 401 plain and the analytics payload with the subrequest header; pointing sourceUrl at the log endpoint with a doubled-dot path returned the HMAC key base64-encoded; after the signed queue entry, reading the payload's output file back through the same endpoint returned the flag base64-encoded. After cleanup that path no longer exists and the endpoint serves normal analytics again."
+  },
+  "reuse_when": [
+    "A framework middleware is the only authentication layer in front of an API.",
+    "A pinned framework version sits below a published middleware or routing bypass fix.",
+    "One handler assigns a URL or path into module scope and another validates it at use time.",
+    "An outbound call is made with an argv array, so only the protocol is attacker-controlled.",
+    "A path filter strips a traversal token once and checks its prefix afterwards.",
+    "An error handler reads the file it failed to parse and includes it in the response.",
+    "A worker consumes commands from a queue reachable from the application host."
+  ],
+  "known_traps": [
+    "A gopher request to a datastore never returns, because the datastore does not close the connection and the outbound client has no timeout. The write has already happened: treat the client-side timeout as success and verify with a read, or append a quit command to the payload.",
+    "RESP length prefixes are byte counts and must match the payload exactly.",
+    "Both the file read and the flag arrive inside HTTP 500 bodies, never in a 200; a client that only parses successful responses sees nothing.",
+    "execFile with an argv array is injection-proof, so shell metacharacter probes are wasted budget; the scheme is the degree of freedom.",
+    "The worker signs the ENCODED payload, so the signature must be computed over the base64 text and not over the plaintext command.",
+    "Worker output is discarded to a null log, so the payload has to write where the read primitive can reach.",
+    "A filename randomised at boot has to be globbed, which is why the chain needs execution rather than the read alone.",
+    "The Next 15 bypass header needs the middleware name repeated up to the recursion limit; a single occurrence does not trip it."
+  ],
+  "flag": null
+}

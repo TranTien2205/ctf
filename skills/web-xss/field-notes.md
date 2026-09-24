@@ -73,3 +73,90 @@ Falsifier: The attribute is escaped, or the handler never fires without interact
 **Blast radius**: The pickled session file executes as the application user for anyone who sets that cookie, so it is a remote backdoor until removed; make the payload delete it in the same command. The exfiltration registers several hundred throwaway accounts and the stored payload keeps firing on every scheduled visit, both of which live in process memory and only clear on restart. Do not point the injected command at configuration or at imported modules. On a shared instance the registration oracle is several hundred sequential writes: keep concurrency low and never probe a namespace the payload has not written yet, because probing creates the name and destroys that symbol.
 
 - status: proposed
+
+## 2026-09-23 · self-XSS notes app with an offline report bot (noted) · proposed
+
+- source note: `solved/noted.md`
+- chain card: `knowledge/chains/pico-noted-internal-origin-named-window-noopener-inband-exfil.json`
+- verification: verified_live — the flag arrived as the content of a note in our own account and was read from the live GET /notes response
+- classified as: `web-xss` (score 1.5, 1 signals matched)
+- also matched: `web-csrf` (2.5), `web-xs-leaks` (2.0), `web-auth-session` (1.5)
+- signals that fired: xss
+
+**Confirming probe that worked**
+
+> report a page whose only job is to post a fixed marker back through the application's own write API using the internal address
+
+Expected: the marker appears in your own account, proving the reported page executed and the internal address is correct
+
+Falsifier: no marker appears, meaning the scheme is not executed by the bot or the address is unreachable
+
+**Traps recorded on this solve**
+
+- target=_blank carries implicit noopener, which puts the new window in a SEPARATE browsing-context group so window.open('',name) cannot resolve the name and silently returns a blank window; the symptom is indistinguishable from popup blocking -- use a NAMED target
+- a top-level data: URL does not execute when Chrome is given it as a command-line argument but does under the bot's CDP-driven navigation; test the path the bot actually uses
+- with no egress, make the payload post its own step-by-step diagnostics back through the app; that converts a silent black box into a debugger
+
+**Blast radius**: each report spawns a browser and a fresh account server-side; keep reports serial. The stored payload runs in your own account only.
+
+- status: proposed
+
+## 2026-09-23 · Why Lambda · proposed
+
+- source note: `solved/why_lambda.md`
+- chain card: `knowledge/chains/htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce.json`
+- verification: verified_live — POST /api/predict returned the flag as the prediction value on the live target
+- classified as: `web-xss` (score 2.5, 2 signals matched)
+- also matched: `web-file-upload` (3.5), `web-ssrf` (3.5), `web-ssti` (2.5)
+- signals that fired: XSS, v-html
+
+**Confirming probe that worked**
+
+> POST /api/predict with the static CSRF header, before and after a complaint whose prediction field carries the payload
+
+Expected: the value changes from an integer to a string carrying command output
+
+Falsifier: it stays an integer, so one of the render, the fetch or the deserialisation did not happen and each has to be checked on its own
+
+**Traps recorded on this solve**
+
+- a payload built on the wrong interpreter version fails to load and is indistinguishable from a rejected upload
+- the code runs while the graph is being built, so the upload route can answer with an error while the exploit has already succeeded
+- an HTML-rendering directive does not run a script tag, only an event handler
+- the filename check is a substring test, so the extension proves nothing about the content
+- the chain has exactly one observable, so every link must be verified offline first
+
+**Blast radius**: the payload runs arbitrary code in the application process and rebinds one of its functions, so choose a function the source itself calls meaningless and restore it afterwards. Each attempt leaves a complaint file and an uploaded model on disk; remove them by an exact marker rather than by wildcard, because the same directory holds content the application generated. Every complaint also starts a headless browser, so keep the attempt count low.
+
+- status: proposed
+
+## 2026-09-24 · BoneChewerCon · proposed
+
+- source note: `solved/htb-bonechewercon-jku-csp-crlf.md`
+- chain card: `knowledge/chains/htb-bonechewercon-jku-forge-csp-injection-nginx-crlf-cookie-plant.json`
+- verification: verified_live — the bot fetched the attacker JWKS (proving the planted cookie was decoded) and then called back with the rendered admin table containing the flag row and the /list error_path flash
+- classified as: `web-xss` (score 4.5, 4 signals matched)
+- also matched: `web-auth-session` (3.5), `web-request-smuggling` (3.5), `web-ssrf` (3.5)
+- signals that fired: XSS, admin bot, content-security-policy, innerHTML
+
+**Confirming probe that worked**
+
+> set the auth cookie to a JWT whose jku is https://abc@localhost@YOURHOST/jwks.json signed with your own key, then GET / and watch your JWKS host
+
+Expected: 200 on / plus a hit on your jwks.json, and the privileged endpoint's error changing from 'You are not admin' to the next gate - proof the forged identity was accepted
+
+Falsifier: 400 'Invalid provider' (host check not bypassed) or 400 'Invalid exponent and/or modulus' (n/e were not decimal strings)
+
+**Traps recorded on this solve**
+
+- NAME COLLISION: a different HTB challenge, 'baby BoneChewerCon', is nginx/PHP/Laravel/Whoops and is covered by htb-bonechewercon-method-not-allowed-whoops-env-disclosure. Check the stack before reusing either card; chain_match scores signals, not challenge names, so a name query returns nothing and that is correct.
+- the IP gate is genuine here: /api/bot/login answers 'Your IP is not allowed' and X-Forwarded-For does not help, so a forged admin token alone reads nothing - the bot must do the reading
+- JWKS n and e must be decimal digit strings because of an isdigit() check; base64url values abort with 'Invalid exponent and/or modulus'
+- dangling markup absorbs forward only, and every submission renders below the flag row, so no dangling-markup variant reaches the flag; that dead end is what forces the CSP-injection route
+- the first render cannot execute the handler - the CSP is still strict at that point; expect the exfil only on the second load, after the cookie swap
+- set Path=/list on the planted cookie, otherwise the bot's existing Path=/ cookie may be sent first and the CSP is never poisoned
+- a free tunnel that injects a browser-warning interstitial will fail the Content-Type application/json check; verify the JWKS URL with an Accept: */* request before using it
+
+**Blast radius**: shared instance: the payload is a row in a shared presentations table with NO delete endpoint, so it cannot be cleaned up afterwards, and while it is live it redirects the shared admin bot and overwrites its auth cookie. Submit exactly one, expect the bot/app to reset the table periodically (so it may need re-submitting), and never point the meta refresh anywhere but the challenge host.
+
+- status: proposed

@@ -9,7 +9,12 @@
     "solved_at": "2026-09-12",
     "assistance": "self-solved"
   },
-  "stack": ["ruby", "sinatra", "webrick", "erb"],
+  "stack": [
+    "ruby",
+    "sinatra",
+    "webrick",
+    "erb"
+  ],
   "preconditions": {
     "all_of": [
       "a request parameter is interpolated into a Ruby template without encoding",
@@ -23,7 +28,6 @@
   "signals": [
     "webrick",
     "ruby",
-    "erb",
     "neon",
     "Glow",
     "Malicious Input Detected",

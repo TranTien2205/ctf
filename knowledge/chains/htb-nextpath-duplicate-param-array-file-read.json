@@ -29,11 +29,9 @@
   "signals": [
     "next.js",
     "x-powered-by",
-    "next",
     "/api/team",
     "enoent",
     "open 'team/",
-    "id",
     "image/png",
     "invalid format",
     "directory traversal detected"

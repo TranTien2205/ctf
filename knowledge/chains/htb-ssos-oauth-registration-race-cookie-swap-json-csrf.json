@@ -34,7 +34,6 @@
   },
   "signals": [
     "oauth2",
-    "sso",
     "single sign on",
     "jsessionid",
     "connect.sid",
@@ -43,7 +42,6 @@
     "text/plain json csrf",
     "shouldbindjson",
     "puppeteer",
-    "bot",
     "submit-url",
     "samesite missing",
     "loginSSO",

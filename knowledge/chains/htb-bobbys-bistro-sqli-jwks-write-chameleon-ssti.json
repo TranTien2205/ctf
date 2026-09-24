@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "id": "htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti",
+  "source_note": "solved/htb-bobbys-bistro-sqli-jwks-overwrite-chameleon-ssti.md",
+  "challenge": {
+    "name": "Bobby's Bistro",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "self-solved"
+  },
+  "stack": ["python", "flask", "sqlalchemy", "sqlite", "chameleon", "pyjwt", "werkzeug"],
+  "preconditions": {
+    "all_of": [
+      "a query filter is built by string formatting even though an ORM is in use",
+      "an identifier read out of the datastore is the whole of the session claim"
+    ],
+    "any_of": [
+      "an upload path is concatenated from an unsanitised uploaded filename",
+      "the signature verifier reads its key set from a file inside the served tree",
+      "a template object is constructed from user-supplied text and rendered"
+    ]
+  },
+  "signals": [
+    "filter(text(", "PageTemplate", "tal:repeat", "tal:content", "chameleon",
+    "PyJWKClient", "jwks.json", "secure_filename", "FileStorage", "python:"
+  ],
+  "chain": [
+    {"step": 1, "stage": "recon", "action": "grep for text(), execute() and format/f-strings inside query construction rather than assuming the ORM parameterises anything", "why": "filter(text(\"col='{}'\".format(x))) is plain concatenation; the ORM around it provides no protection at all"},
+    {"step": 2, "stage": "primitive", "action": "inject a tautology and read whichever columns the view template actually renders", "why": "the rendered set decides the reach of the read; here it exposed the privileged account's identifier, and that identifier is the entire session claim"},
+    {"step": 3, "stage": "primitive", "action": "test the upload for path traversal with a throwaway name first - upload as ../<served dir>/probe and fetch it back", "why": "Werkzeug does not sanitise FileStorage.filename, so directory-plus-filename concatenation is an arbitrary write; prove it on a harmless file before aiming at anything load-bearing"},
+    {"step": 4, "stage": "pivot", "action": "locate the verifier's trust root: if the key set is a file under the served tree and the client object is rebuilt per request with no caching, the write primitive becomes a signing-key primitive", "why": "an arbitrary write plus an on-disk key set equals forging any session, which is a far shorter path than attacking the signature itself"},
+    {"step": 5, "stage": "pivot", "action": "APPEND your public key to the key set under a fresh key id instead of replacing the file, sign a token with the matching private key, and restore the original file when finished", "why": "replacing it would invalidate every other player's already-issued token on a shared instance; appending is non-destructive and reversible, and restoring also revokes your own forged token"},
+    {"step": 6, "stage": "flag", "action": "for a template built from user text behind a character blacklist, drop interpolation entirely and use attribute-based directives with single quotes, rebuilding every string with chr() concatenation, and choose an ITERATING directive over a file object so no method call is needed", "why": "stripping dot and underscore only blocks attribute access and dunders; iterating a file yields its lines, so the read needs no dotted call at all"}
+  ],
+  "first_confirming_probe": {
+    "request": "submit a tautology in the field that is interpolated into the filter and count the rows rendered by the view",
+    "expected": "every row of the table comes back instead of one, exposing whichever columns the template prints",
+    "falsifier": "a single row or an error, meaning the value really is bound as a parameter"
+  },
+  "blast_radius": "mostly additive and reversible, but read this before firing. The injection is SELECT-only. The key set gains one extra key: APPEND, never replace, or every other player's session breaks, and restore the original afterwards. The uploaded probe file and the rendered announcement row cannot be deleted - there is no delete endpoint - and the announcement is written once per registered user, so whatever the template prints becomes visible to everyone on the instance. Develop the template payload locally first instead of iterating against the shared target.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the rendered announcement stored and displayed on the listing page contained the file contents inside the div emitted by the template directive"
+  },
+  "reuse_when": [
+    "an ORM query mixes text() or raw formatting into a filter",
+    "an upload path is concatenated from a client-supplied filename",
+    "a signature verifier loads its key set from a writable path and rebuilds its client per request",
+    "a template engine is handed user text with only a character blacklist in front of it"
+  ],
+  "known_traps": [
+    "a character blacklist is not a sandbox: chr() concatenation rebuilds any string once quotes and dots are stripped, and an iterating directive avoids the method call the blacklist was aimed at",
+    "the blacklist ran on template INPUT only, so characters it strips can still appear in the OUTPUT - the recovered value kept its own braces",
+    "replacing the key set rather than appending to it is destructive on a shared instance and also needlessly noisy; keep the original entry and put the original file back when done",
+    "the view template decides what the injection can read - check which columns are actually printed before assuming a column is reachable",
+    "the resident bot here is a plain requests session, not a browser, so there is no client-side attack surface against it despite it holding the privileged account",
+    "uploads and generated rows cannot be removed afterwards; prove primitives with throwaway names and build payloads offline"
+  ],
+  "flag": null
+}

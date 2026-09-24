@@ -44,3 +44,4 @@ Falsifier: the write endpoint accepts a direct request, so no bot relay is neede
 **Blast radius**: the pollution changes a global application setting; other players on a shared instance lose their sessions
 
 - status: proposed
+

@@ -102,3 +102,4 @@ Falsifier: The artifact contains only real rows, or the job reports an error tha
 **Blast radius**: Low but not zero. Reading is harmless, but the injection runs inside a job with database access, so keep every payload to SELECT and never append a second statement. Each attempt also creates a durable account and artifact rows that other players can see, so use distinctive throwaway names and do not delete or modify rows that are not yours. On a shared instance, other players' artifacts are readable through the missing ownership check; read them for orientation but do not disturb them.
 
 - status: proposed
+

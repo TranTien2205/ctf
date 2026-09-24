@@ -20,6 +20,7 @@ import os
 import json
 import re
 import sys
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -289,6 +290,41 @@ class ContractTests(unittest.TestCase):
         self.assertTrue(all(ref.startswith("skills/web-sqli/")
                             for ref in cls.get("depth_refs", [])),
                         "SQLi depth references must remain under its canonical owner")
+
+    def test_sql_injection_deferred_sink_falsifier_is_not_premature(self):
+        cls = next(c for c in taxonomy()["classes"] if c["id"] == "web-sqli")
+        falsifier = cls["falsifier"].lower()
+        self.assertIn("deferred", falsifier)
+        self.assertIn("consumer", falsifier)
+        self.assertIn("trigger", falsifier)
+        self.assertIn("second-order", (ROOT / "skills/web-sqli/SKILL.md").read_text().lower())
+
+    def test_class_depth_references_have_canonical_owners(self):
+        classes = {c["id"]: c for c in taxonomy()["classes"]}
+        expected = {
+            "web-nosqli": "skills/web-nosqli/",
+            "web-race-condition": "skills/web-race-condition/",
+            "web-idor": "skills/web-idor/",
+        }
+        for class_id, prefix in expected.items():
+            refs = classes[class_id].get("depth_refs", [])
+            with self.subTest(class_id=class_id):
+                self.assertTrue(refs)
+                self.assertTrue(all(ref.startswith(prefix) for ref in refs),
+                                "%s references must be class-owned: %s" % (class_id, refs))
+        self.assertTrue((ROOT / "skills/web-idor/references/README.md").is_file())
+        self.assertTrue((ROOT / "skills/web-nosqli/references/README.md").is_file())
+        self.assertTrue((ROOT / "skills/web-race-condition/references/README.md").is_file())
+
+    def test_graphql_has_one_operational_probe(self):
+        text = (ROOT / "skills/web-graphql/SKILL.md").read_text(encoding="utf-8")
+        self.assertEqual(text.count("## Operational probe"), 1)
+
+    def test_generated_bug_class_skill_template_has_budget_contract(self):
+        generator = (ROOT / "build/make_class_skills.py").read_text(encoding="utf-8")
+        self.assertIn('"budget:"', generator)
+        self.assertIn('stuck_threshold: 3', generator)
+        self.assertIn('on_stuck: pivot', generator)
 
     def test_no_command_hardcodes_a_tree_root(self):
         """The tree has to work wherever it is checked out.
@@ -777,6 +813,37 @@ class ClassifierTests(unittest.TestCase):
             self.assertTrue(item["first_probe"])
             self.assertTrue(item["falsifier"])
 
+    def test_only_reviewed_writeup_signals_extend_classification(self):
+        with tempfile.TemporaryDirectory() as temp:
+            store = Path(temp)
+            (store / "reviewed.json").write_text(json.dumps({
+                "classification": {"primary": "SQL injection"},
+                "signals": ["vendor_magic_marker", "SELECT MAGIC_COL"],
+                "quality": {"review_status": "reviewed", "verified_live": False},
+                "first_probe": {"payload": "MUST_NOT_ENTER_CLASSIFIER"},
+            }), encoding="utf-8")
+            (store / "unreviewed.json").write_text(json.dumps({
+                "classification": {"primary": "web-sqli"},
+                "signals": ["unreviewed_magic_marker"],
+                "quality": {"review_status": "extracted", "verified_live": False},
+            }), encoding="utf-8")
+            taxonomy_classes = taxonomy()["classes"]
+            writeup_signals = classifier.load_writeup_signals(store, taxonomy_classes)
+            merged = classifier.merge_writeup_signals(taxonomy_classes, writeup_signals)
+            ranked = classifier.rank(classifier.scan_text(
+                "vendor_magic_marker", classifier.compile_signals(
+                    merged, "observation_signals")), merged)
+            self.assertEqual(ranked[0]["class"], "web-sqli")
+            self.assertEqual(writeup_signals["web-sqli"],
+                             ["SELECT MAGIC_COL", "vendor_magic_marker"])
+            patterns = dict((class_id, [raw for raw, _ in pats])
+                            for class_id, pats in classifier.compile_signals(
+                                merged, "observation_signals").items())
+            self.assertFalse(any("MUST_NOT_ENTER_CLASSIFIER" in p
+                                 for values in patterns.values() for p in values))
+            self.assertFalse(any("unreviewed_magic_marker" in p
+                                 for values in patterns.values() for p in values))
+
 
 # --------------------------------------------------------------------------- J
 class LearningLoopTests(unittest.TestCase):
@@ -1116,6 +1183,97 @@ class OrchestratorTests(unittest.TestCase):
                    if r["verdict"] == "review"}
         self.assertEqual(flagged, set(report["review"]),
                          "the review list must name exactly the review rows")
+
+
+class KnowledgeStoreTests(unittest.TestCase):
+    """The line between what this toolkit solved and what it merely read.
+
+    chain_match ranks by signal rarity, so every card competes for the top slot.
+    Letting unverified writeup cards into knowledge/chains/ would dilute that
+    ranking with claims nobody checked here, and would quietly turn the
+    `verified` label in bug-classes.json into "somebody on the internet said so".
+    """
+
+    def test_chain_and_writeup_cards_stay_in_their_own_store(self):
+        misplaced = []
+        for path in sorted((ROOT / "knowledge" / "chains").glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if "classification" in data and "chain" not in data:
+                misplaced.append("writeup card in chains/: %s" % path.name)
+        for path in sorted((ROOT / "knowledge" / "cards").glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if "chain" in data and "first_confirming_probe" in data:
+                misplaced.append("chain card in cards/: %s" % path.name)
+        self.assertEqual(misplaced, [], "; ".join(misplaced))
+
+    def test_writeup_cards_never_claim_local_verification(self):
+        offenders = []
+        for path in sorted((ROOT / "knowledge" / "cards").glob("*.json")):
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if (data.get("quality") or {}).get("verified_live") is True:
+                offenders.append(path.name)
+        self.assertEqual(offenders, [],
+                         "a writeup card claims verified_live; only a chain card "
+                         "written from a run on this machine may: %s" % offenders)
+
+    def test_chain_match_reads_only_the_verified_store(self):
+        source = read("tools/chain_match.py")
+        self.assertIn('"chains"', source)
+        self.assertNotIn('"cards"', source,
+                         "chain_match must not read the writeup store")
+
+
+class KnowledgeScaleTests(unittest.TestCase):
+    """Guards that keep the knowledge base usable as it grows.
+
+    Both of these exist because a real defect slipped through: a bug-class skill
+    was dropped from the taxonomy while its directory stayed, so classify.py
+    stopped routing to it and system_eval silently lost a case, and the chain
+    matcher could not retrieve a card from its own handout because an asset-heavy
+    challenge exhausted the read budget on images before reaching any code.
+    """
+
+    def test_every_bug_class_skill_is_in_the_taxonomy(self):
+        taxonomy = {c["id"] for c in
+                    json.loads(read("knowledge/bug-classes.json"))["classes"]}
+        orphans = []
+        for entry in sorted((ROOT / "skills").iterdir()):
+            skill = entry / "SKILL.md"
+            if not skill.is_file():
+                continue
+            match = re.search(r"^tags:\s*\[([^\]]*)\]", skill.read_text(encoding="utf-8"),
+                              re.M)
+            if not match:
+                continue
+            tags = [t.strip() for t in match.group(1).split(",")]
+            if "bug-class" in tags and entry.name not in taxonomy:
+                orphans.append(entry.name)
+        self.assertEqual(orphans, [],
+                         "a skill tagged bug-class is missing from "
+                         "knowledge/bug-classes.json, so classify.py cannot route "
+                         "to it: %s" % orphans)
+
+    def test_chain_match_retrieval_does_not_regress(self):
+        baseline_path = ROOT / "test" / "baselines" / "chain_match.json"
+        if not baseline_path.is_file():
+            self.skipTest("no retrieval baseline recorded")
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        floor = baseline.get("floor_top1_rate")
+        if floor is None:
+            self.skipTest("baseline records no floor")
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "chain_match_eval.py")],
+            capture_output=True, text=True, cwd=str(ROOT))
+        self.assertEqual(proc.returncode, 0, proc.stderr[:400])
+        report = json.loads(proc.stdout)
+        if report["cards_with_ground_truth"] < 5:
+            self.skipTest("too few handouts on disk to measure retrieval")
+        self.assertGreaterEqual(
+            report["top1_rate"], floor,
+            "chain_match no longer retrieves the right card often enough: "
+            "%.3f < floor %.3f. Fix the matcher or the card's signals; do not "
+            "lower the floor to make this pass."
+            % (report["top1_rate"], floor))
 
 
 if __name__ == "__main__":

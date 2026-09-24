@@ -38,7 +38,7 @@
         "cursor\\.execute"
       ],
       "first_probe": "one syntax marker, then a matched true/false pair against the same input",
-      "falsifier": "identical validated response for the true and the false form",
+      "falsifier": "for an immediate sink, identical validated response for the true and false forms; for a stored or deferred sink, the same result after the consumer is triggered",
       "depth_refs": [
         "skills/web-sqli/references/README.md",
         "skills/web-sqli/references/extended-corpus.md"
@@ -72,7 +72,8 @@
       "first_probe": "send the filter pinned to an object you created, with every write field omitted, and read what comes back",
       "falsifier": "the value is coerced to a string, so no object reaches the query",
       "depth_refs": [
-        "skills/web-sqli/references/nosql.md"
+        "skills/web-nosqli/references/README.md",
+        "skills/web-nosqli/references/operators.md"
       ],
       "confusable_with": [
         "web-sqli",
@@ -475,7 +476,7 @@
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
       "observation_signals": [
-        "rO0AB|aced0005|gAN|O:\\d+:\\\"|BAhJ|AAEAAAD",
+        "\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD",
         "deserial|unserial|pickle|marshal|viewstate"
       ],
       "source_signals": [
@@ -506,8 +507,8 @@
       "observation_signals": [
         "race condition|toctou",
         "balance|coupon|voucher|one.?time|redeem",
-        "verification token|confirm",
-        "limit|quota"
+        "verification token|confirmation (?:code|email|link)",
+        "rate.?limit|per.?user limit|quota"
       ],
       "source_signals": [
         "(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit)",
@@ -516,7 +517,7 @@
       "first_probe": "two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
       "falsifier": "the read and the write happen inside one transaction or behind one lock",
       "depth_refs": [
-        "skills/ctf-web/server-side-deser.md"
+        "skills/web-race-condition/references/README.md"
       ],
       "confusable_with": [
         "web-logic-flaw"
@@ -640,7 +641,12 @@
       "first_probe": "create an object as one identity, then request its identifier as a second identity",
       "falsifier": "the handler scopes the lookup by the authenticated owner",
       "depth_refs": [
-        "skills/web-idor/references/api-idor.md"
+        "skills/web-idor/references/README.md",
+        "skills/web-idor/references/sequential-enumeration.md",
+        "skills/web-idor/references/uuid-analysis.md",
+        "skills/web-idor/references/api-idor.md",
+        "skills/web-idor/references/file-idor.md",
+        "skills/web-idor/references/enumeration.md"
       ],
       "confusable_with": [
         "web-logic-flaw",

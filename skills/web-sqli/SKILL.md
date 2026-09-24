@@ -51,6 +51,10 @@ When the body is JSON and the query takes an object, the injection is a shape,
 not a string. Route to `../web-nosqli/SKILL.md` rather than forcing SQL syntax.
 That skill contains the read-safe probe and the write blast-radius warning.
 
+**Falsifier for immediate sinks:** the matched true and false forms produce the
+same validated result. For stored/deferred sinks, this is not a falsifier until
+the consuming job, page, report, or worker has run and its output has been read.
+
 ## Route to depth
 
 If the needed reference is not obvious, open `references/README.md` and choose
@@ -63,9 +67,15 @@ one named file. Do not load the entire directory.
 | Only timing answers | `references/time-blind.md` |
 | Files must be read or written | `references/file-operations.md` |
 | A filter blocks the payload | `references/waf-evasion.md` |
-| Object-shaped filter, comparison operators | `references/nosql.md` |
+| The value is stored, then consumed by a later job/page | `references/extended-corpus.md` — Second-Order SQL Injection |
+| A client-controlled sort/key expression reaches `ORDER BY` | `references/extended-corpus.md` — ExpressionEngine ORDER BY SQLi |
+| Object-shaped filter, comparison operators | `../web-nosqli/SKILL.md` and its references |
 | DBMS identified | `references/mysql.md`, `references/postgresql.md`, `references/mssql.md`, `references/oracle.md` |
 | Still unsure | `references/detection.md` |
+
+For an immediate sort/column signal, use `references/detection.md` for the
+bounded `ORDER BY N` column-count probe before trying UNION. Do not use response
+size alone to search for sort keys: compare ordering or a query-derived marker.
 
 Fingerprint once: MySQL `@@version`, PostgreSQL `version()`, MSSQL `@@version`,
 Oracle `v$version`. Then read only that DBMS file.

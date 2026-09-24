@@ -75,3 +75,34 @@ Falsifier: the token is read inside the same transaction as the update
 **Blast radius**: overwriting server configuration or an imported module can permanently break the instance
 
 - status: proposed
+
+## 2026-09-23 · PhantomFeed · proposed
+
+- source note: `solved/phantomfeed.md`
+- chain card: `knowledge/chains/htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab.json`
+- verification: verified_live — HTTP 200 from GET /backend/static/zz.txt whose body was the flag copied out of /flag<random>.txt on the live target
+- classified as: `web-race-condition` (score 2.5, 2 signals matched)
+- also matched: `web-ssti` (4.5), `web-auth-session` (3.5), `web-oauth-sso` (3.5)
+- signals that fired: gether when the regex ends, and one of them reads the row be, redeem
+
+**Confirming probe that worked**
+
+> POST /phantomfeed/register with email=a@ + 26 a + ! , timed against a normal email
+
+Expected: the registration takes several seconds against a baseline near one second, and the cost roughly doubles for each extra character
+
+Falsifier: the timing is flat with input length, so the validator does not backtrack and the window does not exist
+
+**Traps recorded on this solve**
+
+- the race cannot be won by timing one request: the regex holds the interpreter lock, so an expensive request is starved for the whole window and served only after the disabling update commits
+- a longer backtracking payload makes it worse, because the reverse proxy returns a gateway timeout at sixty seconds
+- a client-side router redirect returns 200 with no Location header, so it cannot be confirmed from the response
+- the JSON serialiser in the reflection escapes double quotes and backslashes, so the injected script must avoid both
+- the template engine escapes the payload's quotes and angle brackets, but the PDF parser decodes character references in the attribute, so no bypass is needed and no unescaping should be attempted
+- the export route returns early when the collection is empty, so a record has to be created first
+- a detector that assumes no digits between a field name and its value fails, because escaped quotes render as numeric character references
+
+**Blast radius**: steps 3 and 9 write. The race leaves one extra account per attempt, so keep the attempt count low. The export payload runs a shell command as the application user: copy the flag to a new path, never overwrite an application file, and remove the copy afterwards. The injected script posts into the feed, which triggers another browser run, so keep its link harmless. Around a hundred concurrent logins is what the race needs; more will simply stall the instance, and its proxy gives up at sixty seconds.
+
+- status: proposed

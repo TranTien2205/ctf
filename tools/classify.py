@@ -21,6 +21,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TAXONOMY = os.path.join(ROOT, "knowledge", "bug-classes.json")
+WRITEUP_CARDS = os.path.join(ROOT, "knowledge", "cards")
 MISSES = os.path.join(ROOT, "knowledge", "classify-misses.log")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
              "vendor", "site-packages"}
@@ -37,6 +38,62 @@ def load_taxonomy(path=TAXONOMY):
         return json.load(handle)
 
 
+def _normalise_class_label(value):
+    return re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-")
+
+
+WRITEUP_CLASS_ALIASES = {
+    "sql-injection": "web-sqli",
+    "sqli": "web-sqli",
+    "nosql-injection": "web-nosqli",
+    "command-injection": "web-command-injection",
+    "server-side-template-injection": "web-ssti",
+    "cross-site-scripting": "web-xss",
+    "cross-site-request-forgery": "web-csrf",
+}
+
+
+def load_writeup_signals(directory=WRITEUP_CARDS, classes=None):
+    """Load only reviewed writeup signal literals, grouped by primary class.
+
+    Writeups are external claims. They may suggest recognition vocabulary only;
+    their probes, verdicts, confidence, and verification never enter the local
+    taxonomy or controller.
+    """
+    signals = {}
+    if not os.path.isdir(directory):
+        return signals
+    for path in sorted(os.path.join(directory, name) for name in os.listdir(directory)
+                       if name.endswith(".json")):
+        try:
+            with open(path, encoding="utf-8") as handle:
+                card = json.load(handle)
+        except (OSError, ValueError):
+            continue
+        quality = card.get("quality") or {}
+        if quality.get("review_status") != "reviewed":
+            continue
+        label = (card.get("classification") or {}).get("primary")
+        if not label or not isinstance(card.get("signals"), list):
+            continue
+        if classes is None:
+            class_id = label
+        else:
+            aliases = {}
+            for entry in classes:
+                aliases[_normalise_class_label(entry["id"])] = entry["id"]
+                aliases[_normalise_class_label(entry["name"])] = entry["id"]
+                aliases[_normalise_class_label(entry["id"].removeprefix("web-"))] = entry["id"]
+            normalized_label = _normalise_class_label(label)
+            class_id = aliases.get(normalized_label) or WRITEUP_CLASS_ALIASES.get(normalized_label)
+            if class_id is None:
+                continue
+        signals.setdefault(class_id, []).extend(
+            item.strip() for item in card["signals"]
+            if isinstance(item, str) and item.strip())
+    return {class_id: sorted(set(items)) for class_id, items in signals.items()}
+
+
 def compile_signals(classes, field):
     compiled = {}
     for entry in classes:
@@ -49,6 +106,22 @@ def compile_signals(classes, field):
                       file=sys.stderr)
         compiled[entry["id"]] = patterns
     return compiled
+
+
+def merge_writeup_signals(classes, writeup_signals):
+    """Add reviewed writeup signals as literal regexes; keep taxonomy policy authoritative."""
+    merged = []
+    for entry in classes:
+        clone = dict(entry)
+        if writeup_signals.get(entry["id"]):
+            source_patterns = list(entry.get("source_signals", []))
+            observation_patterns = list(entry.get("observation_signals", []))
+            # Escape external strings so they are exact literals, never patterns.
+            reviewed = [re.escape(s) for s in writeup_signals[entry["id"]]]
+            clone["source_signals"] = source_patterns + reviewed
+            clone["observation_signals"] = observation_patterns + reviewed
+        merged.append(clone)
+    return merged
 
 
 def walk_source(target):
@@ -176,7 +249,8 @@ def main():
         parser.error("provide an observation or --source")
 
     taxonomy = load_taxonomy(args.taxonomy)
-    classes = taxonomy["classes"]
+    classes = merge_writeup_signals(
+        taxonomy["classes"], load_writeup_signals(classes=taxonomy["classes"]))
     if args.only:
         classes = [c for c in classes if c["evidence_level"] == args.only]
 

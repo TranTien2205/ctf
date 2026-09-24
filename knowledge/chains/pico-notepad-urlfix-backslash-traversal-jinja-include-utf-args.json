@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "pico-notepad-urlfix-backslash-traversal-jinja-include-utf-args",
+  "source_note": "solved/notepad.md",
+  "challenge": {
+    "name": "note writer with blocked separators (notepad)",
+    "platform": "picoCTF",
+    "event": "picoMini by redpwn",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "python",
+    "flask",
+    "jinja2",
+    "werkzeug",
+    "gunicorn"
+  ],
+  "preconditions": {
+    "all_of": [
+      "user input is checked for forbidden characters and then passed through a normaliser before being used as a path",
+      "the normaliser can introduce a character the check rejected"
+    ],
+    "any_of": [
+      "a template include concatenates user input into a template name",
+      "a directory outside the upload root is writable by the worker",
+      "the filename is derived from a prefix of the content while the whole content is written"
+    ]
+  },
+  "signals": [
+    "url_fix",
+    "werkzeug",
+    "backslash",
+    "chmod 1773",
+    "include",
+    "autoescape",
+    "static/",
+    "token_urlsafe"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the sink first: find what turns stored data into a template or a path",
+      "why": "{% include \"errors/\" + error + \".html\" %} with error from the query string is what makes a written file executable"
+    },
+    {
+      "step": 2,
+      "stage": "surface",
+      "action": "read the Dockerfile's permissions, not just the app",
+      "why": "chmod 1773 on templates/errors is the deliberate door; without it the traversal writes nowhere useful"
+    },
+    {
+      "step": 3,
+      "stage": "differential",
+      "action": "read the normaliser's source for rewrites that happen AFTER the application's own check",
+      "why": "werkzeug url_fix starts with s.replace(chr(92), '/'), so a backslash becomes a separator the filter already approved"
+    },
+    {
+      "step": 4,
+      "stage": "shape",
+      "action": "pad the prefix that forms the filename so the payload sits beyond it",
+      "why": "the name comes from content[:128] while the file receives the whole content; padding keeps the on-disk name clean and predictable"
+    },
+    {
+      "step": 5,
+      "stage": "exploit",
+      "action": "write a template whose dangerous identifiers are supplied at render time from request parameters",
+      "why": "the payload itself is subject to the same character filter, so the dunders cannot be literal"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "submit content that is only the traversal prefix built from backslashes, then read the redirect's Location header",
+    "expected": "the Location shows the path outside the upload directory, proving the normaliser produced separators the filter rejected",
+    "falsifier": "the Location still points inside the upload directory, so the normaliser leaves backslashes alone"
+  },
+  "blast_radius": "this writes a file into the application's own template directory and the app offers no delete route. On a shared, always-on host the planted templates cannot be cleaned up, so name them uniquely and say so when reporting.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag was rendered into the GET / response body by the include of the planted template"
+  },
+  "reuse_when": [
+    "a filter runs before a normaliser, encoder or path builder that can reintroduce the blocked byte",
+    "a template name is concatenated from user input",
+    "a filename is derived from a prefix while the full input is stored"
+  ],
+  "known_traps": [
+    "the payload must satisfy the same character filter as the path, which rules out every literal __class__/__globals__ chain; pass the dunders in as request parameters and let jinja's getattr fall back to item lookup",
+    "cycler.__init__.__globals__ resolves to jinja2.utils and has no os; lipsum.__globals__ does",
+    "parameterise the module and every call so a wrong guess is a URL change, not another planted file"
+  ],
+  "flag": null
+}

@@ -74,8 +74,7 @@
   "blast_radius": "arbitrary python runs inside the challenge container; a cp or rm with a wrong path can disturb app state, and an eval(exit()) kills the single-process dev server permanently",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag string read from /static/f.txt on the rebuilt deployment",
-    "proof": "response time near 7s instead of ~1s"
+    "evidence": "flag string read from /static/f.txt on the rebuilt deployment Supporting observation: response time near 7s instead of ~1s"
   },
   "reuse_when": [
     "a server-side pipeline formats user values into an ImageMath or similar sandboxed expression",
@@ -94,17 +93,5 @@
   "classification": {
     "primary": "web-logic-flaw",
     "confidence": 0.8
-  },
-  "source": {
-    "url": "local://knowledge/chains/htb-amidst-us-imagemath-eval-static-folder-exfil.json",
-    "retrieved_at": "2026-09-15",
-    "evidence_spans": [
-      "first_confirming_probe: background[0] = eval(\"__import__('time').sleep(6)\") compared with a ~1s baseline request"
-    ]
-  },
-  "quality": {
-    "verified_live": true,
-    "review_status": "raw",
-    "extraction_confidence": 0.8
   }
 }

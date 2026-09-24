@@ -20,10 +20,12 @@
     "confidence": 0.98
   },
   "signals": [
-    "PROFILE endpoint exposes SQL error behavior",
-    "filtered SQL keywords require an error-based column-discovery bypass",
-    "authenticated ACCESS endpoint accepts directory traversal",
-    "two virtual sites share session state"
+    "PROFILE",
+    "extractvalue(",
+    "Duplicate column name",
+    "ACCESS?action=browse",
+    "$_SESSION=$_POST",
+    "is_ExclusiveMember"
   ],
   "target": {
     "interface": "HTTP",
@@ -94,20 +96,20 @@
     "retrieved_at": "2026-09-04T15:21:33Z",
     "evidence_spans": [
       {
-        "text": "The web page reveals ... a SQL injection vulnerability in the PROFILE endpoint.",
-        "location": "normalized lines 8-10"
+        "text": "there is a SQL injection vulnerability in the `PROFILE` endpoint.",
+        "location": "normalized line 10"
       },
       {
-        "text": "there’s an annoying filter that prevents us from enumerating columns",
-        "location": "normalized lines 19-20"
+        "text": "Duplicate column name 'P4sWW0rD_0F_M3_WTF'",
+        "location": "normalized line 26"
       },
       {
         "text": "After logging in, we found a directory traversal vulnerability",
         "location": "normalized line 72"
       },
       {
-        "text": "The source code for its INDEX page contains",
-        "location": "normalized lines 115-119"
+        "text": "$_SESSION=$_POST;",
+        "location": "normalized lines 119-122"
       }
     ]
   },

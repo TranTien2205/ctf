@@ -10,7 +10,13 @@
     "solved_at": "2026-09-23",
     "assistance": "self-solved"
   },
-  "stack": ["flask", "gunicorn", "pillow", "python3.12", "supervisord"],
+  "stack": [
+    "flask",
+    "gunicorn",
+    "pillow",
+    "python3.12",
+    "supervisord"
+  ],
   "preconditions": {
     "all_of": [
       "An upload handler joins the request-supplied filename onto a directory without sanitising it, so the filename controls where the bytes land.",
@@ -30,10 +36,8 @@
     "os.path.exists",
     "already exists",
     "BLACKLISTED",
-    ".py",
     "send_file",
     "_resized",
-    "PIL",
     "Image.open",
     "gunicorn"
   ],

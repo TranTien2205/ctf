@@ -76,6 +76,12 @@
       "stage": "flag",
       "action": "run the setuid helper and write its output into the job output directory, then download the job",
       "why": "the helper is the only path to the real flag; the download endpoint returns the job file"
+    },
+    {
+      "step": 7,
+      "stage": "cleanup",
+      "action": "have the replacement converter rewrite itself with the original source, then re-read it via the image-embedding primitive to confirm it matches, and turn the saved-assets setting back off",
+      "why": "the write is the only destructive part of the chain and it is trivially reversible, so a shared instance can be left exactly as found"
     }
   ],
   "first_confirming_probe": {
@@ -83,10 +89,10 @@
     "expected": "the returned HTML contains an <img alt=\"f\" src=\"data:...;base64,...\"> whose decoded bytes are the file content",
     "falsifier": "the image is not inlined, or the path is not read from disk"
   },
-  "blast_radius": "overwriting the converter script disables the application's conversion feature until the container is rebuilt; the RCE runs as the service user inside the challenge container only. Rebuild or restart the instance afterwards",
+  "blast_radius": "the RCE runs as the service user inside the challenge container only. Overwriting the converter script would normally disable conversion for everyone until the container is rebuilt - avoid that by making the payload SELF-RESTORING: embed the original converter source (base64) in the replacement and have it rewrite itself after producing output, which limits the outage to the single triggering job. Verified live: afterwards the converter was byte-identical to the original and normal conversions worked again. Also remember the saved-assets setting is global - turn it back off when finished.",
   "verification": {
-    "status": "unverified",
-    "evidence": "chain reproduced end-to-end on a locally built instance of the supplied source: the setuid helper's output was read back from the job download. The supplied source ships a test flag, so no live challenge flag was read and the remote instance was unreachable"
+    "status": "verified_live",
+    "evidence": "first verified live on 2026-09-24 against a running instance: the embed_images probe returned /etc/hostname, the application database yielded the admin password, the absolute attachment key overwrote the converter, and the triggered job's download was the setuid helper's stdout. The earlier entry was a local-only reproduction."
   },
   "reuse_when": [
     "a notebook or document converter exposes embed_images or a similar inline-local-file option",
@@ -98,7 +104,8 @@
     "an already-authenticated session is redirected before the login form is read; log out before switching users",
     "the first base64 data URI in the HTML is a template icon; match the specific image alt tag",
     "the outputs filename path forces a mime extension and cannot write a python file; use the attachments path",
-    "the jupyter converter config file is not loaded by the nbconvert python API, so writing it does not trigger execution"
+    "the jupyter converter config file is not loaded by the nbconvert python API, so writing it does not trigger execution",
+    "do not leave the converter overwritten: embed the original source in the payload and have it restore itself after writing the output, then confirm by re-reading the converter through the same embed_images primitive and diffing it against the shipped source"
   ],
   "flag": null,
   "schema_version": 1

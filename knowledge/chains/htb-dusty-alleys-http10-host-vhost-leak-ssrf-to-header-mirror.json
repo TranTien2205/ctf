@@ -10,7 +10,12 @@
     "solved_at": "2026-09-19",
     "assistance": "writeup-assisted"
   },
-  "stack": ["nginx", "express", "node", "node-fetch"],
+  "stack": [
+    "nginx",
+    "express",
+    "node",
+    "node-fetch"
+  ],
   "preconditions": {
     "all_of": [
       "a reverse proxy fronts one or more applications and selects them by the host header",
@@ -24,10 +29,8 @@
   },
   "signals": [
     "nginx",
-    "express",
     "think",
     "guardian",
-    "host",
     "x-forwarded-for",
     "node-fetch",
     "ssrf",

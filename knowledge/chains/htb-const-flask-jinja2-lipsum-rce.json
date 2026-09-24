@@ -7,25 +7,18 @@
     "event": "Lab",
     "category": "web",
     "solved_at": "2026-09-18",
-    "assistance": "white-box"
+    "assistance": "unknown"
   },
-  "stack": ["python", "flask", "jinja2", "werkzeug"],
+  "stack": [
+    "python",
+    "flask",
+    "jinja2",
+    "werkzeug"
+  ],
   "classification": {
     "primary": "web-ssti",
     "secondary": [],
     "confidence": 0.95
-  },
-  "source": {
-    "url": "local://knowledge/chains/htb-const-flask-jinja2-lipsum-rce.json",
-    "retrieved_at": "2026-09-18",
-    "evidence_spans": [
-      "first_confirming_probe: GET /{{7*7}} returns the custom 404 with <str>49</str> and the lipsum.__globals__ namespace reaches os.popen"
-    ]
-  },
-  "quality": {
-    "verified_live": true,
-    "review_status": "raw",
-    "extraction_confidence": 0.95
   },
   "preconditions": {
     "all_of": [
@@ -38,7 +31,6 @@
     ]
   },
   "signals": [
-    "str(",
     "custom 404",
     "under construction",
     "flask jinja2",
@@ -59,7 +51,7 @@
       "step": 2,
       "stage": "pivot",
       "action": "reach a privileged namespace through lipsum.__globals__.os and confirm with `id` in popen",
-      "why": "lipsum.__globals__ reaches the app module namespace where os is already imported — no import needed"
+      "why": "lipsum.__globals__ reaches the app module namespace where os is already imported \u2014 no import needed"
     },
     {
       "step": 3,
@@ -82,8 +74,7 @@
   "blast_radius": "arbitrary python execution as root inside the single-container app",
   "verification": {
     "status": "verified_live",
-    "evidence": "popen cat flag.txt returned the flagged string inside the custom str() call output",
-    "proof": "GET / with a lipsum-based popen payload returned the flagged string inside the custom error template"
+    "evidence": "popen cat flag.txt returned the flagged string inside the custom str() call output Supporting observation: GET / with a lipsum-based popen payload returned the flagged string inside the custom error template"
   },
   "reuse_when": [
     "an error page names or echoes the input URL through a template that renders it",

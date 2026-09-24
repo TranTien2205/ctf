@@ -40,7 +40,6 @@
     "strings.Contains",
     "Content-Length",
     "exec(",
-    "express",
     "X-Powered-By: Express",
     "nip.io",
     "flushInterface",
@@ -51,13 +50,13 @@
       "step": 1,
       "stage": "reach the internal host past a substring blacklist",
       "action": "Encode the internal address in a form that shares no substring with the blocked list and still resolves to it. nip.io serves dotted, dashed and hex encodings: 0af405cf.nip.io resolves to 10.244.5.207 and contains neither '10.' nor any other blocked token. Send it as the Host header on the proxied request.",
-      "why": "blacklistCheck tests for the substrings localhost, 0.0.0.0, 127., 172., 192., 10. — a string test over the raw bytes, not a parse of the destination address, so any alternate encoding of the same address passes."
+      "why": "blacklistCheck tests for the substrings localhost, 0.0.0.0, 127., 172., 192., 10. \u2014 a string test over the raw bytes, not a parse of the destination address, so any alternate encoding of the same address passes."
     },
     {
       "step": 2,
       "stage": "smuggle a second request past every proxy-side gate",
       "action": "Build one TCP payload containing two pipelined HTTP requests separated by an extra CRLFCRLF. The first is an allowed route with a small valid JSON body whose length matches its Content-Length; the second is the banned route with the real payload. Read the second HTTP status line in the relayed response.",
-      "why": "The parser does bodySplit := strings.Split(raw, \"\\r\\n\\r\\n\") and then validates only bodySplit[1]; the proxy afterwards writes the whole original byte buffer to the upstream socket. Every filter — URL ban, body regexes, Content-Length check — therefore applies to the first request only, while the backend parses and answers both."
+      "why": "The parser does bodySplit := strings.Split(raw, \"\\r\\n\\r\\n\") and then validates only bodySplit[1]; the proxy afterwards writes the whole original byte buffer to the upstream socket. Every filter \u2014 URL ban, body regexes, Content-Length check \u2014 therefore applies to the first request only, while the backend parses and answers both."
     },
     {
       "step": 3,
@@ -81,7 +80,7 @@
   "first_confirming_probe": {
     "request": "Send a single TCP write to the proxy: an allowed route with body {\"a\":1} and Content-Length: 7, then \\r\\n\\r\\n, then a second full request to a route the proxy's URL filter bans, with Host set to the alternate-encoded internal address. Count the HTTP status lines in the response.",
     "expected": "Two HTTP status lines come back on the one connection, and the second belongs to the banned route (any status from the backend, including its own 4xx) rather than the proxy's 400 Bad Request. That proves the bytes after the second CRLFCRLF were forwarded unfiltered. Follow it immediately with two egress probes ('which wget' and one fetch to a benign host) - that answer decides between a one-request exfiltration and a several-hundred-request oracle.",
-    "falsifier": "Only one status line returns, or the single response is the proxy's own 400/403 for the banned URL. Then the proxy re-serialises the request (or validates the whole buffer) and this chain does not apply — move to a different mechanism layer rather than trying more separator variants."
+    "falsifier": "Only one status line returns, or the single response is the proxy's own 400/403 for the banned URL. Then the proxy re-serialises the request (or validates the whole buffer) and this chain does not apply \u2014 move to a different mechanism layer rather than trying more separator variants."
   },
   "blast_radius": "High if the injected value is careless. The sink here runs as root inside the challenge container. The route's legitimate function flushes addresses off a network interface: passing a real interface name (eth0, lo) severs the container's networking and permanently bricks the shared instance with no way back. Always pass a name that does not exist (a bare 'x') so the legitimate command fails harmlessly, and carry the payload in the injected suffix only. Read-only conditions (grep -q, ls, test) keep the whole extraction non-destructive. Keep concurrency at one connection: the proxy reads with a fixed 1024-byte buffer and pipelining plus load makes responses unreliable. Separately, the out-of-band route sends challenge data to whatever collector is named in the URL: that is a real disclosure to a third party, so use a collector you control and never a public paste or request-bin for anything beyond a test marker. Where disclosure matters more than speed, the blind oracle keeps everything on the wire between you and the target.",
   "verification": {

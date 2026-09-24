@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "id": "htb-imagetok-bcrypt-truncation-phar-soapclient-gopher-mysql",
+  "source_note": "solved/htb-imagetok-bcrypt-phar-soapclient-gopher.md",
+  "challenge": {
+    "name": "ImageTok",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "writeup-assisted"
+  },
+  "stack": ["php", "php7.4", "nginx", "php-fpm", "mariadb", "phar", "soap", "curl"],
+  "preconditions": {
+    "all_of": [
+      "a client-held blob is authenticated by bcrypt over a concatenation of a server secret and the blob",
+      "some filesystem call reaches an attacker-controlled path string"
+    ],
+    "any_of": [
+      "a magic method calls an arbitrary method on an attacker-controlled property",
+      "a server-side fetcher validates a URL with parse_url before handing it to a different client",
+      "the application serialises database rows back into the client's own session"
+    ]
+  },
+  "signals": [
+    "password_verify", "password_hash", "bcrypt", "PASSWORD_BCRYPT",
+    "phar://", "SoapClient", "user_agent", "parse_url",
+    "mysql_native_password", "definitely_not_a_flag"
+  ],
+  "chain": [
+    {"step": 1, "stage": "recon", "action": "measure the signed blob: bcrypt hashes only the first 72 bytes of its input, so with a 15-byte secret everything past json[57] is unauthenticated", "why": "the field that lands in the unsigned tail is decided by whatever orders the keys - here ksort put 'files' before 'username'"},
+    {"step": 2, "stage": "primitive", "action": "pad the leading field (upload two images) until the target field starts past the boundary, rewrite it to the privileged value and REUSE the original signature verbatim", "why": "password_verify truncates identically, so the prefix still matches; one accepted forgery is permanent because the app re-saves and properly re-signs the new state"},
+    {"step": 3, "stage": "recon", "action": "pull datastore credentials from the exposed phpinfo route", "why": "fastcgi_param values show up in phpinfo, and the datastore account had an empty password"},
+    {"step": 4, "stage": "pivot", "action": "trigger phar metadata deserialization by feeding a phar:// path to any filesystem call (file_exists here), using a PNG/phar polyglot whose stub is the image bytes plus __HALT_COMPILER()", "why": "the polyglot passes mime_content_type and getimagesize, so the upload validator stores it unchanged"},
+    {"step": 5, "stage": "pivot", "action": "the only gadget needed is a __destruct that calls a method on a property: set that property to a SoapClient so __call becomes an outbound HTTP request, and stuff CRLF into the user_agent option to smuggle a second complete request (Host, cookie, Content-Type, Content-Length, body) on the same keep-alive connection", "why": "the first request absorbs the proxy's rejection while the smuggled one arrives with a loopback REMOTE_ADDR and the forged privileged cookie"},
+    {"step": 6, "stage": "sink", "action": "defeat the scheme allowlist with scheme:///host:port/path - exactly three slashes makes parse_url return false for scheme, host AND port so every !empty() guard short-circuits, while curl still connects", "why": "the guard only inspects what parse_url manages to extract; four slashes breaks curl, three does not"},
+    {"step": 7, "stage": "flag", "action": "speak the datastore's wire protocol over gopher (login packet for the empty-password account, then a query packet) and INSERT the flag into a table the application already serialises back into the caller's session", "why": "the proxy's response is discarded by the SoapClient, so the chain is blind; a write primitive plus anything echoed into your own session becomes the read channel"}
+  ],
+  "first_confirming_probe": {
+    "request": "pad the signed blob so the identity field sits past byte (72 - secret length), rewrite it to the privileged value, keep the original signature and replay it",
+    "expected": "the server accepts the blob and re-issues a freshly signed cookie carrying the privileged identity",
+    "falsifier": "the server discards the blob and mints a new anonymous session, meaning the field is still inside the hashed prefix - add more padding"
+  },
+  "blast_radius": "additive only on a shared instance: a few image uploads (a cron wipes the upload directory every two minutes) plus ONE INSERT of the flag row into the application's own files table under a chosen username. No DROP, no UPDATE of existing rows, and the datastore grant is deliberately limited. There is no delete endpoint, so that row cannot be cleaned up afterwards. The instance was also observed restarting on its own mid-run, so expect to re-fire rather than assume the payload failed.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the flag came back inside the attacker's own session cookie as the single entry of the files array"
+  },
+  "reuse_when": [
+    "a signature is computed with bcrypt over secret-plus-data rather than over a digest",
+    "a filesystem call receives a request-controlled path and ext-phar is loaded",
+    "a class has a destructor that calls a method on a property and ext-soap is loaded",
+    "a URL allowlist is enforced with parse_url but fetched with a different client",
+    "a blind SSRF needs an output channel and the app writes rows back into your session"
+  ],
+  "known_traps": [
+    "PHP urldecodes the POST body, so a percent-encoded payload carried in a form field must be DOUBLE-encoded (% -> %25) or it arrives as raw bytes; the chain will execute perfectly and silently insert nothing",
+    "a deliberately pinned old dependency in the Dockerfile is the hint: curl 7.70.0 accepts %00 inside a URL while 7.74 rejects it with errno 3, and a database handshake is full of NUL bytes",
+    "exactly three slashes after the scheme - four makes the client reject the URL as malformed",
+    "leading whitespace also blinds parse_url but the client rejects it, so it is NOT a usable bypass; verify the client accepts whatever blinds the validator",
+    "setcookie percent-encodes the value, so unquote before base64-decoding and re-encode before replaying, otherwise '+' is decoded back to a space and the blob is corrupted",
+    "the destructor fires at request shutdown and the resulting fault is uncaught, so the triggering response looks like an error even when the chain worked - judge by the side effect"
+  ],
+  "flag": null
+}

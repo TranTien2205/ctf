@@ -34,6 +34,9 @@ belongs to an identity but the handler looks it up by identifier alone.
 2. As identity B, or with no session, request A's identifier.
 3. Reading or writing it proves the finding. One account cannot prove it.
 
+**Falsifier:** the handler scopes the lookup to the authenticated owner, and
+identity B cannot read or modify identity A's object through the tested route.
+
 ## Operational probe
 
 Use two sessions and keep the object read-only:
@@ -72,6 +75,9 @@ application hands out; time-ordered formats are predictable —
   alternative routing headers the framework honours.
 
 ## Route to depth
+
+If the identifier shape is unclear, open `references/README.md` first. Choose
+one named reference; do not load the whole directory.
 
 | Shape | File |
 |---|---|

@@ -104,3 +104,48 @@ flag read was the test flag shipped in the source bundle.
 - `jupyter_nbconvert_config.py` is **not** loaded by the nbconvert Python API
   (`Exporter` is a `LoggingConfigurable`, not an `Application`), so writing that
   config file is not the trigger here.
+
+---
+
+## Live verification — 2026-09-24 (second run, different instance)
+
+The original write-up above was a **local-only reproduction**; the card carried
+`verification: unverified` because the remote instance was unreachable at the time.
+This run confirmed the whole chain against a live target (`154.57.164.82:31655`) and the
+card is now `verified_live`.
+
+Preconditions were re-checked against the supplied handout before reusing anything:
+`nbconvert==7.17.0`, `exporter.embed_images = True`, the `FilesWriter` saved-assets
+branch, `/readflag` setuid root, and `chown -R appuser /srv/app` (so the converter script
+is writable by the service user). All still true.
+
+Sequence, each step confirmed by its own observable:
+
+1. Card's `first_confirming_probe` reproduced exactly: `![f](/etc/hostname)` converted to
+   HTML returned the host name inside the `alt="f"` data URI. (Trap confirmed: the first
+   data URI in the page is a template icon, so the alt tag must be matched.)
+2. `/srv/app/data/app.db` read back as 32768 bytes and opened directly with `sqlite3` —
+   admin password in plaintext. Trap confirmed: it is regenerated per start, so it has to
+   be read fresh on every run.
+3. Fresh `requests.Session` used for the admin login (trap: an already-authenticated
+   session is redirected past the login form).
+4. Attachment key `/srv/app/app/converter/convert_job.py` with an `image/png` base64 value —
+   `os.path.join(build_dir, "/abs/path")` discards the prefix, so the absolute key writes
+   wherever it points.
+5. One further conversion executed the replacement and the job download **was** the
+   setuid helper's stdout.
+
+### Improvement over the original run: leave nothing broken
+
+The card previously said overwriting the converter "disables the application's conversion
+feature until the container is rebuilt". That is avoidable. The replacement script embedded
+the original converter source as base64 and rewrote itself immediately after producing its
+output, so the outage lasted exactly one job.
+
+Verified afterwards, not assumed: a normal notebook converted to proper HTML again, and the
+converter re-read through the same `embed_images` primitive was **byte-identical** to the
+shipped source. The global saved-assets setting was also switched back off.
+
+**Lesson:** when the only destructive step in a chain is a file overwrite and you already
+hold the original bytes, make the payload restore itself — then prove it by reading the file
+back through the read primitive you already have, rather than trusting that it worked.

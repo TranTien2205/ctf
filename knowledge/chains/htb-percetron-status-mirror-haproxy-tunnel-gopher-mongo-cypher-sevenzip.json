@@ -1,0 +1,125 @@
+{
+  "id": "htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip",
+  "source_note": "solved/percetron.md",
+  "challenge": {
+    "name": "Percetron",
+    "platform": "HackTheBox",
+    "event": null,
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "haproxy",
+    "express",
+    "node",
+    "mongodb",
+    "neo4j",
+    "curl"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy denies one path prefix and the application behind it trusts every request the proxy forwards",
+      "a route returns the status code of a URL the attacker chose",
+      "a second route behind the proxy deny rule runs a fetch with no scheme or host filter"
+    ],
+    "any_of": [
+      "the fetch is execFile curl with the URL as an argument",
+      "an internal datastore listens with authentication disabled",
+      "an admin-only route interpolates parsed certificate fields into a database query"
+    ]
+  },
+  "signals": [
+    "healthcheck-dev",
+    "geturlstatuscode",
+    "@steezcram/sevenzip",
+    "searchcertificateconnections",
+    "path -i -m beg",
+    "neo4j-driver",
+    "buildcommandargs",
+    "percetron"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the proxy config for the denied prefix and the app for the route it protects; confirm the app never re-checks the path",
+      "why": "the deny rule is the only control, so the whole chain is about reaching that route once"
+    },
+    {
+      "step": 2,
+      "stage": "falsify",
+      "action": "test percent-encoded and dot-segment forms of the denied path against both the proxy and the app",
+      "why": "HAProxy 2.2 does not decode or normalise, and Node truncates at the fragment, so no path string is denied by one and accepted by the other; rule this out before spending time on it"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "point the status-mirroring route at an attacker server that answers a bare 101 Switching Protocols, with no Upgrade and no Connection header, on a non-default port",
+      "why": "the app mirrors 101 to the proxy, the proxy reads a successful upgrade and stops parsing HTTP on that connection; the headers must be absent or the Node client raises upgrade instead of response and the fetch never resolves"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "write the second request onto the same socket immediately, addressed to the denied path",
+      "why": "the proxy is in tunnel mode and forwards raw bytes, so the ACL is never evaluated; the backend keep-alive timeout closes the socket within seconds"
+    },
+    {
+      "step": 5,
+      "stage": "oracle",
+      "action": "send gopher at a byte logger you control and read what actually arrived before building any wire-protocol payload",
+      "why": "whether curl transmits NUL bytes in a gopher selector is version-dependent, and the channel is blind so a wrong assumption is invisible"
+    },
+    {
+      "step": 6,
+      "stage": "escalate",
+      "action": "send one OP_MSG update over gopher to the unauthenticated datastore to set the account's permission field, then log in again",
+      "why": "registration hardcodes the low-privilege role and no admin is seeded; the session copies the permission at login, so the old session stays unprivileged"
+    },
+    {
+      "step": 7,
+      "stage": "injection",
+      "action": "submit a certificate whose issuer commonName opens a block comment after overwriting the stored path field, and whose organizationName closes it",
+      "why": "each field is interpolated on its own line, so a line comment cannot reach the real path field; the block comment swallows it and leaves the rest of the map literal valid"
+    },
+    {
+      "step": 8,
+      "stage": "rce",
+      "action": "shape the injected path as /a\";<command>;\"/b so that dirname drops the last segment and the archiver's quoted directory argument closes on the injected quote",
+      "why": "the archive library calls execFile with shell true and interpolates the directory into a quoted argument, so the joined shell string runs the command"
+    },
+    {
+      "step": 9,
+      "stage": "flag",
+      "action": "copy the flag into the directory the app serves statically, using a glob for its randomised name, and fetch it",
+      "why": "the execution is blind, so the read-back has to go through a channel the app already exposes"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET /healthcheck?url=http://<your-host>:<non-default-port>/ where that host answers a bare 101, then on the same socket GET /healthcheck-dev?url=http://127.0.0.1:3000/",
+    "expected": "the first request returns 101 and the second returns an application response instead of the proxy's 403",
+    "falsifier": "the first request returns 504 (the 101 carried Upgrade/Connection and the client hung), or the second still returns 403 (the proxy did not enter tunnel mode)"
+  },
+  "blast_radius": "steps 6 to 8 write: one datastore document is modified, one graph node is created and a shell command runs as the application user. Pin the datastore update to your own account by username and never use a match-all filter. The shell command should write to a path you introduced, not overwrite an application file. Remove the written file and the archiver's temporary archives afterwards with a second injected certificate.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "HTTP 200 from GET /static/js/zz.txt whose body was the flag copied out of /flag<random>.txt on the live target"
+  },
+  "reuse_when": [
+    "a reverse proxy ACL is the only thing protecting a route and path-shape bypasses have been ruled out",
+    "an endpoint reflects the status code of a URL the attacker supplies",
+    "a fetch helper passes an attacker-controlled URL to curl with no scheme filter",
+    "a library calls execFile or spawn with shell true and interpolates a path into a quoted argument"
+  ],
+  "known_traps": [
+    "a 101 carrying Upgrade and Connection makes a Node client raise the upgrade event, so the fetch never resolves and the proxy answers 504",
+    "a URL whose port parseInt-s to NaN is rejected, and Node's URL normalises a default port to the empty string, so the listener needs an explicit non-default port",
+    "the backend keep-alive timeout closes the tunnelled socket, so the second request must follow the 101 with no delay",
+    "an application 500 closes the connection, so one tunnel carries one probe",
+    "curl transmits NUL bytes in a gopher selector at 7.70.0 but rejects them with CURLE_URL_MALFORMAT at 8.x; measure it on the target, not on the attacking host",
+    "gopher makes the status code 000, which becomes status 0 and throws, so a successful request is indistinguishable from a failed one by status alone",
+    "a certificate commonName is capped at 64 characters, which constrains the injected path and forces the block-comment form"
+  ],
+  "flag": null,
+  "schema_version": 1
+}

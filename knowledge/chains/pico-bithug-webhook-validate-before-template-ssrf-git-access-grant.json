@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "id": "pico-bithug-webhook-validate-before-template-ssrf-git-access-grant",
+  "source_note": "solved/bithug.md",
+  "challenge": {
+    "name": "git host with repo webhooks (BitHug / wily courier)",
+    "platform": "picoCTF",
+    "event": "picoCTF",
+    "category": "web",
+    "solved_at": "2026-09-23",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "nodejs",
+    "express",
+    "node-fetch",
+    "git",
+    "sqlite"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a stored URL is validated when saved but templated when used",
+      "a placeholder in that URL is filled from a value the attacker controls",
+      "privilege is decided by the source address of the request"
+    ],
+    "any_of": [
+      "the outbound request carries an attacker-controlled body and content type",
+      "the loopback blocklist compares literal strings rather than resolved addresses",
+      "the response of the outbound request is discarded, forcing a side-effecting target"
+    ]
+  },
+  "signals": [
+    "webhook",
+    "formatString",
+    "{{ref}}",
+    "receive-pack",
+    "remoteAddress",
+    "127.0.0.1",
+    "port 80",
+    "access.conf",
+    "refs/meta/config"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "find what grants privilege before looking for a bug",
+      "why": "admin is defined purely as a loopback source address, which names the exact primitive required"
+    },
+    {
+      "step": 2,
+      "stage": "differential",
+      "action": "compare where the URL is checked with where it is finally built",
+      "why": "validation runs at save time while formatString runs at fire time, so a placeholder bypasses every check"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "trace the templated value back to its source and confirm it is unvalidated",
+      "why": "the ref is raw-parsed out of the push body, so it can carry a port and a path"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "pick a loopback spelling the blocklist does not enumerate",
+      "why": "the check compares two literal strings, so 0.0.0.0 reaches the same interface"
+    },
+    {
+      "step": 5,
+      "stage": "exploit",
+      "action": "because the response is discarded, choose a target whose SIDE EFFECT is observable, and deliver it as the request body",
+      "why": "pushing refs/meta/config with access.conf naming our user converts one blind request into ordinary read access"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "store a webhook whose URL is entirely a template placeholder, then trigger it with a ref that expands to a host and port the validator would have rejected",
+    "expected": "the stored URL is accepted despite expanding to a forbidden port, and the target records the request",
+    "falsifier": "the save is rejected, or the placeholder is not expanded at fire time"
+  },
+  "blast_radius": "the challenge issues each user their own target repository and asks that you not touch anyone else's; register your own account and aim every payload at your own _/<user>.git. The push writes a new ref into that repo only.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the readme JSON returned by the live GET /_/<user>.git/api/readme contained the flag once access.conf had been pushed"
+  },
+  "reuse_when": [
+    "a value is validated in one representation and used in another",
+    "a webhook or callback URL supports placeholders",
+    "privilege is derived from source IP and any server-side request primitive exists",
+    "an SSRF response is discarded and a side-effecting target is needed"
+  ],
+  "known_traps": [
+    "the handout is a plain tar despite a .tgz name, so tar tzf fails and looks exactly like a truncated download; check file before re-downloading",
+    "the same formatString rewrites the BODY as well as the URL, so a binary payload containing {{ is silently corrupted",
+    "git rejecting the pushed ref does not stop the webhook: the helper resolves on stdout close regardless of exit code",
+    "build the packfile locally and replay it into a throwaway bare repo with git receive-pack --stateless-rpc before sending it anywhere"
+  ],
+  "flag": null
+}

@@ -9,6 +9,11 @@ cache/
 *.log
 *.sqlite3-journal
 
+# Fetched external material (writeups and raw responses). It is untrusted, may
+# hold flags, credentials or other people's data, and is reproducible by
+# re-running the pinned pipeline; never commit it.
+knowledge/raw/
+
 # Per-run and per-challenge working state; regenerated, and can hold target data
 **/runs/
 **/state.json

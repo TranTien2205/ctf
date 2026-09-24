@@ -26,19 +26,15 @@
     ]
   },
   "signals": [
-    "express",
     "mongoose",
     "mongodb",
     "noteId",
     "$rename",
     "$ne",
-    "update",
     "prototype pollution",
     "__proto__",
     "_peername",
-    "403",
-    "access denied",
-    "/flag"
+    "access denied"
   ],
   "chain": [
     {

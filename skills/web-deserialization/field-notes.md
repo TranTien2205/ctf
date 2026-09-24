@@ -69,3 +69,35 @@ Falsifier: the cookie is opaque or signed, so no object attributes are attacker-
 **Blast radius**: forging the cookie only changes your own session; the generated PDF is written to a fixed static path and must be overwritten with a benign document afterwards so the flag is not left on the shared instance
 
 - status: confirmed
+
+## 2026-09-24 · Spell Orsterra · proposed
+
+- source note: `solved/spell-orsterra.md`
+- chain card: `knowledge/chains/htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce.json`
+- verification: verified_live — flag returned by /readflag through the PLTE webshell, printed immediately after the literal PLTE bytes in the response
+- classified as: `web-deserialization` (score 2.5, 2 signals matched)
+- also matched: `web-ssrf` (2.5), `web-open-redirect` (2.0), `web-ssti` (1.5)
+- signals that fired: unserial, unserialize
+
+**Confirming probe that worked**
+
+> inject the POP chain with map/stamp set to the target's OWN static PNG and export_file set to a unique probe name, then GET /static/exports/<probe>.png
+
+Expected: HTTP 200 with PNG magic, which proves SSRF + redis write + unserialize + __destruct + arbitrary-path write in one shot without hosting anything
+
+Falsifier: 404 after two worker cycles (~2 min): either the stream name/serializer shape is wrong or the XADD never landed
+
+**Traps recorded on this solve**
+
+- writeup-assisted, but two published details are stale: writeup_search named the technique; the chain was re-derived from source and improved twice: the external redirect server is unnecessary (nginx percent-decodes the unix: uri), and the published IDAT pixel array no longer survives GD/zlib so the payload moved to the PLTE chunk
+- the published writeup wraps the stream field as s:1053:"{...}"; that is wrong - the field is plain json_encode(['body'=>..,'headers'=>..]) and a wrapper makes json_decode fail
+- PhpSerializer::encode applies addslashes(), and decode() applies stripslashes(), so the body MUST be pre-slashed; addslashes also removes the raw NULs of private-property mangling, which keeps the body valid UTF-8 and avoids the base64 branch (taken only when the body does not end with '}')
+- a trailing slash on the /assets/ URL lands on the numkeys argument (0/) and Redis rejects the EVAL; the location regex ~ /assets/(.+)/ is unanchored and the '/' inside unix:/run/... already satisfies it, so omit it
+- the write is blind: Redis kills the connection on the 'Host:' line via freeClientAsync, discarding the already-queued reply, so nginx always answers 502 - judge success only by an out-of-band observable
+- the Synacktiv IDAT pixel array from the writeup produces no payload on current GD/zlib; verify any image payload by replaying the target's exact transform chain before trusting it
+- getExportedMap()'s base64 read is a dead end: the result goes into a local variable and mail() is handed the undefined $this->body, so it exfiltrates nothing
+- keep the map small and the handler coordinates off-canvas: imagecopymerge with a negative dst_x still clips and rewrites columns from dst_y down, which perturbs the palette
+
+**Blast radius**: shared instance: the EVAL adds one entry to the 'messages' stream (worker.sh DELs that key every cycle) and the chain writes one file into the web-served exports directory. Use a unique filename, never touch session keys, and delete both the probe file and the webshell with the shell you gain. CONFIG/FLUSHALL/MODULE/SCRIPT are renamed away server-side, so the classic RDB-write path is closed.
+
+- status: proposed

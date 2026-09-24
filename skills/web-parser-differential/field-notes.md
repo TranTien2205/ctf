@@ -98,3 +98,33 @@ Falsifier: Both arms return the same status. If that status is 401 the trust che
 **Blast radius**: overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance
 
 - status: proposed
+
+## 2026-09-23 · stored XSS behind S/MIME (secure-email-service) · proposed
+
+- source note: `solved/secure-email-service.md`
+- chain card: `knowledge/chains/pico-secure-email-service-header-colon-differential-utf7-mt19937.json`
+- verification: verified_live — the flag was read from the GET /api/emails response body on the live target, delivered there by the admin bot's own browser POSTing localStorage.flag to /api/send
+- classified as: `web-parser-differential` (score 0.0, 0 signals matched)
+- also matched: `web-ssti` (3.5), `web-xss` (3.5), `web-race-condition` (2.5)
+- filed by operator override: the matcher did not rank this class; the chain is filed under the class whose first probe opens it
+
+**Confirming probe that worked**
+
+> send one message whose Subject is 'x\nFrom : <other identity>', then read back what the application's own parser reports as the sender
+
+Expected: the parser reports the injected identity, not the genuine From header the generator wrote
+
+Falsifier: the generator rejects the newline, or the parser still reports the genuine sender, meaning the space-before-colon form is not honoured
+
+**Traps recorded on this solve**
+
+- the injected boundary delimiter is itself part of the message text, so email.generator._make_boundary() matches '^--<b>(--)?$', calls it a collision and re-rolls the boundary to '<b>.0' -- the prediction is right and the exploit still fails silently; a single trailing space on the delimiter line defeats the anchored regex and is still a legal RFC 2046 delimiter
+- the same attacker string is used for BOTH the Subject header and the template body, so every injected line must also survive the generator's header guard; keep a space before any colon and no colon before the first whitespace on a line
+- CPython normalises a lone CR to LF inside a header value, so a bare \r is not a way around the guard
+- verify the generator's version from the Dockerfile: a newer local CPython adds verify_generated_headers and rejects payloads the target accepts
+- the recovered PRNG state dies with the process, so collection, recovery and attack must run in one pass
+- a boundary that collided reads as '<digits>==.0' and will not match a strict '={15}\d{19}==' regex, which makes a signed message look unsigned in your own tooling
+
+**Blast radius**: read-only against the target's own data, but the bot endpoint is globally serialised behind a lock and each run costs ~15s; the collection phase writes several hundred messages into your own mailbox, so never point it at a shared account.
+
+- status: proposed

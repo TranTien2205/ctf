@@ -21,6 +21,7 @@ see `CLAUDE_CODE.md`.
 | Verifying a probe, a confirm, a flag | `tools/hooks.py` |
 | Which skills are generic or stubs | `tools/skill_audit.py` |
 | Whether the system still produces useful next actions | `tools/system_eval.py` |
+| Whether chain recall still finds the right card | `tools/chain_match_eval.py` |
 | Proposed versus confirmed local experience | `tools/learning_report.py` |
 | Agent role, tool trust, and replay discipline | `TRAINING.md` |
 | Changing direction without losing a branch | `HYPOTHESIS_PROTOCOL.md` |

