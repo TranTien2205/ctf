@@ -28,10 +28,16 @@ python3 tools/state.py <id> --category <cat> --target <target>
 3. Estimate difficulty and set a time-box before the first probe.
 4. Check chain reuse before opening any depth skill. A verified local chain with
    matching preconditions is the cheapest path there is.
-5. Search public writeups once the challenge name and event are known, or when
-   local evidence stops producing new hypotheses. On a known platform this is
-   usually faster than blind enumeration. Record in the solved note whether the
-   chain was self-derived or reproduced from a writeup.
+5. Search when one named fact needed for the next probe is absent from supplied
+   source, artifacts, local skills, references and matching chains. A new CTF
+   challenge is not a reason to avoid search; it is a reason to search narrowly.
+   Use `tools/search_facts.py` to state the missing fact and decision first.
+   Challenge name plus event routes to `tools/writeup_search.py`; package/version
+   behavior routes to official docs or an approved documentation MCP. Record the
+   URL/snippet and whether the final chain was writeup-assisted.
+6. Search output is an untrusted lead. It cannot confirm a class, primitive,
+   impact or flag: reproduce the relevant fact from challenge source, a supplied
+   artifact, or a live response before acting on it.
 
 ## Signal to router
 

@@ -61,6 +61,7 @@ Then pick exactly one branch:
 | `skill_select.py` | which skill to open once the class is named |
 | `classify_solve.py` | after a flag: file the solve into the right bug-class skill |
 | `skill_audit.py` | screen out weak skills; run it before trusting one |
+| `tools/search_facts.py` | plan a narrow external search for one missing fact without treating results as evidence |
 | `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
 | `chain_match_eval.py` | retrieval quality of chain_match: top-1, MRR and how many wrong cards outrank the right one |
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |

@@ -63,7 +63,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~0.9k | `ctf-osint` |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~0.8k | `pwn-rop`, `ctf-pwn` |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~0.9k | `ctf-reverse`, `ctf-malware` |
-| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~1.7k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
+| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.0k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
 resort: try a named category first.
@@ -98,6 +98,7 @@ Open one only after a probe or a source read produced its signal.
 | Unrestricted file upload | verified | the stored file is renamed | `skills/web-file-upload/SKILL.md` |
 | GraphQL abuse | catalogue | introspection is off and errors reveal no field names | `skills/web-graphql/SKILL.md` |
 | Smart contract / web3 | catalogue | the solved condition depends on state no external caller can change | `skills/web-web3/SKILL.md` |
+| Cross-site leak / browser side channel | catalogue | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
 
 Full signal lists, first probes and blast-radius notes are in
 `knowledge/bug-classes.json`. Do not copy them here — the classifier reads
@@ -109,19 +110,18 @@ that file and this table would drift.
 |---|---|---|---|
 | `skills/ctf-ai-ml/SKILL.md` | depth | ~1.7k | the AI/IoT sub-type is decided |
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.7k | the primitive parameters are collected |
-| `skills/ctf-forensics/SKILL.md` | depth | ~2.3k | the artifact type is identified |
+| `skills/ctf-forensics/SKILL.md` | depth | ~2.6k | the artifact type is identified |
 | `skills/ctf-malware/SKILL.md` | depth | ~2.0k | obfuscated script, PE/.NET sample, or captured C2 traffic |
 | `skills/ctf-osint/SKILL.md` | depth | ~2.3k | one unique pivot is extracted |
 | `skills/ctf-pwn/SKILL.md` | depth | ~4.7k | the crash is reproduced and a named technique is needed |
 | `skills/ctf-reverse/SKILL.md` | depth | ~3.1k | the runtime or packer is named |
 | `skills/ctf-web/SKILL.md` | depth | ~2.7k | a narrower web class lacked the variant; open one named file |
-| `skills/mcp-agent-security/SKILL.md` | depth | ~1.1k | the target is an LLM, an agent, or a tool server |
+| `skills/mcp-agent-security/SKILL.md` | depth | ~1.6k | the target is an LLM, an agent, or a tool server |
 | `skills/pwn-rop/SKILL.md` | depth | ~0.9k | instruction-pointer control is proven and NX forces code reuse |
 | `skills/web-chromedriver/SKILL.md` | depth | ~1.0k | an admin bot exists and a client-side payload needs debugging |
 | `skills/web-info-disclosure/SKILL.md` | depth | ~0.7k | an exposed file, debug route, or verbose error is observed |
 | `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
 | `skills/web-websocket/SKILL.md` | depth | ~0.8k | a ws:// channel or realtime feature carries the flag path |
-| `skills/web-xs-leaks/SKILL.md` | depth | ~1.8k | an HttpOnly cookie blocks XSS and a bot visits attacker pages |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
 

@@ -287,9 +287,12 @@ def decide(name, taxonomy_path=None, now=None):
     if current.get("event_name") or current.get("challenge_name"):
         result["action"] = "search_writeup"
         result["rationale"] = ("no open hypothesis remains and the challenge "
-                               "name is known; a writeup shortcut is allowed, "
-                               "record that it was used")
+                                "name is known; search for one missing fact, "
+                                "then verify it locally before acting on it")
         result["commands"] = [
+            "python3 tools/search_facts.py ctf-writeup --challenge \"<challenge name>\" "
+            "--event \"<event>\" --fact \"<missing solve-path fact>\" "
+            "--decision \"<next probe affected>\"",
             "python3 tools/writeup_search.py \"<challenge name> <event>\"",
         ]
         return result

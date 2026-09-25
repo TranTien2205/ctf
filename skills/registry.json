@@ -38,7 +38,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1283,
+      "skill_tokens": 1399,
       "depth_files": 3,
       "depth_tokens": 1955,
       "use_when": [
@@ -222,7 +222,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1659,
+      "skill_tokens": 1968,
       "depth_files": 4,
       "depth_tokens": 2336,
       "use_when": [
@@ -256,13 +256,13 @@
         "web-ssrf",
         "web-ssti",
         "web-web3",
+        "web-xs-leaks",
         "web-xss",
         "web-xxe",
         "web-chromedriver",
         "ctf-web",
         "web-websocket",
         "web-source-map",
-        "web-xs-leaks",
         "web-info-disclosure"
       ]
     },
@@ -314,7 +314,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 2325,
+      "skill_tokens": 2609,
       "depth_files": 20,
       "depth_tokens": 85200,
       "use_when": [
@@ -469,7 +469,7 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1132,
+      "skill_tokens": 1582,
       "depth_files": 3,
       "depth_tokens": 2201,
       "use_when": [
@@ -551,7 +551,7 @@
       ],
       "skill_tokens": 850,
       "depth_files": 1,
-      "depth_tokens": 1468,
+      "depth_tokens": 2060,
       "use_when": [
         "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
         "a chain card already proves this class here: htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
@@ -687,7 +687,7 @@
       ],
       "skill_tokens": 1048,
       "depth_files": 7,
-      "depth_tokens": 4220,
+      "depth_tokens": 5025,
       "use_when": [
         "a probe or source read produced this class's signal: identify the format from the blob's own magic before touching any gadget",
         "a chain card already proves this class here: htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput, htb-py2-pickle-cookie-reduce-rce-rendered-output"
@@ -699,7 +699,7 @@
       "routes_to": [
         "web-prototype-pollution"
       ],
-      "unlock_signals": "(?:rO0AB|aced0005|gAN|O:\\d+:\\\"|BAhJ|AAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)",
+      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)",
       "bug_class": true
     },
     {
@@ -740,7 +740,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1096,
+      "skill_tokens": 940,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -821,7 +821,7 @@
       "verified_by": [],
       "skill_tokens": 763,
       "depth_files": 1,
-      "depth_tokens": 156,
+      "depth_tokens": 562,
       "use_when": [
         "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped"
       ],
@@ -850,7 +850,7 @@
       ],
       "skill_tokens": 829,
       "depth_files": 3,
-      "depth_tokens": 713,
+      "depth_tokens": 1220,
       "use_when": [
         "a probe or source read produced this class's signal: send the filter pinned to an object you created, with every write field omitted, and read what comes back",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
@@ -996,7 +996,7 @@
       ],
       "skill_tokens": 804,
       "depth_files": 2,
-      "depth_tokens": 1216,
+      "depth_tokens": 1848,
       "use_when": [
         "a probe or source read produced this class's signal: two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -1008,7 +1008,7 @@
       "routes_to": [
         "web-logic-flaw"
       ],
-      "unlock_signals": "(?:race condition|toctou)|(?:balance|coupon|voucher|one.?time|redeem)|(?:verification token|confirm)|(?:limit|quota)|(?:(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit))|(?:await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count))",
+      "unlock_signals": "(?:race condition|toctou)|(?:balance|coupon|voucher|one.?time|redeem)|(?:verification token|confirmation (?:code|email|link))|(?:rate.?limit|per.?user limit|quota)|(?:(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit))|(?:await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count))",
       "bug_class": true
     },
     {
@@ -1024,7 +1024,7 @@
       ],
       "skill_tokens": 1074,
       "depth_files": 1,
-      "depth_tokens": 1504,
+      "depth_tokens": 2758,
       "use_when": [
         "a probe or source read produced this class's signal: one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
         "a chain card already proves this class here: htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1076,7 +1076,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1295,
+      "skill_tokens": 1410,
       "depth_files": 13,
       "depth_tokens": 17159,
       "use_when": [
@@ -1107,7 +1107,7 @@
       ],
       "skill_tokens": 973,
       "depth_files": 6,
-      "depth_tokens": 3535,
+      "depth_tokens": 4606,
       "use_when": [
         "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
         "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1137,7 +1137,7 @@
       ],
       "skill_tokens": 746,
       "depth_files": 7,
-      "depth_tokens": 3241,
+      "depth_tokens": 3864,
       "use_when": [
         "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
         "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
@@ -1208,23 +1208,26 @@
       "categories": [
         "web"
       ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
       "skill_tokens": 1809,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
-        "an admin bot visits attacker pages and the cookie is HttpOnly",
-        "the goal is to learn a fact about the victim's authenticated state"
+        "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel"
       ],
       "do_not_use_when": [
-        "the response is readable cross-origin: use the ordinary web class",
-        "no bot or viewer exists to carry the victim session"
+        "the falsifier has been observed: the bot can reach no attacker-influenced state at all, and no observable on the target changes as a function of what the victim's browser loaded",
+        "the evidence fits one of these better: web-xss, web-cache-poisoning, web-csrf",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
       ],
       "routes_to": [
         "web-xss",
         "web-cache-poisoning",
         "web-csrf"
       ],
-      "unlock_signals": "xs-?leak|cross-?site leak|admin bot|bot visits|onerror|onload|cache prob|iframe timing|same-?site"
+      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
+      "bug_class": true
     },
     {
       "id": "web-xss",
@@ -1240,7 +1243,7 @@
       ],
       "skill_tokens": 1196,
       "depth_files": 7,
-      "depth_tokens": 4193,
+      "depth_tokens": 5810,
       "use_when": [
         "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"

@@ -45,6 +45,13 @@ union    ' ORDER BY N-- -  raising N until it errors, then ' UNION SELECT NULL,.
 Login bypass is worth trying first when the sink is an authentication query:
 `' OR '1'='1'-- -`, `admin'-- -`, `admin'#`, `') OR ('1'='1`.
 
+For blind SQLi, do not hand-infer a bit from a remembered payload. Establish a
+baseline, run a matched true/false pair (or a measured timing oracle), and
+preserve the actual responses. A scanner such as `sqlmap` is an optional
+authorized-target adapter; its summary is not evidence unless the underlying
+request/response or extracted value is recorded. For second-order SQLi, trigger
+the deferred consumer and inspect its output before applying the falsifier.
+
 ## Do not confuse SQLi with NoSQLi
 
 When the body is JSON and the query takes an object, the injection is a shape,

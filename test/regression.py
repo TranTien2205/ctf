@@ -326,6 +326,21 @@ class ContractTests(unittest.TestCase):
         self.assertIn('stuck_threshold: 3', generator)
         self.assertIn('on_stuck: pivot', generator)
 
+    def test_web_and_mcp_content_is_untrusted_and_requires_observed_effect(self):
+        web = (ROOT / "skills/web-triage/SKILL.md").read_text(encoding="utf-8").lower()
+        mcp = (ROOT / "skills/mcp-agent-security/SKILL.md").read_text(encoding="utf-8").lower()
+        self.assertIn("untrusted data", web)
+        self.assertIn("raw request and response", web)
+        self.assertIn("callback establishes only", web)
+        self.assertIn("tool result is evidence", mcp)
+        self.assertIn("third party", mcp)
+
+    def test_large_forensic_artifact_workflow_is_bounded_and_preserves_provenance(self):
+        text = (ROOT / "skills/ctf-forensics/SKILL.md").read_text(encoding="utf-8").lower()
+        for phrase in ("gigabyte", "cryptographic hash", "bounded ranges", "separate evidence directory",
+                       "hash of", "untrusted evidence"):
+            self.assertIn(phrase, text)
+
     def test_no_command_hardcodes_a_tree_root(self):
         """The tree has to work wherever it is checked out.
 
@@ -1155,7 +1170,8 @@ class OrchestratorTests(unittest.TestCase):
 
     def test_agents_md_exists_and_stays_ctf_only(self):
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
-        for tool in ("tools/decide.py", "tools/hooks.py", "tools/skill_audit.py"):
+        for tool in ("tools/decide.py", "tools/hooks.py", "tools/skill_audit.py",
+                     "tools/search_facts.py"):
             self.assertIn(tool, text, "AGENTS.md must document " + tool)
             self.assertTrue((ROOT / tool).is_file(),
                             "AGENTS.md names a missing tool: " + tool)
@@ -1163,7 +1179,21 @@ class OrchestratorTests(unittest.TestCase):
                        "root flag"):
             self.assertNotIn(marker.lower(), text.lower(),
                              "AGENTS.md must stay CTF-only, no red team: "
-                             + marker)
+                              + marker)
+
+    def test_search_facts_plans_a_missing_fact_without_treating_search_as_proof(self):
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tools/search_facts.py"), "ctf-writeup",
+             "--challenge", "Example", "--event", "Example CTF",
+             "--fact", "published solve path", "--decision", "select the first probe"],
+            capture_output=True, text=True, cwd=str(ROOT))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plan = json.loads(proc.stdout)
+        self.assertEqual(plan["action"], "search_external_fact")
+        self.assertEqual(plan["missing_fact"], "published solve path")
+        self.assertIn("tools/writeup_search.py", plan["commands"][0])
+        self.assertTrue(any("untrusted lead" in item.lower()
+                            for item in plan["evidence_policy"]))
 
     def test_skill_audit_report_is_written_and_consistent(self):
         report_path = ROOT / "knowledge" / "skill-audit.json"
