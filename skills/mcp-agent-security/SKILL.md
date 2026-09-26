@@ -125,6 +125,7 @@ third-party MCP server you do not operate.
 
 - `references/prompt-injection-testing.md` — payload shapes and how to read a result
 - `references/tool-permission-audit.md` — tool capability audit checklist
+- `references/adapter-selection.md` — when a docs, browser, proxy, OOB or code-index adapter earns its permissions
 
 ## Routing
 

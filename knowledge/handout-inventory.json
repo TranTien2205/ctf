@@ -1,0 +1,351 @@
+{
+  "schema_version": 1,
+  "policy": "inventory only; raw handouts remain gitignored and are never copied into knowledge",
+  "summary": {
+    "chain_cards": 54,
+    "with_handout": 23,
+    "without_handout": 31,
+    "coverage": 0.426
+  },
+  "cards": [
+    {
+      "chain_id": "htb-amidst-us-imagemath-eval-static-folder-exfil",
+      "challenge": "Amidst Us",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+      "challenge": "ApexSurvive",
+      "handout_available": true,
+      "handout_dir": "challenges/ApexSurvive",
+      "file_count": 52,
+      "byte_count": 3131233
+    },
+    {
+      "chain_id": "htb-artificial-university-grpc-attribute-pollution-eval",
+      "challenge": "ArtificialUniversity",
+      "handout_available": true,
+      "handout_dir": "challenges/ArtificialUniversity",
+      "file_count": 57,
+      "byte_count": 2399848
+    },
+    {
+      "chain_id": "htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti",
+      "challenge": "Bobby's Bistro",
+      "handout_available": true,
+      "handout_dir": "challenges/Bobby's Bistro",
+      "file_count": 23,
+      "byte_count": 60939
+    },
+    {
+      "chain_id": "htb-bonechewercon-jku-forge-csp-injection-nginx-crlf-cookie-plant",
+      "challenge": "BoneChewerCon",
+      "handout_available": true,
+      "handout_dir": "challenges/BoneChewerCon",
+      "file_count": 23,
+      "byte_count": 87909
+    },
+    {
+      "chain_id": "htb-bonechewercon-method-not-allowed-whoops-env-disclosure",
+      "challenge": "BonechewerCon",
+      "handout_available": true,
+      "handout_dir": "challenges/BoneChewerCon",
+      "file_count": 23,
+      "byte_count": 87909
+    },
+    {
+      "chain_id": "htb-broken-authentication-unsigned-base64-json-cookie-forge",
+      "challenge": "broken authentication",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-const-flask-jinja2-lipsum-rce",
+      "challenge": "Site still under construction",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-depotprint-dupkey-gate-formatstring-supervisor-jwt",
+      "challenge": "DepotPrint",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
+      "challenge": "DLLAMA",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-dusty-alleys-http10-host-vhost-leak-ssrf-to-header-mirror",
+      "challenge": "Dusty Alleys",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce",
+      "challenge": "EncoDecept",
+      "handout_available": true,
+      "handout_dir": "challenges/EncoDecept",
+      "file_count": 136,
+      "byte_count": 347753
+    },
+    {
+      "chain_id": "htb-fullstackconf-blind-stored-xss-socketio-oracle",
+      "challenge": "xss (Full Stack Conf)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-imagetok-bcrypt-truncation-phar-soapclient-gopher-mysql",
+      "challenge": "ImageTok",
+      "handout_available": true,
+      "handout_dir": "challenges/ImageTok",
+      "file_count": 25,
+      "byte_count": 2760421
+    },
+    {
+      "chain_id": "htb-magicom-argv-injection-phar-jpeg-config-cmdi",
+      "challenge": "Magicom",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-neonify-erb-ssti-newline-filter-bypass",
+      "challenge": "Neonify",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec",
+      "challenge": "NeuroSync",
+      "handout_available": true,
+      "handout_dir": "challenges/NeuroSync",
+      "file_count": 100,
+      "byte_count": 257285
+    },
+    {
+      "chain_id": "htb-nextpath-duplicate-param-array-file-read",
+      "challenge": "NextPath",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+      "challenge": "nginxatsu",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-nginxatsu-storage-autoindex-db-backup-md5-admin",
+      "challenge": "nginxatsu (rescue-mission variant)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-nomad-notes-replace-pattern-nonce-reuse-referrer-exfil",
+      "challenge": "Nomad Notes",
+      "handout_available": true,
+      "handout_dir": "challenges/Nomad Notes",
+      "file_count": 23,
+      "byte_count": 1947583
+    },
+    {
+      "chain_id": "htb-notebook-converter-pro-embed-images-read-fileswriter-write-rce",
+      "challenge": "Notebook Converter Pro",
+      "handout_available": true,
+      "handout_dir": "challenges/Notebook Converter Pro",
+      "file_count": 25,
+      "byte_count": 51485
+    },
+    {
+      "chain_id": "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
+      "challenge": "NovaCore",
+      "handout_available": true,
+      "handout_dir": "challenges/Novacore",
+      "file_count": 61,
+      "byte_count": 1911653
+    },
+    {
+      "chain_id": "htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge",
+      "challenge": "OmniWatch",
+      "handout_available": true,
+      "handout_dir": "challenges/OmniWatch",
+      "file_count": 69,
+      "byte_count": 4904035
+    },
+    {
+      "chain_id": "htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip",
+      "challenge": "Percetron",
+      "handout_available": true,
+      "handout_dir": "challenges/Percetron",
+      "file_count": 55,
+      "byte_count": 5297913
+    },
+    {
+      "chain_id": "htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab",
+      "challenge": "PhantomFeed",
+      "handout_available": true,
+      "handout_dir": "challenges/PhantomFeed",
+      "file_count": 95,
+      "byte_count": 9813056
+    },
+    {
+      "chain_id": "htb-phonebook-ldap-prefix-oracle",
+      "challenge": "Phonebook",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read",
+      "challenge": "Pod Diagnostics",
+      "handout_available": true,
+      "handout_dir": "challenges/Pod Diagnostics",
+      "file_count": 100,
+      "byte_count": 1667284
+    },
+    {
+      "chain_id": "htb-proxy-smuggling-exec-stderr-oracle",
+      "challenge": "Proxy",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-py2-pickle-cookie-reduce-rce-rendered-output",
+      "challenge": "insecure deserialization (anti_pickle_serum)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-quickblog-codefence-xss-registration-oracle-pickle-session",
+      "challenge": "QuickBlog",
+      "handout_available": true,
+      "handout_dir": "challenges/QuickBlog",
+      "file_count": 25,
+      "byte_count": 1896779
+    },
+    {
+      "chain_id": "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli",
+      "challenge": "red-island-2",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-red-island-ssrf-gopher-redis-lua-rce",
+      "challenge": "Red Island",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-resizer-filename-traversal-olefile-so-import",
+      "challenge": "Resizer",
+      "handout_available": true,
+      "handout_dir": "challenges/Resizer",
+      "file_count": 12,
+      "byte_count": 22416
+    },
+    {
+      "chain_id": "htb-sattrack-client-side-pp-jsfiles-csp-bypass",
+      "challenge": "Sattrack",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-secnotes-mongoose-rename-prototype-pollution-local-gate",
+      "challenge": "Secure Notes",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim",
+      "challenge": "SOS or SSO",
+      "handout_available": true,
+      "handout_dir": "challenges/SOS_or_SSO",
+      "file_count": 57,
+      "byte_count": 679515
+    },
+    {
+      "chain_id": "htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce",
+      "challenge": "Spell Orsterra",
+      "handout_available": true,
+      "handout_dir": "challenges/Spell Orsterra",
+      "file_count": 82,
+      "byte_count": 9439352
+    },
+    {
+      "chain_id": "htb-ssos-oauth-registration-race-cookie-swap-json-csrf",
+      "challenge": "SSOS",
+      "handout_available": true,
+      "handout_dir": "challenges/SSOS",
+      "file_count": 48,
+      "byte_count": 180026
+    },
+    {
+      "chain_id": "htb-todo-magic-list-all-segment-access-control-bypass",
+      "challenge": "broken authentication control (TODO OR NOT TODO)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-tornadoservice-bot-csrf-class-pollution",
+      "challenge": "TornadoService",
+      "handout_available": false
+    },
+    {
+      "chain_id": "htb-unearthly-shop-aggregation-pipeline-injection-autoload-primer-monolog-rce",
+      "challenge": "UnEarthly Shop",
+      "handout_available": true,
+      "handout_dir": "challenges/UnEarthly_Shop",
+      "file_count": 4773,
+      "byte_count": 66077635
+    },
+    {
+      "chain_id": "htb-weather-app-ssrf-crlf-request-smuggling-upsert",
+      "challenge": "Weather App",
+      "handout_available": true,
+      "handout_dir": "challenges/Weather App",
+      "file_count": 16,
+      "byte_count": 15720
+    },
+    {
+      "chain_id": "htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce",
+      "challenge": "Why Lambda",
+      "handout_available": true,
+      "handout_dir": "challenges/Why_Lambda",
+      "file_count": 37,
+      "byte_count": 8502004
+    },
+    {
+      "chain_id": "htb-xxe-content-type-branch-simplexml-noent-file-read",
+      "challenge": "xxe (WAFfles or Ice Cream)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-bithug-webhook-validate-before-template-ssrf-git-access-grant",
+      "challenge": "git host with repo webhooks (BitHug / wily courier)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-crystal-peak-second-order-sqli-async-report",
+      "challenge": "crystal-peak",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-fickle-tempest-column-rotation-png",
+      "challenge": "fickle-tempest",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-noted-internal-origin-named-window-noopener-inband-exfil",
+      "challenge": "self-XSS notes app with an offline report bot (noted)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-notepad-urlfix-backslash-traversal-jinja-include-utf-args",
+      "challenge": "note writer with blocked separators (notepad)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite",
+      "challenge": "NAND circuit checker on a custom CPU (Pachinko / Pachinko Revisited)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-secure-email-service-header-colon-differential-utf7-mt19937",
+      "challenge": "stored XSS behind S/MIME (secure-email-service)",
+      "handout_available": false
+    },
+    {
+      "chain_id": "pico-wily-courier-wasm-xor-key-in-data-section",
+      "challenge": "wily-courier",
+      "handout_available": false
+    },
+    {
+      "chain_id": "picoctf-expense-tracker-second-order-sqli-async-report-union",
+      "challenge": "Expense Tracker",
+      "handout_available": false
+    }
+  ]
+}

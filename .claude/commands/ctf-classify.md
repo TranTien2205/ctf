@@ -7,7 +7,7 @@ solved here. Evidence: $ARGUMENTS
 
 ```bash
 python3 tools/classify.py $ARGUMENTS
-python3 tools/chain_match.py $ARGUMENTS
+python3 tools/chain_match.py $ARGUMENTS        # add --record <id> once a ledger exists
 python3 tools/skill_select.py $ARGUMENTS
 ```
 

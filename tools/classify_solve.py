@@ -209,12 +209,32 @@ def cmd_review(taxonomy):
 
 
 def cmd_confirm(class_id, anchor, taxonomy):
+    """Promote one entry to confirmed.
+
+    The anchor is the solve date, so two solves filed on the same day collided
+    and this refused with 'found: 2' and no way forward: 17 of 54 entries were
+    unconfirmable, which is most of why the review queue never drained. An
+    anchor may now be written 'DATE:challenge-name' to disambiguate, and an
+    ambiguous plain date lists the exact commands that would work.
+    """
     path = notes_path(class_id, taxonomy)
     text = open(path, encoding="utf-8").read()
+    wanted_name = None
+    if ":" in anchor:
+        anchor, wanted_name = anchor.split(":", 1)
     matches = [m for m in ENTRY_HEAD.finditer(text) if m.group("anchor") == anchor]
+    if wanted_name is not None:
+        needle = wanted_name.strip().lower()
+        matches = [m for m in matches if needle in m.group("name").strip().lower()]
     if len(matches) != 1:
-        raise SystemExit(json.dumps({"error": "anchor must identify exactly one entry",
-                                     "anchor": anchor, "found": len(matches)}))
+        detail = {"error": "anchor must identify exactly one entry",
+                  "anchor": anchor, "found": len(matches)}
+        if len(matches) > 1:
+            detail["candidates"] = [m.group("name").strip() for m in matches]
+            detail["disambiguate_with"] = [
+                "python3 tools/classify_solve.py --confirm %s %s:%s"
+                % (class_id, anchor, m.group("name").strip()) for m in matches]
+        raise SystemExit(json.dumps(detail, ensure_ascii=False, indent=2))
     match = matches[0]
     if match.group("status") == "confirmed":
         print(json.dumps({"skipped": "already confirmed", "anchor": anchor}))

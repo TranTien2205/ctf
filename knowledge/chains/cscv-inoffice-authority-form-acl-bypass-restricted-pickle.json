@@ -1,0 +1,102 @@
+{
+  "id": "cscv-inoffice-authority-form-acl-bypass-restricted-pickle",
+  "source_note": "solved/cscv-inoffice.md",
+  "challenge": {
+    "name": "in-office",
+    "platform": "CSCV",
+    "event": "CSCV 2026",
+    "category": "web",
+    "solved_at": "2026-09-24",
+    "assistance": "writeup-assisted"
+  },
+  "stack": ["haproxy-2.9.7", "gunicorn-25.3.0", "flask-3.1.3", "werkzeug", "python-3.14"],
+  "preconditions": {
+    "all_of": [
+      "HAProxy fronts a Python WSGI backend and gates access with an ACL over the path sample fetch",
+      "the protected route is selected only by the path, so the backend routes on PATH_INFO alone",
+      "a backend selection rule keyed on hdr(host) must still match for a backend to be chosen"
+    ],
+    "any_of": [
+      "acl using path or path,url_dec with -m sub / -m beg against a substring of the protected route",
+      "a second ACL over req.hdr(Content-Type) with -m beg multipart/form-data",
+      "an unpickle sink reachable only by POST with a multipart file part"
+    ]
+  },
+  "signals": [
+    "haproxy.cfg",
+    "path,url_dec",
+    "-m sub",
+    "acl is_office_path",
+    "req.hdr(Content-Type) -m beg multipart/form-data",
+    "use_backend if hdr(host)",
+    "src 192.168.0.0/16 office network acl",
+    "gunicorn.conf.py",
+    "RestrictedUnpickler",
+    "find_class module == builtins",
+    "restricted_loads",
+    "request.files['file']",
+    "urlopen(Request(url, headers, method))"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read haproxy.cfg and separate the two gates: a path ACL (path,url_dec -i -m sub office) and a multipart ACL (req.hdr(Content-Type) -i -m beg multipart/form-data), both conditioned on !network_office, plus use_backend back1 if hdr(host) -i mmoffice.x.corp",
+      "why": "the host rule is mandatory for any backend at all (503 otherwise), so every bypass must keep hdr(host) matching while hiding the path from the path fetch"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "defeat the multipart ACL with a leading 0x0b on the header value: Content-Type: \\x0bmultipart/form-data; boundary=x",
+      "why": "HAProxy strips only SP and HTAB from header values so -m beg no longer matches, while Werkzeug's parse_options_header uses Python str.strip() which also strips 0x0b/0x0c and still yields mimetype multipart/form-data with the boundary intact"
+    },
+    {
+      "step": 3,
+      "stage": "pivot",
+      "action": "defeat the path ACL with an authority-form request-target that carries the route and keeps the host match: POST office-process?,mmoffice.x.corp with Host: office-process?,mmoffice.x.corp",
+      "why": "three parsers disagree at once. HAProxy's http_get_path() returns not-found when the target neither starts with / nor has a scheme followed by //, so the path sample is unset and the ACL cannot match (HAProxy issue #2565, same 2.9.7 build). HAProxy accepts authority-form only when the authority equals Host, but hdr(host) splits on commas and tests every occurrence, so the mmoffice.x.corp element still satisfies use_backend. Python's urlsplit then drops everything after the ? into the query, and Werkzeug's '/' + path.lstrip('/') turns the bare token back into /office-process"
+    },
+    {
+      "step": 4,
+      "stage": "exfil",
+      "action": "POST that target with the 0x0b multipart body carrying a protocol-4 pickle restricted to builtins: getattr + dict.__getitem__/__setitem__ + globals() reach utils' module globals, then pickle.sys -> sys.modules -> app module -> Flask app -> view_functions; open('/flag.txt').read() and bind the flag's own .strip bound method into view_functions['index'], then GET / to read it",
+      "why": "is_safe only allows module == builtins minus exec/eval/__import__, but builtins.globals() called from a REDUCE resolves to the nearest Python frame (restricted_loads in utils.py), which hands over the whole module namespace; a str's bound .strip needs no arguments, so it is a legal zero-arg Flask view returning the flag without ever building a function object"
+    },
+    {
+      "step": 5,
+      "stage": "cleanup",
+      "action": "send a second pickle that rebinds view_functions['index'] to getattr(sys.modules['app'], 'index')",
+      "why": "the instance is shared; the original index view object is still reachable, so the swap is fully reversible"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET office-process?,mmoffice.x.corp HTTP/1.1 with Host: office-process?,mmoffice.x.corp",
+    "expected": "405 METHOD NOT ALLOWED from Flask, proving both that HAProxy's path ACL did not fire and that Werkzeug routed the bare token to the POST-only /office-process",
+    "falsifier": "403 Forbidden (path ACL still matched), 503 (hdr(host) no longer matched so no backend), 400 Bad request (HAProxy rejected the authority/Host pair), or 404 (the target did not route to the protected view)"
+  },
+  "blast_radius": "step 4 mutates live in-process Flask state on a shared instance: replacing view_functions['index'] changes / for every other player until restored, so always send the step 5 restore pickle immediately after reading the flag. The unpickle sink is arbitrary builtins-level code in the container; open(..., 'w') on /app is harmless because the source tree is mounted read-only, but the same primitive can kill the worker.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "flag string read from the body of GET / on the live instance after the leak pickle Supporting observation: POST office-process?,mmoffice.x.corp returned 200 OK with body 'It works!'"
+  },
+  "reuse_when": [
+    "a reverse proxy gates a route with an ACL over a path sample fetch while the backend routes on the WSGI PATH_INFO",
+    "the proxy accepts a request-target form whose path sample is unset (authority-form, asterisk-form) but forwards it verbatim",
+    "a host-based backend selection rule uses hdr() and so comma-splits, letting one header value satisfy two contradictory checks",
+    "an unpickle sink is restricted to the builtins module rather than to an allow-list of names"
+  ],
+  "known_traps": [
+    "HAProxy rejects authority-form with 400 unless the authority is byte-equal to Host, so the route token and the required vhost must be smuggled into the same string and separated by a comma for hdr() to split them",
+    "a port in the authority breaks the backend side: urlsplit('office-process:80') parses office-process as a scheme and leaves path '80'",
+    "no URI whose path sample is set can hide the substring: in every form HAProxy accepts, its authority scan and Python's netloc end at the same '/', and url_dec decodes exactly like Python's unquote, so a failing url_dec leaves a literal % that Werkzeug cannot route",
+    "the SSRF at /healthcheck is a dead end for delivery: urlopen with only method/url/headers can never emit a body, because http.client's _is_illegal_header_value permits only obs-fold, which never terminates the header block, and POST without data always sends Content-Length: 0",
+    "gunicorn honours a SCRIPT_NAME request header only from a peer in forwarded_allow_ips (127.0.0.1,::1); through the proxy it is dropped by header_map=drop, so the SCRIPT_NAME prefix-strip trick works when testing the backend directly and silently fails through HAProxy",
+    "/healthcheck returns 'error' for any 4xx/5xx because urlopen raises HTTPError, so a 2xx status code is the only positive oracle it gives"
+  ],
+  "flag": null,
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-parser-differential",
+    "confidence": 0.85
+  }
+}

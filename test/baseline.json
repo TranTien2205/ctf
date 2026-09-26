@@ -1,15 +1,15 @@
 {
   "metrics": {
-    "skills_registered": 46,
-    "bug_classes": 24,
-    "bug_classes_verified": 14,
-    "field_notes_total": 10,
-    "field_notes_confirmed": 0,
+    "skills_registered": 52,
+    "bug_classes": 25,
+    "bug_classes_verified": 16,
+    "field_notes_total": 53,
+    "field_notes_confirmed": 6,
     "routers": 8,
-    "chain_cards": 10,
+    "chain_cards": 58,
     "routing_cases": 13,
     "routing_correct": 13,
-    "solved_notes": 10
+    "solved_notes": 56
   },
-  "note": "Floor for test/regression.py CapabilityTests. Raise it only after run_all.sh passes."
+  "note": "Floor for test/regression.py CapabilityTests: the tree may not lose capability silently. Raise it only after run_all.sh passes, and only to numbers test/capability_report.py actually printed. It sat at the 2026-09-17 values while the corpus grew ~5x, so it permitted deleting 48 of 58 chain cards and 46 of 56 solved notes with the gate still green."
 }

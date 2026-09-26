@@ -128,3 +128,33 @@ Falsifier: the generator rejects the newline, or the parser still reports the ge
 **Blast radius**: read-only against the target's own data, but the bot endpoint is globally serialised behind a lock and each run costs ~15s; the collection phase writes several hundred messages into your own mailbox, so never point it at a shared account.
 
 - status: proposed
+
+## 2026-09-24 · in-office · confirmed
+
+- source note: `solved/cscv-inoffice.md`
+- chain card: `knowledge/chains/cscv-inoffice-authority-form-acl-bypass-restricted-pickle.json`
+- verification: verified_live — flag string read from the body of GET / on the live instance after the leak pickle Supporting observation: POST office-process?,mmoffice.x.corp returned 200 OK with body 'It works!'
+- classified as: `web-parser-differential` (score 1.5, 1 signals matched)
+- also matched: `web-file-upload` (3.5), `web-ssrf` (3.5), `web-request-smuggling` (2.5)
+- signals that fired: haproxy
+
+**Confirming probe that worked**
+
+> GET office-process?,mmoffice.x.corp HTTP/1.1 with Host: office-process?,mmoffice.x.corp
+
+Expected: 405 METHOD NOT ALLOWED from Flask, proving both that HAProxy's path ACL did not fire and that Werkzeug routed the bare token to the POST-only /office-process
+
+Falsifier: 403 Forbidden (path ACL still matched), 503 (hdr(host) no longer matched so no backend), 400 Bad request (HAProxy rejected the authority/Host pair), or 404 (the target did not route to the protected view)
+
+**Traps recorded on this solve**
+
+- HAProxy rejects authority-form with 400 unless the authority is byte-equal to Host, so the route token and the required vhost must be smuggled into the same string and separated by a comma for hdr() to split them
+- a port in the authority breaks the backend side: urlsplit('office-process:80') parses office-process as a scheme and leaves path '80'
+- no URI whose path sample is set can hide the substring: in every form HAProxy accepts, its authority scan and Python's netloc end at the same '/', and url_dec decodes exactly like Python's unquote, so a failing url_dec leaves a literal % that Werkzeug cannot route
+- the SSRF at /healthcheck is a dead end for delivery: urlopen with only method/url/headers can never emit a body, because http.client's _is_illegal_header_value permits only obs-fold, which never terminates the header block, and POST without data always sends Content-Length: 0
+- gunicorn honours a SCRIPT_NAME request header only from a peer in forwarded_allow_ips (127.0.0.1,::1); through the proxy it is dropped by header_map=drop, so the SCRIPT_NAME prefix-strip trick works when testing the backend directly and silently fails through HAProxy
+- /healthcheck returns 'error' for any 4xx/5xx because urlopen raises HTTPError, so a 2xx status code is the only positive oracle it gives
+
+**Blast radius**: step 4 mutates live in-process Flask state on a shared instance: replacing view_functions['index'] changes / for every other player until restored, so always send the step 5 restore pickle immediately after reading the flag. The unpickle sink is arbitrary builtins-level code in the container; open(..., 'w') on /app is harmless because the source tree is mounted read-only, but the same primitive can kill the worker.
+
+- status: confirmed

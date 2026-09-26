@@ -37,7 +37,10 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import state as state_mod  # noqa: E402
 
 PROBE_BUDGET = 5      # probes per mechanism class before a forced layer switch
-MINUTE_BUDGET = 15    # wall minutes per mechanism class before the same
+MINUTE_BUDGET = 15    # active minutes per mechanism class before the same
+IDLE_GAP_MINUTES = 20  # a longer gap between probes is parking, not work
+CHALLENGE_PROBE_BUDGET = 25   # probes across every class before a challenge-level stop
+CHALLENGE_MINUTE_BUDGET = 45  # active minutes across every class, per CLAUDE.md
 FLAG_SOURCES = ("live-response", "artifact")
 
 
@@ -49,8 +52,39 @@ def load_taxonomy(path):
         return {"classes": []}
 
 
+def active_minutes(times, now, charge_tail=False):
+    """Minutes actually worked, not minutes since the first probe.
+
+    The old measure was ``now - first_probe``. Because probes are never removed,
+    a challenge parked on Monday and resumed on Friday came back with every class
+    already past the 15-minute budget, so decide.py answered switch_class for all
+    of them and state.py --revive could never be acted on: the documented
+    park/revive workflow was dead exactly when it mattered. Gaps longer than
+    IDLE_GAP_MINUTES are parking and are not charged.
+
+    charge_tail counts the time since the last probe. The challenge ceiling wants
+    it, because time spent thinking still belongs to the challenge. A single
+    class must not: otherwise a class probed once, twenty minutes before the
+    agent moved on to another class, accrues those twenty minutes and is declared
+    exhausted on work that happened somewhere else.
+    """
+    if not times:
+        return 0.0
+    ordered = sorted(times)
+    total = 0.0
+    for earlier, later in zip(ordered, ordered[1:]):
+        gap = (later - earlier) / 60.0
+        if gap <= IDLE_GAP_MINUTES:
+            total += gap
+    if charge_tail:
+        tail = (now - ordered[-1]) / 60.0
+        if tail <= IDLE_GAP_MINUTES:
+            total += tail
+    return total
+
+
 def compute_budget(probes, now=None):
-    """Per-class probe counts and elapsed minutes since the class was opened.
+    """Per-class probe counts and active minutes worked on the class.
 
     Shared by decide.py and hooks.py so the two never disagree.
     """
@@ -59,15 +93,35 @@ def compute_budget(probes, now=None):
     for probe in probes:
         cls = probe.get("class") or "?"
         when = probe.get("time") or now
-        entry = table.setdefault(cls, {"probes": 0, "first": when})
+        entry = table.setdefault(cls, {"probes": 0, "first": when, "times": []})
         entry["probes"] += 1
         entry["first"] = min(entry["first"], when)
+        entry["times"].append(when)
     for cls, entry in table.items():
-        minutes = (now - entry["first"]) / 60.0
+        minutes = active_minutes(entry.pop("times"), now)
         entry["minutes"] = round(minutes, 1)
         entry["exhausted"] = (entry["probes"] >= PROBE_BUDGET
                               or minutes >= MINUTE_BUDGET)
     return table
+
+
+def challenge_budget(probes, now=None):
+    """The budget no per-class rule can enforce.
+
+    The per-class cap is keyed on an agent-supplied class string, so relabelling
+    the class resets it: 25 web classes x 5 probes is 125 probes with nothing
+    saying stop. CLAUDE.md states a 45-minute ceiling per challenge in prose and
+    no code implemented it. This is that ceiling.
+    """
+    now = now if now is not None else time.time()
+    times = [p.get("time") or now for p in probes]
+    minutes = active_minutes(times, now, charge_tail=True)
+    return {"probes": len(probes),
+            "minutes": round(minutes, 1),
+            "probe_budget": CHALLENGE_PROBE_BUDGET,
+            "minute_budget": CHALLENGE_MINUTE_BUDGET,
+            "exhausted": (len(probes) >= CHALLENGE_PROBE_BUDGET
+                          or minutes >= CHALLENGE_MINUTE_BUDGET)}
 
 
 def falsified_classes(probes):
@@ -170,6 +224,25 @@ def decide(name, taxonomy_path=None, now=None):
             "--next 're-confirm through hooks.py post-probe --verdict "
             "confirms --evidence ...'" % (name, h["id"])
             for h in unsupported]
+        return result
+
+    # Rule 4b: the challenge-level ceiling. Checked before the per-class rule,
+    # because once the whole budget is spent there is no layer left to switch to.
+    overall = challenge_budget(probes, now)
+    result["challenge_budget"] = overall
+    if overall["exhausted"]:
+        result["action"] = "stop_report"
+        result["rationale"] = (
+            "challenge budget exhausted: %d probes and %.0f active minutes across "
+            "%d class(es), against a ceiling of %d probes / %d minutes. Changing "
+            "class does not reset this one. Report what was tried, the exact "
+            "results and the precise blocker, then park the challenge."
+            % (overall["probes"], overall["minutes"], len(budget),
+               CHALLENGE_PROBE_BUDGET, CHALLENGE_MINUTE_BUDGET))
+        result["commands"] = [
+            "python3 tools/state.py %s --show   # the ledger that goes into the report" % name,
+            "python3 tools/writeup_search.py \"<challenge> <event>\"  # if the name is known",
+        ]
         return result
 
     # Rule 5: budget enforcement — park and change layer.

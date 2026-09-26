@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "id": "cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce",
+  "source_note": "CSCV2026/give_to_player/solve_chromatic.py",
+  "challenge": {
+    "name": "Chromatic Aberration",
+    "platform": null,
+    "event": "CSCV 2026",
+    "category": "web",
+    "solved_at": "2026-09-25",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "node",
+    "express",
+    "ejs",
+    "nginx",
+    "angular",
+    "playwright",
+    "docker"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy cache key is reduced to one request-controlled value (workspace) so every /api/...?workspace=<W> GET shares one cache entry",
+      "the client JSON parser strips an XSSI/JSON-hijacking prefix before parsing (Angular FetchBackend strips /^\\)\\]\\}',?\\n/)",
+      "an image-sniffing upload gate accepts a file as image/* while its body is also a parseable JSON object",
+      "an admin bot loads the poisoned workspace and the front-end renders an attacker HTML sink with scripting disabled otherwise (CSP script-src self)"
+    ],
+    "any_of": [
+      "the HTML sink is an Angular bypassSecurityTrustHtml archive block and the script executes from a same-origin srcdoc iframe",
+      "the renderer holds the flag and exposes a template engine reachable through a prototype-pollution merge"
+    ]
+  },
+  "signals": [
+    "representation_id",
+    "proxy_cache_key",
+    "media/raw",
+    "bypassSecurityTrustHtml",
+    "board-compat",
+    "__chromaticBridge",
+    "canvas-1",
+    "outputFunctionName",
+    "getBuiltinModule",
+    "telemetry",
+    "srcdoc",
+    "DOCTYPE svg",
+    ")]}',"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read nginx.conf and note proxy_cache_key \"$scheme|$request_method|$representation_id\" with representation_id mapped from ?workspace=<24hex>",
+      "why": "any GET under /api/ carrying a workspace id collides with every other such request, so one endpoint's body can be served as another's"
+    },
+    {
+      "step": 2,
+      "stage": "polyglot",
+      "action": "build a body that is simultaneously an accepted image and a JSON object: prepend the XSSI prefix \" )]}',\\n \" and put the literal '<!DOCTYPE svg><svg xmlns=...></svg>' inside a JSON string",
+      "why": "Debian file(1) reports image/svg+xml because of the DOCTYPE/XML token; the app's hasDocumentPreamble() only rejects a first non-space byte of { or [, and the XSSI prefix makes the first non-space ')'; Angular removes the prefix with its XSSI regex and JSON.parses the rest"
+    },
+    {
+      "step": 3,
+      "stage": "plant",
+      "action": "POST the body to /api/media and confirm the server echoes mime image/svg+xml",
+      "why": "the upload gate is exactly sniffMime() + hasDocumentPreamble(), so a 201 with image/svg+xml proves the polyglot cleared both"
+    },
+    {
+      "step": 4,
+      "stage": "poison",
+      "action": "GET /api/media/raw?id=<asset>&workspace=<W>, then GET /api/workspaces/manifest?workspace=<W> and compare bodies",
+      "why": "both requests resolve to cache key <W>; the second returns the uploaded JSON manifest instead of the fixed one, confirming the collision before spending a bot visit"
+    },
+    {
+      "step": 5,
+      "stage": "render",
+      "action": "manifest contains one archive block: packet = base64(JSON {version:'canvas-1', markup, integrity:fnv1a32(markup)}) where markup is an <iframe srcdoc> holding the DOM-clobber <form id=__chromaticBridge> plus <script src=/static/board-compat.js>",
+      "why": "LegacyBlocks verifies the FNV-1a32 checksum then returns bypassSecurityTrustHtml(markup); scripts inserted straight into innerHTML do not run, but a same-origin srcdoc iframe does and is allowed by script-src 'self'"
+    },
+    {
+      "step": 6,
+      "stage": "pivot",
+      "action": "POST /api/report {workspace:W} to send the admin bot to /w/W; board-compat.js reads the clobbered window.__chromaticBridge and fetches endpoint '/api/admin/export-preview' with the bot's same-origin admin cookie",
+      "why": "the bot's cookie is httpOnly sameSite=Strict and is attached automatically from the same-origin iframe; the fetch body is the base64-decoded payload"
+    },
+    {
+      "step": 7,
+      "stage": "sink",
+      "action": "payload theme.constructor.prototype.outputFunctionName = x;return <cmd>;//, hitting mergeCatalog prototype pollution and EJS 3.1.6 outputFunctionName code injection",
+      "why": "mergeCatalog keeps the inherited constructor so the string lands on Object.prototype; ejs compiles 'var <name> = __append;' verbatim and the injected return short-circuits with command output"
+    },
+    {
+      "step": 8,
+      "stage": "exfil",
+      "action": "board-compat.js POSTs the response text to /api/telemetry/<channel>; attacker GETs /api/telemetry/<channel> for the flag",
+      "why": "the flag is never returned to the attacker directly by the bot; telemetry is the same-origin side channel"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "upload the XSSI/JSON/SVG polyglot (body starts \" )]}',\\n \" and contains '\"svg\":\"<!DOCTYPE svg><svg xmlns=\\\"http://www.w3.org/2000/svg\\\"></svg>\"'), then GET /api/media/raw?id=<asset>&workspace=<W> followed by GET /api/workspaces/manifest?workspace=<W>",
+    "expected": "upload -> 201 {\"mime\":\"image/svg+xml\"}; the manifest request returns the uploaded body (starts with )]}',) instead of the fixed 'Untitled workspace' JSON",
+    "falsifier": "upload -> 415 unsupported image or invalid image signature; or the manifest request returns the normal fixed manifest, meaning the cache key includes the full request_uri"
+  },
+  "blast_radius": "Local harness: one uploaded asset, one poisoned nginx cache entry for workspace <W> (10m, unique per run) and one short-lived telemetry channel. On a shared instance the same chain is RCE as uid renderer and reads /flag via /readflag; it writes no files. Use a fresh random workspace/channel per attempt and never reuse the victim's.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Local docker compose harness (edge 127.0.0.1:18080): solve_chromatic.py ran all 4 stages - upload 201 image/svg+xml (asset fde9d231...), poisoned manifest cache verified, /api/report accepted, then GET /api/telemetry/<channel> returned {\"html\":\"CSCV2026{...}\\n\"} and reported FLAG. Recorded through tools/hooks.py; the polyglot is the previously-unresolved raw-body gadget."
+  },
+  "reuse_when": [
+    "an nginx/proxy cache key is built from a single parameter instead of the full URI",
+    "an upload/image gate sniffs with file(1) while a downstream JSON parser ignores the content-type",
+    "the client parser strips an XSSI prefix or a BOM before JSON.parse",
+    "an admin bot visits an attacker-controlled page and the app has a bypassed HTML sink plus a self-hostable script gadget"
+  ],
+  "known_traps": [
+    "plain '<svg' or '<?xml' inside a JSON string is NOT enough: file(1) still says application/json/text. The token that flips libmagic to image/svg+xml is '<!DOCTYPE svg>' inside the JSON string value while the file begins with the XSSI prefix",
+    "the XSSI prefix must match Angular's PI regex /^\\)\\]\\}',?\\n/ exactly, i.e. )]}',\\n ; a missing newline or comma placement makes Angular's strip fail and JSON.parse throws",
+    "hasDocumentPreamble only inspects the first 64 bytes and only rejects a first non-space of { or [; the XSSI prefix passes it, but a plain JSON object starting with { is rejected - do not drop the prefix",
+    "scripts inserted through [innerHTML]/bypassSecurityTrustHtml do not execute; the markup must load board-compat.js from a same-origin <iframe srcdoc> so CSP script-src 'self' allows it",
+    "the archive packet is only accepted when integrity == FNV-1a32(markup) as 8 lowercase hex; recompute it over the exact markup bytes",
+    "if the deployed ADMIN_TOKEN was rotated, the fast path (POST /api/admin/export-preview with the token) returns 403 and this bot chain is the only route",
+    "the XML mime detection depends on the host's libmagic build; verify `file --brief --mime-type <polyglot>` == image/svg+xml before uploading"
+  ],
+  "flag": null,
+  "classification": {
+    "primary": "web-cache-poisoning",
+    "secondary": [
+      "web-prototype-pollution",
+      "web-ssti",
+      "web-xss",
+      "web-file-upload"
+    ],
+    "confidence": 0.95
+  }
+}

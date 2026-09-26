@@ -92,9 +92,9 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 658,
-      "depth_files": 6,
-      "depth_tokens": 3808,
+      "skill_tokens": 3169,
+      "depth_files": 8,
+      "depth_tokens": 5193,
       "use_when": [
         "ciphertext, a modulus, a nonce, a key, or a hash is supplied",
         "a custom encryption routine must be broken rather than reversed"
@@ -263,7 +263,9 @@
         "ctf-web",
         "web-websocket",
         "web-source-map",
-        "web-info-disclosure"
+        "web-info-disclosure",
+        "white-box-dependency-measurement",
+        "white-box-intended-path"
       ]
     },
     {
@@ -469,9 +471,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1582,
-      "depth_files": 3,
-      "depth_tokens": 2201,
+      "skill_tokens": 1612,
+      "depth_files": 4,
+      "depth_tokens": 3562,
       "use_when": [
         "the challenge target is an LLM, an agent, or a tool server",
         "an external skill or MCP bundle is being reviewed before install"
@@ -551,7 +553,7 @@
       ],
       "skill_tokens": 850,
       "depth_files": 1,
-      "depth_tokens": 2060,
+      "depth_tokens": 2836,
       "use_when": [
         "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
         "a chain card already proves this class here: htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
@@ -935,7 +937,7 @@
       ],
       "skill_tokens": 762,
       "depth_files": 1,
-      "depth_tokens": 2150,
+      "depth_tokens": 2875,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -966,7 +968,7 @@
       ],
       "skill_tokens": 1192,
       "depth_files": 1,
-      "depth_tokens": 1600,
+      "depth_tokens": 2535,
       "use_when": [
         "a probe or source read produced this class's signal: pollute one harmless property, then read it back through a path that should not have it",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate, htb-tornadoservice-bot-csrf-class-pollution, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1285,6 +1287,53 @@
       ],
       "unlock_signals": "(?:<\\?xml|application/xml|text/xml|soap|wsdl)|(?:\\.docx|\\.xlsx|\\.svg\\b)|(?:doctype|entity)|(?:etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder)|(?:simplexml_load|libxml_disable_entity_loader)|(?:resolve_entities\\s*=\\s*True)",
       "bug_class": true
+    },
+    {
+      "id": "white-box-dependency-measurement",
+      "path": "skills/white-box-dependency-measurement/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 3261,
+      "depth_files": 1,
+      "depth_tokens": 160,
+      "use_when": [
+        "a chain turns on what a pinned, vendored or containerised dependency actually does",
+        "a negative result has to be recordable as a measured boundary, not an opinion"
+      ],
+      "do_not_use_when": [
+        "no source or container is available: there is nothing to measure",
+        "published documentation already settles it and nothing is pinned"
+      ],
+      "routes_to": [
+        "white-box-intended-path",
+        "file-read-primitives"
+      ],
+      "unlock_signals": "package-lock|yarn\\.lock|requirements\\.txt|poetry\\.lock|go\\.sum|Gemfile\\.lock|Dockerfile|docker-compose|node_modules|vendor/|haproxy|gunicorn|uwsgi|nginx\\.conf|varnish|alpine|==\\d+\\.\\d+|@\\d+\\.\\d+\\.\\d+"
+    },
+    {
+      "id": "white-box-intended-path",
+      "path": "skills/white-box-intended-path/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2513,
+      "depth_files": 1,
+      "depth_tokens": 158,
+      "use_when": [
+        "a high-value, low-solve white-box challenge whose author-deliberate oddities are unexplained",
+        "one mechanism budget is spent with no impact and no anomaly newly explained"
+      ],
+      "do_not_use_when": [
+        "a chain already reaches impact: finish it",
+        "the challenge is black-box, so there is no handout to diff against stock"
+      ],
+      "routes_to": [
+        "white-box-dependency-measurement"
+      ],
+      "unlock_signals": "handout|stock app|upstream diff|anomaly|unused (route|field|parameter)|dead code|custom fork|patched vendor|why is this here"
     },
     {
       "id": "ctf-writeup",

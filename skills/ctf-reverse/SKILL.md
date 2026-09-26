@@ -6,6 +6,13 @@ compatibility: Requires filesystem-based agent (Claude Code or similar) with bas
 allowed-tools: Bash Read Write Edit Glob Grep Task WebFetch WebSearch
 metadata:
   user-invocable: "false"
+budget:
+  stuck_threshold: 2
+  on_stuck: pivot
+  stop_conditions:
+    - "a second reference file is about to be opened before any probe has run"
+    - "reading has replaced probing: no new observation since this file was opened"
+    - "tools/decide.py returns switch_class or stop_report for this challenge"
 ---
 
 # CTF Reverse Engineering

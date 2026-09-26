@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-09-24T20:25:48",
+  "generated_at": "2026-09-25T21:39:06",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 50,
+    "skills": 52,
     "review": 0,
     "warn": 0,
     "local_evidence_present": 18,
@@ -46,7 +46,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 75
+      "lines": 157
     },
     {
       "id": "ctf-misc",
@@ -116,7 +116,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 118
+      "lines": 125
     },
     {
       "id": "ctf-crypto",
@@ -126,7 +126,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 112
+      "lines": 119
     },
     {
       "id": "ctf-forensics",
@@ -136,7 +136,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 127
+      "lines": 134
     },
     {
       "id": "ctf-malware",
@@ -146,7 +146,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 180
+      "lines": 187
     },
     {
       "id": "ctf-osint",
@@ -156,7 +156,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 193
+      "lines": 200
     },
     {
       "id": "ctf-pwn",
@@ -166,7 +166,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 211
+      "lines": 218
     },
     {
       "id": "ctf-reverse",
@@ -176,7 +176,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 168
+      "lines": 175
     },
     {
       "id": "ctf-web",
@@ -186,7 +186,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 163
+      "lines": 170
     },
     {
       "id": "file-read-primitives",
@@ -212,7 +212,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 133
+      "lines": 134
     },
     {
       "id": "pwn-rop",
@@ -638,6 +638,26 @@
       "nearest_neighbour": "web-command-injection",
       "overlap": 0.186,
       "trust": "local-confirmed"
+    },
+    {
+      "id": "white-box-dependency-measurement",
+      "layer": "depth",
+      "path": "skills/white-box-dependency-measurement/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 225
+    },
+    {
+      "id": "white-box-intended-path",
+      "layer": "depth",
+      "path": "skills/white-box-intended-path/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 180
     },
     {
       "id": "ctf-writeup",

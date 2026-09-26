@@ -107,3 +107,34 @@ Falsifier: the second request returns the ordinary response, so either the key c
 **Blast radius**: nothing persistent is written: no files, no database rows, no accounts. The only state touched is the proxy cache, and every entry expires within its validity window, so the target returns to normal on its own within seconds. The one real hazard is self-inflicted - reading an exfiltration key too early blocks the payload's write for a full window - and the renderer is triggered once per attempt, so keep attempts few because each one launches a browser.
 
 - status: proposed
+
+## 2026-09-25 · Chromatic Aberration · confirmed
+
+- source note: `CSCV2026/give_to_player/solve_chromatic.py`
+- chain card: `knowledge/chains/cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce.json`
+- verification: verified_live — Local docker compose harness (edge 127.0.0.1:18080): solve_chromatic.py ran all 4 stages - upload 201 image/svg+xml (asset fde9d231...), poisoned manifest cache verified, /api/report accepted, then GET /api/telemetry/<channel> returned {"html":"CSCV2026{...}\n"} and reported FLAG. Recorded through tools/hooks.py; the polyglot is the previously-unresolved raw-body gadget.
+- classified as: `web-cache-poisoning` (score 2.5, 2 signals matched)
+- also matched: `web-prototype-pollution` (4.5), `web-file-upload` (3.5), `web-ssrf` (3.5)
+- signals that fired: age:, cache
+
+**Confirming probe that worked**
+
+> upload the XSSI/JSON/SVG polyglot (body starts " )]}',\n " and contains '"svg":"<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'), then GET /api/media/raw?id=<asset>&workspace=<W> followed by GET /api/workspaces/manifest?workspace=<W>
+
+Expected: upload -> 201 {"mime":"image/svg+xml"}; the manifest request returns the uploaded body (starts with )]}',) instead of the fixed 'Untitled workspace' JSON
+
+Falsifier: upload -> 415 unsupported image or invalid image signature; or the manifest request returns the normal fixed manifest, meaning the cache key includes the full request_uri
+
+**Traps recorded on this solve**
+
+- plain '<svg' or '<?xml' inside a JSON string is NOT enough: file(1) still says application/json/text. The token that flips libmagic to image/svg+xml is '<!DOCTYPE svg>' inside the JSON string value while the file begins with the XSSI prefix
+- the XSSI prefix must match Angular's PI regex /^\)\]\}',?\n/ exactly, i.e. )]}',\n ; a missing newline or comma placement makes Angular's strip fail and JSON.parse throws
+- hasDocumentPreamble only inspects the first 64 bytes and only rejects a first non-space of { or [; the XSSI prefix passes it, but a plain JSON object starting with { is rejected - do not drop the prefix
+- scripts inserted through [innerHTML]/bypassSecurityTrustHtml do not execute; the markup must load board-compat.js from a same-origin <iframe srcdoc> so CSP script-src 'self' allows it
+- the archive packet is only accepted when integrity == FNV-1a32(markup) as 8 lowercase hex; recompute it over the exact markup bytes
+- if the deployed ADMIN_TOKEN was rotated, the fast path (POST /api/admin/export-preview with the token) returns 403 and this bot chain is the only route
+- the XML mime detection depends on the host's libmagic build; verify `file --brief --mime-type <polyglot>` == image/svg+xml before uploading
+
+**Blast radius**: Local harness: one uploaded asset, one poisoned nginx cache entry for workspace <W> (10m, unique per run) and one short-lived telemetry channel. On a shared instance the same chain is RCE as uid renderer and reads /flag via /readflag; it writes no files. Use a fresh random workspace/channel per attempt and never reuse the victim's.
+
+- status: confirmed

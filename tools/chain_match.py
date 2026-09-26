@@ -83,14 +83,20 @@ def _read_order(path):
     return (rank, size)
 
 
-def read_source(target):
+def read_source(target, skip_names=()):
+    """Read a bounded amount of a challenge's text.
+
+    skip_names drops this toolkit's own artefacts (a ledger, a solve script) so
+    they cannot be counted as if they were part of the handout.
+    """
     if os.path.isfile(target):
         paths = [target]
     else:
         paths = []
         for base, dirs, names in os.walk(target):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
-            paths.extend(os.path.join(base, name) for name in names)
+            paths.extend(os.path.join(base, name) for name in names
+                         if name not in skip_names)
         paths = sorted((p for p in paths if _worth_reading(p)), key=_read_order)
     chunks, total = [], 0
     for path in paths:
@@ -108,9 +114,33 @@ def read_source(target):
     return "\n".join(chunks)
 
 
+_WORDISH = re.compile(r"[A-Za-z]{1,5}\Z")
+_EMBEDDED = {}
+
+
 def found(signal, text):
-    """Literal, case-insensitive containment. Signals are literals, not regexes."""
-    return signal.lower() in text
+    """Case-insensitive containment, refusing a short word buried inside another.
+
+    Plain containment made short alphabetic signals fire constantly: measured
+    over the 40 handouts on disk, `lua` matched 9 of them and every single hit
+    was inside `evaluate`; `mail` matched 16 and 13 were inside `email`; `eval`
+    matched 17 and 10 were inside words like `retrieval`. Because the scorer
+    weights rare signals highest, a phantom hit on a rare short signal moved
+    cards up the ranking.
+
+    Only letters are treated as a boundary, not \\b. `lua_State` and `redis.lua`
+    must still match, and \\b would reject the first because `_` is a word
+    character. Longer signals keep plain containment so `template` still matches
+    `templates`.
+    """
+    lowered = signal.lower()
+    if not _WORDISH.match(signal):
+        return lowered in text
+    pattern = _EMBEDDED.get(lowered)
+    if pattern is None:
+        pattern = re.compile(r"(?<![a-z])%s(?![a-z])" % re.escape(lowered))
+        _EMBEDDED[lowered] = pattern
+    return pattern.search(text) is not None
 
 
 def load_signal_stats(path=SIGNAL_STATS):
@@ -186,29 +216,37 @@ def score_card(card, text, lowered, stats=None):
 
 
 def rebuild_stats(chains_dir):
-    """Count, for every signal any card names, how many handouts contain it."""
-    workdir_markers = ("solve.py", "state.json")
+    """Count, for every signal any card names, how many handouts contain it.
+
+    A directory is excluded only when nothing but this toolkit's own scratch
+    files is in it. Excluding every directory that merely *contains* a
+    state.json shrank the corpus to 19 of 103, because tools/state.py writes the
+    ledger into the challenge directory itself: every challenge actually worked
+    on removed itself from the rarity statistics, so the more the toolkit was
+    used the weaker its own ranking became.
+    """
+    workdir_names = {"solve.py", "state.json", "anomaly_map.json", "notes.md"}
     corpus = []
     base = os.path.join(ROOT, "challenges")
     for entry in sorted(os.listdir(base)) if os.path.isdir(base) else []:
         path = os.path.join(base, entry)
         if not os.path.isdir(path):
             continue
-        try:
-            names = set(os.listdir(path))
-        except OSError:
-            continue
-        if any(m in names for m in workdir_markers):
-            continue          # this toolkit's own scratch dir, not a handout
-        if sum(len(files) for _, _, files in os.walk(path)) < 3:
-            continue
-        corpus.append(read_source(path).lower())
+        handout_files = 0
+        for _, _, files in os.walk(path):
+            handout_files += sum(1 for f in files if f not in workdir_names)
+        if handout_files < 3:
+            continue          # nothing but this toolkit's own scratch files
+        corpus.append(read_source(path, skip_names=workdir_names).lower())
 
     signals = set()
     for card in load_chains(chains_dir):
         if "_error" not in card:
             signals.update(card.get("signals", []))
-    df = {s: sum(1 for t in corpus if s.lower() in t) for s in sorted(signals)}
+    # Count with found(), not raw containment: the denominator of the rarity
+    # weight has to be measured the same way a hit is decided, or a signal is
+    # scored against a frequency it can never actually reach.
+    df = {s: sum(1 for t in corpus if found(s, t)) for s in sorted(signals)}
     data = {"corpus": len(corpus), "signals": len(df), "df": df}
     with open(SIGNAL_STATS, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=False)
@@ -216,6 +254,41 @@ def rebuild_stats(chains_dir):
     print(json.dumps({"written": os.path.relpath(SIGNAL_STATS, ROOT),
                       "corpus": data["corpus"], "signals": data["signals"]}, indent=2))
     return 0
+
+
+def record_candidates(challenge, candidates):
+    """Write the candidates into the challenge ledger.
+
+    tools/decide.py rule 6 reads state["chain_candidates"] to return the card's
+    own probe before the agent invents a new one. Nothing wrote that key, so the
+    rule could only ever fire on a regression fixture. A card with no
+    first_confirming_probe is dropped: rule 6 would hand the agent a null request.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import state as state_mod  # noqa: E402
+
+    path = state_mod.path_for(challenge)
+    if not os.path.isfile(path):
+        return {"recorded": False,
+                "reason": "no ledger for %r; run tools/state.py %s --category <cat> "
+                          "--target <target> first" % (challenge, challenge)}
+    with open(path, encoding="utf-8") as handle:
+        current = json.load(handle)
+    if not isinstance(current, dict):
+        return {"recorded": False, "reason": "ledger is not an object; state not changed"}
+    kept = [{"id": c["id"],
+             "first_confirming_probe": c["first_confirming_probe"],
+             "blast_radius": c.get("blast_radius"),
+             "known_traps": c.get("known_traps", []),
+             "suggested_priority": c["suggested_priority"],
+             "match_confidence": c["match_confidence"]}
+            for c in candidates if c.get("first_confirming_probe")]
+    current["chain_candidates"] = kept
+    state_mod.atomic_json(path, current)
+    return {"recorded": True, "count": len(kept),
+            "dropped_without_probe": len(candidates) - len(kept),
+            "ledger": os.path.relpath(path, ROOT),
+            "next": "python3 tools/decide.py %s" % challenge}
 
 
 def main():
@@ -230,6 +303,9 @@ def main():
     parser.add_argument("--rebuild-stats", action="store_true",
                         help="recount signal frequencies over challenges/ and write "
                              "knowledge/signal-stats.json, then exit")
+    parser.add_argument("--record", metavar="CHALLENGE",
+                        help="write the candidates into that challenge's ledger so "
+                             "tools/decide.py returns the card's own probe first")
     args = parser.parse_args()
 
     if args.rebuild_stats:
@@ -282,6 +358,13 @@ def main():
     else:
         output["next_action"] = ("run the first_confirming_probe of " + top[0]["id"]
                                  + " and record the exact result")
+    if args.record:
+        try:
+            output["recorded"] = record_candidates(args.record, top)
+        except (ValueError, OSError) as exc:
+            # a rejected challenge id, an unreadable ledger or malformed JSON.
+            # Recording is a convenience; never lose the match output over it.
+            output["recorded"] = {"recorded": False, "reason": str(exc)}
     print(json.dumps(output, ensure_ascii=False) if args.json
           else json.dumps(output, ensure_ascii=False, indent=2))
     return 1 if broken else 0

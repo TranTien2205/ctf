@@ -71,8 +71,10 @@ Escalation order when a class is exhausted:
    into the current one.
 3. Reverse the deciding function. Do not leave the most suspicious code unread
    while brute-forcing around it.
-4. Pull outside knowledge: `tools/chain_match.py`, then `tools/writeup_search.py`
-   if the challenge name is known.
+4. Pull outside knowledge for one named missing fact: `tools/chain_match.py`,
+   then `tools/search_facts.py` and `tools/writeup_search.py` if challenge name
+   and event are known. Record URL/snippet plus the local verification outcome;
+   search output is a lead, never a verdict.
 5. Time-box out and come back. In a timed contest, one challenge is not worth
    more than its share.
 

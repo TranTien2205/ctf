@@ -46,6 +46,9 @@ def main():
     ap.add_argument("name")
     ap.add_argument("--category")
     ap.add_argument("--target")
+    ap.add_argument("--challenge-name",
+                    help="the challenge's real name, for the writeup-search rule")
+    ap.add_argument("--event", help="the event it came from, for the writeup-search rule")
     ap.add_argument("--hypothesis")
     ap.add_argument("--bug-class", help="taxonomy class owned by the hypothesis")
     ap.add_argument("--probe")
@@ -66,7 +69,11 @@ def main():
         path = path_for(args.name)
     except ValueError as exc:
         ap.error(str(exc))
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    # A read must not mint storage. --show used to create the directory before it
+    # was consulted, so a mistyped or wrongly-cased name left an empty challenge
+    # dir behind; those dirs then outnumbered real handouts in challenges/.
+    if not args.show:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
         with open(path, encoding="utf-8") as handle:
             state = json.load(handle)
@@ -79,6 +86,8 @@ def main():
         ap.error("invalid state structure; state not changed")
     if "decisions" in state and not isinstance(state["decisions"], list):
         ap.error("invalid decisions; state not changed")
+    if "searches" in state and not isinstance(state["searches"], list):
+        ap.error("invalid searches; state not changed")
     for hypothesis in state["hypotheses"]:
         hypothesis.setdefault("id", uuid.uuid4().hex)
     selected = None
@@ -109,6 +118,13 @@ def main():
         state["category"] = args.category
     if args.target:
         state["target"] = args.target
+    # tools/decide.py rule 8 offers a writeup search once either is known. Nothing
+    # could write them, so that rule never fired and the shortcut both CLAUDE.md
+    # and AGENTS.md call legitimate was unreachable from the controller.
+    if args.challenge_name:
+        state["challenge_name"] = args.challenge_name
+    if args.event:
+        state["event_name"] = args.event
     if args.hypothesis:
         created = {"id": uuid.uuid4().hex, "name": args.hypothesis,
                    "bug_class": args.bug_class, "status": "open",

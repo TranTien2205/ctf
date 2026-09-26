@@ -33,7 +33,8 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 import state as state_mod  # noqa: E402
-from decide import compute_budget, PROBE_BUDGET, MINUTE_BUDGET  # noqa: E402
+from decide import (compute_budget, challenge_budget, PROBE_BUDGET,  # noqa: E402
+                    MINUTE_BUDGET, CHALLENGE_PROBE_BUDGET, CHALLENGE_MINUTE_BUDGET)
 
 VERDICTS = ("confirms", "falsifies", "inconclusive")
 EVIDENCE_KINDS = ("surface", "class", "impact", "transport")
@@ -89,6 +90,14 @@ def hook_pre_probe(args, current, path):
         raise Refused("selected hypothesis has no bug_class; classify it before probing")
     if args.probe_class and args.probe_class != hypothesis["bug_class"]:
         raise Refused("probe class does not match the selected hypothesis")
+    overall = challenge_budget(current["probes"])
+    if overall["exhausted"]:
+        raise Refused(
+            "challenge budget exhausted: %d probes / %.0f active minutes against "
+            "%d / %d. Switching class does not reset this. Run tools/decide.py "
+            "and write the stop report."
+            % (overall["probes"], overall["minutes"],
+               CHALLENGE_PROBE_BUDGET, CHALLENGE_MINUTE_BUDGET))
     budget = compute_budget(current["probes"])
     if budget.get(hypothesis["bug_class"], {}).get("exhausted"):
         raise Refused("probe budget exhausted for %s; run tools/decide.py and switch class"

@@ -17,8 +17,10 @@ Rules:
 - Every hypothesis must cite an observation and have a falsifier.
 - Prefer a probe that distinguishes two hypotheses over a payload that merely
   attempts exploitation.
-- After three probes without new signal, PARK the hypothesis at priority 0 and
-  switch class. Close it only when an observation falsifies it. See
+- After five probes or fifteen active minutes without new signal, PARK the
+  hypothesis at priority 0 and switch class. Close it only when an observation
+  falsifies it. `tools/decide.py` owns both numbers and also enforces a
+  challenge-wide ceiling that switching class does not reset. See
   ../HYPOTHESIS_PROTOCOL.md.
 - Do not load depth references before the first useful probe unless the input
   format itself is unknown.

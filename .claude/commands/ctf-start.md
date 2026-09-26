@@ -27,7 +27,7 @@ Do this in order, and do not skip to a payload:
    - black box only        -> `python3 tools/classify.py "<observation>"`
    Then, either way:
    ```bash
-   python3 tools/chain_match.py "<observation>"   # or --source <dir>
+   python3 tools/chain_match.py "<observation>" --record <id>   # or --source <dir>
    python3 tools/skill_select.py "<observation>"  # which skill to open
    ```
 

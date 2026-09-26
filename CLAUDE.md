@@ -68,8 +68,10 @@ A timeout is not a success.
 2. White-box first when source exists: routes, inputs, sinks, auth boundaries,
    queries, flag path — with file and line — before any payload.
 3. `tools/classify.py` names the bug class from the signals actually present, with
-   the file and line for each. `tools/chain_match.py` says whether this exact shape
-   was solved here before. Both return candidates with a first probe and a
+   the file and line for each. `tools/chain_match.py --record <challenge>` says
+   whether this exact shape was solved here before and writes the candidates into
+   the ledger, so `tools/decide.py` hands back the card's own probe instead of a
+   fresh guess. Both return candidates with a first probe and a
    falsifier — never a finding. Run them before opening any depth skill.
 4. One hypothesis, one discriminating probe. Budget: five probes or fifteen
    minutes per mechanism class. On exhaustion, park at priority 0 and change
@@ -124,7 +126,10 @@ an evidence level, and it changes how much weight its skill's content deserves:
 
 ## Chains already verified here
 
-Ten verified chains live in `knowledge/chains/`, derived from `solved/`. Do not
+58 verified chains live in `knowledge/chains/`, derived from `solved/`. That is
+a large enough library that a new web challenge usually matches one: run the
+matcher before inventing a hypothesis, and pass `--record <challenge>` so
+`tools/decide.py` returns the card's own probe first. Do not
 recall them from memory — run
 `tools/chain_match.py`, read the card it returns, and run that card's
 `first_confirming_probe` against this target before reusing anything from it.
@@ -133,10 +138,32 @@ The card carries the traps that cost time the first time, and a
 
 ## Installed tooling
 
-Present on this machine and used as-is, not reinstalled: `requests`, `httpx`
-with HTTP/2, `pwntools`, `ffuf`, `gobuster`, `feroxbuster`, `nmap`, and SecLists
-under `/home/kali/wordlists/SecLists/`. Verify a tool with `which` before
-relying on it, and never claim output from a tool that was not run.
+In this tree, and preferred over hand-written one-off requests because each one
+emits the shape `tools/hooks.py` wants — check with `python3 tools/web/selftest.py`
+(offline, 8 cases) before relying on them:
+
+| Instead of hand-rolling | Run |
+|---|---|
+| a probe plus a hand-copied excerpt | `tools/web/http_probe.py` — holds request and response together for `post-probe` |
+| 40 encodings of a blocked byte, by hand | `tools/web/sanitizer_fuzz.py` — differential sweep; records how many cases proved a negative |
+| a loop over a proven file-read | `tools/web/read_loop.py` — wordlist walk, baseline-classified |
+| an id-enumeration loop | `tools/web/id_sweep.py` — existence oracle |
+| text out of a returned PDF | `tools/web/pdf_text.py` |
+| a lattice, LCG, LFSR or ECC attack | `tools/crypto/` plus `tools/crypto_attack.py --list` |
+
+Measured present on this machine, used as-is: `requests`, `httpx` with HTTP/2,
+`Crypto` (pycryptodome), `sympy`, `jwt`, `bs4`, `lxml`, `websockets`, `selenium`,
+`playwright`, `numpy`, `ecdsa`; `ffuf`, `gobuster`, `feroxbuster`, `nmap`,
+`sqlmap`, `radare2`, `objdump`, `binwalk`, `exiftool`, `tshark`, `john`,
+`hashcat`, `docker`; SecLists under `/home/kali/wordlists/SecLists/`.
+
+Measured **absent** — do not write an exploit that imports one without checking:
+`pwntools`, `gdb`, `gmpy2`, `z3`, `fpylll`, `sage`. `tools/crypto/` is stdlib-only
+by design and needs none of them; `fpylll` only makes its LLL faster. Install with
+`sudo apt install python3-pwntools gdb python3-fpylll python3-gmpy2 python3-z3`.
+
+Verify a tool with `which` or an import before relying on it, and never claim
+output from a tool that was not run.
 
 ## When stuck
 
@@ -144,5 +171,9 @@ relying on it, and never claim output from a tool that was not run.
    or field is the most common cause.
 2. Change mechanism layer, not payload variant.
 3. `tools/chain_match.py`, then `tools/writeup_search.py`.
-4. Park the challenge and return later. Do not spend more than forty-five
-   minutes on one mechanism class.
+4. Park the challenge and return later. `tools/decide.py` now enforces this
+   rather than stating it: five probes or fifteen active minutes per mechanism
+   class, and twenty-five probes or forty-five active minutes for the whole
+   challenge. Relabelling the class does not reset the challenge ceiling, and
+   time spent parked is not charged — a revived challenge resumes with its
+   budget intact.

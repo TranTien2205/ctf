@@ -17,9 +17,9 @@ belongs to the other toolkit and is out of scope here.
 ```
 ~/ctf-v2/
   tools/           classify · chain_match · decide · hooks · state · skill_audit …
-  skills/          46 skills: 8 thin routers + 24 bug classes + references  ← pull one
-  knowledge/       bug-classes.json (24 classes) · chains/ (10 verified cards)
-  solved/          10 solved challenges, with evidence ancestry
+  skills/          52 skills: 8 thin routers + 25 bug classes + method/reference  ← pull one
+  knowledge/       bug-classes.json (25 classes) · chains/ (58 verified cards)
+  solved/          56 solved challenges, with evidence ancestry
   challenges/      handout source and per-challenge state.json
 ```
 
@@ -40,9 +40,9 @@ Then pick exactly one branch:
 
 | Input | First command |
 |---|---|
-| **White-box, source supplied** | `python3 tools/classify.py --source <dir>` then `python3 tools/chain_match.py "<obs>"` |
+| **White-box, source supplied** | `python3 tools/classify.py --source <dir>` then `python3 tools/chain_match.py --source <dir> --record <name>` |
 | **Black-box** | `python3 tools/classify.py "<obs>"` plus `ctf.py "<obs>"` |
-| **Starting a new challenge** | `python3 tools/state.py <name> --category <cat> --target <url>` |
+| **Starting a new challenge** | `python3 tools/state.py <name> --category <cat> --target <url> --challenge-name "<real name>" --event "<event>"` — the last two unlock the controller's writeup-search rule |
 | **Resuming one** | `python3 tools/state.py <name> --show` then `python3 tools/decide.py <name>` |
 | **Challenge and event name known** | `python3 tools/writeup_search.py "<name> <event>"` (a legitimate shortcut; record that it was used) |
 
@@ -52,8 +52,8 @@ Then pick exactly one branch:
 
 | Tool | Use it when |
 |---|---|
-| `classify.py` | name the bug class from the signals; white-box output carries `file:line` |
-| `chain_match.py` | has this shape been solved here before; the card carries the probe and the traps |
+| `classify.py` | name the bug class from the signals; white-box output carries `file:line`. Signals are weighted by how rare they are across the handouts on disk, so a pattern matching most challenges cannot outvote a precise one; re-run `--rebuild-stats` after editing the taxonomy |
+| `chain_match.py` | has this shape been solved here before; the card carries the probe and the traps. `--record <challenge>` writes the candidates into the ledger so `decide.py` returns the card's probe before any invented one |
 | `plan.py` | nothing yet, and you need the first three hypotheses |
 | **`decide.py`** | **what the next step is** — the controller, see section 3 |
 | **`hooks.py`** | **verify each step** — the only write gate for a verdict or a flag |
@@ -62,10 +62,13 @@ Then pick exactly one branch:
 | `classify_solve.py` | after a flag: file the solve into the right bug-class skill |
 | `skill_audit.py` | screen out weak skills; run it before trusting one |
 | `tools/search_facts.py` | plan a narrow external search for one missing fact without treating results as evidence |
+| `tools/handout_inventory.py` | measure locally available retrieval ground truth without importing raw challenge source |
 | `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
 | `chain_match_eval.py` | retrieval quality of chain_match: top-1, MRR and how many wrong cards outrank the right one |
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
+| `tools/web/` | speed primitives that emit the shape `hooks.py` wants: `http_probe` (probe + verbatim excerpt), `sanitizer_fuzz` (differential encoding sweep, records negatives), `read_loop` (proven file-read walk), `id_sweep`, `pdf_text`. `python3 tools/web/selftest.py` proves them offline |
+| `tools/crypto/` + `crypto_attack.py` | lattice, LCG, LFSR, ECC, HNP and integer attacks; `--list` names them |
 
 ---
 

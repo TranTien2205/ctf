@@ -97,3 +97,33 @@ Falsifier: No such element appears. Either the merge guards __proto__, or the co
 **Blast radius**: Low on the target itself: the pollution lives in the victim's page instance only and nothing server-side is written. The real exposure is outward. The chain needs a publicly reachable collector, so anything the injected script sends leaves the lab and reaches whatever host is used; keep it to the cookie and the flag, and take the collector and any tunnel down as soon as the flag is read. The stolen session belongs to a shared admin account, so do not issue state-changing requests with it.
 
 - status: proposed
+
+## 2026-09-25 · Chromatic Aberration · confirmed
+
+- source note: `CSCV2026/give_to_player/WRITEUP.md`
+- chain card: `knowledge/chains/cscv2026-chromatic-mergecatalog-constructor-prototype-ejs-outputfunctionname-rce.json`
+- verification: verified_live — Local docker compose harness (edge on 127.0.0.1:18080). POST /api/admin/export-preview with the default chromatic_admin cookie and the constructor.prototype.outputFunctionName exec payload returned HTTP 200 {"html":"CSCV2026{...}\n"}; the same sink with `id` returned uid=10001(renderer) gid=999(renderer), read from the live response. Recorded in challenges/cscv2026-chromatic/state.json via hooks.py pre-flag (source live-response).
+- classified as: `web-prototype-pollution` (score 4.5, 4 signals matched)
+- also matched: `web-file-upload` (3.5), `web-ssrf` (3.5), `web-command-injection` (3.0)
+- signals that fired: Prototype pollution, __proto__, constructor, merge
+
+**Confirming probe that worked**
+
+> POST /api/admin/export-preview with Cookie chromatic_admin=<token> (or the bot) and JSON body {"title":"t","theme":{"constructor":{"prototype":{"outputFunctionName":"x;__append('[PP-MARKER-b4e1]');var y"}}}}
+
+Expected: HTTP 200 and {"html":"[PP-MARKER-b4e1]<!doctype html>..."} - the marker sits before the template, proving the prototype-inherited option reached the ejs compile step without any RCE
+
+Falsifier: 403 administrator session required, or 200 with the marker absent (merge hardened with Object.hasOwn/Object.create(null), or ejs upgraded past 3.1.6)
+
+**Traps recorded on this solve**
+
+- classify.py --source on the challenge directory ranked web-command-injection first because it scanned this repository's own WRITEUP.md; scanning only renderer/ named web-prototype-pollution. Exclude solution notes from a white-box classify input.
+- ejs prepends 'var <outputFunctionName> = __append;' - the payload must keep it parseable (end with 'var y') and call process.exit(0) before the engine's own output is written, otherwise the JSON on stdout is either a syntax error or double output
+- process.getBuiltinModule needs Node >=20.16/22.3; the fallback is process.mainModule.require('child_process'). Check the runtime before choosing, because a failure here looks identical to the merge not working
+- the merge's `!(key in target)` is deliberate: it preserves the inherited constructor, which is exactly what makes constructor.prototype pollution work. A guard that rejects constructor/prototype or uses Object.create(null) kills the chain; confirm the guard from source, do not assume
+- the supplied handout's .git/ carried a non-stock core.fsmonitor hook (applypatch-msg.sample) that would git-apply a patch removing the nginx cache-key map and the single __proto__ check. It did not fire because there was no index, and by the time of this run .git/config had no core.fsmonitor and the hook was a 17-byte stub; the bugs were still present in the source
+- the full bot path (cache-key collision -> archive block -> board-compat.js -> admin export-preview) is NOT verified end to end here: the unresolved link is which GET /api/...?workspace=<W> can return an attacker body that JSON.parses as the manifest, since /api/media/raw must sniff as an image and must not start with { or [, and /api/telemetry/:channel is res.json()-wrapped
+
+**Blast radius**: Local harness: one renderer worker is spawned per job with a 2.5s timeout and the Object.prototype write dies with that process, so there is nothing to clean up. On a shared instance the same request is RCE as uid renderer and can read the flag; it does not write to disk. The second-order path would leave a poisoned nginx cache entry for up to 10 minutes and may write one uploaded asset.
+
+- status: confirmed

@@ -116,7 +116,8 @@ def audit():
 
         if entry.get("id") not in bug_class_ids:
             # A depth skill that is not a bug class (ctf-*, tool how-tos):
-            # judged as a reference — it must carry commands.
+            # judged as a reference — it must carry commands, and it must say
+            # when to stop reading it.
             row["verdict"] = "reference"
             fences = text.count("```")
             inline = len(re.findall(r"`[^`\n]+`", text))
@@ -125,6 +126,22 @@ def audit():
                 row["flags"].append("reference skill carries too few "
                                     "commands (%d fences, %d inline)"
                                     % (fences, inline))
+            # Every bug-class skill carries a budget and a stop condition, and
+            # the regression suite enforces it. The category corpora carried
+            # neither, though they are the files an agent can sink a whole
+            # session into: ctf-pwn is ~114k tokens, ctf-reverse ~100k,
+            # ctf-crypto ~100k, ctf-web ~97k. The discipline was attached to the
+            # small files and missing from the large ones, which is backwards.
+            low = text.lower()
+            if entry.get("depth_tokens", 0) >= 5000:
+                if "stop_conditions" not in low and "stop when" not in low:
+                    row["verdict"] = "warn"
+                    row["flags"].append("corpus of %d tokens with no stop condition"
+                                        % entry.get("depth_tokens", 0))
+                if "budget" not in low:
+                    row["verdict"] = "warn"
+                    row["flags"].append("corpus of %d tokens with no budget"
+                                        % entry.get("depth_tokens", 0))
             continue
 
         # bug-class skill: full score. Two real formats are accepted: the

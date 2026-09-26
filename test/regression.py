@@ -20,10 +20,12 @@ import os
 import json
 import re
 import sys
+import argparse
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -37,6 +39,8 @@ from tools import decide as decide_mod  # noqa: E402
 from tools import hooks as hooks_mod  # noqa: E402
 from tools import skill_audit  # noqa: E402
 from tools import learning_report  # noqa: E402
+from tools import search_facts  # noqa: E402
+from tools import handout_inventory  # noqa: E402
 
 CASES = ROOT / "test" / "cases"
 BASELINE = ROOT / "test" / "baseline.json"
@@ -93,6 +97,7 @@ FOREIGN_SCRIPT = re.compile(_charclass((0x0400, 0x04FF), (0x3040, 0x30FF),
 EXEMPTIONS = ROOT / "test" / "gate-exemptions.json"
 # Tools and skills that were referenced in documentation but never existed.
 PHANTOM = re.compile(r"solver/recognize\.py|credential-hygiene|external-recon/")
+TOOL_PATH = re.compile(r"\btools/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*\.py\b")
 PROMPT_SECTIONS = ["## Context", "## Role", "## Goal", "## Instructions",
                    "## Constraints", "## Output Format", "## Examples"]
 
@@ -387,6 +392,152 @@ class ContractTests(unittest.TestCase):
             hits = PHANTOM.findall(path.read_text(encoding="utf-8"))
             self.assertEqual(hits, [], "%s references a tool that does not exist: %r"
                              % (path.relative_to(ROOT), hits[:4]))
+
+    def test_a_short_signal_does_not_fire_inside_a_longer_word(self):
+        """`lua` must not match `evaluate`, and `lua_State` must still match.
+
+        Plain containment had `lua` matching 9 of the 40 handouts with every hit
+        inside `evaluate`, `mail` matching 16 with 13 inside `email`, and `eval`
+        matching 17 with 10 inside words like `retrieval` — 61 phantom hits over
+        18 signals. Because the scorer weights rare signals highest, a phantom
+        hit on a rare short signal pushed the wrong card up the ranking. Only
+        letters bound a signal: \\b would reject `lua_State`, which is a real hit.
+        """
+        should_match = [("lua", "lua_State *L"), ("lua", "redis.lua script"),
+                        ("eval", "eval(userInput)"), ("mail", "mail() helper"),
+                        ("curl", "curl -s http://x"), ("xss", "an XSS payload"),
+                        ("template", "templates are rendered")]
+        should_not = [("lua", "evaluate the archive"), ("eval", "retrieval of the key"),
+                      ("mail", "the email field"), ("curl", "curlybrace syntax"),
+                      ("bio", "biography"), ("latex", "translatex")]
+        for signal, text in should_match:
+            self.assertTrue(chain_match.found(signal, text.lower()),
+                            "%r must still match %r" % (signal, text))
+        for signal, text in should_not:
+            self.assertFalse(chain_match.found(signal, text.lower()),
+                             "%r must not fire inside %r" % (signal, text))
+
+    def test_rarity_statistics_are_counted_with_the_real_matcher(self):
+        """The IDF denominator has to be measured the way a hit is decided.
+
+        rebuild_stats counted raw containment while scoring used found(), so
+        every short signal was scored against a frequency it could never reach.
+        """
+        source = (ROOT / "tools" / "chain_match.py").read_text(encoding="utf-8")
+        self.assertIn("found(s, t)", source,
+                      "rebuild_stats must count with found(), not `s.lower() in t`")
+
+    def test_classify_discounts_a_signal_that_matches_most_handouts(self):
+        """A matched signal must be worth less when it matches everything.
+
+        classify.py scored a plain count, so web-file-upload's
+        `avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b` — which matches 95%
+        of the handouts on disk — counted the same as a signal that matches one.
+        Rarity modulates the count between SIGNAL_FLOOR and 1.0; it does not
+        replace it, because two corroborating common signals are real evidence.
+        """
+        stats = classifier.load_signal_stats()
+        if not stats:
+            self.skipTest("knowledge/classify-signal-stats.json not built")
+        total = stats["corpus"]
+        broad = [k for k, v in stats["df"].items() if v / total > 0.6]
+        self.assertTrue(broad, "expected some broad signals to exist to discount")
+        rare_w = classifier.signal_weight("x", "a-signal-never-seen", stats)
+        for key in broad[:5]:
+            class_id, signal = key.split("||", 1)
+            broad_w = classifier.signal_weight(class_id, signal, stats)
+            self.assertLess(broad_w, rare_w,
+                            "%r matches %d/%d handouts yet scores %.3f, "
+                            "no less than a never-seen signal at %.3f"
+                            % (signal, stats["df"][key], total, broad_w, rare_w))
+            self.assertGreaterEqual(broad_w, classifier.SIGNAL_FLOOR,
+                                    "a matched signal must never be worth nothing")
+
+    def test_every_state_key_the_controller_reads_has_a_writer(self):
+        """A controller rule that reads a key nothing writes is a dead rule.
+
+        decide.py rule 6 — reuse a solved chain before inventing a hypothesis,
+        the cheapest win the system has — read state["chain_candidates"] while no
+        tool wrote it. It fired only on a regression fixture, so for the whole
+        life of the tree the controller never once offered a solved card's probe.
+        Only the fixture kept it looking alive, which is exactly what this guards.
+        """
+        decide_src = (ROOT / "tools" / "decide.py").read_text(encoding="utf-8")
+        read_keys = set(re.findall(r'current\.get\("([a-z_]+)"\)', decide_src))
+        read_keys -= {"probes", "hypotheses", "flag", "name", "category", "target",
+                      "next_action", "decisions", "searches", "schema_version"}
+        writers = "\n".join(p.read_text(encoding="utf-8")
+                            for p in sorted((ROOT / "tools").glob("*.py"))
+                            if p.name != "decide.py")
+        dead = [key for key in sorted(read_keys)
+                if ('"%s"' % key) not in writers]
+        self.assertEqual(dead, [],
+                         "tools/decide.py branches on state keys no tool writes, so "
+                         "those rules can never fire outside a test fixture: %s" % dead)
+
+    def test_documents_state_the_budget_the_controller_enforces(self):
+        """One number, in one place, restated nowhere that can drift from it.
+
+        PROMPT.md — the file the session contract tells the agent to load first —
+        said "after three probes ... park that class" while decide.py enforced
+        five, as did HYPOTHESIS_PROTOCOL.md, CLAUDE.md, AGENTS.md and
+        LOOP_DISCIPLINE.md. An agent obeying PROMPT.md parked a live class two
+        probes early while the controller was still returning run_probe.
+        """
+        words = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6,
+                 "ten": 10, "fifteen": 15, "twenty": 20, "twenty-five": 25,
+                 "thirty": 30, "forty-five": 45}
+
+        def value(token):
+            token = token.lower()
+            return words.get(token, int(token) if token.isdigit() else None)
+
+        pattern = re.compile(
+            r"\b([a-z-]+|\d+) probes? (?:or|/) ([a-z-]+|\d+) (?:active )?minutes?\b",
+            re.I)
+        wrong = []
+        for path in authored_files():
+            rel = path.relative_to(ROOT).as_posix()
+            if rel.startswith(("solved/", "challenges/", "test/")):
+                continue
+            for probes, minutes in pattern.findall(path.read_text(encoding="utf-8")):
+                got_p, got_m = value(probes), value(minutes)
+                if got_p is None or got_m is None:
+                    continue
+                pair = (got_p, got_m)
+                if pair not in {(decide_mod.PROBE_BUDGET, decide_mod.MINUTE_BUDGET),
+                                (decide_mod.CHALLENGE_PROBE_BUDGET,
+                                 decide_mod.CHALLENGE_MINUTE_BUDGET)}:
+                    wrong.append("%s says %d probes / %d minutes" % (rel, got_p, got_m))
+        self.assertEqual(wrong, [],
+                         "a document states a budget the controller does not enforce "
+                         "(decide.py: %d/%d per class, %d/%d per challenge): %s"
+                         % (decide_mod.PROBE_BUDGET, decide_mod.MINUTE_BUDGET,
+                            decide_mod.CHALLENGE_PROBE_BUDGET,
+                            decide_mod.CHALLENGE_MINUTE_BUDGET, wrong))
+
+    def test_every_tool_path_named_in_prose_resolves(self):
+        """PHANTOM only knew three retired names, so it could not catch a new one.
+
+        skills/crypto-triage/SKILL.md once told every crypto session to start with
+        `python3 tools/crypto_attack.py --list` while that file did not exist: the
+        router's first command was a file-not-found and nothing in the gate said
+        so. This resolves every tools/<name>.py written anywhere an agent reads,
+        which is the check that would have caught it.
+        """
+        sources = (list((ROOT / "skills").rglob("*.md"))
+                   + [ROOT / rel for rel in CONTROL_PLANE]
+                   + [ROOT / "AGENTS.md"]
+                   + sorted((ROOT / ".claude" / "commands").glob("*.md")))
+        dangling = []
+        for path in sources:
+            if not path.is_file():
+                continue
+            for ref in sorted(set(TOOL_PATH.findall(path.read_text(encoding="utf-8")))):
+                if not (ROOT / ref).is_file():
+                    dangling.append("%s -> %s" % (path.relative_to(ROOT), ref))
+        self.assertEqual(dangling, [],
+                         "a document names a tool that does not exist: %s" % dangling[:6])
 
     def test_every_tool_is_named_somewhere(self):
         """The reverse of the check below: no tool may sit in tools/ unreferenced.
@@ -1070,6 +1221,48 @@ class OrchestratorTests(unittest.TestCase):
                             for command in decision["commands"]))
         self.assertEqual(decision["next_probe"]["class"], "web-ssrf")
 
+    def test_a_resumed_challenge_is_not_born_budget_exhausted(self):
+        """Parking and reviving is documented; it used to be unreachable.
+
+        The minute budget was `now - first probe`, so a challenge parked on
+        Monday and resumed on Friday returned switch_class for every class and
+        state.py --revive could never be acted on. Only minutes actually worked
+        are charged now: gaps longer than the idle threshold are parking.
+        """
+        start = 1000.0
+        week = 7 * 24 * 3600
+        probes = [{"request": "GET /?p=%d" % i, "result": "inconclusive",
+                   "time": start + i * 120, "verdict": "inconclusive",
+                   "class": "web-ssti"} for i in range(2)]
+        self.write_state("resumed", {
+            "hypotheses": [{"id": "h1", "name": "ssti", "status": "open",
+                            "bug_class": "web-ssti", "priority": 50, "time": start}],
+            "probes": probes, "classes_considered": ["web-ssti", "web-ssrf"]})
+        decision = decide_mod.decide("resumed", now=start + week)
+        self.assertEqual(decision["action"], "run_probe",
+                         "a week-old challenge must resume, not arrive exhausted")
+
+    def test_challenge_ceiling_stops_class_hopping(self):
+        """The per-class cap is keyed on an agent-supplied string, so relabelling
+        the class resets it. Twenty-five classes at five probes each is 125
+        probes with nothing saying stop; CLAUDE.md stated a 45-minute ceiling
+        per challenge that no code implemented. This is that ceiling."""
+        start = 1000.0
+        probes = [{"request": "GET /?p=%d" % i, "result": "inconclusive",
+                   "time": start + i * 60, "verdict": "inconclusive",
+                   "class": "made-up-class-%d" % i}
+                  for i in range(decide_mod.CHALLENGE_PROBE_BUDGET)]
+        self.write_state("hopper", {
+            "hypotheses": [{"id": "h1", "name": "n", "status": "open",
+                            "bug_class": "web-ssti", "priority": 50, "time": start}],
+            "probes": probes, "classes_considered": ["web-ssti"]})
+        budgets = decide_mod.compute_budget(probes, start + 60 * len(probes))
+        self.assertFalse(any(b["exhausted"] for b in budgets.values()),
+                         "no single class is over its own cap, which is the point")
+        decision = decide_mod.decide("hopper", now=start + 60 * len(probes))
+        self.assertEqual(decision["action"], "stop_report")
+        self.assertIn("challenge budget exhausted", decision["rationale"])
+
     def test_decide_prefers_an_unprobed_chain_card(self):
         self.write_state("t4", {
             "hypotheses": [{"id": "h1", "name": "fresh idea", "status": "open",
@@ -1171,7 +1364,7 @@ class OrchestratorTests(unittest.TestCase):
     def test_agents_md_exists_and_stays_ctf_only(self):
         text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
         for tool in ("tools/decide.py", "tools/hooks.py", "tools/skill_audit.py",
-                     "tools/search_facts.py"):
+                     "tools/search_facts.py", "tools/handout_inventory.py"):
             self.assertIn(tool, text, "AGENTS.md must document " + tool)
             self.assertTrue((ROOT / tool).is_file(),
                             "AGENTS.md names a missing tool: " + tool)
@@ -1194,6 +1387,30 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("tools/writeup_search.py", plan["commands"][0])
         self.assertTrue(any("untrusted lead" in item.lower()
                             for item in plan["evidence_policy"]))
+
+    def test_search_fact_record_keeps_external_claim_separate_from_probe_evidence(self):
+        with tempfile.TemporaryDirectory() as temp:
+            state_path = Path(temp) / "state.json"
+            state_path.write_text(json.dumps({
+                "schema_version": 1, "name": "search-test", "hypotheses": [],
+                "probes": [], "next_action": None,
+            }), encoding="utf-8")
+            args = SimpleNamespace(
+                record="search-test", url="https://docs.example.test/feature",
+                title="Example feature docs", snippet="Feature is enabled by default",
+                outcome="supported", local_verification="source: config.enabled = true",
+                kind="official-docs", fact="default feature behavior",
+                decision="choose the first probe", version="1.2.3",
+            )
+            payload = {"queries": ["Example 1.2.3 default feature behavior"]}
+            with patch.object(search_facts.state_mod, "path_for", return_value=str(state_path)):
+                recorded = search_facts.record(args, payload, argparse.ArgumentParser())
+            state_data = json.loads(state_path.read_text())
+            self.assertEqual(recorded["recorded"]["outcome"], "supported")
+            self.assertEqual(len(state_data["searches"]), 1)
+            self.assertEqual(state_data["searches"][0]["snippet"], "Feature is enabled by default")
+            self.assertEqual(state_data["probes"], [])
+            self.assertNotIn("flag", state_data)
 
     def test_skill_audit_report_is_written_and_consistent(self):
         report_path = ROOT / "knowledge" / "skill-audit.json"
@@ -1262,6 +1479,32 @@ class KnowledgeScaleTests(unittest.TestCase):
     matcher could not retrieve a card from its own handout because an asset-heavy
     challenge exhausted the read budget on images before reaching any code.
     """
+
+    def test_handout_inventory_excludes_solver_workdirs(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            chains = root / "knowledge" / "chains"
+            challenges = root / "challenges"
+            chains.mkdir(parents=True)
+            (chains / "clean.json").write_text(json.dumps({
+                "id": "clean-card", "challenge": {"name": "Clean Challenge"},
+            }), encoding="utf-8")
+            (chains / "work.json").write_text(json.dumps({
+                "id": "work-card", "challenge": {"name": "Work Challenge"},
+            }), encoding="utf-8")
+            clean = challenges / "Clean Challenge"
+            clean.mkdir(parents=True)
+            (clean / "app.py").write_text("print('ok')", encoding="utf-8")
+            work = challenges / "Work Challenge"
+            work.mkdir(parents=True)
+            (work / "state.json").write_text("{}", encoding="utf-8")
+            with patch.object(handout_inventory, "ROOT", root), \
+                    patch.object(handout_inventory, "CHAINS", chains), \
+                    patch.object(handout_inventory, "CHALLENGES", challenges):
+                report = handout_inventory.inventory()
+            rows = {row["chain_id"]: row for row in report["cards"]}
+            self.assertTrue(rows["clean-card"]["handout_available"])
+            self.assertFalse(rows["work-card"]["handout_available"])
 
     def test_every_bug_class_skill_is_in_the_taxonomy(self):
         taxonomy = {c["id"] for c in

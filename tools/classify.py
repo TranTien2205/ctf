@@ -15,6 +15,7 @@ That log is the backlog of classes this toolkit does not know yet.
 import argparse
 import datetime
 import json
+import math
 import os
 import re
 import sys
@@ -31,6 +32,46 @@ BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", "
 # A verified class has been solved here; a catalogue class has not. The bonus
 # breaks ties toward what this toolkit can actually back up with a chain card.
 VERIFIED_BONUS = 0.5
+SIGNAL_STATS = os.path.join(ROOT, "knowledge", "classify-signal-stats.json")
+# Scratch this toolkit writes into a challenge directory. Counting it would make
+# a signal look common because we kept writing about it.
+WORKDIR_NAMES = {"solve.py", "state.json", "anomaly_map.json", "notes.md"}
+
+
+def load_signal_stats(path=SIGNAL_STATS):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data.get("df"), dict) else None
+
+
+SIGNAL_FLOOR = 0.4   # what a matched signal is worth however common it is
+
+
+def signal_weight(class_id, signal, stats):
+    """A matched signal is worth between SIGNAL_FLOOR and 1.0 by how rare it is.
+
+    The score used to be a plain count, so every matched signal was worth one.
+    Measured over the 40 handouts on disk, thirteen of the taxonomy's 174 signals
+    match more than 60% of them: web-file-upload's matches 95%, and
+    web-auth-session's `alg\\b|hs256|rs256|none` matches 88% because `none` hits
+    every Python `None`. Under a count those outvoted a precise signal.
+
+    Rarity modulates the count here rather than replacing it. Replacing it was
+    tried first and was worse: summing raw log-rarity made web-cache-poisoning
+    lose the EncoDecept observation to web-parser-differential, because two
+    corroborating signals at 68% each summed to less than one signal at 55%.
+    Two independent signals firing is real evidence even when each is common, so
+    breadth discounts a signal toward the floor instead of erasing it.
+    """
+    if not stats:
+        return 1.0
+    total = max(1, int(stats.get("corpus", 1)))
+    df = int(stats.get("df", {}).get("%s||%s" % (class_id, signal), 0))
+    rarity = math.log((total + 1.0) / (df + 1.0)) / math.log(total + 1.0)
+    return SIGNAL_FLOOR + (1.0 - SIGNAL_FLOOR) * max(0.0, min(1.0, rarity))
 
 
 def load_taxonomy(path=TAXONOMY):
@@ -188,23 +229,27 @@ def scan_text(text, compiled, limit_per_class=6):
     return hits
 
 
-def rank(hits, classes):
+def rank(hits, classes, stats=None):
     index = {entry["id"]: entry for entry in classes}
     ranked = []
     for class_id, evidence in hits.items():
         entry = index[class_id]
-        distinct = len({item["signal"] for item in evidence})
+        matched = {item["signal"] for item in evidence}
+        distinct = len(matched)
         total = len(entry.get("observation_signals", [])) + len(entry.get("source_signals", []))
         # Coverage breaks ties: a class whose whole signature fired fits better than
         # one where a few generic signals did.
         coverage = round(distinct / total, 3) if total else 0.0
-        score = distinct + (VERIFIED_BONUS if entry["evidence_level"] == "verified" else 0.0)
+        weight = sum(signal_weight(class_id, signal, stats) for signal in matched)
+        score = weight + (VERIFIED_BONUS if entry["evidence_level"] == "verified" else 0.0)
         ranked.append({
             "class": class_id,
             "name": entry["name"],
             "evidence_level": entry["evidence_level"],
             "verified_by": entry["verified_by"],
             "score": round(score, 2),
+            "scoring": "signal-rarity" if stats else "signal-count",
+            "match_weight": round(weight, 4),
             "signals_matched": distinct,
             "signals_defined": total,
             "coverage": coverage,
@@ -219,6 +264,62 @@ def rank(hits, classes):
         })
     ranked.sort(key=lambda item: (-item["score"], -item["coverage"], item["class"]))
     return ranked
+
+
+def rebuild_stats(taxonomy_path=TAXONOMY):
+    """Count, for every taxonomy signal, how many handouts its pattern matches.
+
+    The same corpus rule chain_match.py uses: a challenge directory counts when
+    it holds at least three files that are not this toolkit's own scratch.
+    """
+    base = os.path.join(ROOT, "challenges")
+    corpus = []
+    for name in sorted(os.listdir(base)) if os.path.isdir(base) else []:
+        path = os.path.join(base, name)
+        if not os.path.isdir(path):
+            continue
+        real = 0
+        for _, _, files in os.walk(path):
+            real += sum(1 for f in files if f not in WORKDIR_NAMES)
+        if real < 3:
+            continue
+        chunks, total = [], 0
+        for item in walk_source(path):
+            if os.path.basename(item) in WORKDIR_NAMES:
+                continue
+            try:
+                if os.path.getsize(item) > MAX_FILE_BYTES:
+                    continue
+                with open(item, encoding="utf-8", errors="replace") as handle:
+                    chunks.append(handle.read(40000))
+            except OSError:
+                continue
+            total += len(chunks[-1])
+            if total >= 400000:
+                break
+        corpus.append("\n".join(chunks).lower())
+
+    classes = load_taxonomy(taxonomy_path)["classes"]
+    df = {}
+    for entry in classes:
+        signals = (entry.get("observation_signals", [])
+                   + entry.get("source_signals", []))
+        for signal in signals:
+            try:
+                pattern = re.compile(signal, re.I)
+            except re.error:
+                continue
+            df["%s||%s" % (entry["id"], signal)] = sum(
+                1 for text in corpus if pattern.search(text))
+    data = {"corpus": len(corpus), "signals": len(df), "df": df}
+    with open(SIGNAL_STATS, "w", encoding="utf-8") as handle:
+        json.dump(data, handle, indent=2, ensure_ascii=False)
+        handle.write("\n")
+    broad = sum(1 for v in df.values() if corpus and v / len(corpus) > 0.6)
+    print(json.dumps({"written": os.path.relpath(SIGNAL_STATS, ROOT),
+                      "corpus": data["corpus"], "signals": data["signals"],
+                      "signals_matching_over_60pct": broad}, indent=2))
+    return 0
 
 
 def log_miss(kind, value):
@@ -242,7 +343,13 @@ def main():
                         help="restrict to classes at this evidence level")
     parser.add_argument("--taxonomy", default=TAXONOMY)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--rebuild-stats", action="store_true",
+                        help="recount how many handouts each taxonomy signal matches "
+                             "and write knowledge/classify-signal-stats.json, then exit")
     args = parser.parse_args()
+
+    if args.rebuild_stats:
+        return rebuild_stats(args.taxonomy)
 
     observation = " ".join(args.observation).strip()
     if not observation and not args.source:
@@ -269,7 +376,9 @@ def main():
         hits = scan_text(observation, compile_signals(classes, "observation_signals"))
         kind, value = "observation", observation
 
-    ranked = [item for item in rank(hits, classes) if item["signals_matched"] >= args.min_signals]
+    stats = load_signal_stats()
+    ranked = [item for item in rank(hits, classes, stats)
+              if item["signals_matched"] >= args.min_signals]
     top = ranked[: max(1, args.n)]
     if not top:
         log_miss(kind, value)

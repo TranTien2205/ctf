@@ -86,9 +86,13 @@ from a supplied challenge artifact during this session.
    Record the top candidates as hypotheses with their first probes. A candidate
    whose `evidence_level` is `catalogue` carries no local proof — weigh it lower
    than a `verified` one.
-4. Reuse: `python3 tools/chain_match.py [--source <path>] "<observation>"`.
+4. Reuse: `python3 tools/chain_match.py [--source <path>] "<observation>" --record <id>`.
    Record each candidate above the coverage threshold as a hypothesis at its
-   `suggested_priority`, with the card id as its evidence.
+   `suggested_priority`, with the card id as its evidence. `--record` writes them
+   into the ledger, which is what makes `tools/decide.py` hand back the card's own
+   confirming probe instead of asking for a fresh hypothesis; without it that
+   rule cannot fire. Open the ledger first (step 5) so there is something to
+   write into.
 5. Open the ledger:
    `python3 tools/state.py <id> --category <cat> --target <target>`.
 
@@ -111,8 +115,12 @@ from a supplied challenge artifact during this session.
    exact command and the exact result with `tools/run.py` or in the ledger.
 9. Open one depth skill only after a probe produced the signal that unlocks it,
    and open one named reference file inside it, never the whole directory.
-10. After three probes in a class with no new signal, park that class at priority
-    0 with the reason and switch mechanism layer. Do not delete it.
+10. After five probes or fifteen active minutes in a class with no new signal,
+    park that class at priority 0 with the reason and switch mechanism layer. Do
+    not delete it. `tools/decide.py` enforces exactly these numbers
+    (`PROBE_BUDGET`, `MINUTE_BUDGET`); it also stops the whole challenge at
+    `CHALLENGE_PROBE_BUDGET` probes or `CHALLENGE_MINUTE_BUDGET` active minutes,
+    which changing class does not reset.
 
 **Phase 3 — outside knowledge**
 

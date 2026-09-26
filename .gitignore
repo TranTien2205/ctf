@@ -19,7 +19,12 @@ knowledge/raw/
 **/state.json
 **/baseline.json
 !test/baseline.json
-build/
+
+# NOT build artifacts: build/ holds the four generators that PRODUCE
+# knowledge/bug-classes.json, the bug-class skills, skills/INDEX.md and
+# skills/registry.json. Ignoring it kept only their output in history, and
+# test/regression.py reads build/make_class_skills.py, so a fresh clone could
+# not pass its own gate. Track the generators; ignore nothing here.
 
 # Large vendored binaries: keep them out of history
 tools/ghidra-dist/
@@ -33,6 +38,14 @@ tools/ghidra-dist/
 #   git add -f "challenges/<name>"
 # scripts/repo_init.sh does exactly that for the Weather App regression fixture.
 challenges/
+
+# Per-event working directories hold the same thing challenges/ does -- handout
+# source, organizer material, and real flags -- plus generated runtime
+# credentials. CSCV2026/ carries an event writeup with a live flag and
+# diemthi/runtime/jsreport-pass. tools/crypto/selftest.py reads
+# CSCV2026/Crypto/solve/output_typhon.txt for its real-data case and SKIPS when
+# it is absent, which is why ignoring this costs a clone nothing but the skip.
+CSCV2026/
 # Media never belongs in history, even inside a force-added challenge
 *.gif
 *.jpg
