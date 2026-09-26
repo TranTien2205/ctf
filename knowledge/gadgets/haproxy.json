@@ -1,0 +1,16 @@
+{
+  "package": "haproxy",
+  "ecosystem": "system",
+  "gadgets": [
+    {
+      "versions": "2.2 (measured)",
+      "sink": "`path -i -m beg` does not decode or normalise, and a bare 101 puts the connection in tunnel mode",
+      "payload": "mirror a bare `HTTP/1.1 101 Switching Protocols` with no Upgrade/Connection header",
+      "effect": "tunnel mode, then an arbitrary protocol (e.g. gopher to a backend datastore) over the same socket",
+      "precondition": "a backend whose status line you can influence",
+      "trap": "if the 101 carries Upgrade/Connection, Node's client raises 'upgrade' instead of 'response' and the request hangs to the render timeout",
+      "proven_by": "knowledge/chains/htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip.json"
+    }
+  ],
+  "schema_version": 1
+}

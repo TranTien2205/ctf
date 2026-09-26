@@ -1,0 +1,15 @@
+{
+  "package": "nuxt",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "2.15.7 (nuxt/nuxt#10319)",
+      "sink": "client-side router accepts a protocol-relative path",
+      "payload": "a redirect target of the form ///evil.host",
+      "effect": "client-side open redirect, useful to steal an OAuth token",
+      "precondition": "a redirect parameter reaching the client router",
+      "proven_by": "knowledge/chains/htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab.json"
+    }
+  ],
+  "schema_version": 1
+}

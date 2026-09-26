@@ -1,0 +1,15 @@
+{
+  "package": "reportlab",
+  "ecosystem": "pypi",
+  "gadgets": [
+    {
+      "versions": "<= 3.6.12",
+      "sink": "CVE-2023-33733: a colour attribute is evaluated",
+      "payload": "a paraparser colour expression that escapes to builtins",
+      "effect": "RCE when untrusted HTML is rendered to PDF",
+      "precondition": "attacker-controlled markup reaching paraparser",
+      "proven_by": "knowledge/chains/htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab.json"
+    }
+  ],
+  "schema_version": 1
+}

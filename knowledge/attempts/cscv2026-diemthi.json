@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "id": "cscv2026-diemthi-exam-score",
+  "challenge": "diemthi / Exam Score",
+  "event": "CSCV 2026",
+  "points": 464,
+  "solves_at_attempt": 0,
+  "status": "unsolved",
+  "why_this_file_exists": "knowledge/chains/ only accepts a solve, so a challenge worked for a whole session and NOT solved leaves nothing behind and the next attempt re-walks the same dead layers. This records what was measured dead, with the measurement, so a resumed or similar target starts past it.",
+  "confirmed_primitive": {
+    "what": "arbitrary file read: an absolute `template` escapes TEMPLATES_DIR and the file's bytes are rendered by handlebars into the returned PDF",
+    "where": "CSCV2026/diemthi/server/index.js:77 loadTemplate -- rejects only '..' then path.resolve",
+    "probe": "POST /api/export  template=/proc/self/mountinfo&data={\"id\":\"x\"}",
+    "evidence": "200 application/pdf; mutool extracted the mountinfo text, naming every host path bind-mounted into the app container",
+    "limits": "only NUL-free, handlebars-parseable files. Measured: a NUL at start, middle or end all give 502 (planted probe files); scores.db has 16763 NUL bytes, -shm 32728, and /proc/self/environ and /proc/1/cmdline are NUL-separated."
+  },
+  "flag_location": "internal-storage:/app/assets.txt, gated by Origin: http://diemthi/ plus a one-shot nonce and HMAC-SHA256(jsreport admin password, nonce). No published port, so the final request must come from inside the compose network.",
+  "layers_measured_dead": [
+    {
+      "layer": "name /secret/jsreport-pass in `template`",
+      "mechanism": "sanitize.js:13 removeBlockedWord deletes the literal word, stack-based",
+      "what_was_measured": "22 bypasses (tag-discard, nested sesecretcret, entity, U+017F long s, duplicate urlencoded key, /proc/*/root) all 404, with the 404 body echoing the cleaned string as a free oracle; plus 24228 fuzz cases",
+      "why_unreachable": "removeBlockedWord runs LAST in every pass, so nothing can re-form the word",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "none -- structural"
+    },
+    {
+      "layer": "reach the same file by another path",
+      "mechanism": "bind mount at /secret/jsreport-pass only",
+      "what_was_measured": "350 symlinks in the app container, 0 into /secret; a content scan of 5098 files found the value only at /secret/jsreport-pass",
+      "why_unreachable": "no alias, no symlink, no second copy",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "a symlink or a second mount"
+    },
+    {
+      "layer": "HTML/JS injection so Chromium reads file:///proc/self/environ",
+      "mechanism": "chrome-pdf renders at a file:// origin (jsreport log: GET file:///tmp/jsreport/autocleanup/<uuid>-chrome-pdf.html, HeadlessChrome/79, --no-sandbox), so ONE iframe wins",
+      "what_was_measured": "24228 grammar cases through both sanitizer paths -> 0 outputs containing '<' and 0 containing 'secret'; 4605 NUL-free files scanned -> none has a triple-stash in a non-text HTML context and none an iframe/object/embed/frame/base with a steerable URL",
+      "why_unreachable": "no way to produce a '<'; the template file cannot host the tag either",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "any file on disk with a raw sink inside a tag, or a sanitize-html bug that emits '<'"
+    },
+    {
+      "layer": "jsreport {#child} -> Object.prototype.helpers -> vm2 escape",
+      "mechanism": "childTemplates.js applyParameters walks a dotted @param path with it = it[k] = it[k] || {}, so @__proto__.helpers$=<b64> lands on Object.prototype; the next render run()s that string in the vm2 sandbox",
+      "what_was_measured": "Dockerfile:14 states the store stays empty by design; GET /odata/templates returned value:[]; applyParameters runs only after a template is found (if (!template) return null). With a sample template present the chain DID produce the prize, so the gate is the store, not the technique.",
+      "why_unreachable": "empty template store, by author design",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "one template entity in the store -- e.g. POST /studio/create-samples, which exists but sits behind studio auth"
+    },
+    {
+      "layer": "{#asset <path>} disk read inside the jsreport container",
+      "mechanism": "jsreport-assets readAsset falls back to the disk only when searchOnDiskIfNotFoundInStore",
+      "what_was_measured": "measured directly, all four encodings: 'Asset /etc/hostname not found'. assets.js:303 sets the flag only when reporter.options.allowLocalFilesAccess === true, and the extension's optionsSchema declares no default.",
+      "why_unreachable": "disk fallback off",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "allowLocalFilesAccess: true in the deploy config"
+    },
+    {
+      "layer": "arbitrary template text (would give {{require}}/{{render}} and a free {#child})",
+      "mechanism": "handlebars compiles whatever loadTemplate read",
+      "what_was_measured": "the app writes only SQLite (NUL-laden) and a .eml draft; index.js:243 returns 503 before rendering when SMTP is unset, so mail.js's draft writer is dead code. App runs as uid 0 and everything is writable, but no code path writes attacker content to a NUL-free file.",
+      "why_unreachable": "no attacker-controlled NUL-free file",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "SMTP_HOST set, which reopens the .eml draft path"
+    },
+    {
+      "layer": "$ref reference resolution (the one shape the app whitelists)",
+      "mechanism": "resolveReferences.js:30 `if (ref in byid)` -- `in` walks the prototype chain of an empty {}, so {$ref:'constructor'} yields Object and {$ref:'__proto__'} Object.prototype",
+      "what_was_measured": "rendered with recipe html: every $ref (__proto__, constructor, toString, valueOf, hasOwnProperty, toLocaleString, a missing id) printed [object Object]. recurse only descends into a node that has $id, and resolution is ONE hop, so Function is unreachable and escapeExpression's toHTML path returns non-strings.",
+      "why_unreachable": "one hop only",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "a second hop, or any function-valued property reachable from data"
+    },
+    {
+      "layer": "SQL injection / IDOR on the data layer",
+      "mechanism": "better-sqlite3",
+      "what_was_measured": "db.js and import.js are fully parameterised",
+      "why_unreachable": "no string-built query",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "none"
+    },
+    {
+      "layer": "express.static path traversal (mounted at / before sanitizeBody)",
+      "mechanism": "serve-static in express 4.21.2",
+      "what_was_measured": "12 payloads (.., %2e%2e, %252e%252e, ..;/, ....//, %00, .%2e) all 404",
+      "why_unreachable": "serve-static normalises and rejects",
+      "on_instance": "stock",
+      "precondition_that_would_reopen": "an older express"
+    }
+  ],
+  "still_open": [
+    {
+      "lead": "$values reference envelope -- the sibling shape the author blocked ANYWHERE in the tree (index.js:143 containsArrayReferenceEnvelope). By the blocked-sibling rule the author tested it and it worked. resolveReferences.js:39 gives it a different recursion path: obj = obj.$values.map(recurse), and Array.prototype.map calls recurse(element, index, array), so prop becomes a NUMBER and parent an ARRAY where every other path passes a key name and an object; the plain-array branch additionally passes the OUTER prop down.",
+      "falsifier": "send {\"$id\":\"r\",\"$values\":[...]} straight to a LOCAL jsreport /api/report, bypassing the app check, and diff what resolveReferences produces against the object path. If data merely becomes an Array that request.js already handles (Object.assign(Array.isArray(dataInput) ? [] : {}, ...)), the lead is dead.",
+      "cost_minutes": 15,
+      "status": "registered, not run"
+    }
+  ],
+  "anomaly_map": "challenges/diemthi/anomaly_map.json",
+  "honest_conclusion": "Unsolved. Under the stock handout every route to the HMAC key was closed by measurement, and the one working chain needs a store entity the deploy does not create. Two things were never established: whether the deployed instance matches the local rebuild, and what $values buys. The unreachability was proven against a LOCAL REBUILD, not against the real instance."
+}

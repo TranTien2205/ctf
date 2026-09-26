@@ -1,0 +1,16 @@
+{
+  "package": "handlebars",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "4.6.0+ (measured on 4.7.9)",
+      "sink": "not a gadget -- the DEFENCE you must account for",
+      "payload": "n/a",
+      "effect": "prototype property and method access is denied by default, so {{x.constructor.constructor}} is dead; escapeExpression escapes & < > \" ' ` = (space and / are NOT escaped, and = being escaped is what stops attribute injection); only a triple-stash, or an object whose toHTML is callable, emits raw",
+      "precondition": "n/a",
+      "trap": "the lexer rejects NUL anywhere in the content, so a NUL-bearing file cannot be used as a template at all -- measured: NUL at start, middle or end all fail",
+      "proven_by": "measured on 4.7.9 (knowledge/attempts/cscv2026-diemthi.json)"
+    }
+  ],
+  "schema_version": 1
+}

@@ -27,6 +27,8 @@ see `CLAUDE_CODE.md`.
 | Changing direction without losing a branch | `HYPOTHESIS_PROTOCOL.md` |
 | What counts as evidence | `EVIDENCE_POLICY.md` |
 | Reusing a chain already solved here | `tools/chain_match.py` |
+| Whether this dependency version was already measured | `tools/gadget_lookup.py` + `knowledge/gadgets/` |
+| What a previous attempt already proved dead | `knowledge/attempts/` |
 | Turning a solve into a better skill | `LEARNING_LOOP.md` + `tools/classify_solve.py` |
 | Accepting a change to this system | `test/run_all.sh` |
 
@@ -150,6 +152,7 @@ emits the shape `tools/hooks.py` wants — check with `python3 tools/web/selftes
 | an id-enumeration loop | `tools/web/id_sweep.py` — existence oracle |
 | text out of a returned PDF | `tools/web/pdf_text.py` |
 | a lattice, LCG, LFSR or ECC attack | `tools/crypto/` plus `tools/crypto_attack.py --list` |
+| guessing whether a pinned dependency is exploitable | `tools/gadget_lookup.py --lockfile <handout>/package-lock.json` |
 
 Measured present on this machine, used as-is: `requests`, `httpx` with HTTP/2,
 `Crypto` (pycryptodome), `sympy`, `jwt`, `bs4`, `lxml`, `websockets`, `selenium`,

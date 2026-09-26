@@ -1,0 +1,16 @@
+{
+  "package": "sanitize-html",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "2.x (measured on 2.17.7)",
+      "sink": "not a gadget -- a measured DEAD END worth not re-testing",
+      "payload": "n/a",
+      "effect": "with allowedTags: [] and disallowedTagsMode: 'discard', no input produces a raw '<'. Measured 24228 grammar cases: 0 hits. Raw text survives only for an ALLOWED script/style (result += text) or xmp/textarea (angle brackets escaped), so an empty allowlist closes all of them.",
+      "precondition": "n/a",
+      "trap": "entity decoding AFTER sanitising is still safe for '<': a decode list of &apos; &#39; &quot; &amp; can only emit ' \" &, and an ampersand decoded last is not re-scanned",
+      "proven_by": "measured (knowledge/attempts/cscv2026-diemthi.json)"
+    }
+  ],
+  "schema_version": 1
+}

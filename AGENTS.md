@@ -69,6 +69,8 @@ Then pick exactly one branch:
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
 | `tools/web/` | speed primitives that emit the shape `hooks.py` wants: `http_probe` (probe + verbatim excerpt), `sanitizer_fuzz` (differential encoding sweep, records negatives), `read_loop` (proven file-read walk), `id_sweep`, `pdf_text`. `python3 tools/web/selftest.py` proves them offline |
 | `tools/crypto/` + `crypto_attack.py` | lattice, LCG, LFSR, ECC, HNP and integer attacks; `--list` names them |
+| `tools/gadget_lookup.py` | before opening a class skill: has this exact dependency been measured here before? `--lockfile <handout>/package-lock.json` reads the real versions and matches them against `knowledge/gadgets/<package>.json`. classify.py has no notion of a version, so this is the only version-aware recall in the tree |
+| `knowledge/attempts/` | the kill map of a challenge worked but NOT solved: every layer measured dead, with the measurement and the precondition that would reopen it. `knowledge/chains/` only accepts a solve, so without this the next attempt re-walks the same dead layers |
 
 ---
 

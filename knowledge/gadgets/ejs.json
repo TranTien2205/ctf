@@ -1,0 +1,15 @@
+{
+  "package": "ejs",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "<= 3.1.9 (exploited on 3.1.6)",
+      "sink": "options.outputFunctionName is interpolated into the compiled function source",
+      "payload": "pollute constructor.prototype.outputFunctionName with `x;<js>;`",
+      "effect": "RCE at render time without a template argument",
+      "precondition": "a prototype-pollution primitive reaching ejs options",
+      "proven_by": "knowledge/chains/cscv2026-chromatic-mergecatalog-constructor-prototype-ejs-outputfunctionname-rce.json"
+    }
+  ],
+  "schema_version": 1
+}

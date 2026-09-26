@@ -1,0 +1,15 @@
+{
+  "package": "keras / tensorflow",
+  "ecosystem": "pypi",
+  "gadgets": [
+    {
+      "versions": "h5 Lambda layers",
+      "sink": "load_model executes a Lambda layer's marshalled bytecode at GRAPH-BUILD time",
+      "payload": "an .h5 whose Lambda layer carries marshalled code",
+      "effect": "RCE on load, before any inference",
+      "precondition": "the target loads an uploaded model; the marshal format is INTERPRETER-VERSION specific, so build it on the target's Python version",
+      "proven_by": "knowledge/chains/htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce.json"
+    }
+  ],
+  "schema_version": 1
+}

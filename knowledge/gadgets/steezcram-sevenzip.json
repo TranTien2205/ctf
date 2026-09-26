@@ -1,0 +1,15 @@
+{
+  "package": "@steezcram/sevenzip",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "as shipped",
+      "sink": "execFile(dll, args, {shell: true}) with a quoted `\"${parameters.dir}\"`",
+      "payload": "a dir value that closes the quote and appends a command",
+      "effect": "OS command injection",
+      "precondition": "control of the dir parameter; note path.dirname drops the last segment",
+      "proven_by": "knowledge/chains/htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip.json"
+    }
+  ],
+  "schema_version": 1
+}

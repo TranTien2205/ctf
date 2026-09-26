@@ -64,3 +64,6 @@ CSCV2026/
 *.pem
 *.key
 id_rsa*
+
+# Transient review digest produced by hand for the field-note queue; regenerate, never commit.
+REVIEW_QUEUE.md

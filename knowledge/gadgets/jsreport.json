@@ -1,0 +1,42 @@
+{
+  "package": "jsreport",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "2.x (measured on 2.9.0)",
+      "sink": "jsreport-child-templates applyParameters: a dotted @param path is walked with `it = it[k] = it[k] || {}`, then extend(true, req, modifications)",
+      "payload": "{#child <an existing store template> @__proto__.helpers$=<base64 of a JSON string>} emitted into the RENDERED OUTPUT, which the extension re-scans",
+      "effect": "Object.prototype.helpers becomes a string in the long-lived engine process; the NEXT render resolves inputs.template.helpers to it and run()s it in the vm2 sandbox",
+      "precondition": "at least ONE template entity in the document store. Measured: a stock deploy can have none, and applyParameters runs only after a template is found.",
+      "trap": "pollute with a STRING. An array (e.g. `scripts`) makes node.extend recurse forever and every later request dies with Maximum call stack size exceeded.",
+      "proven_by": "knowledge/chains/cscv2026-chromatic-* ; measured dead on a stock diemthi deploy (knowledge/attempts/cscv2026-diemthi.json)"
+    },
+    {
+      "versions": "2.x (measured on 2.9.0)",
+      "sink": "jsreport-core/lib/render/resolveReferences.js:30 `if (ref in byid)` -- `in` walks the prototype chain of an empty object",
+      "payload": "data = {\"$id\":\"r\",\"name\":{\"$ref\":\"__proto__\"}}  (nested $ref resolves only when the parent carries $id)",
+      "effect": "yields Object.prototype, Object, or an Object.prototype method as a DATA value",
+      "precondition": "one hop only, so Function is not reachable; measured to print [object Object] for every ref",
+      "trap": "top-level {\"$ref\":\"__proto__\"} makes inputs.data BE Object.prototype, so the three __appDirectory writes land on it -- fixed keys, fixed values, not useful",
+      "proven_by": "measured on a local 2.9.0 (knowledge/attempts/cscv2026-diemthi.json)"
+    },
+    {
+      "versions": "2.x",
+      "sink": "jsreport-assets readAsset disk fallback",
+      "payload": "{#asset /etc/passwd} in the rendered output",
+      "effect": "arbitrary file read inside the jsreport container",
+      "precondition": "extensions.assets.searchOnDiskIfNotFoundInStore, which assets.js sets only when reporter.options.allowLocalFilesAccess === true. Measured OFF on a stock 2.9.0: 'Asset /etc/hostname not found'.",
+      "proven_by": "measured (knowledge/attempts/cscv2026-diemthi.json)"
+    },
+    {
+      "versions": "2.x",
+      "sink": "jsreport-core engineScript: every FUNCTION global of the safeSandbox becomes a handlebars helper, because child-templates always assigns template.helpers a string",
+      "payload": "{{require \"child_process\"}} / {{render x}} / {{respond a b}} from template content",
+      "effect": "require is blocked while templatingEngines.allowedModules is []; jsreport-handlebars does a HOST-side require(opts.handlebarsModulePath), so a polluted Object.prototype.handlebarsModulePath turns {{render x}} into host require() of an arbitrary path",
+      "precondition": "template CONTENT control, plus prototype pollution for the render variant",
+      "trap": "measured present: require, render, respond, setTimeout, childTemplateParseData, childTemplateSerializeData. Measured ABSENT: evalGet, evalSet, safeGet -- the xlsx helpers load only for their own recipes.",
+      "proven_by": "measured with the 'Missing helper' error as an oracle"
+    }
+  ],
+  "schema_version": 1
+}
