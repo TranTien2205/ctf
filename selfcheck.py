@@ -4,6 +4,7 @@ import glob
 import json
 import os
 import py_compile
+import shutil
 import subprocess
 import sys
 
@@ -68,6 +69,63 @@ try:
           bool(matched.get("candidates")) and matched["candidates"][0]["status"] == "candidate")
 except ValueError:
     check("chain matcher returns a candidate, not proof", False, matcher.stderr.strip())
+# The control plane. AGENTS.md makes this file the whole pre-flight — "fix any
+# FAIL before starting" — while every check above it asked only whether a file
+# exists or compiles. Nothing here ever executed decide.py or hooks.py, so an
+# agent could open a session, be told the system was healthy, and discover
+# mid-solve that the write gate was broken. By then, under this tree's own
+# rules, no verdict it had recorded could be trusted.
+LOOP_CHALLENGE = "selfcheck-control-loop"
+
+
+def _run(*argv):
+    return subprocess.run([sys.executable] + [os.path.join(ROOT, argv[0])] + list(argv[1:]),
+                          capture_output=True, text=True)
+
+
+try:
+    shutil.rmtree(os.path.join(ROOT, "challenges", LOOP_CHALLENGE), ignore_errors=True)
+    created = _run("tools/state.py", LOOP_CHALLENGE, "--category", "web",
+                   "--target", "http://127.0.0.1:1/")
+    added = _run("tools/state.py", LOOP_CHALLENGE, "--hypothesis",
+                 "selfcheck hypothesis", "--bug-class", "web-ssti")
+    hypothesis_id = json.loads(added.stdout)["state"]["hypotheses"][0]["id"]
+
+    decision = _run("tools/decide.py", LOOP_CHALLENGE)
+    action = json.loads(decision.stdout).get("action")
+    check("decide.py returns an action", bool(action),
+          "" if action else decision.stderr.strip()[:120])
+
+    timeout_confirm = _run("tools/hooks.py", "post-probe", LOOP_CHALLENGE,
+                           "--hypothesis-id", hypothesis_id, "--class", "web-ssti",
+                           "--request", "curl -m 10 http://127.0.0.1:1/",
+                           "--verdict", "confirms", "--evidence-kind", "class",
+                           "--evidence", "curl: (28) Operation timed out after 10001 ms")
+    ok = timeout_confirm.returncode != 0
+    check("hooks.py refuses a timeout as a confirmation", ok,
+          "" if ok else "a timeout was accepted as evidence of a bug class")
+
+    surface_confirm = _run("tools/hooks.py", "post-probe", LOOP_CHALLENGE,
+                           "--hypothesis-id", hypothesis_id, "--class", "web-ssti",
+                           "--request", "GET /login",
+                           "--verdict", "confirms", "--evidence-kind", "surface",
+                           "--evidence", "200 OK, the login form rendered")
+    ok = surface_confirm.returncode != 0
+    check("hooks.py refuses surface evidence as a confirmation", ok,
+          "" if ok else "a rendered form was accepted as proof of a bug class")
+
+    self_confirm = _run("tools/state.py", LOOP_CHALLENGE,
+                        "--hypothesis-id", hypothesis_id, "--status", "confirmed")
+    reopened = _run("tools/decide.py", LOOP_CHALLENGE)
+    got = json.loads(reopened.stdout).get("action")
+    check("decide.py reopens a confirmation that bypassed the write gate",
+          got == "reopen_confirm",
+          "" if got == "reopen_confirm" else "decide.py answered %r instead" % got)
+except Exception as exc:                      # a broken control plane must be loud
+    check("control loop is executable", False, "%s: %s" % (type(exc).__name__, exc))
+finally:
+    shutil.rmtree(os.path.join(ROOT, "challenges", LOOP_CHALLENGE), ignore_errors=True)
+
 print("\n".join("[%s] %s%s" % ("PASS" if ok else "FAIL", name, " — " + detail if detail else "")
                  for name, ok, detail in checks))
 passed = sum(ok for _, ok, _ in checks)

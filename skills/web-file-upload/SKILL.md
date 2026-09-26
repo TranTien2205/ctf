@@ -107,6 +107,31 @@ curl -s https://target.com/uploads/test.txt
 - `references/archive-attacks.md` - Archive-based attacks
 - `references/webshell-templates.md` - Webshell templates per language
 
+## Operational probe
+
+Upload a benign marker first. The question is not whether the upload succeeds —
+it is *where the file lands and what later reads it*:
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-file-upload \
+  --url "$BASE/upload" --method POST \
+  --header 'Content-Type: multipart/form-data; boundary=X' \
+  --body $'--X\r\nContent-Disposition: form-data; name="f"; filename="m.txt"\r\n\r\nMARKER\r\n--X--\r\n' \
+  --evidence-regex '"(?:path|url|filename|id)"' --evidence-kind surface \
+  --on-match inconclusive --on-miss inconclusive --write-ack
+```
+
+A 200 and a stored path are surface. The class needs the stored file to be *read
+back* — fetch it, and if the response is a PDF or an archive, extract rather than
+eyeball it (`tools/web/pdf_text.py --find-flag`).
+
+**Falsifier:** the stored file is renamed, served with a fixed type, and never
+parsed again.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

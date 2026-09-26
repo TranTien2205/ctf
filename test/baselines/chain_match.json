@@ -1,11 +1,13 @@
 {
-  "cards_total": 49,
-  "cards_with_ground_truth": 16,
-  "top1": 16,
+  "_note": "Descriptive snapshot of the last measured run. floor_top1_rate is NOT a measurement and must not be raised to track one: the gate asserts top1_rate >= floor, and raising the floor to the latest number is the move test_retrieval_floor's own message forbids.",
+  "cards_total": 58,
+  "cards_with_ground_truth": 22,
+  "cards_skipped_ambiguous_source": 1,
+  "top1": 21,
   "top1_rate": 1.0,
   "mrr": 1.0,
   "not_retrieved": 0,
   "rivals_per_query": 0.0,
-  "promiscuous_signals": 30,
+  "promiscuous_signals": 28,
   "floor_top1_rate": 0.85
 }

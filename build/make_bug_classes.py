@@ -18,6 +18,7 @@ Both are Python regexes, matched case-insensitively.
 """
 import json
 import os
+import re
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "knowledge", "bug-classes.json")
@@ -50,7 +51,15 @@ CLASSES = [
         "verified_by": ["htb-secnotes-mongoose-rename-prototype-pollution-local-gate"],
         "observation_signals": [r"mongo|mongoose|couch|elasticsearch|redis\b",
                                 r"\$ne\b|\$gt\b|\$where\b|\$regex\b|\$rename\b",
-                                r"[0-9a-f]{24}\b", r"__v\b"],
+                                r"[0-9a-f]{24}\b", r"__v\b",
+                                r"object datastore|object-shaped filter|24-hex id",
+                                # Measured gap: htb-unearthly-shop's opener — "the decoded
+                                # request body is handed to the driver as the whole query
+                                # structure" — matched nothing, because every signal above
+                                # names an operator or a driver, never the shape of the handoff.
+                                r"aggregation (?:pipeline|stage)|\$(?:match|lookup|group|unwind)\b",
+                                r"body (?:becomes|is) the (?:query|filter)|whole query structure",
+                                r"reaches (?:the )?(?:driver|query) (?:whole|unchanged|as-is)"],
         "source_signals": [r"mongoose\.model|findOne\s*\(\s*req\.|find\s*\(\s*req\.(?:body|query)",
                            r"updateMany|updateOne\s*\(\s*req\.", r"\$where"],
         "first_probe": "send the filter pinned to an object you created, with every write field omitted, and read what comes back",
@@ -91,7 +100,8 @@ CLASSES = [
     },
     {
         "id": "web-xxe", "name": "XML external entity", "skill_dir": "web-xxe",
-        "evidence_level": "catalogue", "verified_by": [],
+        "evidence_level": "verified",
+        "verified_by": ["htb-xxe-content-type-branch-simplexml-noent-file-read"],
         "observation_signals": [r"<\?xml|application/xml|text/xml|soap|wsdl",
                                 r"\.docx|\.xlsx|\.svg\b", r"doctype|entity"],
         "source_signals": [r"etree\.(?:parse|fromstring)|lxml|xml\.dom|SAXParser|DocumentBuilder",
@@ -109,6 +119,7 @@ CLASSES = [
         "verified_by": ["htb-red-island-ssrf-gopher-redis-lua-rce",
                         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"],
         "observation_signals": [r"\bssrf\b",
+                                r"loopback-only|reachable by the backend itself",
                                 r"url\s*[=:]|endpoint\s*[=:]|webhook|url (?:field|param\w*|input)",
                                 r"server.?side (?:fetch|request)|fetches? (?:the |a )?url",
                                 r"pdf|screenshot|render|thumbnail|preview|import from url",
@@ -142,10 +153,29 @@ CLASSES = [
         "evidence_level": "verified",
         "verified_by": ["htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"],
         "observation_signals": [r"traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
+                                r"inspects the raw body|raw body before a decoder|before a decoder runs",
                                 r"x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
-                                r"hop-by-hop", r"403.{0,40}(?:only|internal|local)"],
+                                r"hop-by-hop", r"403.{0,40}(?:only|internal|local)",
+                                # Measured gap: the blind mechanism label for htb-neurosync —
+                                # "one front layer is the whole authorization story and its
+                                # decision is keyed on a header the client can supply" — named
+                                # no class, though it is exactly a proxy-trust boundary.
+                                r"middleware|x-middleware|edge (?:function|runtime)",
+                                r"(?:one|only|single|front) (?:front )?layer.{0,40}authori",
+                                r"header the client can (?:set|supply|control|choose)",
+                                r"internal[- ]subrequest|x-middleware-subrequest"],
         "source_signals": [r"headers\.get\s*\(\s*[\"']x-(?:real-ip|forwarded)",
-                           r"request\.headers\[[\"']x-", r"if not .*header.*:\s*\n\s*.*local"],
+                           r"request\.headers\[[\"']x-", r"if not .*header.*:\s*\n\s*.*local",
+                           # A parser differential is a disagreement between TWO
+                           # parsers. The three patterns above only describe the
+                           # application half, so a proxy config stating the whole
+                           # boundary — acl on path,url_dec plus a network ACL —
+                           # produced no candidate at all.
+                           r"acl\s+\S+\s+(?:path|url|req\.hdr|hdr|method|base)\b",
+                           r"http-request\s+(?:deny|set-header|replace-path)\b",
+                           r"use_backend\s+\S+\s+if\b|acl\s+\S+\s+src\s+\d",
+                           r"-m\s+(?:beg|sub|dir|reg|end)\b",
+                           r"location\s+[~^=]|^\s*internal\s*;|proxy_set_header\s"],
         "first_probe": "send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "falsifier": "both forms are rejected, so the trust check does not depend on that header",
         "depth_refs": ["skills/web-triage/references/http-parser-differential.md"],
@@ -225,6 +255,7 @@ CLASSES = [
                         "htb-tornadoservice-bot-csrf-class-pollution",
                         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"],
         "observation_signals": [r"__proto__|prototype pollution|class pollution",
+                                r"connection-derived|derived from the connection",
                                 r"constructor|__class__|__globals__|__init__",
                                 r"merge|deep.?(?:assign|copy|merge)"],
         "source_signals": [r"__proto__", r"Object\.assign\s*\(\s*\{\}?\s*,\s*(?:req|body)",
@@ -240,10 +271,14 @@ CLASSES = [
         "evidence_level": "verified",
         "verified_by": ["htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
                         "htb-py2-pickle-cookie-reduce-rce-rendered-output"],
-        "observation_signals": [r"rO0AB|aced0005|gAN|O:\d+:\"|BAhJ|AAEAAAD",
+        "observation_signals": [r"\brO0AB|\baced0005|\bgAN|O:\d+:\"|\bBAhJ|\bAAEAAAD",
                                 r"deserial|unserial|pickle|marshal|viewstate"],
         "source_signals": [r"pickle\.loads|yaml\.load\s*\(|unserialize|ObjectInputStream|readObject",
-                           r"Marshal\.load|BinaryFormatter|torch\.load|joblib\.load"],
+                           r"Marshal\.load|BinaryFormatter|torch\.load|joblib\.load",
+                           # pickle.loads is the convenience form. A challenge that
+                           # WANTS a restricted unpickler subclasses Unpickler and
+                           # overrides find_class, which the line above never saw.
+                           r"Unpickler\b|find_class\s*\(|restricted_loads|\.load\s*\(\s*\)\s*$"],
         "first_probe": "identify the format from the blob's own magic before touching any gadget",
         "falsifier": "the blob is signed with a key that is not leaked and not reachable",
         "depth_refs": ["skills/ctf-web/server-side-deser.md"],
@@ -255,7 +290,7 @@ CLASSES = [
         "verified_by": ["htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
                         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"],
         "observation_signals": [r"race condition|toctou", r"balance|coupon|voucher|one.?time|redeem",
-                                r"verification token|confirm", r"limit|quota"],
+                                r"verification token|confirmation (?:code|email|link)", r"rate.?limit|per.?user limit|quota"],
         "source_signals": [r"(?:get|select|find)[^\n]{0,80}\n[^\n]{0,80}(?:update|save|commit)",
                            r"await [^\n]*\n[^\n]*await [^\n]*(?:token|balance|count)"],
         "first_probe": "two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
@@ -266,7 +301,8 @@ CLASSES = [
     },
     {
         "id": "web-logic-flaw", "name": "Business logic / mass assignment", "skill_dir": "web-logic-flaw",
-        "evidence_level": "catalogue", "verified_by": [],
+        "evidence_level": "verified",
+        "verified_by": ["pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"],
         "observation_signals": [r"registration|signup|checkout|coupon|workflow|approval",
                                 r"role|is_?admin|privilege|status"],
         "source_signals": [r"(?:update|create)\s*\(\s*(?:req\.body|request\.(?:json|form))\s*\)",
@@ -337,7 +373,7 @@ CLASSES = [
                                 r"php://filter"],
         "source_signals": [r"(?:include|require)(?:_once)?\s*\(\s*\$_(?:GET|POST|REQUEST|COOKIE)",
                            r"file_get_contents\s*\(\s*\$_|readfile\s*\(\s*\$",
-                           r"open\s*\(\s*(?:os\.path\.join\s*\()?\s*[^,)\n]*(?:req|request|params)",
+                           r"(?<![a-z])open\s*\(\s*(?:os\.path\.join\s*\()?\s*[^,)\n]*(?:req|request|params)",
                            r"(?:send_file|sendFile|res\.download|sendfile)\s*\([^)\n]*(?:req|request|params|\$\{)",
                            r"path\.join\s*\([^)\n]*(?:req\.|request\.|params)",
                            r"php://filter|\.\./\.\./"],
@@ -384,7 +420,60 @@ CLASSES = [
         "depth_refs": ["skills/web-web3/references/extended.md"],
         "confusable_with": [],
     },
+    {
+        "id": "web-xs-leaks", "name": "Cross-site leak / browser side channel",
+        "skill_dir": "web-xs-leaks",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [r"admin bot|report to admin|visit.{0,20}url|headless",
+                                r"xs-?leak|side.?channel",
+                                r"window\.length|frame count|cache probe",
+                                r"script-src\s+'none'"],
+        "source_signals": [r"puppeteer|playwright|selenium|chromedriver|google-chrome",
+                           r"script-src\s+'none'",
+                           r"URLBlocklist|URLAllowlist|policies/managed",
+                           r"setCookie[\s\S]{0,120}sameSite",
+                           r"maxmemory-policy\s+(?:allkeys|volatile)-lru"],
+        "first_probe": "decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
+        "falsifier": "the bot can reach no attacker-influenced state at all, and no observable on the target changes as a function of what the victim's browser loaded",
+        "depth_refs": ["skills/ctf-web/client-side.md"],
+        "confusable_with": ["web-xss", "web-cache-poisoning", "web-csrf"],
+        "blast_radius": "the read-back channel is often a shared cache or store; filling it to force eviction destroys every other key, so never run it against an instance someone else is using",
+    },
 ]
+
+
+def self_name_signal(entry):
+    """The names a person actually types for this class, as one anchored pattern.
+
+    classify.py is the first command AGENTS.md tells the agent to run, and it
+    returned nothing at all for `sqli in a login form`. Measured across fifteen
+    classes, four did not match their own name — sqli, ssti, xxe and nosqli —
+    while xss, ssrf, csrf and cors did, purely because those letters happened to
+    appear inside an unrelated pattern. The taxonomy knew how to recognise the
+    evidence for a class and not the name of it.
+
+    Derived rather than hand-listed so a renamed class cannot drift from the
+    word that finds it. Anchored on both sides so `sqli` does not fire inside
+    `nosqli`, and `sql injection` does not fire inside `nosql injection`.
+    """
+    words = {entry["id"].split("-", 1)[-1]}          # web-sqli -> sqli
+    words.add(entry["id"].replace("-", " "))          # web-sqli -> web sqli
+    words.add(entry["id"].split("-", 1)[-1].replace("-", " "))
+    words.add(entry["name"].lower())                  # SQL injection
+    for extra in entry.get("aka", []):
+        words.add(extra.lower())
+    # A one- or two-letter token is noise, and a name with a slash is two names.
+    parts = set()
+    for word in words:
+        for piece in word.split(" / "):
+            piece = piece.strip()
+            if len(piece) >= 3:
+                parts.add(re.escape(piece))
+    # Longest first so the alternation prefers the most specific name, then
+    # alphabetical: a set iterates in hash order, so sorting on length alone
+    # made the generator emit a different file on every run.
+    ordered = sorted(parts, key=lambda piece: (-len(piece), piece))
+    return r"(?<![a-z0-9])(?:%s)(?![a-z0-9])" % "|".join(ordered)
 
 
 def main():
@@ -393,6 +482,8 @@ def main():
         assert entry["id"] not in seen, "duplicate class id: " + entry["id"]
         seen.add(entry["id"])
         entry["category"] = "web"
+        entry["observation_signals"] = (list(entry.get("observation_signals", []))
+                                        + [self_name_signal(entry)])
         entry["skill"] = "skills/%s/SKILL.md" % entry["skill_dir"]
         entry.setdefault("blast_radius", None)
         if entry["evidence_level"] == "verified":

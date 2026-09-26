@@ -40,11 +40,42 @@ def is_workdir(path):
     return any(m in names for m in WORKDIR_MARKERS)
 
 
-def source_dir_for(name):
+ALIASES = os.path.join(ROOT, "test", "baselines", "chain_match_aliases.json")
+
+
+def load_aliases():
+    """Explicit name -> directory pairings, each one reviewed and measured.
+
+    A card whose challenge name is not its directory name is invisible to the
+    eval, which understates retrieval quality. Guessing the pairing by fuzzy
+    match would let a wrong pair move top1 without anyone noticing, so the
+    pairings live in a file that records, per alias, how many of the card's
+    signals were found in that source and where the card ranked there.
+    """
+    try:
+        with open(ALIASES, encoding="utf-8") as fh:
+            payload = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for name, entry in (payload.get("aliases") or {}).items():
+        key = name.lower().replace(" ", "").replace("_", "").replace("-", "")
+        out[key] = entry.get("directory")
+    return out
+
+
+def source_dir_for(name, aliases=None):
     """Pick the handout directory for a challenge name, ignoring workdirs."""
     if not name:
         return None
     key = name.lower().replace(" ", "").replace("_", "").replace("-", "")
+    if aliases is None:
+        aliases = load_aliases()
+    target = aliases.get(key)
+    if target:
+        path = os.path.join(CHALLENGES, target)
+        if os.path.isdir(path) and not is_workdir(path):
+            return path
     best, best_size = None, -1
     for entry in os.listdir(CHALLENGES):
         path = os.path.join(CHALLENGES, entry)
@@ -160,6 +191,11 @@ def main():
 
     cards = chain_match.load_chains(a.chains)
     cases, per_signal_hits, sources = [], {}, {}
+    # challenge NAMES are what source_dir_for resolves, so two cards whose names
+    # normalise the same way both claim one handout directory. At most one can be
+    # right, which makes the pair untestable rather than failing -- scoring it
+    # anyway invented a rank-19 that was the sole source of every rival reported.
+    claimed, ambiguous = {}, []
 
     # first pass: read every ground-truth source so promiscuity can be measured
     # before it is used to filter
@@ -169,6 +205,7 @@ def main():
         path = source_dir_for((card.get("challenge") or {}).get("name"))
         if path:
             sources[card["id"]] = chain_match.read_source(path).lower()
+            claimed.setdefault(path, []).append(card["id"])
 
     if a.drop_promiscuous is not None:
         total = max(1, len(sources))
@@ -196,6 +233,18 @@ def main():
         name = (card.get("challenge") or {}).get("name")
         path = source_dir_for(name)
         if not path:
+            continue
+        if len(claimed.get(path, [])) > 1:
+            rel = os.path.relpath(path, ROOT)
+            if any(a["source"] == rel for a in ambiguous):
+                continue                      # one entry per directory, not per card
+            ambiguous.append({
+                "source": os.path.relpath(path, ROOT),
+                "claimed_by": sorted(claimed[path]),
+                "why": "two challenge names normalise to this one directory, so the "
+                       "pairing is a guess; give the losing card its own handout "
+                       "directory, or rename one challenge, before trusting a rank here",
+            })
             continue
         text = chain_match.read_source(path)
         sources[card["id"]] = text.lower()
@@ -238,6 +287,8 @@ def main():
     report = {
         "cards_total": sum(1 for c in cards if "_error" not in c),
         "cards_with_ground_truth": n,
+        "cards_skipped_ambiguous_source": len({a["source"] for a in ambiguous}),
+        "ambiguous_sources": ambiguous,
         "top1": top1,
         "top1_rate": round(top1 / n, 3) if n else 0.0,
         "mrr": round(mrr, 3),

@@ -62,7 +62,7 @@ Shares signals with: `../web-request-smuggling/`, `../web-auth-session/`. Check 
 
 Depth, one named file at a time:
 
-- `../web-triage/references/http-parser-differential.md`
+- `skills/web-triage/references/http-parser-differential.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

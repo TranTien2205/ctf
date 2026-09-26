@@ -113,6 +113,27 @@ echo -n 'COOKIE_VALUE' | base64 -d
 - `references/ruby-deser.md` - Ruby deserialization
 - `references/detection.md` - Serialization detection methods
 
+## Operational probe
+
+Identify the format from the blob's own magic *before* touching any gadget:
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-deserialization \
+  --url "$BASE/api/me" --header "Cookie: user=$BLOB" \
+  --evidence-regex 'rO0AB|aced0005|^gAN|O:\d+:"|BAhJ' --evidence-kind class \
+  --on-match confirms --on-miss inconclusive
+```
+
+Those anchors name Java, Python pickle, PHP and Ruby in that order. A blob that
+merely base64-decodes to JSON is not deserialization.
+
+**Falsifier:** the blob is signed with a key that is not leaked and not reachable.
+Gadget work before the format is named is the usual way this class burns a budget.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

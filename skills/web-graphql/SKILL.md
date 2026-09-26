@@ -41,26 +41,6 @@ Confirmation is a schema/error oracle, not a finding by itself. The exploit
 class is confirmed only when a read or mutation crosses an authorization or
 validation boundary and the result is observed.
 
-## Operational probe
-
-Start with a bounded schema request against the observed endpoint:
-
-```bash
-curl -i "$BASE/graphql" \
-  -H 'Content-Type: application/json' \
-  --data-binary '{"query":"{__typename}"}'
-```
-
-If the endpoint accepts it, request only the observed schema surface. If
-introspection is disabled, use one unknown field and preserve the exact error.
-Do not invent field names after a silent response.
-
-The first useful signal is schema/type disclosure.
-Schema disclosure is not an exploit; the vulnerability signal is separate.
-Use two identities or roles to request one observed object field or mutation,
-and compare the authorization result. A schema that is merely public is not an
-authorization finding.
-
 ## What the schema buys
 
 The schema is the attack surface list: every field, every mutation, every
@@ -83,10 +63,30 @@ Shares signals with: `../web-idor/`, `../web-logic-flaw/`. Check those before co
 
 Depth, one named file at a time:
 
-- `../ctf-web/server-side-2.md`
+- `skills/ctf-web/server-side-2.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+
+## Operational probe
+
+Start with a bounded schema request against the observed endpoint:
+
+```bash
+curl -i "$BASE/graphql" \
+  -H 'Content-Type: application/json' \
+  --data-binary '{"query":"{__typename}"}'
+```
+
+If the endpoint accepts it, request only the observed schema surface. If
+introspection is disabled, use one unknown field and preserve the exact error.
+Do not invent field names after a silent response.
+
+The first useful signal is schema/type disclosure.
+Schema disclosure is not an exploit; the vulnerability signal is separate.
+Use two identities or roles to request one observed object field or mutation,
+and compare the authorization result. A schema that is merely public is not an
+authorization finding.
 
 ## Field notes
 

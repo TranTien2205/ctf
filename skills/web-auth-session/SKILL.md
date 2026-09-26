@@ -146,6 +146,28 @@ print(jwt.encode({'user':'admin'}, key='', algorithm='none'))
   value the session carries into a query or a path.
 - Budget and escalation as in `../LOOP_DISCIPLINE.md`.
 
+## Operational probe
+
+Decode before modifying anything — the weakness is usually already visible:
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-auth-session \
+  --url "$BASE/api/me" --header "Cookie: session=$TOKEN" \
+  --evidence-regex '"(?:role|isAdmin|uid)"' --evidence-kind surface \
+  --on-match inconclusive --on-miss inconclusive
+```
+
+Note `--evidence-kind surface` and `inconclusive` on both branches: a decoded
+token and a successful login are *surface* evidence. The class is confirmed only
+when a token you forged is accepted, which is `impact`.
+
+**Falsifier:** the signature is verified with a key that is neither leaked nor
+guessable.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

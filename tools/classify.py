@@ -149,6 +149,27 @@ def compile_signals(classes, field):
     return compiled
 
 
+def is_distinctive(literal):
+    """A writeup literal may only be admitted when it cannot be an ordinary word.
+
+    The card 31c3-2014-devilish contributed six literals to the SQL injection
+    class. Five are distinctive — `extractvalue(`, `Duplicate column name`,
+    `is_ExclusiveMember`, `$_SESSION=$_POST`, `ACCESS?action=browse`. The sixth
+    was the bare word `PROFILE`, and because the literals were compiled
+    case-insensitively and unanchored it matched the word "profile" anywhere.
+    Measured: the observation "a Flask app with a user profile page and an
+    avatar" returned web-sqli as the top candidate on that single word. A
+    literal earns its place by containing punctuation, a separator, or more than
+    one word — never by being a noun someone happened to capitalise.
+    """
+    stripped = literal.strip()
+    if len(stripped) < 4:
+        return False
+    if re.fullmatch(r"[A-Za-z]+", stripped):
+        return False
+    return True
+
+
 def merge_writeup_signals(classes, writeup_signals):
     """Add reviewed writeup signals as literal regexes; keep taxonomy policy authoritative."""
     merged = []
@@ -157,15 +178,45 @@ def merge_writeup_signals(classes, writeup_signals):
         if writeup_signals.get(entry["id"]):
             source_patterns = list(entry.get("source_signals", []))
             observation_patterns = list(entry.get("observation_signals", []))
-            # Escape external strings so they are exact literals, never patterns.
-            reviewed = [re.escape(s) for s in writeup_signals[entry["id"]]]
+            # Escape external strings so they are exact literals, never patterns,
+            # and drop the ones that are ordinary words.
+            reviewed = [re.escape(s) for s in writeup_signals[entry["id"]]
+                        if is_distinctive(s)]
             clone["source_signals"] = source_patterns + reviewed
             clone["observation_signals"] = observation_patterns + reviewed
         merged.append(clone)
     return merged
 
 
-def walk_source(target):
+# The marker must start the name or follow a separator, so `resolve.py` and
+# `problem.py` are handout files while `diemthi_exploit.py` is ours.
+SELF_AUTHORED = re.compile(
+    r"(?:^|[_-])(writeup|solve|exploit|payload|probe|poc|notes|scratch)s?(?![a-z])"
+    r"[^/]*\.(?:md|py|sh|js|txt|json)$"
+    r"|^(?:state|anomaly_map)\.json$", re.I)
+
+
+def is_self_authored(path):
+    """True for a file this toolkit wrote into a challenge directory.
+
+    Measured on CSCV2026: three of the top four candidates drew their evidence
+    from `exploit.py`, `WRITEUP.md` and `solve.py` — files written here, not
+    handed out. That is self-confirming evidence: an agent writes an attempt
+    into the challenge directory and a later run reads it back as an observation
+    about the target. Worse when the attempt failed, which is the diemthi case:
+    the lost challenge's exploit.py was the top candidate's only evidence.
+
+    Lockfiles are NOT excluded. package-lock.json is part of the handout and
+    naming a real dependency is a real signal.
+    """
+    name = os.path.basename(path)
+    if SELF_AUTHORED.search(name):
+        return True
+    parts = {p.lower() for p in os.path.normpath(path).split(os.sep)}
+    return bool(parts & {"solve", "solves", "exploit", "writeup", "solution"})
+
+
+def walk_source(target, include_self_authored=False):
     if os.path.isfile(target):
         yield target
         return
@@ -174,7 +225,10 @@ def walk_source(target):
         for name in sorted(names):
             if os.path.splitext(name)[1].lower() in BINARY_EXT:
                 continue
-            yield os.path.join(base, name)
+            full = os.path.join(base, name)
+            if not include_self_authored and is_self_authored(full):
+                continue
+            yield full
 
 
 def scan_source(target, compiled, limit_per_class=4):
@@ -266,6 +320,36 @@ def rank(hits, classes, stats=None):
     return ranked
 
 
+def record_classes(challenge, ranked):
+    """Write the classes this run considered into the challenge ledger.
+
+    tools/decide.py:279 reads state["classes_considered"] so that switch_class
+    can name the next class to open and its first probe. Nothing wrote it, so
+    switch_class could only ever park the dead class and then tell the agent to
+    re-classify from scratch — the one moment the controller is supposed to be
+    most useful. classify.py emits a `classes_considered` COUNT in its stdout,
+    which is why a check for the name alone does not notice the gap.
+    """
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import state as state_mod  # noqa: E402
+
+    path = state_mod.path_for(challenge)
+    if not os.path.isfile(path):
+        return {"recorded": False,
+                "reason": "no ledger for %r; run tools/state.py %s --category <cat> "
+                          "--target <target> first" % (challenge, challenge)}
+    with open(path, encoding="utf-8") as handle:
+        current = json.load(handle)
+    if not isinstance(current, dict):
+        return {"recorded": False, "reason": "ledger is not an object; state not changed"}
+    ordered = [item["class"] for item in ranked]
+    current["classes_considered"] = ordered
+    state_mod.atomic_json(path, current)
+    return {"recorded": True, "classes": ordered,
+            "ledger": os.path.relpath(path, ROOT),
+            "next": "python3 tools/decide.py %s" % challenge}
+
+
 def rebuild_stats(taxonomy_path=TAXONOMY):
     """Count, for every taxonomy signal, how many handouts its pattern matches.
 
@@ -343,6 +427,9 @@ def main():
                         help="restrict to classes at this evidence level")
     parser.add_argument("--taxonomy", default=TAXONOMY)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--record", metavar="CHALLENGE",
+                        help="write the considered classes into that challenge's ledger "
+                             "so tools/decide.py can name the next class on switch_class")
     parser.add_argument("--rebuild-stats", action="store_true",
                         help="recount how many handouts each taxonomy signal matches "
                              "and write knowledge/classify-signal-stats.json, then exit")
@@ -367,6 +454,9 @@ def main():
                               "path": args.source}), file=sys.stderr)
             return 2
         hits = scan_source(args.source, compile_signals(classes, "source_signals"))
+        excluded = sorted(os.path.relpath(f, ROOT)
+                          for f in walk_source(args.source, include_self_authored=True)
+                          if is_self_authored(f))
         if observation:
             for class_id, evidence in scan_text(observation,
                                                 compile_signals(classes, "observation_signals")).items():
@@ -375,6 +465,7 @@ def main():
     else:
         hits = scan_text(observation, compile_signals(classes, "observation_signals"))
         kind, value = "observation", observation
+        excluded = []
 
     stats = load_signal_stats()
     ranked = [item for item in rank(hits, classes, stats)
@@ -387,9 +478,15 @@ def main():
         "mode": "classify",
         "input": {"kind": kind, "value": value},
         "classes_considered": len(classes),
+        "excluded_self_authored": excluded,
         "candidates": top,
         "rules": taxonomy["rules"],
     }
+    if args.record:
+        try:
+            result["recorded"] = record_classes(args.record, ranked)
+        except (ValueError, OSError) as exc:
+            result["recorded"] = {"recorded": False, "reason": str(exc)}
     if top:
         result["next_action"] = ("run the first_probe of %s and record the exact result"
                                  % top[0]["class"])

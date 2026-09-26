@@ -22,6 +22,7 @@ see `CLAUDE_CODE.md`.
 | Which skills are generic or stubs | `tools/skill_audit.py` |
 | Whether the system still produces useful next actions | `tools/system_eval.py` |
 | Whether chain recall still finds the right card | `tools/chain_match_eval.py` |
+| Whether chain recall stays quiet on a challenge it has never seen | `tools/holdout_eval.py` |
 | Proposed versus confirmed local experience | `tools/learning_report.py` |
 | Agent role, tool trust, and replay discipline | `TRAINING.md` |
 | Changing direction without losing a branch | `HYPOTHESIS_PROTOCOL.md` |
@@ -69,8 +70,10 @@ A timeout is not a success.
    only on the supplied port.
 2. White-box first when source exists: routes, inputs, sinks, auth boundaries,
    queries, flag path — with file and line — before any payload.
-3. `tools/classify.py` names the bug class from the signals actually present, with
-   the file and line for each. `tools/chain_match.py --record <challenge>` says
+3. `tools/classify.py --record <challenge>` names the bug class from the signals
+   actually present, with the file and line for each, and writes the considered
+   classes into the ledger so `tools/decide.py` can name the next class when it
+   forces a layer switch. `tools/chain_match.py --record <challenge>` says
    whether this exact shape was solved here before and writes the candidates into
    the ledger, so `tools/decide.py` hands back the card's own probe instead of a
    fresh guess. Both return candidates with a first probe and a
@@ -152,18 +155,32 @@ emits the shape `tools/hooks.py` wants — check with `python3 tools/web/selftes
 | an id-enumeration loop | `tools/web/id_sweep.py` — existence oracle |
 | text out of a returned PDF | `tools/web/pdf_text.py` |
 | a lattice, LCG, LFSR or ECC attack | `tools/crypto/` plus `tools/crypto_attack.py --list` |
+| `checksec`, `ROPgadget` and a guess about what is still exploitable | `tools/pwn_triage.py <binary>` — stdlib-only ELF triage: protections **with the evidence for each**, dangerous imports annotated with what they buy, essential ROP gadgets, and the routes each protection leaves open. `python3 tools/pwnstatic/selftest.py` checks it against `readelf` (9 cases, offline) |
 | guessing whether a pinned dependency is exploitable | `tools/gadget_lookup.py --lockfile <handout>/package-lock.json` |
 
-Measured present on this machine, used as-is: `requests`, `httpx` with HTTP/2,
+Measured present on 2026-09-25, used as-is: `requests`, `httpx` with HTTP/2,
 `Crypto` (pycryptodome), `sympy`, `jwt`, `bs4`, `lxml`, `websockets`, `selenium`,
-`playwright`, `numpy`, `ecdsa`; `ffuf`, `gobuster`, `feroxbuster`, `nmap`,
-`sqlmap`, `radare2`, `objdump`, `binwalk`, `exiftool`, `tshark`, `john`,
-`hashcat`, `docker`; SecLists under `/home/kali/wordlists/SecLists/`.
+`playwright`, `numpy`, `ecdsa`, `capstone`; `ffuf`, `gobuster`, `feroxbuster`,
+`nmap`, `sqlmap`, `radare2`, `objdump`, `readelf`, `nm`, `strings`, `binwalk`,
+`exiftool`, `tshark`, `john`, `hashcat`, `docker`, `gcc`, `socat`, `xxd`;
+SecLists under `/home/kali/wordlists/SecLists/`.
 
-Measured **absent** — do not write an exploit that imports one without checking:
-`pwntools`, `gdb`, `gmpy2`, `z3`, `fpylll`, `sage`. `tools/crypto/` is stdlib-only
-by design and needs none of them; `fpylll` only makes its LLL faster. Install with
-`sudo apt install python3-pwntools gdb python3-fpylll python3-gmpy2 python3-z3`.
+Measured **absent** on the same date — do not write an exploit that imports one
+without checking: `pwntools`, `gdb`, `gmpy2`, `z3`, `fpylll`, `sage`, `angr`,
+`unicorn`, `keystone`, `ropper`, `pyelftools`; and the binaries `gdb`,
+`ROPgadget`, `ropper`, `one_gadget`, `checksec`, `patchelf`, `strace`, `ltrace`.
+`pip` here is **EXTERNALLY-MANAGED**, so a plain `pip install` refuses; use
+`sudo apt install python3-pwntools gdb python3-fpylll python3-gmpy2 python3-z3`,
+or a venv. Until that is done:
+
+- `tools/crypto/` is stdlib-only by design and needs none of them; `fpylll` only
+  makes its LLL faster.
+- `tools/pwn_triage.py` covers first contact with a binary without any of them —
+  protections, imports, gadgets and the routes each protection leaves — because
+  `checksec`, `ROPgadget` and `pwntools` are exactly what is missing.
+- **`radare2` is the dynamic story here, not `gdb`**: `r2 -d ./chal` debugs,
+  `r2 -A` analyses, and `pdf @ main` disassembles. Reach for it before assuming
+  no runtime analysis is possible.
 
 Verify a tool with `which` or an import before relying on it, and never claim
 output from a tool that was not run.

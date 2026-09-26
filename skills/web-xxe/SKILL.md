@@ -2,7 +2,7 @@
 name: web-xxe
 description: >
   Action-oriented depth skill for XML external entity. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: file-read-primitives, web-ssrf.
-  Catalogue class: nothing in this toolkit has solved one yet.
+  Verified here by 1 chain card(s).
 tags: [web, xxe, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
@@ -11,13 +11,16 @@ budget:
   stop_conditions:
     - "same probe point: 3 attempts with no new signal"
     - "the class falsifier is observed"
-evidence_level: catalogue
+evidence_level: verified
 ---
 # XML external entity
 
-**Catalogue class.** This toolkit has never solved one. What follows is
-standard published knowledge, not local experience — treat it as a starting
-point and record what actually happens in `field-notes.md`.
+**Verified here.** Chains that prove this class:
+
+- `knowledge/chains/htb-xxe-content-type-branch-simplexml-noent-file-read.json`
+
+Run `python3 tools/chain_match.py` before this skill: a matching
+chain gives you the exact confirming probe that already worked.
 
 ## First probe
 
@@ -41,28 +44,6 @@ older configurations resolve external entities by default.
 Expected confirmation is entity expansion in the response or an attributable
 callback. A generic XML parse error does not prove entity resolution.
 
-## Operational probe
-
-Use a baseline document, then one internal entity whose value is a harmless
-known file or marker:
-
-```xml
-<?xml version="1.0"?>
-<!DOCTYPE r [<!ENTITY probe "XXE_PROBE">]>
-<r>&probe;</r>
-```
-
-If the endpoint echoes the field, replace only the internal entity with a local
-file reference that the supplied challenge definitely contains. If there is no
-echo channel, use an out-of-band URL only when the challenge provides a
-controlled callback. Record status, body length, parser error, and callback
-evidence separately. A malformed XML error does not prove external entity
-resolution.
-
-For uploads, keep the first file a valid document of the observed type. Do not
-combine XXE with archive traversal, polyglot content, or an external callback in
-the first request.
-
 ## Where it usually hides
 
 Document formats are ZIP containers with XML inside: replacing one part of a
@@ -85,10 +66,32 @@ Shares signals with: `../file-read-primitives/`, `../web-ssrf/`. Check those bef
 
 Depth, one named file at a time:
 
-- `../ctf-web/server-side-2.md`
+- `skills/ctf-web/server-side-2.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+
+## Operational probe
+
+Use a baseline document, then one internal entity whose value is a harmless
+known file or marker:
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE r [<!ENTITY probe "XXE_PROBE">]>
+<r>&probe;</r>
+```
+
+If the endpoint echoes the field, replace only the internal entity with a local
+file reference that the supplied challenge definitely contains. If there is no
+echo channel, use an out-of-band URL only when the challenge provides a
+controlled callback. Record status, body length, parser error, and callback
+evidence separately. A malformed XML error does not prove external entity
+resolution.
+
+For uploads, keep the first file a valid document of the observed type. Do not
+combine XXE with archive traversal, polyglot content, or an external callback in
+the first request.
 
 ## Field notes
 

@@ -92,6 +92,29 @@ Depth, one named file at a time:
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
+## Operational probe
+
+Two requests, compared: one address you control, then the same request against an
+internal-only address. Status *and* timing carry the signal.
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-ssrf \
+  --url "$BASE/fetch" --method POST --body 'url=http://127.0.0.1:1/' \
+  --evidence-regex 'ECONNREFUSED|Connection refused|:1\b' \
+  --evidence-kind class --on-match confirms --on-miss inconclusive
+```
+
+A refused loopback port is a better first probe than a callback host: it needs no
+egress, and the error text names the address the server actually dialled.
+
+**Falsifier:** the fetch target is fixed in source and the request never
+influences it. Reaching your own host proves egress, not SSRF — the class signal
+is that *the server* chose an address you supplied.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class is

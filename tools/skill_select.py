@@ -60,6 +60,28 @@ def collect_text(target, limit=400000):
     return "\n".join(chunks)
 
 
+def classify_rank(text, source_mode):
+    """{class_id: (position, score)} from tools/classify.py over the same text.
+
+    Imported lazily so this dispatcher keeps working if the taxonomy is being
+    regenerated, and so a classifier failure degrades to the old unlock-signal
+    order instead of taking the dispatcher down with it.
+    """
+    try:
+        import classify as classify_mod
+        classes = classify_mod.load_taxonomy()["classes"]
+        writeups = classify_mod.load_writeup_signals()
+        classes = classify_mod.merge_writeup_signals(classes, writeups)
+        field = "source_signals" if source_mode else "observation_signals"
+        compiled = classify_mod.compile_signals(classes, field)
+        hits = classify_mod.scan_text(text, compiled)
+        ranked = classify_mod.rank(hits, classes, classify_mod.load_signal_stats())
+    except Exception:
+        return {}
+    return {item["class"]: (position, item["score"])
+            for position, item in enumerate(ranked)}
+
+
 def select(text, category, registry, source_mode=False):
     index = by_id(registry)
     problems = []
@@ -115,7 +137,23 @@ def select(text, category, registry, source_mode=False):
         else:
             entry_out["reason"] = "no unlock signal observed yet"
             locked.append(entry_out)
-    unlocked.sort(key=lambda item: (-len(item["matched_signals"]), item["id"]))
+
+    # Order by what classify.py concluded, not by a second opinion.
+    #
+    # This tool used to rank on len(matched_signals) alone: its own regex pass
+    # over registry unlock_signals, unweighted, ignoring the taxonomy entirely.
+    # That made two classifiers in one tree, and the weaker one decided which
+    # skill the agent opened. Measured on CSCV2026/public, classify.py put
+    # web-parser-differential first at 4.50 on haproxy.conf while this tool
+    # returned web-file-upload — the chain's last entry point rather than the
+    # gate that has to be crossed to reach it. An agent following it would open
+    # upload payloads instead of reading the proxy ACL.
+    taxonomy_rank = classify_rank(text, source_mode)
+    for item in unlocked:
+        if item["id"] in taxonomy_rank:
+            item["classify_rank"], item["classify_score"] = taxonomy_rank[item["id"]]
+    unlocked.sort(key=lambda item: (item.get("classify_rank", 10 ** 6),
+                                    -len(item["matched_signals"]), item["id"]))
 
     budget = sum(item["tokens"] for item in open_now)
     top = unlocked[0] if unlocked else None

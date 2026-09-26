@@ -39,6 +39,11 @@ diff the handout against it. The first probe is the answer to one question:
 
 > **What did the author ADD, REMOVE or GUARD that upstream does not have?**
 
+When no chain card matches, this process skill is the fallback: run
+`python3 tools/novel_plan.py --json <source>` to inventory likely boundaries and
+first probes. Treat its output as hypotheses; confirm each anomaly and falsifier
+through the normal ledger/hooks path.
+
 **Falsifier** — the observation that closes this method: the diff against stock
 is empty apart from branding and configuration, i.e. the challenge is an
 unmodified application and the bug is in a dependency, not in the handout. Then

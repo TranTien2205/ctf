@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 759,000 tokens across 309 files. Opening
+The depth corpus is roughly 762,000 tokens across 309 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -78,7 +78,7 @@ Open one only after a probe or a source read produced its signal.
 | NoSQL / operator injection | verified | the value is coerced to a string | `skills/web-nosqli/SKILL.md` |
 | OS command injection | catalogue | the value is passed as a single argv element | `skills/web-command-injection/SKILL.md` |
 | Server-side template injection | verified | the marker is reflected literally | `skills/web-ssti/SKILL.md` |
-| XML external entity | catalogue | the parser is configured with entity resolution disabled | `skills/web-xxe/SKILL.md` |
+| XML external entity | verified | the parser is configured with entity resolution disabled | `skills/web-xxe/SKILL.md` |
 | Server-side request forgery | verified | the fetch target is fixed in source and the request never influences it | `skills/web-ssrf/SKILL.md` |
 | Request smuggling / CRLF injection | verified | the value is percent-encoded or validated | `skills/web-request-smuggling/SKILL.md` |
 | Parser differential / proxy trust | verified | both forms are rejected | `skills/web-parser-differential/SKILL.md` |
@@ -90,7 +90,7 @@ Open one only after a probe or a source read produced its signal.
 | Prototype / class pollution | verified | the merge rejects reserved keys | `skills/web-prototype-pollution/SKILL.md` |
 | Unsafe deserialization | verified | the blob is signed with a key that is not leaked and not reachable | `skills/web-deserialization/SKILL.md` |
 | Race condition / TOCTOU | verified | the read and the write happen inside one transaction or behind one lock | `skills/web-race-condition/SKILL.md` |
-| Business logic / mass assignment | catalogue | the handler reads an explicit allowlist of fields and ignores everything | `skills/web-logic-flaw/SKILL.md` |
+| Business logic / mass assignment | verified | the handler reads an explicit allowlist of fields and ignores everything | `skills/web-logic-flaw/SKILL.md` |
 | Authentication and session | verified | the signature is verified with a key that is neither leaked nor guessabl | `skills/web-auth-session/SKILL.md` |
 | OAuth / SSO flow | verified | the state parameter is bound to the session and the redirect target is a | `skills/web-oauth-sso/SKILL.md` |
 | Broken object-level authorization | catalogue | the handler scopes the lookup by the authenticated owner | `skills/web-idor/SKILL.md` |
@@ -108,13 +108,13 @@ that file and this table would drift.
 
 | Skill | Layer | Tokens | Opened when |
 |---|---|---|---|
-| `skills/ctf-ai-ml/SKILL.md` | depth | ~1.7k | the AI/IoT sub-type is decided |
+| `skills/ctf-ai-ml/SKILL.md` | depth | ~1.8k | the AI/IoT sub-type is decided |
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.7k | the primitive parameters are collected |
-| `skills/ctf-forensics/SKILL.md` | depth | ~2.6k | the artifact type is identified |
-| `skills/ctf-malware/SKILL.md` | depth | ~2.0k | obfuscated script, PE/.NET sample, or captured C2 traffic |
-| `skills/ctf-osint/SKILL.md` | depth | ~2.3k | one unique pivot is extracted |
+| `skills/ctf-forensics/SKILL.md` | depth | ~2.7k | the artifact type is identified |
+| `skills/ctf-malware/SKILL.md` | depth | ~2.1k | obfuscated script, PE/.NET sample, or captured C2 traffic |
+| `skills/ctf-osint/SKILL.md` | depth | ~2.4k | one unique pivot is extracted |
 | `skills/ctf-pwn/SKILL.md` | depth | ~4.7k | the crash is reproduced and a named technique is needed |
-| `skills/ctf-reverse/SKILL.md` | depth | ~3.1k | the runtime or packer is named |
+| `skills/ctf-reverse/SKILL.md` | depth | ~3.2k | the runtime or packer is named |
 | `skills/ctf-web/SKILL.md` | depth | ~2.7k | a narrower web class lacked the variant; open one named file |
 | `skills/mcp-agent-security/SKILL.md` | depth | ~1.6k | the target is an LLM, an agent, or a tool server |
 | `skills/pwn-rop/SKILL.md` | depth | ~0.9k | instruction-pointer control is proven and NX forces code reuse |
@@ -123,7 +123,7 @@ that file and this table would drift.
 | `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
 | `skills/web-websocket/SKILL.md` | depth | ~0.8k | a ws:// channel or realtime feature carries the flag path |
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |
-| `skills/white-box-intended-path/SKILL.md` | depth | ~2.5k | see registry use_when |
+| `skills/white-box-intended-path/SKILL.md` | depth | ~2.6k | see registry use_when |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
 

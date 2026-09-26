@@ -46,6 +46,9 @@ def main():
     ap.add_argument("name")
     ap.add_argument("--category")
     ap.add_argument("--target")
+    ap.add_argument("--source",
+                    help="path to the supplied handout, so a resumed session and "
+                         "tools/decide.py can both find the source again")
     ap.add_argument("--challenge-name",
                     help="the challenge's real name, for the writeup-search rule")
     ap.add_argument("--event", help="the event it came from, for the writeup-search rule")
@@ -121,6 +124,11 @@ def main():
     # tools/decide.py rule 8 offers a writeup search once either is known. Nothing
     # could write them, so that rule never fired and the shortcut both CLAUDE.md
     # and AGENTS.md call legitimate was unreachable from the controller.
+    # A resumed session used to get a target URL and a hypothesis list with no
+    # path to the source it had been reasoning about, and decide.py could not
+    # name the novel-plan command because it did not know where the handout was.
+    if args.source:
+        state["source"] = args.source
     if args.challenge_name:
         state["challenge_name"] = args.challenge_name
     if args.event:

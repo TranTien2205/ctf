@@ -18,6 +18,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CHAINS = os.path.join(ROOT, "knowledge", "chains")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 SIGNAL_STATS = os.path.join(ROOT, "knowledge", "signal-stats.json")
+# Separates a real match from a coincidence. See the comment in score_card.
+STRONG_COVERAGE = 0.5
+STRONG_MIN_SIGNALS = 3
 MAX_FILE_BYTES = 1024 * 1024
 MAX_PER_FILE = 40000
 MAX_TOTAL = 400000
@@ -171,7 +174,7 @@ def signal_weight(signal, stats):
     return math.log((total + 1.0) / (df + 1.0))
 
 
-def score_card(card, text, lowered, stats=None):
+def score_card(card, text, lowered, stats=None, source_mode=True):
     signals = card.get("signals", [])
     if not signals:
         return None
@@ -180,6 +183,14 @@ def score_card(card, text, lowered, stats=None):
     if not matched:
         return None
     ratio = len(matched) / len(signals)
+    # The coverage bar was measured on source trees, where the right card matches
+    # a median 0.89 of its own signals. A one-line black-box observation cannot
+    # reach that however good the match is — it simply does not contain enough
+    # text — so holding it to the same bar graded real matches as coincidence.
+    # Out of source mode the count of distinct matched signals is the only
+    # honest test available.
+    strong = len(matched) >= STRONG_MIN_SIGNALS and (
+        ratio >= STRONG_COVERAGE or not source_mode)
     if stats:
         # rank on the raw summed rarity. An earlier attempt squashed it with
         # 1-exp(-weight) so the reported number would stay inside 0..1, but that
@@ -204,8 +215,16 @@ def score_card(card, text, lowered, stats=None):
         "signals_missing": [s for s in signals if s not in matched],
         "signal_coverage": round(ratio, 3),
         "match_confidence": confidence,
-        "suggested_priority": max(10, min(90, int(round(confidence * 100)))),
-        "status": "candidate",
+        "suggested_priority": (max(10, min(90, int(round(confidence * 100))))
+                               if strong else 10),
+        # A card whose own signature is barely present is a coincidence, not a
+        # lead. Measured by tools/holdout_eval.py over 24 held-out cards: the
+        # right card matches a median 0.89 of its own signals, a wrong one 0.27,
+        # yet match_confidence is computed from summed rarity and never saw that
+        # difference — so the index reported a median 0.65 confidence on a card
+        # that was not the answer, and never once abstained. decide.py rule 6
+        # then ran that card's probe ahead of the agent's own hypothesis.
+        "status": "candidate" if strong else "weak",
         "preconditions_to_confirm": card.get("preconditions", {}),
         "first_confirming_probe": card.get("first_confirming_probe"),
         "blast_radius": card.get("blast_radius"),
@@ -276,6 +295,10 @@ def record_candidates(challenge, candidates):
         current = json.load(handle)
     if not isinstance(current, dict):
         return {"recorded": False, "reason": "ledger is not an object; state not changed"}
+    # Only a strong match is written to the ledger. decide.py rule 6 runs a
+    # recorded card's probe ahead of the agent's own hypothesis, so a weak card
+    # there spends a probe on a coincidence.
+    candidates = [c for c in candidates if c.get("status") == "candidate"]
     kept = [{"id": c["id"],
              "first_confirming_probe": c["first_confirming_probe"],
              "blast_radius": c.get("blast_radius"),
@@ -332,7 +355,8 @@ def main():
     for card in cards:
         if "_error" in card:
             continue
-        result = score_card(card, text, lowered, stats)
+        result = score_card(card, text, lowered, stats,
+                            source_mode=bool(args.source))
         if result and result["signal_coverage"] >= args.min_coverage:
             scored.append(result)
     scored.sort(key=lambda item: (-(item.get("match_weight") or 0.0),
@@ -353,7 +377,15 @@ def main():
             "Read blast_radius before any write on a shared instance.",
         ],
     }
-    if not top:
+    strong = [c for c in top if c.get("status") == "candidate"]
+    if not strong:
+        output["abstained"] = True
+        output["next_action"] = (
+            "no solved chain is a strong match" +
+            (" (%d weak one(s) shown: their own signature is mostly absent, so "
+             "treat them as coincidence, not as a lead)" % len(top) if top else "") +
+            "; plan from source with tools/novel_plan.py and take the opening layer")
+    elif not top:
         output["next_action"] = "no solved chain matches; proceed from the router's first probe"
     else:
         output["next_action"] = ("run the first_confirming_probe of " + top[0]["id"]

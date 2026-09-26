@@ -40,6 +40,34 @@ Host a page that issues the request cross-origin and have the viewer load it.
 Confirmation is the state change, observed from your own account or from the
 endpoint's response afterwards.
 
+## Reaching a JSON endpoint from a form
+
+A form cannot set an arbitrary content type, but `text/plain` is allowed. The
+body is `name` + `=` + `value`, so putting the opening of the JSON document in
+the field name and closing it in the value produces a valid JSON body with no
+encoding applied. Endpoints that parse the body by content sniff, or that accept
+`text/plain`, are reachable this way.
+
+## Traps
+
+- Fire one route at a time. Two payloads at once — a form and a framed script,
+  say — make success unattributable, and bot cycles are limited.
+- Bot sessions are often re-created per visit, so a stolen credential dies fast.
+  Verify it immediately.
+- Check the cookie's same-site attribute before assuming the browser will attach
+  it to a cross-origin request.
+
+## Routing
+
+Shares signals with: `../web-xss/`, `../web-cors/`. Check those before committing to this one.
+
+Depth, one named file at a time:
+
+- `skills/ctf-web/client-side.md`
+
+Signals that route here are in `knowledge/bug-classes.json`; classify with
+`python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+
 ## Operational probe
 
 Record a same-origin baseline first:
@@ -64,38 +92,6 @@ and `text/plain` is rejected, record `inconclusive` instead of overclaiming.
 
 For a bot challenge, submit one URL, wait for one bot cycle, then read the object
 you own. Do not combine a state-change form with an XSS payload in one cycle.
-
-## Reaching a JSON endpoint from a form
-
-A form cannot set an arbitrary content type, but `text/plain` is allowed. The
-body is `name` + `=` + `value`, so putting the opening of the JSON document in
-the field name and closing it in the value produces a valid JSON body with no
-encoding applied. Endpoints that parse the body by content sniff, or that accept
-`text/plain`, are reachable this way.
-
-## Traps
-
-- Fire one route at a time. Two payloads at once — a form and a framed script,
-  say — make success unattributable, and bot cycles are limited.
-- Bot sessions are often re-created per visit, so a stolen credential dies fast.
-  Verify it immediately.
-- Check the cookie's same-site attribute before assuming the browser will attach
-  it to a cross-origin request.
-- A CSRF token from the attacker's own session does not prove that a bot session
-  can be acted on.
-- Cross-origin `fetch` may be blocked by CORS or Private Network Access; a form
-  navigation can still send a request without exposing its response body.
-
-## Routing
-
-Shares signals with: `../web-xss/`, `../web-cors/`. Check those before committing to this one.
-
-Depth, one named file at a time:
-
-- `../ctf-web/client-side.md`
-
-Signals that route here are in `knowledge/bug-classes.json`; classify with
-`python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
 ## Field notes
 

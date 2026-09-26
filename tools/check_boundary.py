@@ -55,7 +55,11 @@ DECLARES_BOUNDARY = {
     "skills/ctf-misc/jails-and-shells.md",
 }
 
-SKIP_DIRS = {".git", "__pycache__", "cache", "raw", "challenges"}
+# ".claude" holds git worktrees that agents run in. Each is a full copy of the
+# tree, including THIS file, so scanning them reports this file's own marker
+# list as a violation. A worktree is a transient checkout, not authored
+# content, and the real copy is scanned anyway.
+SKIP_DIRS = {".git", ".claude", "__pycache__", "cache", "raw", "challenges"}
 
 
 def violations():

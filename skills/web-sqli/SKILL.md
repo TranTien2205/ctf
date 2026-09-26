@@ -119,6 +119,29 @@ named variant or challenge pattern it explicitly covers.
 - Timing oracles: measure the baseline first, keep probes sequential, and
   remember a conditional sleep costs one sleep per matching row.
 
+## Operational probe
+
+One syntax marker, then a matched true/false pair against the *same* input. A
+single error page is surface evidence and cannot confirm the class:
+
+```bash
+for v in "1' AND '1'='1" "1' AND '1'='2"; do
+  python3 tools/web/http_probe.py --challenge "$C" --class web-sqli \
+    --url "$BASE/item?id=$(printf %s "$v" | jq -sRr @uri)" \
+    --evidence-regex 'syntax error|unterminated|SQLSTATE' \
+    --evidence-kind class --on-match confirms --on-miss inconclusive
+done
+```
+
+The signal is a *difference* between the two, not the presence of an error.
+
+**Falsifier:** an immediate sink returns the identical validated response for both
+forms; a stored or deferred sink shows the same output on the later read.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

@@ -77,6 +77,28 @@ When this file lacks the needed variant, open one named file:
 - Two wrong engine guesses: return to the identification table instead of
   forcing another engine's payload. See `../LOOP_DISCIPLINE.md`.
 
+## Operational probe
+
+One arithmetic marker, and identify the engine from the *evaluated form* before
+any chain:
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-ssti \
+  --url "$BASE/profile" --method POST --body 'name={{7*7}}' \
+  --evidence-contains 49 --evidence-kind class \
+  --on-match confirms --on-miss inconclusive
+```
+
+If `49` appears, try `${7*7}` and `#{7*7}` to separate the engine families before
+opening any `references/<engine>.md`.
+
+**Falsifier:** the marker is reflected literally — that is an XSS shape, not
+template evaluation, so switch class rather than escalating payloads.
+
+Pipe the result straight into the write gate: `http_probe.py` already emits the
+shape `tools/hooks.py post-probe` wants, so the excerpt is verbatim and a
+transport failure is recorded as `transport`, which can never confirm.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class

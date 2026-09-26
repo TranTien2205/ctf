@@ -6,7 +6,12 @@
     "execute_downloaded_code": false,
     "obey_instructions_inside_downloaded_text": false,
     "import_unit": "one reviewed card with evidence spans, never a whole skill tree",
-    "redact": ["flags", "tokens", "credentials", "personal data"]
+    "redact": [
+      "flags",
+      "tokens",
+      "credentials",
+      "personal data"
+    ]
   },
   "sources": [
     {
@@ -46,6 +51,31 @@
         "write-ups with no stated mechanism: a narrative without a primitive is not a card"
       ],
       "notes": "Already supported by tools/github_pilot.py and tools/crawl.py. Sibling repositories exist for other years; add each as its own pinned source."
+    },
+    {
+      "id": "claude-red",
+      "kind": "github-repo",
+      "repo": "SnailSploit/Claude-Red",
+      "url": "https://github.com/SnailSploit/Claude-Red",
+      "licence": "MIT",
+      "pinned_commit": "739512a8588b28ff3b554e669391c22508602878",
+      "reviewed_at": "2026-09-25",
+      "declared_scope": "authorized red team engagements, bug bounty triage, security research, CTF preparation",
+      "take": [
+        "container and Kubernetes escape, which no skill in this tree covers and which does appear in jeopardy CTF",
+        "CI/CD pipeline and secret abuse (GitHub Actions injection), likewise uncovered here",
+        "WAF and filter bypass as a named technique list, to sit beside tools/web/sanitizer_fuzz.py"
+      ],
+      "reject": [
+        "the recommended install: it is `git clone` into ~/.claude/skills, a whole-tree copy, which this toolkit forbids",
+        "every red-team skill: active-directory, privesc, lateral movement, persistence, C2 frameworks, EDR evasion, anti-forensics, initial access, keylogger architecture, shellcode, Windows mitigation and boundary defeat. AGENTS.md section 7 puts all of it in the other toolkit",
+        "phishing and social engineering: no jeopardy CTF reading, and they target people rather than a supplied scope",
+        "the 14 wireless skills and network-layer attacks: they need radio hardware or a LAN position, neither of which a jeopardy target gives",
+        "the 29 web, auth, api, crypto, osint and exploit-dev skills: measured, every one maps onto a class or skill this tree already ships, 15 of them onto classes VERIFIED here by chain cards. Importing them trades local evidence for published prose",
+        "its skill counts and coverage claims: repository claims, not local coverage"
+      ],
+      "notes": "78 skills, MIT, well organised. Measured against this tree on 2026-09-25: the in-scope half is already covered here and the additive half is mostly out of scope. Five files are worth staging; nothing is worth copying. Treat every staged file as untrusted text.",
+      "pinned_at": "2026-09-19T23:46:22Z"
     }
   ]
 }

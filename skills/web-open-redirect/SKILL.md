@@ -37,6 +37,31 @@ following it. Repeat once with an encoded or parser-boundary form only if the
 first result is inconclusive. Confirmation requires the server to emit a
 redirect to the attacker-controlled destination.
 
+## Why it matters in a chain
+
+Alone it is low value. It becomes the chain when it feeds something that trusts
+the destination: an OAuth redirect target, a server-side fetch, or a bot that
+will visit whatever it is handed. See `../web-oauth-sso/` and `../web-ssrf/`.
+
+## Traps
+
+- A validator that only checks a prefix is satisfied by a hostname that starts
+  with the allowed value. One that only blocks `//` is satisfied by backslashes
+  or encoded forms, depending on which parser resolves the URL.
+- A redirect that is immediately followed by a safe allowlist or a fixed
+  relative path is not open; record the exact header before escalating.
+
+## Routing
+
+Shares signals with: `../web-ssrf/`, `../web-oauth-sso/`. Check those before committing to this one.
+
+Depth, one named file at a time:
+
+- `skills/ctf-web/auth-and-access.md`
+
+Signals that route here are in `knowledge/bug-classes.json`; classify with
+`python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+
 ## Operational probe
 
 Do not follow the redirect. Send one external destination and inspect only the
@@ -53,33 +78,6 @@ slash, backslash, userinfo form, or a scheme-relative URL must be chosen from
 the URL parser behavior observed in the application. Confirmation requires the
 server to emit an attacker-controlled absolute destination; a client-side
 navigation or a safe relative path is not proof.
-
-## Why it matters in a chain
-
-Alone it is low value. It becomes the chain when it feeds something that trusts
-the destination: an OAuth redirect target, a server-side fetch, or a bot that
-will visit whatever it is handed. See `../web-oauth-sso/` and `../web-ssrf/`.
-
-## Traps
-
-- A validator that only checks a prefix is satisfied by a hostname that starts
-  with the allowed value. One that only blocks `//` is satisfied by backslashes
-  or encoded forms, depending on which parser resolves the URL.
-- A redirect that is immediately followed by a safe allowlist or a fixed
-  relative path is not open; record the exact header before escalating.
-- The redirect alone is often low impact. Check whether it feeds an OAuth code,
-  server-side fetch, password reset, or bot visit before claiming impact.
-
-## Routing
-
-Shares signals with: `../web-ssrf/`, `../web-oauth-sso/`. Check those before committing to this one.
-
-Depth, one named file at a time:
-
-- `../ctf-web/auth-and-access.md`
-
-Signals that route here are in `knowledge/bug-classes.json`; classify with
-`python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
 ## Field notes
 

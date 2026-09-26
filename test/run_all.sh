@@ -28,6 +28,27 @@ if ! "$PY" tools/system_eval.py --json; then fail=1; fi
 hr "REQUIRED: learning-loop report"
 if ! "$PY" tools/learning_report.py --json; then fail=1; fi
 
+hr "REQUIRED: tool-layer selftests (web, crypto, pwn primitives -- all offline)"
+# These three prove the primitives the agent is told to prefer over hand-rolled
+# requests. They were shipped with selftests that the gate never ran, so a
+# regression in them would have been invisible here; measured at ~17s together.
+for t in tools/web/selftest.py tools/crypto/selftest.py tools/pwnstatic/selftest.py; do
+  if [ -f "$t" ]; then
+    printf -- '-- %s\n' "$t"
+    "$PY" "$t" >/dev/null || { echo "FAILED: $t (run it directly for the detail)"; fail=1; }
+  else
+    echo "MISSING: $t"; fail=1
+  fi
+done
+
+hr "REPORTED: chain transfer to an unseen challenge (a metric, not a contract)"
+# chain_match_eval measures recall when the right card IS present and reads 1.0.
+# This asks the other question -- hold a card out and see whether any card from
+# the same mechanism family comes back -- and currently reads 0.042. It is
+# printed rather than enforced because it is a number to move, not a floor to
+# defend; a threshold here would only invite tuning the harness.
+"$PY" tools/holdout_eval.py --json 2>/dev/null | "$PY" -c "import json,sys; d=json.load(sys.stdin); print('transfer=%s wrong_family=%s silent=%s over %s challenges' % (d['transfer_rate'], d['wrong_family_rate'], d['silent_rate'], d['cards_measurable']))" || echo "holdout_eval did not run"
+
 hr "OPTIONAL: foundation tests (need jsonschema and tornado)"
 if "$PY" -c "import jsonschema, tornado" 2>/dev/null; then
   "$PY" -m unittest discover -s tests || fail=1

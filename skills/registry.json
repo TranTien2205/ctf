@@ -275,7 +275,7 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1721,
+      "skill_tokens": 1798,
       "depth_files": 3,
       "depth_tokens": 16099,
       "use_when": [
@@ -295,7 +295,7 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 2651,
+      "skill_tokens": 2728,
       "depth_files": 23,
       "depth_tokens": 97074,
       "use_when": [
@@ -316,7 +316,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 2609,
+      "skill_tokens": 2686,
       "depth_files": 20,
       "depth_tokens": 85200,
       "use_when": [
@@ -338,7 +338,7 @@
         "rev",
         "forensics"
       ],
-      "skill_tokens": 2003,
+      "skill_tokens": 2080,
       "depth_files": 3,
       "depth_tokens": 7388,
       "use_when": [
@@ -358,7 +358,7 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 2275,
+      "skill_tokens": 2352,
       "depth_files": 3,
       "depth_tokens": 12786,
       "use_when": [
@@ -378,7 +378,7 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 4660,
+      "skill_tokens": 4738,
       "depth_files": 18,
       "depth_tokens": 109578,
       "use_when": [
@@ -399,7 +399,7 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 3132,
+      "skill_tokens": 3210,
       "depth_files": 18,
       "depth_tokens": 97067,
       "use_when": [
@@ -420,7 +420,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2656,
+      "skill_tokens": 2733,
       "depth_files": 18,
       "depth_tokens": 94007,
       "use_when": [
@@ -446,7 +446,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-ssrf-gopher-redis-lua-rce"
       ],
-      "skill_tokens": 1174,
+      "skill_tokens": 1498,
       "depth_files": 4,
       "depth_tokens": 4610,
       "use_when": [
@@ -461,7 +461,7 @@
         "web-ssrf",
         "web-xxe"
       ],
-      "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
+      "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
       "bug_class": true
     },
     {
@@ -522,7 +522,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1471,
+      "skill_tokens": 1696,
       "depth_files": 5,
       "depth_tokens": 6266,
       "use_when": [
@@ -537,7 +537,7 @@
         "web-oauth-sso",
         "web-idor"
       ],
-      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:alg\\b|hs256|rs256|none)|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
+      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:alg\\b|hs256|rs256|none)|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
       "bug_class": true
     },
     {
@@ -551,7 +551,7 @@
       "verified_by": [
         "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
-      "skill_tokens": 850,
+      "skill_tokens": 851,
       "depth_files": 1,
       "depth_tokens": 2836,
       "use_when": [
@@ -565,7 +565,7 @@
       "routes_to": [
         "web-parser-differential"
       ],
-      "unlock_signals": "(?:x-cache|cf-cache-status|age:|vary:)|(?:cache)|(?:cdn|varnish|cloudfront)|(?:Cache-Control|s-maxage)|(?:cache\\.(?:set|get)\\s*\\(\\s*(?:req|request))",
+      "unlock_signals": "(?:x-cache|cf-cache-status|age:|vary:)|(?:cache)|(?:cdn|varnish|cloudfront)|(?:(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9]))|(?:Cache-Control|s-maxage)|(?:cache\\.(?:set|get)\\s*\\(\\s*(?:req|request))",
       "bug_class": true
     },
     {
@@ -602,7 +602,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 880,
+      "skill_tokens": 882,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -616,7 +616,7 @@
       "routes_to": [
         "web-ssti"
       ],
-      "unlock_signals": "(?:command injection)|(?:\\bping\\b.{0,20}(?:host|ip|target))|(?:uid=\\d+\\(|gid=\\d+\\()|(?:sh: \\d+:|/bin/sh)|(?:os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True)|(?:shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$)|(?:require\\s*\\(\\s*[\\\"']child_process|from subprocess import)|(?:(?:execSync|spawnSync|execFileSync)\\s*\\()|(?:child_process[^\\n]{0,40}exec\\s*\\()",
+      "unlock_signals": "(?:command injection)|(?:\\bping\\b.{0,20}(?:host|ip|target))|(?:uid=\\d+\\(|gid=\\d+\\()|(?:sh: \\d+:|/bin/sh)|(?:(?<![a-z0-9])(?:web\\ command\\ injection|os\\ command\\ injection|command\\ injection|command\\-injection)(?![a-z0-9]))|(?:os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True)|(?:shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$)|(?:require\\s*\\(\\s*[\\\"']child_process|from subprocess import)|(?:(?:execSync|spawnSync|execFileSync)\\s*\\()|(?:child_process[^\\n]{0,40}exec\\s*\\()",
       "bug_class": true
     },
     {
@@ -628,7 +628,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 957,
+      "skill_tokens": 924,
       "depth_files": 1,
       "depth_tokens": 153,
       "use_when": [
@@ -642,7 +642,7 @@
       "routes_to": [
         "web-csrf"
       ],
-      "unlock_signals": "(?:access-control-allow-origin|access-control-allow-credentials)|(?:\\bcors\\b)|(?:origin:)|(?:Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*)|(?:origin.{0,30}(?:reflect|echo))|(?:cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true)",
+      "unlock_signals": "(?:access-control-allow-origin|access-control-allow-credentials)|(?:\\bcors\\b)|(?:origin:)|(?:(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9]))|(?:Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*)|(?:origin.{0,30}(?:reflect|echo))|(?:cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true)",
       "bug_class": true
     },
     {
@@ -657,7 +657,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1034,
+      "skill_tokens": 971,
       "depth_files": 1,
       "depth_tokens": 768,
       "use_when": [
@@ -672,7 +672,7 @@
         "web-xss",
         "web-cors"
       ],
-      "unlock_signals": "(?:\\bcsrf\\b|xsrf)|(?:samesite|sameorigin)|(?:admin bot|bot visits)|(?:text/plain|enctype)|(?:csrf.{0,20}(?:disable|exempt|false))|(?:@csrf_exempt)|(?:samesite\\s*[=:]\\s*[\\\"']?none)",
+      "unlock_signals": "(?:\\bcsrf\\b|xsrf)|(?:samesite|sameorigin)|(?:admin bot|bot visits)|(?:text/plain|enctype)|(?:(?<![a-z0-9])(?:cross\\-site\\ request\\ forgery|web\\ csrf|csrf)(?![a-z0-9]))|(?:csrf.{0,20}(?:disable|exempt|false))|(?:@csrf_exempt)|(?:samesite\\s*[=:]\\s*[\\\"']?none)",
       "bug_class": true
     },
     {
@@ -687,7 +687,7 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1048,
+      "skill_tokens": 1272,
       "depth_files": 7,
       "depth_tokens": 5025,
       "use_when": [
@@ -701,7 +701,7 @@
       "routes_to": [
         "web-prototype-pollution"
       ],
-      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)",
+      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:(?<![a-z0-9])(?:unsafe\\ deserialization|web\\ deserialization|deserialization)(?![a-z0-9]))|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)|(?:Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$)",
       "bug_class": true
     },
     {
@@ -716,7 +716,7 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
       ],
-      "skill_tokens": 1118,
+      "skill_tokens": 1399,
       "depth_files": 7,
       "depth_tokens": 6162,
       "use_when": [
@@ -730,7 +730,7 @@
       "routes_to": [
         "file-read-primitives"
       ],
-      "unlock_signals": "(?:upload|multipart/form-data|filename=)|(?:avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b)|(?:image/|mime|magic byte)|(?:multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path))|(?:os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename))",
+      "unlock_signals": "(?:upload|multipart/form-data|filename=)|(?:avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b)|(?:image/|mime|magic byte)|(?:(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9]))|(?:multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path))|(?:os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename))",
       "bug_class": true
     },
     {
@@ -742,7 +742,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 940,
+      "skill_tokens": 942,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -757,7 +757,7 @@
         "web-idor",
         "web-logic-flaw"
       ],
-      "unlock_signals": "(?:graphql|/gql\\b)|(?:__schema|__typename|introspection)|(?:\\bquery\\s*\\{|\\bmutation\\s*\\{)|(?:graphql|apollo|graphene|strawberry)|(?:introspection\\s*[=:]\\s*True)",
+      "unlock_signals": "(?:graphql|/gql\\b)|(?:__schema|__typename|introspection)|(?:\\bquery\\s*\\{|\\bmutation\\s*\\{)|(?:(?<![a-z0-9])(?:graphql\\ abuse|web\\ graphql|graphql)(?![a-z0-9]))|(?:graphql|apollo|graphene|strawberry)|(?:introspection\\s*[=:]\\s*True)",
       "bug_class": true
     },
     {
@@ -784,7 +784,7 @@
         "web-logic-flaw",
         "web-auth-session"
       ],
-      "unlock_signals": "(?:\\bidor\\b)|(?:/(?:users?|orders?|files?|notes?|invoices?)/\\d+)|(?:user_?id|account_?id|object_?id)|(?:[0-9a-f]{8}-[0-9a-f]{4}-)|(?:findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params))|(?:get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*=)",
+      "unlock_signals": "(?:\\bidor\\b)|(?:/(?:users?|orders?|files?|notes?|invoices?)/\\d+)|(?:user_?id|account_?id|object_?id)|(?:[0-9a-f]{8}-[0-9a-f]{4}-)|(?:(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9]))|(?:findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params))|(?:get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*=)",
       "bug_class": true
     },
     {
@@ -819,24 +819,26 @@
       "categories": [
         "web"
       ],
-      "evidence_level": "catalogue",
-      "verified_by": [],
-      "skill_tokens": 763,
+      "evidence_level": "verified",
+      "verified_by": [
+        "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
+      ],
+      "skill_tokens": 773,
       "depth_files": 1,
       "depth_tokens": 562,
       "use_when": [
-        "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped"
+        "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped",
+        "a chain card already proves this class here: pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the handler reads an explicit allowlist of fields and ignores everything else",
-        "the evidence fits one of these better: web-idor, web-race-condition",
-        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+        "the evidence fits one of these better: web-idor, web-race-condition"
       ],
       "routes_to": [
         "web-idor",
         "web-race-condition"
       ],
-      "unlock_signals": "(?:registration|signup|checkout|coupon|workflow|approval)|(?:role|is_?admin|privilege|status)|(?:(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\))|(?:\\*\\*(?:request|data)\\b)|(?:setattr\\s*\\(\\s*\\w+\\s*,\\s*k)",
+      "unlock_signals": "(?:registration|signup|checkout|coupon|workflow|approval)|(?:role|is_?admin|privilege|status)|(?:(?<![a-z0-9])(?:mass\\ assignment|web\\ logic\\ flaw|business\\ logic|logic\\ flaw|logic\\-flaw)(?![a-z0-9]))|(?:(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\))|(?:\\*\\*(?:request|data)\\b)|(?:setattr\\s*\\(\\s*\\w+\\s*,\\s*k)",
       "bug_class": true
     },
     {
@@ -850,7 +852,7 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 829,
+      "skill_tokens": 844,
       "depth_files": 3,
       "depth_tokens": 1220,
       "use_when": [
@@ -865,7 +867,7 @@
         "web-sqli",
         "web-prototype-pollution"
       ],
-      "unlock_signals": "(?:mongo|mongoose|couch|elasticsearch|redis\\b)|(?:\\$ne\\b|\\$gt\\b|\\$where\\b|\\$regex\\b|\\$rename\\b)|(?:[0-9a-f]{24}\\b)|(?:__v\\b)|(?:mongoose\\.model|findOne\\s*\\(\\s*req\\.|find\\s*\\(\\s*req\\.(?:body|query))|(?:updateMany|updateOne\\s*\\(\\s*req\\.)|(?:\\$where)",
+      "unlock_signals": "(?:mongo|mongoose|couch|elasticsearch|redis\\b)|(?:\\$ne\\b|\\$gt\\b|\\$where\\b|\\$regex\\b|\\$rename\\b)|(?:[0-9a-f]{24}\\b)|(?:__v\\b)|(?:object datastore|object-shaped filter|24-hex id)|(?:aggregation (?:pipeline|stage)|\\$(?:match|lookup|group|unwind)\\b)|(?:body (?:becomes|is) the (?:query|filter)|whole query structure)|(?:reaches (?:the )?(?:driver|query) (?:whole|unchanged|as-is))|(?:(?<![a-z0-9])(?:operator\\ injection|web\\ nosqli|nosqli|nosql)(?![a-z0-9]))|(?:mongoose\\.model|findOne\\s*\\(\\s*req\\.|find\\s*\\(\\s*req\\.(?:body|query))|(?:updateMany|updateOne\\s*\\(\\s*req\\.)|(?:\\$where)",
       "bug_class": true
     },
     {
@@ -879,7 +881,7 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 769,
+      "skill_tokens": 771,
       "depth_files": 1,
       "depth_tokens": 1389,
       "use_when": [
@@ -894,7 +896,7 @@
         "web-auth-session",
         "web-open-redirect"
       ],
-      "unlock_signals": "(?:oauth|openid|oidc|saml|single sign|sso\\b)|(?:redirect_uri|client_id|response_type|authorization_code)|(?:state=|nonce=)|(?:/authorize|/token|/callback)|(?:client_secret|redirect_uri)|(?:state\\s*(?:!=|==)\\s*)|(?:\\.well-known/openid)",
+      "unlock_signals": "(?:oauth|openid|oidc|saml|single sign|sso\\b)|(?:redirect_uri|client_id|response_type|authorization_code)|(?:state=|nonce=)|(?:/authorize|/token|/callback)|(?:(?<![a-z0-9])(?:web\\ oauth\\ sso|oauth\\ sso|oauth\\-sso|sso\\ flow|oauth)(?![a-z0-9]))|(?:client_secret|redirect_uri)|(?:state\\s*(?:!=|==)\\s*)|(?:\\.well-known/openid)",
       "bug_class": true
     },
     {
@@ -906,7 +908,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 902,
+      "skill_tokens": 865,
       "depth_files": 1,
       "depth_tokens": 151,
       "use_when": [
@@ -921,7 +923,7 @@
         "web-ssrf",
         "web-oauth-sso"
       ],
-      "unlock_signals": "(?:redirect|next=|returnurl|callback=|continue=)|(?:\\b30[1237]\\b)|(?:redirect\\s*\\(\\s*(?:req|request|params|\\$_))|(?:Location:\\s*[\\\"']?\\s*\\+)",
+      "unlock_signals": "(?:redirect|next=|returnurl|callback=|continue=)|(?:\\b30[1237]\\b)|(?:(?<![a-z0-9])(?:web\\ open\\ redirect|open\\ redirect|open\\-redirect)(?![a-z0-9]))|(?:redirect\\s*\\(\\s*(?:req|request|params|\\$_))|(?:Location:\\s*[\\\"']?\\s*\\+)",
       "bug_class": true
     },
     {
@@ -935,7 +937,7 @@
       "verified_by": [
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 762,
+      "skill_tokens": 763,
       "depth_files": 1,
       "depth_tokens": 2875,
       "use_when": [
@@ -950,7 +952,7 @@
         "web-request-smuggling",
         "web-auth-session"
       ],
-      "unlock_signals": "(?:traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy)|(?:x-real-ip|x-forwarded-for|x-forwarded-host|connection:)|(?:hop-by-hop)|(?:403.{0,40}(?:only|internal|local))|(?:headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded))|(?:request\\.headers\\[[\\\"']x-)|(?:if not .*header.*:\\s*\\n\\s*.*local)",
+      "unlock_signals": "(?:traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy)|(?:inspects the raw body|raw body before a decoder|before a decoder runs)|(?:x-real-ip|x-forwarded-for|x-forwarded-host|connection:)|(?:hop-by-hop)|(?:403.{0,40}(?:only|internal|local))|(?:middleware|x-middleware|edge (?:function|runtime))|(?:(?:one|only|single|front) (?:front )?layer.{0,40}authori)|(?:header the client can (?:set|supply|control|choose))|(?:internal[- ]subrequest|x-middleware-subrequest)|(?:(?<![a-z0-9])(?:web\\ parser\\ differential|parser\\ differential|parser\\-differential|proxy\\ trust)(?![a-z0-9]))|(?:headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded))|(?:request\\.headers\\[[\\\"']x-)|(?:if not .*header.*:\\s*\\n\\s*.*local)|(?:acl\\s+\\S+\\s+(?:path|url|req\\.hdr|hdr|method|base)\\b)|(?:http-request\\s+(?:deny|set-header|replace-path)\\b)|(?:use_backend\\s+\\S+\\s+if\\b|acl\\s+\\S+\\s+src\\s+\\d)|(?:-m\\s+(?:beg|sub|dir|reg|end)\\b)|(?:location\\s+[~^=]|^\\s*internal\\s*;|proxy_set_header\\s)",
       "bug_class": true
     },
     {
@@ -966,7 +968,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 1192,
+      "skill_tokens": 1141,
       "depth_files": 1,
       "depth_tokens": 2535,
       "use_when": [
@@ -981,7 +983,7 @@
         "web-nosqli",
         "web-deserialization"
       ],
-      "unlock_signals": "(?:__proto__|prototype pollution|class pollution)|(?:constructor|__class__|__globals__|__init__)|(?:merge|deep.?(?:assign|copy|merge))|(?:__proto__)|(?:Object\\.assign\\s*\\(\\s*\\{\\}?\\s*,\\s*(?:req|body))|(?:(?:_\\.)?merge\\s*\\(|extend\\s*\\(\\s*true)|(?:setattr\\s*\\()|(?:\\$rename)",
+      "unlock_signals": "(?:__proto__|prototype pollution|class pollution)|(?:connection-derived|derived from the connection)|(?:constructor|__class__|__globals__|__init__)|(?:merge|deep.?(?:assign|copy|merge))|(?:(?<![a-z0-9])(?:web\\ prototype\\ pollution|prototype\\ pollution|prototype\\-pollution|class\\ pollution|prototype)(?![a-z0-9]))|(?:__proto__)|(?:Object\\.assign\\s*\\(\\s*\\{\\}?\\s*,\\s*(?:req|body))|(?:(?:_\\.)?merge\\s*\\(|extend\\s*\\(\\s*true)|(?:setattr\\s*\\()|(?:\\$rename)",
       "bug_class": true
     },
     {
@@ -996,7 +998,7 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 804,
+      "skill_tokens": 807,
       "depth_files": 2,
       "depth_tokens": 1848,
       "use_when": [
@@ -1010,7 +1012,7 @@
       "routes_to": [
         "web-logic-flaw"
       ],
-      "unlock_signals": "(?:race condition|toctou)|(?:balance|coupon|voucher|one.?time|redeem)|(?:verification token|confirmation (?:code|email|link))|(?:rate.?limit|per.?user limit|quota)|(?:(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit))|(?:await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count))",
+      "unlock_signals": "(?:race condition|toctou)|(?:balance|coupon|voucher|one.?time|redeem)|(?:verification token|confirmation (?:code|email|link))|(?:rate.?limit|per.?user limit|quota)|(?:(?<![a-z0-9])(?:web\\ race\\ condition|race\\ condition|race\\-condition|toctou)(?![a-z0-9]))|(?:(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit))|(?:await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count))",
       "bug_class": true
     },
     {
@@ -1024,7 +1026,7 @@
       "verified_by": [
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1074,
+      "skill_tokens": 1041,
       "depth_files": 1,
       "depth_tokens": 2758,
       "use_when": [
@@ -1039,7 +1041,7 @@
         "web-ssrf",
         "web-parser-differential"
       ],
-      "unlock_signals": "(?:smuggl|desync|crlf)|(?:content-length|transfer-encoding)|(?:%0d%0a|\\\\r\\\\n|\\\\u010d|\\\\u010a)|(?:proxy|gateway|load balancer|nginx|haproxy|traefik)|(?:http://\\$\\{[^}]*\\}|https://\\$\\{[^}]*\\})|(?:(?:url|endpoint|host)\\s*[+]\\s*(?:req|request|params))|(?:setHeader\\s*\\([^)]*(?:req|request|params))",
+      "unlock_signals": "(?:smuggl|desync|crlf)|(?:content-length|transfer-encoding)|(?:%0d%0a|\\\\r\\\\n|\\\\u010d|\\\\u010a)|(?:proxy|gateway|load balancer|nginx|haproxy|traefik)|(?:(?<![a-z0-9])(?:web\\ request\\ smuggling|request\\ smuggling|request\\-smuggling|crlf\\ injection)(?![a-z0-9]))|(?:http://\\$\\{[^}]*\\}|https://\\$\\{[^}]*\\})|(?:(?:url|endpoint|host)\\s*[+]\\s*(?:req|request|params))|(?:setHeader\\s*\\([^)]*(?:req|request|params))",
       "bug_class": true
     },
     {
@@ -1078,7 +1080,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1410,
+      "skill_tokens": 1648,
       "depth_files": 13,
       "depth_tokens": 17159,
       "use_when": [
@@ -1092,7 +1094,7 @@
       "routes_to": [
         "web-nosqli"
       ],
-      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
       "bug_class": true
     },
     {
@@ -1107,7 +1109,7 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce",
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 973,
+      "skill_tokens": 1232,
       "depth_files": 6,
       "depth_tokens": 4606,
       "use_when": [
@@ -1122,7 +1124,7 @@
         "file-read-primitives",
         "web-request-smuggling"
       ],
-      "unlock_signals": "(?:\\bssrf\\b)|(?:url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input))|(?:server.?side (?:fetch|request)|fetches? (?:the |a )?url)|(?:pdf|screenshot|render|thumbnail|preview|import from url)|(?:127\\.0\\.0\\.1|localhost|169\\.254|metadata)|(?:admin bot|headless)|(?:requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url))|(?:urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`))|(?:curl_setopt|file_get_contents\\s*\\(\\s*\\$)|(?:http://\\$\\{|https://\\$\\{)",
+      "unlock_signals": "(?:\\bssrf\\b)|(?:loopback-only|reachable by the backend itself)|(?:url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input))|(?:server.?side (?:fetch|request)|fetches? (?:the |a )?url)|(?:pdf|screenshot|render|thumbnail|preview|import from url)|(?:127\\.0\\.0\\.1|localhost|169\\.254|metadata)|(?:admin bot|headless)|(?:(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9]))|(?:requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url))|(?:urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`))|(?:curl_setopt|file_get_contents\\s*\\(\\s*\\$)|(?:http://\\$\\{|https://\\$\\{)",
       "bug_class": true
     },
     {
@@ -1137,7 +1139,7 @@
         "htb-neonify-erb-ssti-newline-filter-bypass",
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
       ],
-      "skill_tokens": 746,
+      "skill_tokens": 958,
       "depth_files": 7,
       "depth_tokens": 3864,
       "use_when": [
@@ -1152,7 +1154,7 @@
         "web-xss",
         "web-command-injection"
       ],
-      "unlock_signals": "(?:\\{\\{|\\$\\{|#\\{|<%=)|(?:jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b)|(?:template)|(?:\\b49\\b)|(?:render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params))|(?:eval\\s*\\(\\s*(?:template|tpl))",
+      "unlock_signals": "(?:\\{\\{|\\$\\{|#\\{|<%=)|(?:jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b)|(?:template)|(?:\\b49\\b)|(?:(?<![a-z0-9])(?:server\\-side\\ template\\ injection|web\\ ssti|ssti)(?![a-z0-9]))|(?:render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params))|(?:eval\\s*\\(\\s*(?:template|tpl))",
       "bug_class": true
     },
     {
@@ -1164,7 +1166,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 910,
+      "skill_tokens": 914,
       "depth_files": 2,
       "depth_tokens": 4166,
       "use_when": [
@@ -1175,7 +1177,7 @@
         "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
       ],
       "routes_to": [],
-      "unlock_signals": "(?:solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat)|(?:0x[0-9a-f]{40}\\b)|(?:setup\\(\\)|isSolved\\(\\))|(?:pragma solidity|contract \\w+\\s*\\{)|(?:delegatecall|selfdestruct|tx\\.origin)",
+      "unlock_signals": "(?:solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat)|(?:0x[0-9a-f]{40}\\b)|(?:setup\\(\\)|isSolved\\(\\))|(?:(?<![a-z0-9])(?:smart\\ contract|web\\ web3|web3)(?![a-z0-9]))|(?:pragma solidity|contract \\w+\\s*\\{)|(?:delegatecall|selfdestruct|tx\\.origin)",
       "bug_class": true
     },
     {
@@ -1228,7 +1230,7 @@
         "web-cache-poisoning",
         "web-csrf"
       ],
-      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
+      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9]))|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
       "bug_class": true
     },
     {
@@ -1258,7 +1260,7 @@
         "web-ssti",
         "web-csrf"
       ],
-      "unlock_signals": "(?:\\bxss\\b)|(?:admin bot|bot visits|report (?:url|link))|(?:content-security-policy|nonce-)|(?:dompurify|sanitiz)|(?:innerHTML|outerHTML|document\\.write|insertAdjacentHTML)|(?:dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{)|(?:res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{)|(?:(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{)|(?:v-html|\\bunescape\\b|autoescape\\s*=\\s*False)",
+      "unlock_signals": "(?:\\bxss\\b)|(?:admin bot|bot visits|report (?:url|link))|(?:content-security-policy|nonce-)|(?:dompurify|sanitiz)|(?:(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9]))|(?:innerHTML|outerHTML|document\\.write|insertAdjacentHTML)|(?:dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{)|(?:res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{)|(?:(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{)|(?:v-html|\\bunescape\\b|autoescape\\s*=\\s*False)",
       "bug_class": true
     },
     {
@@ -1268,24 +1270,26 @@
       "categories": [
         "web"
       ],
-      "evidence_level": "catalogue",
-      "verified_by": [],
-      "skill_tokens": 972,
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-xxe-content-type-branch-simplexml-noent-file-read"
+      ],
+      "skill_tokens": 978,
       "depth_files": 1,
       "depth_tokens": 600,
       "use_when": [
-        "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed"
+        "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed",
+        "a chain card already proves this class here: htb-xxe-content-type-branch-simplexml-noent-file-read"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the parser is configured with entity resolution disabled",
-        "the evidence fits one of these better: file-read-primitives, web-ssrf",
-        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+        "the evidence fits one of these better: file-read-primitives, web-ssrf"
       ],
       "routes_to": [
         "file-read-primitives",
         "web-ssrf"
       ],
-      "unlock_signals": "(?:<\\?xml|application/xml|text/xml|soap|wsdl)|(?:\\.docx|\\.xlsx|\\.svg\\b)|(?:doctype|entity)|(?:etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder)|(?:simplexml_load|libxml_disable_entity_loader)|(?:resolve_entities\\s*=\\s*True)",
+      "unlock_signals": "(?:<\\?xml|application/xml|text/xml|soap|wsdl)|(?:\\.docx|\\.xlsx|\\.svg\\b)|(?:doctype|entity)|(?:(?<![a-z0-9])(?:xml\\ external\\ entity|web\\ xxe|xxe)(?![a-z0-9]))|(?:etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder)|(?:simplexml_load|libxml_disable_entity_loader)|(?:resolve_entities\\s*=\\s*True)",
       "bug_class": true
     },
     {
@@ -1319,7 +1323,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2513,
+      "skill_tokens": 2580,
       "depth_files": 1,
       "depth_tokens": 158,
       "use_when": [

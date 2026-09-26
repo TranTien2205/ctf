@@ -63,13 +63,16 @@ Then pick exactly one branch:
 | `skill_audit.py` | screen out weak skills; run it before trusting one |
 | `tools/search_facts.py` | plan a narrow external search for one missing fact without treating results as evidence |
 | `tools/handout_inventory.py` | measure locally available retrieval ground truth without importing raw challenge source |
+| `tools/novel_plan.py` | build a bounded source-first plan when no solved chain matches a novel challenge |
 | `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
 | `chain_match_eval.py` | retrieval quality of chain_match: top-1, MRR and how many wrong cards outrank the right one |
+| `holdout_eval.py` | the question chain_match_eval cannot ask: hold each card out of the index, query with its own handout, and see whether the library abstains or invents. It measured 0 abstentions and a median 0.65 confidence on a card that was not the answer; that is what the strong/weak grade in chain_match now fixes |
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
 | `tools/web/` | speed primitives that emit the shape `hooks.py` wants: `http_probe` (probe + verbatim excerpt), `sanitizer_fuzz` (differential encoding sweep, records negatives), `read_loop` (proven file-read walk), `id_sweep`, `pdf_text`. `python3 tools/web/selftest.py` proves them offline |
 | `tools/crypto/` + `crypto_attack.py` | lattice, LCG, LFSR, ECC, HNP and integer attacks; `--list` names them |
 | `tools/gadget_lookup.py` | before opening a class skill: has this exact dependency been measured here before? `--lockfile <handout>/package-lock.json` reads the real versions and matches them against `knowledge/gadgets/<package>.json`. classify.py has no notion of a version, so this is the only version-aware recall in the tree |
+| `tools/pwn_triage.py` + `tools/pwnstatic/` | first contact with a pwn or rev binary. `pwntools`, `gdb`, `ROPgadget`, `ropper`, `one_gadget`, `checksec` and `patchelf` are all measured ABSENT here and pip is EXTERNALLY-MANAGED, so this is stdlib-only: protections with the evidence that decided each one, dangerous imports annotated with what they buy, the essential ROP gadgets, and which routes each protection still leaves. It reports and ranks; it never claims a bug. `python3 tools/pwnstatic/selftest.py` proves it against `readelf` offline |
 | `knowledge/attempts/` | the kill map of a challenge worked but NOT solved: every layer measured dead, with the measurement and the precondition that would reopen it. `knowledge/chains/` only accepts a solve, so without this the next attempt re-walks the same dead layers |
 
 ---
@@ -93,7 +96,14 @@ deterministic tools:
    next step)          quote a proving excerpt;
         │              a timeout is never a confirm)
         ▼
-  run_probe / switch_class / verify_flag / record_solve / stop_report
+  run_probe / novel_plan / switch_class / verify_flag / record_solve / stop_report
+
+When source is recorded and no solved chain matches, the controller answers
+`novel_plan` before any single-class probe: it reads the source, names the
+layers and gives each one its own falsifier. A layered white-box challenge
+opened from one classifier answer lands on the last sink rather than the
+boundary in front of it. Record the handout with
+`tools/state.py <name> --source <dir>` or the rule cannot fire.
 ```
 
 Hard rules — breaking one breaks the control loop:

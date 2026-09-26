@@ -159,6 +159,40 @@ class StructureTests(unittest.TestCase):
             self.assertTrue((ROOT / skill["path"]).is_file(),
                             "registry names a missing file: " + skill["path"])
 
+    def test_bug_classes_json_matches_its_generator(self):
+        """knowledge/bug-classes.json is generated; regenerating must be a no-op.
+
+        It had drifted from build/make_bug_classes.py in three places at once,
+        because each fix was applied to the OUTPUT by hand and the generator was
+        left stale. Regenerating then silently reverted every one of them: the
+        whole web-xs-leaks class vanished, the base64 deserialization magics lost
+        their \\b anchors so they fired inside any blob, and two race-condition
+        signals fell back to the promiscuous "confirm" and bare "limit". Nothing
+        in the gate noticed, because nothing compared the two. This does.
+        """
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_mbc", ROOT / "build" / "make_bug_classes.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as tmp:
+            module.OUT = os.path.join(tmp, "bug-classes.json")
+            with contextlib.redirect_stdout(io.StringIO()):
+                module.main()
+            produced = json.loads(Path(module.OUT).read_text(encoding="utf-8"))
+        committed = json.loads(read("knowledge/bug-classes.json"))
+        self.assertEqual(
+            [c["id"] for c in produced["classes"]],
+            [c["id"] for c in committed["classes"]],
+            "build/make_bug_classes.py and knowledge/bug-classes.json disagree on "
+            "which classes exist; regenerating would add or drop a class. Fix the "
+            "GENERATOR, then re-run it -- never hand-edit the output.")
+        self.assertEqual(
+            produced, committed,
+            "knowledge/bug-classes.json is not what build/make_bug_classes.py "
+            "produces. Port the change into the generator and re-run it; a "
+            "hand-edited output is reverted by the next regeneration.")
+
     def test_every_skill_on_disk_is_registered(self):
         on_disk = {p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")}
         registered = {s["id"] for s in registry()["skills"]}
@@ -346,6 +380,18 @@ class ContractTests(unittest.TestCase):
                        "hash of", "untrusted evidence"):
             self.assertIn(phrase, text)
 
+    def test_novel_whitebox_plan_surfaces_chain_openers_without_claiming_a_finding(self):
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tools/novel_plan.py"), "--json",
+             str(ROOT / "CSCV2026/public")], capture_output=True, text=True, cwd=str(ROOT))
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        plan = json.loads(proc.stdout)
+        ids = {row["id"] for row in plan["layers"]}
+        self.assertTrue({"proxy-boundary", "internal-fetch", "upload-boundary"}.issubset(ids))
+        self.assertIn("serialized-input", ids)
+        self.assertIn("no proof is claimed", plan["chain_match_policy"])
+        self.assertIn("source text", " ".join(plan["rules"]))
+
     def test_no_command_hardcodes_a_tree_root(self):
         """The tree has to work wherever it is checked out.
 
@@ -453,6 +499,372 @@ class ContractTests(unittest.TestCase):
             self.assertGreaterEqual(broad_w, classifier.SIGNAL_FLOOR,
                                     "a matched signal must never be worth nothing")
 
+    def test_abstaining_writes_nothing_to_the_ledger(self):
+        """Silence must reach the controller, or abstaining changes nothing.
+
+        decide.py rule 6 runs a recorded card's probe ahead of the agent's own
+        hypothesis, so grading a card weak only helps if the weak card also stops
+        being recorded. Held out across 24 challenges, the index returns a card
+        from the wrong mechanism family 29% of the time; without this the agent
+        would spend its first probe on one of them instead of planning from
+        source.
+        """
+        source = (ROOT / "tools" / "chain_match.py").read_text(encoding="utf-8")
+        self.assertIn('c.get("status") == "candidate"', source,
+                      "--record must filter weak cards out before writing the ledger")
+        marker = source.index("def record_candidates")
+        body = source[marker:source.index("def main()", marker)]
+        self.assertIn("candidate", body,
+                      "the filter belongs inside record_candidates, where the "
+                      "ledger is actually written")
+
+    def test_the_transfer_harness_does_not_invent_its_own_ground_truth(self):
+        """tools/holdout_eval.py scores retrieval, so it must not grade its own work.
+
+        Two ground truths were tried and discarded while building it. A Jaccard
+        over stack and chain wording called two JWT key-confusion cards unrelated
+        and reported a 4% transfer rate that meant nothing. Shared chain stages
+        were worse than meaningless: recon, primitive, pivot, exfil and cleanup
+        are the schema's fixed stage names, present in every card, so every pair
+        looked related and the harness reported that a peer existed for 100% of
+        challenges. Both numbers were published before inspection caught them.
+
+        What replaced them comes from outside the harness: the class an operator
+        reviewed through classify_solve, widened by the taxonomy's own
+        confusable_with. This guards that it stays that way, because an
+        improvement measured against a ground truth the improver can edit is not
+        a measurement.
+        """
+        source = (ROOT / "tools" / "holdout_eval.py").read_text(encoding="utf-8")
+        for discarded in ("def relatedness", "def vocabulary", "def mechanism_family"):
+            self.assertNotIn(discarded, source,
+                             "%s computed ground truth inside the harness; it must not return"
+                             % discarded)
+
+        # The filing leaked: a retriever that keys on skills/*/field-notes.md then
+        # scores well for agreeing with the labels the metric is defined over. The
+        # winning bake-off approach disclosed exactly that and put its leak-free
+        # number at 0.083 against the 0.208 it reported. Prose may still explain
+        # the history, but no code may read the filing back in.
+        code = "\n".join(line for line in source.splitlines()
+                         if not line.lstrip().startswith("#"))
+        code = re.sub(r'"""(?:.|\n)*?"""', "", code)
+        for leaked in ("field-notes.md", "confusable_with", "bug-classes.json"):
+            self.assertNotIn(leaked, code,
+                             "the harness must not read %r: a retriever keyed on it "
+                             "would be scored against its own labelling" % leaked)
+
+        families = json.loads((ROOT / "test" / "baselines" /
+                               "mechanism_families.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(families["pairs"]), 8,
+                                "too few reviewed pairs to measure transfer at all")
+        chains = {p.stem for p in (ROOT / "knowledge" / "chains").glob("*.json")}
+        for entry in families["pairs"]:
+            self.assertEqual(len(entry["pair"]), 2)
+            self.assertGreaterEqual(entry["votes"], 2,
+                                    "a pair needs two of three annotators")
+            for card in entry["pair"]:
+                self.assertIn(card, chains,
+                              "%s is not a card on disk; a typo here silently drops a "
+                              "pair from the metric" % card)
+
+    def test_the_taxonomy_can_name_what_this_library_already_solved(self):
+        """A class the toolkit cannot name is a class it cannot route to.
+
+        Three annotators described, blind, the move that opens each of the 24
+        handout-backed chains. Feeding those descriptions to classify.py named a
+        class for 20 of 24; two of the misses were signals that never described
+        the shape of the handoff — "one front layer is the whole authorization
+        story and its decision is keyed on a header the client can supply", and
+        "the decoded request body is handed to the driver as the whole query
+        structure". Both are now covered and the measure reads 22 of 24.
+
+        The two that remain are structural and are recorded in the data file:
+        one belongs to a registry skill that is not a bug class, and one names a
+        mechanism the taxonomy has no class for.
+        """
+        data = json.loads((ROOT / "test" / "baselines" /
+                           "mechanism_families.json").read_text(encoding="utf-8"))
+        mechanisms = data.get("opening_mechanisms") or {}
+        self.assertGreaterEqual(len(mechanisms), 20, "too few reviewed mechanisms to measure")
+        named = 0
+        for text in mechanisms.values():
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools" / "classify.py"), "--json", str(text)[:400]],
+                cwd=str(ROOT), capture_output=True, text=True)
+            if json.loads(result.stdout).get("candidates"):
+                named += 1
+        self.assertGreaterEqual(
+            named, 22,
+            "classify.py named only %d of %d mechanisms this library has actually solved; "
+            "a drop here means a signal was narrowed or a class removed" % (named, len(mechanisms)))
+
+    def test_a_solve_is_filed_by_what_opened_the_chain(self):
+        """AGENTS.md section 5 states the rule; this is what makes it reachable.
+
+        classify_card scored the whole card at once — every chain stage, the
+        signals, the stack and the entire solved note — so the exploit narrative
+        decided the filing. Its vocabulary is the loud part (RCE, pickle,
+        template) and it outvoted the quiet sentence that says where the chain
+        actually starts. Measured on the library: a chain opening on "a
+        recursive merge whose destination is an object" was filed under SSRF,
+        one opening on "f-strings inside query construction" under SSTI. The
+        --into docstring already admitted this; the fix is to rank the opening
+        stages on their own first, and fall back to the full text only when they
+        name no class at all.
+        """
+        source = (ROOT / "tools" / "classify_solve.py").read_text(encoding="utf-8")
+        self.assertIn("def opening_text", source)
+        marker = source.index("def classify_card")
+        body = source[marker:source.index("def render_entry", marker)]
+        self.assertIn("opening_text(card)", body,
+                      "classify_card must rank the opening stages before anything else")
+
+        card = {
+            "id": "synthetic", "source_note": "does/not/exist.md",
+            "signals": [], "stack": [],
+            "chain": [
+                {"stage": "recon", "action": "a recursive merge copies request keys into an "
+                                             "object whose prototype is shared"},
+                {"stage": "exfil", "action": "read the flag with a pickle reduce that spawns a "
+                                             "template render and returns remote code execution"},
+            ],
+        }
+        taxonomy = json.loads(TAXONOMY.read_text(encoding="utf-8"))
+        ranked = classify_solve.classify_card(card, taxonomy)
+        self.assertTrue(ranked, "the opener names a mechanism, so something must rank")
+        self.assertEqual(ranked[0]["class"], "web-prototype-pollution",
+                         "the opening merge decides the filing, not the pickle and template "
+                         "vocabulary of the final payload; got %s" % ranked[0]["class"])
+
+    def test_a_barely_matching_chain_card_is_graded_weak(self):
+        """The index must be able to say it does not know.
+
+        tools/holdout_eval.py holds each card out and queries with its own
+        handout, which is then a challenge the library has never seen. Measured
+        over 24: it abstained 0 times and reported a median 0.65 confidence, up
+        to 0.891, on a card that was not the answer — and decide.py rule 6 runs a
+        recorded card's probe ahead of the agent's own hypothesis. The right card
+        matches a median 0.89 of its own signals and a wrong one 0.27, but
+        match_confidence was summed rarity and never saw that difference.
+        """
+        card = {"id": "probe-card", "_path": "synthetic",
+                "signals": ["alpha-marker", "beta-marker", "gamma-marker",
+                            "delta-marker", "epsilon-marker", "zeta-marker"],
+                "stack": [], "chain": [], "preconditions": {},
+                "first_confirming_probe": {"request": "x"}}
+        barely = chain_match.score_card(card, "alpha-marker only", "alpha-marker only")
+        self.assertIsNotNone(barely)
+        self.assertEqual(barely["status"], "weak",
+                         "one of six signals is a coincidence, not a lead")
+        self.assertEqual(barely["suggested_priority"], 10,
+                         "a weak card must not arrive with a high priority")
+
+        text = " ".join(card["signals"][:5])
+        solid = chain_match.score_card(card, text, text)
+        self.assertEqual(solid["status"], "candidate",
+                         "five of six signals present is a real match")
+        self.assertGreater(solid["suggested_priority"], 10)
+
+    def test_registry_unlock_signals_match_the_taxonomy(self):
+        """A stale unlock_signals lets the dispatcher veto the classifier's answer.
+
+        registry.json's unlock_signals are generated from the taxonomy's signals,
+        and skill_select only ranks a skill whose unlock_signals matched. After
+        the taxonomy gained proxy-config signals but the registry was not
+        regenerated, web-parser-differential scored 4.50 in classify.py and was
+        still locked out of dispatch with "no unlock signal observed yet". It
+        looked fine on the real challenge only because that file happens to
+        contain the word haproxy, which the stale pattern already carried.
+        """
+        taxonomy = {c["id"]: c for c in
+                    json.loads(TAXONOMY.read_text(encoding="utf-8"))["classes"]}
+        stale = []
+        for skill in json.loads((ROOT / "skills" / "registry.json")
+                                .read_text(encoding="utf-8"))["skills"]:
+            entry = taxonomy.get(skill["id"])
+            pattern = skill.get("unlock_signals")
+            if entry is None or not pattern:
+                continue
+            for signal in entry.get("source_signals", []) + entry.get("observation_signals", []):
+                if signal not in pattern:
+                    stale.append("%s is missing %r" % (skill["id"], signal[:48]))
+                    break
+        self.assertEqual(stale, [],
+                         "skills/registry.json is behind knowledge/bug-classes.json; "
+                         "re-run python3 build/make_registry.py: %s" % stale[:4])
+
+    def test_source_signals_read_context_not_just_substrings(self):
+        """Three misreadings that sent a real challenge to the wrong skill.
+
+        Measured on CSCV2026/public, whose chain is proxy ACL -> internal route
+        -> multipart parser -> restricted unpickle. classify.py answered
+        file-read-primitives, web-file-upload, web-ssrf, web-ssti: the opener and
+        the sink were both absent and the winner rested on a regex bug.
+
+        (a) `urlopen(` contains `open(`, so an outbound fetch scored as a local
+            file read. (b) web-deserialization knew `pickle.loads` but not a
+            subclassed `Unpickler` with `find_class`, which is the form an author
+            writes when the restriction IS the challenge. (c) every
+            parser-differential signal described the application reading a
+            trusted header, so a proxy config stating the whole boundary matched
+            nothing — a differential needs both parsers, and only one was modelled.
+        """
+        taxonomy = json.loads(TAXONOMY.read_text(encoding="utf-8"))["classes"]
+
+        def classes_for(text):
+            found = set()
+            for entry in taxonomy:
+                for signal in entry.get("source_signals", []):
+                    try:
+                        if re.search(signal, text, re.I | re.M):
+                            found.add(entry["id"])
+                            break
+                    except re.error:
+                        pass
+            return found
+
+        outbound = classes_for("with urlopen(request, timeout=3) as response:")
+        self.assertNotIn("file-read-primitives", outbound,
+                         "urlopen( is an outbound fetch; open( inside it is not a file read")
+        self.assertIn("web-ssrf", outbound)
+
+        self.assertIn("file-read-primitives",
+                      classes_for("with open(os.path.join(BASE, request.args['n'])) as fh:"),
+                      "a genuine request-controlled open() must still be found")
+
+        self.assertIn("web-deserialization",
+                      classes_for("class RestrictedUnpickler(pickle.Unpickler):\n"
+                                  "    def find_class(self, module, name):"),
+                      "a restricted unpickler is the deserialization sink an author writes")
+
+        self.assertIn("web-parser-differential",
+                      classes_for("  acl is_office_path path,url_dec -i -m sub office\n"
+                                  "  http-request deny if is_office_path !network_office\n"
+                                  "  use_backend back1 if is_office_web"),
+                      "the proxy half of a parser differential must be recognisable")
+
+    def test_dispatcher_defers_to_the_classifier(self):
+        """One classifier decides which skill opens, not two that disagree.
+
+        skill_select ranked on its own regex pass over registry unlock_signals,
+        unweighted, ignoring the taxonomy. On CSCV2026/public classify.py put
+        web-parser-differential first at 4.50 while the dispatcher returned
+        web-file-upload — the chain's last entry point instead of the gate that
+        has to be crossed first. AGENTS.md sends the agent to the dispatcher, so
+        the weaker opinion was the one that got acted on.
+        """
+        source = ("acl is_office_path path,url_dec -i -m sub office\n"
+                  "http-request deny if is_office_path !network_office\n"
+                  "use_backend back1 if is_office_web\n"
+                  "f = request.files['file']\n"
+                  "class RestrictedUnpickler(pickle.Unpickler):\n"
+                  "    def find_class(self, module, name): pass\n")
+        registry = skill_select.load_registry()
+        picked = skill_select.select(source, "web", registry, source_mode=True)
+        top = picked.get("depth_candidate")
+        self.assertIsNotNone(top, "a source naming a proxy ACL must unlock some depth skill")
+        self.assertEqual(top["id"], "web-parser-differential",
+                         "the dispatcher must open the chain opener, not the last "
+                         "entry point; got %s" % top["id"])
+        self.assertEqual(top.get("classify_rank"), 0,
+                         "the dispatcher's choice must carry the classifier's rank")
+
+    def test_every_class_is_found_by_its_own_name(self):
+        """Typing the name of a class must return that class.
+
+        classify.py is the first command AGENTS.md tells the agent to run, and
+        `sqli in a login form` returned no candidate at all. Four of fifteen
+        classes did not match their own name — sqli, ssti, xxe, nosqli — while
+        xss, ssrf, csrf and cors did, only because those letters happened to sit
+        inside an unrelated pattern. The taxonomy could recognise the evidence
+        for a class without recognising what the class is called.
+        """
+        taxonomy = json.loads(TAXONOMY.read_text(encoding="utf-8"))["classes"]
+        missing = []
+        for entry in taxonomy:
+            word = entry["id"].split("-", 1)[-1].replace("-", " ")
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "tools" / "classify.py"), "--json", word],
+                cwd=str(ROOT), capture_output=True, text=True)
+            got = [c["class"] for c in (json.loads(result.stdout).get("candidates") or [])]
+            if entry["id"] not in got[:2]:
+                missing.append("%s not found by %r (got %s)" % (entry["id"], word, got[:2]))
+        self.assertEqual(missing, [],
+                         "a class must be reachable by the name a person types: %s" % missing)
+
+    def test_a_writeup_literal_may_not_be_an_ordinary_word(self):
+        """External text may add a signal, but not a signal that matches anything.
+
+        The one reviewed writeup card contributed six literals to SQL injection.
+        Five were distinctive; the sixth was the bare word `PROFILE`, compiled
+        case-insensitively and unanchored. Measured before the fix, the wholly
+        benign observation "a Flask app with a user profile page and an avatar"
+        returned web-sqli as its TOP candidate on that single word — a class
+        this toolkit then treats as verified local experience.
+        """
+        for word in ["PROFILE", "profile", "admin", "SESSION", "token", "user"]:
+            self.assertFalse(classifier.is_distinctive(word),
+                             "%r is an ordinary word and must not become a class signal" % word)
+        for literal in ["extractvalue(", "Duplicate column name", "is_ExclusiveMember",
+                        "$_SESSION=$_POST", "ACCESS?action=browse"]:
+            self.assertTrue(classifier.is_distinctive(literal),
+                            "%r is distinctive evidence and must be kept" % literal)
+        benign = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "classify.py"), "--json",
+             "a Flask app with a user profile page and an avatar"],
+            cwd=str(ROOT), capture_output=True, text=True)
+        classes = [c["class"] for c in
+                   (json.loads(benign.stdout).get("candidates") or [])]
+        self.assertNotIn("web-sqli", classes[:1],
+                         "a profile page alone must not make SQL injection the top "
+                         "candidate; got %s" % classes[:3])
+
+    def test_white_box_scan_excludes_this_toolkit_s_own_files(self):
+        """Evidence about a target may not come from what we wrote about it.
+
+        Measured on CSCV2026 before the fix: three of the top four candidates
+        drew their evidence from `diemthi_exploit.py`, `WRITEUP.md` and
+        `solve/attacks.py`. The top candidate's only evidence was the exploit
+        script from diemthi — the challenge this toolkit LOST — so a failed
+        attempt was being read back as an observation about the target.
+
+        The filter must not overreach: a lockfile naming a real dependency, and
+        a handout file that merely contains the substring (`resolve.py`,
+        `solver_config.json`), are evidence and must be kept.
+        """
+        ours = ["WRITEUP.md", "writeup.md", "solve.py", "solve2.py", "solves.py",
+                "exploit.py", "diemthi_exploit.py", "my_solve.py", "probe.py",
+                "poc.js", "notes.md", "state.json", "anomaly_map.json"]
+        theirs = ["resolve.py", "problem.py", "app.js", "routes.py", "models.py",
+                  "package-lock.json", "solver_config.json", "prober.js",
+                  "notesapp.py", "index.html"]
+        for name in ours:
+            self.assertTrue(classifier.is_self_authored(name),
+                            "%s is written by this toolkit and must not be scanned" % name)
+        for name in theirs:
+            self.assertFalse(classifier.is_self_authored(name),
+                             "%s is handout evidence and must still be scanned" % name)
+
+    def test_taxonomy_matches_the_generator_that_produces_it(self):
+        """A generated artifact must not drift from its generator.
+
+        knowledge/bug-classes.json is written by build/make_bug_classes.py and
+        read by classify.py, skill_audit.py, the registry and the index. It sat
+        one class behind its generator — web-xs-leaks was defined in the
+        generator and absent from the JSON — which orphaned that skill, tripped
+        the capability floor, and read as a deliberate deletion rather than a
+        missed regenerate. Only the generator is the source of truth.
+        """
+        generator = (ROOT / "build" / "make_bug_classes.py").read_text(encoding="utf-8")
+        declared = set(re.findall(r'"id":\s*"([a-z0-9-]+)"', generator))
+        built = {c["id"] for c in json.loads(TAXONOMY.read_text(encoding="utf-8"))["classes"]}
+        missing = sorted(declared - built)
+        self.assertEqual(missing, [],
+                         "build/make_bug_classes.py defines these classes but "
+                         "knowledge/bug-classes.json does not carry them; re-run "
+                         "python3 build/make_bug_classes.py: %s" % missing)
+
     def test_every_state_key_the_controller_reads_has_a_writer(self):
         """A controller rule that reads a key nothing writes is a dead rule.
 
@@ -469,8 +881,12 @@ class ContractTests(unittest.TestCase):
         writers = "\n".join(p.read_text(encoding="utf-8")
                             for p in sorted((ROOT / "tools").glob("*.py"))
                             if p.name != "decide.py")
+        # Look for an assignment INTO a state dict, not for the name anywhere.
+        # A bare name check passed `classes_considered` because classify.py
+        # printed it as a count in its own stdout while never writing it to the
+        # ledger, so the third dead rule survived the first version of this test.
         dead = [key for key in sorted(read_keys)
-                if ('"%s"' % key) not in writers]
+                if not re.search(r'\[\s*"%s"\s*\]\s*=' % re.escape(key), writers)]
         self.assertEqual(dead, [],
                          "tools/decide.py branches on state keys no tool writes, so "
                          "those rules can never fire outside a test fixture: %s" % dead)
@@ -1105,11 +1521,16 @@ class CapabilityTests(unittest.TestCase):
     def test_the_gate_script_checks_every_required_step(self):
         """Every REQUIRED step in run_all.sh must set the failure flag."""
         script = read("test/run_all.sh")
-        required = re.findall(r'^hr "REQUIRED:[^"]*"\n(.*)$', script, re.M)
+        # Check the whole step, not the first line of it. A step may open with a
+        # comment or run a loop over several selftests, and the single-line form
+        # read the comment and reported the step as unchecked.
+        steps = re.split(r'^hr "', script, flags=re.M)[1:]
+        required = [s for s in steps if s.startswith("REQUIRED:")]
         self.assertTrue(required, "run_all.sh declares no required steps")
-        for command in required:
-            self.assertIn("fail=1", command,
-                          "a REQUIRED step in run_all.sh ignores its exit status: %s" % command)
+        for step in required:
+            title = step.split('"', 1)[0]
+            self.assertIn("fail=1", step,
+                          "a REQUIRED step in run_all.sh ignores its exit status: %s" % title)
 
     def test_system_evaluation_is_wired_into_the_gate(self):
         script = read("test/run_all.sh")
@@ -1262,6 +1683,34 @@ class OrchestratorTests(unittest.TestCase):
         decision = decide_mod.decide("hopper", now=start + 60 * len(probes))
         self.assertEqual(decision["action"], "stop_report")
         self.assertIn("challenge budget exhausted", decision["rationale"])
+
+    def test_a_novel_white_box_challenge_plans_its_layers_first(self):
+        """The case this system was worst at: source, but no chain that fits.
+
+        Rule 6 reuses a solved chain and rule 7a says "classify, then probe".
+        Between them the agent fell through to one classifier answer and opened
+        one depth skill, which on a layered challenge is the last entry point
+        rather than the gate in front of it — CSCV2026 routed to file upload
+        while the chain opened at a proxy ACL.
+        """
+        self.write_state("novel", {
+            "category": "web", "source": "challenges/novel/handout",
+            "hypotheses": [], "probes": []})
+        decision = decide_mod.decide("novel")
+        self.assertEqual(decision["action"], "novel_plan")
+        self.assertTrue(any("novel_plan.py" in c for c in decision["commands"]),
+                        "the controller must name the planner it is asking for")
+
+    def test_a_matching_chain_still_outranks_the_novel_planner(self):
+        """Reuse before novelty. Planning is the fallback, never the default."""
+        self.write_state("both", {
+            "category": "web", "source": "challenges/both/handout",
+            "hypotheses": [], "probes": [],
+            "chain_candidates": [{"id": "card-1",
+                                  "first_confirming_probe": "the card probe"}]})
+        decision = decide_mod.decide("both")
+        self.assertEqual(decision["action"], "run_probe")
+        self.assertEqual(decision["next_probe"]["chain_card"], "card-1")
 
     def test_decide_prefers_an_unprobed_chain_card(self):
         self.write_state("t4", {
@@ -1525,6 +1974,57 @@ class KnowledgeScaleTests(unittest.TestCase):
                          "a skill tagged bug-class is missing from "
                          "knowledge/bug-classes.json, so classify.py cannot route "
                          "to it: %s" % orphans)
+
+    def test_every_retrieval_alias_re_proves_itself(self):
+        """An alias file is a place to smuggle in a wrong pairing, so re-measure.
+
+        chain_match_eval pairs a card to its handout by name. An alias overrides
+        that pairing by hand, which is exactly the kind of edit that can move
+        top1_rate without anyone auditing why -- so every alias must still hold:
+        the directory has to exist, hold real source, and the named card has to
+        rank FIRST on it. A stale or invented alias fails here rather than
+        quietly flattering the metric.
+        """
+        path = ROOT / "test" / "baselines" / "chain_match_aliases.json"
+        if not path.exists():
+            self.skipTest("no alias file; the eval falls back to name matching")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        aliases = payload.get("aliases") or {}
+        self.assertTrue(payload.get("_why"), "the alias file must say why it exists")
+        sys.path.insert(0, str(ROOT / "tools"))
+        import chain_match
+        import chain_match_eval as ev
+
+        cards = [c for c in chain_match.load_chains(chain_match.CHAINS)
+                 if "_error" not in c]
+        by_id = {c["id"]: c for c in cards}
+        stats = chain_match.load_signal_stats()
+        seen_dirs = {}
+        for name, entry in aliases.items():
+            directory, card_id = entry.get("directory"), entry.get("card")
+            self.assertTrue(directory and card_id,
+                            "alias %r must name both a directory and a card" % name)
+            self.assertNotIn(directory, seen_dirs,
+                             "directory %r is claimed by two aliases (%s and %s); "
+                             "one of them is wrong" % (directory,
+                                                      seen_dirs.get(directory), name))
+            seen_dirs[directory] = name
+            src = ROOT / "challenges" / directory
+            self.assertTrue(src.is_dir(),
+                            "alias %r points at a missing directory %r" % (name, directory))
+            self.assertIn(card_id, by_id,
+                          "alias %r names a card that no longer exists: %s" % (name, card_id))
+            text = chain_match.read_source(str(src))
+            self.assertTrue(text.strip(),
+                            "alias %r points at a directory with no readable "
+                            "source, so the pairing cannot have been measured" % name)
+            ranked = ev.rank_cards(cards, text, None, stats)
+            self.assertTrue(ranked, "nothing ranked on %r at all" % directory)
+            self.assertEqual(
+                ranked[0]["id"], card_id,
+                "alias %r claims %s for %r, but %s ranks first there -- the alias "
+                "is stale or wrong, and it is moving top1_rate" % (
+                    name, card_id, directory, ranked[0]["id"]))
 
     def test_chain_match_retrieval_does_not_regress(self):
         baseline_path = ROOT / "test" / "baselines" / "chain_match.json"

@@ -43,8 +43,52 @@ def load_chain(chain_id):
     return card
 
 
+OPENING_STAGES = ("recon", "primitive")
+
+
+def opening_text(card):
+    """The move that gets purchase, not the one that gets the flag.
+
+    AGENTS.md section 5: "a note belongs to the class whose first probe opens
+    the chain, not the class of the final payload." This function is what makes
+    that rule reachable; the docstring of --into already admitted the old
+    behaviour broke it.
+    """
+    steps = card.get("chain", [])
+    opening = [s.get("action", "") for s in steps if s.get("stage") in OPENING_STAGES]
+    if not opening and steps:
+        opening = [steps[0].get("action", "")]
+    return "\n".join(opening)
+
+
+def _rank_text(text, classes):
+    hits = classifier.scan_text(text, classifier.compile_signals(classes, "observation_signals"),
+                               limit_per_class=8)
+    for class_id, evidence in classifier.scan_text(
+            text, classifier.compile_signals(classes, "source_signals"), limit_per_class=8).items():
+        hits.setdefault(class_id, []).extend(evidence)
+    return classifier.rank(hits, classes, classifier.load_signal_stats())
+
+
 def classify_card(card, taxonomy):
-    """Classify from the card's own signals and its solved note, nothing else."""
+    """Classify from the card's own signals and its solved note, nothing else.
+
+    The opening stages are ranked first and on their own. Scoring the whole card
+    at once lets the final payload decide: a chain that opens on "a recursive
+    merge whose destination is an object" filed as SSRF, one opening on "bcrypt
+    hashes only the first 72 bytes" filed as request smuggling, one opening on
+    "f-strings inside query construction" filed as SSTI. The exploit narrative
+    carries the loud vocabulary — RCE, pickle, template — and outvoted the quiet
+    sentence that actually says where the chain starts.
+
+    The full text is still ranked, and is used when the opening stages name no
+    class at all, so a card whose opener is written vaguely still gets filed.
+    """
+    classes = taxonomy["classes"]
+    opening = _rank_text(opening_text(card), classes)
+    if opening:
+        return opening
+
     parts = list(card.get("signals", [])) + list(card.get("stack", []))
     for step in card.get("chain", []):
         parts.append(step.get("action", ""))
@@ -52,14 +96,7 @@ def classify_card(card, taxonomy):
     if os.path.isfile(note_path):
         with open(note_path, encoding="utf-8", errors="replace") as handle:
             parts.append(handle.read())
-    text = "\n".join(parts)
-    classes = taxonomy["classes"]
-    hits = classifier.scan_text(text, classifier.compile_signals(classes, "observation_signals"),
-                               limit_per_class=8)
-    for class_id, evidence in classifier.scan_text(
-            text, classifier.compile_signals(classes, "source_signals"), limit_per_class=8).items():
-        hits.setdefault(class_id, []).extend(evidence)
-    return classifier.rank(hits, classes)
+    return _rank_text("\n".join(parts), classes)
 
 
 def render_entry(card, primary, others):
@@ -208,6 +245,81 @@ def cmd_review(taxonomy):
     return 0
 
 
+GENERATOR = os.path.join(ROOT, "build", "make_bug_classes.py")
+LIVE_STATUSES = ("verified_live", "verified_artifact")
+
+
+def cmd_promote(class_id, chain_id, taxonomy):
+    """Raise a class from catalogue to verified, against the card that proves it.
+
+    CLAUDE.md lists hand-editing bug-classes.json as a trap: "the label rises
+    only through a chain card and classify_solve, never by editing". There was
+    no such path in classify_solve, so the only way to promote was the forbidden
+    one, and nobody took it — web-xxe and web-logic-flaw each hold a
+    verified_live chain card in their own field notes while still telling the
+    agent "this toolkit has never solved one", which AGENTS.md then instructs it
+    to weight down. This is the missing path. It refuses unless the evidence is
+    on disk, and it edits the generator rather than its output.
+    """
+    entry = next((c for c in taxonomy["classes"] if c["id"] == class_id), None)
+    if entry is None:
+        raise SystemExit(json.dumps({"error": "unknown class", "class": class_id}))
+    if entry["evidence_level"] != "catalogue":
+        raise SystemExit(json.dumps({"skipped": "already %s" % entry["evidence_level"],
+                                     "class": class_id,
+                                     "verified_by": entry.get("verified_by", [])}))
+    card_path = os.path.join(ROOT, "knowledge", "chains", chain_id + ".json")
+    if not os.path.isfile(card_path):
+        raise SystemExit(json.dumps({"error": "no such chain card", "chain": chain_id}))
+    with open(card_path, encoding="utf-8") as handle:
+        card = json.load(handle)
+    status = (card.get("verification") or {}).get("status")
+    if status not in LIVE_STATUSES:
+        raise SystemExit(json.dumps({
+            "error": "chain card is not verified against a live response or artifact",
+            "chain": chain_id, "status": status, "accepted": list(LIVE_STATUSES)}))
+    notes = notes_path(class_id, taxonomy)
+    cites = os.path.isfile(notes) and chain_id in open(notes, encoding="utf-8").read()
+    if not cites:
+        raise SystemExit(json.dumps({
+            "error": "the class's field notes do not cite this card, so the card is "
+                     "not local experience for this class",
+            "class": class_id, "chain": chain_id,
+            "fix": "python3 tools/classify_solve.py --chain %s --into %s" % (chain_id, class_id)}))
+
+    source = open(GENERATOR, encoding="utf-8").read()
+    needle = '"id": "%s"' % class_id
+    if needle not in source:
+        raise SystemExit(json.dumps({"error": "class not defined in the generator",
+                                     "class": class_id, "generator": "build/make_bug_classes.py"}))
+    old = '"evidence_level": "catalogue", "verified_by": [],'
+    start = source.index(needle)
+    end = source.find('"id": "', start + len(needle))
+    block = source[start:end if end != -1 else len(source)]
+    if old not in block:
+        raise SystemExit(json.dumps({"error": "generator block is not in the expected "
+                                              "catalogue shape; promote by hand and say why",
+                                     "class": class_id}))
+    new = ('"evidence_level": "verified",\n'
+           '        "verified_by": ["%s"],' % chain_id)
+    source = source[:start] + block.replace(old, new, 1) + source[start + len(block):]
+    with open(GENERATOR, "w", encoding="utf-8") as handle:
+        handle.write(source)
+    print(json.dumps({
+        "promoted": class_id, "verified_by": chain_id,
+        "evidence": {"card": os.path.relpath(card_path, ROOT), "status": status,
+                     "cited_in": os.path.relpath(notes, ROOT)},
+        "edited": "build/make_bug_classes.py",
+        "next": ["python3 build/make_bug_classes.py",
+                 "python3 build/make_class_skills.py",
+                 "python3 build/make_registry.py",
+                 "python3 build/make_index.py",
+                 "python3 tools/skill_audit.py --apply",
+                 "bash test/run_all.sh"],
+    }, indent=2))
+    return 0
+
+
 def cmd_confirm(class_id, anchor, taxonomy):
     """Promote one entry to confirmed.
 
@@ -262,12 +374,18 @@ def main():
     group.add_argument("--review", action="store_true", help="list entries awaiting review")
     group.add_argument("--confirm", nargs=2, metavar=("CLASS", "ANCHOR"),
                        help="promote one entry to confirmed")
+    group.add_argument("--promote", nargs=2, metavar=("CLASS", "CHAIN_ID"),
+                       help="raise a catalogue class to verified against a chain card "
+                            "that proves it; refuses unless the card is verified_live "
+                            "and cited in that class's field notes")
     parser.add_argument("--into", help="force the target class instead of the top candidate")
     parser.add_argument("--dry-run", action="store_true", help="print the entry, write nothing")
     args = parser.parse_args()
     taxonomy = classifier.load_taxonomy(TAXONOMY)
     if args.review:
         return cmd_review(taxonomy)
+    if args.promote:
+        return cmd_promote(args.promote[0], args.promote[1], taxonomy)
     if args.confirm:
         return cmd_confirm(args.confirm[0], args.confirm[1], taxonomy)
     return cmd_record(args, taxonomy)

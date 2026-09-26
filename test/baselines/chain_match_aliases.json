@@ -1,0 +1,24 @@
+{
+  "_why": "chain_match_eval pairs a card with its handout by normalising the challenge NAME to a directory name. A card whose name is not the directory name is unmeasurable, which understates retrieval quality. Fuzzy matching would fix that by guessing, and a wrong pairing silently inflates or deflates top1 -- so every alias here is stated explicitly and carries the measurement that proved it.",
+  "_rules": [
+    "An alias is added only after the card's own signals are checked against that directory's source, and the card is verified to rank first there.",
+    "Record how many of the card's signals were found, and name the specific ones that are too distinctive to be a coincidence.",
+    "One directory may be claimed by at most one card; a second claimant is an ambiguous source and the eval must skip it, not pick a winner."
+  ],
+  "aliases": {
+    "Proxy": {
+      "directory": "HTB Proxy",
+      "card": "htb-proxy-smuggling-exec-stderr-oracle",
+      "verified_on": "2026-09-25",
+      "signals_present": "10 of 11",
+      "distinctive_matches": ["flushInterface", "ip-wrapper", "nip.io", "net.Dial"],
+      "absent": ["X-Powered-By: Express"],
+      "rank_on_that_source": 1,
+      "note": "the directory carries the event prefix that the card's name omits"
+    }
+  },
+  "handouts_with_no_chain_card": {
+    "_why": "measured 2026-09-25: these directories hold real handout source but no card claims them, so they are a SOLVING backlog, not a retrieval gap. Listing them keeps the two from being confused when top1_rate is read.",
+    "directories": ["OOPArtDB", "SocratesPanel"]
+  }
+}

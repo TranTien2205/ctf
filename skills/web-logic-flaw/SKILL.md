@@ -2,7 +2,7 @@
 name: web-logic-flaw
 description: >
   Action-oriented depth skill for Business logic / mass assignment. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-idor, web-race-condition.
-  Catalogue class: nothing in this toolkit has solved one yet.
+  Verified here by 1 chain card(s).
 tags: [web, logic-flaw, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
@@ -11,13 +11,16 @@ budget:
   stop_conditions:
     - "same probe point: 3 attempts with no new signal"
     - "the class falsifier is observed"
-evidence_level: catalogue
+evidence_level: verified
 ---
 # Business logic / mass assignment
 
-**Catalogue class.** This toolkit has never solved one. What follows is
-standard published knowledge, not local experience — treat it as a starting
-point and record what actually happens in `field-notes.md`.
+**Verified here.** Chains that prove this class:
+
+- `knowledge/chains/pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite.json`
+
+Run `python3 tools/chain_match.py` before this skill: a matching
+chain gives you the exact confirming probe that already worked.
 
 ## First probe
 
@@ -63,7 +66,7 @@ Shares signals with: `../web-idor/`, `../web-race-condition/`. Check those befor
 
 Depth, one named file at a time:
 
-- `../ctf-web/auth-and-access.md`
+- `skills/ctf-web/auth-and-access.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

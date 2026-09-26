@@ -70,7 +70,8 @@
       "what_was_measured": "rendered with recipe html: every $ref (__proto__, constructor, toString, valueOf, hasOwnProperty, toLocaleString, a missing id) printed [object Object]. recurse only descends into a node that has $id, and resolution is ONE hop, so Function is unreachable and escapeExpression's toHTML path returns non-strings.",
       "why_unreachable": "one hop only",
       "on_instance": "stock",
-      "precondition_that_would_reopen": "a second hop, or any function-valued property reachable from data"
+      "precondition_that_would_reopen": "a second hop, or any function-valued property reachable from data",
+      "correction_2026_09_25": "the note said \"Function is unreachable\". Re-measured against the container's own resolveReferences: a Function DOES reach data -- {$ref:'constructor'} resolves to [Function: Object] and {$ref:'toString'} to [Function: toString]. What fails is the RENDER, not the resolution: handlebars invokes a function-valued property and prints its return value, so Object() yields {} and prints [object Object], which is exactly the evidence originally recorded. The precondition to reopen is therefore narrower than written: not \"any function-valued property reachable from data\" (that is already true) but a template on disk that renders such a value in a PATH position ({{x.y}}) or hands it to a helper, so the call result is not what gets printed."
     },
     {
       "layer": "SQL injection / IDOR on the data layer",
@@ -87,16 +88,27 @@
       "why_unreachable": "serve-static normalises and rejects",
       "on_instance": "stock",
       "precondition_that_would_reopen": "an older express"
-    }
-  ],
-  "still_open": [
+    },
     {
-      "lead": "$values reference envelope -- the sibling shape the author blocked ANYWHERE in the tree (index.js:143 containsArrayReferenceEnvelope). By the blocked-sibling rule the author tested it and it worked. resolveReferences.js:39 gives it a different recursion path: obj = obj.$values.map(recurse), and Array.prototype.map calls recurse(element, index, array), so prop becomes a NUMBER and parent an ARRAY where every other path passes a key name and an object; the plain-array branch additionally passes the OUTER prop down.",
-      "falsifier": "send {\"$id\":\"r\",\"$values\":[...]} straight to a LOCAL jsreport /api/report, bypassing the app check, and diff what resolveReferences produces against the object path. If data merely becomes an Array that request.js already handles (Object.assign(Array.isArray(dataInput) ? [] : {}, ...)), the lead is dead.",
-      "cost_minutes": 15,
-      "status": "registered, not run"
+      "layer": "$values array-reference envelope (the sibling the app blocks anywhere in the tree)",
+      "mechanism": "resolveReferences.js:39-40 `if ('$values' in obj) obj = obj.$values.map(recurse)` -- Array.prototype.map passes (element, index, array), so prop becomes a NUMBER and parent an ARRAY, unlike every other path which passes a key name and an object.",
+      "what_was_measured": "ran the container's own /app/node_modules/jsreport-core/lib/render/resolveReferences.js on 10 payloads as a read-only oracle. The $values path and the plain-object path produce the SAME primitive in every pair: $ref to constructor gives [Function: Object] both ways, $ref to __proto__ gives Object.prototype both ways, an unresolved $ref gives undefined both ways. The only difference is that the container becomes an Array instead of an object. Then engineScript.js:35-38 writes exactly three fixed properties onto inputs.data (__appDirectory, __rootDirectory, __parentModuleDirectory), and resolveReferences is called ONLY there (engineScript.js:35 is its single call site in jsreport-core), never on the whole request -- so the request's own template key is out of reach.",
+      "why_unreachable": "$values grants no primitive the unblocked $ref object path does not already grant; the array-ness reaches only three fixed writes",
+      "on_instance": "stock, local rebuild",
+      "precondition_that_would_reopen": "a jsreport version whose code after engineScript.js:35 iterates or spreads inputs.data in a way that distinguishes an Array from an object",
+      "falsifier_outcome": "the lead's own stated kill condition was met: data merely becomes an Array",
+      "cost_minutes_actual": 15
+    },
+    {
+      "layer": "{#child} applyParameters prototype pollution -- the store gate, pinned to line numbers",
+      "mechanism": "jsreport-child-templates/lib/childTemplates.js: convert() resolves the child from the store first (resolveEntityFromPath, then a find by name), and if nothing is found it logs \"was not found, skipping\" and RETURNS NULL before applyParameters is ever called.",
+      "what_was_measured": "read the container's own copy: the store lookup and the `if (!template) return null` guard sit at lines 123-153, applyParameters is called at line 159. Store contents measured directly: /app/data holds only `settings` -- no templates directory and no template entity at all, after 20 hours of uptime, so jsreport-sample-template does not auto-create one in this configuration.",
+      "why_unreachable": "an empty store short-circuits before the pollution sink; the sink is real but unreachable",
+      "on_instance": "stock, local rebuild",
+      "precondition_that_would_reopen": "exactly one template entity in the jsreport store. The full chain after that point was already walked end to end and is recorded on the ledger hypothesis marked SOLVED LOCALLY, whose stated precondition is this same one."
     }
   ],
+  "still_open": [],
   "anomaly_map": "challenges/diemthi/anomaly_map.json",
-  "honest_conclusion": "Unsolved. Under the stock handout every route to the HMAC key was closed by measurement, and the one working chain needs a store entity the deploy does not create. Two things were never established: whether the deployed instance matches the local rebuild, and what $values buys. The unreachability was proven against a LOCAL REBUILD, not against the real instance."
+  "honest_conclusion": "Unsolved. Under the stock handout every route to the HMAC key was closed by measurement, and the one working chain needs a store entity the deploy does not create. Two things were never established: whether the deployed instance matches the local rebuild, and what $values buys. The unreachability was proven against a LOCAL REBUILD, not against the real instance. Updated 2026-09-25: the last open lead ($values) was run and is dead, so no mechanism layer remains untried on a stock instance. The chain to the flag is complete and was walked locally, but it hangs on one precondition that the handout Dockerfile deliberately denies -- a single template in the jsreport store. Whether the real instance ships an empty store is the one fact that cannot be measured from here."
 }

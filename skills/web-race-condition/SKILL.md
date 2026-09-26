@@ -69,7 +69,7 @@ Shares signals with: `../web-logic-flaw/`. Check those before committing to this
 
 Depth, one named file at a time:
 
-- `../ctf-web/server-side-deser.md`
+- `skills/web-race-condition/references/README.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

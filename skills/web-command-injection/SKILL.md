@@ -71,8 +71,8 @@ Shares signals with: `../web-ssti/`. Check those before committing to this one.
 
 Depth, one named file at a time:
 
-- `../ctf-web/server-side-exec.md`
-- `../ctf-web/server-side-2.md`
+- `skills/ctf-web/server-side-exec.md`
+- `skills/ctf-web/server-side-2.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

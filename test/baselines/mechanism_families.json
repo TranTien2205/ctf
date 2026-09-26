@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "purpose": "Ground truth for tools/holdout_eval.py: which solved chains share a MECHANISM FAMILY, meaning the move that OPENS one would be a live hypothesis on the other.",
+  "why_not_the_filing": "The metric previously read the card->class filing in skills/*/field-notes.md, widened by confusable_with. Two problems. First the filing is wrong for several cards, because classify_card scored the whole card at once and the exploit narrative outvoted the opener: a chain opening on a recursive merge into an object was filed under SSRF, one opening on bcrypt truncation under request smuggling. Second, and worse, a retrieval approach that keys on that same filing then scores well for agreeing with the labels the metric is defined over. The winning approach in the 2026-09-26 bake-off disclosed exactly that leak itself and said its leak-free number was 0.083, not the 0.208 it reported.",
+  "method": "Three annotators labelled the 24 handout-backed cards independently and blind: they read only knowledge/chains/*.json and were forbidden from opening skills/*/field-notes.md or using bug-class names. 33 distinct pairs were proposed; a pair is recorded here only when at least two of the three agreed. Ten of the eleven were unanimous.",
+  "what_was_refused": [
+    "cards that merely END the same way. Four chains finish holding a forged session token from four unrelated openings; pairing them would reward a retriever for matching endings.",
+    "cards sharing a late sub-mechanism. An unsanitised filename joined onto a directory appears in four chains but is the OPENING of only two.",
+    "percetron with novacore, although their preconditions read alike: percetron's card records path-shape bypasses as measured dead, so returning novacore there would propose the one thing that challenge already ruled out."
+  ],
+  "asymmetry_note": "The race group is deliberately non-transitive: apexsurvive and ssos each pair with phantomfeed but not with each other, because phantomfeed genuinely carries both race shapes while the other two do not. Do not close this into a clique.",
+  "annotated_on": "2026-09-26",
+  "pairs": [
+    {
+      "pair": [
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce",
+        "htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce",
+        "htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec",
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-notebook-converter-pro-embed-images-read-fileswriter-write-rce",
+        "htb-resizer-filename-traversal-olefile-so-import"
+      ],
+      "votes": 2
+    },
+    {
+      "pair": [
+        "htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge",
+        "htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip",
+        "htb-proxy-smuggling-exec-stderr-oracle"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-quickblog-codefence-xss-registration-oracle-pickle-session",
+        "htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-quickblog-codefence-xss-registration-oracle-pickle-session",
+        "htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim",
+        "htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce"
+      ],
+      "votes": 3
+    },
+    {
+      "pair": [
+        "htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce",
+        "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "votes": 3
+    }
+  ],
+  "opening_mechanisms": {
+    "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce": "A state-changing sequence is not atomic: \"race the profile update so an interleaved commit lands between the update and the token re-read\" — \"the token is fetched after the profile is committed, in a different function\". The opening purchase is concurrency, not the XSS that follows.",
+    "htb-artificial-university-grpc-attribute-pollution-eval": "Untrusted structure reaches an object merge: \"look for a recursive merge whose destination is an object rather than a dict, and then grep the same class for eval/exec/system reading an attribute that merge could create\" — attacker keys land in __dict__ of a long-lived service object and a sibling method feeds one of them to eval.",
+    "htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti": "A query filter is built by string formatting despite an ORM: \"grep for text(), execute() and format/f-strings inside query construction\" — filter(text(\"col='{}'\".format(x))) is plain concatenation, so a tautology reads whatever columns the view renders.",
+    "htb-bonechewercon-jku-forge-csp-injection-nginx-crlf-cookie-plant": "A destination allowlist is enforced by string surgery instead of by the parser that will actually fetch: \"compare the validator's host extraction with the HTTP client's: here domain=netloc.split('@')[1] vs requests' urlsplit().hostname=rpartition('@')[2]; abuse the disagreement with https://abc@localhost@ATTACKER/jwks.json\" — the token names its own key source and the check that should confine it reads the URL differently.",
+    "htb-bonechewercon-method-not-allowed-whoops-env-disclosure": "Make the application throw where it has no handler and read what the error path prints: \"submit the form exactly as declared, even if the route looks unlikely to accept that method\", then \"enumerate the labelled detail sections of the error page\" — the environment table is the configuration file verbatim.",
+    "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce": "The cache key does not capture what decides the response: \"the cache key is the URI plus the extension, so an authenticated page can be stored under a static-looking URL\" — confirmed by requesting /path.html?cb=N twice for MISS then HIT and reading it back anonymously, because the backend treats the dot as a format delimiter and ignores what the proxy keyed on.",
+    "htb-imagetok-bcrypt-truncation-phar-soapclient-gopher-mysql": "The signature does not cover all of the signed data: \"bcrypt hashes only the first 72 bytes of its input, so with a 15-byte secret everything past json[57] is unauthenticated\" — pad the leading field until the target field starts past the boundary, rewrite it and reuse the original signature verbatim.",
+    "htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec": "One front layer is the whole authorization story and its decision is keyed on a header the client can supply: \"send the framework's internal-subrequest header on a protected route and compare against the same route without it\" — found by reading the pinned version against its published bypass advisory, after which no route re-checks auth.",
+    "htb-nomad-notes-replace-pattern-nonce-reuse-referrer-exfil": "The renderer's own substitution semantics are the bug: \"if substitution is done with String.replace(pattern, value) then the $ replacement patterns are live - $-backtick expands to the text before the match\", so checking the substitution order against key order lets a user field copy the nonce that was substituted earlier on the same line.",
+    "htb-notebook-converter-pro-embed-images-read-fileswriter-write-rce": "An attacker-supplied path inside an uploaded document reaches the filesystem unconfined: \"upload a notebook whose markdown cell references a local path as an image and convert to html\" — embed_images inlines the referenced file as base64 in the response; the same pipeline later writes wherever an unsanitised attachment key points.",
+    "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce": "The app trusts a header the proxy is expected to set, and the client decides whether it survives: \"list the proxy-added header in the Connection header so the proxy strips its own header before forwarding\" — \"the application treats a request with no proxy header as local and skips the token check\".",
+    "htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge": "The cache key omits what the response depends on: \"read the cache configuration before the application. Write down exactly what the hash function feeds in\" — a hash that omits the URL and keys on a client-controlled header means one cacheable response answers every path, and a branch returning hash for a cookie-bearing path marks the page to share.",
+    "htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-rce": "The front proxy stops parsing and starts relaying raw bytes, so a second request never meets the gate: \"point the status-mirroring route at an attacker server that answers a bare 101 Switching Protocols\" then \"write the second request onto the same socket immediately, addressed to the denied path\" — path-shape bypasses were measured dead first.",
+    "htb-phantomfeed-redos-verification-race-nuxt-open-redirect-oauth-token-xss-reportlab": "A create-then-disable sequence is not atomic, and the slow step in between is attacker-controlled: \"read the registration order and check whether the row is written before the flag that disables it\", then widen the window with a validator whose cost is exponential in input length and fire the logins concurrently.",
+    "htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read": "The cache key is a subset of the request: \"read the proxy's cache key before anything else and note every request attribute it leaves out\", then \"repeat that argument; the proxy keys on the first value while the backend sees a list that fails its allow-list and is reflected into the error path\" — the victim's own request returns the stored payload.",
+    "htb-proxy-smuggling-exec-stderr-oracle": "Two openings, both about a hand-written gate that inspects something other than what it forwards: \"blacklistCheck tests for the substrings localhost, 0.0.0.0, 127. ... a string test over the raw bytes, not a parse of the destination address\" (beaten by 0af405cf.nip.io), and \"bodySplit := strings.Split(raw, \\\"\\\\r\\\\n\\\\r\\\\n\\\") and then validates only bodySplit[1]\" while the proxy writes the whole original buffer upstream.",
+    "htb-quickblog-codefence-xss-registration-oracle-pickle-session": "The client-side renderer's escaping decides the sink: \"read the client-side renderer, not the server template, and write down exactly which characters it escapes. If '<' is escaped but '>' is not, the sink is an attribute rather than a tag\" — so the payload must be a self-firing attribute (autofocus plus onfocus), fired by the privileged browser that visits the page.",
+    "htb-resizer-filename-traversal-olefile-so-import": "The supplied filename is the filesystem path: \"upload once, upload the same name again, and upload a path-equivalent form such as ./name. A duplicate-file rejection on the equivalent form proves the raw filename is used and the check is path-based\" — the write lands wherever the name points, and the rejection doubles as a file-existence oracle.",
+    "htb-sos-or-sso-vue-vbind-onerror-xss-support-bot-oidc-repoint-role-claim": "A front-end framework hands attacker-chosen attributes to the DOM: \"when a framework renders stored content through a dynamic component that binds an attribute object, test an on-handler attribute\" — Vue refuses to set an /^on[a-z]/ key as a property when the value is a string, so it becomes a real inline handler in the reviewer bot's session.",
+    "htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce": "The server builds an outbound connection out of an untrusted string: \"GET /assets/127.0.0.1:80/ and confirm the app's own page comes back\" proves proxy_pass http://$1 is a full SSRF, and because nginx accepts unix:<path>:<uri> and percent-decodes the URI, the decoded bytes become literal protocol tokens for the internal line-protocol service.",
+    "htb-ssos-oauth-registration-race-cookie-swap-json-csrf": "Win the registration ordering on an identifier the application will later claim itself: \"win a registration race on a fixed account (e.g. student@domain) by hammering POST /api/register with your own password before the bot's startup sequence reaches its own registerUser for the same account\" — owning it makes the bot's own login fail and leaves the shared token on your account.",
+    "htb-unearthly-shop-aggregation-pipeline-injection-autoload-primer-monolog-rce": "The decoded request body is handed to the driver as the whole query structure: \"check whether the database helper calls an aggregation rather than a find, and whether the request body reaches it whole\" — \"a controlled pipeline is strictly more than a controlled filter: it reads other collections and, through its write stages, modifies them\".",
+    "htb-weather-app-ssrf-crlf-request-smuggling-upsert": "A request field is interpolated into a fetched URL without encoding: \"place unicode characters that the URL parser folds into space, carriage return and line feed inside the interpolated field\", then \"append a full registration request to the loopback origin with an exact content length\" — the backend issues the request, so the loopback-only restriction is satisfied.",
+    "htb-why-lambda-complaint-vhtml-xss-bot-keras-lambda-h5-upload-rce": "The rendering directive, not the template text, is the sink: \"find where the privileged browser renders attacker input, and check the rendering directive rather than the template text\" — an interpolation passed to an HTML-rendering directive executes only an event handler, not a script tag, and the injected script then runs same-origin as the bot."
+  },
+  "coverage_note": "classify.py is expected to name a class for each opening_mechanism below. Two do not, and both are structural rather than missing signals: bonechewercon-method-not-allowed opens on reading an unhandled error page, which belongs to web-info-disclosure — a registry skill that is not a bug class, so classify.py can never return it; and imagetok opens on \"the signature does not cover all of the signed data\" (bcrypt truncating at 72 bytes), a mechanism the taxonomy has no class for at all. Coverage measured 2026-09-26: 22 of 24."
+}

@@ -3,5 +3,21 @@
     "allow": [
       "Bash(ssh:*)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // .tool_response.filePath // empty'); case \"$f\" in */.claude/worktrees/*) exit 0 ;; */tools/*|*/skills/*|*/knowledge/*|*/test/*) ;; *) exit 0 ;; esac; r=$(git -C \"$(dirname \"$f\")\" rev-parse --show-toplevel 2>/dev/null) || exit 0; [ -n \"$r\" ] && [ -f \"$r/test/run_all.sh\" ] || exit 0; cd \"$r\" || exit 0; L=/tmp/claude-ctf-gate.$$.log; if bash test/run_all.sh >\"$L\" 2>&1; then rm -f \"$L\"; exit 0; fi; printf '{\"systemMessage\":\"ctf-v2 gate FAILED after editing %s - see %s\"}\\n' \"$f\" \"$L\"; exit 2",
+            "asyncRewake": true,
+            "timeout": 300,
+            "statusMessage": "ctf-v2 gate (background)"
+          }
+        ]
+      }
+    ]
   }
 }

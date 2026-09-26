@@ -29,7 +29,8 @@
         "syntax error|sqlstate|you have an error in your sql",
         "order\\s*by|union\\s+select",
         "boolean.{0,12}(?:delta|difference)",
-        "time.?based|sleep\\(|pg_sleep|waitfor delay"
+        "time.?based|sleep\\(|pg_sleep|waitfor delay",
+        "(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9])"
       ],
       "source_signals": [
         "SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"'])",
@@ -62,7 +63,12 @@
         "mongo|mongoose|couch|elasticsearch|redis\\b",
         "\\$ne\\b|\\$gt\\b|\\$where\\b|\\$regex\\b|\\$rename\\b",
         "[0-9a-f]{24}\\b",
-        "__v\\b"
+        "__v\\b",
+        "object datastore|object-shaped filter|24-hex id",
+        "aggregation (?:pipeline|stage)|\\$(?:match|lookup|group|unwind)\\b",
+        "body (?:becomes|is) the (?:query|filter)|whole query structure",
+        "reaches (?:the )?(?:driver|query) (?:whole|unchanged|as-is)",
+        "(?<![a-z0-9])(?:operator\\ injection|web\\ nosqli|nosqli|nosql)(?![a-z0-9])"
       ],
       "source_signals": [
         "mongoose\\.model|findOne\\s*\\(\\s*req\\.|find\\s*\\(\\s*req\\.(?:body|query)",
@@ -93,7 +99,8 @@
         "command injection",
         "\\bping\\b.{0,20}(?:host|ip|target)",
         "uid=\\d+\\(|gid=\\d+\\(",
-        "sh: \\d+:|/bin/sh"
+        "sh: \\d+:|/bin/sh",
+        "(?<![a-z0-9])(?:web\\ command\\ injection|os\\ command\\ injection|command\\ injection|command\\-injection)(?![a-z0-9])"
       ],
       "source_signals": [
         "os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True",
@@ -128,7 +135,8 @@
         "\\{\\{|\\$\\{|#\\{|<%=",
         "jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b",
         "template",
-        "\\b49\\b"
+        "\\b49\\b",
+        "(?<![a-z0-9])(?:server\\-side\\ template\\ injection|web\\ ssti|ssti)(?![a-z0-9])"
       ],
       "source_signals": [
         "render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params)",
@@ -151,12 +159,15 @@
       "id": "web-xxe",
       "name": "XML external entity",
       "skill_dir": "web-xxe",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-xxe-content-type-branch-simplexml-noent-file-read"
+      ],
       "observation_signals": [
         "<\\?xml|application/xml|text/xml|soap|wsdl",
         "\\.docx|\\.xlsx|\\.svg\\b",
-        "doctype|entity"
+        "doctype|entity",
+        "(?<![a-z0-9])(?:xml\\ external\\ entity|web\\ xxe|xxe)(?![a-z0-9])"
       ],
       "source_signals": [
         "etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder",
@@ -187,11 +198,13 @@
       ],
       "observation_signals": [
         "\\bssrf\\b",
+        "loopback-only|reachable by the backend itself",
         "url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input)",
         "server.?side (?:fetch|request)|fetches? (?:the |a )?url",
         "pdf|screenshot|render|thumbnail|preview|import from url",
         "127\\.0\\.0\\.1|localhost|169\\.254|metadata",
-        "admin bot|headless"
+        "admin bot|headless",
+        "(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9])"
       ],
       "source_signals": [
         "requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url)",
@@ -225,7 +238,8 @@
         "smuggl|desync|crlf",
         "content-length|transfer-encoding",
         "%0d%0a|\\\\r\\\\n|\\\\u010d|\\\\u010a",
-        "proxy|gateway|load balancer|nginx|haproxy|traefik"
+        "proxy|gateway|load balancer|nginx|haproxy|traefik",
+        "(?<![a-z0-9])(?:web\\ request\\ smuggling|request\\ smuggling|request\\-smuggling|crlf\\ injection)(?![a-z0-9])"
       ],
       "source_signals": [
         "http://\\$\\{[^}]*\\}|https://\\$\\{[^}]*\\}",
@@ -256,14 +270,25 @@
       ],
       "observation_signals": [
         "traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
+        "inspects the raw body|raw body before a decoder|before a decoder runs",
         "x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
         "hop-by-hop",
-        "403.{0,40}(?:only|internal|local)"
+        "403.{0,40}(?:only|internal|local)",
+        "middleware|x-middleware|edge (?:function|runtime)",
+        "(?:one|only|single|front) (?:front )?layer.{0,40}authori",
+        "header the client can (?:set|supply|control|choose)",
+        "internal[- ]subrequest|x-middleware-subrequest",
+        "(?<![a-z0-9])(?:web\\ parser\\ differential|parser\\ differential|parser\\-differential|proxy\\ trust)(?![a-z0-9])"
       ],
       "source_signals": [
         "headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded)",
         "request\\.headers\\[[\\\"']x-",
-        "if not .*header.*:\\s*\\n\\s*.*local"
+        "if not .*header.*:\\s*\\n\\s*.*local",
+        "acl\\s+\\S+\\s+(?:path|url|req\\.hdr|hdr|method|base)\\b",
+        "http-request\\s+(?:deny|set-header|replace-path)\\b",
+        "use_backend\\s+\\S+\\s+if\\b|acl\\s+\\S+\\s+src\\s+\\d",
+        "-m\\s+(?:beg|sub|dir|reg|end)\\b",
+        "location\\s+[~^=]|^\\s*internal\\s*;|proxy_set_header\\s"
       ],
       "first_probe": "send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
       "falsifier": "both forms are rejected, so the trust check does not depend on that header",
@@ -291,7 +316,8 @@
         "\\bxss\\b",
         "admin bot|bot visits|report (?:url|link)",
         "content-security-policy|nonce-",
-        "dompurify|sanitiz"
+        "dompurify|sanitiz",
+        "(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9])"
       ],
       "source_signals": [
         "innerHTML|outerHTML|document\\.write|insertAdjacentHTML",
@@ -327,7 +353,8 @@
         "\\bcsrf\\b|xsrf",
         "samesite|sameorigin",
         "admin bot|bot visits",
-        "text/plain|enctype"
+        "text/plain|enctype",
+        "(?<![a-z0-9])(?:cross\\-site\\ request\\ forgery|web\\ csrf|csrf)(?![a-z0-9])"
       ],
       "source_signals": [
         "csrf.{0,20}(?:disable|exempt|false)",
@@ -356,7 +383,8 @@
       "observation_signals": [
         "access-control-allow-origin|access-control-allow-credentials",
         "\\bcors\\b",
-        "origin:"
+        "origin:",
+        "(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9])"
       ],
       "source_signals": [
         "Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*",
@@ -383,7 +411,8 @@
       "verified_by": [],
       "observation_signals": [
         "redirect|next=|returnurl|callback=|continue=",
-        "\\b30[1237]\\b"
+        "\\b30[1237]\\b",
+        "(?<![a-z0-9])(?:web\\ open\\ redirect|open\\ redirect|open\\-redirect)(?![a-z0-9])"
       ],
       "source_signals": [
         "redirect\\s*\\(\\s*(?:req|request|params|\\$_)",
@@ -413,7 +442,8 @@
       "observation_signals": [
         "x-cache|cf-cache-status|age:|vary:",
         "cache",
-        "cdn|varnish|cloudfront"
+        "cdn|varnish|cloudfront",
+        "(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9])"
       ],
       "source_signals": [
         "Cache-Control|s-maxage",
@@ -443,8 +473,10 @@
       ],
       "observation_signals": [
         "__proto__|prototype pollution|class pollution",
+        "connection-derived|derived from the connection",
         "constructor|__class__|__globals__|__init__",
-        "merge|deep.?(?:assign|copy|merge)"
+        "merge|deep.?(?:assign|copy|merge)",
+        "(?<![a-z0-9])(?:web\\ prototype\\ pollution|prototype\\ pollution|prototype\\-pollution|class\\ pollution|prototype)(?![a-z0-9])"
       ],
       "source_signals": [
         "__proto__",
@@ -477,11 +509,13 @@
       ],
       "observation_signals": [
         "\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD",
-        "deserial|unserial|pickle|marshal|viewstate"
+        "deserial|unserial|pickle|marshal|viewstate",
+        "(?<![a-z0-9])(?:unsafe\\ deserialization|web\\ deserialization|deserialization)(?![a-z0-9])"
       ],
       "source_signals": [
         "pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject",
-        "Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load"
+        "Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load",
+        "Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$"
       ],
       "first_probe": "identify the format from the blob's own magic before touching any gadget",
       "falsifier": "the blob is signed with a key that is not leaked and not reachable",
@@ -508,7 +542,8 @@
         "race condition|toctou",
         "balance|coupon|voucher|one.?time|redeem",
         "verification token|confirmation (?:code|email|link)",
-        "rate.?limit|per.?user limit|quota"
+        "rate.?limit|per.?user limit|quota",
+        "(?<![a-z0-9])(?:web\\ race\\ condition|race\\ condition|race\\-condition|toctou)(?![a-z0-9])"
       ],
       "source_signals": [
         "(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit)",
@@ -530,11 +565,14 @@
       "id": "web-logic-flaw",
       "name": "Business logic / mass assignment",
       "skill_dir": "web-logic-flaw",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
+      ],
       "observation_signals": [
         "registration|signup|checkout|coupon|workflow|approval",
-        "role|is_?admin|privilege|status"
+        "role|is_?admin|privilege|status",
+        "(?<![a-z0-9])(?:mass\\ assignment|web\\ logic\\ flaw|business\\ logic|logic\\ flaw|logic\\-flaw)(?![a-z0-9])"
       ],
       "source_signals": [
         "(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\)",
@@ -568,7 +606,8 @@
         "\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,}",
         "session|jsessionid|connect\\.sid|phpsessid|laravel_session",
         "cookie_secret|app_key|secret_key|signed cookie",
-        "alg\\b|hs256|rs256|none"
+        "alg\\b|hs256|rs256|none",
+        "(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9])"
       ],
       "source_signals": [
         "jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value",
@@ -601,7 +640,8 @@
         "oauth|openid|oidc|saml|single sign|sso\\b",
         "redirect_uri|client_id|response_type|authorization_code",
         "state=|nonce=",
-        "/authorize|/token|/callback"
+        "/authorize|/token|/callback",
+        "(?<![a-z0-9])(?:web\\ oauth\\ sso|oauth\\ sso|oauth\\-sso|sso\\ flow|oauth)(?![a-z0-9])"
       ],
       "source_signals": [
         "client_secret|redirect_uri",
@@ -632,7 +672,8 @@
         "\\bidor\\b",
         "/(?:users?|orders?|files?|notes?|invoices?)/\\d+",
         "user_?id|account_?id|object_?id",
-        "[0-9a-f]{8}-[0-9a-f]{4}-"
+        "[0-9a-f]{8}-[0-9a-f]{4}-",
+        "(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9])"
       ],
       "source_signals": [
         "findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params)",
@@ -672,12 +713,13 @@
         "/proc/self",
         "\\balias\\b|/assets\\.\\.",
         "\\.env\\b|source (?:leak|disclosure)|leaked source",
-        "php://filter"
+        "php://filter",
+        "(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9])"
       ],
       "source_signals": [
         "(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE)",
         "file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$",
-        "open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params)",
+        "(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params)",
         "(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{)",
         "path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params)",
         "php://filter|\\.\\./\\.\\./"
@@ -707,7 +749,8 @@
       "observation_signals": [
         "upload|multipart/form-data|filename=",
         "avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b",
-        "image/|mime|magic byte"
+        "image/|mime|magic byte",
+        "(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9])"
       ],
       "source_signals": [
         "multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path)",
@@ -734,7 +777,8 @@
       "observation_signals": [
         "graphql|/gql\\b",
         "__schema|__typename|introspection",
-        "\\bquery\\s*\\{|\\bmutation\\s*\\{"
+        "\\bquery\\s*\\{|\\bmutation\\s*\\{",
+        "(?<![a-z0-9])(?:graphql\\ abuse|web\\ graphql|graphql)(?![a-z0-9])"
       ],
       "source_signals": [
         "graphql|apollo|graphene|strawberry",
@@ -762,7 +806,8 @@
       "observation_signals": [
         "solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat",
         "0x[0-9a-f]{40}\\b",
-        "setup\\(\\)|isSolved\\(\\)"
+        "setup\\(\\)|isSolved\\(\\)",
+        "(?<![a-z0-9])(?:smart\\ contract|web\\ web3|web3)(?![a-z0-9])"
       ],
       "source_signals": [
         "pragma solidity|contract \\w+\\s*\\{",
@@ -788,7 +833,8 @@
         "admin bot|report to admin|visit.{0,20}url|headless",
         "xs-?leak|side.?channel",
         "window\\.length|frame count|cache probe",
-        "script-src\\s+'none'"
+        "script-src\\s+'none'",
+        "(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9])"
       ],
       "source_signals": [
         "puppeteer|playwright|selenium|chromedriver|google-chrome",
@@ -807,9 +853,9 @@
         "web-cache-poisoning",
         "web-csrf"
       ],
+      "blast_radius": "the read-back channel is often a shared cache or store; filling it to force eviction destroys every other key, so never run it against an instance someone else is using",
       "category": "web",
-      "skill": "skills/web-xs-leaks/SKILL.md",
-      "blast_radius": "the read-back channel is often a shared cache or store; filling it to force eviction destroys every other key, so never run it against an instance someone else is using"
+      "skill": "skills/web-xs-leaks/SKILL.md"
     }
   ]
 }

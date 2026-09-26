@@ -41,25 +41,6 @@ Confirmation is the on-chain solved predicate changing after the attributable
 transaction. A reverted transaction, a local simulation, or a guessed flag is
 not confirmation.
 
-## Operational probe
-
-Before writing a transaction, capture:
-
-```text
-RPC endpoint, chain id, setup address, challenge caller, solved predicate,
-starting storage/state, and the exact read-only calls used to obtain them.
-```
-
-Run read-only calls first. Then choose one state transition whose post-state can
-be predicted from the setup contract. Confirmation requires the solved predicate
-to change after the attributable transaction and a receipt/status proving it
-was mined. A local simulation, a successful transaction with unchanged state,
-or a guessed private key is inconclusive.
-
-For a delegatecall or `tx.origin` hypothesis, prove the call path with a harmless
-view/state marker before attempting the solved condition. Preserve calldata and
-receipt output verbatim.
-
 ## Where the routes usually are
 
 Delegated calls that execute foreign code in this contract's storage; access
@@ -80,10 +61,29 @@ and any function that is reachable before initialisation.
 
 Depth, one named file at a time:
 
-- `references/extended.md`
+- `skills/web-web3/references/extended.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+
+## Operational probe
+
+Before writing a transaction, capture:
+
+```text
+RPC endpoint, chain id, setup address, challenge caller, solved predicate,
+starting storage/state, and the exact read-only calls used to obtain them.
+```
+
+Run read-only calls first. Then choose one state transition whose post-state can
+be predicted from the setup contract. Confirmation requires the solved predicate
+to change after the attributable transaction and a receipt/status proving it
+was mined. A local simulation, a successful transaction with unchanged state,
+or a guessed private key is inconclusive.
+
+For a delegatecall or `tx.origin` hypothesis, prove the call path with a harmless
+view/state marker before attempting the solved condition. Preserve calldata and
+receipt output verbatim.
 
 ## Field notes
 

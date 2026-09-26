@@ -26,6 +26,15 @@ knowledge/raw/
 # test/regression.py reads build/make_class_skills.py, so a fresh clone could
 # not pass its own gate. Track the generators; ignore nothing here.
 
+# Transient agent worktrees. Each is a full copy of the tree (636 MB when this
+# was written) and is deleted when its agent finishes.
+.claude/worktrees/
+
+# Fetched writeup corpus. Same rule as knowledge/raw/ above: external material
+# that holds other people's flags — ctf_writeups.csv carries ten of them — and
+# is reproducible by re-running the collection. Keep it locally, never commit it.
+Writeup/
+
 # Large vendored binaries: keep them out of history
 tools/ghidra-dist/
 *.zip

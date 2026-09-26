@@ -316,6 +316,33 @@ def decide(name, taxonomy_path=None, now=None):
             ]
             return result
 
+    # Rule 6b: no card fits, but source does. Plan the layers before probing.
+    #
+    # Rule 6 reuses a solved chain; rule 7a says "classify, then probe". Between
+    # them sat the case this system is worst at: a white-box challenge whose
+    # shape nothing here has solved. The agent fell through to a single
+    # classifier answer and opened one depth skill, which on a layered challenge
+    # picks the last entry point rather than the gate in front of it. That is
+    # how CSCV2026 routed to file upload while the chain opened at a proxy ACL.
+    # novel_plan reads the source and names the layers, each with its own
+    # falsifier, so the first probe tests the opener instead of the sink.
+    source = current.get("source")
+    if source and not probes and not current.get("chain_candidates"):
+        result["action"] = "novel_plan"
+        result["rationale"] = (
+            "no solved chain matched and no probe has run yet, but source is "
+            "recorded: inventory the layers and take the opener first. A single "
+            "class answer on a layered white-box challenge opens the last sink, "
+            "not the boundary that has to be crossed to reach it")
+        result["commands"] = [
+            "python3 tools/novel_plan.py %s --json" % source,
+            "python3 tools/anomaly_map.py %s   # what the author wrote on purpose" % source,
+            "python3 tools/classify.py --source %s --record %s" % (source, name),
+            "python3 tools/state.py %s --hypothesis '<the opening layer>' "
+            "--bug-class <class-id> --next '<that layer falsifier>'" % name,
+        ]
+        return result
+
     # Rule 7a: state exists but nothing has been hypothesised yet.
     if not open_hyp and not probes:
         result["action"] = "new_hypothesis"
