@@ -164,6 +164,12 @@
       "observation": "the parameter is passed to eval with only a character blocklist in front of it, and it rejects letters and quotes",
       "expect": "web-command-injection",
       "why": "live-verified: the same chain. A denylist in front of an evaluator is the shape, not the shell"
+    },
+    {
+      "id": "rejected-but-still-echoed",
+      "observation": "the page refuses the input with an error message, but the value is still echoed back into the form field unescaped",
+      "expect": "web-xss",
+      "why": "live-verified: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce. The filter guarded the evaluator, not the view"
     }
   ]
 }

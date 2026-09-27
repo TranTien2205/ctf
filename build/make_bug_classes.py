@@ -245,8 +245,21 @@ CLASSES = [
         "verified_by": ["htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
                         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"],
         "observation_signals": [r"\bxss\b", r"admin bot|bot visits|report (?:url|link)",
+                                # The class had no words for what you actually
+                                # SEE first: your own input coming back into the
+                                # page. pcalc reflected the raw parameter into a
+                                # form value while its filter was refusing the
+                                # very same string.
+                                r"(?:echo\w*|reflect\w*|render\w*|repopulat\w*|appears?|shown|displayed|comes? back|put back)[^\n]{0,70}(?:unescaped|unencoded|\braw\b|verbatim|without (?:being )?escap\w+|not escaped|as.is|into the (?:form|field|input|page|attribute))",
+                                r"(?:refus\w+|reject\w+|error message|invalid|blocked|denied)[^\n]{0,70}\b(?:still|but|yet|anyway)\b[^\n]{0,50}(?:echo\w*|reflect\w*|shown|displayed|appears?|comes? back)",
                                 r"content-security-policy|nonce-", r"dompurify|sanitiz"],
         "source_signals": [r"innerHTML|outerHTML|document\.write|insertAdjacentHTML",
+                           # PHP had no representation here at all, so pcalc's
+                           # views/index.php:21 -- a raw $_GET echoed into an
+                           # attribute -- ranked nothing. Tempered so that an
+                           # escaped echo does not match.
+                           r"<\?=\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\n]){0,70}\$_(?:GET|POST|REQUEST|COOKIE)",
+                           r"\becho\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\n]){0,70}\$_(?:GET|POST|REQUEST|COOKIE)",
                            r"dangerouslySetInnerHTML|mark_safe|\|\s*safe\b|\{\{\{",
                            r"res\.(?:send|write|end)\s*\(\s*`[^`\n]*\$\{",
                            r"(?:render|reply)\s*\([^)\n]*\bhtml\b[^)\n]*\$\{",

@@ -340,12 +340,16 @@
       "observation_signals": [
         "\\bxss\\b",
         "admin bot|bot visits|report (?:url|link)",
+        "(?:echo\\w*|reflect\\w*|render\\w*|repopulat\\w*|appears?|shown|displayed|comes? back|put back)[^\\n]{0,70}(?:unescaped|unencoded|\\braw\\b|verbatim|without (?:being )?escap\\w+|not escaped|as.is|into the (?:form|field|input|page|attribute))",
+        "(?:refus\\w+|reject\\w+|error message|invalid|blocked|denied)[^\\n]{0,70}\\b(?:still|but|yet|anyway)\\b[^\\n]{0,50}(?:echo\\w*|reflect\\w*|shown|displayed|appears?|comes? back)",
         "content-security-policy|nonce-",
         "dompurify|sanitiz",
         "(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9])"
       ],
       "source_signals": [
         "innerHTML|outerHTML|document\\.write|insertAdjacentHTML",
+        "<\\?=\\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE)",
+        "\\becho\\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE)",
         "dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{",
         "res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{",
         "(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{",

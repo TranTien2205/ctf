@@ -606,7 +606,7 @@
       ],
       "skill_tokens": 973,
       "depth_files": 2,
-      "depth_tokens": 5398,
+      "depth_tokens": 5765,
       "use_when": [
         "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
         "a chain card already proves this class here: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
@@ -1265,7 +1265,7 @@
         "web-ssti",
         "web-csrf"
       ],
-      "unlock_signals": "(?:\\bxss\\b)|(?:admin bot|bot visits|report (?:url|link))|(?:content-security-policy|nonce-)|(?:dompurify|sanitiz)|(?:(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9]))|(?:innerHTML|outerHTML|document\\.write|insertAdjacentHTML)|(?:dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{)|(?:res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{)|(?:(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{)|(?:v-html|\\bunescape\\b|autoescape\\s*=\\s*False)",
+      "unlock_signals": "(?:\\bxss\\b)|(?:admin bot|bot visits|report (?:url|link))|(?:(?:echo\\w*|reflect\\w*|render\\w*|repopulat\\w*|appears?|shown|displayed|comes? back|put back)[^\\n]{0,70}(?:unescaped|unencoded|\\braw\\b|verbatim|without (?:being )?escap\\w+|not escaped|as.is|into the (?:form|field|input|page|attribute)))|(?:(?:refus\\w+|reject\\w+|error message|invalid|blocked|denied)[^\\n]{0,70}\\b(?:still|but|yet|anyway)\\b[^\\n]{0,50}(?:echo\\w*|reflect\\w*|shown|displayed|appears?|comes? back))|(?:content-security-policy|nonce-)|(?:dompurify|sanitiz)|(?:(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9]))|(?:innerHTML|outerHTML|document\\.write|insertAdjacentHTML)|(?:<\\?=\\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE))|(?:\\becho\\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE))|(?:dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{)|(?:res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{)|(?:(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{)|(?:v-html|\\bunescape\\b|autoescape\\s*=\\s*False)",
       "bug_class": true
     },
     {
