@@ -1,0 +1,16 @@
+{
+  "package": "newtonsoft.json",
+  "ecosystem": "nuget",
+  "gadgets": [
+    {
+      "versions": "13.0.3 (measured live; applies to every version, this is configuration rather than a CVE)",
+      "sink": "JsonConvert.DeserializeObject called with JsonSerializerSettings { TypeNameHandling = All | Objects | Auto | Arrays } on attacker-influenced JSON",
+      "payload": "{\"$type\":\"<Namespace>.<Class>, <AssemblyName>\",\"<property>\":\"<value>\"}",
+      "effect": "the JSON names the CLR type to construct, and Json.NET then sets each named property. Look in the APPLICATION'S OWN assembly before reaching for a published gadget chain: a class whose property setter has a side effect is a complete one-object gadget. Nexus Void shipped Nexus_Void.Helpers.StatusCheckHelper, whose `command` setter builds a ProcessStartInfo for /bin/bash -c and runs it, so {\"$type\":\"Nexus_Void.Helpers.StatusCheckHelper, Nexus_Void\",\"command\":\"<cmd>\"} is RCE with no ysoserial and no chain.",
+      "precondition": "TypeNameHandling is anything other than None, and no SerializationBinder restricts the types. The assembly name in $type must be the ASSEMBLY, not the namespace; for a project named Nexus_Void both happen to read the same and that hides the distinction.",
+      "trap": "the cast AFTER deserialisation is irrelevant. The application here does `deserialized as List<ProductModel>`, which yields null for the gadget, and the page then renders as if nothing happened -- but the setter already ran while the object was being built. Do not read an unchanged page as the payload having failed. Corollary: the command's output is not returned, so plan how it comes back before sending it (a copy into a served wwwroot needs no listener).",
+      "proven_by": "measured live (knowledge/chains/htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce.json)"
+    }
+  ],
+  "schema_version": 1
+}

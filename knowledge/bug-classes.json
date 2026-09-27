@@ -36,6 +36,8 @@
       ],
       "source_signals": [
         "SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"'])",
+        "(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\"",
+        "\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{",
         "(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{)",
         "(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{",
         "cursor\\.execute"
@@ -522,6 +524,8 @@
       ],
       "source_signals": [
         "pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject",
+        "TypeNameHandling\\s*(?:=|\\.)\\s*(?:TypeNameHandling\\.)?(?:All|Objects|Auto|Arrays)",
+        "JavaScriptSerializer|SimpleTypeResolver|LosFormatter|NetDataContractSerializer|ObjectStateFormatter|EnableUnsafeBinaryFormatterSerialization",
         "Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load",
         "Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$"
       ],
@@ -626,6 +630,8 @@
       ],
       "source_signals": [
         "jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value",
+        "(?:ReadJwtToken|ReadToken)\\s*\\([^\\n)]*\\)\\s*as\\s+JwtSecurityToken",
+        "Response\\.Redirect\\s*\\([^\\n]*\\)\\s*;[\\s\\S]{0,500}await\\s+_next\\s*\\(\\s*context\\s*\\)",
         "APP_KEY|SECRET_KEY|cookie_secret|secure_cookie",
         "verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none"
       ],

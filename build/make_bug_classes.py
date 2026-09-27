@@ -39,6 +39,12 @@ CLASSES = [
                                 r"\bsingle quote\b|\bapostrophe\b",
                                 r"database error|db error|query (?:error|failed)"],
         "source_signals": [r"SELECT[\s\S]{0,160}(?:\+|%|\.format|\$\{|f[\"'])",
+                           # .NET: raw-SQL APIs handed a C# interpolated string.
+                           # Nexus Void ranked no SQL class at all from source
+                           # because every existing pattern was written for
+                           # python, node or php quoting.
+                           r"(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\s*=|new\s+SqlCommand)[^\n]{0,80}\$\"",
+                           r"\$\"[^\"\n]{0,100}\b(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^\"\n]{0,200}\{",
                            r"(?:execute|query|run)\s*\([^\n]*(?:%|format|\+|\$\{)",
                            r"(?:INSERT|UPDATE|DELETE)[^\n]*\$\{", r"cursor\.execute"],
         "first_probe": "one syntax marker, then a matched true/false pair against the same input",
@@ -282,6 +288,12 @@ CLASSES = [
         "observation_signals": [r"\brO0AB|\baced0005|\bgAN|O:\d+:\"|\bBAhJ|\bAAEAAAD",
                                 r"deserial|unserial|pickle|marshal|viewstate"],
         "source_signals": [r"pickle\.loads|yaml\.load\s*\(|unserialize|ObjectInputStream|readObject",
+                           # .NET: the configuration IS the vulnerability. Any
+                           # TypeNameHandling but None lets the JSON name the
+                           # CLR type, so look in the app's own assembly for a
+                           # property setter with a side effect.
+                           r"TypeNameHandling\s*(?:=|\.)\s*(?:TypeNameHandling\.)?(?:All|Objects|Auto|Arrays)",
+                           r"JavaScriptSerializer|SimpleTypeResolver|LosFormatter|NetDataContractSerializer|ObjectStateFormatter|EnableUnsafeBinaryFormatterSerialization",
                            r"Marshal\.load|BinaryFormatter|torch\.load|joblib\.load",
                            # pickle.loads is the convenience form. A challenge that
                            # WANTS a restricted unpickler subclasses Unpickler and
@@ -338,6 +350,11 @@ CLASSES = [
                                 r"reuse the (?:original |old )?(?:signature|mac|hmac)",
                                 r"\bbcrypt\b[^\n]{0,40}(?:72|truncat)"],
         "source_signals": [r"jwt\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value",
+                           # .NET: claims taken from a PARSE rather than from
+                           # the validated token, and the middleware shape that
+                           # writes a redirect and then runs the pipeline anyway.
+                           r"(?:ReadJwtToken|ReadToken)\s*\([^\n)]*\)\s*as\s+JwtSecurityToken",
+                           r"Response\.Redirect\s*\([^\n]*\)\s*;[\s\S]{0,500}await\s+_next\s*\(\s*context\s*\)",
                            r"APP_KEY|SECRET_KEY|cookie_secret|secure_cookie",
                            r"verify\s*=\s*False|algorithms\s*=\s*\[[^\]]*none"],
         "first_probe": "decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",

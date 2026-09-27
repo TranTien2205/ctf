@@ -25,10 +25,26 @@ TAXONOMY = os.path.join(ROOT, "knowledge", "bug-classes.json")
 WRITEUP_CARDS = os.path.join(ROOT, "knowledge", "cards")
 MISSES = os.path.join(ROOT, "knowledge", "classify-misses.log")
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build",
-             "vendor", "site-packages"}
+             "vendor", "site-packages",
+             # .NET publishes into bin/ and obj/, and a handout usually ships
+             # them. Scanning them reported signal matches at line 47896 of a
+             # .dll and ranked the wrong class first on Nexus Void.
+             "bin", "obj", "target", "Debug", "Release"}
+# Vendored client libraries, by the conventions that put them there. These are
+# third-party source, not the application's, and scanning them ranks the wrong
+# class: wwwroot/lib is to ASP.NET what node_modules is to node.
+VENDOR_PATH_PARTS = (os.path.join("wwwroot", "lib"), os.path.join("static", "vendor"),
+                     os.path.join("public", "vendor"), os.path.join("assets", "vendor"))
+# A bundled or minified asset has no line structure a person wrote. Measured on
+# the Nexus Void handout: every hand-written file topped out at 599 characters
+# on its longest line, while the vendored tailwind bundle reached 103,659.
+MAX_LINE_CHARS = 2000
 MAX_FILE_BYTES = 2 * 1024 * 1024
 BINARY_EXT = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz",
-              ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".so", ".pyc", ".class", ".jar"}
+              ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".so", ".pyc", ".class", ".jar",
+              ".dll", ".exe", ".pdb", ".a", ".o", ".lib", ".dylib", ".wasm", ".nupkg",
+              ".bin", ".dat", ".7z", ".bz2", ".xz", ".rlib", ".wav", ".mp3", ".webp",
+              ".bmp", ".tiff", ".otf"}
 # A verified class has been solved here; a catalogue class has not. The bonus
 # breaks ties toward what this toolkit can actually back up with a chain card.
 VERIFIED_BONUS = 0.5
@@ -241,6 +257,15 @@ def scan_source(target, compiled, limit_per_class=4):
             with open(path, encoding="utf-8", errors="replace") as handle:
                 text = handle.read()
         except OSError:
+            continue
+        # An extension list can never be complete. A NUL byte early in the file
+        # is what actually separates a compiled artifact from source, and it
+        # costs one substring check on text we have already read.
+        if "\x00" in text[:4096]:
+            continue
+        if any(part in path for part in VENDOR_PATH_PARTS):
+            continue
+        if max((len(line) for line in text.splitlines()), default=0) > MAX_LINE_CHARS:
             continue
         for class_id, patterns in compiled.items():
             bucket = hits.setdefault(class_id, [])

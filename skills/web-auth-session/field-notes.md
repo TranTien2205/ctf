@@ -133,3 +133,38 @@ Falsifier: the mailbox stays empty (nodemailer given a single recipient, or the 
 **Blast radius**: Step 6 writes onto Object.prototype for the lifetime of the process and step 7 OVERWRITES a template file on disk — views/transmit.html stops being the real page until the instance is restarted. Pick a view that has not been rendered yet in that process: nunjucks' FileSystemLoader caches compiled templates by name, so overwriting a view that was already served does nothing. The PUT itself is safe for the row: mergedeep adds no own key to the target, so data.update() is a no-op update (it still answers 500, see traps). Anything that crashes the node process is expensive here because database.js runs sequelize.sync({force:true}) on boot: every account, bounty and the JWT signing secret are destroyed and the whole setup has to be redone.
 
 - status: confirmed
+
+## 2026-09-27 · Nexus Void · confirmed
+
+- source note: `challenges/Nexus Void/web_nexus_void/Nexus_Void/Middleware/JWTMiddleware.cs`
+- chain card: `knowledge/chains/htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce.json`
+- verification: verified_live — Live HTB instance. Controls: no cookie -> 302, Token=garbage -> 302, Token=a.b.c -> 302; an alg=none token with an empty signature -> 200 rendering id="username" value="n0ne_f0rged". The planted gadget answered 200 Added, the trigger GET answered 200, and GET /nv_9f21.txt returned the flag. Recorded in challenges/nexusvoid/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). The dropped file was removed with a second gadget and verified 404; the probe items were removed from the wishlist and the page shows 'Wishlist is empty'.
+- classified as: `web-auth-session` (score 1.13, 1 signals matched)
+- also matched: `web-parser-differential` (1.09), `web-open-redirect` (0.49)
+- signals that fired: alg
+
+**Confirming probe that worked**
+
+> GET /Home/Setting three times: with no Cookie header, with Token=garbage, and with Token=<base64url {"alg":"none","typ":"JWT"}>.<base64url {"username":"n0ne_f0rged","ID":"1","iss":"NexusVoid"}>. (trailing dot, empty signature)
+
+Expected: the first two answer 302 to /, the third answers 200 and the page contains id="username" value="n0ne_f0rged" -- a username that belongs to no account
+
+Falsifier: the forged token also answers 302, or the no-cookie request also answers 200 (the page was never gated, so the 200 says nothing)
+
+**Traps recorded on this solve**
+
+- the wrong first move here is attacking the HS256 key, and it is an expensive one: 14,448,372 candidates from SecLists scraped-JWT-secrets.txt and rockyou.txt produced no match. The token looks like a signing problem and is not one -- the signature is never checked, so no key search can succeed. Read the middleware before touching the crypto.
+- there is no admin surface to reach by impersonation, so do not go looking for one. /Home/Market, /Home/Trending, /Home/Collection, /Home/Wallet, /Home/Admin, /Home/Dashboard, /Home/Profile, /Home/Orders, /Home/Seller, /Home/Flag and /Admin all answer 404, although the nav bar lists market, trending, collection and wallet. Forging username=admin, administrator, root or Xclow3n changes nothing but the echoed string: the three real pages differ only by the length of the username. The privilege is in how far the ID claim reaches into SQL, not in the name.
+- the wrong first move here is attacking the HS256 key. The token looks like a signing problem and it is not one: the signature is never checked, so a key search is wasted no matter how long it runs. Read the middleware before touching the crypto.
+- `ValidateToken` returns `false.ToString()`, which is "False" with a capital F, and the caller compares it to "false". Even if the caller had returned, the comparison would never match. Two independent bugs on adjacent lines, and only reading both explains why an invalid token is accepted.
+- the redirect still happens, so a browser and any client that follows redirects will land on the login page and hide the bypass. Use a client that does not follow redirects, and read the body that came back WITH the 302.
+- in the product lookup, `sellerName` injected with OR makes FirstOrDefault return the first row of the whole table, so the response says "Added" while a product you never named is what got added. A boolean oracle built on that endpoint must use AND, not OR.
+- the boolean oracle is 200 versus 500, not two different messages: a FALSE lookup returns null and the next line dereferences product.name, so the app throws. The 500 is the FALSE branch, not a broken probe.
+- the INSERT branch is reachable only while the ID owns no Wishlist row. Plant one payload per fresh ID; re-using an ID silently takes the UPDATE branch, where the data column is generated and not yours.
+- GET /Home/Wishlist reads `WHERE ID='{ID}'` (quoted) while POST reads `WHERE ID={ID}` (unquoted). The same claim is injectable in one and not the other, so check every statement rather than assuming the quoting is consistent.
+- WishlistRemove ends in RedirectToAction("Home", "Wishlist"), which has the action and controller the wrong way round and answers 404. The removal SQL has already run by then, so a 404 there is success, not failure.
+- tools/classify.py --source on a .NET handout reads bin/ and obj/, so it reports matches inside compiled .dll and .a files with meaningless line numbers. Read the Controllers, Helpers and Middleware directories yourself; the classifier's white-box output is unusable on a published .NET tree until those directories are skipped.
+
+**Blast radius**: Every step writes. The planted row is an INSERT at an ID no real account holds yet, so it displaces nothing, but it CANNOT be removed with the same primitive: the INSERT branch only runs when the ID owns no row, so a second attempt at that ID takes the UPDATE branch instead. Pick a high ID (1337 here), use one row per payload, and expect them to stay. The command runs as root, so keep it to a copy into wwwroot and remove that file afterwards with a second one-line gadget -- verified 404 after. Anything added to your own wishlist during probing is removable through /Home/WishlistRemove. Do not use `OR '1'='1'` in the product lookup on a shared instance without expecting it: FirstOrDefault then returns the FIRST product in the table, not the one you named, and that product is what gets added.
+
+- status: confirmed

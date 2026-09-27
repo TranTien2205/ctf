@@ -1,0 +1,125 @@
+{
+ "schema_version": 1,
+ "id": "htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce",
+ "source_note": "challenges/Nexus Void/web_nexus_void/Nexus_Void/Middleware/JWTMiddleware.cs",
+ "challenge": {
+  "name": "Nexus Void",
+  "platform": "HackTheBox",
+  "event": "HackTheBox",
+  "category": "web",
+  "solved_at": "2026-09-27",
+  "assistance": "self-solved"
+ },
+ "stack": [
+  "dotnet 7",
+  "asp.net core mvc",
+  "kestrel",
+  "entity framework core 7.0.10",
+  "sqlite",
+  "newtonsoft.json 13.0.3",
+  "alpine",
+  "supervisord",
+  "docker"
+ ],
+ "preconditions": {
+  "all_of": [
+   "an authentication middleware calls Response.Redirect on failure but does not return, and does not skip the rest of the pipeline",
+   "the claims the application acts on are read with a parse-only call (JwtSecurityTokenHandler.ReadToken) rather than from the validated token",
+   "at least one of those forged claims is interpolated into a raw SQL statement",
+   "a column that statement can write is later deserialised by Json.NET with TypeNameHandling set to anything other than None",
+   "the application's OWN assembly contains a type whose property setter has a side effect"
+  ],
+  "any_of": [
+   "static files are served from wwwroot, so a command can drop its output where it can be fetched back with no external listener",
+   "the process runs as root and the flag is a file on disk"
+  ]
+ },
+ "signals": [
+  "TypeNameHandling",
+  "JsonConvert.DeserializeObject",
+  "FromSqlRaw",
+  "ExecuteSqlRaw",
+  "context.Response.Redirect",
+  "ReadToken",
+  "JwtSecurityTokenHandler",
+  "ProcessStartInfo",
+  "UseShellExecute",
+  "HttpContext.Items",
+  "EnableUnsafeBinaryFormatterSerialization",
+  "UseStaticFiles",
+  "$type"
+ ],
+ "chain": [
+  {
+   "step": 1,
+   "stage": "recon",
+   "action": "read the auth middleware for a failure path that calls Redirect without `return` and without short-circuiting; here JWTMiddleware.cs:30 redirects and then still runs `await _next(context)`",
+   "why": "this is the whole entry. A redirect written into the response is not a stop: the controller still executes and still renders, so the browser follows a 302 while an HTTP client reads the body that was produced anyway. The same file also compares ValidateToken's return, which is bool.ToString() = \"False\", against the literal \"false\" (JWTHelper.cs:64 versus JWTMiddleware.cs:30), so the failure branch is unreachable even on its own terms"
+  },
+  {
+   "step": 2,
+   "stage": "primitive",
+   "action": "confirm with a three-way control, not with one request: no cookie, a garbage cookie, and a well-formed alg=none token carrying an invented username",
+   "why": "the first two must redirect and the third must render. Without the controls a 200 proves nothing, because the page might not be gated at all. Here no cookie and Token=garbage both answered 302 while the alg=none token answered 200 with the invented username rendered into the settings form. getClaims uses ReadToken, which parses without verifying, so every claim is attacker-chosen"
+  },
+  {
+   "step": 3,
+   "stage": "sink",
+   "action": "find where the forged claims land in SQL. HomeController.cs:101 builds INSERT INTO Wishlist(ID, username, data) VALUES({ID},'{username}', '{serializedData}') from the claims directly",
+   "why": "the claim is not just an identity, it is a string that reaches raw SQL. Closing the quote after username lets the third column be written verbatim: username = x', '<base64>')-- . Prefer this INSERT over the several other injectable statements, because it is the only one that lets you choose the CONTENT of a column rather than just which row is selected"
+  },
+  {
+   "step": 4,
+   "stage": "sink",
+   "action": "that column is base64 and is fed to JsonConvert.DeserializeObject with TypeNameHandling.All (SerializeHelper.cs:23), so the $type field of the planted JSON chooses the type to construct",
+   "why": "TypeNameHandling.All means the JSON names the class. The usual published gadgets are not needed: the application's own assembly ships StatusCheckHelper, whose `command` SETTER builds a ProcessStartInfo for /bin/bash -c and runs it. Deserialising a property is calling its setter, so setting `command` is the execution"
+  },
+  {
+   "step": 5,
+   "stage": "impact",
+   "action": "plant {\"$type\":\"Nexus_Void.Helpers.StatusCheckHelper, Nexus_Void\",\"command\":\"cp /flag.txt /app/wwwroot/<name>.txt\"} at an ID that owns no row yet, then GET the page that reads that row, then fetch the dropped file",
+   "why": "Program.cs:23 calls UseStaticFiles, so wwwroot is a readable drop point and the whole chain stays in band: no tunnel, no listener, no callback host. The cast after deserialisation fails and the page renders empty, which is irrelevant -- the command already ran while the object was being built"
+  }
+ ],
+ "first_confirming_probe": {
+  "request": "GET /Home/Setting three times: with no Cookie header, with Token=garbage, and with Token=<base64url {\"alg\":\"none\",\"typ\":\"JWT\"}>.<base64url {\"username\":\"n0ne_f0rged\",\"ID\":\"1\",\"iss\":\"NexusVoid\"}>. (trailing dot, empty signature)",
+  "expected": "the first two answer 302 to /, the third answers 200 and the page contains id=\"username\" value=\"n0ne_f0rged\" -- a username that belongs to no account",
+  "falsifier": "the forged token also answers 302, or the no-cookie request also answers 200 (the page was never gated, so the 200 says nothing)"
+ },
+ "blast_radius": "Every step writes. The planted row is an INSERT at an ID no real account holds yet, so it displaces nothing, but it CANNOT be removed with the same primitive: the INSERT branch only runs when the ID owns no row, so a second attempt at that ID takes the UPDATE branch instead. Pick a high ID (1337 here), use one row per payload, and expect them to stay. The command runs as root, so keep it to a copy into wwwroot and remove that file afterwards with a second one-line gadget -- verified 404 after. Anything added to your own wishlist during probing is removable through /Home/WishlistRemove. Do not use `OR '1'='1'` in the product lookup on a shared instance without expecting it: FirstOrDefault then returns the FIRST product in the table, not the one you named, and that product is what gets added.",
+ "verification": {
+  "status": "verified_live",
+  "evidence": "Live HTB instance. Controls: no cookie -> 302, Token=garbage -> 302, Token=a.b.c -> 302; an alg=none token with an empty signature -> 200 rendering id=\"username\" value=\"n0ne_f0rged\". The planted gadget answered 200 Added, the trigger GET answered 200, and GET /nv_9f21.txt returned the flag. Recorded in challenges/nexusvoid/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). The dropped file was removed with a second gadget and verified 404; the probe items were removed from the wishlist and the page shows 'Wishlist is empty'."
+ },
+ "reuse_when": [
+  "any middleware or filter whose failure path calls Redirect, WriteAsync or a status assignment without `return` and without short-circuiting the pipeline: test it with a THREE-way control, because a single 200 cannot tell a bypass from an ungated page",
+  "a JWT library used twice, once to validate and once to read: grep for ReadToken, decode(..., verify=False), jwt.decode with verify off, or any parse that returns claims without the key. The claims the application acts on must come from the validated token object, and when they do not the signature is decorative",
+  "a claim, header or session value that is not just an identity but a STRING that reaches raw SQL: ID and username here both did, and the one to pick is whichever statement lets you choose a column's CONTENT rather than only which row is read",
+  "Json.NET with TypeNameHandling anything but None, JavaScriptSerializer with a SimpleTypeResolver, BinaryFormatter, or a DataContractSerializer with a known type list: look in the APPLICATION'S OWN assembly first. A purpose-built class with a side-effecting property setter beats every published gadget chain and needs no ysoserial",
+  "a .NET property setter that starts a Process, writes a file, or opens a connection: deserialising that property is calling it, so the gadget is one JSON object and no chain at all",
+  "an RCE where the output has to come back and there is no callback host: check for UseStaticFiles and a wwwroot the process can write to. Copying the target into the web root turns a blind command into an in-band read"
+ ],
+ "known_traps": [
+  "the wrong first move here is attacking the HS256 key, and it is an expensive one: 14,448,372 candidates from SecLists scraped-JWT-secrets.txt and rockyou.txt produced no match. The token looks like a signing problem and is not one -- the signature is never checked, so no key search can succeed. Read the middleware before touching the crypto.",
+  "there is no admin surface to reach by impersonation, so do not go looking for one. /Home/Market, /Home/Trending, /Home/Collection, /Home/Wallet, /Home/Admin, /Home/Dashboard, /Home/Profile, /Home/Orders, /Home/Seller, /Home/Flag and /Admin all answer 404, although the nav bar lists market, trending, collection and wallet. Forging username=admin, administrator, root or Xclow3n changes nothing but the echoed string: the three real pages differ only by the length of the username. The privilege is in how far the ID claim reaches into SQL, not in the name.",
+  "the wrong first move here is attacking the HS256 key. The token looks like a signing problem and it is not one: the signature is never checked, so a key search is wasted no matter how long it runs. Read the middleware before touching the crypto.",
+  "`ValidateToken` returns `false.ToString()`, which is \"False\" with a capital F, and the caller compares it to \"false\". Even if the caller had returned, the comparison would never match. Two independent bugs on adjacent lines, and only reading both explains why an invalid token is accepted.",
+  "the redirect still happens, so a browser and any client that follows redirects will land on the login page and hide the bypass. Use a client that does not follow redirects, and read the body that came back WITH the 302.",
+  "in the product lookup, `sellerName` injected with OR makes FirstOrDefault return the first row of the whole table, so the response says \"Added\" while a product you never named is what got added. A boolean oracle built on that endpoint must use AND, not OR.",
+  "the boolean oracle is 200 versus 500, not two different messages: a FALSE lookup returns null and the next line dereferences product.name, so the app throws. The 500 is the FALSE branch, not a broken probe.",
+  "the INSERT branch is reachable only while the ID owns no Wishlist row. Plant one payload per fresh ID; re-using an ID silently takes the UPDATE branch, where the data column is generated and not yours.",
+  "GET /Home/Wishlist reads `WHERE ID='{ID}'` (quoted) while POST reads `WHERE ID={ID}` (unquoted). The same claim is injectable in one and not the other, so check every statement rather than assuming the quoting is consistent.",
+  "WishlistRemove ends in RedirectToAction(\"Home\", \"Wishlist\"), which has the action and controller the wrong way round and answers 404. The removal SQL has already run by then, so a 404 there is success, not failure.",
+  "tools/classify.py --source on a .NET handout reads bin/ and obj/, so it reports matches inside compiled .dll and .a files with meaningless line numbers. Read the Controllers, Helpers and Middleware directories yourself; the classifier's white-box output is unusable on a published .NET tree until those directories are skipped."
+ ],
+ "flag": null,
+ "classification": {
+  "primary": "web-auth-session",
+  "secondary": [
+   "web-sqli",
+   "web-deserialization",
+   "web-logic-flaw"
+  ],
+  "confidence": 0.95
+ }
+}

@@ -524,7 +524,7 @@
       ],
       "skill_tokens": 1696,
       "depth_files": 5,
-      "depth_tokens": 7655,
+      "depth_tokens": 9064,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -537,7 +537,7 @@
         "web-oauth-sso",
         "web-idor"
       ],
-      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:\\balg\\b|\\bhs256\\b|\\brs256\\b|alg\\w*\\s*['\"]?\\s*[:=]\\s*['\"]?\\s*none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
+      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:\\balg\\b|\\bhs256\\b|\\brs256\\b|alg\\w*\\s*['\"]?\\s*[:=]\\s*['\"]?\\s*none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:(?:ReadJwtToken|ReadToken)\\s*\\([^\\n)]*\\)\\s*as\\s+JwtSecurityToken)|(?:Response\\.Redirect\\s*\\([^\\n]*\\)\\s*;[\\s\\S]{0,500}await\\s+_next\\s*\\(\\s*context\\s*\\))|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
       "bug_class": true
     },
     {
@@ -701,7 +701,7 @@
       "routes_to": [
         "web-prototype-pollution"
       ],
-      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:(?<![a-z0-9])(?:unsafe\\ deserialization|web\\ deserialization|deserialization)(?![a-z0-9]))|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)|(?:Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$)",
+      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:(?<![a-z0-9])(?:unsafe\\ deserialization|web\\ deserialization|deserialization)(?![a-z0-9]))|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:TypeNameHandling\\s*(?:=|\\.)\\s*(?:TypeNameHandling\\.)?(?:All|Objects|Auto|Arrays))|(?:JavaScriptSerializer|SimpleTypeResolver|LosFormatter|NetDataContractSerializer|ObjectStateFormatter|EnableUnsafeBinaryFormatterSerialization)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)|(?:Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$)",
       "bug_class": true
     },
     {
@@ -1094,7 +1094,7 @@
       "routes_to": [
         "web-nosqli"
       ],
-      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
       "bug_class": true
     },
     {

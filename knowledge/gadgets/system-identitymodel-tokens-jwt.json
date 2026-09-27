@@ -1,0 +1,16 @@
+{
+  "package": "system.identitymodel.tokens.jwt",
+  "ecosystem": "nuget",
+  "gadgets": [
+    {
+      "versions": "7.0.0 (measured live; the library behaved correctly -- the gadget is how it was called)",
+      "sink": "JwtSecurityTokenHandler.ReadToken used to fetch the claims the application acts on, while ValidateToken is called only for its return value",
+      "payload": "a token the handler can PARSE but not verify: header {\"alg\":\"none\",\"typ\":\"JWT\"}, any payload, and an empty signature segment (note the trailing dot)",
+      "effect": "every claim is attacker-chosen. ReadToken parses without a key, so whatever ValidateToken concluded is irrelevant to the claims that are then used.",
+      "precondition": "the calling code must fail to stop on a validation failure. In ASP.NET Core that is usually a middleware that calls context.Response.Redirect(...) without `return` and still awaits _next(context): the response carries a 302 while the controller runs and renders anyway.",
+      "trap": "ValidateToken here returned bool.ToString(), which is \"False\" with a capital F, and the caller compared it to the literal \"false\" -- so the failure branch was unreachable even before the missing return. Check the CASE of any stringly-typed validation result. A browser follows the 302 and hides the whole thing, so probe with a client that does not follow redirects and read the body returned WITH the 302. Always run the three-way control (no cookie / garbage cookie / forged token) before calling a 200 a bypass.",
+      "proven_by": "measured live (knowledge/chains/htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce.json)"
+    }
+  ],
+  "schema_version": 1
+}
