@@ -537,7 +537,7 @@
         "web-oauth-sso",
         "web-idor"
       ],
-      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:alg\\b|hs256|rs256|none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
+      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:\\balg\\b|\\bhs256\\b|\\brs256\\b|alg\\w*\\s*['\"]?\\s*[:=]\\s*['\"]?\\s*none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
       "bug_class": true
     },
     {
@@ -565,7 +565,7 @@
       "routes_to": [
         "web-parser-differential"
       ],
-      "unlock_signals": "(?:x-cache|cf-cache-status|age:|vary:)|(?:cache)|(?:cdn|varnish|cloudfront)|(?:(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9]))|(?:Cache-Control|s-maxage)|(?:cache\\.(?:set|get)\\s*\\(\\s*(?:req|request))",
+      "unlock_signals": "(?:x-cache|cf-cache-status|\\bage:\\s*\\d|\\bvary:)|(?:cache)|(?:cdn|varnish|cloudfront)|(?:(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9]))|(?:Cache-Control|s-maxage)|(?:cache\\.(?:set|get)\\s*\\(\\s*(?:req|request))",
       "bug_class": true
     },
     {
@@ -603,8 +603,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 882,
-      "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_files": 2,
+      "depth_tokens": 4426,
       "use_when": [
         "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel"
       ],
@@ -629,8 +629,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 924,
-      "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_files": 2,
+      "depth_tokens": 1418,
       "use_when": [
         "a probe or source read produced this class's signal: repeat an authenticated request with a foreign Origin and read whether the origin is reflected alongside credentials"
       ],
@@ -730,7 +730,7 @@
       "routes_to": [
         "file-read-primitives"
       ],
-      "unlock_signals": "(?:upload|multipart/form-data|filename=)|(?:avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b)|(?:image/|mime|magic byte)|(?:(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9]))|(?:multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path))|(?:os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename))",
+      "unlock_signals": "(?:upload|multipart/form-data|filename=)|(?:\\bavatars?\\b|\\battachments?\\b|\\bimports?\\b|\\bplugins?\\b|\\.tar\\b|\\.zip\\b)|(?:image/|mime|magic byte)|(?:(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9]))|(?:multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path))|(?:os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename))",
       "bug_class": true
     },
     {
@@ -743,8 +743,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 942,
-      "depth_files": 1,
-      "depth_tokens": 151,
+      "depth_files": 2,
+      "depth_tokens": 3372,
       "use_when": [
         "a probe or source read produced this class's signal: one introspection query; if it is disabled, one field-suggestion error to recover names"
       ],
@@ -1137,14 +1137,15 @@
       "evidence_level": "verified",
       "verified_by": [
         "htb-neonify-erb-ssti-newline-filter-bypass",
-        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
       "skill_tokens": 958,
       "depth_files": 7,
-      "depth_tokens": 3864,
+      "depth_tokens": 4751,
       "use_when": [
         "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
-        "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+        "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the marker is reflected literally, which is an XSS shape rather than template evaluation",
@@ -1212,25 +1213,27 @@
       "categories": [
         "web"
       ],
-      "evidence_level": "catalogue",
-      "verified_by": [],
-      "skill_tokens": 1809,
-      "depth_files": 1,
-      "depth_tokens": 151,
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
+      ],
+      "skill_tokens": 1852,
+      "depth_files": 2,
+      "depth_tokens": 2810,
       "use_when": [
-        "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel"
+        "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
+        "a chain card already proves this class here: htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the bot can reach no attacker-influenced state at all, and no observable on the target changes as a function of what the victim's browser loaded",
-        "the evidence fits one of these better: web-xss, web-cache-poisoning, web-csrf",
-        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+        "the evidence fits one of these better: web-xss, web-cache-poisoning, web-csrf"
       ],
       "routes_to": [
         "web-xss",
         "web-cache-poisoning",
         "web-csrf"
       ],
-      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9]))|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
+      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:@font-face|unicode-range)|(?:font-src[^\\n;]*\\*)|(?:(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9]))|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:font-src[^\\n;\\\"']*\\*)|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
       "bug_class": true
     },
     {

@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 762,000 tokens across 309 files. Opening
+The depth corpus is roughly 780,000 tokens across 313 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -98,7 +98,7 @@ Open one only after a probe or a source read produced its signal.
 | Unrestricted file upload | verified | the stored file is renamed | `skills/web-file-upload/SKILL.md` |
 | GraphQL abuse | catalogue | introspection is off and errors reveal no field names | `skills/web-graphql/SKILL.md` |
 | Smart contract / web3 | catalogue | the solved condition depends on state no external caller can change | `skills/web-web3/SKILL.md` |
-| Cross-site leak / browser side channel | catalogue | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
+| Cross-site leak / browser side channel | verified | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
 
 Full signal lists, first probes and blast-radius notes are in
 `knowledge/bug-classes.json`. Do not copy them here — the classifier reads

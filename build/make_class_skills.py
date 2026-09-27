@@ -8,7 +8,16 @@ technique content, written per class.
 Verified classes cite the chain card that proves them. Catalogue classes say
 plainly that nothing here has solved one, so a reader never mistakes standard
 knowledge for local experience.
+
+This generator OVERWRITES SKILL.md, and several of these files have been extended
+by hand since they were generated -- an "Operational probe" section, a worked
+example, a measured trap. A plain re-run silently deleted 169 such lines across
+eight skills before this guard existed, and only `git diff` caught it. So a file
+whose body no longer matches any generated body is left alone and REPORTED; pass
+--force to overwrite it deliberately, after copying the hand-written part into
+the BODIES entry or into field-notes.md where it will survive.
 """
+import argparse
 import json
 import os
 
@@ -605,14 +614,54 @@ an entry has any other status.
 """
 
 
+def hand_edited(skill_path, entry):
+    """True when the file on disk carries prose this generator did not write.
+
+    The header and footer are regenerated from the taxonomy every run, so they
+    legitimately differ whenever a class is promoted. The BODY is the part a
+    human extends, so that is the part compared: if every line of the stored
+    body is still present in the file, the file is generator-shaped and safe to
+    rewrite. A line that is not in the stored body is a hand edit.
+    """
+    if not os.path.isfile(skill_path):
+        return []
+    with open(skill_path, encoding="utf-8") as handle:
+        text = handle.read()
+    generated = set(frontmatter(entry).splitlines())
+    generated |= set(BODIES[entry["id"]].splitlines())
+    generated |= set(footer(entry).splitlines())
+    # The header is taxonomy-derived and changes on promotion; accept any form
+    # of it by accepting every line the current taxonomy would produce plus the
+    # catalogue wording it may still be carrying.
+    generated |= set(header(entry).splitlines())
+    generated |= {
+        "**Catalogue class.** This toolkit has never solved one. What follows is",
+        "standard published knowledge, not local experience \u2014 treat it as a starting",
+        "point and record what actually happens in `field-notes.md`.",
+    }
+    return [line for line in text.splitlines()
+            if line.strip() and line not in generated]
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--force", action="store_true",
+                        help="overwrite a SKILL.md that carries hand-written lines")
+    args = parser.parse_args()
+
     with open(TAXONOMY, encoding="utf-8") as handle:
         taxonomy = json.load(handle)
-    created, updated_notes = [], []
+    created, updated_notes, skipped = [], [], []
     for entry in taxonomy["classes"]:
         directory = os.path.join(ROOT, "skills", entry["skill_dir"])
         skill_path = os.path.join(directory, "SKILL.md")
         if entry["id"] in BODIES:
+            extra = [] if args.force else hand_edited(skill_path, entry)
+            if extra:
+                skipped.append({"skill": entry["skill_dir"],
+                                "hand_written_lines": len(extra),
+                                "first": extra[0][:90]})
+                continue
             os.makedirs(directory, exist_ok=True)
             with open(skill_path, "w", encoding="utf-8") as handle:
                 handle.write(frontmatter(entry) + header(entry)
@@ -623,8 +672,14 @@ def main():
             with open(notes, "w", encoding="utf-8") as handle:
                 handle.write(FIELD_NOTES_HEADER.format(name=entry["name"]))
             updated_notes.append(entry["skill_dir"])
-    print(json.dumps({"skills_written": len(created), "field_notes_created": len(updated_notes),
-                      "skills": created}, ensure_ascii=False, indent=1))
+    result = {"skills_written": len(created), "field_notes_created": len(updated_notes),
+              "skills": created}
+    if skipped:
+        result["skipped_hand_edited"] = skipped
+        result["note"] = ("these files carry lines this generator did not write and were "
+                          "LEFT ALONE. Move the hand-written part into the BODIES entry or "
+                          "into field-notes.md, then re-run with --force.")
+    print(json.dumps(result, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":

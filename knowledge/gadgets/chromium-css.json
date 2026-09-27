@@ -1,0 +1,25 @@
+{
+  "package": "chromium css",
+  "ecosystem": "browser",
+  "gadgets": [
+    {
+      "versions": "headless Chromium as driven by puppeteer 23.x (measured live)",
+      "sink": "attacker-controlled CSS rendered in a privileged page, with a CSP whose font-src carries a host wildcard",
+      "payload": "one @font-face per candidate character, all sharing one font-family, each with its own unicode-range and its own absolute URL; then apply that family to the element holding the secret and force it visible with display:block !important",
+      "effect": "leaks the SET of characters the secret contains: the browser fetches a face only when a character inside its unicode-range is actually rendered, so the URLs that get requested are the characters present. When the secret's generator sorts its output, the set IS the string and the leak is complete rather than partial.",
+      "precondition": "font-src must permit the destination. If it is font-src 'self' only, the same trick still works against SAME-ORIGIN URLs, which turns it into a CSRF primitive rather than an exfiltration one -- a font load is a GET the victim performs.",
+      "trap": "nothing is fetched unless the character is actually PAINTED, so an element hidden with a !important utility class leaks nothing and looks identical to the technique failing. Style only the element you want; a second hidden secret on the same page would union its characters into the result. Confirm the stylesheet is really being served first -- an app that writes it asynchronously can race the bot's visit.",
+      "proven_by": "measured live (knowledge/chains/htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind.json)"
+    },
+    {
+      "versions": "any CSP with font-src 'self' (measured live)",
+      "sink": "a privileged route gated on a connection-derived value (req.ip == '127.0.0.1', a trusted X-Forwarded-For, a loopback allowlist) that also accepts a plain GET",
+      "payload": "@font-face{font-family:go;src:url(/privileged/route/with/token);} applied to any element that renders",
+      "effect": "the bot performs the GET from inside, so the address check passes. No external host, no script execution, and no violation of a CSP that allows only 'self'.",
+      "precondition": "the route must act on a GET and must not require a header the font load cannot set",
+      "trap": "the fetch is fire-and-forget: the response is never visible to you, so the effect has to be read back some other way (here, the target page changing from 403 to 200).",
+      "proven_by": "measured live (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

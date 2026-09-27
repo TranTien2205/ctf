@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-26T21:53:40",
+  "generated_at": "2026-09-27T06:31:21",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -9,8 +9,8 @@
     "skills": 52,
     "review": 0,
     "warn": 0,
-    "local_evidence_present": 18,
-    "local_evidence_stub": 7,
+    "local_evidence_present": 19,
+    "local_evidence_stub": 6,
     "local_evidence_missing": 0,
     "actionable_skills": 18,
     "basic_skills": 7
@@ -585,17 +585,15 @@
       "id": "web-xs-leaks",
       "layer": "depth",
       "path": "skills/web-xs-leaks/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 141,
+      "local_evidence": "present",
+      "lines": 145,
       "actionability": "operational",
-      "nearest_neighbour": "web-command-injection",
-      "overlap": 0.074,
-      "trust": "catalogue-or-unreviewed"
+      "nearest_neighbour": "web-oauth-sso",
+      "overlap": 0.073,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-xss",

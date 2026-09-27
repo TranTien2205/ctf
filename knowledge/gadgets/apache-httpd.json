@@ -1,0 +1,25 @@
+{
+  "package": "apache httpd",
+  "ecosystem": "system",
+  "gadgets": [
+    {
+      "versions": "2.4 (measured live on 2.4.65, alpine)",
+      "sink": "AllowOverride All on a writable document root: .htaccess is a configuration write, and a configuration write is a process",
+      "payload": ".htaccess containing  Options +ExecCGI  and  AddHandler cgi-script .<ext>  , plus a file with that extension, chmod 0755, whose first two lines are a Content-Type header and a blank line",
+      "effect": "escapes PHP entirely. disable_functions and open_basedir are PHP SAPI settings and do not apply to a process Apache execs through mod_cgi, so a setuid helper or any binary can be run when every PHP exec function is blocked.",
+      "precondition": "mod_cgi loaded, AllowOverride All (or at least Options FileInfo) on a directory you can write to",
+      "trap": "the script MUST print Content-Type and a blank line before anything else and MUST be 0755, or Apache answers an opaque 500 with the output discarded -- the same 500 a failed exec gives, so the two are indistinguishable from outside. Check the document root for a misspelled .htacess: it is inert, which both explains why overrides look disabled and leaves the real slot free. Remove the .htaccess afterwards; it enables CGI for the whole directory.",
+      "proven_by": "measured live (knowledge/chains/htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape.json)"
+    },
+    {
+      "versions": "2.4 (measured live)",
+      "sink": "not the way in here -- a measured dead end worth not re-walking",
+      "payload": "ScriptAlias /cgi-bin /usr/bin  then  GET /cgi-bin/<binary>?<args>",
+      "effect": "execution really does happen: a missing binary answers 404 while a real one answers 500, which is 'premature end of script headers'. But a plain binary emits no CGI headers so the output is discarded, and query-string-to-argv did not fire on this build (an awk program passed that way left no file behind), so neither output nor arguments were reachable. Use the .htaccess route instead.",
+      "precondition": "n/a",
+      "trap": "the 404-versus-500 difference is still a useful oracle for which binaries exist on the box",
+      "proven_by": "measured live (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

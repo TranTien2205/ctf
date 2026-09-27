@@ -1,0 +1,117 @@
+{
+ "schema_version": 1,
+ "id": "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape",
+ "source_note": "challenges/JerryTok/web_jerrytok/challenge/src/Controller/DefaultController.php",
+ "challenge": {
+  "name": "Jerryboree",
+  "platform": "HackTheBox",
+  "event": "HackTheBox",
+  "category": "web",
+  "solved_at": "2026-09-27",
+  "assistance": "self-solved"
+ },
+ "stack": [
+  "php 8.2",
+  "symfony 7.0",
+  "twig 3.24",
+  "apache 2.4",
+  "mod_cgi",
+  "mod_actions",
+  "php-fpm",
+  "alpine",
+  "docker"
+ ],
+ "preconditions": {
+  "all_of": [
+   "a request value is interpolated into the SOURCE of a template rather than into its context (DefaultController::index passes it to twig createTemplate())",
+   "the template environment is the application's own, so every Symfony Twig extension is registered, including render() and controller()",
+   "the PHP jail blocks the obvious end: disable_functions removes the whole exec family and open_basedir pins PHP to the application directory",
+   "the web server can be made to run a process that is not PHP: Apache has mod_cgi loaded and AllowOverride All on the document root"
+  ],
+  "any_of": [
+   "ScriptAlias maps a URL prefix onto a directory full of real binaries, which is a second, independent way to reach a non-PHP process",
+   "the flag is only readable through a setuid helper, so a file-read primitive is not enough and a process is required"
+  ]
+ },
+ "signals": [
+  "createTemplate",
+  "disable_functions",
+  "open_basedir",
+  "ScriptAlias /cgi-bin /usr/bin",
+  "Action php-script",
+  "AllowOverride All",
+  "readflag",
+  "AbstractController",
+  "Jerryboree",
+  "preloadable_libiconv",
+  "ExecCGI",
+  "cgi-script"
+ ],
+ "chain": [
+  {
+   "step": 1,
+   "stage": "recon",
+   "action": "read the one controller and the container's own hardening before sending a payload: entrypoint.sh writes disable_functions and open_basedir into conf.d, and httpd.conf carries ScriptAlias, Action and AllowOverride",
+   "why": "the interesting half of this challenge is not the injection, it is what the injection cannot do. Knowing the jail first stops a long detour through webshells that can never call a command"
+  },
+  {
+   "step": 2,
+   "stage": "primitive",
+   "action": "confirm the template injection with an arithmetic marker before anything else: GET /?location={{7*7}} renders 49, and {{_self}} returns __string_template__<hash>",
+   "why": "the value reaches createTemplate(), so it is template code and not data. The _self form also proves it is a runtime-compiled string template rather than a pre-existing file"
+  },
+  {
+   "step": 3,
+   "stage": "primitive",
+   "action": "measure the jail instead of trusting the Dockerfile: write a read-only PHP file through the app and fetch it, printing ini_get('disable_functions'), ini_get('open_basedir'), PHP_SAPI and get_loaded_extensions()",
+   "why": "the measured answer differed from the image in one way that matters: LD_PRELOAD was empty at runtime although the Dockerfile sets it, which removes the whole GNU-libiconv memory-corruption branch from consideration. SAPI is cgi-fcgi and open_basedir is the application root"
+  },
+  {
+   "step": 4,
+   "stage": "sink",
+   "action": "turn the SSTI into an arbitrary file write with the Symfony fragment gadget: {{ render(controller('Symfony\\Component\\Filesystem\\Filesystem::dumpFile', {'filename': ..., 'content': ...})) }}",
+   "why": "controller() builds a ControllerReference and render() resolves it through the controller resolver, which instantiates any class with a no-argument constructor and calls the named method with the map entries bound by PARAMETER NAME. Filesystem has a no-argument constructor and dumpFile/chmod/remove are exactly the primitives needed. Twig 3.24 refuses a string where a filter wants a callable, so the usual ['id']|map('system') family is dead here"
+  },
+  {
+   "step": 5,
+   "stage": "impact",
+   "action": "leave PHP entirely: write .htaccess with Options +ExecCGI and AddHandler cgi-script .<ext>, write a shell script with that extension that prints the CGI headers and then runs the setuid helper, chmod it 0755 through the same gadget, and request it",
+   "why": "disable_functions and open_basedir are PHP SAPI settings. A file Apache executes through mod_cgi is a separate process and neither applies to it. The script only has to emit Content-Type and a blank line first, otherwise Apache answers 500 with the output discarded"
+  }
+ ],
+ "first_confirming_probe": {
+  "request": "GET /?location={{7*7}} and then GET /?location={{_self}}",
+  "expected": "the page renders 49 in place of the value, and _self renders __string_template__ followed by a hash: the parameter is compiled as template source",
+  "falsifier": "the braces come back literally (the value is passed as context, not source), or the page 500s on every brace (the template is not compiled from the request at all)"
+ },
+ "blast_radius": "Steps 4 and 5 WRITE into the document root, and the .htaccess changes how Apache treats that directory for everyone until it is removed. Keep the dropped files to a private extension, and remove every one of them afterwards through the same Filesystem::remove gadget; this solve verified 404 on each dropped path and 200 on / afterwards. The command itself is only the challenge's own read-only helper. Do not leave the .htaccess behind: it enables CGI execution for the whole directory.",
+ "verification": {
+  "status": "verified_live",
+  "evidence": "Live HTB instance. /?location={{7*7}} rendered 49; a written probe reported SAPI=cgi-fcgi, disable_functions covering the exec family, open_basedir pinned to the app root and an empty LD_PRELOAD; the dropped .rick script returned the flag in the HTTP response body. Recorded in challenges/jerrytok/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). All six dropped files removed afterwards and verified 404. Cleanup: Filesystem::remove over the six paths; / still answers 200."
+ },
+ "reuse_when": [
+  "a request value reaches a template COMPILER (createTemplate, template_from_string, Twig_Environment::createTemplate, Jinja from_string) rather than a template context",
+  "Twig SSTI where the string-callable filters are refused: Twig 3.12 and later reject ['cmd']|map('system'), so reach for the framework's own functions instead of the engine's",
+  "Symfony with an SSTI or any template control: render(controller('Class::method', {named args})) instantiates any no-argument class and calls a method, which is a general-purpose gadget far beyond file writes",
+  "disable_functions blocks the exec family: stop looking for a PHP function and look for a component the web server will run as its own process (mod_cgi, mod_actions, a ScriptAlias, a queue worker, a cron)",
+  "AllowOverride All on a directory you can write to: .htaccess is a configuration write, and Options +ExecCGI plus AddHandler is a process",
+  "a flag readable only through a setuid helper: a file-read primitive is not enough, the chain has to end in a process"
+ ],
+ "known_traps": [
+  "measure the jail, do not read it off the Dockerfile. This image sets LD_PRELOAD to a GNU libiconv build, which is the precondition for the well-known iconv memory-corruption bypass, but at runtime getenv('LD_PRELOAD') is EMPTY. Believing the Dockerfile would have sent the solve into a heap-grooming exploit that could not have worked.",
+  "the shipped document root contains a file named .htacess, one letter short of .htaccess, so Apache never reads it. It is not a rewrite config that is failing, it is an inert file and the real .htaccess slot is free. Check the spelling before concluding overrides are disabled.",
+  "ScriptAlias /cgi-bin /usr/bin looks like the way in and is a dead end on its own: a request to a real binary returns 500 and a request to a missing one returns 404, so execution IS happening, but Apache discards the output because a plain binary emits no CGI headers. Query-string-to-argv also did not fire here (a program written through awk left no file), so neither output nor arguments were reachable that way.",
+  "Twig 3.24 rejects a string where a filter expects a callable, so map/filter/sort/reduce with 'system' all fail. Fingerprint the engine first with constant('Twig\\\\Environment::VERSION') instead of cycling payloads.",
+  "source() and include() on an absolute path answer 500 here, and it is open_basedir rather than the Twig loader; do not read that as the injection being sandboxed.",
+  "a CGI script must print Content-Type and a blank line before anything else, and it must be chmod 0755. Either one missing gives the same opaque 500 as a failed exec."
+ ],
+ "flag": null,
+ "classification": {
+  "primary": "web-ssti",
+  "secondary": [
+   "web-logic-flaw",
+   "file-read-primitives"
+  ],
+  "confidence": 0.9
+ }
+}

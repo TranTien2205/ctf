@@ -1,0 +1,16 @@
+{
+  "package": "sqlite",
+  "ecosystem": "system",
+  "gadgets": [
+    {
+      "versions": "SQLite 3 generally (measured live through node sqlite-async 1.1.1 / sqlite3 5.1.7)",
+      "sink": "a request value interpolated into the LIMIT clause",
+      "payload": "LIMIT (SELECT CASE WHEN <predicate> THEN 1 ELSE 0 END)",
+      "effect": "a boolean oracle with no error output, no UNION and no stacked queries. SQLite accepts ANY scalar expression as LIMIT, so the number of rows the endpoint returns is one bit. Binary-search unicode(substr((<subquery>),i,1)) per position, and length((<subquery>)) first, to read arbitrary tables including sqlite_master.",
+      "precondition": "the query returns a row set whose baseline size is known and non-zero, so 1 row and 0 rows are distinguishable. Pin it by first inserting exactly one row you own.",
+      "trap": "LIMIT sits after WHERE, so the injection cannot add a predicate -- only the row count carries the signal. A LIKE pattern used to find the table will fail silently if the application set PRAGMA case_sensitive_like=ON. In a JavaScript caller, sending the value as the NUMBER 0 can hit a truthiness guard like `if (id && pagination)` and get no response at all, which reads as a timeout; send the STRING \"0\" instead.",
+      "proven_by": "measured live (knowledge/chains/htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind.json)"
+    }
+  ],
+  "schema_version": 1
+}

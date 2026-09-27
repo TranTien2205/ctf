@@ -131,7 +131,8 @@
       "evidence_level": "verified",
       "verified_by": [
         "htb-neonify-erb-ssti-newline-filter-bypass",
-        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
       "observation_signals": [
         "\\{\\{|\\$\\{|#\\{|<%=",
@@ -447,7 +448,7 @@
         "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
       "observation_signals": [
-        "x-cache|cf-cache-status|age:|vary:",
+        "x-cache|cf-cache-status|\\bage:\\s*\\d|\\bvary:",
         "cache",
         "cdn|varnish|cloudfront",
         "(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9])"
@@ -613,7 +614,7 @@
         "\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,}",
         "session|jsessionid|connect\\.sid|phpsessid|laravel_session",
         "cookie_secret|app_key|secret_key|signed cookie",
-        "alg\\b|hs256|rs256|none",
+        "\\balg\\b|\\bhs256\\b|\\brs256\\b|alg\\w*\\s*['\"]?\\s*[:=]\\s*['\"]?\\s*none",
         "\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code",
         "password reset|forgot password|magic link",
         "passwordless|no password (?:field|input|required)|no credential",
@@ -768,7 +769,7 @@
       ],
       "observation_signals": [
         "upload|multipart/form-data|filename=",
-        "avatar|attachment|import|plugin|\\.tar\\b|\\.zip\\b",
+        "\\bavatars?\\b|\\battachments?\\b|\\bimports?\\b|\\bplugins?\\b|\\.tar\\b|\\.zip\\b",
         "image/|mime|magic byte",
         "(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9])"
       ],
@@ -847,18 +848,23 @@
       "id": "web-xs-leaks",
       "name": "Cross-site leak / browser side channel",
       "skill_dir": "web-xs-leaks",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
+      ],
       "observation_signals": [
         "admin bot|report to admin|visit.{0,20}url|headless",
         "xs-?leak|side.?channel",
         "window\\.length|frame count|cache probe",
         "script-src\\s+'none'",
+        "@font-face|unicode-range",
+        "font-src[^\\n;]*\\*",
         "(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9])"
       ],
       "source_signals": [
         "puppeteer|playwright|selenium|chromedriver|google-chrome",
         "script-src\\s+'none'",
+        "font-src[^\\n;\\\"']*\\*",
         "URLBlocklist|URLAllowlist|policies/managed",
         "setCookie[\\s\\S]{0,120}sameSite",
         "maxmemory-policy\\s+(?:allkeys|volatile)-lru"

