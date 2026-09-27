@@ -600,23 +600,25 @@
       "categories": [
         "web"
       ],
-      "evidence_level": "catalogue",
-      "verified_by": [],
-      "skill_tokens": 882,
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
+      ],
+      "skill_tokens": 973,
       "depth_files": 2,
-      "depth_tokens": 4426,
+      "depth_tokens": 5398,
       "use_when": [
-        "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel"
+        "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
+        "a chain card already proves this class here: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
       ],
       "do_not_use_when": [
         "the falsifier has been observed: the value is passed as a single argv element, never through a shell",
-        "the evidence fits one of these better: web-ssti",
-        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+        "the evidence fits one of these better: web-ssti"
       ],
       "routes_to": [
         "web-ssti"
       ],
-      "unlock_signals": "(?:command injection)|(?:\\bping\\b.{0,20}(?:host|ip|target))|(?:uid=\\d+\\(|gid=\\d+\\()|(?:sh: \\d+:|/bin/sh)|(?:(?<![a-z0-9])(?:web\\ command\\ injection|os\\ command\\ injection|command\\ injection|command\\-injection)(?![a-z0-9]))|(?:os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True)|(?:shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$)|(?:require\\s*\\(\\s*[\\\"']child_process|from subprocess import)|(?:(?:execSync|spawnSync|execFileSync)\\s*\\()|(?:child_process[^\\n]{0,40}exec\\s*\\()",
+      "unlock_signals": "(?:command injection)|(?:(?:calculator|expression|formula|math|template)[^\\n]{0,60}(?:evaluat\\w+|\\beval\\b|comput\\w+ (?:the )?(?:result|value)))|(?:\\beval\\b[^\\n]{0,60}(?:user|request|input|param\\w*|\\bget\\b|\\bpost\\b|formula|expression|supplied))|(?:(?:user|request|input|param\\w*|formula|expression|supplied)[^\\n]{0,60}(?:reaches|passed to|handed to|goes into|lands in)[^\\n]{0,30}\\beval\\b)|(?:(?:filter|denylist|blocklist|blocks?|rejects?|strips?)[^\\n]{0,70}(?:letters|alphabetic|\\ba-z\\b|quote\\w*)[^\\n]{0,70}(?:eval\\w*|expression|formula|sandbox|evaluator))|(?:\\bping\\b.{0,20}(?:host|ip|target))|(?:uid=\\d+\\(|gid=\\d+\\()|(?:sh: \\d+:|/bin/sh)|(?:(?<![a-z0-9])(?:web\\ command\\ injection|os\\ command\\ injection|command\\ injection|command\\-injection)(?![a-z0-9]))|(?:os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True)|(?:\\beval\\s*\\(\\s*['\\\"][^'\\\"\\n]{0,40}['\\\"]\\s*\\.\\s*\\$)|(?:\\beval\\s*\\([^\\n]{0,60}(?:\\$_(?:GET|POST|REQUEST)|request\\.(?:args|form|GET|POST)|params\\[))|(?:new\\s+Function\\s*\\(|vm\\.run(?:InNewContext|InThisContext|InContext)?\\s*\\()|(?:preg_match(?:_all)?\\s*\\(\\s*['\\\"]/\\[[^\\]\\n]{0,20}a-z[^\\]\\n]{0,20}\\])|(?:shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$)|(?:require\\s*\\(\\s*[\\\"']child_process|from subprocess import)|(?:(?:execSync|spawnSync|execFileSync)\\s*\\()|(?:child_process[^\\n]{0,40}exec\\s*\\()",
       "bug_class": true
     },
     {

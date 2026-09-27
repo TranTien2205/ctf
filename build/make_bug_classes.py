@@ -85,10 +85,26 @@ CLASSES = [
     },
     {
         "id": "web-command-injection", "name": "OS command injection", "skill_dir": "web-command-injection",
-        "evidence_level": "catalogue", "verified_by": [],
-        "observation_signals": [r"command injection", r"\bping\b.{0,20}(?:host|ip|target)",
+        "evidence_level": "verified",
+        "verified_by": ["htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"],
+        "observation_signals": [r"command injection",
+                                # pcalc: classify returned NOTHING for a textbook
+                                # eval-injection observation, because this class
+                                # only knew about OS commands. Code reaching an
+                                # evaluator is the same class of finding.
+                                r"(?:calculator|expression|formula|math|template)[^\n]{0,60}(?:evaluat\w+|\beval\b|comput\w+ (?:the )?(?:result|value))",
+                                r"\beval\b[^\n]{0,60}(?:user|request|input|param\w*|\bget\b|\bpost\b|formula|expression|supplied)",
+                                r"(?:user|request|input|param\w*|formula|expression|supplied)[^\n]{0,60}(?:reaches|passed to|handed to|goes into|lands in)[^\n]{0,30}\beval\b",
+                                r"(?:filter|denylist|blocklist|blocks?|rejects?|strips?)[^\n]{0,70}(?:letters|alphabetic|\ba-z\b|quote\w*)[^\n]{0,70}(?:eval\w*|expression|formula|sandbox|evaluator)", r"\bping\b.{0,20}(?:host|ip|target)",
                                 r"uid=\d+\(|gid=\d+\(", r"sh: \d+:|/bin/sh"],
         "source_signals": [r"os\.system\s*\(|subprocess\.(?:run|call|Popen)[^\n]*shell\s*=\s*True",
+                           # An evaluator fed by string concatenation, and the
+                           # character-class denylist that is usually the only
+                           # thing in front of it.
+                           r"\beval\s*\(\s*['\"][^'\"\n]{0,40}['\"]\s*\.\s*\$",
+                           r"\beval\s*\([^\n]{0,60}(?:\$_(?:GET|POST|REQUEST)|request\.(?:args|form|GET|POST)|params\[)",
+                           r"new\s+Function\s*\(|vm\.run(?:InNewContext|InThisContext|InContext)?\s*\(",
+                           r"preg_match(?:_all)?\s*\(\s*['\"]/\[[^\]\n]{0,20}a-z[^\]\n]{0,20}\]",
                            r"shell_exec\s*\(|passthru\s*\(|proc_open\s*\(|\bsystem\s*\(\s*\$",
                            r"require\s*\(\s*[\"']child_process|from subprocess import",
                            r"(?:execSync|spawnSync|execFileSync)\s*\(",

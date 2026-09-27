@@ -152,6 +152,18 @@
       "observation": "the endpoint starts answering 429 after twenty tries, but the doubled slash form of the same path is never throttled",
       "expect": "web-parser-differential",
       "why": "live-verified: the same chain. A limiter keyed on the raw path is the same defect as a deny keyed on it"
+    },
+    {
+      "id": "calculator-evaluates-expression",
+      "observation": "a calculator page takes a formula in the query string and evaluates whatever expression you type",
+      "expect": "web-command-injection",
+      "why": "live-verified: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
+    },
+    {
+      "id": "eval-behind-a-character-denylist",
+      "observation": "the parameter is passed to eval with only a character blocklist in front of it, and it rejects letters and quotes",
+      "expect": "web-command-injection",
+      "why": "live-verified: the same chain. A denylist in front of an evaluator is the shape, not the shell"
     }
   ]
 }

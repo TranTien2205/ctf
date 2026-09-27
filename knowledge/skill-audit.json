@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T08:20:54",
+  "generated_at": "2026-09-27T08:56:55",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -9,8 +9,8 @@
     "skills": 52,
     "review": 0,
     "warn": 0,
-    "local_evidence_present": 19,
-    "local_evidence_stub": 6,
+    "local_evidence_present": 20,
+    "local_evidence_stub": 5,
     "local_evidence_missing": 0,
     "actionable_skills": 18,
     "basic_skills": 7
@@ -267,17 +267,16 @@
       "layer": "depth",
       "path": "skills/web-command-injection/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
+        "no operational probe contract"
       ],
-      "score": 80,
+      "score": 90,
       "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 85,
+      "local_evidence": "present",
+      "lines": 92,
       "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.19,
-      "trust": "catalogue-or-unreviewed"
+      "nearest_neighbour": "web-parser-differential",
+      "overlap": 0.182,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-cors",
@@ -349,8 +348,8 @@
       "local_evidence": "stub",
       "lines": 96,
       "actionability": "operational",
-      "nearest_neighbour": "web-command-injection",
-      "overlap": 0.189,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.182,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -365,7 +364,7 @@
       "local_evidence": "stub",
       "lines": 105,
       "actionability": "operational",
-      "nearest_neighbour": "web-command-injection",
+      "nearest_neighbour": "web-open-redirect",
       "overlap": 0.042,
       "trust": "catalogue-or-unreviewed"
     },
@@ -591,8 +590,8 @@
       "local_evidence": "present",
       "lines": 145,
       "actionability": "operational",
-      "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.073,
+      "nearest_neighbour": "web-command-injection",
+      "overlap": 0.075,
       "trust": "local-confirmed"
     },
     {

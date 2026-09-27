@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 783,000 tokens across 313 files. Opening
+The depth corpus is roughly 784,000 tokens across 313 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -76,7 +76,7 @@ Open one only after a probe or a source read produced its signal.
 |---|---|---|---|
 | SQL injection | verified | for an immediate sink | `skills/web-sqli/SKILL.md` |
 | NoSQL / operator injection | verified | the value is coerced to a string | `skills/web-nosqli/SKILL.md` |
-| OS command injection | catalogue | the value is passed as a single argv element | `skills/web-command-injection/SKILL.md` |
+| OS command injection | verified | the value is passed as a single argv element | `skills/web-command-injection/SKILL.md` |
 | Server-side template injection | verified | the marker is reflected literally | `skills/web-ssti/SKILL.md` |
 | XML external entity | verified | the parser is configured with entity resolution disabled | `skills/web-xxe/SKILL.md` |
 | Server-side request forgery | verified | the fetch target is fixed in source and the request never influences it | `skills/web-ssrf/SKILL.md` |

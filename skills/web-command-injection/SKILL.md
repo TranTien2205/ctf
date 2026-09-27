@@ -2,7 +2,7 @@
 name: web-command-injection
 description: >
   Action-oriented depth skill for OS command injection. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: web-ssti.
-  Catalogue class: nothing in this toolkit has solved one yet.
+  Verified here by 1 chain card(s).
 tags: [web, command-injection, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
@@ -11,13 +11,20 @@ budget:
   stop_conditions:
     - "same probe point: 3 attempts with no new signal"
     - "the class falsifier is observed"
-evidence_level: catalogue
+evidence_level: verified
 ---
 # OS command injection
 
-**Catalogue class.** This toolkit has never solved one. What follows is
-standard published knowledge, not local experience — treat it as a starting
-point and record what actually happens in `field-notes.md`.
+**Verified here.** Chains that prove this class:
+
+- `knowledge/chains/htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce.json`
+
+Run `python3 tools/chain_match.py` before this skill: a matching chain gives you
+the exact confirming probe that already worked. Note what that card widened this
+class to cover — code reaching an **evaluator** (`eval`, an expression sandbox, a
+calculator) is the same finding as a shell metacharacter reaching a shell, and
+the classifier now routes both here. Everything below that the chain card does
+not cover is still standard published knowledge.
 
 ## First probe
 
