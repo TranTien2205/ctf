@@ -1,0 +1,119 @@
+{
+ "schema_version": 1,
+ "id": "htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read",
+ "source_note": "challenges/The Galactic Times/web_the_galactic_times/challenge/views/list.pug",
+ "challenge": {
+  "name": "The Galactic Times",
+  "platform": "HackTheBox",
+  "event": "HackTheBox",
+  "category": "web",
+  "solved_at": "2026-09-27",
+  "assistance": "self-solved"
+ },
+ "stack": [
+  "node",
+  "fastify",
+  "fastify-helmet",
+  "point-of-view",
+  "pug",
+  "fastify-formbody",
+  "sqlite-async",
+  "puppeteer",
+  "headless chrome 90",
+  "docker"
+ ],
+ "preconditions": {
+  "all_of": [
+   "the page holding the secret is gated on a connection-derived value, so only something on the box can read it",
+   "something on the box renders attacker-controlled content: here a puppeteer bot visits a second gated page on every submission",
+   "the template writes that content unescaped, which for pug is !{...} and for its siblings is <%- ... %> or {{{ ... }}}",
+   "the CSP forbids inline script but allows a CDN origin plus 'unsafe-eval', which together are a complete execution primitive",
+   "the CSP sets neither form-action nor navigate-to, so a top-level navigation is unrestricted even when every fetch and image is confined to 'self'"
+  ],
+  "any_of": [
+   "the secret and the bot share an origin, so the bot's own read of it is same-origin and needs no CORS",
+   "no readable sink exists on the target, which forces the answer outward rather than making it merely convenient"
+  ]
+ },
+ "signals": [
+  "Only localhost is allowed",
+  "!{feedback[i].comment}",
+  "script-src 'self' 'unsafe-eval' https://cdnjs.cloudflare.com/",
+  "point-of-view",
+  "reply.view",
+  "puppeteer.launch",
+  "waitUntil: 'networkidle2'",
+  "db.migrate",
+  "purgeData",
+  "fastify-formbody",
+  "Route POST:/x not found"
+ ],
+ "chain": [
+  {
+   "step": 1,
+   "stage": "recon",
+   "action": "read the CSP as the specification of the intended solution before probing anything. 'unsafe-eval' plus exactly one CDN origin describes a library-driven execution primitive; the absence of form-action and navigate-to says the way out is a navigation",
+   "why": "this challenge is solvable from its CSP header alone. Every later measurement only confirmed what the policy already said, and reading it that way first would have saved most of the session"
+  },
+  {
+   "step": 2,
+   "stage": "recon",
+   "action": "enumerate routes to completion and read every rendered page in full. /feedback links to /list in its markup, and /alien -- the page that actually holds the flag -- is only found by discovery",
+   "why": "both gated routes answer the same 401, so the proxy-shaped 'Only localhost is allowed' is a signpost: a route someone bothered to gate is a route that matters. Missing /alien cost a whole phase of this solve"
+  },
+  {
+   "step": 3,
+   "stage": "primitive",
+   "action": "prove the bot exists with a payload that needs NO JavaScript: <meta http-equiv=\"refresh\" content=\"0;url=http://<collector>/marker\">. CSP does not restrict meta refresh",
+   "why": "this single probe settles three unknowns at once and separates them from each other: the feedback really is rendered as raw HTML, a bot really does render it, and the container really does have outbound internet. Testing them together with a JavaScript payload leaves a failure unattributable"
+  },
+  {
+   "step": 4,
+   "stage": "primitive",
+   "action": "prove the CSP bypass with a second payload that loads the library from the allowed CDN and navigates, and put a meta-refresh FALLBACK a few seconds later pointing at a different path",
+   "why": "the fallback is what makes the result clean. If the library path fires you see its marker and never the fallback; if it does not you see the fallback and know execution failed rather than delivery"
+  },
+  {
+   "step": 5,
+   "stage": "impact",
+   "action": "final payload: the library from the CDN, then {{constructor.constructor('<js>')()}}, where <js> uses a SYNCHRONOUS XMLHttpRequest to read the gated page and then assigns location to the collector with the flag in the query",
+   "why": "the bot's page is same-origin with the secret AND originates from 127.0.0.1, so its read passes the gate that no header of mine could. The navigation carries the result out through the one channel the CSP leaves open"
+  }
+ ],
+ "first_confirming_probe": {
+  "request": "submit, as the stored content, exactly: <meta http-equiv=\"refresh\" content=\"0;url=http://<your collector>/marker\">",
+  "expected": "a request for /marker arrives at your collector from a headless browser user agent, within seconds of the submission",
+  "falsifier": "nothing arrives. Before blaming the payload, re-prove that the collector is reachable from outside at that exact moment -- a dead tunnel and a broken payload look identical from here"
+ },
+ "blast_radius": "Every attempt writes a row and launches a browser on the target: the submission endpoint calls the bot synchronously in its handler, so one submission is one Chrome launch. Keep the rate to a few per minute and the attempt count low. The app wipes its own table after each bot visit, so nothing persists and there is nothing to clean up on the target, but that same wipe means a payload left sitting is gone by the next visit -- submit and watch in one go rather than staging. On your own side this needs a public collector: bind it to loopback, expose it only through one tunnel, use it for the single leak, then tear it down and verify the port is refusing connections.",
+ "verification": {
+  "status": "verified_live",
+  "evidence": "Live HTB instance. A meta-refresh payload produced a request from Mozilla/5.0 (X11; Linux x86_64) ... HeadlessChrome/90.0.4427.0 Safari/537.36, proving the bot, the raw-HTML rendering and the container's egress. A cdnjs angular payload with an 8-second meta-refresh fallback produced the angular marker and never the fallback, proving the CSP bypass. The final payload returned GOT?f=HTB{...} to the collector. Separately, before any of that, the bypass was verified in a browser against the live origin's real CSP header: new Function(...) returned FUNC-OK, the cdnjs script loaded and defined angular, angular.bootstrap on {{constructor.constructor(...)()}} executed, fetch('/alien') reached the app and was refused by it with 401 rather than by CSP, while a cross-origin fetch and a cross-origin image were both blocked."
+ },
+ "reuse_when": [
+  "a page holding the prize is gated on a connection-derived value and no header moves it: stop attacking the gate and find something already inside that renders your content",
+  "a CSP that forbids inline script but names a CDN origin and 'unsafe-eval': that pair is the execution primitive, and the CDN's own template library is the tool. Check what the policy does NOT mention -- form-action and navigate-to are usually absent, which leaves navigation as an unrestricted channel out",
+  "a template engine's unescaped form reaching stored content: pug's !{...}, EJS's <%- %>, handlebars' {{{ }}}, jinja's |safe. The escaped and unescaped forms differ by one character and only the unescaped one is a sink",
+  "any bot-driven challenge: prove the bot with a payload that needs no script at all before debugging a payload that does. A meta refresh is unaffected by CSP and isolates delivery from execution",
+  "a headless browser driven by puppeteer with waitUntil networkidle2: anything asynchronous in your payload races browser.close(). Read synchronously, or do the exfiltrating navigation first and the reading second"
+ ],
+ "known_traps": [
+  "a dead callback host is indistinguishable from a broken payload, and this is the trap that cost the most here. The free ssh tunnel used carried traffic for roughly a minute after it was established and then silently stopped while the ssh process stayed alive and the public hostname merely timed out. Four payload variants and a length sweep were all wrongly suspected before re-sending a known-good payload showed that IT had stopped arriving too. Prove delivery with a marker request immediately before every submission, and rebuild the tunnel per attempt rather than leaving one up.",
+  "fetch().then(...) in the payload produces no hit AND no error, because the bot's goto resolves on network idle and browser.close() tears the page down before the promise settles. That silence reads exactly like a payload that never ran. Use a synchronous XMLHttpRequest.",
+  "a failed angular expression is silent. Keep the expression string single-quoted with double quotes inside -- the one form proven to work here -- because a backslash-escaped variant parses as nothing and reports nothing. Avoid regexes in the expression too: braces inside {{ }} are an avoidable risk, and indexOf plus substr needs neither braces nor escapes.",
+  "always include a catch that navigates with the error text. Without it every failure mode looks the same from outside.",
+  "`kill \"${VAR:-0}\"` in a runner script sends the signal to the whole PROCESS GROUP on the first pass, when the variable is still unset, and kills the script itself -- exit 144 after printing one line. This masqueraded as the exploit failing for two runs. Only ever kill a PID that is set and greater than 1.",
+  "the app's own cleanup wipes the stored content after every bot visit, so a payload cannot be staged and triggered later; and a browser that follows redirects will turn the gated page's 401 into something else entirely if you probe it carelessly.",
+  "discovery that was interrupted is not a negative result. The route holding the flag was in the wordlist already in use; the run was cut short by a timeout wrapper after printing two routes, and the partial output was read as the complete list."
+ ],
+ "flag": null,
+ "classification": {
+  "primary": "web-xss",
+  "secondary": [
+   "web-xs-leaks",
+   "web-logic-flaw",
+   "web-csrf"
+  ],
+  "confidence": 0.95
+ }
+}

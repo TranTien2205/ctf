@@ -1252,7 +1252,7 @@
       ],
       "skill_tokens": 1196,
       "depth_files": 7,
-      "depth_tokens": 5810,
+      "depth_tokens": 6997,
       "use_when": [
         "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"

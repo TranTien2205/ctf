@@ -3,7 +3,7 @@
   "id": "htb-galactic-times-list-localhost-gate",
   "challenge": "The Galactic Times",
   "event": "HackTheBox",
-  "status": "unsolved-blocked-on-tooling; design fully understood from the handout",
+  "status": "solved; kept for the measured negatives",
   "why_this_file_exists": "knowledge/chains/ only accepts a solve. Everything that does not need an outbound callback was measured here and most of it is DEAD; without this file the next attempt re-walks nine header bypasses, nine path variants and two prototype-pollution routes that are already known to fail.",
   "attempted_at": "2026-09-27",
   "target_shape": {
@@ -101,5 +101,6 @@
     "run_it_yourself": "bash challenges/galactictimes/solve.sh  -- it opens one ssh reverse tunnel to a loopback collector, submits the payload, waits for the bot, prints the flag and tears both down, checking the port is closed afterwards",
     "or": "re-run the challenge from a session that is not in auto mode, where the agent can open the tunnel itself",
     "validated_before_handover": "the inner JavaScript parses under node --check, the payload round-trips through JSON, and the script passes bash -n"
-  }
+  },
+  "superseded_by": "SUPERSEDED: the challenge was solved on 2026-09-27. See knowledge/chains/htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read.json. The dead layers below are still accurate and still worth not re-walking; only the 'unsolved' framing is out of date."
 }
