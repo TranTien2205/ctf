@@ -261,6 +261,12 @@ CLASSES = [
                            r"<\?=\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\n]){0,70}\$_(?:GET|POST|REQUEST|COOKIE)",
                            r"\becho\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\n]){0,70}\$_(?:GET|POST|REQUEST|COOKIE)",
                            r"dangerouslySetInnerHTML|mark_safe|\|\s*safe\b|\{\{\{",
+                           # The template engines' own opt-out-of-escaping
+                           # syntax. The Galactic Times renders stored feedback
+                           # through pug's !{...} and nothing here matched it,
+                           # so the one real sink in the tree ranked nothing.
+                           r"!\{\s*[A-Za-z_$][\w$.\[\]'\"]{0,40}\s*\}",
+                           r"<%-\s*[A-Za-z_$]|\{%\s*autoescape\s+(?:off|false)",
                            r"res\.(?:send|write|end)\s*\(\s*`[^`\n]*\$\{",
                            r"(?:render|reply)\s*\([^)\n]*\bhtml\b[^)\n]*\$\{",
                            r"v-html|\bunescape\b|autoescape\s*=\s*False"],
