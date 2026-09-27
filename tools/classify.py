@@ -407,9 +407,19 @@ def rebuild_stats(taxonomy_path=TAXONOMY):
 
 
 def log_miss(kind, value):
+    # One gap is one line. Re-logging the same observation with a fresh
+    # timestamp inflated classify_miss_lines (27 distinct misses read as 127),
+    # which made the backlog look like an emergency instead of a short list.
     try:
+        text = re.sub(r"\s+", " ", value)[:300]
+        if os.path.exists(MISSES):
+            with open(MISSES, encoding="utf-8") as handle:
+                for line in handle:
+                    parts = line.rstrip("\n").split("\t")
+                    if len(parts) >= 3 and parts[1] == kind and parts[2] == text:
+                        return
         line = "%s\t%s\t%s\n" % (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                 kind, re.sub(r"\s+", " ", value)[:300])
+                                 kind, text)
         with open(MISSES, "a", encoding="utf-8") as handle:
             handle.write(line)
     except OSError:

@@ -100,3 +100,36 @@ Falsifier: Both requests return 401, meaning the version is patched or the heade
 **Blast radius**: The executed command runs as root inside the container and the queue is shared, so anything pushed there runs once for whoever pops it. Copying a secret into a web-readable directory exposes it to every other visitor until removed. The stored sourceUrl is global process state: leaving it pointed at gopher or at a missing file breaks the endpoint for everyone, so restore it. A gopher request to a datastore that does not close the connection leaves the outbound client hanging with no timeout, which ties up a worker on the target.
 
 - status: proposed
+
+## 2026-09-26 · Intergalactic Bounty · confirmed
+
+- source note: `challenges/Intergalatic Bounty/web_intergalatic_bounty/challenge/controllers/bountyController.js`
+- chain card: `knowledge/chains/htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce.json`
+- verification: verified_live — Live HTB instance. GET /transmit returned HTTP 200 rendering the bounty JSON that needle had written over views/transmit.html, with the `status` field replaced by the output of `cat /flag.txt`. Recorded in challenges/galactic-bounty/state.json through tools/hooks.py post-probe (verdict confirms, evidence-kind impact) and pre-flag (source live-response).
+- classified as: `web-auth-session` (score 1.08, 1 signals matched)
+- also matched: `web-logic-flaw` (0.93)
+- signals that fired: JWT
+
+**Confirming probe that worked**
+
+> POST /api/sendEmail with {"email":["<your registered address>@interstellar.htb","test@email.htb"]}, then GET the mail app on the second exposed port
+
+Expected: HTTP 200 {"message":"New verification code sent"} and the verification code visible in the mailbox that only shows mail addressed to test@email.htb — proving the array was read as an IN-list by the ORM and as a recipient list by the mailer
+
+Falsifier: the mailbox stays empty (nodemailer given a single recipient, or the lookup is a strict string equality that an array cannot satisfy), or /api/sendEmail answers 'User not found' (the ORM rejected the array instead of widening to IN)
+
+**Traps recorded on this solve**
+
+- needle's `output` alone CRASHES the app when the fetched response is JSON. With parse_response at its default 'all', needle emits a parsed object and then does file.write(chunk) on it: ERR_INVALID_ARG_TYPE escapes as an unhandled rejection because transmitAPI has no try/catch, node exits, supervisord restarts it and sequelize.sync({force:true}) wipes the database. Pollute parse_response:false in the same request. Reproduced offline against needle 3.3.1 before it was fired again.
+- the PUT always answers 500 {"message":"Error fetching data"} — that is data.update() failing AFTER mergedeep has already run. The pollution has landed; do not read the 500 as a failed probe. Confirm it out of band with an unauthenticated request (once `cookies` is polluted, cookie-parser returns early because req.cookies is inherited, and every request authenticates as the polluted token).
+- the puppeteer branch is a measured dead end on modern node. Object.prototype.debuggingPort DOES reach chromium's argv (computeLaunchArguments destructures it off the options object, and @puppeteer/browsers spawns with a plain {detached,env,stdio} literal), but node 20.18.3 ignores a prototype-inherited `shell` — an own shell:true shells out, the inherited one does not — so the argv injection never reaches /bin/sh. BrowserLauncher also existsSync()s executablePath, which kills the 'executablePath = command #' variant.
+- nunjucks caches compiled templates per loader, so overwriting a view that has already been rendered in this process is silently a no-op. views/index.html is the obvious target and the wrong one if anything has fetched / — use a view no request has reached yet.
+- JSON.stringify escapes the double quotes inside the payload, so the template on disk reads require(\"child_process\"). nunjucks' lexer unescapes it, but only if the OUTER quotes are single — write {{range.constructor('...\"...\"...')()}}, never the reverse.
+- MailHog persists across an app restart (separate supervisord program, maildir storage), so after a crash the mailbox still holds the previous code. Hit /deleteall on the mail app before re-reading, or take the last match, or you will verify with a stale OTP.
+- registerAPI's response says 'Verification email sent' but User.createUser never sends one. Only /api/sendEmail does. Waiting for the mail that the registration response promised wastes the first probe.
+- the email-parser polyglot that public writeups use ('"test@email.htb ..."@interstellar.htb') is a different opener for the same step. A differential sweep of email-addresses 5.0.0 against nodemailer 6.9.16 over 25 candidate strings found no single-address form that parses as domain interstellar.htb while producing envelope recipient test@email.htb — the array shape goes through /api/sendEmail instead, which skips the domain check entirely.
+- provenance: the chain was derived from the pinned package sources (needle's `output`, puppeteer's debuggingPort/shell) before any search; a writeup search was then used once, to choose between those two candidate final hops rather than spend probes on both, and the puppeteer branch was measured dead locally afterwards. Card is filed writeup-assisted for that reason.
+
+**Blast radius**: Step 6 writes onto Object.prototype for the lifetime of the process and step 7 OVERWRITES a template file on disk — views/transmit.html stops being the real page until the instance is restarted. Pick a view that has not been rendered yet in that process: nunjucks' FileSystemLoader caches compiled templates by name, so overwriting a view that was already served does nothing. The PUT itself is safe for the row: mergedeep adds no own key to the target, so data.update() is a no-op update (it still answers 500, see traps). Anything that crashes the node process is expensive here because database.js runs sequelize.sync({force:true}) on boot: every account, bounty and the JWT signing secret are destroyed and the whole setup has to be redone.
+
+- status: confirmed

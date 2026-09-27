@@ -1,0 +1,16 @@
+{
+  "package": "werkzeug",
+  "ecosystem": "pypi",
+  "gadgets": [
+    {
+      "versions": "2.2.2 (measured live)",
+      "sink": "arbitrary bytes into a cookie value via RFC2109 quoted-string octal escapes",
+      "payload": "Cookie: session=\"AA\\015\\012BB\"   ->  the application receives AA<CR><LF>BB",
+      "effect": "injects bytes that cannot appear literally in an HTTP header (CR, LF, NUL, space) into whatever the application builds from the cookie -- a cache key, a store key, a log line, a downstream protocol",
+      "precondition": "the cookie value is used to build something line- or delimiter-sensitive",
+      "trap": "only the OCTAL form inside a quoted value is decoded. Verified on 2.2.2: \"AA\\101BB\" arrives as AAABB, while \"AA\\x41BB\" arrives as AAx41BB and a percent-encoded %0d%0a is NOT decoded at all. A raw control byte in the header never survives, so testing only the raw and percent forms produces a false negative.",
+      "proven_by": "measured (knowledge/chains/htb-serialflow-werkzeug-octal-cookie-memcached-injection-pylibmc-flag1-pickle-rce.json)"
+    }
+  ],
+  "schema_version": 1
+}

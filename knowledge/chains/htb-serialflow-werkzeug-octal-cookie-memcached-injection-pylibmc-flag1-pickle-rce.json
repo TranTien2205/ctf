@@ -1,0 +1,119 @@
+{
+  "schema_version": 1,
+  "id": "htb-serialflow-werkzeug-octal-cookie-memcached-injection-pylibmc-flag1-pickle-rce",
+  "source_note": "challenges/SerialFlow/challenge/application/app.py",
+  "challenge": {
+    "name": "SerialFlow",
+    "platform": "HackTheBox",
+    "event": "HTB Cyber Apocalypse 2024",
+    "category": "web",
+    "solved_at": "2026-09-26",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "python",
+    "flask 2.2.2",
+    "werkzeug 2.2.2",
+    "flask-session 0.4.0",
+    "pylibmc 1.6.3",
+    "libmemcached 1.1.4",
+    "memcached",
+    "alpine",
+    "docker"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a server-side session store keys on the raw cookie value: Flask-Session builds key_prefix + sid with no sanitisation (flask_session/sessions.py open_session)",
+      "the cookie value can carry arbitrary bytes: Werkzeug decodes RFC2109 octal escapes inside a QUOTED cookie, so \\015\\012 becomes a real CRLF without any control byte in the HTTP header",
+      "the memcached client does not validate keys: pylibmc leaves libmemcached's VERIFY_KEY behaviour off, so the key reaches the wire verbatim and the text protocol is line-based",
+      "the stored value is unpickled on read. Either path works: Flask-Session calls pickle.loads on it itself, and pylibmc ALSO unpickles any value whose memcached flags are 1 (PYLIBMC_FLAG_PICKLE), which fires inside client.get() before the application sees it"
+    ],
+    "any_of": [
+      "the app renders a session value back into the page, which gives an output channel without writing to disk",
+      "the app's static folder is servable, so a dropped file can be read back over HTTP"
+    ]
+  },
+  "signals": [
+    "SerialFlow",
+    "pylibmc",
+    "SESSION_TYPE",
+    "memcached",
+    "flask_session",
+    "uicolor",
+    "key_prefix",
+    "session:",
+    "PYLIBMC_FLAG_PICKLE",
+    "Werkzeug/2.2.2",
+    "__reduce__",
+    "11211"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "note that the single page has no forms, links or endpoints, so the session cookie is the entire input surface; then probe the cookie itself rather than hunting for routes",
+      "why": "when the only thing the client controls is an opaque identifier, the identifier IS the parameter. The handout later showed an unlinked /set?uicolor= route that the front end never references, so route enumeration would not have found the real surface either"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "fingerprint the backend arithmetically: bisect the cookie length against the 500 boundary. Here <=242 is fine and >=243 fails",
+      "why": "memcached's maximum key length is 250, so a cutoff at 243 proves the key is a fixed 8-byte prefix plus the raw cookie. 8 bytes is exactly Flask-Session's default 'session:'. This identifies the store, the prefix and the absence of sanitisation without a single line of source"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "prove the byte channel: send Cookie: session=\"AA\\101BB\" and watch the echo come back as AAABB",
+      "why": "Werkzeug unquotes RFC2109 octal escapes, so \\015\\012 injects a real CRLF into the memcached key while the HTTP header itself stays free of control characters. Raw control bytes in the header cannot survive; the octal form is the whole trick"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "inject a second memcached command through the key of the client's own GET: sid = x<CRLF>set session:<K> <flags> 2592000 <len><CRLF><protocol-0 pickle>. The client appends its own CRLF and terminates the data block",
+      "why": "the stream memcached sees becomes 'get session:x' then a complete 'set'. THE PICKLE MUST BE PROTOCOL 0: the cookie reaches Flask as a str, so any byte >= 0x80 (protocol 2 starts with \\x80) is re-encoded as multi-byte UTF-8 and the set's byte count stops matching, so nothing is stored. Flags 0 and 1 BOTH execute -- measured both ways with protocol 0 on a clean connection. Flags 1 (PYLIBMC_FLAG_PICKLE) makes pylibmc unpickle inside client.get(); flags 0 returns bytes that Flask-Session then unpickles itself. Public writeups use flags 0."
+    },
+    {
+      "step": 5,
+      "stage": "impact",
+      "action": "wait for the memcached connection to resync (poll with random cookies until one returns 200), then request with Cookie: session=<K>; the __reduce__ payload runs as root",
+      "why": "the injection request itself always ends 500, because save_session reuses the same poisoned sid in a set and corrupts the connection. Random cookies never touch <K>, so polling cannot clobber the payload while the connection recovers"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET / with Cookie: session=\"AA\\101BB\", next to a plain Cookie: session=AAABB",
+    "expected": "both answer 200 and both echo Set-Cookie: session=AAABB — the octal escape was decoded server-side, so arbitrary bytes can be pushed into the session-store key",
+    "falsifier": "the echo comes back as the literal AA\\101BB or quoted (no octal decoding, so there is no byte channel), or the request 500s (the value is validated before it reaches the store)"
+  },
+  "blast_radius": "The injection corrupts the app's single shared memcached connection every time, so the app 500s and sometimes resets connections until it recovers; on a shared instance that is a visible outage of a few seconds. The RCE runs as root. Keep the command additive and reversible: this solve created /app/application/static/f.txt, read it over HTTP and then removed the directory with a second round (verified 404 afterwards, with / still 200). Do NOT overwrite application/templates/index.html, which is what public writeups do -- that destroys the only page the app serves and cannot be undone without a rebuild.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Live HTB instance. The chain was first validated end to end against a local container built from the supplied Dockerfile (GET /static/f.txt returned the placeholder the container's placeholder flag), then run once against the target: inject 200, resync after 3 polls, trigger 200, and GET /static/f.txt returned the real flag. Recorded in challenges/target-30968/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). Cleaned up with a second RCE round."
+  },
+  "reuse_when": [
+    "a server-side session store (memcached, redis) keys on an attacker-controlled cookie and the protocol is line-based",
+    "an opaque identifier is the only input: bisect its length against the error boundary, because the cutoff reveals both the store's key limit and the app's key prefix",
+    "a cookie value needs bytes that cannot appear in an HTTP header -- try RFC2109 quoting with octal escapes before concluding the byte is unreachable",
+    "a client library interprets stored metadata (memcached flags, content-type, a type tag) -- controlling that metadata can turn a data write into a deserialisation sink with no application bug at all",
+    "a payload must survive a str round-trip: use an ASCII-only encoding (pickle protocol 0), because anything >= 0x80 is re-encoded as multi-byte UTF-8 and silently breaks a byte count"
+  ],
+  "known_traps": [
+    "USE PICKLE PROTOCOL 0 -- this is the requirement that actually matters. The cookie reaches Flask as a str, so protocol 2 (which starts with \\x80) is re-encoded as multi-byte UTF-8, the set's byte count no longer matches the data, and the value is silently never stored. Flask-Session itself serialises with dumps(..., 0) for the same reason.",
+    "flags 0 and flags 1 BOTH give execution, and an early measurement here said otherwise. With protocol 0 and a resynced connection both were re-measured and both ran the command: flags 1 unpickles inside pylibmc's client.get(), flags 0 is unpickled by Flask-Session's own serializer.loads. The first 'flags 0 does nothing' reading came from a protocol-2 payload on a desynced connection -- two confounders at once. Do not conclude a negative from a single run against a flapping instance.",
+    "use pickle protocol 0. Protocol 2 starts with \\x80, and the cookie reaches Flask as a str, so every byte >= 0x80 is re-encoded as multi-byte UTF-8 and the set's byte count no longer matches the data -- the value is silently not stored. Flask-Session itself serialises with dumps(..., 0) for the same reason.",
+    "the injection request ALWAYS returns 500 and that is not failure. open_session's get carries the injection and succeeds; save_session then reuses the same poisoned sid in a set, which memcached rejects ('bad command line format' / 'bad data chunk') and pylibmc raises. Verify the injection by reading the key out of memcached, never by the HTTP status.",
+    "that same 500 leaves the app's single shared pylibmc connection desynced, so the trigger usually fails if sent immediately. Poll with RANDOM cookies until one returns 200 before triggering -- random cookies cannot clobber the payload key, whereas re-requesting the payload key lets save_session overwrite it with a normal flags-0 session.",
+    "a failed trigger is safe to retry: its save_session also fails, so the overwrite does not happen and the payload survives. A SUCCESSFUL trigger does overwrite it, so re-inject before each new attempt.",
+    "raw control bytes in the Cookie header do not work and a percent-encoded %0d%0a is not decoded either. Only the quoted-string octal form is decoded (verified: \"AA\\101BB\" -> AAABB, while \"AA\\x41BB\" -> AAx41BB).",
+    "do not read anything into the length-boundary flapping: this instance intermittently returned 500 for lengths that later returned 200. Re-measure a suspicious boundary twice with two distinct keys before building a theory on it -- one such false reading sent this solve chasing a non-existent client-side key check.",
+    "the container cannot be restarted with docker restart: entrypoint.sh chmods itself to 600 on first run, so a restart fails with 'permission denied'. Use docker rm -f plus docker run for a fresh instance, and poll the app over HTTP for readiness -- docker's port proxy accepts connections before Flask is listening, so a bare TCP connect is not a readiness check."
+  ],
+  "flag": null,
+  "classification": {
+    "primary": "web-parser-differential",
+    "secondary": [
+      "web-deserialization",
+      "web-auth-session"
+    ],
+    "confidence": 0.9
+  }
+}

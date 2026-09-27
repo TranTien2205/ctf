@@ -461,7 +461,7 @@
         "web-ssrf",
         "web-xxe"
       ],
-      "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
+      "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:\\bfilename\\b[^\\n]{0,30}param|param\\w*[^\\n]{0,20}\\bfilename\\b)|(?:download (?:endpoint|route|handler)|serves? (?:a |the )?file)|(?:(?:error|exception|traceback|stack trace|debug|\\b50[03]\\b[^\\n]{0,12}(?:page|error|response))[^\\n]{0,45}(?:environment|config\\w*|settings|\\.env\\b|secret))|(?:environment table|unhandled exception[^\\n]{0,40}(?:print|show|reveal|leak|dump))|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
       "bug_class": true
     },
     {
@@ -524,7 +524,7 @@
       ],
       "skill_tokens": 1696,
       "depth_files": 5,
-      "depth_tokens": 6266,
+      "depth_tokens": 7655,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -537,7 +537,7 @@
         "web-oauth-sso",
         "web-idor"
       ],
-      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:alg\\b|hs256|rs256|none)|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
+      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:alg\\b|hs256|rs256|none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
       "bug_class": true
     },
     {
@@ -642,7 +642,7 @@
       "routes_to": [
         "web-csrf"
       ],
-      "unlock_signals": "(?:access-control-allow-origin|access-control-allow-credentials)|(?:\\bcors\\b)|(?:origin:)|(?:(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9]))|(?:Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*)|(?:origin.{0,30}(?:reflect|echo))|(?:cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true)",
+      "unlock_signals": "(?:access-control-allow-origin|access-control-allow-credentials)|(?:\\bcors\\b)|(?:origin:)|(?:\\borigin header\\b|cross.?origin)|(?:allows? credentials|with credentials)|(?:(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9]))|(?:Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*)|(?:origin.{0,30}(?:reflect|echo))|(?:cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true)",
       "bug_class": true
     },
     {
@@ -784,7 +784,7 @@
         "web-logic-flaw",
         "web-auth-session"
       ],
-      "unlock_signals": "(?:\\bidor\\b)|(?:/(?:users?|orders?|files?|notes?|invoices?)/\\d+)|(?:user_?id|account_?id|object_?id)|(?:[0-9a-f]{8}-[0-9a-f]{4}-)|(?:(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9]))|(?:findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params))|(?:get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*=)",
+      "unlock_signals": "(?:\\bidor\\b)|(?:/(?:users?|orders?|files?|notes?|invoices?)/\\d+)|(?:user_?id|account_?id|object_?id)|(?:[0-9a-f]{8}-[0-9a-f]{4}-)|(?:(?:chang|increment|modif|tamper)\\w*[^\\n]{0,30}\\bid\\b)|(?:another (?:user|account|customer|person)'?s?\\b)|(?:(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9]))|(?:findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params))|(?:get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*=)",
       "bug_class": true
     },
     {
@@ -939,7 +939,7 @@
       ],
       "skill_tokens": 763,
       "depth_files": 1,
-      "depth_tokens": 2875,
+      "depth_tokens": 5394,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1094,7 +1094,7 @@
       "routes_to": [
         "web-nosqli"
       ],
-      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
       "bug_class": true
     },
     {
@@ -1111,7 +1111,7 @@
       ],
       "skill_tokens": 1232,
       "depth_files": 6,
-      "depth_tokens": 4606,
+      "depth_tokens": 6841,
       "use_when": [
         "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
         "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1124,7 +1124,7 @@
         "file-read-primitives",
         "web-request-smuggling"
       ],
-      "unlock_signals": "(?:\\bssrf\\b)|(?:loopback-only|reachable by the backend itself)|(?:url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input))|(?:server.?side (?:fetch|request)|fetches? (?:the |a )?url)|(?:pdf|screenshot|render|thumbnail|preview|import from url)|(?:127\\.0\\.0\\.1|localhost|169\\.254|metadata)|(?:admin bot|headless)|(?:(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9]))|(?:requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url))|(?:urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`))|(?:curl_setopt|file_get_contents\\s*\\(\\s*\\$)|(?:http://\\$\\{|https://\\$\\{)",
+      "unlock_signals": "(?:\\bssrf\\b)|(?:loopback-only|reachable by the backend itself)|(?:url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input))|(?:server.?side (?:fetch|request)|fetches? (?:the |a )?url)|(?:pdf|screenshot|render|thumbnail|preview|import from url)|(?:127\\.0\\.0\\.1|localhost|169\\.254|metadata)|(?:admin bot|headless)|(?:outbound (?:http|https|network) request)|(?:\\burl\\b[^\\n]{0,30}(?:supplied|provided|controlled|given|submitted))|(?:\\bcurl\\b|file_get_contents|http client|requests\\.get)|(?:(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9]))|(?:requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url))|(?:urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`))|(?:curl_setopt|file_get_contents\\s*\\(\\s*\\$)|(?:http://\\$\\{|https://\\$\\{)",
       "bug_class": true
     },
     {

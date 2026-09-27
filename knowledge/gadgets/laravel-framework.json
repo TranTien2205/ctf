@@ -1,0 +1,16 @@
+{
+  "package": "laravel/framework",
+  "ecosystem": "packagist",
+  "gadgets": [
+    {
+      "versions": "10.x with QUEUE_CONNECTION=redis (measured live on Laravel 10 + predis 2.1 + redis 7.0.15)",
+      "sink": "queue payloads are neither signed nor encrypted: data.command is a plain PHP-serialized object that the worker unserializes",
+      "payload": "RPUSH <prefix>queues:<name>  {\"uuid\":\"...\",\"displayName\":\"<Job>\",\"job\":\"Illuminate\\\\Queue\\\\CallQueuedHandler@call\",\"maxTries\":null,\"maxExceptions\":null,\"failOnTimeout\":false,\"backoff\":null,\"timeout\":null,\"retryUntil\":null,\"data\":{\"commandName\":\"<Job>\",\"command\":\"O:..:\\\"<Job>\\\":..{..}\"},\"id\":\"<20 chars>\",\"attempts\":0}",
+      "effect": "arbitrary object injection in the worker process. CallQueuedHandler::getCommand unserializes anything whose command string starts with 'O:' and only falls back to the Encrypter otherwise, so no key is needed. Any job property that reaches a dangerous call (a shell command, a path, a model id) is then attacker-controlled.",
+      "precondition": "a write primitive against the queue store -- an SSRF that can speak the store's protocol is enough; redis needs no auth in most challenge images",
+      "trap": "the queue key carries the redis prefix: with no APP_NAME the default is Str::slug('Laravel','_').'_database_', so the list is laravel_database_queues:default. Confirm with KEYS * rather than assuming. A job that uses SerializesModels is still fine to forge by hand -- __unserialize skips properties missing from your array. Read a genuine payload out of the list with LRANGE and diff against it before trusting your own serialization; a wrong class-name byte length is silently rejected. Finally, check the worker's --sleep value: at --sleep=600 a pushed job can sit for ten minutes, and a quiet queue is not evidence of a bad payload.",
+      "proven_by": "measured live (knowledge/chains/htb-screencrack-domain-loopback-ssrf-gopher-redis-laravel-queue-forge-system-injection.json)"
+    }
+  ],
+  "schema_version": 1
+}

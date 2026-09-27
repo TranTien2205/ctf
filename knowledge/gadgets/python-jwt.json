@@ -1,0 +1,25 @@
+{
+  "package": "python_jwt",
+  "ecosystem": "pypi",
+  "gadgets": [
+    {
+      "versions": "< 3.3.4 (CVE-2022-39227); confirmed pinned at python_jwt==3.3.3 in a live target's requirements.txt",
+      "sink": "claim forgery with an untouched, still-valid signature",
+      "payload": "{\"  <header>.<forged-claims-b64url>.\":\"\",\"protected\":\"<header>\",\"payload\":\"<payload>\",\"signature\":\"<signature>\"}  -- sent verbatim as the whole Authorization header value",
+      "effect": "arbitrary claims (role, user, exp) are accepted while the signature still verifies, because process_jwt reads the claims from raw_token.split('.') while jwcrypto deserializes and verifies the JSON-serialized members. Nothing is re-signed.",
+      "precondition": "the service hands you any validly signed token at all; an asymmetric alg (PS256/RS256/ES256) is not a defence here, it is the reason this is the only way in",
+      "trap": "the two leading spaces in the crafted key are load-bearing -- base64 decoding silently discards the non-alphabet { \" and space characters, so split('.')[0] still decodes to the genuine header. The protected/payload/signature members must stay byte-identical to the issued token or jwcrypto rejects it before the forged claims are ever read. Send the JSON object raw: no Bearer prefix, no URL-encoding.",
+      "proven_by": "measured live (knowledge/chains/htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge.json)"
+    },
+    {
+      "versions": "any",
+      "sink": "fingerprint, not a bug",
+      "payload": "n/a",
+      "effect": "a JWT header of {\"alg\":\"PS256\",\"typ\":\"JWT\"} from a Python service is a strong tell for python_jwt, because PS256 is its default while PyJWT and python-jose default to HS256. Use it to pick the library before writing any payload. Confirmed against source: the vulnerable app calls jwt.generate_jwt(claims, key, 'PS256', ...) and verify_jwt(token, key, ['PS256']), then reads token[1]['role'] -- the claims half that the CVE forges. The signing key was jwk.JWK.generate(kty='RSA', size=2048) at boot, so key recovery was never on the table.",
+      "precondition": "n/a",
+      "trap": "PS256 also means algorithm confusion and key brute force are dead ends -- do not spend the class budget there",
+      "proven_by": "measured live (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

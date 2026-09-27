@@ -158,3 +158,69 @@ Falsifier: 403 Forbidden (path ACL still matched), 503 (hdr(host) no longer matc
 **Blast radius**: step 4 mutates live in-process Flask state on a shared instance: replacing view_functions['index'] changes / for every other player until restored, so always send the step 5 restore pickle immediately after reading the flag. The unpickle sink is arbitrary builtins-level code in the container; open(..., 'w') on /app is harmless because the source tree is mounted read-only, but the same primitive can kill the worker.
 
 - status: confirmed
+
+## 2026-09-26 · LockTalk · confirmed
+
+- source note: `challenges/LockTalk/conf/haproxy.cfg`
+- chain card: `knowledge/chains/htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge.json`
+- verification: verified_live — Live HTB instance. GET /api/v1/./get_ticket returned HTTP 200 with a PS256 ticket carrying role=guest; that ticket on /api/v1/flag returned 403 'guest user does not have the required authorization to access the resource.'; the JSON-serialized forgery with role=administrator returned HTTP 200 and the flag in the response body. Recorded in challenges/target-31523/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). Solve shape: 8 requests of recon and 2 probe sweeps; no writeup was consulted for either half. Mechanism corrected after the handout arrived: the ACL is path_beg,url_dec -i (conf/haproxy.cfg:16), and the exact-match behaviour was then reproduced offline against haproxy:2.8.1-alpine in a two-config differential (with vs without the converter).
+- classified as: `web-parser-differential` (score 0.0, 0 signals matched)
+- also matched: `web-auth-session` (1.5), `web-ssrf` (1.0), `web-logic-flaw` (0.93)
+- filed by operator override: the matcher did not rank this class; the chain is filed under the class whose first probe opens it
+
+**Confirming probe that worked**
+
+> GET /api/v1/./get_ticket with curl --path-as-is, next to a plain GET /api/v1/get_ticket
+
+Expected: the plain path returns the proxy's HTML 403 'Request forbidden by administrative rules.' and the dot-segment path returns HTTP 200 with {"ticket: ":"eyJhbGciOiJQUzI1NiI..."} — one request apart, proving the ACL is matched literally and the backend normalises
+
+Falsifier: both return 403 (the ACL is a prefix match, or the proxy normalises before matching — try //, ;, %2e, a trailing slash and case next), or both return 404 (the route never existed and the 403 was about something else)
+
+**Traps recorded on this solve**
+
+- THE RULE IS WEAKER THAN IT READS, and this was measured, not assumed. conf/haproxy.cfg:16 says  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  which reads as a prefix deny. Reproduced offline against haproxy:2.8.1-alpine with the same backend: WITH the ',url_dec' converter, /api/v1/get_ticket/ and /api/v1/get_ticket/x are ALLOWED (200); with the converter removed they are DENIED (403). Appending a converter to the path_beg shorthand drops its implicit -m beg and the rule degrades to an exact string match. The author added url_dec to harden against percent-encoding and silently turned a prefix deny into an exact-path deny.
+- the dot-segment bypass does NOT depend on that bug: /api/v1/./get_ticket returned 200 in BOTH configs in the offline differential, because HAProxy does not resolve dot segments while Werkzeug does. That is the portable half of this finding -- it works against a correctly written path_beg too.
+- url_dec did not even help where it was meant to: /api/v1/%2e/get_ticket is allowed in both configs, because the decoded form /api/v1/./get_ticket does not begin with the blocked prefix either. It then 404s at Flask because Werkzeug does not percent-decode before route matching.
+- use curl --path-as-is. Without it curl collapses /api/v1/./get_ticket to /api/v1/get_ticket client-side and the bypass silently does not happen -- the probe then reports a false negative on a working payload.
+- /api/v1//get_ticket answers 308, not 200 -- Werkzeug merges the duplicate slash and redirects. It is real evidence that normalisation exists, but it is not itself the bypass; //api/v1/get_ticket (leading, not interior) returns 200 directly.
+- the query string is not part of the path sample: /api/v1/get_ticket?x=1 is still denied. Do not waste a probe on it.
+- the forged token is a JSON object, not a compact JWT, and it is sent as the whole Authorization header value. It contains spaces, braces and quotes; send it verbatim without URL-encoding and without a Bearer prefix (middleware.py:9 reads the raw header).
+- the two leading spaces in the crafted key are load-bearing: they keep the JSON key distinct and are discarded by base64 decoding along with { and ", so split('.')[0] still decodes to the genuine header. Dropping them breaks the header parse.
+- do not recompute or re-sign anything. The protected, payload and signature members must be byte-identical to the issued ticket or jwcrypto rejects the token before python_jwt ever reads the forged claims. The signing key is generated per boot (config.py), so there is nothing to recover.
+
+**Blast radius**: Read-only end to end. Every step is a GET; nothing is written to the target and there is nothing to clean up. The forged token is accepted for the lifetime of the ticket it was built from (one hour here), so re-fetch a ticket rather than reusing a stale forgery.
+
+- status: confirmed
+
+## 2026-09-26 · SerialFlow · confirmed
+
+- source note: `challenges/SerialFlow/challenge/application/app.py`
+- chain card: `knowledge/chains/htb-serialflow-werkzeug-octal-cookie-memcached-injection-pylibmc-flag1-pickle-rce.json`
+- verification: verified_live — Live HTB instance. The chain was first validated end to end against a local container built from the supplied Dockerfile (GET /static/f.txt returned the placeholder the container's placeholder flag), then run once against the target: inject 200, resync after 3 polls, trigger 200, and GET /static/f.txt returned the real flag. Recorded in challenges/target-30968/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). Cleaned up with a second RCE round.
+- classified as: `web-parser-differential` (score 0.0, 0 signals matched)
+- also matched: `web-auth-session` (0.98)
+- filed by operator override: the matcher did not rank this class; the chain is filed under the class whose first probe opens it
+
+**Confirming probe that worked**
+
+> GET / with Cookie: session="AA\101BB", next to a plain Cookie: session=AAABB
+
+Expected: both answer 200 and both echo Set-Cookie: session=AAABB — the octal escape was decoded server-side, so arbitrary bytes can be pushed into the session-store key
+
+Falsifier: the echo comes back as the literal AA\101BB or quoted (no octal decoding, so there is no byte channel), or the request 500s (the value is validated before it reaches the store)
+
+**Traps recorded on this solve**
+
+- USE PICKLE PROTOCOL 0 -- this is the requirement that actually matters. The cookie reaches Flask as a str, so protocol 2 (which starts with \x80) is re-encoded as multi-byte UTF-8, the set's byte count no longer matches the data, and the value is silently never stored. Flask-Session itself serialises with dumps(..., 0) for the same reason.
+- flags 0 and flags 1 BOTH give execution, and an early measurement here said otherwise. With protocol 0 and a resynced connection both were re-measured and both ran the command: flags 1 unpickles inside pylibmc's client.get(), flags 0 is unpickled by Flask-Session's own serializer.loads. The first 'flags 0 does nothing' reading came from a protocol-2 payload on a desynced connection -- two confounders at once. Do not conclude a negative from a single run against a flapping instance.
+- use pickle protocol 0. Protocol 2 starts with \x80, and the cookie reaches Flask as a str, so every byte >= 0x80 is re-encoded as multi-byte UTF-8 and the set's byte count no longer matches the data -- the value is silently not stored. Flask-Session itself serialises with dumps(..., 0) for the same reason.
+- the injection request ALWAYS returns 500 and that is not failure. open_session's get carries the injection and succeeds; save_session then reuses the same poisoned sid in a set, which memcached rejects ('bad command line format' / 'bad data chunk') and pylibmc raises. Verify the injection by reading the key out of memcached, never by the HTTP status.
+- that same 500 leaves the app's single shared pylibmc connection desynced, so the trigger usually fails if sent immediately. Poll with RANDOM cookies until one returns 200 before triggering -- random cookies cannot clobber the payload key, whereas re-requesting the payload key lets save_session overwrite it with a normal flags-0 session.
+- a failed trigger is safe to retry: its save_session also fails, so the overwrite does not happen and the payload survives. A SUCCESSFUL trigger does overwrite it, so re-inject before each new attempt.
+- raw control bytes in the Cookie header do not work and a percent-encoded %0d%0a is not decoded either. Only the quoted-string octal form is decoded (verified: "AA\101BB" -> AAABB, while "AA\x41BB" -> AAx41BB).
+- do not read anything into the length-boundary flapping: this instance intermittently returned 500 for lengths that later returned 200. Re-measure a suspicious boundary twice with two distinct keys before building a theory on it -- one such false reading sent this solve chasing a non-existent client-side key check.
+- the container cannot be restarted with docker restart: entrypoint.sh chmods itself to 600 on first run, so a restart fails with 'permission denied'. Use docker rm -f plus docker run for a fresh instance, and poll the app over HTTP for readiness -- docker's port proxy accepts connections before Flask is listening, so a bare TCP connect is not a readiness check.
+
+**Blast radius**: The injection corrupts the app's single shared memcached connection every time, so the app 500s and sometimes resets connections until it recovers; on a shared instance that is a visible outage of a few seconds. The RCE runs as root. Keep the command additive and reversible: this solve created /app/application/static/f.txt, read it over HTTP and then removed the directory with a second round (verified 404 afterwards, with / still 200). Do NOT overwrite application/templates/index.html, which is what public writeups do -- that destroys the only page the app serves and cannot be undone without a rebuild.
+
+- status: confirmed

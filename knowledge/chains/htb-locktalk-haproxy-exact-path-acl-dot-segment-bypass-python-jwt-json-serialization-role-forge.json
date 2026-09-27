@@ -1,0 +1,116 @@
+{
+  "schema_version": 1,
+  "id": "htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge",
+  "source_note": "challenges/LockTalk/conf/haproxy.cfg",
+  "challenge": {
+    "name": "LockTalk",
+    "platform": "HackTheBox",
+    "event": "HackTheBox",
+    "category": "web",
+    "solved_at": "2026-09-26",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "python",
+    "flask",
+    "werkzeug",
+    "uwsgi",
+    "haproxy 2.8.1",
+    "python_jwt 3.3.3",
+    "jwcrypto",
+    "docker"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a reverse proxy in front of the app denies a route, and its denial is visibly NOT the app's error format (HTML 403 from HAProxy vs JSON 401 from Flask)",
+      "the proxy does not normalise the path (dot segments, duplicate slashes) while the backend router does",
+      "and/or the deny rule is weaker than it reads: conf/haproxy.cfg:16 is  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  and appending the url_dec CONVERTER to the path_beg shorthand drops its implicit -m beg, so the rule matches the path EXACTLY instead of as a prefix",
+      "the token is signed with an asymmetric algorithm and a key generated fresh at boot (config.py: jwk.JWK.generate(kty='RSA', size=2048)), so the signature cannot be forged and the weakness must be in the library",
+      "the token library reads its claims from a different parse of the token than the one it verifies (python_jwt 3.3.3, conf/requirements.txt)"
+    ],
+    "any_of": [
+      "the JWT header says PS256 -- python_jwt's default algorithm, naming the library before any payload is written",
+      "a role claim is carried in the token and checked by the protected route (middleware.py:16 reads token[1]['role'])"
+    ]
+  },
+  "signals": [
+    "LockTalk",
+    "get_ticket",
+    "Request forbidden by administrative rules",
+    "api/v1/flag",
+    "api/v1/chat",
+    "guest_user",
+    "does not have the required authorization",
+    "uWSGI Server",
+    "PS256",
+    "python_jwt",
+    "jwcrypto",
+    "haproxy",
+    "administrator"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "compare the shape of every rejection, not just its status code: GET /api/v1/get_ticket returns an HTML body 'Request forbidden by administrative rules.' while /api/v1/flag and /api/v1/chat/1 return JSON {\"message\":\"JWT token is missing or invalid.\"}",
+      "why": "two different error FORMATS mean two different programs are answering. The HTML 403 is the proxy's own page, so that route is blocked in front of the app rather than by the app, and the question becomes a path-matching question instead of an auth question"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "sweep path forms with curl --path-as-is: /api/v1//get_ticket, /api/v1/./get_ticket, //api/v1/get_ticket, /api/v1/get_ticket/, /api/v1/%2e/get_ticket, /api/v1/GET_TICKET",
+      "why": "separates an exact-string ACL from a prefix ACL and shows which normalisation the backend performs. Measured here: /api/v1/./get_ticket and //api/v1/get_ticket return 200 with a ticket; /api/v1/%2e/get_ticket is 404 (Werkzeug does not percent-decode before route matching); /api/v1/get_ticket/ and /api/v1/get_ticket/x are 404, i.e. they PASS a rule written with path_beg; /api/v1/GET_TICKET is still 403 (-i) and /api/v1/get_ticket?x=1 is still 403 (the query string is not part of the path sample). The trailing-slash result is the tell that the prefix match is not actually in force -- see the traps for the measured cause."
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "decode the ticket: header {\"alg\":\"PS256\",\"typ\":\"JWT\"}, claims {exp,iat,jti,nbf,role:\"guest\",user:\"guest_user\"}; GET /api/v1/flag with it returns 403 'guest user does not have the required authorization'",
+      "why": "PS256 with a 256-byte signature rules out algorithm confusion and key guessing. PS256 is python_jwt's default algorithm, which names the library to attack before any payload is written"
+    },
+    {
+      "step": 4,
+      "stage": "impact",
+      "action": "send a JWS JSON-serialized token whose first key is two spaces followed by <original-header>.<forged-claims>. and whose protected/payload/signature members are the untouched originals: {\"  <hdr>.<forged>.\":\"\",\"protected\":\"<hdr>\",\"payload\":\"<payload>\",\"signature\":\"<sig>\"}",
+      "why": "CVE-2022-39227 in python_jwt < 3.3.4; conf/requirements.txt pins python_jwt==3.3.3. process_jwt takes the claims from raw_token.split('.'), so element 1 is the forged payload, while jwcrypto deserializes the JSON and verifies the genuine protected/payload/signature. middleware.py:15-16 calls verify_jwt(...) then reads token[1]['role'], which is exactly the forged half. The signature stays valid because it is never recomputed, and base64 decoding silently drops the non-alphabet characters { \" and the spaces, so element 0 still decodes to the real header. routes.py:41 gates /flag on authorize_roles(['administrator']), so 'administrator' is the exact string needed."
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "GET /api/v1/./get_ticket with curl --path-as-is, next to a plain GET /api/v1/get_ticket",
+    "expected": "the plain path returns the proxy's HTML 403 'Request forbidden by administrative rules.' and the dot-segment path returns HTTP 200 with {\"ticket: \":\"eyJhbGciOiJQUzI1NiI...\"} — one request apart, proving the ACL is matched literally and the backend normalises",
+    "falsifier": "both return 403 (the ACL is a prefix match, or the proxy normalises before matching — try //, ;, %2e, a trailing slash and case next), or both return 404 (the route never existed and the 403 was about something else)"
+  },
+  "blast_radius": "Read-only end to end. Every step is a GET; nothing is written to the target and there is nothing to clean up. The forged token is accepted for the lifetime of the ticket it was built from (one hour here), so re-fetch a ticket rather than reusing a stale forgery.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Live HTB instance. GET /api/v1/./get_ticket returned HTTP 200 with a PS256 ticket carrying role=guest; that ticket on /api/v1/flag returned 403 'guest user does not have the required authorization to access the resource.'; the JSON-serialized forgery with role=administrator returned HTTP 200 and the flag in the response body. Recorded in challenges/target-31523/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). Solve shape: 8 requests of recon and 2 probe sweeps; no writeup was consulted for either half. Mechanism corrected after the handout arrived: the ACL is path_beg,url_dec -i (conf/haproxy.cfg:16), and the exact-match behaviour was then reproduced offline against haproxy:2.8.1-alpine in a two-config differential (with vs without the converter)."
+  },
+  "reuse_when": [
+    "a denial's BODY FORMAT differs from the app's own errors (HTML where the app speaks JSON, or a different server header) — that names a proxy as the denier and turns an auth problem into a path-matching problem",
+    "a reverse proxy, WAF or ingress denies one route while neighbouring routes reach the app",
+    "a proxy deny rule carries a CONVERTER (,url_dec ,lower ,field ...) appended to a *_beg / *_end / *_sub shorthand -- measure whether the implicit match method survived, because on HAProxy 2.8.1 it does not",
+    "an allow/deny rule is written against a literal path and the framework behind it normalises (Werkzeug, Express, Spring all differ in what they collapse)",
+    "a token is signed with RS*/PS*/ES* so the signature cannot be forged — stop attacking the crypto and identify the LIBRARY; its version is the vulnerability",
+    "a JWT header says PS256 in a Python service: python_jwt's default is PS256 and versions below 3.3.4 carry CVE-2022-39227",
+    "any token library that parses a token twice — once to read claims and once to verify — can be split between the two parses"
+  ],
+  "known_traps": [
+    "THE RULE IS WEAKER THAN IT READS, and this was measured, not assumed. conf/haproxy.cfg:16 says  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  which reads as a prefix deny. Reproduced offline against haproxy:2.8.1-alpine with the same backend: WITH the ',url_dec' converter, /api/v1/get_ticket/ and /api/v1/get_ticket/x are ALLOWED (200); with the converter removed they are DENIED (403). Appending a converter to the path_beg shorthand drops its implicit -m beg and the rule degrades to an exact string match. The author added url_dec to harden against percent-encoding and silently turned a prefix deny into an exact-path deny.",
+    "the dot-segment bypass does NOT depend on that bug: /api/v1/./get_ticket returned 200 in BOTH configs in the offline differential, because HAProxy does not resolve dot segments while Werkzeug does. That is the portable half of this finding -- it works against a correctly written path_beg too.",
+    "url_dec did not even help where it was meant to: /api/v1/%2e/get_ticket is allowed in both configs, because the decoded form /api/v1/./get_ticket does not begin with the blocked prefix either. It then 404s at Flask because Werkzeug does not percent-decode before route matching.",
+    "use curl --path-as-is. Without it curl collapses /api/v1/./get_ticket to /api/v1/get_ticket client-side and the bypass silently does not happen -- the probe then reports a false negative on a working payload.",
+    "/api/v1//get_ticket answers 308, not 200 -- Werkzeug merges the duplicate slash and redirects. It is real evidence that normalisation exists, but it is not itself the bypass; //api/v1/get_ticket (leading, not interior) returns 200 directly.",
+    "the query string is not part of the path sample: /api/v1/get_ticket?x=1 is still denied. Do not waste a probe on it.",
+    "the forged token is a JSON object, not a compact JWT, and it is sent as the whole Authorization header value. It contains spaces, braces and quotes; send it verbatim without URL-encoding and without a Bearer prefix (middleware.py:9 reads the raw header).",
+    "the two leading spaces in the crafted key are load-bearing: they keep the JSON key distinct and are discarded by base64 decoding along with { and \", so split('.')[0] still decodes to the genuine header. Dropping them breaks the header parse.",
+    "do not recompute or re-sign anything. The protected, payload and signature members must be byte-identical to the issued ticket or jwcrypto rejects the token before python_jwt ever reads the forged claims. The signing key is generated per boot (config.py), so there is nothing to recover."
+  ],
+  "flag": null,
+  "classification": {
+    "primary": "web-parser-differential",
+    "secondary": [
+      "web-auth-session",
+      "web-logic-flaw"
+    ],
+    "confidence": 0.9
+  }
+}

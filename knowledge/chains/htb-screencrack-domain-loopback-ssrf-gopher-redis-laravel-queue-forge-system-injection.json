@@ -1,0 +1,117 @@
+{
+  "schema_version": 1,
+  "id": "htb-screencrack-domain-loopback-ssrf-gopher-redis-laravel-queue-forge-system-injection",
+  "source_note": "challenges/ScreenCrack/challenge/app/Http/Controllers/SiteShotController.php",
+  "challenge": {
+    "name": "ScreenCrack",
+    "platform": "HackTheBox",
+    "event": "HackTheBox",
+    "category": "web",
+    "solved_at": "2026-09-26",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "php 8.1",
+    "laravel 10",
+    "apache",
+    "redis 7",
+    "predis",
+    "curl",
+    "alpine",
+    "docker"
+  ],
+  "preconditions": {
+    "all_of": [
+      "an SSRF filter that range-checks only IP LITERALS: SiteShotController::validateUrl calls isLocalIP() only when the host parses as an IPv4, and never resolves a domain before allowing it",
+      "the filter never checks the SCHEME, so any protocol curl supports is reachable once the host passes",
+      "an in-process queue whose payloads are neither signed nor encrypted (Laravel redis queue, serializer json, data.command is a plain PHP-serialized string)",
+      "a queued job that concatenates one of its own properties into a shell command: FileQueue::deleteFile does system(\"echo '\".$this->uuid.\"'>>halo\")"
+    ],
+    "any_of": [
+      "the SSRF response body is written somewhere fetchable, which turns the blind SSRF into a read oracle",
+      "the flag is readable by the worker's user, so the injected command can copy it into the webroot"
+    ]
+  },
+  "signals": [
+    "ScreenCrack",
+    "getss",
+    "get-html",
+    "SiteShotService",
+    "FileQueue",
+    "rmFile",
+    "deleteFile",
+    "isLocalIP",
+    "checkdnsrr",
+    "laravel_database_queues",
+    "queue:work",
+    "screenshotmachine",
+    "Dont do naughty stuff"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read the URL validator before sending anything: isValidIPv4 + isLocalIP only fire when the host IS an IP literal, and isValidDomain only checks a regex plus checkdnsrr",
+      "why": "a domain is never resolved and compared against private ranges, so any public name pointing at loopback walks straight through. The scheme is not examined at all, which is the second half of the bug"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "POST /api/get-html with site=http://127.0.0.1/ and then with a loopback-resolving domain; the first is refused with 'Dont do naughty stuff.' and the second returns a /src/<uuid>.txt holding the app's own index page",
+      "why": "one request pair proves the filter is literal-only and that the fetch really lands on loopback. getHtmlResp writes the response body to the webroot and hands back its path, so the SSRF is readable, not blind"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "make the SSRF a full Redis client: site=gopher://<loopback-domain>:6379/_<url-encoded RESP>, ending the command sequence with QUIT",
+      "why": "curl speaks gopher, so arbitrary bytes reach 6379. Without QUIT redis holds the socket open, curl hits its 3s timeout, curl_errno fires and the handler returns {'status':'failed'} with no file -- the SSRF looks blind. QUIT makes redis close the connection, curl completes, and the saved file contains the raw replies. That single addition turns write-only into read-write"
+    },
+    {
+      "step": 4,
+      "stage": "sink",
+      "action": "LRANGE the real queue first and copy the app's own job payload shape, then RPUSH a forged copy whose FileQueue.uuid is  x'; <cmd>; echo '",
+      "why": "Laravel's redis queue stores data.command as a plain serialized string and CallQueuedHandler::getCommand unserializes anything starting with 'O:' without a signature. Reading a genuine payload first is what makes the forgery byte-correct -- see the traps"
+    },
+    {
+      "step": 5,
+      "stage": "impact",
+      "action": "wait for the worker, then fetch the file the injected command wrote",
+      "why": "the job runner is  php artisan queue:work --queue=default --sleep=600  so a pushed job can sit for up to ten minutes before anything happens. deleteFile() then runs system(\"echo '<uuid>'>>halo\") with the attacker string inside the single quotes"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /api/get-html with {\"site\":\"gopher://<a domain that resolves to 127.0.0.1>:6379/_%2A1%0D%0A%244%0D%0APING%0D%0A%2A1%0D%0A%244%0D%0AQUIT%0D%0A\"}, then GET the returned /src/<uuid>.txt",
+    "expected": "the saved file contains +PONG — the host filter was bypassed by a name, the scheme was never checked, and the QUIT trailer made the reply readable",
+    "falsifier": "'Dont do naughty stuff.' (the validator resolves domains too, or rejects non-http schemes), or {'status':'failed'} with no file even with QUIT present (curl has no gopher support, or nothing is listening on 6379)"
+  },
+  "blast_radius": "The SSRF writes one file per request into /www/public/src, which the app's own rmFile jobs would eventually clean. The RCE runs as the worker user and this solve used it additively: cat /flag into a new file under the webroot, read it over HTTP, then queued a second job to delete both that file and the 'halo' file the sink appends to. Note the queue is shared application state: a malformed forged payload stays in the list and makes the worker throw on every wake until it is drained or retried out. Do NOT reach for the redis CONFIG SET dir + dbfilename + SAVE trick here -- it rewrites the live RDB and the server's persistence settings for a target that already yields clean RCE through the queue.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Live HTB instance. GET /src/<uuid>.txt after the gopher probe contained '+PONG' and the full INFO server block (redis_version 7.0.15). LRANGE showed the genuine App\\Jobs\\rmFile payload, the forged copy was RPUSHed onto laravel_database_queues:default, and after the worker's next wake GET /src/pwn7b.txt returned the flag. Recorded in challenges/target-31591/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response)."
+  },
+  "reuse_when": [
+    "an SSRF allowlist or denylist tests the host only when it parses as an IP -- a domain that resolves to the address you want is then free, with no DNS rebinding needed",
+    "a URL validator inspects the host but never the scheme: gopher:// (and dict://, ftp://) turn an HTTP-shaped SSRF into a raw TCP write primitive",
+    "a blind SSRF talks to a line protocol that keeps the socket open -- append the protocol's own quit/close command so the client completes and you can read the replies",
+    "an application queue (Laravel redis/database, Sidekiq, Celery) stores serialized job payloads without a signature and the worker shares the box",
+    "before forging a serialized payload, read a REAL one out of the queue and diff against it; the transport that stores the jobs is usually also the one that shows them to you",
+    "a queued job builds a shell command out of one of its own properties -- the property is attacker-controlled the moment the payload is"
+  ],
+  "known_traps": [
+    "count the class-name length by hand and then check it against a real payload. This solve first pushed O:22:\"App\\Message\\FileQueue\" -- the name is 21 bytes -- so PHP's unserialize rejected it and the job silently did nothing. The mistake was invisible until LRANGE showed the app's own payload spelling it O:21. When a serialized payload has a producer you can observe, read its output before writing your own.",
+    "without a trailing QUIT the gopher SSRF reports {'status':'failed'} and returns no filename, because redis keeps the connection open until curl's 3s CURLOPT_TIMEOUT expires and curl_errno makes the handler bail. That failure is indistinguishable from 'gopher is unsupported' and will send you looking for a different protocol.",
+    "the queue key carries Laravel's redis prefix. With no APP_NAME in .env the default is Str::slug('Laravel','_').'_database_', so the list is laravel_database_queues:default, not queues:default. Confirm with KEYS * through the same oracle rather than assuming.",
+    "the worker is started with --sleep=600, so a pushed job may wait ten minutes before running. A silent queue is not evidence that the payload is wrong -- check LLEN and the :reserved zset to see whether the worker has consumed anything at all before changing the payload.",
+    "validateUrl runs BEFORE getSS prepends http://, so a bare host like example.com fails validation on the screenshot endpoint (parse_url returns no host). Only fully-qualified URLs get through, on either endpoint.",
+    "isValidDomain calls checkdnsrr, so the chosen name must actually resolve from inside the container. Pick a name whose loopback mapping is public rather than one you control by hosts-file or local resolver."
+  ],
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "secondary": [
+      "web-deserialization",
+      "web-command-injection"
+    ],
+    "confidence": 0.9
+  }
+}

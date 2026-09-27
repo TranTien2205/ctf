@@ -1,0 +1,145 @@
+{
+  "purpose": "Black-box recall of tools/classify.py. Every case is an observation a solver could plausibly type before reading source. The first five come from chains verified live in this repository on 2026-09-26, so their labels are not opinion; the rest are ordinary phrasings of classes the taxonomy already claims to cover.",
+  "why_this_exists": "Five separate times the classifier returned nothing useful on a real black-box challenge while its source_signals worked fine. The gap is on the observation side only. This file is the measurement that decides whether a signal edit actually helped.",
+  "scoring": "a case passes when the expected class appears in the candidates; a case whose expect is null passes only when the classifier returns NOTHING, so recall cannot be bought by widening signals",
+  "cases": [
+    {
+      "id": "otp-verification-code",
+      "observation": "the app emails a 6 digit verification code and POST /api/verify takes the email and the code to activate the account",
+      "expect": "web-auth-session",
+      "provenance": "HTB Intergalactic Bounty, solved live 2026-09-26"
+    },
+    {
+      "id": "ssrf-plain-english",
+      "observation": "the server makes an outbound http request to a url supplied in the request body using curl",
+      "expect": "web-ssrf",
+      "provenance": "HTB ScreenCrack, solved live 2026-09-26"
+    },
+    {
+      "id": "ssrf-host-validated-then-refetched",
+      "observation": "a server side fetch validates the host of the submitted link and then hands only that host to the http client",
+      "expect": "web-ssrf",
+      "provenance": "HTB Interstellar, solved live 2026-09-26"
+    },
+    {
+      "id": "proxy-vs-backend-path",
+      "observation": "a reverse proxy denies one path with 403 while the backend framework normalises dot segments and answers the same route",
+      "expect": "web-parser-differential",
+      "provenance": "HTB LockTalk, solved live 2026-09-26"
+    },
+    {
+      "id": "cookie-becomes-store-key",
+      "observation": "the session cookie value is used directly as the key of a server side session store with no sanitisation",
+      "expect": "web-parser-differential",
+      "provenance": "HTB SerialFlow, solved live 2026-09-26"
+    },
+    {
+      "id": "queue-job-unsigned",
+      "observation": "the application pushes serialized jobs onto a redis queue and a worker unserializes them without any signature",
+      "expect": "web-deserialization",
+      "provenance": "HTB ScreenCrack, solved live 2026-09-26"
+    },
+    {
+      "id": "login-bypass-quote",
+      "observation": "putting a single quote in the login username makes the page return a database error",
+      "expect": "web-sqli",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "graphql-introspection",
+      "observation": "the api endpoint accepts graphql queries and introspection is enabled",
+      "expect": "web-graphql",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "idor-object-id",
+      "observation": "changing the numeric user id in the request returns another account's data",
+      "expect": "web-idor",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "cors-origin-reflected",
+      "observation": "the response echoes back whatever Origin header I send and allows credentials",
+      "expect": "web-cors",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "open-redirect-param",
+      "observation": "a url parameter controls where the login page redirects after success",
+      "expect": "web-open-redirect",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "upload-extension",
+      "observation": "the site lets me upload an avatar and only checks the file extension",
+      "expect": "web-file-upload",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "race-double-spend",
+      "observation": "sending the same purchase request many times at once credits the balance twice",
+      "expect": "web-race-condition",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "jwt-none-alg",
+      "observation": "the session is a json web token and the header algorithm can be changed",
+      "expect": "web-auth-session",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "path-traversal-download",
+      "observation": "a download endpoint takes a filename parameter and returns the file contents",
+      "expect": "file-read-primitives",
+      "provenance": "ordinary phrasing"
+    },
+    {
+      "id": "xs-leak-search-404",
+      "observation": "a search page returns 404 when nothing matches and an admin bot visits links I supply",
+      "expect": "web-xs-leaks",
+      "provenance": "corpus: TeamItaly CTF 2023 LeakyNoteV3"
+    },
+    {
+      "id": "passwordless-login",
+      "expect": "web-auth-session",
+      "observation": "Flask werkzeug passwordless login form, username only, no password field",
+      "provenance": "knowledge/classify-misses.log, real session 2026-09-26"
+    },
+    {
+      "id": "signature-does-not-cover-all-signed-data",
+      "expect": "web-auth-session",
+      "observation": "bcrypt hashes only the first 72 bytes of its input so everything past that is unauthenticated; pad the leading field and reuse the original signature verbatim",
+      "provenance": "knowledge/classify-misses.log, real session 2026-09-26"
+    },
+    {
+      "id": "error-page-leaks-environment",
+      "expect": "file-read-primitives",
+      "observation": "make the application throw where it has no handler and read what the error page prints; the environment table shows the configuration",
+      "provenance": "knowledge/classify-misses.log, real session 2026-09-26"
+    },
+    {
+      "id": "neg-pwn-rop",
+      "expect": null,
+      "observation": "64-bit ELF, NX enabled, no PIE, gets() into a 64-byte stack buffer, want a ROP chain to system",
+      "provenance": "out of scope: the taxonomy is 25 web classes, this is pwn"
+    },
+    {
+      "id": "neg-crypto-hastad",
+      "expect": null,
+      "observation": "RSA public key with e=3 and three ciphertexts under different moduli, Hastad broadcast",
+      "provenance": "out of scope: the taxonomy is 25 web classes, this is crypto"
+    },
+    {
+      "id": "neg-ordinary-app",
+      "expect": null,
+      "observation": "PHP 8.2 depot print waybill label service form submit label generation",
+      "provenance": "an ordinary application description with no mechanism in it"
+    },
+    {
+      "id": "neg-recon-headers",
+      "expect": null,
+      "observation": "Phonebook login form Accept-Ranges static file server option no server header",
+      "provenance": "banner/recon noise with no mechanism in it"
+    }
+  ]
+}

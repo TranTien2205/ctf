@@ -1,0 +1,25 @@
+{
+  "package": "needle",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "3.x (measured on 3.3.1)",
+      "sink": "prototype pollution -> arbitrary file write, via the `output` option",
+      "payload": "Object.prototype.output = \"/app/views/<a view no request has rendered yet>.html\"; Object.prototype.parse_response = false",
+      "effect": "needle reads `output` with a bare `options.output` and every other option through a get_option() that falls through to the prototype, so when the caller passes an object LITERAL (needle.get(url, {compressed:true, follow_max:0}, cb)) every option is prototype-reachable. With `output` set, a 200 response body is written to that path: the SSRF becomes an arbitrary file write, and a template directory turns it into RCE.",
+      "precondition": "the options bag handed to needle is a plain object literal (not Object.create(null)), the response is HTTP 200 (needle only writes on 200), and something later reads the written path",
+      "trap": "MANDATORY companion: pollute parse_response:false too. At the default parse_response:'all' needle parses a JSON response and then calls file.write(chunk) on the parsed OBJECT -> ERR_INVALID_ARG_TYPE from node:internal/streams/writable. If the calling handler has no try/catch that escapes as an unhandled rejection and kills the process. Polluting only `output` looks fine against an HTML response and crashes the app against a JSON one.",
+      "proven_by": "measured live + reproduced offline (knowledge/chains/htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce.json)"
+    },
+    {
+      "versions": "3.x (measured on 3.3.1)",
+      "sink": "prototype pollution -> request control, via cookies / headers / proxy",
+      "payload": "Object.prototype.cookies = {\"<name>\": \"<value>\"}  (or .headers, or .proxy)",
+      "effect": "adds a Cookie header (cookies.write), arbitrary headers, or redirects the whole request to another host:port with the original URI as the request-line path. Lets the polluted client authenticate to the app it is being pointed at.",
+      "precondition": "same object-literal options bag",
+      "trap": "follow_max cannot be raised this way when the caller passes it explicitly: get_option() prefers the caller's OWN property over the prototype, so an own follow_max:0 stays 0",
+      "proven_by": "measured live (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

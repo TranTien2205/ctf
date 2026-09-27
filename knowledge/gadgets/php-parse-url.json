@@ -1,0 +1,25 @@
+{
+  "package": "php parse_url + curl",
+  "ecosystem": "php",
+  "gadgets": [
+    {
+      "versions": "PHP 7.0.x (measured on 7.0.33 with the distro curl on Debian stretch)",
+      "sink": "host-allowlist bypass when the validated string and the fetched string are not the same string",
+      "payload": "url=0://127.0.0.1:80;<allowed-host>:80/   -> parse_url()['host'] is the whole '127.0.0.1:80;<allowed-host>:80' and satisfies a /<allowed-host>$/ suffix test, while curl re-parses that string and stops the host at 127.0.0.1:80",
+      "effect": "full SSRF to loopback through a host allowlist, with a clean Host header so the target vhost answers normally",
+      "precondition": "the code validates parse_url($url)['host'] and then passes that host (or any re-derived string) to CURLOPT_URL instead of the original URL; the allowlist regex has no left anchor or delimiter",
+      "trap": "filter_var(FILTER_VALIDATE_URL) is STRICTER for http:// than for an unknown scheme -- percent-encoded and bracketed hosts rejected under http:// are accepted under 0://, so retry a rejected host shape with a junk scheme before discarding it. Also: parse_url splits the port into its own key, so a :port in the submitted URL never reaches curl when only ['host'] is forwarded -- a port sweep that returns identical results is measuring nothing.",
+      "proven_by": "measured live (knowledge/chains/htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce.json)"
+    },
+    {
+      "versions": "same",
+      "sink": "not a gadget here -- a measured DEAD END worth not re-testing",
+      "payload": "0://[::ffff:127.0.0.1].<allowed-host>:80/  and  0://[127.0.0.1].<allowed-host>/",
+      "effect": "the first passes both gates and connects, but every port times out with 0 bytes because curl takes the bracketed v4-mapped IPv6 literal and nothing answers it in this container; the second does reach loopback but Apache replies 400 Bad Request because the Host header becomes '[127.0.0.1].<allowed-host>'. Both look like a working SSRF and neither delivers a usable response.",
+      "precondition": "n/a",
+      "trap": "a connect that times out on EVERY port is not a firewall -- it is usually the wrong address family",
+      "proven_by": "measured live (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

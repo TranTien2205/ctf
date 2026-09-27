@@ -10,6 +10,15 @@
       "precondition": "a backend whose status line you can influence",
       "trap": "if the 101 carries Upgrade/Connection, Node's client raises 'upgrade' instead of 'response' and the request hangs to the render timeout",
       "proven_by": "knowledge/chains/htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip.json"
+    },
+    {
+      "versions": "2.8.1 (source-confirmed and reproduced offline against haproxy:2.8.1-alpine, 2026-09-26)",
+      "sink": "a CONVERTER appended to a path_beg shorthand silently drops its implicit -m beg, degrading a prefix deny to an exact-path deny",
+      "payload": "against  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  every one of these is ALLOWED: /api/v1/get_ticket/  /api/v1/get_ticket/x  /api/v1/./get_ticket  //api/v1/get_ticket  (curl --path-as-is)",
+      "effect": "the rule reads as a prefix deny and behaves as an exact string match. Two-config differential on 2.8.1: WITH ',url_dec' the trailing-slash and suffix forms return 200; with the converter removed they return 403. Separately, and independently of the converter bug, HAProxy resolves no dot segments and no leading double slash, so /api/v1/./get_ticket and //api/v1/get_ticket reach a normalising backend (Werkzeug) in BOTH configs.",
+      "precondition": "the denial is HAProxy's own HTML page rather than the app's error format -- that is what identifies the proxy as the denier",
+      "trap": "curl collapses ./ client-side unless --path-as-is is passed, so the bypass silently fails to fire and looks like a dead end. url_dec buys nothing here: /api/v1/%2e/get_ticket is allowed either way, since the decoded /api/v1/./get_ticket does not begin with the blocked prefix either, and Werkzeug does not percent-decode before route matching so it 404s. /api/v1//get_ticket answers 308 (Werkzeug merges the slash and redirects), not 200. The query string is not part of the path sample, so ?x=1 is still denied. A hardening converter added to a *_beg / *_end / *_sub rule is a REGRESSION on this version -- always re-measure the match method after adding one.",
+      "proven_by": "measured live (knowledge/chains/htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge.json)"
     }
   ],
   "schema_version": 1

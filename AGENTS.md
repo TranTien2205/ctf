@@ -65,6 +65,7 @@ Then pick exactly one branch:
 | `tools/handout_inventory.py` | measure locally available retrieval ground truth without importing raw challenge source |
 | `tools/novel_plan.py` | build a bounded source-first plan when no solved chain matches a novel challenge |
 | `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
+| `observation_eval.py` | black-box recall of classify.py against observations a solver would actually type. system_eval's classification cases are written in the taxonomy's own vocabulary, so they pass whatever the signals look like; this one is phrased the way a challenge looks before source, and five verified chains supply its labels |
 | `chain_match_eval.py` | retrieval quality of chain_match: top-1, MRR and how many wrong cards outrank the right one |
 | `holdout_eval.py` | the question chain_match_eval cannot ask: hold each card out of the index, query with its own handout, and see whether the library abstains or invents. It measured 0 abstentions and a median 0.65 confidence on a card that was not the answer; that is what the strong/weak grade in chain_match now fixes |
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |

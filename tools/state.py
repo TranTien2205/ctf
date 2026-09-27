@@ -109,9 +109,16 @@ def main():
         ap.error("--revive cannot be combined with --close or --deprioritize")
     if args.show:
         ledger = sorted(state["hypotheses"], key=lambda h: (-(h.get("priority") or 0), h.get("time", 0)))
+        # bug_class is what the control loop keys on, and category/target/source
+        # are what decide.py reads to pick its next action, so a --show that
+        # hides them makes the documented resume (--show then decide.py) a guess.
         print(json.dumps({"path": path, "name": state.get("name"),
+                          "category": state.get("category"),
+                          "target": state.get("target"),
+                          "source": state.get("source"),
                           "next_action": state.get("next_action"),
                           "hypotheses": [{"id": h["id"], "name": h.get("name"),
+                                          "bug_class": h.get("bug_class"),
                                           "status": h.get("status"),
                                           "priority": h.get("priority"),
                                           "reason": h.get("reason") or h.get("deprioritized_reason")}

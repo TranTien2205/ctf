@@ -1,0 +1,16 @@
+{
+  "package": "puppeteer",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "23.x (measured on 23.5.3 with @puppeteer/browsers 2.4.0, node 20.18.3)",
+      "sink": "not a gadget -- a measured DEAD END worth not re-testing",
+      "payload": "n/a (attempted: Object.prototype.shell = true together with Object.prototype.debuggingPort = \"0 ; <cmd> ; #\")",
+      "effect": "the argv injection half WORKS: ChromeLauncher.computeLaunchArguments destructures debuggingPort/executablePath/args/pipe off the options object, so a prototype value lands verbatim in `--remote-debugging-port=<value>` in the spawned argv, and @puppeteer/browsers spawns with a plain literal {detached, env, stdio}. The shell half does NOT: node 20.18.3 honours an OWN shell:true but ignores a prototype-inherited one, so the injected metacharacters stay a single argv element and never reach /bin/sh. Measured with a control (own shell:true shells out and prints uid=; inherited shell:true does not).",
+      "precondition": "n/a",
+      "trap": "BrowserLauncher.launch() calls existsSync(launchArgs.executablePath) before spawning, which also kills the 'Object.prototype.executablePath = \"/bin/sh -c ... #\"' variant. Object.prototype.args is unreachable whenever the caller passes args explicitly (own property wins), so --disable-web-security cannot be added to an admin bot this way.",
+      "proven_by": "measured offline against the pinned packages (knowledge/chains/htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce.json)"
+    }
+  ],
+  "schema_version": 1
+}

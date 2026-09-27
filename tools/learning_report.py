@@ -44,6 +44,12 @@ def report():
     misses_path = ROOT / "knowledge" / "classify-misses.log"
     miss_lines = [line for line in misses_path.read_text(encoding="utf-8").splitlines()
                   if line.strip()] if misses_path.is_file() else []
+    # Distinct is the honest backlog size; raw lines double-count a gap that was
+    # observed on more than one day.
+    miss_distinct = set()
+    for line in miss_lines:
+        parts = line.split("\t")
+        miss_distinct.add((parts[1], parts[2]) if len(parts) >= 3 else ("_raw", line))
     return {
         "summary": {
             "classes": len(rows),
@@ -53,6 +59,7 @@ def report():
             "proposed_notes": proposed,
             "confirmed_notes": confirmed,
             "classify_miss_lines": len(miss_lines),
+            "classify_miss_distinct": len(miss_distinct),
         },
         "review_queue": [r for r in rows if r["proposed"]],
         "classes": rows,

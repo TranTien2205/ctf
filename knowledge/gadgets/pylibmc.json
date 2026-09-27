@@ -1,0 +1,25 @@
+{
+  "package": "pylibmc",
+  "ecosystem": "pypi",
+  "gadgets": [
+    {
+      "versions": "1.6.3 with libmemcached 1.1.4 (measured live and in a local container built from the challenge Dockerfile)",
+      "sink": "memcached value FLAGS are a deserialisation sink: flags=1 makes pylibmc unpickle inside client.get(), independently of what the application does",
+      "payload": "set <key> 1 2592000 <len>\\r\\n<pickle protocol 0 of an object whose __reduce__ returns (os.system, (cmd,))>",
+      "effect": "code execution inside the caller's get(), before the application sees the value -- the app does not have to unpickle anything itself. NOTE: where the app also unpickles (Flask-Session does), flags=0 reaches execution by that route instead, so flags=1 is a second, app-independent path rather than a requirement.",
+      "precondition": "any primitive that can write a memcached key/value with chosen flags -- here a CRLF injection through a session key built from a cookie",
+      "trap": "PYLIBMC_FLAG_PICKLE is 1 (src/_pylibmcmodule.h: NONE=0, PICKLE=1, INTEGER=2, LONG=4, ZLIB=8, TEXT=16). Use pickle protocol 0 whenever the payload travels through something that becomes a str (a cookie, a header, a URL): protocol 2 starts with \\x80 and is re-encoded as multi-byte UTF-8, which silently breaks any byte count around it. An early measurement here read as 'flags 0 does nothing'; re-measured with protocol 0 on a clean connection, flags 0 and 1 both executed.",
+      "proven_by": "measured (knowledge/chains/htb-serialflow-werkzeug-octal-cookie-memcached-injection-pylibmc-flag1-pickle-rce.json)"
+    },
+    {
+      "versions": "same",
+      "sink": "no key validation, and a corrupted connection is sticky",
+      "payload": "n/a",
+      "effect": "libmemcached's VERIFY_KEY behaviour is off by default, so keys containing CR/LF reach the wire and the line-based text protocol is injectable. The cost is that the injecting request leaves the client's single shared connection desynced.",
+      "precondition": "n/a",
+      "trap": "the injecting request always 500s (the library raises on a later op), which looks like the injection failed -- confirm by reading the key straight out of memcached instead. Afterwards poll with UNRELATED keys until the app answers 200 again before triggering; re-requesting the payload key lets the app overwrite it with a normal flags-0 value.",
+      "proven_by": "measured (same chain card)"
+    }
+  ],
+  "schema_version": 1
+}

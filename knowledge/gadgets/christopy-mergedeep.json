@@ -1,0 +1,16 @@
+{
+  "package": "@christopy/mergedeep",
+  "ecosystem": "npm",
+  "gadgets": [
+    {
+      "versions": "1.0.4",
+      "sink": "recursive merge -> Object.prototype pollution",
+      "payload": "{\"__proto__\": {\"<option>\": \"<value>\"}}  sent as JSON to any handler that merges the request body",
+      "effect": "mergeDeep walks Object.keys(source); a JSON-parsed body carries __proto__ as an OWN enumerable key, so it is enumerated. `if (!target[key])` sees the inherited Object.prototype (truthy) and skips the guard, then recurses into mergeDeep(Object.prototype, payload) and Object.assign()s every leaf onto Object.prototype. No __proto__/constructor filtering at all.",
+      "precondition": "the merged source is JSON.parse()d (express.json / body-parser preserves the own __proto__ key; object rest/spread preserves it too)",
+      "trap": "the merge adds NO own key to the target, so the caller's subsequent ORM .update() is a no-op on the row and may still answer 500 from an unrelated failure. A 500 does not mean the pollution failed — verify it out of band, e.g. pollute `cookies` and watch cookie-parser return early (it skips when req.cookies is truthy, and req.cookies resolves through the prototype).",
+      "proven_by": "measured live (knowledge/chains/htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce.json)"
+    }
+  ],
+  "schema_version": 1
+}
