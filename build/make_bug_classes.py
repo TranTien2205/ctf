@@ -45,6 +45,12 @@ CLASSES = [
                            # python, node or php quoting.
                            r"(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\s*=|new\s+SqlCommand)[^\n]{0,80}\$\"",
                            r"\$\"[^\"\n]{0,100}\b(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^\"\n]{0,200}\{",
+                           # The python twin of the line above, and the reason
+                           # No Threshold ranked SQL injection third: an f-string
+                           # prefix comes BEFORE the verb, so a pattern looking
+                           # for a quote AFTER SELECT never sees it.
+                           r"f\"[^\"\n]{0,60}\b(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^\"\n]{0,200}\{"
+                           r"|f'[^'\n]{0,60}\b(?:SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b[^'\n]{0,200}\{",
                            r"(?:execute|query|run)\s*\([^\n]*(?:%|format|\+|\$\{)",
                            r"(?:INSERT|UPDATE|DELETE)[^\n]*\$\{", r"cursor\.execute"],
         "first_probe": "one syntax marker, then a matched true/false pair against the same input",

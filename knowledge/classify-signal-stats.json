@@ -1,6 +1,6 @@
 {
   "corpus": 49,
-  "signals": 251,
+  "signals": 252,
   "df": {
     "web-sqli||\\bsql\\b": 5,
     "web-sqli||sqlite|mysql|mariadb|postgres|mssql|oracle": 29,
@@ -16,6 +16,7 @@
     "web-sqli||SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"'])": 25,
     "web-sqli||(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\"": 0,
     "web-sqli||\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{": 1,
+    "web-sqli||f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{": 3,
     "web-sqli||(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{)": 10,
     "web-sqli||(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{": 11,
     "web-sqli||cursor\\.execute": 3,

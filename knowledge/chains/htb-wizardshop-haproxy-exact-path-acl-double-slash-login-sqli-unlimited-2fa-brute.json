@@ -1,9 +1,9 @@
 {
  "schema_version": 1,
  "id": "htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute",
- "source_note": "challenges/wizardshop/state.json",
+ "source_note": "challenges/No-Threshold/web_nothreshold/conf/haproxy.cfg",
  "challenge": {
-  "name": "Wizard Shop",
+  "name": "No Threshold (app titled Wizard Shop)",
   "platform": "HackTheBox",
   "event": "HackTheBox",
   "category": "web",
@@ -11,11 +11,12 @@
   "assistance": "self-solved"
  },
  "stack": [
-  "haproxy",
+  "haproxy 2.8.3",
   "flask",
   "werkzeug",
-  "jinja2",
+  "uwsgi",
   "sqlite",
+  "alpine",
   "docker"
  ],
  "preconditions": {
@@ -40,7 +41,13 @@
   "vary: Cookie",
   "Invalid username or password",
   "Invalid 2FA Code!",
-  "session=eyJ"
+  "session=eyJ",
+  "path_beg,url_dec",
+  "track-sc0",
+  "stick-table type ip",
+  "http_req_rate",
+  "hdr(X-Forwarded-For)",
+  "uwsgi.cache_set"
  ],
  "chain": [
   {
@@ -76,8 +83,8 @@
   {
    "step": 6,
    "stage": "impact",
-   "action": "the second factor is four characters and the proxy rate-limits /auth/verify-2fa at 20 requests, but the limiter is keyed on the same literal path, so //auth/verify-2fa is unlimited: measured 20x400 then 10x429 on one, 30x400 on the other. Brute-force through the bypass, then use the returned session on //dashboard",
-   "why": "the same normalisation gap that opened the login also removes the only control protecting the second factor. The rate limit was the real defence, and it was defeated by the character that had already been proven to work"
+   "action": "the rate limit has TWO independently attackable keys, and the handout shows both. haproxy.cfg:21 decides WHETHER to track with `acl is_auth_verify_2fa path_beg,url_dec /auth/verify-2fa`, and haproxy.cfg:32 decides WHICH BUCKET with `http-request track-sc0 hdr(X-Forwarded-For)`. Defeat either: //auth/verify-2fa never matches the ACL, so nothing is tracked; or keep the exact path and send a different X-Forwarded-For each time, so every request lands in its own bucket. Then brute-force the four digits and use the session on //dashboard",
+   "why": "the converter on line 21 drops path_beg's implicit -m beg and degrades the prefix match to an exact string compare -- the HAProxy 2.8.x bug this toolkit first measured on LockTalk, confirmed here on 2.8.3. The bucket key is worse: it is a header the client sends, and line 18 only supplies one when the request has none. Measured as four concurrent 40-request bursts: exact path with no header gave 20x400 then 14x429, rotating the header gave 40x400 and no 429 at all, a second no-header control gave 38x429 proving the bucket was still hot, and the doubled slash gave 39x400"
   }
  ],
  "first_confirming_probe": {
@@ -88,13 +95,15 @@
  "blast_radius": "The brute force is the dangerous part on a shared instance. The pending login is SERVER-SIDE with no cookie, so every attempt runs against state shared by everyone on that instance: a successful guess consumes it for whoever else was mid-login, and the traffic is thousands of requests in a burst. Keep the pool small, batch it, and stop at the first hit -- this solve stopped after 438 codes. The SQL injection is read-only as used here (a SELECT in the login), but the same injection point reaches an UPDATE-free statement only by luck, so do not extend it with stacked queries. Nothing was written to the target and nothing needs cleaning up.",
  "verification": {
   "status": "verified_live",
-  "evidence": "Live HTB instance. /auth/login -> 403 'Request forbidden by administrative rules.' while //auth/login -> 200 with <form action=\"/auth/login\" method=\"POST\">; username=\"admin' --\" -> 302 location /auth/verify-2fa; the boolean oracle read users = 1:admin:<32-char plaintext password>; /auth/verify-2fa gave 20x400 then 10x429 while //auth/verify-2fa gave 30x400; code 0438 answered 302 to /dashboard with session=eyJhdXRoZW50aWNhdGVkIjp0cnVlfQ..., and //dashboard with that cookie returned 'Welcome, here is your flag: HTB{...}'. Recorded in challenges/wizardshop/state.json through tools/hooks.py post-probe (confirms, evidence-kind class three times then impact) and pre-flag (source live-response)."
+  "evidence": "Live HTB instance. /auth/login -> 403 'Request forbidden by administrative rules.' while //auth/login -> 200 with <form action=\"/auth/login\" method=\"POST\">; username=\"admin' --\" -> 302 location /auth/verify-2fa; the boolean oracle read users = 1:admin:<32-char plaintext password>; /auth/verify-2fa gave 20x400 then 10x429 while //auth/verify-2fa gave 30x400; code 0438 answered 302 to /dashboard with session=eyJhdXRoZW50aWNhdGVkIjp0cnVlfQ..., and //dashboard with that cookie returned 'Welcome, here is your flag: HTB{...}'. Recorded in challenges/wizardshop/state.json through tools/hooks.py post-probe (confirms, evidence-kind class three times then impact) and pre-flag (source live-response). Handout received AFTER the solve and read against it: blueprints/login.py:28 is the f-string SQL, login.py:10-14 is set_2fa_code(4) writing random.choices(string.digits, k=4) into one global uwsgi cache key for 300s, verify2fa.py:8 is the redirect that explains the lapse, verify2fa.py:26-29 is the race that explains the 500s, and conf/haproxy.cfg:21/32/36 are the three rules. Dockerfile pins haproxy 2.8.3. The rate-limit mechanism in step 6 was CORRECTED against the source and then re-measured: four concurrent 40-request bursts gave 20x400+14x429 (exact path, no header), 40x400 (exact path, rotating header), 38x429 (no-header control proving the bucket was hot) and 39x400 (doubled slash)."
  },
  "reuse_when": [
   "two different error-page formats come back from one host: that is a proxy in front, and the paths it answers for are the paths it has rules about. Map them before reading a single line of application logic",
   "a route nothing links to answers 403 from the proxy: the proxy has just told you the route exists and matters. /dashboard was found this way, not by wordlist",
   "any proxy-enforced access rule on a named path: try //path, /./path, /path/./x, /path%2f and a trailing slash, with curl --path-as-is. The proxy compares strings; the framework resolves them",
-  "a proxy-enforced RATE LIMIT, not just a deny: the limiter is usually keyed on the same literal path, so the same normalisation trick that bypasses a deny also removes the limit. Always re-measure the limit through the bypass path before concluding an endpoint cannot be brute-forced",
+  "a proxy-enforced RATE LIMIT: read it as TWO questions, not one. What decides that tracking happens (usually a path ACL), and what the counter is keyed on (usually a header). Either one is a bypass, and a header-keyed bucket is the weaker of the two because the client supplies it",
+  "any HAProxy stick-table tracked on hdr(X-Forwarded-For), X-Real-IP or a similar client-supplied value: rotate it. A rule that adds the header only `if !{ req.hdr(X-Forwarded-For) -m found }` hands the key straight to the attacker",
+  "a *_beg, *_end or *_sub ACL with a converter appended (path_beg,url_dec / path_beg,lower): on HAProxy 2.8.x the implicit match method is dropped and the rule silently becomes an exact compare. Confirmed twice here now, on 2.8.1 and 2.8.3",
   "a login with no registration route: the way in is the query behind it or the credentials inside it, and a 3-way response (success redirect / invalid / server error) is already a boolean oracle",
   "a short second factor whose pending state is not bound to a cookie: it is shared server-side, so it can be attacked from any connection and re-armed at will by logging in again"
  ],
@@ -102,11 +111,14 @@
   "curl collapses /./ and // client-side unless --path-as-is is passed, so the bypass silently fails to fire and reads as a dead end. Pass it on every probe in this family.",
   "/auth//login is NOT a bypass here: Werkzeug merges the duplicate slash and answers 308, so a redirect-following client reports the 403 it was redirected into. Only the LEADING double slash works.",
   "/AUTH/LOGIN answers the Flask 404, so case variation is not a bypass -- Werkzeug routes are case-sensitive. Do not spend probes on it.",
-  "the boolean oracle needs the comment form. username=\"admin' AND '1'='1\" answers 400 because the password clause survives, which looks like the injection failing; it is the injection working with a wrong payload shape. Use \"admin' AND (<predicate>)--\".",
+  "the boolean oracle needs the comment form. username=\"admin' AND '1'='1\" answers 400 because the password clause survives, which looks like the injection failing; it is the injection working with a wrong payload shape. Use \"admin' AND (<predicate>)--\". Source: blueprints/login.py:28 interpolates BOTH fields into one f-string.",
   "python's urllib RAISES the 302 as an HTTPError when a redirect handler declines the redirect, so the TRUE case of the oracle arrives in the except branch and a naive `r.status == 302` check reports every row as FALSE. This cost a full extraction run before it was caught.",
-  "the pending login has no cookie and lapses. Once it does, every 2FA attempt answers 302 -> /auth/login, which is 'not 400' and so reads as a hit to any brute-forcer whose success test is negative. Test for the ACTUAL success shape (302 to /dashboard, or a Set-Cookie) and re-login when the /auth/login redirect appears.",
-  "immediately after the correct code is accepted, concurrent in-flight attempts answer 500 rather than 400, because the state they were racing has been consumed. Three codes adjacent to the real one answered 500 in this solve; none of them was valid.",
-  "one isolated 403 in the middle of a brute-force run is the proxy, not a hit. Re-test any candidate serially before believing it."
+  "the pending login has no cookie: blueprints/login.py:13 puts the code in ONE global uwsgi cache key with a 300s TTL, so it is per-instance state shared by everyone, and verify2fa.py:8 redirects to /auth/login whenever the key is absent. A brute-forcer whose success test is merely 'not 400' reads that 302 as a hit. Test for the real success shape (302 to /dashboard, or a Set-Cookie) and re-login when the /auth/login redirect appears.",
+  "a redirect-following client makes that lapse look like something else entirely: the 302 leads to /auth/login, which the proxy denies, so the client reports 403 and you start hunting a WAF. An early run of this measurement produced 30x403 for exactly that reason and said nothing about what it was testing.",
+  "immediately after the correct code is accepted, concurrent in-flight attempts answer 500 rather than 400. verify2fa.py:26 calls uwsgi.cache_get(...).decode() after line 29 has already deleted the key, so the racing request passes cache_exists and then dereferences None. Three codes adjacent to the real one answered 500 in this solve; none of them was valid.",
+  "one isolated 403 in the middle of a brute-force run is the proxy, not a hit. Re-test any candidate serially before believing it.",
+  "measure a rate limit with a CONCURRENT burst and a control in the same run. Fired serially, 30 requests never filled the 60s sliding window and the control produced no 429 at all, which would have credited the bypass with an effect it had not been shown to have. The controls that make the result mean anything are: the same burst without the bypass, and a second no-bypass burst afterwards proving the bucket was still hot.",
+  "the X-Forwarded-For must still be a well-formed IPv4 when the ACL does match: haproxy.cfg:24-26 denies with 400 on anything the regex rejects, so 'not-an-ip' and 999.1.1.1 both answer 400 and look like an application response."
  ],
  "flag": null,
  "classification": {

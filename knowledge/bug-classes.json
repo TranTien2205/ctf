@@ -38,6 +38,7 @@
         "SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"'])",
         "(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\"",
         "\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{",
+        "f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{",
         "(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{)",
         "(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{",
         "cursor\\.execute"

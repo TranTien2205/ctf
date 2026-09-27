@@ -939,7 +939,7 @@
       ],
       "skill_tokens": 763,
       "depth_files": 1,
-      "depth_tokens": 6416,
+      "depth_tokens": 6920,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1094,7 +1094,7 @@
       "routes_to": [
         "web-nosqli"
       ],
-      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
       "bug_class": true
     },
     {

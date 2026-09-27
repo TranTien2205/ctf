@@ -12,7 +12,7 @@
       "proven_by": "knowledge/chains/htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip.json"
     },
     {
-      "versions": "2.8.1 (source-confirmed and reproduced offline against haproxy:2.8.1-alpine, 2026-09-26)",
+      "versions": "2.8.1 and 2.8.3 (2.8.1 source-confirmed and reproduced offline against haproxy:2.8.1-alpine on 2026-09-26; 2.8.3 confirmed on 2026-09-27 from the No Threshold handout, where `acl is_auth_verify_2fa path_beg,url_dec /auth/verify-2fa` guards a rate limit that //auth/verify-2fa walks straight past)",
       "sink": "a CONVERTER appended to a path_beg shorthand silently drops its implicit -m beg, degrading a prefix deny to an exact-path deny",
       "payload": "against  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  every one of these is ALLOWED: /api/v1/get_ticket/  /api/v1/get_ticket/x  /api/v1/./get_ticket  //api/v1/get_ticket  (curl --path-as-is)",
       "effect": "the rule reads as a prefix deny and behaves as an exact string match. Two-config differential on 2.8.1: WITH ',url_dec' the trailing-slash and suffix forms return 200; with the converter removed they return 403. Separately, and independently of the converter bug, HAProxy resolves no dot segments and no leading double slash, so /api/v1/./get_ticket and //api/v1/get_ticket reach a normalising backend (Werkzeug) in BOTH configs.",
@@ -21,12 +21,12 @@
       "proven_by": "measured live (knowledge/chains/htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge.json)"
     },
     {
-      "versions": "measured live on an HTB instance fronting Flask/Werkzeug, 2026-09-27 (version not disclosed by the instance; the 403 body 'Request forbidden by administrative rules.' is HAProxy's own page)",
-      "sink": "a rate limit and a deny enforced on the SAME literal path, so one normalisation trick removes both",
-      "payload": "//auth/verify-2fa in place of /auth/verify-2fa, with curl --path-as-is",
-      "effect": "the limiter is keyed on the path string, not on the route. Measured on the same endpoint in the same minute: /auth/verify-2fa gave 20 x 400 then 10 x 429, while //auth/verify-2fa gave 30 x 400 and never a 429. A four-digit second factor that is unbruteforceable through the front door falls in a few hundred requests through the doubled slash.",
-      "precondition": "the backend normalises the leading double slash (Werkzeug does) and the limiter's key is the raw path",
-      "trap": "re-measure the LIMIT through the bypass path, not just the deny. It is easy to prove the deny is bypassable, assume the endpoint is now open, and still be throttled -- or, as here, to assume a rate-limited endpoint cannot be attacked at all. Note the asymmetry with the deny: /auth//login (double slash in the MIDDLE) answers 308 because Werkzeug merges it and redirects, so only the LEADING double slash is a bypass.",
+      "versions": "2.8.3 (config read from the handout, behaviour measured live, 2026-09-27)",
+      "sink": "a stick-table rate limit has TWO keys, and both are usually attackable: the ACL that decides WHETHER to track, and the expression the counter is bucketed BY",
+      "payload": "given\n  acl is_x path_beg,url_dec /auth/verify-2fa\n  http-request track-sc0 hdr(X-Forwarded-For) if is_x\n  http-request deny deny_status 429 if is_x { sc_http_req_rate(0) gt 20 }\neither  //auth/verify-2fa  (the ACL never matches, so nothing is tracked)  or  a different X-Forwarded-For on every request  (each lands in its own bucket)",
+      "effect": "a four-digit second factor that is unbruteforceable through the front door falls in a few hundred requests. Measured as four concurrent 40-request bursts against one live instance: exact path with no header 20x400 then 14x429; exact path with a rotating header 40x400 and no 429; a second no-header burst 38x429, proving the bucket was still hot when the rotating run passed; doubled slash 39x400.",
+      "precondition": "for the header route, the config must supply the header only when it is missing -- `http-request add-header X-Forwarded-For %[src] if !{ req.hdr(X-Forwarded-For) -m found }` hands the key to the client. For the path route, the backend must normalise the leading double slash; Werkzeug does.",
+      "trap": "measure with a CONCURRENT burst and keep a no-bypass control in the same run. Fired serially, 30 requests never filled the 60s sliding window and even the control produced no 429, which would have credited the bypass with an effect it had not been shown to have. Also: escaping the ACL escapes every rule guarded by it, including any X-Forwarded-For validity check, so the two routes are not equivalent -- the header route still has to satisfy the IPv4 regex (a malformed value answers 400) while the path route bypasses that too. And note the asymmetry with a plain deny: /auth//login (double slash in the MIDDLE) answers 308 because Werkzeug merges it, so only the LEADING double slash is a bypass.",
       "proven_by": "measured live (knowledge/chains/htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute.json)"
     }
   ],
