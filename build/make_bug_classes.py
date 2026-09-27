@@ -165,6 +165,29 @@ CLASSES = [
         "evidence_level": "verified",
         "verified_by": ["htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"],
         "observation_signals": [r"traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
+                                # Wizard Shop: the classifier named only request
+                                # smuggling, on the bare word "proxy", because
+                                # this class had no vocabulary at all for the
+                                # thing it is actually about -- two programs
+                                # disagreeing about what a path means.
+                                # (?<![:/]) so http:// and https:// are not read as a doubled
+                                # path separator; that alone took this signal from
+                                # 11 of 48 handouts to 2; requiring a path character right
+                                # after the slashes rules out a // line comment.
+                                r"(?:(?<![:/])//(?=[A-Za-z0-9_%.-])|/\./|%2e|%2f|dot.?segment|doubled? slash|trailing slash)[^\n]{0,70}(?:bypass\w*|reach\w*|allowed|accepted|\b200\b|differ\w*|through|throttl\w*|\blimit\w*|denied|\b40[13]\b|\b429\b)",
+                                r"(?:normali[sz]\w+|decod\w+|resolv\w+|collaps\w+|merg\w+)[^\n]{0,60}\b(?:path|url|uri|slash|segment)\b[^\n]{0,70}(?:differ\w*|before|but|while|backend|upstream|app\b|framework|proxy)",
+                                r"(?:proxy|gateway|front|edge|waf|acl|rule|filter)[^\n]{0,70}(?:exact|literal|string|verbatim)[^\n]{0,40}(?:path|match|compar\w+)",
+                                r"(?:403|401|denied|blocked|forbidden|rate.?limit\w*|429)[^\n]{0,70}\bexact\b[^\n]{0,30}path",
+                                # Two DIFFERENT path shapes close together is the
+                                # mechanism itself -- varying the shape rather
+                                # than the path -- and needs no vocabulary for
+                                # the outcome, which is what the signal above
+                                # was too narrow about.
+                                r"(?:(?<![:/])//[A-Za-z0-9_]|/\./|%2f|%2e)[^\n]{0,70}(?:(?<![:/])//[A-Za-z0-9_]|/\./|%2f|%2e)",
+                                # "the same route spelled differently is treated
+                                # differently" stated in words rather than in
+                                # path syntax.
+                                r"(?:same|identical)\s+(?:path|route|endpoint|url)[^\n]{0,70}(?:differ\w*|never|not |no longer|bypass\w*|allowed|throttl\w*|\blimit\w*|denied|\b429\b)",
                                 r"inspects the raw body|raw body before a decoder|before a decoder runs",
                                 r"x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
                                 r"hop-by-hop", r"403.{0,40}(?:only|internal|local)",

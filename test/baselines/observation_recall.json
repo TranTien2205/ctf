@@ -140,6 +140,18 @@
       "expect": null,
       "observation": "Phonebook login form Accept-Ranges static file server option no server header",
       "provenance": "banner/recon noise with no mechanism in it"
+    },
+    {
+      "id": "proxy-exact-path-vs-normalising-backend",
+      "observation": "the login page answers 403 with a page that is not the app's, but //auth/login and /auth/./login return it normally",
+      "expect": "web-parser-differential",
+      "why": "live-verified: htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute"
+    },
+    {
+      "id": "rate-limit-keyed-on-literal-path",
+      "observation": "the endpoint starts answering 429 after twenty tries, but the doubled slash form of the same path is never throttled",
+      "expect": "web-parser-differential",
+      "why": "live-verified: the same chain. A limiter keyed on the raw path is the same defect as a deny keyed on it"
     }
   ]
 }

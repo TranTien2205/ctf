@@ -224,3 +224,35 @@ Falsifier: the echo comes back as the literal AA\101BB or quoted (no octal decod
 **Blast radius**: The injection corrupts the app's single shared memcached connection every time, so the app 500s and sometimes resets connections until it recovers; on a shared instance that is a visible outage of a few seconds. The RCE runs as root. Keep the command additive and reversible: this solve created /app/application/static/f.txt, read it over HTTP and then removed the directory with a second round (verified 404 afterwards, with / still 200). Do NOT overwrite application/templates/index.html, which is what public writeups do -- that destroys the only page the app serves and cannot be undone without a rebuild.
 
 - status: confirmed
+
+## 2026-09-27 · Wizard Shop · confirmed
+
+- source note: `challenges/wizardshop/state.json`
+- chain card: `knowledge/chains/htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute.json`
+- verification: verified_live — Live HTB instance. /auth/login -> 403 'Request forbidden by administrative rules.' while //auth/login -> 200 with <form action="/auth/login" method="POST">; username="admin' --" -> 302 location /auth/verify-2fa; the boolean oracle read users = 1:admin:<32-char plaintext password>; /auth/verify-2fa gave 20x400 then 10x429 while //auth/verify-2fa gave 30x400; code 0438 answered 302 to /dashboard with session=eyJhdXRoZW50aWNhdGVkIjp0cnVlfQ..., and //dashboard with that cookie returned 'Welcome, here is your flag: HTB{...}'. Recorded in challenges/wizardshop/state.json through tools/hooks.py post-probe (confirms, evidence-kind class three times then impact) and pre-flag (source live-response).
+- classified as: `web-parser-differential` (score 1.25, 1 signals matched)
+- also matched: `web-request-smuggling` (1.0)
+- signals that fired: //auth/login, /./auth/login, /auth/./login and /auth%2f
+
+**Confirming probe that worked**
+
+> GET /auth/login and GET //auth/login with curl --path-as-is, and compare the bodies rather than only the status codes
+
+Expected: the first returns a 403 whose body is the proxy's own page ('Request forbidden by administrative rules.'), the second returns the application's login form
+
+Falsifier: both return the same error page, or the 403 body is in the application's own error format -- then the denial is the app's and no path trick can move it
+
+**Traps recorded on this solve**
+
+- curl collapses /./ and // client-side unless --path-as-is is passed, so the bypass silently fails to fire and reads as a dead end. Pass it on every probe in this family.
+- /auth//login is NOT a bypass here: Werkzeug merges the duplicate slash and answers 308, so a redirect-following client reports the 403 it was redirected into. Only the LEADING double slash works.
+- /AUTH/LOGIN answers the Flask 404, so case variation is not a bypass -- Werkzeug routes are case-sensitive. Do not spend probes on it.
+- the boolean oracle needs the comment form. username="admin' AND '1'='1" answers 400 because the password clause survives, which looks like the injection failing; it is the injection working with a wrong payload shape. Use "admin' AND (<predicate>)--".
+- python's urllib RAISES the 302 as an HTTPError when a redirect handler declines the redirect, so the TRUE case of the oracle arrives in the except branch and a naive `r.status == 302` check reports every row as FALSE. This cost a full extraction run before it was caught.
+- the pending login has no cookie and lapses. Once it does, every 2FA attempt answers 302 -> /auth/login, which is 'not 400' and so reads as a hit to any brute-forcer whose success test is negative. Test for the ACTUAL success shape (302 to /dashboard, or a Set-Cookie) and re-login when the /auth/login redirect appears.
+- immediately after the correct code is accepted, concurrent in-flight attempts answer 500 rather than 400, because the state they were racing has been consumed. Three codes adjacent to the real one answered 500 in this solve; none of them was valid.
+- one isolated 403 in the middle of a brute-force run is the proxy, not a hit. Re-test any candidate serially before believing it.
+
+**Blast radius**: The brute force is the dangerous part on a shared instance. The pending login is SERVER-SIDE with no cookie, so every attempt runs against state shared by everyone on that instance: a successful guess consumes it for whoever else was mid-login, and the traffic is thousands of requests in a burst. Keep the pool small, batch it, and stop at the first hit -- this solve stopped after 438 codes. The SQL injection is read-only as used here (a SELECT in the login), but the same injection point reaches an UPDATE-free statement only by luck, so do not extend it with stacked queries. Nothing was written to the target and nothing needs cleaning up.
+
+- status: confirmed

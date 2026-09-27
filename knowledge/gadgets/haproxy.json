@@ -19,6 +19,15 @@
       "precondition": "the denial is HAProxy's own HTML page rather than the app's error format -- that is what identifies the proxy as the denier",
       "trap": "curl collapses ./ client-side unless --path-as-is is passed, so the bypass silently fails to fire and looks like a dead end. url_dec buys nothing here: /api/v1/%2e/get_ticket is allowed either way, since the decoded /api/v1/./get_ticket does not begin with the blocked prefix either, and Werkzeug does not percent-decode before route matching so it 404s. /api/v1//get_ticket answers 308 (Werkzeug merges the slash and redirects), not 200. The query string is not part of the path sample, so ?x=1 is still denied. A hardening converter added to a *_beg / *_end / *_sub rule is a REGRESSION on this version -- always re-measure the match method after adding one.",
       "proven_by": "measured live (knowledge/chains/htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge.json)"
+    },
+    {
+      "versions": "measured live on an HTB instance fronting Flask/Werkzeug, 2026-09-27 (version not disclosed by the instance; the 403 body 'Request forbidden by administrative rules.' is HAProxy's own page)",
+      "sink": "a rate limit and a deny enforced on the SAME literal path, so one normalisation trick removes both",
+      "payload": "//auth/verify-2fa in place of /auth/verify-2fa, with curl --path-as-is",
+      "effect": "the limiter is keyed on the path string, not on the route. Measured on the same endpoint in the same minute: /auth/verify-2fa gave 20 x 400 then 10 x 429, while //auth/verify-2fa gave 30 x 400 and never a 429. A four-digit second factor that is unbruteforceable through the front door falls in a few hundred requests through the doubled slash.",
+      "precondition": "the backend normalises the leading double slash (Werkzeug does) and the limiter's key is the raw path",
+      "trap": "re-measure the LIMIT through the bypass path, not just the deny. It is easy to prove the deny is bypassable, assume the endpoint is now open, and still be throttled -- or, as here, to assume a rate-limited endpoint cannot be attacked at all. Note the asymmetry with the deny: /auth//login (double slash in the MIDDLE) answers 308 because Werkzeug merges it and redirects, so only the LEADING double slash is a bypass.",
+      "proven_by": "measured live (knowledge/chains/htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute.json)"
     }
   ],
   "schema_version": 1

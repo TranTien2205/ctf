@@ -278,6 +278,12 @@
       ],
       "observation_signals": [
         "traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy",
+        "(?:(?<![:/])//(?=[A-Za-z0-9_%.-])|/\\./|%2e|%2f|dot.?segment|doubled? slash|trailing slash)[^\\n]{0,70}(?:bypass\\w*|reach\\w*|allowed|accepted|\\b200\\b|differ\\w*|through|throttl\\w*|\\blimit\\w*|denied|\\b40[13]\\b|\\b429\\b)",
+        "(?:normali[sz]\\w+|decod\\w+|resolv\\w+|collaps\\w+|merg\\w+)[^\\n]{0,60}\\b(?:path|url|uri|slash|segment)\\b[^\\n]{0,70}(?:differ\\w*|before|but|while|backend|upstream|app\\b|framework|proxy)",
+        "(?:proxy|gateway|front|edge|waf|acl|rule|filter)[^\\n]{0,70}(?:exact|literal|string|verbatim)[^\\n]{0,40}(?:path|match|compar\\w+)",
+        "(?:403|401|denied|blocked|forbidden|rate.?limit\\w*|429)[^\\n]{0,70}\\bexact\\b[^\\n]{0,30}path",
+        "(?:(?<![:/])//[A-Za-z0-9_]|/\\./|%2f|%2e)[^\\n]{0,70}(?:(?<![:/])//[A-Za-z0-9_]|/\\./|%2f|%2e)",
+        "(?:same|identical)\\s+(?:path|route|endpoint|url)[^\\n]{0,70}(?:differ\\w*|never|not |no longer|bypass\\w*|allowed|throttl\\w*|\\blimit\\w*|denied|\\b429\\b)",
         "inspects the raw body|raw body before a decoder|before a decoder runs",
         "x-real-ip|x-forwarded-for|x-forwarded-host|connection:",
         "hop-by-hop",
