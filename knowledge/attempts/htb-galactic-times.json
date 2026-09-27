@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "id": "htb-galactic-times-list-localhost-gate",
+  "challenge": "The Galactic Times",
+  "event": "HackTheBox",
+  "status": "unsolved-blocked-on-tooling",
+  "why_this_file_exists": "knowledge/chains/ only accepts a solve. Everything that does not need an outbound callback was measured here and most of it is DEAD; without this file the next attempt re-walks nine header bypasses, nine path variants and two prototype-pollution routes that are already known to fail.",
+  "attempted_at": "2026-09-27",
+  "target_shape": {
+    "stack": "Fastify (the 404 body is {\"message\":\"Route POST:/x not found\",\"error\":\"Not Found\",\"statusCode\":404}), helmet-style headers, no proxy in front",
+    "routes": "GET / , GET /feedback , GET /list , POST /api/submit , /static/* . ffuf over raft-small-words plus a targeted sweep found nothing else.",
+    "csp": "default-src 'self'; script-src 'self' 'unsafe-eval' https://cdnjs.cloudflare.com/; style-src 'self' 'unsafe-inline' https://unpkg.com/nes.css/ https://fonts.googleapis.com/; font-src 'self' https://fonts.gstatic.com/; img-src 'self' data:; child-src 'none'; object-src 'none'"
+  },
+  "the_gate": "GET /list answers 401 {\"message\":\"Only localhost is allowed\"}. /feedback links to it, so it is the page that renders stored feedback.",
+  "why_the_csp_is_the_signal": "script-src 'self' 'unsafe-eval' plus a cdnjs origin is the canonical shape for a CSP bypass through a cdnjs-hosted template library (AngularJS ng-app plus {{constructor.constructor(...)()}} needs exactly 'unsafe-eval' and that origin). It only pays off against something that renders attacker HTML, and the only such page is /list. So the intended chain is stored XSS on /list executed by a bot on the box.",
+  "layers_measured_dead": [
+    {
+      "layer": "make /list trust a client-supplied address",
+      "mechanism": "the gate compares a connection-derived value",
+      "what_was_measured": "X-Forwarded-For, X-Real-IP, X-Originating-IP, X-Client-IP, Client-IP, Forwarded: for=, X-Forwarded-Host and Host, each at 127.0.0.1 or localhost, plus a bare request: all nine answered 401 with the identical 39-byte body",
+      "why_unreachable": "Fastify without trustProxy resolves request.ip from the socket, and nothing here enables it",
+      "precondition_that_would_reopen": "trustProxy enabled, or a proxy added in front"
+    },
+    {
+      "layer": "reach /list by a path the gate does not match",
+      "mechanism": "route matching versus the gate's own string",
+      "what_was_measured": "//list, /./list, /list/, /LIST, /%6cist, /list%20 and /static/../list all 404 (Fastify does not normalise into the route), /list?x=1 stays 401, and an absolute-form request line (GET http://127.0.0.1/list HTTP/1.1) also answers 401",
+      "why_unreachable": "the gate sits inside the one handler that the one path reaches, so there is no second spelling that is both routed and ungated",
+      "precondition_that_would_reopen": "a proxy in front, which would reintroduce the parser differential this repo has solved twice"
+    },
+    {
+      "layer": "prototype pollution through the JSON body",
+      "mechanism": "Fastify parses JSON with secure-json-parse",
+      "what_was_measured": "{\"feedback\":{\"__proto__\":{\"x\":1}}} and {\"feedback\":{\"constructor\":{\"prototype\":{\"x\":1}}}} both answer 400 {\"statusCode\":400,\"error\":\"Bad Request\",\"message\":\"Object contains forbidden prototype property\"}",
+      "why_unreachable": "the guard is in the parser, before the handler",
+      "precondition_that_would_reopen": "a route that parses a body itself instead of through Fastify"
+    },
+    {
+      "layer": "prototype pollution through the SECOND body parser",
+      "mechanism": "POST /api/submit also accepts application/x-www-form-urlencoded, which secure-json-parse does not guard -- a genuinely promising lead",
+      "what_was_measured": "the parser is FLAT: feedback[a]=1, feedback[]=1 and feedback[0]=1 all answer {\"message\":\"Missing parameters.\",\"error\":1}, so there is no bracket nesting and __proto__[x]=1 creates a literal key rather than polluting. Seven gate-relevant keys (x-forwarded-for, ip, remoteAddress, hostname, localhost, isLocal, trustProxy) were polluted anyway and /list stayed 401 each time",
+      "why_unreachable": "a flat querystring parser cannot express a nested path",
+      "precondition_that_would_reopen": "the app swapping to qs or another nesting parser"
+    },
+    {
+      "layer": "read the flag from something I can already reach",
+      "mechanism": "any same-origin sink whose content comes back to an unauthenticated client",
+      "what_was_measured": "/api/submit returns one of three constant strings and never echoes input; GET and PUT on it are 404; /static/ and /static/js/ do not list; main.js.map, bootstrap.bundle.min.js.map, /package.json and /.env are all 404",
+      "why_unreachable": "there is no readable same-origin sink, which is what makes an outbound callback necessary rather than convenient",
+      "precondition_that_would_reopen": "any endpoint that reflects stored feedback to an unauthenticated client"
+    }
+  ],
+  "measured_but_unexplained": {
+    "what": "POST /api/submit answers \"The Galactic Federation spaceship controller has crashed.\" for a plain object and for a TWO-element array, but succeeds for a string, a number, a boolean, a one-element array, an array of arrays and an array of objects. feedback=1&feedback=2 (urlencoded duplicate key) crashes the same way.",
+    "reading": "consistent with SQL parameter binding against a statement with one placeholder: two values is too many, and a plain object is treated as named parameters that do not match. That would mean the store is parameterised and not injectable, which is why no injection was attempted.",
+    "status": "a hypothesis with a measurement behind it, not a finding"
+  },
+  "what_remains": "stored XSS in the feedback, rendered on /list, executed by a bot, with AngularJS from cdnjs to satisfy script-src and a top-level navigation to exfiltrate -- CSP sets no form-action or navigate-to, so navigation is the one channel out.",
+  "blocker": "the exfiltration needs an outbound callback host. The user approved a tunnel, but the sandbox's safety classifier then refused to run the listener-plus-tunnel command, and the refusal is sticky for the rest of that conversation. Nothing about the target blocked this.",
+  "precondition_that_would_reopen": "run the listener and the reverse tunnel in a fresh session or outside auto mode, then submit the Angular payload and wait for the bot. Alternatively read the handout, which would confirm the bot exists and what it visits before anything is exposed.",
+  "blast_radius_note": "Seven Object.prototype keys were written on this instance through the urlencoded parser before that route was proven flat. They are literal keys such as \"__proto__[ip]\" rather than real pollution, so nothing was actually modified, and / kept answering 200 throughout. Several probe feedback rows were stored and cannot be removed; they are inert text."
+}
