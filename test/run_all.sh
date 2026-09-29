@@ -28,11 +28,13 @@ if ! "$PY" tools/system_eval.py --json; then fail=1; fi
 hr "REQUIRED: learning-loop report"
 if ! "$PY" tools/learning_report.py --json; then fail=1; fi
 
-hr "REQUIRED: tool-layer selftests (web, crypto, pwn, forensics primitives -- all offline)"
-# These four prove the primitives the agent is told to prefer over hand-rolled
+hr "REQUIRED: tool-layer selftests (web, crypto, pwn, forensics, a-d primitives -- all offline)"
+# These prove the primitives the agent is told to prefer over hand-rolled
 # requests. They were shipped with selftests that the gate never ran, so a
 # regression in them would have been invisible here; measured at ~17s together.
-for t in tools/web/selftest.py tools/crypto/selftest.py tools/pwnstatic/selftest.py tools/forensics/selftest.py; do
+# tools/ad is the attack-defense control plane; its selftest is pure-function
+# only -- no sockets, no subprocess -- so it stays safe to run here.
+for t in tools/web/selftest.py tools/crypto/selftest.py tools/pwnstatic/selftest.py tools/forensics/selftest.py tools/ad/selftest.py; do
   if [ -f "$t" ]; then
     printf -- '-- %s\n' "$t"
     "$PY" "$t" >/dev/null || { echo "FAILED: $t (run it directly for the detail)"; fail=1; }
