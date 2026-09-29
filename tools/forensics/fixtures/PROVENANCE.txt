@@ -1,0 +1,46 @@
+Fixture provenance - where every byte in this tree came from.
+Built once and committed; a selftest reads them offline.
+
+REAL bytes, copied from an artifact produced on this box:
+  bundle/C/$MFT, mft-only/$MFT   first 64 bytes of the $MFT of an NTFS volume
+                                 made with mkntfs and extracted with
+                                 sleuthkit 'icat <img> 0'. Header reads
+                                 46 49 4c 45 = FILE, usa_offset 0x0030.
+  bundle/C/$Boot                 first 16 bytes of the same volume's $Boot,
+                                 'icat <img> 7'. OEM 'NTFS    ' at offset 3.
+  bundle/.../places.sqlite       first 32 bytes of a database created by
+                                 sqlite3 3.x: 'SQLite format 3\x00'.
+  bundle/capture/session.pcap    first 24 bytes of a file written by
+                                 text2pcap -F pcap: d4 c3 b2 a1.
+  bundle/capture/session.pcapng  first 32 bytes of a file written by
+                                 text2pcap (default format): 0a 0d 0d 0a.
+  bundle/.../invoice_2026.exe    first 256 bytes of a real PE test binary
+                                 from the go module cache: MZ, and PE\0\0
+                                 at the e_lfanew offset.
+  bundle/.../quarterly.xls       first 16 bytes of a real .xls shipped in
+                                 /usr/share/doc: d0 cf 11 e0 a1 b1 1a e1.
+  bundle/.../stage2.zip          a complete tiny zip written by 7z.
+  bundle/.../toolkit.7z          a complete tiny 7z written by 7z.
+  bundle/CloudTrail/...json.gz   a complete tiny gzip written by gzip.
+  kape-comment.zip               written by python zipfile with an archive
+                                 comment; 'unzip -z' prints the comment back.
+
+CONSTRUCTED headers, each cross-checked against an independent tool here:
+  *.evtx    'ElfFile\x00' - libmagic on this box names these bytes
+            'MS Windows 10-11 Event Log'.
+  SYSTEM, SOFTWARE, SAM, NTUSER.DAT, Amcache.hve, *.LOG1, *.LOG2
+            'regf' - libmagic names these bytes
+            'MS Windows registry file, NT/2000 or above'. A hive
+            transaction log carries the same signature, which is why the
+            .LOG1/.LOG2 name has to win over the magic.
+
+CONSTRUCTED and NOT verifiable on this box:
+  *.pf      'SCCA' at offset 4, and 'MAM\x04' at offset 0 for the
+            compressed Windows 10 form. No prefetch sample exists here and
+            neither libmagic's database nor binwalk's signatures know
+            'SCCA', so these two values are documentation, not measurement.
+            artifact_inventory.py says so in magic_provenance and treats
+            the .pf extension as the primary signal.
+  $J, $LogFile, $I..., wtmp, *.raw, auth.log
+            name-classified only. These formats have no signature at
+            offset 0 that this tool claims to know.

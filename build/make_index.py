@@ -69,7 +69,15 @@ EPILOGUE = """
 
 `ctf-writeup` is opened after a flag is verified, to record the chain.
 `security-skill-evaluation` is opened when judging whether a skill earns its
-place. `ctf-malware` is reached from `rev-triage` or `forensics-triage`.
+place. `ctf-malware` is reached from `rev-triage`, `forensics-triage` or
+`dfir-sherlock-triage`.
+
+`forensics-triage` and `dfir-sherlock-triage` are not interchangeable and sit on
+different categories (`forensics` and `dfir`) so that `tools/skill_select.py` can
+never return one when the other was meant. `forensics-triage` asks what is hidden
+inside a container; `dfir-sherlock-triage` asks what happened on a host whose
+artifacts are exactly what they claim to be. Each one's falsifier is the other's
+entry condition.
 `ctf-playbook` is the entry point and is never a depth target.
 
 ## Chain reuse comes before depth
@@ -139,6 +147,7 @@ def main():
         "forensics-triage": "PCAP, disk, memory, media, logs",
         "osint-triage": "name, handle, photo, domain in public sources",
         "ai-iot-triage": "LLM endpoint, model file, IoT firmware or protocol",
+        "dfir-sherlock-triage": "artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail",
         "ctf-misc": "jail, encoding chain, game or VM, programming task",
     }
     for entry in registry["skills"]:
@@ -152,17 +161,39 @@ def main():
             entry["skill_tokens"] / 1000, nxt))
 
     lines += ["", "`ctf-misc` is both router and depth for its category, and it is the last",
-              "resort: try a named category first.", "",
-              "## Web bug classes", "",
-              "Open one only after a probe or a source read produced its signal.", "",
-              "| Class | Evidence | Closed when (falsifier) | Skill |", "|---|---|---|---|"]
+              "resort: try a named category first."]
+
+    # One table per category. The taxonomy used to be web-only and this heading said
+    # so unconditionally; a DFIR evidence-family class printed under "Web bug classes"
+    # is a false statement about the tree, and no test would have caught it.
+    CATEGORY_HEADING = {
+        "web": ("## Web bug classes",
+                "Open one only after a probe or a source read produced its signal."),
+        "dfir": ("## DFIR evidence families",
+                 "Not vulnerability classes: each one is a family of artifacts that "
+                 "answers one kind of investigation question. Open one after the "
+                 "inventory names the family."),
+    }
+    seen_categories = []
     for cls in taxonomy["classes"]:
-        entry = by_id.get(cls["id"])
-        if entry is None:
-            continue
-        mark = "verified" if cls["evidence_level"] == "verified" else "catalogue"
-        lines.append("| %s | %s | %s | `%s` |" % (
-            cls["name"], mark, cls["falsifier"].split(",")[0][:72], cls["skill"]))
+        category = cls.get("category", "web")
+        if category not in seen_categories:
+            seen_categories.append(category)
+    for category in seen_categories:
+        heading, blurb = CATEGORY_HEADING.get(
+            category, ("## %s bug classes" % category.upper(),
+                       "Open one only after its signal fired."))
+        lines += ["", heading, "", blurb, "",
+                  "| Class | Evidence | Closed when (falsifier) | Skill |", "|---|---|---|---|"]
+        for cls in taxonomy["classes"]:
+            if cls.get("category", "web") != category:
+                continue
+            entry = by_id.get(cls["id"])
+            if entry is None:
+                continue
+            mark = "verified" if cls["evidence_level"] == "verified" else "catalogue"
+            lines.append("| %s | %s | %s | `%s` |" % (
+                cls["name"], mark, cls["falsifier"].split(",")[0][:72], cls["skill"]))
 
     lines += ["", "Full signal lists, first probes and blast-radius notes are in",
               "`knowledge/bug-classes.json`. Do not copy them here — the classifier reads",

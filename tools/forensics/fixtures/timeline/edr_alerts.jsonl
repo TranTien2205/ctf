@@ -1,0 +1,3 @@
+{"alert": {"time": "2026-09-27T11:03:40.000Z"}, "severity": "high", "message": "script block: IEX DownloadString"}
+{"alert": {"time": "2026-09-27T11:10:00.000Z"}, "severity": "critical", "message": "audit log cleared (1102)"}
+{"alert": {"time": "2026-09-27T11:05:10.000Z"}, "severity": "medium", "message": "service install UpdaterSvc"}

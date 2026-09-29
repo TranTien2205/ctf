@@ -547,6 +547,148 @@ CLASSES = [
         "confusable_with": ["web-xss", "web-cache-poisoning", "web-csrf"],
         "blast_radius": "the read-back channel is often a shared cache or store; filling it to force eviction destroys every other key, so never run it against an instance someone else is using",
     },
+
+    # ------------------------------------------------------- DFIR evidence families
+    # Not vulnerability classes. Each one is a family of artifacts that answers one
+    # kind of investigation question in an artifact-bundle lab (HTB Sherlocks), and
+    # each is a mechanism layer that tools/decide.py can force a switch between -
+    # which is the whole reason they are classes and not just router table rows.
+    # category is "dfir", which is why main() uses setdefault rather than assignment.
+    # source_signals is empty on purpose: a Sherlock ships no application source, so
+    # there is nothing for a source scan to match. Every observation_signal below was
+    # measured to match ZERO of the five tools/system_eval.py classification case
+    # texts and ZERO handout files under challenges/.
+    {
+        "id": "dfir-authentication-trace", "name": "Authentication and logon trace",
+        "skill_dir": "dfir-authentication-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\b(?:4624|4625|4634|4647|4648|4672|4776)\b",
+            r"logon type\s*\d{1,2}|\blogon types?\b",
+            r"\b(?:4768|4769|4771)\b",
+            r"auth\.log|\bwtmp\b|\bbtmp\b|\blastlog\b",
+            r"failed logon|successful logon|logon session|logonid",
+            r"terminalservices-localsessionmanager|remoteconnectionmanager|rdpcorets",
+        ],
+        "source_signals": [],
+        "first_probe": "filter the event set to 4624 and read the LogonType and IpAddress fields of the first match",
+        "falsifier": "no authentication record names a source address or an account outside the host's own service accounts, and every logon is type 5 service or type 0 system",
+        "depth_refs": ["skills/dfir-sherlock-triage/windows-event-logs.md",
+                       "skills/ctf-forensics/linux-forensics.md"],
+        "confusable_with": ["dfir-execution-trace", "dfir-network-exfil-trace"],
+    },
+    {
+        "id": "dfir-execution-trace", "name": "Process execution trace",
+        "skill_dir": "dfir-execution-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\bsysmon\b",
+            r"\b(?:4688|4103|4104)\b",
+            r"processguid|parentimage|parentcommandline|newprocessname",
+            r"\.pf\b|prefetch (?:file|director|hash|run)",
+            r"amcache|shimcache|appcompatcache|userassist",
+            r"consolehost_history|psreadline|encodedcommand|script block logging",
+        ],
+        "source_signals": [],
+        "first_probe": "filter to Sysmon event 1 or Security 4688 and read the CommandLine and ParentImage of the first match",
+        "falsifier": "no event 1, 4688, 4103 or 4104 exists in the set, and every process artifact present names a signed binary under the system directory with no command line carrying a URL or an encoded run",
+        "depth_refs": ["skills/dfir-sherlock-triage/windows-event-logs.md",
+                       "skills/dfir-sherlock-triage/registry-and-execution.md"],
+        "confusable_with": ["dfir-persistence-trace", "dfir-authentication-trace"],
+    },
+    {
+        "id": "dfir-persistence-trace", "name": "Host persistence trace",
+        "skill_dir": "dfir-persistence-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\brunonce\b|\brunonceex\b|\brun key\b|\brun keys\b",
+            r"currentversion\\+run|currentcontrolset\\+services",
+            r"\b(?:7045|4697|4698|4699|4702)\b",
+            r"taskcache|schtasks|scheduled task xml",
+            r"__eventfilter|commandlineeventconsumer|filtertoconsumerbinding",
+            r"systemd timer|authorized_keys|ld\.so\.preload|/etc/cron\.d|launchdaemons",
+        ],
+        "source_signals": [],
+        "first_probe": "read the Run and RunOnce values and the Services subkeys from the SOFTWARE and SYSTEM hives, and compare each image path against the intrusion window",
+        "falsifier": "every autostart entry and service image path resolves to a signed vendor binary whose file creation time predates the intrusion window",
+        "depth_refs": ["skills/dfir-sherlock-triage/registry-and-execution.md",
+                       "skills/ctf-forensics/linux-forensics.md"],
+        "confusable_with": ["dfir-execution-trace", "dfir-antiforensics-trace"],
+    },
+    {
+        "id": "dfir-filesystem-timeline", "name": "Filesystem metadata timeline",
+        "skill_dir": "dfir-filesystem-timeline", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\$mft\b|\$usnjrnl\b|\$extend\b|\$boot\b",
+            r"usn journal|usn_record|usnjrnl",
+            r"standard_information|\$file_name\b|timestomp",
+            r"\$recycle\.bin|jump ?list|automaticdestinations",
+            r"\bshellbags?\b|usrclass\.dat",
+            r"\bmactime\b|\bbodyfile\b|tsk_gettimes|fls -m",
+        ],
+        "source_signals": [],
+        "first_probe": "build a bodyfile from the filesystem metadata and read the entries inside the intrusion window in chronological order",
+        "falsifier": "no file was created, renamed or deleted inside the intrusion window outside routine operating-system paths, and the $STANDARD_INFORMATION and $FILE_NAME timestamps agree on every candidate",
+        "depth_refs": ["skills/dfir-sherlock-triage/filesystem-timeline.md",
+                       "skills/ctf-forensics/windows.md"],
+        "confusable_with": ["dfir-antiforensics-trace", "dfir-execution-trace"],
+    },
+    {
+        "id": "dfir-network-exfil-trace", "name": "Network and exfiltration trace",
+        "skill_dir": "dfir-network-exfil-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\bdestinationip\b|\bdestinationhostname\b|dns query name",
+            r"io,phs|conv,tcp|--export-objects",
+            r"srudb\.dat|qmgr\.db|pfirewall\.log",
+            r"beacon(?:ing)? interval|\bc2 beacon",
+            r"conn\.log|eve\.json|\bzeek\b|\bsuricata\b",
+            r"dns tunnel(?:ling|ing)?|dns exfil",
+        ],
+        "source_signals": [],
+        "first_probe": "read the per-peer byte counts in each direction and identify the peer with the largest outbound volume, then join it to the owning process",
+        "falsifier": "every outbound conversation resolves to a vendor update or telemetry endpoint, and the largest outbound volume in the window is smaller than a routine update",
+        "depth_refs": ["skills/dfir-sherlock-triage/network-and-cloud.md"],
+        "confusable_with": ["dfir-execution-trace", "dfir-cloud-audit-trace"],
+    },
+    {
+        "id": "dfir-cloud-audit-trace", "name": "Cloud audit trail",
+        "skill_dir": "dfir-cloud-audit-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\bcloudtrail\b",
+            r"useridentity\.(?:type|arn)|\bsessioncontext\b|\bassumedrole\b",
+            r"getcalleridentity|createaccesskey|putbucketpolicy|attachuserpolicy|createloginprofile",
+            r"vpc flow log|\bguardduty\b",
+            r"unified audit log|sign-?in logs|userprincipalname|conditionalaccess",
+            r"s3 (?:server )?access log|\bconsolelogin\b",
+        ],
+        "source_signals": [],
+        "first_probe": "extract eventTime, eventName, sourceIPAddress and userIdentity.arn from every record, sort by time, and read the first action that is not a read",
+        "falsifier": "every recorded action belongs to a service principal or an automation role whose behaviour is unchanged across the whole window, and no credential or policy object was created or modified",
+        "depth_refs": ["skills/dfir-sherlock-triage/network-and-cloud.md"],
+        "confusable_with": ["dfir-authentication-trace", "dfir-network-exfil-trace"],
+    },
+    {
+        "id": "dfir-antiforensics-trace", "name": "Anti-forensics and log tampering trace",
+        "skill_dir": "dfir-antiforensics-trace", "category": "dfir",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"\b1102\b|audit log (?:was )?cleared|log clearing",
+            r"timestomp|setfiletime",
+            r"vssadmin delete shadows|volume shadow cop",
+            r"usn deletejournal|fsutil usn",
+            r"detectionhistory|\bmplog\b|defender quarantine",
+            r"\b4719\b|auditpol /clear|\befstmpwp\b",
+        ],
+        "source_signals": [],
+        "first_probe": "look for Security 1102 and, whether or not it is present, read the event record identifiers in order and report the largest discontinuity",
+        "falsifier": "record identifiers are contiguous across the whole window, no 1102 or 104 exists, and the $STANDARD_INFORMATION and $FILE_NAME timestamps agree on every file created in the window",
+        "depth_refs": ["skills/dfir-sherlock-triage/windows-event-logs.md",
+                       "skills/ctf-forensics/windows.md"],
+        "confusable_with": ["dfir-filesystem-timeline", "dfir-persistence-trace"],
+    },
 ]
 
 
@@ -589,7 +731,11 @@ def main():
     for entry in CLASSES:
         assert entry["id"] not in seen, "duplicate class id: " + entry["id"]
         seen.add(entry["id"])
-        entry["category"] = "web"
+        # setdefault, not assignment: the tree gained DFIR evidence-family classes
+        # whose category is "dfir", and an unconditional assignment relabelled every
+        # one of them "web". Output-neutral for the 25 web classes, which carry no
+        # category key in the literal below.
+        entry.setdefault("category", "web")
         entry["observation_signals"] = (list(entry.get("observation_signals", []))
                                         + [self_name_signal(entry)])
         entry["skill"] = "skills/%s/SKILL.md" % entry["skill_dir"]

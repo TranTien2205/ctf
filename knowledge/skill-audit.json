@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-09-27T12:13:01",
+  "generated_at": "2026-09-28T01:08:13",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 52,
+    "skills": 60,
     "review": 0,
     "warn": 0,
     "local_evidence_present": 20,
-    "local_evidence_stub": 5,
+    "local_evidence_stub": 12,
     "local_evidence_missing": 0,
-    "actionable_skills": 18,
-    "basic_skills": 7
+    "actionable_skills": 20,
+    "basic_skills": 12
   },
   "review": [],
   "warn": [],
@@ -67,6 +67,133 @@
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
       "lines": 71
+    },
+    {
+      "id": "dfir-sherlock-triage",
+      "layer": "router",
+      "path": "skills/dfir-sherlock-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
+      "lines": 123
+    },
+    {
+      "id": "dfir-antiforensics-trace",
+      "layer": "depth",
+      "path": "skills/dfir-antiforensics-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 216,
+      "actionability": "basic",
+      "nearest_neighbour": "dfir-filesystem-timeline",
+      "overlap": 0.03,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-cloud-audit-trace",
+      "layer": "depth",
+      "path": "skills/dfir-cloud-audit-trace/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 211,
+      "actionability": "operational",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.025,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-filesystem-timeline",
+      "layer": "depth",
+      "path": "skills/dfir-filesystem-timeline/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 201,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.03,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-network-exfil-trace",
+      "layer": "depth",
+      "path": "skills/dfir-network-exfil-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 216,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.033,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-persistence-trace",
+      "layer": "depth",
+      "path": "skills/dfir-persistence-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 201,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.02,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-authentication-trace",
+      "layer": "depth",
+      "path": "skills/dfir-authentication-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 214,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.026,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-execution-trace",
+      "layer": "depth",
+      "path": "skills/dfir-execution-trace/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 233,
+      "actionability": "operational",
+      "nearest_neighbour": "dfir-persistence-trace",
+      "overlap": 0.018,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "osint-triage",

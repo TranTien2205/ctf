@@ -21,6 +21,7 @@ SKILLS = {
     "pwn": "skills/pwn-binary-triage/SKILL.md",
     "crypto": "skills/crypto-triage/SKILL.md", "rev": "skills/rev-triage/SKILL.md",
     "forensics": "skills/forensics-triage/SKILL.md", "osint": "skills/osint-triage/SKILL.md",
+    "dfir": "skills/dfir-sherlock-triage/SKILL.md",
     "misc": "skills/ctf-misc/SKILL.md", "ai": "skills/ai-iot-triage/SKILL.md",
 }
 SIGNALS = (
@@ -33,6 +34,10 @@ SIGNALS = (
     ("crypto", r"rsa|aes|ecc|cipher|encrypted|modulus|ciphertext|lattice|prng|hash|nonce|oracle padding|padding oracle|diffie|elgamal"),
     ("rev", r"rev|reverse engineering|decompil\w*|disassembl\w*|packed|firmware|bytecode|ghidra|ida pro|crackme|obfuscated binary"),
     ("forensics", r"pcap|memory dump|disk image|stego|steganography|forensics|wireshark|event log|volatility|carving|exiftool"),
+    # DFIR / investigation bundles (HTB Sherlocks). Every token here is one the
+    # forensics row does not claim: that row owns the carrier words (pcap, stego,
+    # "event log"), this one owns the artifact and investigation words.
+    ("dfir", r"sherlock|evtx|sysmon|prefetch|amcache|shimcache|usnjrnl|usn journal|\$mft|\$j\b|registry hive|ntuser\.dat|usrclass|cloudtrail|dfir|incident response|triage collection|kape|logon type|4624|4625|4688|4104|7045|scheduled task|script block|threat hunt|blue team"),
     ("osint", r"osint|geolocation|reverse image|whois|social media"),
     ("ai", r"llm|prompt injection|machine learning|model weights|iot|firmware|system prompt|pickle model|mqtt|coap|modbus"),
     # Misc is scored last in practice because it is the residual category, but

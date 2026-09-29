@@ -1,0 +1,5 @@
+when,user,src,event
+2026-09-27T13:00:03.120+02:00,analyst,10.10.14.22,4624 logon type 3
+2026-09-27T12:59:41+02:00,administrator,10.10.14.22,4625 failed logon
+2026-09-27T13:12:31+02:00,analyst,10.10.14.22,4634 logoff
+not-a-timestamp,ghost,0.0.0.0,deliberately unparseable row

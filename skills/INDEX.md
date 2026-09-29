@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 786,000 tokens across 313 files. Opening
+The depth corpus is roughly 856,000 tokens across 339 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -60,6 +60,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `ctf-crypto` |
 | jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.1k | — |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.6k | `ctf-forensics`, `ctf-malware` |
+| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.6k | `ctf-forensics`, `ctf-malware` |
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~0.9k | `ctf-osint` |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~0.8k | `pwn-rop`, `ctf-pwn` |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~0.9k | `ctf-reverse`, `ctf-malware` |
@@ -100,6 +101,20 @@ Open one only after a probe or a source read produced its signal.
 | Smart contract / web3 | catalogue | the solved condition depends on state no external caller can change | `skills/web-web3/SKILL.md` |
 | Cross-site leak / browser side channel | verified | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
 
+## DFIR evidence families
+
+Not vulnerability classes: each one is a family of artifacts that answers one kind of investigation question. Open one after the inventory names the family.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Authentication and logon trace | catalogue | no authentication record names a source address or an account outside th | `skills/dfir-authentication-trace/SKILL.md` |
+| Process execution trace | catalogue | no event 1 | `skills/dfir-execution-trace/SKILL.md` |
+| Host persistence trace | catalogue | every autostart entry and service image path resolves to a signed vendor | `skills/dfir-persistence-trace/SKILL.md` |
+| Filesystem metadata timeline | catalogue | no file was created | `skills/dfir-filesystem-timeline/SKILL.md` |
+| Network and exfiltration trace | catalogue | every outbound conversation resolves to a vendor update or telemetry end | `skills/dfir-network-exfil-trace/SKILL.md` |
+| Cloud audit trail | catalogue | every recorded action belongs to a service principal or an automation ro | `skills/dfir-cloud-audit-trace/SKILL.md` |
+| Anti-forensics and log tampering trace | catalogue | record identifiers are contiguous across the whole window | `skills/dfir-antiforensics-trace/SKILL.md` |
+
 Full signal lists, first probes and blast-radius notes are in
 `knowledge/bug-classes.json`. Do not copy them here — the classifier reads
 that file and this table would drift.
@@ -108,6 +123,13 @@ that file and this table would drift.
 
 | Skill | Layer | Tokens | Opened when |
 |---|---|---|---|
+| `skills/dfir-antiforensics-trace/SKILL.md` | depth | ~4.7k | see registry use_when |
+| `skills/dfir-cloud-audit-trace/SKILL.md` | depth | ~3.7k | see registry use_when |
+| `skills/dfir-filesystem-timeline/SKILL.md` | depth | ~4.0k | see registry use_when |
+| `skills/dfir-network-exfil-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
+| `skills/dfir-persistence-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
+| `skills/dfir-authentication-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
+| `skills/dfir-execution-trace/SKILL.md` | depth | ~5.3k | see registry use_when |
 | `skills/ctf-ai-ml/SKILL.md` | depth | ~1.8k | the AI/IoT sub-type is decided |
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.7k | the primitive parameters are collected |
 | `skills/ctf-forensics/SKILL.md` | depth | ~2.7k | the artifact type is identified |
@@ -131,7 +153,15 @@ that file and this table would drift.
 
 `ctf-writeup` is opened after a flag is verified, to record the chain.
 `security-skill-evaluation` is opened when judging whether a skill earns its
-place. `ctf-malware` is reached from `rev-triage` or `forensics-triage`.
+place. `ctf-malware` is reached from `rev-triage`, `forensics-triage` or
+`dfir-sherlock-triage`.
+
+`forensics-triage` and `dfir-sherlock-triage` are not interchangeable and sit on
+different categories (`forensics` and `dfir`) so that `tools/skill_select.py` can
+never return one when the other was meant. `forensics-triage` asks what is hidden
+inside a container; `dfir-sherlock-triage` asks what happened on a host whose
+artifacts are exactly what they claim to be. Each one's falsifier is the other's
+entry condition.
 `ctf-playbook` is the entry point and is never a depth target.
 
 ## Chain reuse comes before depth
