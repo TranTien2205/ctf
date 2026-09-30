@@ -4,8 +4,10 @@
 No network, no challenge instance, no optional dependency. The fixtures beside
 this file are real bytes on disk - EVTX and registry magic read off artifacts
 produced on this box, a JSONL of Windows event records in the shape converters
-actually emit, and three timeline sources in three different time formats - so a
-case here fails when a tool's behaviour changes, not when a mock drifts.
+actually emit, and five timeline sources spanning three file formats and all
+four epoch widths - so a case here fails when a tool's behaviour changes, not
+when a mock drifts. The microsecond values in journal_sample.jsonl were read off
+this box's own journal; the two rows labelled SYNTHETIC in that file were not.
 
 The case that matters most is the last group: a primitive that ran no parser, or
 whose filter matched nothing, must never be able to propose verdict=confirms.
@@ -30,6 +32,8 @@ EVTX = os.path.join(FIX, "evtx", "sherlock_sample.jsonl")
 DAMAGED = os.path.join(FIX, "evtx", "damaged.jsonl")
 BUNDLE = os.path.join(FIX, "bundle")
 TL = os.path.join(FIX, "timeline")
+JOURNAL = os.path.join(TL, "journal_sample.jsonl")
+UNPLACEABLE = os.path.join(TL, "epoch_unplaceable.csv")
 CASES = []
 
 
@@ -66,6 +70,27 @@ def case(name, tool, argv, check, verbose=False):
     CASES.append(entry)
 
 
+def tiers(out, label):
+    """The per-source assumption counts of one source, keyed by tier name.
+
+    Read from sources[], not from the merged assumptions[] list: the merged list
+    is ordered by first appearance, so indexing it would pin an ordering the tool
+    never promised.
+    """
+    for src in out.get("sources") or []:
+        if src["label"] == label:
+            return src["assumptions"]
+    return {}
+
+
+def ts_of(out, time_value, timecol="__REALTIME_TIMESTAMP"):
+    """The merged UTC timestamp of the row whose time column held this text."""
+    for row in out.get("rows") or []:
+        if row["fields"].get(timecol) == time_value:
+            return row["ts"]
+    return None
+
+
 def no_confirm(out, _code):
     """The invariant: this run must not have proposed a confirmation."""
     argv = out.get("post_probe_argv") or []
@@ -83,7 +108,8 @@ def main():
     args = ap.parse_args()
     v = args.verbose
 
-    missing = [p for p in (EVTX, DAMAGED, BUNDLE, TL) if not os.path.exists(p)]
+    missing = [p for p in (EVTX, DAMAGED, BUNDLE, TL, JOURNAL, UNPLACEABLE)
+               if not os.path.exists(p)]
     if missing:
         fkit.jprint({"mode": "tools-forensics-selftest", "verdict": "FAIL",
                      "total": 0, "failures": 1,
@@ -203,6 +229,67 @@ def main():
          lambda o, c: (bool(o["gaps"]["found"])
                        and o["gaps"]["found"][0]["seconds"] >= 120,
                        "largest=%ss" % o["gaps"]["found"][0]["seconds"]), v)
+
+    # journald is the one log source guaranteed to exist on a systemd host, and
+    # __REALTIME_TIMESTAMP is microseconds. With two tiers the whole file was
+    # unparsed: measured on this box, 20 of 20 records, parsed 0.
+    case("timeline: a journald microsecond epoch parses, none left unparsed",
+         "timeline_merge.py",
+         ["--source", JOURNAL + ":__REALTIME_TIMESTAMP:journal",
+          "--challenge", "st"],
+         lambda o, c: (o["unparsed"]["total"] == 0
+                       and o["merged"]["rows_total"] == 6
+                       and tiers(o, "journal").get("epoch_microseconds") == 4
+                       and ts_of(o, "1790688901511836")
+                       == "2026-09-29T13:35:01.511836+00:00",
+                       "unparsed=%s tiers=%s us_row=%s"
+                       % (o["unparsed"]["total"], tiers(o, "journal"),
+                          ts_of(o, "1790688901511836"))), v)
+
+    case("timeline: a nanosecond epoch lands on the same instant as the "
+         "microsecond one",
+         "timeline_merge.py",
+         ["--source", JOURNAL + ":__REALTIME_TIMESTAMP:journal",
+          "--challenge", "st"],
+         lambda o, c: (tiers(o, "journal").get("epoch_nanoseconds") == 1
+                       and ts_of(o, "1790688901511836000")
+                       == ts_of(o, "1790688901511836"),
+                       "ns=%s us=%s" % (ts_of(o, "1790688901511836000"),
+                                        ts_of(o, "1790688901511836"))), v)
+
+    # The regression pin. Two tiers were added underneath the old two, so the
+    # question this asks is whether seconds and milliseconds still read exactly
+    # as they did: same tier name, same resolved timestamp.
+    case("timeline: seconds and milliseconds still read as they did before the "
+         "microsecond and nanosecond tiers existed",
+         "timeline_merge.py",
+         ["--source", os.path.join(TL, "proc_events.tsv") + ":epoch:proc",
+          "--source", JOURNAL + ":__REALTIME_TIMESTAMP:journal",
+          "--challenge", "st"],
+         lambda o, c: (tiers(o, "proc") == {"epoch_seconds": 2}
+                       and tiers(o, "journal").get("epoch_milliseconds") == 1
+                       and ts_of(o, "1790507038", "epoch")
+                       == "2026-09-27T11:03:58+00:00"
+                       and ts_of(o, "1790688901511")
+                       == "2026-09-29T13:35:01.511000+00:00",
+                       "proc=%s ms_row=%s s_row=%s"
+                       % (tiers(o, "proc"), ts_of(o, "1790688901511"),
+                          ts_of(o, "1790507038", "epoch"))), v)
+
+    # The four tiers widen what a bare number may mean, so the 1970..2200 window
+    # is the only thing left refusing one. If this case ever passes by parsing
+    # all three rows, a wrong tier is succeeding silently.
+    case("timeline: a number no tier can place inside 1970..2200 is still "
+         "refused, one beside it still parses",
+         "timeline_merge.py",
+         ["--source", UNPLACEABLE + ":epoch:bad", "--challenge", "st"],
+         lambda o, c: (o["merged"]["rows_total"] == 1
+                       and o["unparsed"]["total"] == 2
+                       and all("outside 1970..2200" in smp["reason"]
+                               for smp in o["unparsed"]["samples"]),
+                       "parsed=%s unparsed=%s reasons=%s"
+                       % (o["merged"]["rows_total"], o["unparsed"]["total"],
+                          [smp["time_value"] for smp in o["unparsed"]["samples"]])), v)
 
     # ---- the invariant the write gate rests on ------------------------------
     case("GATE: inventory refuses to confirm (it ran no parser)",

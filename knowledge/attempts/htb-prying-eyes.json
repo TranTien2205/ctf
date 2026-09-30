@@ -1,0 +1,174 @@
+{
+  "schema_version": 1,
+  "id": "htb-prying-eyes",
+  "challenge": "Prying Eyes",
+  "event": "HackTheBox",
+  "points": null,
+  "solves_at_attempt": null,
+  "status": "unsolved",
+  "why_this_file_exists": "knowledge/chains/ only accepts a solve. Seventeen layers were closed here by measurement in one session; without this file the next attempt re-walks every one of them.",
+  "confirmed_primitive": {
+    "what": "authenticated access to the whole forum: registration is open and unguarded",
+    "where": "POST /auth/register, username 4-32 chars and password 6-32, no CSRF token and no email confirmation",
+    "probe": "POST /auth/register username=<4-32> password=<6-32>",
+    "evidence": "302 to /auth/login with the session flash {\"flashes\":{\"success\":[\"You are now registered.\"]}}",
+    "limits": "it opens the 8 threads and the reply form; it does not reach any moderator surface"
+  },
+  "flag_location": "UNKNOWN. The only redacted artifact is the image on post 6, a Google 2-Step Verification screenshot with two opaque red rectangles over the account address and the authenticator app name. No flag-shaped string appears anywhere on the authenticated surface.",
+  "layers_measured_dead": [
+    {
+      "layer": "stored XSS through the post body",
+      "mechanism": "message is rendered into <p style=\"white-space: pre-line\">",
+      "what_was_measured": "sent a marker containing <u>, \", ' and &. The render escaped every one: &lt;u&gt;UPROBE9&lt;/u&gt; and &quot; and &#39; and &amp;amp.",
+      "why_unreachable": "the template engine escapes by default and the post body has no unescaped construct",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a sink that renders the body raw, or a second-order path that re-renders it"
+    },
+    {
+      "layer": "rotate as an injection point",
+      "mechanism": "hidden field rotate reaches the server-side image pipeline",
+      "what_was_measured": "rotate=notanumber is rejected server-side: 'Rotate must be between 0 and 360 and a multiple of 90.'",
+      "why_unreachable": "validated before it reaches the pipeline",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build where the validator is absent"
+    },
+    {
+      "layer": "flip as an injection point",
+      "mechanism": "hidden boolean field",
+      "what_was_measured": "flip=maybe rejected by AJV with 'must be boolean'",
+      "why_unreachable": "typed by the schema",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "none seen"
+    },
+    {
+      "layer": "parentId as a query injection point",
+      "mechanism": "the reply is attached by an integer id",
+      "what_was_measured": "parentId=1', 1+0 and '1 OR 1=1' all produce the AJV pair [\"must have required property 'title'\", 'must be integer'] -- the value never reaches a query. The same errors LEAKED the schema: a union of a reply shape keyed on parentId and a thread shape requiring title.",
+      "why_unreachable": "AJV validates before the handler",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a route whose id is not schema-checked"
+    },
+    {
+      "layer": "mass assignment on the post handler",
+      "mechanism": "extra body keys beside the declared ones",
+      "what_was_measured": "sent userId=1, id=777, createdAt=2020-01-01 and image=<hex> with a valid reply. The post came back attributed to me, with the real timestamp and no image: every extra key ignored.",
+      "why_unreachable": "the handler reads only declared fields",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a handler that spreads the body into the insert"
+    },
+    {
+      "layer": "image supplied as a string path instead of a file",
+      "mechanism": "sharp() accepts a string as a filesystem path",
+      "what_was_measured": "image=/etc/passwd, /etc/hostname, /app/package.json and a nonexistent name were ALL accepted with no error and no processing: the field is ignored entirely when it is not a file part.",
+      "why_unreachable": "the handler reads the multipart file, never the field",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a handler that passes the field value to the loader"
+    },
+    {
+      "layer": "SVG input into the image pipeline",
+      "mechanism": "librsvg via the image loader",
+      "what_was_measured": "an SVG sent as image/png was refused with 'There was an issue processing your image, please try again.'",
+      "why_unreachable": "SVG is not in the accepted set",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build with the SVG loader enabled"
+    },
+    {
+      "layer": "path traversal on the two file-serving routes",
+      "mechanism": "/uploads/<id> and /static/<path>",
+      "what_was_measured": "nine traversal shapes on /uploads and three on /static: all 404 with the identical 1092-byte app 404. One shape, ..%c0%af, returned 500 -- a generic error page with no stack trace.",
+      "why_unreachable": "the router normalises and the 500 handler is terse",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a verbose error surface"
+    },
+    {
+      "layer": "verbose error disclosure",
+      "mechanism": "the 500 and 404 handlers",
+      "what_was_measured": "both render the app's own terse template. No framework page, no stack trace, no path, no environment.",
+      "why_unreachable": "custom handlers",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a route that escapes the handler"
+    },
+    {
+      "layer": "exposed artifacts",
+      "mechanism": "the fixed high-value path set",
+      "what_was_measured": "seven paths (.git/HEAD, .env, .DS_Store, robots.txt, llm.txt, index.html.bak, a map sibling) plus two directory levels: every one 404, no autoindex, zero HTML comments in any page, no sourceMappingURL in either stylesheet.",
+      "why_unreachable": "nothing is served that was not meant to be",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build that ships a map or a dotfile"
+    },
+    {
+      "layer": "hidden threads behind the id gap",
+      "mechanism": "the index lists ids 1,2,5,6,9,11,13",
+      "what_was_measured": "authenticated id sweep over 1-40 with tools/web/id_sweep.py: exactly 8 ids exist, the 7 listed plus the one I created. The gaps are REPLY ids -- my own reply took id 16.",
+      "why_unreachable": "there is no unlisted thread",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build with a private or moderator-only thread"
+    },
+    {
+      "layer": "the AVIF container hiding a second image",
+      "mechanism": "an auxiliary item beside the colour image",
+      "what_was_measured": "parsed iloc directly: exactly two items. Colour 22770 bytes, alpha auxiliary 74 bytes -- a uniform, fully-opaque plane carrying no data. Pillow confirms 0 transparent pixels of 256360.",
+      "why_unreachable": "the redaction is baked into the colour plane",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a file whose alpha or aux item carries real variation"
+    },
+    {
+      "layer": "recovering the original upload",
+      "mechanism": "the stored name is a 32-hex id",
+      "what_was_measured": "the id is not md5 of the upload, of the stored output, or of either filename. .png, .orig, _original, a trailing slash and a trailing dot all 404; the route serves the id verbatim and appends nothing.",
+      "why_unreachable": "no original is retained at a derivable path",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build that keeps the pre-transform file"
+    },
+    {
+      "layer": "the multipart filename as an injection point into the CLI",
+      "mechanism": "the HTB forum thread reports trouble with filenames containing periods",
+      "what_was_measured": "six filename shapes (a, a.png, a.avif, a.b.png, png:a.png, 'a.png -quality 1') with identical bytes produced a byte-identical 691-byte output every time.",
+      "why_unreachable": "the filename never reaches the pipeline",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a build that names the temp file from the upload"
+    },
+    {
+      "layer": "the multipart Content-Type as an injection point",
+      "mechanism": "file.mimetype could pick the loader",
+      "what_was_measured": "eight values including image/avif, text/plain, image/svg+xml and image/png;x=y: every one accepted, identical output. The loader sniffs content.",
+      "why_unreachable": "the declared type is ignored",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a handler that trusts the declared type"
+    },
+    {
+      "layer": "CVE-2022-44268 shaped profile read",
+      "mechanism": "a PNG tEXt chunk keyed 'profile' whose value is a path",
+      "what_was_measured": "built the chunk (exiftool confirms 'Profile: /etc/passwd' on the input), uploaded it: the output is a normal 691-byte AVIF with no raw profile and no trace of the file.",
+      "why_unreachable": "either the read does not happen, or AVIF cannot carry the raw-profile tEXt chunk that PNG output would",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "an output format that carries text chunks -- which is exactly what the forum's 'How to bypass the .avif extension?!!' hint points at"
+    },
+    {
+      "layer": "multi-frame input producing numbered output files",
+      "mechanism": "a CLI image tool writes out-0, out-1",
+      "what_was_measured": "a 3-frame animated GIF was accepted and produced ONE 926-byte file; -0, -1, -2, .0 and _0 siblings all 404.",
+      "why_unreachable": "the pipeline writes a single file",
+      "on_instance": "live, 154.57.164.64:31430",
+      "precondition_that_would_reopen": "a tool invocation that splits frames"
+    }
+  ],
+  "still_open": [
+    {
+      "lead": "Change the OUTPUT format away from AVIF. The official HTB forum thread (primary source, spoiler-free) has a player asking 'How to bypass the .avif extension?!!', another told to read the challenge's Dockerfile to find 'the key tool(s) involved', and one reporting trouble with filenames containing periods. A third says 'the library in the code is just a wrapper to the CLI', which a pure sharp/libvips binding is not.",
+      "supporting_measurement": "the accepted-format matrix is PNG, GIF, BMP, JPEG and PPM; TIFF, WebP, MVG, SVG and plain text are refused. libvips supports TIFF and WebP, so an unmodified sharp does not fit that set.",
+      "falsifier": "identify the tool from its own documentation and find every documented way its output format is decided; if none is reachable from file content alone, the lead is dead.",
+      "cost_minutes": 30,
+      "status": "registered, not run"
+    },
+    {
+      "lead": "The redacted pixels are NOT recoverable from the served file -- that is measured. So either the flag is not under the red boxes, or the challenge yields a DIFFERENT file (an original on disk, or an arbitrary read).",
+      "supporting_measurement": "two AVIF items only; alpha is 74 bytes and uniform; no original at any derivable path.",
+      "falsifier": "if an arbitrary file read exists, the flag is a file, not a pixel region.",
+      "cost_minutes": 20,
+      "status": "registered, not run"
+    }
+  ],
+  "anomaly_map": null,
+  "honest_conclusion": "Unsolved. Seventeen layers closed by measurement in one session, including every input I control (rotate, flip, message, parentId, filename, content-type, extra keys, the file bytes across nine formats) and every artifact route. The authored feature is a server-side rotate/flip pipeline that re-encodes to AVIF, and the one primary source available says its library shells out to a CLI named in the challenge's Dockerfile -- which I do not have. The open lead is the output format, not the pixels: the redaction is baked into the colour plane and nothing in the container hides anything."
+}

@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "id": "htb-speednet-graphql-dev-mutation-idor-alias-2fa-bypass",
+  "source_note": "solved/speednet.md",
+  "challenge": {
+    "name": "Speednet",
+    "event": "HackTheBox",
+    "category": "web"
+  },
+  "stack": [
+    "nginx",
+    "vite",
+    "react",
+    "graphql",
+    "apollo",
+    "jwt"
+  ],
+  "preconditions": {
+    "all_of": [
+      "a GraphQL endpoint with introspection enabled",
+      "a second factor whose code is short enough to enumerate",
+      "an account-recovery mutation that can be aimed at an address you do not own"
+    ],
+    "any_of": [
+      "a mutation whose name marks it as a development leftover (dev*, test*, debug*)",
+      "a query taking an object id with no ownership check",
+      "a rate limiter at the proxy that counts HTTP requests rather than GraphQL operations"
+    ]
+  },
+  "signals": [
+    "/graphql",
+    "devForgotPassword",
+    "verifyTwoFactor",
+    "resendOTP",
+    "2FA_REQUIRED",
+    "userProfile(userId",
+    "Authorization:localStorage.getItem",
+    "index-*.js",
+    "Dev only! Password reset token"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "action": "mine the Vite bundle for routes and the one api path",
+      "why": "the SPA ships no server-rendered links; tools/web/bundle_miner.py recovered /login /register /forgot-password /reset-password /2fa /billing /profile /usage and exactly one api path, /graphql",
+      "stage": "recon"
+    },
+    {
+      "step": 2,
+      "action": "introspect the schema",
+      "why": "introspection was enabled and returned the whole surface in one read: 4 queries and 8 mutations, including a devForgotPassword sitting next to the real forgotPassword",
+      "stage": "recon"
+    },
+    {
+      "step": 3,
+      "action": "register, then userProfile(userId:1) with your own token",
+      "why": "userProfile takes an arbitrary userId and enforces no ownership: it returned admin@speednet.htb, username admin, twoFactorAuthEnabled true",
+      "stage": "access"
+    },
+    {
+      "step": 4,
+      "action": "mutation devForgotPassword(email: the admin address)",
+      "why": "the dev variant returns the reset token in the response body instead of emailing it: 'Dev only! Password reset token: <uuid>'",
+      "stage": "access"
+    },
+    {
+      "step": 5,
+      "action": "resetPassword(token, newPassword), then login",
+      "why": "login then answers 2FA_REQUIRED:<session uuid> rather than a token",
+      "stage": "access"
+    },
+    {
+      "step": 6,
+      "action": "carry the whole 4-digit OTP keyspace as ALIASED mutations inside one GraphQL document",
+      "why": "the app has no attempt cap but nginx rate-limits at 4-5 req/s, so 10^4 sequential requests is not available. Aliasing puts 500 verifyTwoFactor calls in ONE http request: the keyspace fell in 9 requests and 35 seconds",
+      "stage": "escalate"
+    },
+    {
+      "step": 7,
+      "action": "query invoiceHistory as the admin",
+      "why": "the flag is an invoice number",
+      "stage": "impact"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /graphql with body {\"query\": \"{ __schema { queryType { name } mutationType { name } types { name kind } } }\"} -- written with spaces before each selection set on purpose: the brace-hugging form is indistinguishable from a flag to the no-flags guard, and this card is the first GraphQL one in the tree",
+    "expected": "a schema document rather than an error, which is what makes every later step cheap: the whole attack surface arrives in one read",
+    "falsifier": "introspection disabled (the field is rejected or the response carries only an error), or a schema with no development-leftover mutation and no id-taking query"
+  },
+  "blast_radius": "step 5 CHANGES the admin password, so the account is altered for anyone else on the instance; record the new password. Step 6 is read-only in effect (verifyTwoFactor creates nothing) but generates volume -- alias batching is the LOW-load option, 9 requests against 10000.",
+  "known_traps": [
+    "The bundle sends the raw token as the Authorization header with NO 'Bearer ' prefix; using Bearer gets 'Not authenticated' and reads like an authorization bug rather than a client mistake.",
+    "Calling forgotPassword after devForgotPassword regenerates the token and invalidates the one you just leaked -- take the dev token and use it immediately.",
+    "Sequential OTP brute force trips an nginx 429 that then blocks every other request to the instance. Measure the limiter before raising concurrency; the alias batch avoids it entirely.",
+    "The OTP is bound to its own session: your own OTP against another user's session token is refused.",
+    "GraphQL variable nullability is strict -- RegisterInput is not RegisterInput!, and the mismatch reads as a server error."
+  ],
+  "verification": {
+    "status": "verified_live",
+    "evidence": "{\"id\": 18, \"number\": \"HTB{...}\", \"amount\": 400, \"status\": \"PAID\", \"dueDate\": \"1712311200000\"} read from data.invoiceHistory on the live instance with the admin token"
+  },
+  "reuse_when": [
+    "a GraphQL API with introspection on and any mutation named dev*/test*/debug* beside its real counterpart",
+    "a numeric second factor behind a proxy rate limit: alias batching turns 10^4 attempts into single-digit HTTP requests",
+    "a query that takes a user or object id and returns another account's record"
+  ],
+  "classification": {
+    "primary": "web-graphql",
+    "confidence": 0.9
+  },
+  "flag": null
+}

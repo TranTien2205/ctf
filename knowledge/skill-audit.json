@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-09-28T01:08:13",
+  "generated_at": "2026-09-30T00:35:30",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 60,
+    "skills": 67,
     "review": 0,
     "warn": 0,
-    "local_evidence_present": 20,
-    "local_evidence_stub": 12,
+    "local_evidence_present": 21,
+    "local_evidence_stub": 11,
     "local_evidence_missing": 0,
     "actionable_skills": 20,
     "basic_skills": 12
@@ -27,6 +27,16 @@
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
       "lines": 117
+    },
+    {
+      "id": "ad-service-triage",
+      "layer": "router",
+      "path": "skills/ad-service-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
+      "lines": 119
     },
     {
       "id": "ai-iot-triage",
@@ -59,16 +69,6 @@
       "lines": 123
     },
     {
-      "id": "forensics-triage",
-      "layer": "router",
-      "path": "skills/forensics-triage/SKILL.md",
-      "flags": [],
-      "score": null,
-      "verdict": "thin-by-design",
-      "local_evidence": "not-applicable",
-      "lines": 71
-    },
-    {
       "id": "dfir-sherlock-triage",
       "layer": "router",
       "path": "skills/dfir-sherlock-triage/SKILL.md",
@@ -79,121 +79,24 @@
       "lines": 123
     },
     {
-      "id": "dfir-antiforensics-trace",
-      "layer": "depth",
-      "path": "skills/dfir-antiforensics-trace/SKILL.md",
-      "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 216,
-      "actionability": "basic",
-      "nearest_neighbour": "dfir-filesystem-timeline",
-      "overlap": 0.03,
-      "trust": "catalogue-or-unreviewed"
+      "id": "forensics-triage",
+      "layer": "router",
+      "path": "skills/forensics-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
+      "lines": 71
     },
     {
-      "id": "dfir-cloud-audit-trace",
-      "layer": "depth",
-      "path": "skills/dfir-cloud-audit-trace/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 211,
-      "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.025,
-      "trust": "catalogue-or-unreviewed"
-    },
-    {
-      "id": "dfir-filesystem-timeline",
-      "layer": "depth",
-      "path": "skills/dfir-filesystem-timeline/SKILL.md",
-      "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 201,
-      "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.03,
-      "trust": "catalogue-or-unreviewed"
-    },
-    {
-      "id": "dfir-network-exfil-trace",
-      "layer": "depth",
-      "path": "skills/dfir-network-exfil-trace/SKILL.md",
-      "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 216,
-      "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.033,
-      "trust": "catalogue-or-unreviewed"
-    },
-    {
-      "id": "dfir-persistence-trace",
-      "layer": "depth",
-      "path": "skills/dfir-persistence-trace/SKILL.md",
-      "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 201,
-      "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.02,
-      "trust": "catalogue-or-unreviewed"
-    },
-    {
-      "id": "dfir-authentication-trace",
-      "layer": "depth",
-      "path": "skills/dfir-authentication-trace/SKILL.md",
-      "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 214,
-      "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.026,
-      "trust": "catalogue-or-unreviewed"
-    },
-    {
-      "id": "dfir-execution-trace",
-      "layer": "depth",
-      "path": "skills/dfir-execution-trace/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
-      "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 233,
-      "actionability": "operational",
-      "nearest_neighbour": "dfir-persistence-trace",
-      "overlap": 0.018,
-      "trust": "catalogue-or-unreviewed"
+      "id": "ir-live-estate-triage",
+      "layer": "router",
+      "path": "skills/ir-live-estate-triage/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "thin-by-design",
+      "local_evidence": "not-applicable",
+      "lines": 158
     },
     {
       "id": "osint-triage",
@@ -234,6 +137,36 @@
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
       "lines": 123
+    },
+    {
+      "id": "ad-patch-without-breaking-sla",
+      "layer": "depth",
+      "path": "skills/ad-patch-without-breaking-sla/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 129
+    },
+    {
+      "id": "ad-planted-backdoor-hunt",
+      "layer": "depth",
+      "path": "skills/ad-planted-backdoor-hunt/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 132
+    },
+    {
+      "id": "ad-traffic-mining",
+      "layer": "depth",
+      "path": "skills/ad-traffic-mining/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 125
     },
     {
       "id": "ctf-ai-ml",
@@ -314,6 +247,123 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 170
+    },
+    {
+      "id": "dfir-antiforensics-trace",
+      "layer": "depth",
+      "path": "skills/dfir-antiforensics-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 216,
+      "actionability": "basic",
+      "nearest_neighbour": "dfir-filesystem-timeline",
+      "overlap": 0.029,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-authentication-trace",
+      "layer": "depth",
+      "path": "skills/dfir-authentication-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 214,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.026,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-cloud-audit-trace",
+      "layer": "depth",
+      "path": "skills/dfir-cloud-audit-trace/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 213,
+      "actionability": "operational",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.025,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-execution-trace",
+      "layer": "depth",
+      "path": "skills/dfir-execution-trace/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 233,
+      "actionability": "operational",
+      "nearest_neighbour": "dfir-persistence-trace",
+      "overlap": 0.018,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-filesystem-timeline",
+      "layer": "depth",
+      "path": "skills/dfir-filesystem-timeline/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 201,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.03,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-network-exfil-trace",
+      "layer": "depth",
+      "path": "skills/dfir-network-exfil-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 216,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.033,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "dfir-persistence-trace",
+      "layer": "depth",
+      "path": "skills/dfir-persistence-trace/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 201,
+      "actionability": "basic",
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.02,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "file-read-primitives",
@@ -467,17 +517,15 @@
       "id": "web-graphql",
       "layer": "depth",
       "path": "skills/web-graphql/SKILL.md",
-      "flags": [
-        "field-notes is a template stub (16 lines)"
-      ],
-      "score": 80,
+      "flags": [],
+      "score": 90,
       "verdict": "pass",
-      "local_evidence": "stub",
+      "local_evidence": "present",
       "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "web-open-redirect",
       "overlap": 0.182,
-      "trust": "catalogue-or-unreviewed"
+      "trust": "local-confirmed"
     },
     {
       "id": "web-idor",
@@ -780,6 +828,16 @@
       "lines": 140
     },
     {
+      "id": "parallel-layer-sweep",
+      "layer": "reference",
+      "path": "skills/parallel-layer-sweep/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 111
+    },
+    {
       "id": "security-skill-evaluation",
       "layer": "reference",
       "path": "skills/security-skill-evaluation/SKILL.md",
@@ -788,6 +846,16 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 97
+    },
+    {
+      "id": "web-parallel-sweep",
+      "layer": "reference",
+      "path": "skills/web-parallel-sweep/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 159
     }
   ]
 }

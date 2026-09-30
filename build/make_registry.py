@@ -25,6 +25,30 @@ PORTED = {
         "routes_to": ["web-xss", "web-csrf", "file-read-primitives"],
         "unlock_signals": r"chromedriver|webdriver|selenium|headless|puppeteer|playwright|admin bot|bot visits|9515|4444",
     },
+    "web-parallel-sweep": {
+        "layer": "reference", "categories": ["web"],
+        "use_when": ["a web target with recon done and no strong chain match, so several "
+                     "bug-class families each need their own bounded measurement",
+                     "a web challenge is being worked one hypothesis at a time and the "
+                     "clock is the blocker"],
+        "do_not_use_when": ["chain_match.py returns a candidate: run that card's probe first",
+                            "no recon exists yet: run ctf-web-recon and ctf-web-bundle first",
+                            "one endpoint and one sink, so there is nothing to fan out"],
+        "routes_to": ["web-triage", "parallel-layer-sweep", "white-box-intended-path"],
+        "unlock_signals": r"ctf-web-|fan.?out|parallel (?:web )?sweep|subagent_fanout|ten families",
+    },
+    "parallel-layer-sweep": {
+        "layer": "reference", "categories": ["*"],
+        "use_when": ["a multi-layer white-box handout and no strong chain match, so several "
+                     "independent mechanism layers each need their own falsifier",
+                     "a session is walking layers one at a time and the clock is the blocker"],
+        "do_not_use_when": ["chain_match.py returns a candidate: run that card's probe first",
+                            "one endpoint and one sink, so there is nothing to fan out",
+                            "the only way to measure the layer is a write-shaped probe"],
+        "routes_to": ["white-box-intended-path", "white-box-dependency-measurement",
+                      "ctf-playbook"],
+        "unlock_signals": r"subagent|fan.?out|parallel layer|layer sweep|novel_plan|several layers",
+    },
     "mcp-agent-security": {
         "layer": "depth", "categories": ["ai"],
         "use_when": ["the challenge target is an LLM, an agent, or a tool server",
@@ -101,6 +125,65 @@ PORTED = {
         "routes_to": ["white-box-dependency-measurement"],
         "unlock_signals": (r"handout|stock app|upstream diff|anomaly|unused (route|field|parameter)|"
                            r"dead code|custom fork|patched vendor|why is this here"),
+    },
+    # --- attack-defense. A different game from jeopardy: the flag rotates every
+    # --- tick, you are also the target, and availability is scored continuously.
+    "ad-service-triage": {
+        "layer": "router", "categories": ["*"],
+        "use_when": ["an attack-defense contest starts and a service needs triage",
+                     "every team runs an identical copy of the service you are defending"],
+        "do_not_use_when": ["a single jeopardy target with one flag: use ctf-playbook",
+                            "the service is currently red: restore availability first"],
+        "routes_to": ["ad-traffic-mining", "ad-patch-without-breaking-sla",
+                      "ad-planted-backdoor-hunt", "ir-live-estate-triage",
+                      "web-triage", "white-box-intended-path"],
+        "unlock_signals": (r"attack.?defen[cs]e|attack-defense|scoreboard|tick|"
+                           r"other teams|team host|flag rotat|availability|sla|uptime"),
+    },
+    "ad-traffic-mining": {
+        "layer": "depth", "categories": ["*"],
+        "use_when": ["another team is already attacking your service and the capture holds their payload",
+                     "source reading has produced no hypothesis and the clock is the blocker"],
+        "do_not_use_when": ["no baseline capture exists, so nothing can be ranked against normal",
+                            "a candidate has already replayed against your own box and returned nothing"],
+        "routes_to": ["ad-patch-without-breaking-sla", "web-triage"],
+        "unlock_signals": (r"capture|pcap|dumpcap|tcpdump|tshark|replay|their exploit|"
+                           r"inbound (request|traffic)|steal (the )?exploit"),
+    },
+    "ad-patch-without-breaking-sla": {
+        "layer": "depth", "categories": ["*"],
+        "use_when": ["a bug is understood and a patch is about to go onto a live scored service",
+                     "a patch has just been applied and nothing has verified the feature still works"],
+        "do_not_use_when": ["no green baseline was saved, so there is nothing to compare against",
+                            "the service is already red: this is recovery, not patching"],
+        "routes_to": ["ad-service-triage", "ad-planted-backdoor-hunt"],
+        "unlock_signals": (r"patch|hotfix|mitigat|rollback|revert|health check|"
+                           r"availability|sla|regression|checker"),
+    },
+    "ad-planted-backdoor-hunt": {
+        "layer": "depth", "categories": ["*"],
+        "use_when": ["every team booted an identical image and it may carry a planted foothold",
+                     "credentials have just been rotated and the first thirty minutes are free"],
+        "do_not_use_when": ["the task is reconstructing what an attacker did: use ir-live-estate-triage",
+                            "the sweep has not been bounded to hosts the event assigned you"],
+        "routes_to": ["ad-patch-without-breaking-sla", "dfir-persistence-trace",
+                      "ir-live-estate-triage"],
+        "unlock_signals": (r"backdoor|planted|starting image|authorized_keys|systemd (unit|timer)|"
+                           r"cron|suid|ld\.so\.preload|web shell|persistence"),
+    },
+    "ir-live-estate-triage": {
+        "layer": "router", "categories": ["dfir"],
+        "use_when": ["a live estate has already been hit and both recovery and investigation are scored",
+                     "services are down, files are encrypted, and a clock is running"],
+        "do_not_use_when": ["the input is a closed artifact bundle with a numbered question list: "
+                            "use dfir-sherlock-triage",
+                            "nothing is scored for availability, so the intake need not be bounded"],
+        "routes_to": ["dfir-authentication-trace", "dfir-execution-trace",
+                      "dfir-persistence-trace", "dfir-filesystem-timeline",
+                      "dfir-network-exfil-trace", "dfir-cloud-audit-trace",
+                      "dfir-antiforensics-trace", "ad-planted-backdoor-hunt"],
+        "unlock_signals": (r"ransom|encrypted files|ransom note|restore|recovery|incident response|"
+                           r"post.?incident|live host|estate|root cause"),
     },
 }
 

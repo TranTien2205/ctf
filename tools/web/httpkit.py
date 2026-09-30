@@ -53,10 +53,20 @@ def request(url, method="GET", headers=None, body=None, timeout=10,
             resp = exc
         with resp:
             raw = resp.read(max_bytes)
+            # dict(resp.headers.items()) keeps only the LAST value of a repeated
+            # header, and Set-Cookie is repeated on every response that sets more
+            # than one cookie -- measured: three Set-Cookie headers collapsed to
+            # the third, so a cookie inventory built from `headers` silently lost
+            # two of three. `headers` stays the collapsed dict every existing
+            # caller reads; `headers_all` preserves order and duplicates, and
+            # `set_cookies` is the list that a session or recon tool actually needs.
+            pairs = [[k, v] for k, v in resp.headers.items()]
             return {
                 "ok": True, "url": url, "method": method.upper(),
                 "status": getattr(resp, "status", None) or resp.getcode(),
                 "headers": dict(resp.headers.items()),
+                "headers_all": pairs,
+                "set_cookies": [v for k, v in pairs if k.lower() == "set-cookie"],
                 "final_url": resp.geturl(),
                 "length": len(raw),
                 "body": raw.decode("utf-8", "replace"),
@@ -65,7 +75,8 @@ def request(url, method="GET", headers=None, body=None, timeout=10,
             }
     except Exception as exc:                       # transport, DNS, TLS, timeout
         return {"ok": False, "url": url, "method": method.upper(),
-                "status": None, "headers": {}, "body": "", "body_bytes": b"",
+                "status": None, "headers": {}, "headers_all": [], "set_cookies": [],
+                "body": "", "body_bytes": b"",
                 "length": 0, "error": "%s: %s" % (type(exc).__name__, exc),
                 "elapsed": round(time.monotonic() - started, 4)}
 

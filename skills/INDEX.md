@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 856,000 tokens across 339 files. Opening
+The depth corpus is roughly 876,000 tokens across 347 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -56,11 +56,13 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 
 | Observed evidence | Router | Tokens | Next |
 |---|---|---|---|
+| ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.4k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
 | ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `ctf-crypto` |
 | jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.1k | — |
+| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.7k | `ctf-forensics`, `ctf-malware` |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.6k | `ctf-forensics`, `ctf-malware` |
-| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.6k | `ctf-forensics`, `ctf-malware` |
+| ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~0.9k | `ctf-osint` |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~0.8k | `pwn-rop`, `ctf-pwn` |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~0.9k | `ctf-reverse`, `ctf-malware` |
@@ -123,13 +125,9 @@ that file and this table would drift.
 
 | Skill | Layer | Tokens | Opened when |
 |---|---|---|---|
-| `skills/dfir-antiforensics-trace/SKILL.md` | depth | ~4.7k | see registry use_when |
-| `skills/dfir-cloud-audit-trace/SKILL.md` | depth | ~3.7k | see registry use_when |
-| `skills/dfir-filesystem-timeline/SKILL.md` | depth | ~4.0k | see registry use_when |
-| `skills/dfir-network-exfil-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
-| `skills/dfir-persistence-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
-| `skills/dfir-authentication-trace/SKILL.md` | depth | ~4.2k | see registry use_when |
-| `skills/dfir-execution-trace/SKILL.md` | depth | ~5.3k | see registry use_when |
+| `skills/ad-patch-without-breaking-sla/SKILL.md` | depth | ~1.5k | see registry use_when |
+| `skills/ad-planted-backdoor-hunt/SKILL.md` | depth | ~1.6k | see registry use_when |
+| `skills/ad-traffic-mining/SKILL.md` | depth | ~1.6k | see registry use_when |
 | `skills/ctf-ai-ml/SKILL.md` | depth | ~1.8k | the AI/IoT sub-type is decided |
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.7k | the primitive parameters are collected |
 | `skills/ctf-forensics/SKILL.md` | depth | ~2.7k | the artifact type is identified |
@@ -147,7 +145,9 @@ that file and this table would drift.
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |
 | `skills/white-box-intended-path/SKILL.md` | depth | ~2.6k | see registry use_when |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
+| `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.2k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
+| `skills/web-parallel-sweep/SKILL.md` | reference | ~2.0k | see registry use_when |
 
 ## Skills that are not routed to automatically
 

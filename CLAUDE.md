@@ -30,7 +30,12 @@ see `CLAUDE_CODE.md`.
 | Reusing a chain already solved here | `tools/chain_match.py` |
 | Whether this dependency version was already measured | `tools/gadget_lookup.py` + `knowledge/gadgets/` |
 | What a previous attempt already proved dead | `knowledge/attempts/` |
+| Closing several layers at once, safely | `tools/subagent_fanout.py` + `.claude/agents/` + `skills/parallel-layer-sweep/` |
+| **Running the fleet so an hour becomes fifteen minutes** | **`ORCHESTRATION.md`** |
+| Where a subagent may write, and where it may not | `/home/kali/ctf-work` (full rights) vs this repo (read-only) — `tools/workspace.py` |
+| Running a web challenge as ten measurements at once | `tools/subagent_fanout.py --web` + the ten `.claude/agents/ctf-web-*` + `skills/web-parallel-sweep/` |
 | Turning a solve into a better skill | `LEARNING_LOOP.md` + `tools/classify_solve.py` |
+| Running an attack-defense contest | `tools/ad/RUNBOOK.md` + `tools/ad/tick.py` |
 | Accepting a change to this system | `test/run_all.sh` |
 
 ## Scope
@@ -39,6 +44,10 @@ Authorized CTF and lab work only: jeopardy and attack-defense, white-box and
 black-box. This tree does not read or import `~/security-toolkit`. If a contest
 forbids AI assistance, this system is for practice before the contest, not
 during it.
+
+Attack-defense runs a sibling loop under `tools/ad/`: `tools/decide.py` and
+`tools/hooks.py` are the jeopardy controller and do not apply there. The proof
+standard still does — a flag comes from a live response or a supplied artifact.
 
 ## Autonomy
 
@@ -154,9 +163,14 @@ emits the shape `tools/hooks.py` wants — check with `python3 tools/web/selftes
 | a loop over a proven file-read | `tools/web/read_loop.py` — wordlist walk, baseline-classified |
 | an id-enumeration loop | `tools/web/id_sweep.py` — existence oracle |
 | text out of a returned PDF | `tools/web/pdf_text.py` |
-| a lattice, LCG, LFSR or ECC attack | `tools/crypto/` plus `tools/crypto_attack.py --list` |
+| twenty hand-written requests to find which payload shape an input reacts to | `tools/web/variant_matrix.py` — one request per shape across ten families, baseline-diffed and ranked, every negative counted; `--dry-run` sends nothing |
+| a hand-rolled thread pool for a race | `tools/web/race_probe.py` — overlapping requests with a **serial baseline first**; a signature that also appears serially is not a race |
+| re-deriving endpoints from minified JavaScript | `tools/web/bundle_miner.py` — source-map recovery plus an endpoint inventory; a `sources` traversal is rejected and counted |
+| twenty minutes working out what the session cookie is | `tools/web/session_dissect.py` — names the format, then the one weakness that applies; analysis only |
+| a lattice, LCG, LFSR or ECC attack | `tools/crypto/` plus `tools/crypto_attack.py list` (a subcommand, **not** `--list`, which exits 2) |
 | `checksec`, `ROPgadget` and a guess about what is still exploitable | `tools/pwn_triage.py <binary>` — stdlib-only ELF triage: protections **with the evidence for each**, dangerous imports annotated with what they buy, essential ROP gadgets, and the routes each protection leaves open. `python3 tools/pwnstatic/selftest.py` checks it against `readelf` (9 cases, offline) |
 | guessing whether a pinned dependency is exploitable | `tools/gadget_lookup.py --lockfile <handout>/package-lock.json` |
+| walking a layered handout one layer at a time | `tools/subagent_fanout.py --brief <handout>` — one brief per `novel_plan` layer, then one `ctf-layer-prober` subagent each, then `--merge`. `--validate` refuses any report whose evidence is not a verbatim response excerpt |
 
 Measured present on 2026-09-25, used as-is: `requests`, `httpx` with HTTP/2,
 `Crypto` (pycryptodome), `sympy`, `jwt`, `bs4`, `lxml`, `websockets`, `selenium`,

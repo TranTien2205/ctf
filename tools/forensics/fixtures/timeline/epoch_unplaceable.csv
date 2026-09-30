@@ -1,0 +1,4 @@
+epoch,note
+1790688901,reference row: epoch seconds, inside 1970..2200, must parse
+12345678901234,millisecond tier reads this as 2361-03-21, outside the window
+99999999999999999999,nanosecond tier reads this as 5138-11-16, outside the window

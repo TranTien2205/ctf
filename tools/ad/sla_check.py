@@ -9,10 +9,19 @@ and the feature in the same edit. So the contract here is deliberately narrow:
     apply the patch
     after:           sla_check.py <spec> --save after.json --compare before.json
 
-and `--compare` exits non-zero when a check that PASSED before now fails. That
-is the only signal worth acting on: a check that was already red is the
-organiser's problem or an earlier mistake, and blocking on it would stop you
-patching at all.
+and `--compare` exits non-zero when a check that PASSED before now fails -- or
+has VANISHED from the spec. That is the only signal worth acting on: a check that
+was already red is the organiser's problem or an earlier mistake, and blocking on
+it would stop you patching at all.
+
+Exit codes, because `sla_check.py ... && deploy` has to be able to tell "you broke
+the service" from "you typo'd the path":
+
+    0   every check green, no regression
+    1   a regression against --compare: REVERT THE PATCH
+    2   a check is failing, but it was already failing (or there is no --compare):
+        your call
+    3   the spec itself is unusable -- missing, unparseable, or it has no checks
 
 The spec is JSON the operator writes once per service, e.g.
 
@@ -44,6 +53,14 @@ import sys
 import time
 import urllib.error
 import urllib.request
+
+
+VANISHED_REASON = (
+    "this check passed before the patch and is no longer in the spec: a check was "
+    "removed, renamed, or the spec was edited. Restore it, or prove the feature "
+    "still works another way. If the removal is deliberate, re-save the baseline "
+    "with --save -- that is the legal move, not switching --compare off."
+)
 
 
 def run_check(base, check, default_timeout=5.0):
@@ -124,12 +141,19 @@ def run_all(spec):
 
 
 def compare(before, after):
-    """Regressions only: a check that passed before and fails now.
+    """Regressions only: a check that passed before and fails now, or is gone now.
 
     Deliberately asymmetric. Something newly FIXED is not a reason to block, and
     something that was already broken is not caused by this patch.
+
+    But a check that passed before and is no longer in `after` IS a regression.
+    The commonest way to lose availability is to patch by deleting the feature,
+    and then delete or rename the check that noticed -- at which point a version
+    of this function that only walked `after` returned "safe to keep" and blessed
+    exactly the failure the tool exists to stop.
     """
     was = {r["name"]: r["ok"] for r in before.get("results", [])}
+    now = {r["name"]: r["ok"] for r in after.get("results", [])}
     regressions, recovered = [], []
     for r in after.get("results", []):
         name = r["name"]
@@ -138,9 +162,16 @@ def compare(before, after):
                                 "excerpt": r["excerpt"]})
         elif was.get(name) is False and r["ok"]:
             recovered.append(name)
+    for name, ok in was.items():
+        if ok and name not in now:
+            regressions.append({"check": name, "reasons": [VANISHED_REASON],
+                                "excerpt": ""})
     return {
         "regressions": regressions,
         "recovered": recovered,
+        # Informational only, and deliberately not a blocker: adding a check is
+        # never a reason to refuse a patch.
+        "added": [n for n in now if n not in was],
         "verdict": "REVERT THE PATCH" if regressions else "safe to keep",
     }
 
@@ -153,13 +184,22 @@ def main():
     ap.add_argument("--compare", help="an earlier saved run; exits 1 on a regression")
     args = ap.parse_args()
 
-    with open(args.spec, encoding="utf-8") as fh:
-        spec = json.load(fh)
+    # Exit 3, not 1: an unreadable spec is an operator typo, and it must not be
+    # confused with "the patch broke the service".
+    try:
+        with open(args.spec, encoding="utf-8") as fh:
+            spec = json.load(fh)
+    except (OSError, ValueError) as exc:
+        print(json.dumps({"error": "the spec is unusable", "spec": args.spec,
+                          "detail": "%s: %s" % (type(exc).__name__, exc)}))
+        return 3
     if not spec.get("checks"):
-        raise SystemExit(json.dumps({
+        print(json.dumps({
             "error": "the spec has no checks",
+            "spec": args.spec,
             "why": "a spec with no checks always passes, which is worse than no "
                    "check at all because it reads as a green light"}))
+        return 3
 
     out = run_all(spec)
 

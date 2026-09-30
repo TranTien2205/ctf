@@ -17,8 +17,8 @@ belongs to the other toolkit and is out of scope here.
 ```
 ~/ctf-v2/
   tools/           classify · chain_match · decide · hooks · state · skill_audit …
-  skills/          52 skills: 8 thin routers + 25 bug classes + method/reference  ← pull one
-  knowledge/       bug-classes.json (25 classes) · chains/ (58 verified cards)
+  skills/          66 skills: 11 routers + 32 bug classes + method/reference  ← pull one
+  knowledge/       bug-classes.json (32 classes) · chains/ (69 verified cards)
   solved/          56 solved challenges, with evidence ancestry
   challenges/      handout source and per-challenge state.json
 ```
@@ -44,6 +44,7 @@ Then pick exactly one branch:
 | **Black-box** | `python3 tools/classify.py "<obs>"` plus `ctf.py "<obs>"` |
 | **Starting a new challenge** | `python3 tools/state.py <name> --category <cat> --target <url> --challenge-name "<real name>" --event "<event>"` — the last two unlock the controller's writeup-search rule |
 | **Resuming one** | `python3 tools/state.py <name> --show` then `python3 tools/decide.py <name>` |
+| **Attack-defense contest, not jeopardy** | `cat tools/ad/PREFLIGHT.md` the night before, then `cat tools/ad/RUNBOOK.md` on the day, then open `skills/ad-service-triage/SKILL.md`. The sibling loop lives under `tools/ad/`; `tools/decide.py` and `tools/hooks.py` are the jeopardy controller and do not run here |
 | **Challenge and event name known** | `python3 tools/writeup_search.py "<name> <event>"` (a legitimate shortcut; record that it was used) |
 
 ---
@@ -71,10 +72,17 @@ Then pick exactly one branch:
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
 | `tools/web/` | speed primitives that emit the shape `hooks.py` wants: `http_probe` (probe + verbatim excerpt), `sanitizer_fuzz` (differential encoding sweep, records negatives), `read_loop` (proven file-read walk), `id_sweep`, `pdf_text`. `python3 tools/web/selftest.py` proves them offline |
+| `tools/web/variant_matrix.py` | the shape question, in one command: one request per payload SHAPE at one injection point across ten families, baseline-diffed on status, length, markers, `Location` and timing, ranked, with every shape that produced nothing counted as a proved negative. `--dry-run` prints the matrix without sending; a write-shaped matrix is refused without `--write-ack`. A `confirms` verdict is offered only on a marker hit |
+| `tools/web/race_probe.py` | overlapping requests, and the **serial baseline first** — a response signature that also appears serially is not a race. A/B interleaving for a check-then-act window, an overlap measurement that forces `inconclusive` when the requests did not actually overlap, and a refusal without `--write-ack` |
+| `tools/web/bundle_miner.py` | the front-end's real source: source map by comment, header, guessed sibling or inline data URI, `sourcesContent` reconstructed, then endpoints, routes, feature flags, `process.env` refs and secret CANDIDATES with file and line. A map is attacker-controlled data, so a `sources` path that escapes `--out` is rejected and counted |
+| `tools/web/session_dissect.py` | what the token IS, before attacking it: JWT/JWE, itsdangerous, Django, Rails, Fernet, express-signed, base64-JSON, or `opaque` with the reason. Decodes what needs no key, names the weakness that applies, and recovers an HMAC key offline against a wordlist. Analysis only — it never forges and never sends |
 | `tools/crypto/` + `crypto_attack.py` | lattice, LCG, LFSR, ECC, HNP and integer attacks; `--list` names them |
 | `tools/gadget_lookup.py` | before opening a class skill: has this exact dependency been measured here before? `--lockfile <handout>/package-lock.json` reads the real versions and matches them against `knowledge/gadgets/<package>.json`. classify.py has no notion of a version, so this is the only version-aware recall in the tree |
 | `tools/pwn_triage.py` + `tools/pwnstatic/` | first contact with a pwn or rev binary. `pwntools`, `gdb`, `ROPgadget`, `ropper`, `one_gadget`, `checksec` and `patchelf` are all measured ABSENT here and pip is EXTERNALLY-MANAGED, so this is stdlib-only: protections with the evidence that decided each one, dangerous imports annotated with what they buy, the essential ROP gadgets, and which routes each protection still leaves. It reports and ranks; it never claims a bug. `python3 tools/pwnstatic/selftest.py` proves it against `readelf` offline |
+| `tools/subagent_fanout.py --web` | a WEB target, split by bug-class family instead of by generic layer: one brief per `ctf-web-*` subagent, built from the taxonomy's own fields, ordered read-only first and write-shaped last, and short-circuited when a chain card is a strong match |
+| `tools/subagent_fanout.py` | a layered white-box handout, to be closed in parallel rather than one layer at a time. `--brief <handout>` turns `novel_plan.py` layers into one brief per subagent, each with its own falsifier and the layers a kill map already closed; `--contract` is the single source of truth for what a subagent returns; `--validate` refuses a report whose evidence is not a verbatim response excerpt; `--merge` prints the `hooks.py` commands for the MAIN thread. It never writes state.json |
 | `knowledge/attempts/` | the kill map of a challenge worked but NOT solved: every layer measured dead, with the measurement and the precondition that would reopen it. `knowledge/chains/` only accepts a solve, so without this the next attempt re-walks the same dead layers |
+| `tools/ad/` | **attack-defense only**, and deliberately a sibling plane: it does not write `challenges/<name>/state.json` and does not go through `tools/hooks.py`. `sla_check` runs the service's own health checks and `--compare` refuses a patch that broke something which previously passed -- including a check that was deleted or renamed; `flag_farm` runs one exploit against every listed team each tick, holds a flag as *pending* until the scoreboard really accepts it, and prints `immune`, the teams that have already patched; `traffic_mine` ranks your own capture against the checker's baseline and hands back a replay command; `cap_split` turns a capture into the raw requests `traffic_mine` wants, which a `tshark follow` dump cannot do without carrying the victim's response into the replay. `tick` reads one service's ledger and answers which ONE of the runbook's three steady-state questions is unanswered, availability first -- a red or unmeasured service outranks every attack action, and a structural guard makes reordering the rules unable to switch that off. `tools/ad/RUNBOOK.md` is the first thirty minutes, `tools/ad/PREFLIGHT.md` is what to install tonight and what degrades without it, and `agent/ad-roles.md` indexes the five read-only subagents in `.claude/agents/ad-*.md`. `host_snapshot.sh` plus `host_diff.py` replace the absent `debsums` and `aide`: a change on EVERY host is the image, a change on ONE host of eight is a person, and every collector is wrapped in `timeout` because the first design was measured unrunnable. `secret_inventory.py` groups credentials by value fingerprint so the widely-shared one is rotated while there is still time to fix what it breaks, and it never prints more than four characters of a value. `sh lab/ad-range/dryrun.sh` rehearses all of it offline in one command. `python3 tools/ad/selftest.py` proves the decision logic offline and `python3 tools/ad/agent_lint.py` proves the subagents still carry their prohibitions |
 
 ---
 
@@ -175,6 +183,67 @@ calls rule out nothing or if a value would have to be guessed.
 
 ---
 
+## 3b. Subagents — sixteen of them, all read-only on this tree
+
+**How to actually use them is `ORCHESTRATION.md`** — the wave structure, what never
+to delegate, and the measured cost of one agent (7-10 minutes) that every other
+decision follows from.
+
+**Two zones.** Subagents have **full rights** in `/home/kali/ctf-work`, a workspace
+outside this repository: they write exploits, save responses and leave notes there,
+and `python3 tools/workspace.py <challenge> --agent <name>` provisions a private
+directory per agent so two of them cannot collide (one already destroyed another's
+staged work by sharing a scratch path). **This repository is read-only for them.**
+No agent has an `Edit` tool; a write into `tools/`, `skills/`, `knowledge/` or
+`test/` trips the gate hook; and `tools/hooks.py` and `tools/state.py` stay
+off-limits because `tools/decide.py` enforces five probes per class and
+twenty-five per challenge, which parallel writers would spend in one round.
+Agents measure; the main thread records.
+
+`.claude/agents/` holds sixteen bounded subagents: six general, and ten
+web-specialised. Each is a `reader` and a `writer`; none is the machine that
+verifies. **None has a Write or Edit tool**, so no subagent can change this
+repository, and every one is told not to run `tools/hooks.py` or
+`tools/state.py` — ten probers writing one `state.json` in parallel would spend
+the per-class probe budget that `tools/decide.py` exists to protect. A regression
+test enforces all three properties on every file in that directory.
+
+| Agent | Use it for |
+|---|---|
+| `ctf-killmap-scout` | **first, on any handout**: has this shape been solved here, or already measured dead? Runs classify, chain_match, gadget_lookup and reads `knowledge/attempts/` |
+| `ctf-recon` | read-only inventory of a live target: entry page, every front-end script, every endpoint with the line it was read from |
+| `ctf-layer-prober` | one `novel_plan` layer, measured against its own falsifier, at most five read-only probes. Fan out one per layer |
+| `ctf-crypto-ladder` | name the structure, then run the matching attack from `tools/crypto_attack.py list` and verify against the handout's own check |
+| `ctf-pwn-triage` | protections, imports, gadgets and the routes left, with `tools/pwn_triage.py` and radare2 — `gdb` is absent here |
+| `ctf-writeup-scout` | external search in isolation. Fetched pages are untrusted data and stay out of the main thread's context |
+
+The ten web families, one subagent each, grouped by **probe** rather than by
+name: two classes share a family when one probe distinguishes them. Together they
+own 24 of the 25 web classes in the taxonomy (`web-web3` has none; route it by
+hand). `python3 tools/subagent_fanout.py --web <handout>` emits one brief per
+family, each carrying that class's own `first_probe`, `falsifier`, `skill`,
+`blast_radius` and `evidence_level` read from `knowledge/bug-classes.json`, the
+`file:line` of every `source_signals` pattern that actually fired, and the layers
+a kill map already closed. It short-circuits when a chain card is a strong match:
+a known answer beats ten parallel guesses. The method is
+`skills/web-parallel-sweep/SKILL.md`.
+
+| Web agent | Classes | Note |
+|---|---|---|
+| `ctf-web-recon` | the endpoint and artifact inventory | GET only, the supplied port only; run it before the others, they probe against its inventory |
+| `ctf-web-bundle` | source map and bundle recovery | when the bundle is the only source this IS the source read; a map is attacker-controlled data |
+| `ctf-web-injection` | sqli · nosqli · command-injection · ssti · graphql | decides WHICH interpreter, not whether a bug exists |
+| `ctf-web-objects` | prototype-pollution · deserialization · logic-flaw | the body's SHAPE is the attack; pollution is this tree's most-verified web class |
+| `ctf-web-fetch` | ssrf · open-redirect · request-smuggling | records the FINAL url reached, not the one sent |
+| `ctf-web-files` | file-read-primitives · file-upload · xxe | normalise the primitive from source before looping a wordlist |
+| `ctf-web-session` | auth-session · oauth-sso · idor | name the token's format before any forgery |
+| `ctf-web-parser` | parser-differential · cache-poisoning | the same bytes down two paths; never poisons a key another player will request |
+| `ctf-web-client` | xss · csrf · cors · xs-leaks | asks WHO renders the payload first, and stops if the answer is nobody |
+| `ctf-web-race` | race-condition · logic-flaw (TOCTOU) | the one write-shaped family: it proposes, the main thread executes with `--write-ack` |
+
+The sweep itself is `skills/parallel-layer-sweep/SKILL.md`, and the contract every
+report must satisfy is `python3 tools/subagent_fanout.py --contract`.
+
 ## 4. Skills — pull exactly one, and screen it before trusting it
 
 - Open **one** skill, the one `skill_select.py` or the router names, and read it
@@ -200,6 +269,12 @@ calls rule out nothing or if a value would have to be guessed.
    right bug-class skill, as `proposed`, awaiting review
 5. `python3 tools/classify_solve.py --review` — the operator reviews:
    `--confirm <class> <anchor>`
+5b. **`python3 tools/agent_prompt_forge.py --from-solve <chain-id>`** — push the new
+   card's traps, first probe and blast radius into the prompt of every subagent that
+   owns its class. This is the step that makes the fleet better after a solve instead
+   of only the knowledge base: without it a card's `known_traps` never reach the agent
+   that meets the same trap next. Measured before it existed: 70 cards carried 403
+   traps between them and not one sentence appeared in any subagent prompt.
 6. `bash test/run_all.sh` — the gate must PASS before this counts as done
 
 Use `python3 tools/learning_report.py` during review to see the queue. Confirmed
@@ -233,7 +308,18 @@ classes, the tool refuses to file — that is correct behaviour, so do not force
 - If the event forbids AI assistance, this system is for practice **before** the
   contest.
 - **No red team**: every machine, Active Directory or box privilege-escalation
-  technique belongs to the other toolkit and is out of scope here.
+  technique belongs to the other toolkit and is out of scope here. Attacking a
+  host to gain a foothold is that toolkit's job, not this one's.
+- **Defending a host you were handed is in scope.** In attack-defense the estate
+  is issued to you and keeping it alive is the scored task: rotating the
+  credentials that shipped in the image, reading cron, timers, units and
+  `authorized_keys` for what the organiser planted, patching a service without
+  breaking its checker, and copying evidence before it is destroyed. That is
+  defence of your own assets, under `tools/ad/` and the `dfir-*` classes. The
+  line is whose host it is, not how low in the stack the work sits: inventory and
+  remove on your own estate, yes; escalate or take something on someone else's,
+  no — and the only hosts you may touch at all are the ones listed individually
+  in the contest's own team list.
 - Never commit a real flag, a credential, or state holding sensitive evidence.
 - Any change to the system: `bash test/run_all.sh` must PASS before it counts as
   done.

@@ -30,7 +30,7 @@ numbers, so one guessed bit length routes to the wrong attack.
 
 ```bash
 ls -la ./; file ./*; sed -n '1,60p' output*.txt   # supplied files, shape of the data
-python3 tools/crypto_attack.py --list            # attacks available and their args
+python3 tools/crypto_attack.py list              # attacks available and their args
 ```
 
 Record exactly: **RSA** — modulus bits, `e`, ciphertext count, repeated modulus or

@@ -46,6 +46,7 @@ CASES = ROOT / "test" / "cases"
 BASELINE = ROOT / "test" / "baseline.json"
 CONTROL_PLANE = [
     "CLAUDE.md", "PROMPT.md", "SKILL_GUIDE.md", "HYPOTHESIS_PROTOCOL.md",
+    "ORCHESTRATION.md",
     "EVIDENCE_POLICY.md", "README.md", "VERSIONING.md", "LEARNING_LOOP.md",
     "EXTERNAL_SOURCES.md",
     "skills/INDEX.md", "skills/LOOP_DISCIPLINE.md",
@@ -954,6 +955,78 @@ class ContractTests(unittest.TestCase):
                     dangling.append("%s -> %s" % (path.relative_to(ROOT), ref))
         self.assertEqual(dangling, [],
                          "a document names a tool that does not exist: %s" % dangling[:6])
+
+    def test_every_tool_flag_named_in_prose_exists(self):
+        """The path test's sibling, one level down: the FLAGS have to be real too.
+
+        test_every_tool_path_named_in_prose_resolves catches a document naming a
+        tool that does not exist. It does not catch a document naming a flag the
+        tool does not have, and that is what happened: CLAUDE.md, AGENTS.md and
+        skills/crypto-triage/SKILL.md all told a crypto session to run
+        `tools/crypto_attack.py --list`, while `list` is a SUBCOMMAND there --
+        the documented form exits 2 with "the following arguments are required:
+        command". Crypto was this toolkit's measured zero in a real contest and
+        the router's first command did not run.
+
+        Subcommand-aware on purpose: hooks.py keeps --verdict and --evidence
+        under `post-probe`, so checking only top-level help reported fifteen real
+        flags as missing.
+        """
+        sources = (list((ROOT / "skills").rglob("*.md"))
+                   + [ROOT / rel for rel in CONTROL_PLANE]
+                   + [ROOT / "AGENTS.md"]
+                   + sorted((ROOT / ".claude" / "commands").glob("*.md"))
+                   + sorted((ROOT / ".claude" / "agents").glob("*.md")))
+        helpcache = {}
+
+        def helptext(tool, sub):
+            key = (tool, sub)
+            if key not in helpcache:
+                argv = [sys.executable, str(ROOT / tool)] + ([sub] if sub else []) + ["--help"]
+                try:
+                    done = subprocess.run(argv, capture_output=True, text=True,
+                                          timeout=120, cwd=str(ROOT))
+                    helpcache[key] = done.stdout + done.stderr
+                except (OSError, subprocess.SubprocessError):
+                    helpcache[key] = ""
+            return helpcache[key]
+
+        flag_re = re.compile(r"(?<![\w<-])(--[a-z][a-z0-9-]+)")
+        call_re = re.compile(r"python3 (tools/[\w/]+\.py)((?:\s+\S+)*)")
+        block_re = re.compile(r"```(?:bash|sh|console)?\n(.*?)```", re.S)
+        bogus, checked = [], 0
+        for path in sources:
+            if not path.is_file():
+                continue
+            for block in block_re.findall(path.read_text(encoding="utf-8")):
+                # join backslash continuations, or a flag on the second line is
+                # attributed to no command at all and silently skipped
+                for line in re.sub(r"\\\n\s*", " ", block).splitlines():
+                    hit = call_re.search(line.strip())
+                    if not hit or not (ROOT / hit.group(1)).is_file():
+                        continue
+                    tool, rest = hit.group(1), hit.group(2).split()
+                    top = helptext(tool, None)
+                    sub = None
+                    if (rest and not rest[0].startswith("-")
+                            and re.fullmatch(r"[a-z][a-z0-9-]*", rest[0])
+                            and rest[0] in top):
+                        sub = rest[0]
+                    text = helptext(tool, sub)
+                    if not text:
+                        continue
+                    checked += 1
+                    for flag in sorted(set(flag_re.findall(line))):
+                        if flag not in text:
+                            bogus.append("%s -> %s%s has no %s" % (
+                                path.relative_to(ROOT), tool,
+                                (" " + sub) if sub else "", flag))
+        self.assertGreater(checked, 40,
+                           "only %d documented commands were checked; the extractor "
+                           "has stopped matching and this test proves nothing" % checked)
+        self.assertEqual(sorted(set(bogus)), [],
+                         "a document tells an agent to pass a flag the tool does not "
+                         "have: %s" % sorted(set(bogus))[:6])
 
     def test_every_tool_is_named_somewhere(self):
         """The reverse of the check below: no tool may sit in tools/ unreferenced.
@@ -1974,6 +2047,197 @@ class KnowledgeScaleTests(unittest.TestCase):
                          "a skill tagged bug-class is missing from "
                          "knowledge/bug-classes.json, so classify.py cannot route "
                          "to it: %s" % orphans)
+
+    def test_subagent_reports_cannot_claim_more_than_they_measured(self):
+        """The fan-out validator is the only thing between model prose and the ledger.
+
+        A subagent's conclusion is hypothesizer output. If a report that summarises
+        instead of quoting, or that calls a timeout a confirm, is merged, then model
+        text has entered the place a captured response belongs -- which is the one
+        failure the whole control loop is built to prevent. Each case below is an
+        over-claim that MUST be refused, plus two honest reports that must pass.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import subagent_fanout as fan
+
+        honest_confirm = {"layer_id": "template-sink", "class": "web-ssti",
+                          "falsifier_outcome": "broken", "probes": [{
+                              "request": "GET /p?n={{7*7}}", "transport": "ok",
+                              "response_excerpt": "<h1>Hello 49</h1>", "evidence": "49",
+                              "evidence_kind": "class", "verdict": "confirms"}]}
+        honest_negative = {"layer_id": "upload", "class": "web-file-upload",
+                           "falsifier_outcome": "held", "probes": [{
+                               "request": "GET /uploads/m.txt", "transport": "ok",
+                               "response_excerpt": "Content-Type: text/plain",
+                               "evidence": "Content-Type: text/plain",
+                               "evidence_kind": "class", "verdict": "refutes"}]}
+        for name, report in (("honest confirm", honest_confirm),
+                             ("honest negative", honest_negative)):
+            problems, _ = fan.validate_report(report)
+            self.assertEqual(problems, [], "%s was refused: %s" % (name, problems))
+
+        def probe(**over):
+            base = {"request": "GET /", "transport": "ok",
+                    "response_excerpt": "<h1>Hello 49</h1>", "evidence": "49",
+                    "evidence_kind": "class", "verdict": "confirms"}
+            base.update(over)
+            return {"layer_id": "l", "probes": [base]}
+
+        refusals = {
+            "a summary instead of a quote":
+                probe(evidence="the template evaluated arithmetic"),
+            "a timeout as a confirm":
+                probe(transport="timeout", response_excerpt="", evidence=""),
+            "surface evidence as a confirm":
+                probe(evidence_kind="surface"),
+            "a write-shaped probe from a subagent":
+                probe(request="DELETE /api/users"),
+            "a confirm with no evidence at all":
+                probe(evidence="", response_excerpt=""),
+            "a transport failure not recorded as inconclusive":
+                probe(transport="reset", response_excerpt="", evidence="",
+                      evidence_kind="transport", verdict="refutes"),
+        }
+        for label, report in refusals.items():
+            problems, _ = fan.validate_report(report)
+            self.assertTrue(problems, "the validator ACCEPTED %s" % label)
+
+        # the probe ceiling is the same five decide.py enforces per class
+        sixth = {"layer_id": "l", "probes": [
+            {"request": "GET /%d" % i, "transport": "ok", "response_excerpt": "x",
+             "evidence": "x", "evidence_kind": "surface", "verdict": "inconclusive"}
+            for i in range(fan.PROBE_CEILING + 1)]}
+        problems, _ = fan.validate_report(sixth)
+        self.assertTrue(any("ceiling" in p for p in problems),
+                        "a sixth probe in one layer was not refused: %s" % problems)
+
+    def test_web_fanout_briefs_come_from_the_taxonomy_and_short_circuit(self):
+        """The web sweep must not invent a class, and must not sweep past a known answer.
+
+        Two failures this guards. First, a family map that names a class id the
+        taxonomy does not have would hand a subagent a first_probe and a falsifier
+        that nobody wrote -- so every class id is resolved, and an unresolved one is
+        flagged rather than filled in. Second, a strong chain match means the answer
+        is already on disk: ten parallel guesses cost more than running that card's
+        own probe, so the sweep has to say so instead of starting.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import subagent_fanout as fan
+
+        taxonomy = {c["id"] for c in json.loads(
+            (ROOT / "knowledge" / "bug-classes.json").read_text(encoding="utf-8"))["classes"]}
+        named = [cid for spec in fan.WEB_FAMILIES for cid in spec["classes"]]
+        self.assertTrue(named, "the web family map names no classes at all")
+        unknown = sorted(set(named) - taxonomy)
+        self.assertEqual(unknown, [],
+                         "the web family map names classes absent from the taxonomy: %s"
+                         % unknown)
+
+        agents_dir = ROOT / ".claude" / "agents"
+        for spec in fan.WEB_FAMILIES:
+            self.assertTrue((agents_dir / (spec["agent"] + ".md")).is_file(),
+                            "family %r spawns %r, which has no definition under "
+                            ".claude/agents" % (spec["family"], spec["agent"]))
+        write_shaped = [s["family"] for s in fan.WEB_FAMILIES if s.get("write_shaped")]
+        self.assertEqual(write_shaped, ["race"],
+                         "exactly one web family may be write-shaped, and it is the race "
+                         "family; got %s" % write_shaped)
+
+        # with no handout there is no reading list and no short circuit, but the
+        # families and their taxonomy fields must still be complete
+        bare = fan.web_briefs(None, "http://example.invalid", "t")
+        self.assertEqual(bare["families"], len(fan.WEB_FAMILIES))
+        self.assertIsNone(bare["strong_chain_match"])
+        for brief in bare["briefs"]:
+            for cls in brief["classes"]:
+                self.assertNotIn("_missing_from_taxonomy", cls,
+                                 "%s carries an unresolved class: %s"
+                                 % (brief["family"], cls))
+                self.assertTrue(cls.get("first_probe"),
+                                "%s has no first_probe from the taxonomy" % cls["id"])
+                self.assertTrue(cls.get("falsifier"),
+                                "%s has no falsifier from the taxonomy" % cls["id"])
+
+        # a handout whose card is a STRONG match must short-circuit the sweep
+        src = ROOT / "challenges" / "Spell Orsterra"
+        if not src.is_dir():
+            self.skipTest("the Spell Orsterra handout is not on disk")
+        hit = fan.web_briefs(str(src), None, "spell")
+        self.assertIsNotNone(hit["strong_chain_match"],
+                             "a handout whose own chain card scores `candidate` produced "
+                             "no short circuit, so the sweep would run past the answer")
+        self.assertNotIn("error", hit["strong_chain_match"],
+                         "the short circuit reported an error instead of a match: %s"
+                         % hit["strong_chain_match"])
+        self.assertIn("first_confirming_probe",
+                      hit["strong_chain_match"].get("do_this_instead", ""),
+                      "the short circuit does not say to run the card's own probe")
+
+    def test_subagent_capability_matches_the_invariant(self):
+        """What a subagent may do, and the one thing it may never do.
+
+        This test used to ban `Write` outright. That was measured wrong: on a
+        GraphQL target every step past recon was a POST and the agent needed to
+        author a client and an exploit script to take any of them, so with no
+        Write the whole fleet could only look, and the solve happened with no
+        subagent at all. Write is now REQUIRED of the ctf-* agents and paired
+        with a scratch-only rule; `Edit` stays banned, because Edit is the tool
+        that would let an agent surgically rewrite a rule file it had not read.
+
+        The absolute rule is the LEDGER, not the filesystem: `tools/decide.py`
+        enforces five probes per class and twenty-five per challenge, so agents
+        recording probes in parallel would spend that budget in one round.
+        """
+        agents = sorted((ROOT / ".claude" / "agents").glob("*.md"))
+        self.assertTrue(agents, "no subagent definitions found")
+        writers = []
+        for path in agents:
+            text = path.read_text(encoding="utf-8")
+            head = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+            self.assertTrue(head, "%s has no YAML frontmatter" % path.name)
+            fields = dict(re.findall(r"^(\w[\w-]*):\s*(.+)$", head.group(1), re.M))
+            self.assertEqual(fields.get("name"), path.stem,
+                             "%s: frontmatter name must equal the filename" % path.name)
+            self.assertGreater(len(fields.get("description", "")), 60,
+                               "%s: description is too short to route on" % path.name)
+            self.assertIn("tools", fields,
+                          "%s: no tools list, so it inherits everything" % path.name)
+            declared = {t.strip() for t in fields["tools"].split(",")}
+
+            for banned in ("Edit", "NotebookEdit"):
+                self.assertNotIn(banned, declared,
+                                 "%s declares %s, which can rewrite a rule file in "
+                                 "place; agents get Write for scratch work instead"
+                                 % (path.name, banned))
+            self.assertRegex(
+                text, r"[Dd]o not run `tools/hooks\.py`|off-limits",
+                "%s does not keep the ledger off-limits; parallel agents would "
+                "race the probe budget decide.py enforces" % path.name)
+
+            if "Write" in declared:
+                writers.append(path.name)
+                self.assertIn("Where you may write", text,
+                              "%s has Write but no section saying where" % path.name)
+                # two zones: a workspace with full rights OUTSIDE this repository,
+                # and this repository read-only. An agent told it may write but not
+                # told where will invent a path, and two agents inventing the same
+                # path have already destroyed each other's work here.
+                self.assertIn("ctf-work", text,
+                              "%s has Write but never names the workspace outside this "
+                              "repository, so it has nowhere sanctioned to work"
+                              % path.name)
+                for guarded in ("tools/", "skills/", "knowledge/", "test/"):
+                    self.assertIn(guarded, text,
+                                  "%s has Write but never names %s as off-limits"
+                                  % (path.name, guarded))
+                self.assertRegex(
+                    text, r"never delete anything above|Never delete anything above",
+                    "%s has Write but does not forbid deleting above its own "
+                    "directory, which is how one agent destroyed another's work"
+                    % path.name)
+        self.assertTrue(writers,
+                        "no subagent can write at all -- that is the state that made "
+                        "the fleet unable to take any step past recon")
 
     def test_every_retrieval_alias_re_proves_itself(self):
         """An alias file is a place to smuggle in a wrong pairing, so re-measure.

@@ -168,3 +168,36 @@ Falsifier: the forged token also answers 302, or the no-cookie request also answ
 **Blast radius**: Every step writes. The planted row is an INSERT at an ID no real account holds yet, so it displaces nothing, but it CANNOT be removed with the same primitive: the INSERT branch only runs when the ID owns no row, so a second attempt at that ID takes the UPDATE branch instead. Pick a high ID (1337 here), use one row per payload, and expect them to stay. The command runs as root, so keep it to a copy into wwwroot and remove that file afterwards with a second one-line gadget -- verified 404 after. Anything added to your own wishlist during probing is removable through /Home/WishlistRemove. Do not use `OR '1'='1'` in the product lookup on a shared instance without expecting it: FirstOrDefault then returns the FIRST product in the table, not the one you named, and that product is what gets added.
 
 - status: confirmed
+
+## undated · Desire · confirmed
+
+- source note: `solved/desire.md`
+- chain card: `knowledge/chains/htb-desire-session-file-path-traversal-via-username-cookie.json`
+- verification: verified_live — GET /user/admin returned 200 and admin.html line 229 carried HTB{...}; the body was saved to /home/kali/ctf-work/challenges/web30732/artifacts/admin_response.html and recorded through tools/hooks.py post-probe (evidence-kind class) then pre-flag --source live-response
+- classified as: `web-auth-session` (score 0.0, 0 signals matched)
+- also matched: `web-parser-differential` (1.09)
+- filed by operator override: the matcher did not rank this class; the chain is filed under the class whose first probe opens it
+
+**Confirming probe that worked**
+
+> Log in normally, then repeat one authenticated request with the plaintext username cookie replaced by a string that is not a registered account (for example nosuchuser_zzz), and again with the session cookie replaced by a single junk character.
+
+Expected: the junk session cookie is accepted while the unknown username returns a server error. That asymmetry says the identity is the plaintext cookie and that it is dereferenced server-side, which is what makes it a candidate path component.
+
+Falsifier: tampering with the username cookie changes nothing, or the session cookie is verified (a junk value is rejected) -- then the identity is the token and this card does not apply.
+
+**Traps recorded on this solve**
+
+- mholt/archiver v3.5.0 SILENTLY SKIPS a zip entry whose name escapes the destination: the response is a normal 202 and nothing is written. The tell is that re-uploading the same escaping entry never produces the 'file already exists' error that a clean entry produces on its second upload. Read that asymmetry as the patch, not as the vulnerability -- the traversal here is in the SESSION path, not in the archive.
+- Because the extractor refuses to overwrite, the 'file already exists: <path>' error is a clean file-existence oracle -- but only inside the destination. Escaping probes always answer 202, so a sweep for files at the application root reads as 'nothing is there' whatever is actually there. Run a control on a path you know exists before trusting one of those sweeps.
+- A username cookie the application cannot resolve gives Fiber's bare 'Internal Server Error', while the handler's own failures give JSON. The two 500s mean different things: the bare one is the redis lookup missing, so it also confirms that the cookie is the key.
+- sessionID is sha256 of the SERVER's clock in whole seconds. One candidate hash is a coin flip; put the hashes for a few seconds either side of the login into the same archive and the race disappears.
+- The registration filter blocks / . and \ in the username, which makes the account name look safe and hides that the same value travels back as an unvalidated cookie. Check the cookie separately from the field that set it.
+- FLAG is an environment variable (ENV FLAG= in the Dockerfile), not a file, so no amount of arbitrary file WRITING reaches it directly -- the only route is to satisfy the Role == "admin" test that guards the template.
+- mholt/archiver v3's Zip.CheckPath is a STRING prefix test, not a path-boundary test: to,_ = filepath.Abs(to); if !strings.HasPrefix(filepath.Join(to, filename), to). An entry named ../<username>ZZ/f therefore resolves to a SIBLING directory that still shares the prefix and IS written -- measured here as 'reading file in zip archive: file already exists: files/probe_sess_9k2xZZ/px.txt'. A plain ../f is skipped and a sibling-prefix ../<username>ZZ/f is written, which is why one negative on the plain form does not close the class.
+- A zip SYMLINK entry (external_attr 0o120777<<16) is honoured by extractFile -> writeNewSymbolicLink, and its name only has to satisfy the same prefix test. Planting ../<username>S with content '/' makes every absolute path reachable as ../<username>S/<abs> -- measured as 'file already exists: files/probe_sess_9k2xS/etc/passwd'. writeNewSymbolicLink also os.Remove()s whatever is already at that name, which is the ONE way to overwrite despite OverwriteExisting=false, and it is destructive on a shared instance.
+- The username cookie needs an entry in REDIS, not a row in the SSO database: /register rejects / . and \ so no account can ever carry a dot segment, and probing the cookie alone reads as 'must be an existing user'. PrepareSession (http.go:73-75) writes redis[username] before the password is checked, so a deliberately failed login mints the key for any string at all. Measuring the cookie without also reading the login handler closes the real bug by mistake.
+
+**Blast radius**: Registration and the archive upload both write, and neither the Go service nor the Node SSO exposes a delete route, so every account and every extracted file stays on the shared instance. Use one throwaway account and one small archive. The forged session file lands in YOUR OWN files/<account>/ directory, so nobody else's session is touched, and the redis key written by the wrong-password login is the traversal string rather than a real username -- it cannot log anyone else out. archiver refuses to overwrite an existing file, so a repeat upload of the same entry name fails with 500 rather than corrupting anything.
+
+- status: confirmed

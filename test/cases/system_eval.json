@@ -1,74 +1,305 @@
 {
-  "comment": "Offline actionability cases. These are intentionally small and stable: they test whether the system gives a useful next action without contacting a target.",
-  "classification": [
-    {
-      "id": "ssti-arithmetic-marker",
-      "observation": "Jinja2 template renders the name parameter and {{7*7}} becomes 49",
-      "expect_top": "web-ssti"
-    },
-    {
-      "id": "foreign-origin-credentials",
-      "observation": "API reflects Origin and sends Access-Control-Allow-Credentials true on authenticated response",
-      "expect_top": "web-cors"
-    },
-    {
-      "id": "object-level-authorization",
-      "observation": "GET /api/invoices/100 returns another user's invoice when the identifier is changed",
-      "expect_top": "web-idor"
-    },
-    {
-      "id": "cache-deception-extension-cache",
-      "observation": "nginx proxy_cache location regex for css js html json, X-Cache-Status header, authenticated page served from cache by uri",
-      "expect_top": "web-cache-poisoning"
-    },
-    {
-      "id": "ordinary-app-negative",
-      "observation": "A static page serves CSS and a health endpoint returns 200",
-      "expect_top": null
+ "comment": "Offline actionability cases. These are intentionally small and stable: they test whether the system gives a useful next action without contacting a target.",
+ "classification": [
+  {
+   "id": "ssti-arithmetic-marker",
+   "observation": "Jinja2 template renders the name parameter and {{7*7}} becomes 49",
+   "expect_top": "web-ssti"
+  },
+  {
+   "id": "foreign-origin-credentials",
+   "observation": "API reflects Origin and sends Access-Control-Allow-Credentials true on authenticated response",
+   "expect_top": "web-cors"
+  },
+  {
+   "id": "object-level-authorization",
+   "observation": "GET /api/invoices/100 returns another user's invoice when the identifier is changed",
+   "expect_top": "web-idor"
+  },
+  {
+   "id": "cache-deception-extension-cache",
+   "observation": "nginx proxy_cache location regex for css js html json, X-Cache-Status header, authenticated page served from cache by uri",
+   "expect_top": "web-cache-poisoning"
+  },
+  {
+   "id": "ordinary-app-negative",
+   "observation": "A static page serves CSS and a health endpoint returns 200",
+   "expect_top": null
+  }
+ ],
+ "routing": [
+  {
+   "id": "web",
+   "observation": "HTTP endpoint with a cookie and a template",
+   "category": "web"
+  },
+  {
+   "id": "pwn",
+   "observation": "ELF input crashes with NX and checksec output",
+   "category": "pwn"
+  },
+  {
+   "id": "crypto",
+   "observation": "RSA modulus ciphertext and nonce",
+   "category": "crypto"
+  },
+  {
+   "id": "forensics",
+   "observation": "PCAP memory dump and disk image",
+   "category": "forensics"
+  },
+  {
+   "id": "misc",
+   "observation": "Python sandbox jail and encoding chain",
+   "category": "misc"
+  }
+ ],
+ "decisions": [
+  {
+   "id": "empty-state-classifies-first",
+   "name": "eval-empty",
+   "state": {
+    "hypotheses": [],
+    "probes": []
+   },
+   "action": "new_hypothesis"
+  },
+  {
+   "id": "verified-flag-records-solve",
+   "name": "eval-flag",
+   "state": {
+    "hypotheses": [],
+    "probes": [],
+    "flag": {
+     "value": "candidate",
+     "source": "live-response",
+     "evidence": "response excerpt"
     }
-  ],
-  "routing": [
-    {"id": "web", "observation": "HTTP endpoint with a cookie and a template", "category": "web"},
-    {"id": "pwn", "observation": "ELF input crashes with NX and checksec output", "category": "pwn"},
-    {"id": "crypto", "observation": "RSA modulus ciphertext and nonce", "category": "crypto"},
-    {"id": "forensics", "observation": "PCAP memory dump and disk image", "category": "forensics"},
-    {"id": "misc", "observation": "Python sandbox jail and encoding chain", "category": "misc"}
-  ],
-  "decisions": [
-    {
-      "id": "empty-state-classifies-first",
-      "name": "eval-empty",
-      "state": {"hypotheses": [], "probes": []},
-      "action": "new_hypothesis"
-    },
-    {
-      "id": "verified-flag-records-solve",
-      "name": "eval-flag",
-      "state": {"hypotheses": [], "probes": [], "flag": {"value": "candidate", "source": "live-response", "evidence": "response excerpt"}},
-      "action": "record_solve"
-    }
-  ],
-  "evidence_policy": [
-    {
-      "id": "encodecept-surface-is-not-deserialization",
-      "class": "web-deserialization",
-      "verdict": "inconclusive",
-      "evidence_kind": "surface",
-      "evidence": "HTTP/1.1 302 Found; location: /login"
-    },
-    {
-      "id": "encodecept-markdown-render-is-class-signal",
-      "class": "web-xss",
-      "verdict": "confirms",
-      "evidence_kind": "class",
-      "evidence": "bioPreview contains <p>ENCODECEPT_MARKER</p>"
-    },
-    {
-      "id": "encodecept-cache-hit-is-impact",
-      "class": "web-cache-poisoning",
-      "verdict": "confirms",
-      "evidence_kind": "impact",
-      "evidence": "X-Cache-Status: HIT; authenticated marker served to anonymous client"
-    }
-  ]
+   },
+   "action": "record_solve"
+  }
+ ],
+ "evidence_policy": [
+  {
+   "id": "encodecept-surface-is-not-deserialization",
+   "class": "web-deserialization",
+   "verdict": "inconclusive",
+   "evidence_kind": "surface",
+   "evidence": "HTTP/1.1 302 Found; location: /login"
+  },
+  {
+   "id": "encodecept-markdown-render-is-class-signal",
+   "class": "web-xss",
+   "verdict": "confirms",
+   "evidence_kind": "class",
+   "evidence": "bioPreview contains <p>ENCODECEPT_MARKER</p>"
+  },
+  {
+   "id": "encodecept-cache-hit-is-impact",
+   "class": "web-cache-poisoning",
+   "verdict": "confirms",
+   "evidence_kind": "impact",
+   "evidence": "X-Cache-Status: HIT; authenticated marker served to anonymous client"
+  }
+ ],
+ "ad_decisions": [
+  {
+   "id": "ad-intake-runs-before-anything",
+   "why": "the intake phase is unbudgeted and comes first",
+   "ledger": {
+    "service": "notes",
+    "phase": "intake",
+    "tick_seconds": 60,
+    "intake": [
+     {
+      "step": "snapshot-before-touching",
+      "done": false
+     }
+    ],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {},
+   "now": 1790000000.0,
+   "action": "intake_step"
+  },
+  {
+   "id": "ad-red-service-outranks-every-attack",
+   "why": "availability is scored continuously and cannot be won back",
+   "ledger": {
+    "service": "notes",
+    "phase": "steady",
+    "tick_seconds": 60,
+    "intake": [],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {
+    "sla_ok": false,
+    "sla_failed": [
+     "store_note"
+    ],
+    "sla_age_seconds": 10.0,
+    "sla_save": "s.json",
+    "live_files": 0,
+    "live_newest": null,
+    "live_age_seconds": null,
+    "mined_path": null,
+    "mined_newest": null,
+    "mined_age_seconds": null,
+    "mined_top": null,
+    "new_flags": 0,
+    "immune": [],
+    "teams_yielding": [],
+    "submit_error": null,
+    "pending_flags": 0,
+    "alert": null,
+    "last_farm_age_seconds": 20.0
+   },
+   "now": 1790000000.0,
+   "action": "restore_service"
+  },
+  {
+   "id": "ad-unmeasured-is-not-green",
+   "why": "a fact that could not be read must never arrive as False and read as fine",
+   "ledger": {
+    "service": "notes",
+    "phase": "steady",
+    "tick_seconds": 60,
+    "intake": [],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {
+    "sla_ok": null,
+    "sla_failed": [],
+    "sla_age_seconds": null,
+    "sla_save": null,
+    "live_files": 0,
+    "live_newest": null,
+    "live_age_seconds": null,
+    "mined_path": null,
+    "mined_newest": null,
+    "mined_age_seconds": null,
+    "mined_top": null,
+    "new_flags": 0,
+    "immune": [],
+    "teams_yielding": [],
+    "submit_error": null,
+    "pending_flags": 0,
+    "alert": null,
+    "last_farm_age_seconds": 20.0
+   },
+   "now": 1790000000.0,
+   "action": "restore_service"
+  },
+  {
+   "id": "ad-held-flags-before-a-new-exploit",
+   "why": "flags the farm is holding are already stolen and sitting in a file",
+   "ledger": {
+    "service": "notes",
+    "phase": "steady",
+    "tick_seconds": 60,
+    "intake": [],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {
+    "sla_ok": true,
+    "sla_failed": [],
+    "sla_age_seconds": 10.0,
+    "sla_save": "s.json",
+    "live_files": 0,
+    "live_newest": null,
+    "live_age_seconds": null,
+    "mined_path": null,
+    "mined_newest": null,
+    "mined_age_seconds": null,
+    "mined_top": null,
+    "new_flags": 0,
+    "immune": [],
+    "teams_yielding": [],
+    "submit_error": null,
+    "pending_flags": 9,
+    "alert": "submission has failed for 3 consecutive ticks",
+    "last_farm_age_seconds": 20.0
+   },
+   "now": 1790000000.0,
+   "action": "fix_submission"
+  },
+  {
+   "id": "ad-unmined-capture-before-a-hypothesis",
+   "why": "another team's working exploit is cheaper to read than a bug is to find",
+   "ledger": {
+    "service": "notes",
+    "phase": "steady",
+    "tick_seconds": 60,
+    "intake": [],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {
+    "sla_ok": true,
+    "sla_failed": [],
+    "sla_age_seconds": 10.0,
+    "sla_save": "s.json",
+    "live_files": 12,
+    "live_newest": 1789999990.0,
+    "live_age_seconds": 10.0,
+    "mined_path": null,
+    "mined_newest": null,
+    "mined_age_seconds": null,
+    "mined_top": null,
+    "new_flags": 0,
+    "immune": [],
+    "teams_yielding": [],
+    "submit_error": null,
+    "pending_flags": 0,
+    "alert": null,
+    "last_farm_age_seconds": 20.0
+   },
+   "now": 1790000000.0,
+   "action": "mine_traffic"
+  },
+  {
+   "id": "ad-all-three-questions-answered-holds",
+   "why": "the steady-state loop asks three questions and nothing else",
+   "ledger": {
+    "service": "notes",
+    "phase": "steady",
+    "tick_seconds": 60,
+    "intake": [],
+    "exploit_ideas": [],
+    "patches": [],
+    "paths": {}
+   },
+   "facts": {
+    "sla_ok": true,
+    "sla_failed": [],
+    "sla_age_seconds": 10.0,
+    "sla_save": "s.json",
+    "live_files": 0,
+    "live_newest": null,
+    "live_age_seconds": null,
+    "mined_path": null,
+    "mined_newest": null,
+    "mined_age_seconds": null,
+    "mined_top": null,
+    "new_flags": 0,
+    "immune": [],
+    "teams_yielding": [],
+    "submit_error": null,
+    "pending_flags": 0,
+    "alert": null,
+    "last_farm_age_seconds": 20.0
+   },
+   "now": 1790000000.0,
+   "action": "hold"
+  }
+ ]
 }

@@ -1,0 +1,6 @@
+{"__REALTIME_TIMESTAMP": "1790688901511836", "__MONOTONIC_TIMESTAMP": "46371586744", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "CRON", "_PID": "503086", "MESSAGE": "pam_unix(cron:session): session opened for user root(uid=0) by root(uid=0)"}
+{"__REALTIME_TIMESTAMP": "1790688901517483", "__MONOTONIC_TIMESTAMP": "46371592392", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "CRON", "_PID": "503088", "MESSAGE": "(root) CMD (command -v debian-sa1 > /dev/null && debian-sa1 1 1)"}
+{"__REALTIME_TIMESTAMP": "1790688901528100", "__MONOTONIC_TIMESTAMP": "46371603009", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "CRON", "_PID": "503086", "MESSAGE": "pam_unix(cron:session): session closed for user root"}
+{"__REALTIME_TIMESTAMP": "1790689020059237", "__MONOTONIC_TIMESTAMP": "46490134147", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "systemd", "_PID": "1", "MESSAGE": "Starting NetworkManager-dispatcher.service - Network Manager Script Dispatcher Service..."}
+{"__REALTIME_TIMESTAMP": "1790688901511836000", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "fixture", "MESSAGE": "SYNTHETIC ROW, not produced by journald: the same instant written at nanosecond width"}
+{"__REALTIME_TIMESTAMP": "1790688901511", "PRIORITY": "6", "SYSLOG_IDENTIFIER": "fixture", "MESSAGE": "SYNTHETIC ROW, not produced by journald: the same instant written at millisecond width"}

@@ -62,7 +62,14 @@ def request_line(args):
 
 
 def header_blob(resp):
-    return "\n".join("%s: %s" % kv for kv in resp.get("headers", {}).items())
+    """Every header line, duplicates included.
+
+    The collapsed `headers` dict keeps only the last Set-Cookie, so a sweep over
+    it could match at most one cookie on a response that set several. Prefer the
+    order-preserving pair list and fall back for a caller that predates it.
+    """
+    pairs = resp.get("headers_all") or list(resp.get("headers", {}).items())
+    return "\n".join("%s: %s" % (k, v) for k, v in pairs)
 
 
 def pick_evidence(resp, args):
@@ -235,6 +242,13 @@ def main(argv=None):
             "length": resp.get("length"),
             "elapsed": resp.get("elapsed"),
             "headers": resp.get("headers", {}),
+            # `headers` is a dict, so a repeated header keeps only its last
+            # value -- measured on a live run: an agent reading this object saw
+            # one of three Set-Cookie lines with no way to know two were gone.
+            # header_blob already searches the full pair list; these two fields
+            # put it in the REPORT too, which is what an agent actually reads.
+            "headers_all": resp.get("headers_all", []),
+            "set_cookies": resp.get("set_cookies", []),
             "body_head": resp.get("body", "")[: args.body_chars],
             "body_truncated": len(resp.get("body", "")) > args.body_chars,
         },

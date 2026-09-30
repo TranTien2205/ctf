@@ -8,6 +8,10 @@ venv/
 cache/
 *.log
 *.sqlite3-journal
+# Hand-redirected gate output. *.log above covers the well-named case; these are
+# the ad-hoc names that leaked into the tree root.
+/.g?.txt
+gate*.txt
 
 # Fetched external material (writeups and raw responses). It is untrusted, may
 # hold flags, credentials or other people's data, and is reproducible by

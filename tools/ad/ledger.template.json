@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "_what_this_is": [
+    "One ledger per service. Copy it with: python3 tools/ad/tick.py runs/<service>/ledger.json --init <service>",
+    "It is the only file tools/ad/tick.py reads to decide the next action, and it is a printed intake checklist on its own.",
+    "Fill authorized_event and the paths block before the contest. Every path is read exactly as written, relative to the tree root.",
+    "runs/ is ignored by git (.gitignore, rule **/runs/), so team hosts, tokens and captured flags stay out of history. A farm config left outside runs/ does not: *.seen is ignored nowhere else.",
+    "Record progress with: python3 tools/ad/tick.py <ledger> record --kind <kind> --field name=value"
+  ],
+  "service": "<service>",
+  "authorized_event": "",
+  "phase": "intake",
+  "tick_seconds": 60,
+  "paths": {
+    "sla_spec": "runs/<service>/sla-spec.json",
+    "sla_saves": "runs/<service>/sla/",
+    "capture_baseline": "runs/<service>/baseline/",
+    "capture_live": "runs/<service>/live/",
+    "mined": "runs/<service>/mined/",
+    "farm_config": "runs/<service>/farm.json",
+    "farm_log": "runs/<service>/farm.log"
+  },
+  "intake": [
+    {
+      "step": "snapshot-before-touching",
+      "done": false,
+      "at": null,
+      "note": "Image the box if the platform allows it. Record time, hostname, listening ports, logged-in users and which files are encrypted. Nothing here is recoverable once it is overwritten."
+    },
+    {
+      "step": "evidence-copied-off-box",
+      "done": false,
+      "at": null,
+      "note": "Logs, service configs and any ransom note copied to a host that is not this one, with hashes recorded before anything moved. Availability is recoverable; evidence is not."
+    },
+    {
+      "step": "sla-spec-written-and-green",
+      "done": false,
+      "at": null,
+      "note": "Third on purpose, before rotation: the pre-rotation save is what every later --compare is measured against, and it cannot be taken after the credentials have already changed. Two or three checks that exercise the real feature beat ten that assert 200 on /."
+    },
+    {
+      "step": "credentials-rotated",
+      "done": false,
+      "at": null,
+      "note": "Every password, SSH key, database credential and application token. The starting image is identical for every team, so until this is done every other team already has your access."
+    },
+    {
+      "step": "unknown-keys-and-accounts-removed",
+      "done": false,
+      "at": null,
+      "note": "authorized_keys everywhere, and every account with a login shell. Rotating a password does not close a key that was already installed."
+    },
+    {
+      "step": "planted-persistence-swept",
+      "done": false,
+      "at": null,
+      "note": "Cron, systemd timers and units, web-accessible directories, SUID binaries, ld.so.preload. skills/ad-planted-backdoor-hunt/SKILL.md is the ordered sweep; it is catalogue knowledge, so treat it as a checklist rather than as experience from this tree."
+    },
+    {
+      "step": "baseline-capture-started",
+      "done": false,
+      "at": null,
+      "note": "The baseline can only be captured while the organiser's checker is the only thing talking to the service. Once other teams start attacking, it can never be taken again, and without it every request scores the same."
+    },
+    {
+      "step": "farm-dry-run-proven",
+      "done": false,
+      "at": null,
+      "note": "Team list, flag format and submitter proven with --dry-run before there is an exploit, so the first real flag is not also the first test of the plumbing."
+    }
+  ],
+  "exploit_ideas": [],
+  "patches": [],
+  "claims": []
+}

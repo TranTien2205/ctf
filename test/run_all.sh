@@ -51,6 +51,36 @@ hr "REPORTED: chain transfer to an unseen challenge (a metric, not a contract)"
 # defend; a threshold here would only invite tuning the harness.
 "$PY" tools/holdout_eval.py --json 2>/dev/null | "$PY" -c "import json,sys; d=json.load(sys.stdin); print('transfer=%s wrong_family=%s silent=%s over %s challenges' % (d['transfer_rate'], d['wrong_family_rate'], d['silent_rate'], d['cards_measurable']))" || echo "holdout_eval did not run"
 
+hr "REQUIRED: subagent prompts are current with the evidence"
+# A solve produces a chain card with traps and a first probe; without this the
+# card never reaches the agent that needs it next, and the agent definitions
+# quietly age. --check fails when any managed block is behind the cards.
+"$PY" tools/agent_prompt_forge.py --check >/dev/null || { echo "FAILED: subagent prompts are stale -- run tools/agent_prompt_forge.py --apply"; fail=1; }
+
+hr "REQUIRED: attack-defense subagent lint (offline)"
+# The prohibitions in .claude/agents/ad-*.md are only real if something reads them
+# back. Warnings do not fail: one deliberate FILL-IN has to survive until the
+# estate's real path is known on the day.
+if ! "$PY" tools/ad/agent_lint.py >/dev/null; then
+  echo "FAILED: tools/ad/agent_lint.py (run it directly for the detail)"; fail=1
+fi
+
+hr "REQUIRED: web primitive selftests (--selftest on the tool itself -- all offline)"
+# variant_matrix, race_probe, bundle_miner and session_dissect keep their checks
+# behind their own --selftest flag, the pattern sanitizer_fuzz established, rather
+# than in tools/web/selftest.py. 255 checks between them; each one exits non-zero
+# when an assertion fails, and each was built by breaking the tool on purpose and
+# confirming the check caught it.
+for t in variant_matrix race_probe bundle_miner session_dissect; do
+  f="tools/web/$t.py"
+  if [ -f "$f" ]; then
+    printf -- '-- %s --selftest\n' "$f"
+    "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
+  else
+    echo "MISSING: $f"; fail=1
+  fi
+done
+
 hr "OPTIONAL: foundation tests (need jsonschema and tornado)"
 if "$PY" -c "import jsonschema, tornado" 2>/dev/null; then
   "$PY" -m unittest discover -s tests || fail=1

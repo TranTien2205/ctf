@@ -36,6 +36,11 @@ matched can never be proposed as a confirmation.
     # numbers that are 100ns ticks since 1601 need to say so
     ... --source tools/forensics/fixtures/timeline/mft_filetime.csv:created_filetime:mft --filetime
 
+    # journald writes __REALTIME_TIMESTAMP in MICROSECONDS; no flag is needed,
+    # the tier is taken from the magnitude
+    journalctl -n 200 -o json --no-pager > /tmp/j.jsonl
+    ... --source /tmp/j.jsonl:__REALTIME_TIMESTAMP:journal
+
 --format and --filetime attach to the --source they follow, so several sources
 with different shapes can be given in one run.
 """
@@ -53,10 +58,27 @@ import fkit  # noqa: E402
 
 UTC = timezone.utc
 FILETIME_EPOCH = datetime(1601, 1, 1, tzinfo=UTC)
-# 1e11 seconds is the year 5138; 1e11 milliseconds is 1973. Anything at or above
-# the threshold is therefore milliseconds, and the count of each reading is
-# reported so the choice is auditable instead of implicit.
+# Four tiers, each a thousand times the one below it, because a bare epoch number
+# is written in seconds, milliseconds, microseconds or nanoseconds depending on
+# what produced it. 1e11 seconds is the year 5138 and 1e11 milliseconds is 1973,
+# so a number at or above a threshold cannot be the coarser unit; the count of
+# each reading is reported so the choice is auditable instead of implicit.
+#
+# The microsecond tier is what lets journald in at all. A systemd host writes
+# __REALTIME_TIMESTAMP in microseconds -- measured on this box, 1790688901511836
+# -- and with only two tiers that read as milliseconds, resolved to the year
+# 58725, and was rejected: 20 of 20 records unparsed, parsed 0, from the one log
+# source guaranteed to exist on a Linux estate.
+#
+# Known collision, not solved here: a Windows FILETIME for a date between 1970
+# and 2200 is 116444736000000000..189025920000000000 ticks, which sits inside the
+# nanosecond tier. Such a number no longer trips the out-of-range message that
+# carries HINT; it reads as a date in 1973..1976 instead. A FILETIME source needs
+# --filetime, and magnitude alone cannot separate the two, because real epoch
+# nanoseconds for 1973..1976 occupy exactly the same band.
 MS_THRESHOLD = 10 ** 11
+US_THRESHOLD = MS_THRESHOLD * 1000      # 1e14; 1e14 us is 1973, 1e14 ms is 5138
+NS_THRESHOLD = US_THRESHOLD * 1000      # 1e17; 1e17 ns is 1973, 1e17 us is 5138
 SAMPLE_CAP = 3                 # unparsed rows kept per source, as evidence samples
 PLAUSIBLE_LOW = datetime(1970, 1, 1, tzinfo=UTC)
 PLAUSIBLE_HIGH = datetime(2200, 1, 1, tzinfo=UTC)
@@ -91,7 +113,9 @@ ASSUMPTIONS = {
     "naive_utc": "a timestamp carrying no timezone was read as UTC",
     "offset_to_utc": "a timestamp carrying an explicit offset was converted to UTC",
     "epoch_seconds": "a bare number below 1e11 was read as epoch seconds",
-    "epoch_milliseconds": "a bare number at or above 1e11 was read as epoch milliseconds",
+    "epoch_milliseconds": "a bare number in 1e11..1e14 was read as epoch milliseconds",
+    "epoch_microseconds": "a bare number in 1e14..1e17 was read as epoch microseconds (journald __REALTIME_TIMESTAMP)",
+    "epoch_nanoseconds": "a bare number at or above 1e17 was read as epoch nanoseconds",
     "filetime": "a number on a --filetime source was read as 100ns ticks since 1601-01-01 UTC",
 }
 
@@ -155,8 +179,28 @@ def from_filetime(text):
 
 
 def from_numeric(text):
+    """-> (aware UTC datetime, assumption key), tier chosen by magnitude.
+
+    Widest tier first, so seconds and milliseconds keep the exact ranges they had
+    before microseconds and nanoseconds were added. The string returned is a KEY
+    into ASSUMPTIONS: a tier with no entry there raises KeyError when the
+    assumptions block is assembled, which is why the two are edited together.
+    in_range still has the last word -- a number placed in the wrong tier lands
+    outside 1970..2200 and is refused rather than merged.
+    """
     value = float(text)
-    if abs(value) >= MS_THRESHOLD:
+    magnitude = abs(value)
+    if magnitude >= NS_THRESHOLD:
+        # float carries 53 bits, so a nanosecond count above 9007199254740992 is
+        # rounded before the division. At 1.8e18 that is under 256ns of error,
+        # below the microsecond resolution datetime has, so nothing is lost that
+        # the output could have printed.
+        return in_range(lambda: datetime.fromtimestamp(value / 1e9, UTC),
+                        text), "epoch_nanoseconds"
+    if magnitude >= US_THRESHOLD:
+        return in_range(lambda: datetime.fromtimestamp(value / 1e6, UTC),
+                        text), "epoch_microseconds"
+    if magnitude >= MS_THRESHOLD:
         return in_range(lambda: datetime.fromtimestamp(value / 1000.0, UTC),
                         text), "epoch_milliseconds"
     return in_range(lambda: datetime.fromtimestamp(value, UTC), text), "epoch_seconds"

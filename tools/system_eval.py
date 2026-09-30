@@ -21,6 +21,8 @@ sys.path.insert(0, str(ROOT))
 from unittest.mock import patch  # noqa: E402
 
 import ctf  # noqa: E402
+sys.path.insert(0, str(ROOT / "tools" / "ad"))
+import tick as ad_tick  # noqa: E402
 from tools import classify as classifier  # noqa: E402
 from tools import decide as decide_mod  # noqa: E402
 
@@ -82,6 +84,18 @@ def run_cases():
             actual = payload.get("action")
             results.append({"id": case["id"], "kind": "decision", "ok": actual == case["action"],
                             "actual": actual, "expected": case["action"]})
+
+    # The attack-defense tick decider lives outside tools/decide.py on purpose, so
+    # without this group AGENTS.md's claim that the offline evaluator is a required
+    # gate is false for half the control plane. Additive and safe: an absent key
+    # reads as an empty list, exactly like evidence_policy below.
+    for case in cases.get("ad_decisions", []):
+        payload = ad_tick.decide_next(case["ledger"], case["facts"],
+                                      now=case.get("now"), ledger_path="<eval>")
+        actual = payload.get("action")
+        results.append({"id": case["id"], "kind": "ad-decision",
+                        "ok": actual == case["action"], "actual": actual,
+                        "expected": case["action"], "why": case.get("why", "")})
 
     for case in cases.get("evidence_policy", []):
         confirms = case["verdict"] == "confirms"

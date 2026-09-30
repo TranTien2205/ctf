@@ -130,14 +130,18 @@ bare `/var/log` tree):
 grep -aE "Accepted (password|publickey)" auth.log      # successful logins
 grep -acE "Failed password" auth.log                    # brute-force volume
 grep -aE "session opened for user" auth.log
-last -f wtmp                                            # login sessions, durations
-last -f btmp                                            # failed attempts
 ```
 
-`wtmp` and `btmp` are binary; `last -f` from util-linux reads them and is present
-here. A brute-force question usually wants three values that all come from
-`auth.log`: the count of failures, the source address, and the timestamp of the
-first success that follows them.
+`wtmp` and `btmp` are binary. Measured today, `last`, `lastb`, `lastlog` and
+`utmpdump` are all **absent here**, so do not plan a minute-three command around
+them: walk the struct instead. The record is **384 bytes**, so the record count is
+the file size divided by 384 — an invariant, unlike any absolute size, because
+`wtmp` grows with every login. The format string and the `ut_type` values are in
+`../dfir-authentication-trace/SKILL.md`.
+
+A brute-force question usually wants three values that all come from `auth.log`
+anyway: the count of failures, the source address, and the timestamp of the first
+success that follows them.
 
 Persistence on the Linux side lives in `/etc/systemd/system/` and
 `~/.config/systemd/user/` timers and services, `~/.ssh/authorized_keys`, crontabs
