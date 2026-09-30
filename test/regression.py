@@ -30,6 +30,42 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+# Trees .gitignore excludes ON PURPOSE because they hold real flags and organiser
+# material: challenges/ (line 53, force-add one at a time) and CSCV2026/ (line 61,
+# "carries an event writeup with a live flag").
+#
+# A fresh clone therefore has every card, alias, skill note and planner case that
+# REFERS to those trees, but not the data. Four checks asserted the referent
+# existed, so the gate passed on the machine that solved the challenge and failed
+# on every clone -- measured: 121 pass here, 117 pass and 4 fail in a clean clone
+# of the same commit. That is a portability bug in the gate, not a defect in the
+# tree, and committing the data to silence it would break the repository's own
+# rule against committing a flag.
+#
+# The convention already exists: tools/crypto/selftest.py reads
+# CSCV2026/Crypto/solve/output_typhon.txt and SKIPS when it is absent, which
+# .gitignore itself points at as the reason ignoring the tree "costs a clone
+# nothing but the skip". These helpers apply that same rule to the gate: check
+# the reference when the data is present, skip it when it is not, and never let
+# an absent referent read as a broken one.
+UNCOMMITTED_DATA_ROOTS = ("challenges/", "CSCV2026/")
+
+
+def refers_to_uncommitted_data(relpath):
+    """True when this path lives in a tree .gitignore excludes on purpose."""
+    norm = str(relpath).replace(os.sep, "/").lstrip("./")
+    return norm.startswith(UNCOMMITTED_DATA_ROOTS)
+
+
+def absent_uncommitted(relpath):
+    """True when the path is BOTH inside such a tree AND not on this disk.
+
+    Deliberately two conditions. A reference into challenges/ that IS present --
+    a force-added fixture -- stays fully checked, so the gate keeps catching a
+    genuinely broken pairing wherever the data exists to check it against.
+    """
+    return refers_to_uncommitted_data(relpath) and not (ROOT / relpath).exists()
 import ctf  # noqa: E402
 from tools import state  # noqa: E402
 from tools import chain_match, skill_select  # noqa: E402
@@ -307,16 +343,27 @@ class ContractTests(unittest.TestCase):
             exempt.add((entry["path"], entry["target"]))
         link = re.compile(r"`([A-Za-z0-9_./-]+\.md)`")
         broken = []
+        uncommitted = []
         for skill in sorted((ROOT / "skills").rglob("*.md")):
             rel = skill.relative_to(ROOT).as_posix()
             for target in link.findall(skill.read_text(encoding="utf-8")):
                 if (rel, target) in exempt:
                     continue
                 candidates = [skill.parent / target, ROOT / target]
-                if not any(c.is_file() for c in candidates):
-                    broken.append("%s -> %s" % (rel, target))
+                if any(c.is_file() for c in candidates):
+                    continue
+                if absent_uncommitted(target):
+                    # A field note citing the handout it was written from. The
+                    # handout is gitignored, so this is absent by design on a
+                    # clone rather than a broken link.
+                    uncommitted.append("%s -> %s" % (rel, target))
+                    continue
+                broken.append("%s -> %s" % (rel, target))
         self.assertEqual(broken, [],
                          "a skill names a reference file that does not exist: %s" % broken)
+        if uncommitted:
+            print("\n  note: %d skill reference(s) point into a gitignored data "
+                  "tree and were not checked: %s" % (len(uncommitted), uncommitted))
 
     def test_sql_injection_has_one_canonical_owner(self):
         """SQLi references must live under web-sqli, not a second web corpus."""
@@ -382,6 +429,9 @@ class ContractTests(unittest.TestCase):
             self.assertIn(phrase, text)
 
     def test_novel_whitebox_plan_surfaces_chain_openers_without_claiming_a_finding(self):
+        if absent_uncommitted("CSCV2026/public"):
+            self.skipTest("CSCV2026/ is gitignored (it carries a live flag); the "
+                          "planner's golden case needs that handout on disk")
         proc = subprocess.run(
             [sys.executable, str(ROOT / "tools/novel_plan.py"), "--json",
              str(ROOT / "CSCV2026/public")], capture_output=True, text=True, cwd=str(ROOT))
@@ -1262,8 +1312,9 @@ class ChainReuseTests(unittest.TestCase):
             for field in ("id", "source_note", "challenge", "preconditions", "signals",
                           "chain", "first_confirming_probe", "blast_radius", "verification"):
                 self.assertIn(field, card, "%s is missing %s" % (card.get("id"), field))
-            self.assertTrue((ROOT / card["source_note"]).is_file(),
-                            "%s points at a missing note" % card["id"])
+            if not absent_uncommitted(card["source_note"]):
+                self.assertTrue((ROOT / card["source_note"]).is_file(),
+                                "%s points at a missing note" % card["id"])
             self.assertTrue(card["signals"], "%s has no signals to match on" % card["id"])
             self.assertIn(card["verification"]["status"],
                           ("verified_live", "writeup-claimed", "unverified"))
@@ -2264,6 +2315,8 @@ class KnowledgeScaleTests(unittest.TestCase):
         by_id = {c["id"]: c for c in cards}
         stats = chain_match.load_signal_stats()
         seen_dirs = {}
+        absent_dirs = []
+        seen_measured = 0
         for name, entry in aliases.items():
             directory, card_id = entry.get("directory"), entry.get("card")
             self.assertTrue(directory and card_id,
@@ -2272,16 +2325,24 @@ class KnowledgeScaleTests(unittest.TestCase):
                              "directory %r is claimed by two aliases (%s and %s); "
                              "one of them is wrong" % (directory,
                                                       seen_dirs.get(directory), name))
+            # Both of these are properties of the alias FILE and need no handout,
+            # so they keep running on a clone: two aliases claiming one directory
+            # is still wrong, and so is naming a card that no longer exists.
             seen_dirs[directory] = name
-            src = ROOT / "challenges" / directory
-            self.assertTrue(src.is_dir(),
-                            "alias %r points at a missing directory %r" % (name, directory))
             self.assertIn(card_id, by_id,
                           "alias %r names a card that no longer exists: %s" % (name, card_id))
+            src = ROOT / "challenges" / directory
+            if not src.is_dir():
+                # challenges/ is gitignored; only force-added fixtures reach a
+                # clone. The RE-MEASUREMENT below needs the handout, so it is
+                # skipped here and still runs on any machine that has it.
+                absent_dirs.append(directory)
+                continue
             text = chain_match.read_source(str(src))
             self.assertTrue(text.strip(),
                             "alias %r points at a directory with no readable "
                             "source, so the pairing cannot have been measured" % name)
+            seen_measured += 1
             ranked = ev.rank_cards(cards, text, None, stats)
             self.assertTrue(ranked, "nothing ranked on %r at all" % directory)
             self.assertEqual(
@@ -2289,6 +2350,15 @@ class KnowledgeScaleTests(unittest.TestCase):
                 "alias %r claims %s for %r, but %s ranks first there -- the alias "
                 "is stale or wrong, and it is moving top1_rate" % (
                     name, card_id, directory, ranked[0]["id"]))
+
+        # Say plainly how much of this check actually ran. Silence here would let
+        # a clone report a green alias test having re-measured nothing at all.
+        if absent_dirs and not seen_measured:
+            self.skipTest("no alias handout is present in this checkout, so no "
+                          "pairing could be re-measured: %s" % ", ".join(absent_dirs))
+        if absent_dirs:
+            print("\n  note: %d of %d alias pairing(s) not re-measured, handout "
+                  "absent: %s" % (len(absent_dirs), len(aliases), ", ".join(absent_dirs)))
 
     def test_chain_match_retrieval_does_not_regress(self):
         baseline_path = ROOT / "test" / "baselines" / "chain_match.json"
