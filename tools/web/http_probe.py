@@ -101,7 +101,7 @@ def pick_evidence(resp, args):
 
 
 def build_argv(hook, args, request, result=None, evidence=None, verdict=None,
-               evidence_kind=None):
+               evidence_kind=None, response=None):
     argv = ["python3", HOOKS, hook, args.challenge, "--request", request]
     if hook == "pre-probe":
         if args.hypothesis_id:
@@ -118,6 +118,13 @@ def build_argv(hook, args, request, result=None, evidence=None, verdict=None,
         argv += ["--result", result]
     if evidence:
         argv += ["--evidence", evidence]
+    # tools/hooks.py post-probe now REQUIRES the bytes behind a `confirms`
+    # verdict and checks the quote against them. This tool is the one component
+    # that holds the request and the response together, which is exactly why it
+    # is the sanctioned path: it can supply them without anyone retyping
+    # anything.
+    if response and verdict == "confirms":
+        argv += ["--response", response]
     if evidence_kind:
         argv += ["--evidence-kind", evidence_kind]
     if args.probe_class:
@@ -212,6 +219,28 @@ def main(argv=None):
     if not resp["ok"] and verdict == "confirms":
         verdict = "inconclusive"
         downgrades.append("transport failure can never confirm")
+    # A response to a request that was not the one asked for is not evidence
+    # about the target. Measured on a live box: `Connection: X-Real-IP` bypassed
+    # an API token check -- curl and a raw socket answered 200 where the plain
+    # request answered 401 -- and this tool answered 401 for the same call,
+    # because http.client replaces the Connection header with its own. Reporting
+    # a confident 401 there is worse than failing, so a dropped header forces
+    # inconclusive and names the tool that can send it.
+    dropped = resp.get("headers_not_sent") or []
+    if dropped:
+        # Unconditional, and the first version got this wrong by gating it on
+        # verdict == confirms. In the real case the evidence did NOT match --
+        # precisely BECAUSE the header was dropped -- so the verdict was already
+        # a miss and the guard never ran, leaving a confident negative about a
+        # request that was never sent. Any verdict here is about the wrong
+        # request, so every one of them becomes inconclusive.
+        if verdict != "inconclusive":
+            verdict = "inconclusive"
+        downgrades.append(
+            "urllib replaced %s on the wire, so this response answers a "
+            "DIFFERENT request than the one asked for and neither a match nor a "
+            "miss means anything. Use curl or a raw socket for a hop-by-hop, "
+            "Connection, Host or Transfer-Encoding probe" % ", ".join(dropped))
     if verdict == "confirms" and NEVER_CONFIRMATIONS.search(evidence or ""):
         verdict = "inconclusive"
         downgrades.append("the excerpt reads as a timeout or a dead connection")
@@ -230,8 +259,26 @@ def main(argv=None):
     if not kind:
         kind = "class" if matched else "surface"
 
+    # The bytes behind the verdict, assembled from the same two places
+    # is_verbatim_substring checks: the header block and the body. A response can
+    # be megabytes, and the whole thing on a command line would hit ARG_MAX, so
+    # when it is large a window around the evidence is passed instead -- the
+    # substring check in hooks.py still holds on the window, and a window that
+    # does not contain the evidence is a real failure rather than a size problem.
+    RESPONSE_BUDGET = 60000
+    full_response = header_blob(resp) + "\n\n" + resp.get("body", "")
+    response_for_hook = full_response
+    if len(full_response) > RESPONSE_BUDGET:
+        at = full_response.find(evidence) if evidence else -1
+        if at >= 0:
+            half = RESPONSE_BUDGET // 2
+            start = max(0, at - half)
+            response_for_hook = full_response[start:start + RESPONSE_BUDGET]
+        else:
+            response_for_hook = full_response[:RESPONSE_BUDGET]
+
     post_argv = build_argv("post-probe", args, request, result, evidence, verdict,
-                           kind)
+                           kind, response=response_for_hook)
 
     report = {
         "mode": "http-probe", "ok": True,

@@ -2,6 +2,7 @@
 name: ctf-pwn-triage
 description: First contact with a pwn or rev binary. Runs tools/pwn_triage.py for protections, dangerous imports and ROP gadgets, then radare2 for the disassembly, and returns which exploitation routes the protections actually leave open. gdb, pwntools, ROPgadget and checksec are all absent on this machine, so it works with what is installed.
 tools: Bash, Write, Read, Grep, Glob
+model: opus
 ---
 
 You answer the questions that decide the first hour, using the tools that exist
@@ -95,9 +96,28 @@ One fenced ```json block:
   "why_that_route": "<which protection closed the others>",
   "gadgets": {"pop rdi ; ret": "0x401234"},
   "unknowns": ["<what needs a running instance>"],
+  "flag_candidate": "<the flag string, or null — normally null: you triage>",
+  "flag_source": "live-response | artifact | null",
+  "flag_evidence": "<verbatim bytes containing the flag, or null>",
+  "flag_command": "<exact command that produced those bytes, or null>",
+  "measured_dead": [{"layer": "<route you ruled out>", "how": "<the protection and the evidence for it>"}],
+  "next_lead": "<the single best untried route, or null>",
   "conclusion": "<one sentence; a hypothesis, not proof>"
 }
 ```
+
+**Why the four flag keys are here when you are a triage agent.** You are the
+first member of the pwn fleet, and `.claude/workflows/solver-fleet.js` spawns
+you with the same schema as the four solvers behind you. Your
+`flag_candidate` is normally `null` and that is the correct outcome — say so
+rather than manufacturing one. But if the flag is simply sitting in the binary
+and `strings` reads it out, return it with the real bytes and the exact command,
+because the orchestrator checks that the flag appears inside those bytes and
+there is no reason to make the fleet re-find it.
+
+`measured_dead` is the deliverable the fleet actually consumes: a route closed
+by a protection, with the evidence that closed it, is what stops the four
+solvers behind you each rediscovering the same wall.
 
 ## Limits
 

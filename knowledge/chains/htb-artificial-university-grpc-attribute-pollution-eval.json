@@ -10,7 +10,18 @@
     "solved_at": "2026-09-23",
     "assistance": "self-solved"
   },
-  "stack": ["flask", "werkzeug", "grpc", "protobuf", "selenium", "firefox", "pdf.js", "curl", "sqlite", "fpdf"],
+  "stack": [
+    "flask",
+    "werkzeug",
+    "grpc",
+    "protobuf",
+    "selenium",
+    "firefox",
+    "pdf.js",
+    "curl",
+    "sqlite",
+    "fpdf"
+  ],
   "preconditions": {
     "all_of": [
       "A recursive merge writes attacker-controlled keys into an object's __dict__, and the destination of that merge is a long-lived service object.",
@@ -109,5 +120,10 @@
     "int() over a subprocess's stdout plus a global error handler that returns the exception args leaks that stdout in the response body — a free read channel worth checking for.",
     "The polluted attribute cannot be removed through the merge. Overwrite it with something that returns a valid value instead of leaving a destructive expression behind."
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.59,
+    "derived_by": "backfill_classification.py"
+  }
 }

@@ -230,6 +230,11 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "derived_by": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How this label was decided, so a tool-derived label is never mistaken for a reviewed one. backfill_classification.py writes its own name here; an operator decision says so and why. 21 cards already carried this key while the schema forbade it, and nothing noticed because nothing validated every card -- see the gate test that now does."
         }
       }
     }

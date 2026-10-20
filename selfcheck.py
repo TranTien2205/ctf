@@ -75,7 +75,14 @@ except ValueError:
 # agent could open a session, be told the system was healthy, and discover
 # mid-solve that the write gate was broken. By then, under this tree's own
 # rules, no verdict it had recorded could be trusted.
-LOOP_CHALLENGE = "selfcheck-control-loop"
+# Unique per process, because this name is created and then rmtree'd. With a
+# fixed name two concurrent runs race and delete each other's challenge
+# mid-check, which reports as a control-loop FAIL that nothing is wrong with.
+# Measured while building the contest plane: the PostToolUse gate hook runs the
+# suite on every edit, so a hook run and a manual run overlap routinely, and
+# the resulting failure sent a real debugging session looking for a bug in
+# decide.py that did not exist.
+LOOP_CHALLENGE = "selfcheck-control-loop-%d" % os.getpid()
 
 
 def _run(*argv):

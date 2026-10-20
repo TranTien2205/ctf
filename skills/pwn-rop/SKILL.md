@@ -1,5 +1,6 @@
 ---
 name: pwn-rop
+evidence_level: catalogue
 description: >
   Return-Oriented Programming (ROP) chain construction. Use when binary has
   NX enabled and requires code reuse for exploitation. Covers basic ROP,
@@ -18,6 +19,82 @@ budget:
 ---
 
 # ROP Chain Construction
+
+**Catalogue class.** The taxonomy classes that route here — `pwn-code-reuse` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
+## Read this before the Quick Reference below
+
+**`ROPgadget`, `ropper`, `one_gadget`, `pwntools`, `gdb` and `checksec` are all
+measured ABSENT on this machine, and `pip` here is EXTERNALLY-MANAGED.** The
+"ROPgadget Commands" and "ropper Commands" sections further down are published
+reference for a machine that has them; on this one those commands fail at the
+shell. What exists here instead:
+
+```bash
+python3 tools/pwn_triage.py <binary>    # protections WITH the evidence for each,
+                                       # dangerous imports, essential gadgets,
+                                       # and the routes each protection leaves
+r2 -A <binary>                          # analyse;  afl lists functions
+r2 -d <binary>                          # the debugger here, since gdb is absent
+```
+
+Inside radare2, `/R pop rdi` searches for ROP sequences. Build payloads with
+`struct.pack` and deliver them with `socat` or a stdlib socket, never with
+`pwntools`.
+
+## First probe
+
+**This class presupposes control of the instruction pointer.** Confirm that
+first, or you are in the wrong skill: `pwn-stack-overflow` and
+`pwn-format-string` are the two that establish it.
+
+The first probe is therefore a question to the triage output, not a payload:
+
+```bash
+python3 tools/pwn_triage.py <binary> | head -40
+```
+
+**Expected signal.** Read three facts off it before writing anything.
+
+| Fact in the triage output | What it decides |
+|---|---|
+| `nx: true` | code reuse is the route; shellcode on the stack is not |
+| `pie: false` | the binary's own gadgets have fixed addresses, so no leak is needed for them |
+| `relro: full` | a GOT overwrite is closed, whatever the leak is worth |
+| a `system` or `/bin/sh` entry in the imports or strings | the chain may be short; check before building a libc leak |
+
+If `pie` is true you need a leak first: build and fire the leak chain alone, and
+**verify the leaked value looks like a libc address** before chaining further. A
+chain built on an unverified leak fails for a reason you cannot see.
+
+## Falsifier
+
+The gadgets actually present cannot express the call: no controllable argument
+register for the target function, or no writable page to pivot into. That is a
+measurement from the executable segments `tools/pwn_triage.py` scanned, not an
+opinion, and it closes the route rather than suggesting a different chain.
+
+## Discipline and traps
+
+- **Never claim a gadget you did not see in real output.** No invented address,
+  no remembered offset. The repository rule applies hardest here, because a ROP
+  chain is entirely made of addresses.
+- **A crash is not a flag.** Report the exact signal and the value you
+  controlled at the fault, not "it segfaults so the chain nearly works".
+- **x86-64 libc calls need stack alignment**; the `ret` padding trick is in the
+  Stack Alignment section below. A chain that works locally and not remotely is
+  usually alignment or environment, not the gadgets.
+- **Attempt ceiling: five chains.** On exhaustion report which chains are
+  measured dead with the measurement that killed each, so the next agent does
+  not rebuild them. `tools/decide.py` will answer `escalate` rather than ending
+  the challenge.
+
 
 ## Quick Reference
 

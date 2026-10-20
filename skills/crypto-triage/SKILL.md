@@ -19,6 +19,15 @@ evidence_level: catalogue
 
 # Crypto — Recognition Router
 
+**Catalogue class.** The taxonomy classes that route here — `crypto-rsa`, `crypto-prng`, `crypto-ecc-dlog`, `crypto-symmetric-oracle` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
+
 Not: understand the cryptosystem. Instead: read the parameters, name the attack they allow,
 run it, check the recovered secret against something the handout verifies by itself. This
 file routes — open **one** file from the index, never the directory.

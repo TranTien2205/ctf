@@ -367,8 +367,7 @@ presenting its technique as local experience.
 
 - **cscv-inoffice-authority-form-acl-bypass-restricted-pickle** — `GET office-process?,mmoffice.x.corp HTTP/1.1 with Host: office-process?,mmoffice.x.corp`
   expected: 405 METHOD NOT ALLOWED from Flask, proving both that HAProxy's path ACL did not fire and that Werkzeug routed the bare token to the POST-only /office-process
-- **cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce** — `upload the XSSI/JSON/SVG polyglot (body starts " )]}',
- " and contains '"svg":"<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'), then GET /api/media/raw?id=<asset>&workspace=<W> foll`
+- **cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce** — `upload the XSSI/JSON/SVG polyglot (body starts " )]}',\n " and contains '"svg":"<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'), then GET /api/media/raw?id=<asset>&workspace=<W> foll`
   expected: upload -> 201 {"mime":"image/svg+xml"}; the manifest request returns the uploaded body (starts with )]}',) instead of the fixed 'Untitled workspace' JSON
 - **htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce** — `authenticated GET /settings.html?cb=1 twice, then anonymous GET /settings.html?cb=1`
   expected: the anonymous request returns 200 with X-Cache-Status HIT and the body of the authenticated page
@@ -378,21 +377,19 @@ presenting its technique as local experience.
 ### Traps this tree has already paid for
 
 - HAProxy rejects authority-form with 400 unless the authority is byte-equal to Host, so the route token and the required vhost must be smuggled into the same string and separated by a comma for hdr() to split them  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
-- a port in the authority breaks the backend side: urlsplit('office-process:80') parses office-process as a scheme and leaves path '80'  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
-- no URI whose path sample is set can hide the substring: in every form HAProxy accepts, its authority scan and Python's netloc end at the same '/', and url_dec decodes exactly like Python's unquote, so a failing url_dec leaves a literal % that Werkzeug cannot route  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
-- the SSRF at /healthcheck is a dead end for delivery: urlopen with only method/url/headers can never emit a body, because http.client's _is_illegal_header_value permits only obs-fold, which never terminates the header block, and POST without data always sends Content-Length: 0  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
-- gunicorn honours a SCRIPT_NAME request header only from a peer in forwarded_allow_ips (127.0.0.1,::1); through the proxy it is dropped by header_map=drop, so the SCRIPT_NAME prefix-strip trick works when testing the backend directly and silently fails through HAProxy  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
-- /healthcheck returns 'error' for any 4xx/5xx because urlopen raises HTTPError, so a 2xx status code is the only positive oracle it gives  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
 - plain '<svg' or '<?xml' inside a JSON string is NOT enough: file(1) still says application/json/text. The token that flips libmagic to image/svg+xml is '<!DOCTYPE svg>' inside the JSON string value while the file begins with the XSSI prefix  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
-- the XSSI prefix must match Angular's PI regex /^\)\]\}',?
-/ exactly, i.e. )]}',
- ; a missing newline or comma placement makes Angular's strip fail and JSON.parse throws  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
-- hasDocumentPreamble only inspects the first 64 bytes and only rejects a first non-space of { or [; the XSSI prefix passes it, but a plain JSON object starting with { is rejected - do not drop the prefix  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
-- scripts inserted through [innerHTML]/bypassSecurityTrustHtml do not execute; the markup must load board-compat.js from a same-origin <iframe srcdoc> so CSP script-src 'self' allows it  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
-- the archive packet is only accepted when integrity == FNV-1a32(markup) as 8 lowercase hex; recompute it over the exact markup bytes  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
-- if the deployed ADMIN_TOKEN was rotated, the fast path (POST /api/admin/export-preview with the token) returns 403 and this bot chain is the only route  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
+- report the internal 127.0.0.1 URL to the bot, not the public address, or the bot session is not used  *(htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce)*
+- needle's `output` alone CRASHES the app when the fetched response is JSON. With parse_response at its default 'all', needle emits a parsed object and then does file.write(chunk) on it: ERR_INVALID_ARG_TYPE escapes as an unhandled rejection because transmitAPI has no try/catch, node exits, supervisor  *(htb-intergalactic-bounty-recipient-array-differential-otp-mass-assign-needle-output-nunjucks-rce)*
+- THE RULE IS WEAKER THAN IT READS, and this was measured, not assumed. conf/haproxy.cfg:16 says  http-request deny if { path_beg,url_dec -i /api/v1/get_ticket }  which reads as a prefix deny. Reproduced offline against haproxy:2.8.1-alpine with the same backend: WITH the ',url_dec' converter, /api/v1  *(htb-locktalk-haproxy-exact-path-acl-dot-segment-bypass-python-jwt-json-serialization-role-forge)*
+- the bot runs on a fixed schedule; place the poisoned state first, then poll  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
+- a 101 carrying Upgrade and Connection makes a Node client raise the upgrade event, so the fetch never resolves and the proxy answers 504  *(htb-percetron-status-mirror-haproxy-tunnel-gopher-mongo-cypher-sevenzip)*
+- a poisoning request arriving while the entry is still valid is served from cache and poisons nothing; compare a timestamp in the body to tell a hit from a miss  *(htb-pod-diagnostics-arg-cache-key-duplicate-param-poisoning-renderer-file-read)*
+- USE PICKLE PROTOCOL 0 -- this is the requirement that actually matters. The cookie reaches Flask as a str, so protocol 2 (which starts with \x80) is re-encoded as multi-byte UTF-8, the set's byte count no longer matches the data, and the value is silently never stored. Flask-Session itself serialise  *(htb-serialflow-werkzeug-octal-cookie-memcached-injection-pylibmc-flag1-pickle-rce)*
+- curl collapses /./ and // client-side unless --path-as-is is passed, so the bypass silently fails to fire and reads as a dead end. Pass it on every probe in this family.  *(htb-wizardshop-haproxy-exact-path-acl-double-slash-login-sqli-unlimited-2fa-brute)*
+- a port in the authority breaks the backend side: urlsplit('office-process:80') parses office-process as a scheme and leaves path '80'  *(cscv-inoffice-authority-form-acl-bypass-restricted-pickle)*
+- the XSSI prefix must match Angular's PI regex /^\)\]\}',?\n/ exactly, i.e. )]}',\n ; a missing newline or comma placement makes Angular's strip fail and JSON.parse throws  *(cscv2026-chromatic-xssi-json-svg-polyglot-cache-key-collision-bot-rce)*
 
-*57 more in the cards above; open the card before working its chain.*
+*66 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 66 of 78 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
@@ -404,12 +401,11 @@ presenting its technique as local experience.
 
 - **2026-09-24 · in-office · confirmed** (`web-parser-differential`) — **Confirming probe that worked** > GET office-process?,mmoffice.x.corp HTTP/1.1 with Host: office-process?,mmoffice.x.corp Expected: 405 METHOD NOT ALLOWED from Flask, proving both that HAProxy's path
 - **2026-09-26 · LockTalk · confirmed** (`web-parser-differential`) — **Confirming probe that worked** > GET /api/v1/./get_ticket with curl --path-as-is, next to a plain GET /api/v1/get_ticket Expected: the plain path returns the proxy's HTML 403 'Request forbidden by a
-- **2026-09-26 · SerialFlow · confirmed** (`web-parser-differential`) — **Confirming probe that worked** > GET / with Cookie: session="AAABB", next to a plain Cookie: session=AAABB Expected: both answer 200 and both echo Set-Cookie: session=AAABB — the octal escape was
+- **2026-09-26 · SerialFlow · confirmed** (`web-parser-differential`) — **Confirming probe that worked** > GET / with Cookie: session="AA\101BB", next to a plain Cookie: session=AAABB Expected: both answer 200 and both echo Set-Cookie: session=AAABB — the octal escape was
 - **2026-09-27 · No Threshold (app titled Wizard Shop) · confirmed** (`web-parser-differential`) — **Confirming probe that worked** > GET /auth/login and GET //auth/login with curl --path-as-is, and compare the bodies rather than only the status codes Expected: the first returns a 403 whose body is
 - **2026-09-21 · EncoDecept · confirmed** (`web-cache-poisoning`) — **Confirming probe that worked** > authenticated GET /settings.html?cb=1 twice, then anonymous GET /settings.html?cb=1 Expected: the anonymous request returns 200 with X-Cache-Status HIT and the body 
-- **2026-09-25 · Chromatic Aberration · confirmed** (`web-cache-poisoning`) — **Confirming probe that worked** > upload the XSSI/JSON/SVG polyglot (body starts " )]}',
- " and contains '"svg":"<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'), then GET /api/medi
+- **2026-09-25 · Chromatic Aberration · confirmed** (`web-cache-poisoning`) — **Confirming probe that worked** > upload the XSSI/JSON/SVG polyglot (body starts " )]}',\n " and contains '"svg":"<!DOCTYPE svg><svg xmlns=\"http://www.w3.org/2000/svg\"></svg>"'), then GET /api/medi
 
-*9 cards, 69 traps, 6 confirmed notes.*
+*10 cards, 78 traps, 6 confirmed notes.*
 
 <!-- FORGED:END -->

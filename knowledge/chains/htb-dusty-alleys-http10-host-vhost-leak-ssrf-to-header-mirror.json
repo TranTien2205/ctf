@@ -89,5 +89,10 @@
     "combining a content length with a chunked encoding is rejected by the proxy, so smuggling is not the way into the unproxied backend routes",
     "the reflecting endpoint looks like a harmless debug route; its real value is that it prints credentials attached by a server-side fetcher"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.57,
+    "derived_by": "backfill_classification.py"
+  }
 }

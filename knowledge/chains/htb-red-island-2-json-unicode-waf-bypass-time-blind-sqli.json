@@ -82,5 +82,10 @@
     "compare hex strings as strings, not as a numeric literal, or the comparison silently fails"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-sqli",
+    "confidence": 0.63,
+    "derived_by": "backfill_classification.py"
+  }
 }

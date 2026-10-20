@@ -28,13 +28,17 @@ if ! "$PY" tools/system_eval.py --json; then fail=1; fi
 hr "REQUIRED: learning-loop report"
 if ! "$PY" tools/learning_report.py --json; then fail=1; fi
 
-hr "REQUIRED: tool-layer selftests (web, crypto, pwn, forensics, a-d primitives -- all offline)"
+hr "REQUIRED: tool-layer selftests (web, crypto, pwn, forensics, contest, a-d primitives -- all offline)"
 # These prove the primitives the agent is told to prefer over hand-rolled
 # requests. They were shipped with selftests that the gate never ran, so a
 # regression in them would have been invisible here; measured at ~17s together.
 # tools/ad is the attack-defense control plane; its selftest is pure-function
 # only -- no sockets, no subprocess -- so it stays safe to run here.
-for t in tools/web/selftest.py tools/crypto/selftest.py tools/pwnstatic/selftest.py tools/forensics/selftest.py tools/ad/selftest.py; do
+# tools/contest is the jeopardy portfolio plane: it ranks many challenges against
+# one clock. Its selftest is pure-function too, and it is the only thing proving
+# that the dispatch plan names subagents which actually exist on disk -- a plan
+# naming an absent agent cannot be executed, and nothing else would catch it.
+for t in tools/web/selftest.py tools/crypto/selftest.py tools/pwnstatic/selftest.py tools/forensics/selftest.py tools/contest/selftest.py tools/ad/selftest.py; do
   if [ -f "$t" ]; then
     printf -- '-- %s\n' "$t"
     "$PY" "$t" >/dev/null || { echo "FAILED: $t (run it directly for the detail)"; fail=1; }
@@ -49,7 +53,7 @@ hr "REPORTED: chain transfer to an unseen challenge (a metric, not a contract)"
 # the same mechanism family comes back -- and currently reads 0.042. It is
 # printed rather than enforced because it is a number to move, not a floor to
 # defend; a threshold here would only invite tuning the harness.
-"$PY" tools/holdout_eval.py --json 2>/dev/null | "$PY" -c "import json,sys; d=json.load(sys.stdin); print('transfer=%s wrong_family=%s silent=%s over %s challenges' % (d['transfer_rate'], d['wrong_family_rate'], d['silent_rate'], d['cards_measurable']))" || echo "holdout_eval did not run"
+"$PY" tools/holdout_eval.py --json 2>/dev/null | "$PY" -c "import json,sys; d=json.load(sys.stdin); print('transfer=%s wrong_family=%s family_lead=%s silent=%s correct_peer_named=%s over %s challenges' % (d['transfer_rate'], d['wrong_family_rate'], d['family_lead_rate'], d['silent_rate'], d['correct_peer_named_rate'], d['cards_measurable']))" || echo "holdout_eval did not run"
 
 hr "REQUIRED: subagent prompts are current with the evidence"
 # A solve produces a chain card with traps and a first probe; without this the

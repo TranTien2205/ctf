@@ -94,5 +94,10 @@
     "git rejecting the pushed ref does not stop the webhook: the helper resolves on stdout close regardless of exit code",
     "build the packfile locally and replay it into a throwaway bare repo with git receive-pack --stateless-rpc before sending it anywhere"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.66,
+    "derived_by": "backfill_classification.py"
+  }
 }

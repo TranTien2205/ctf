@@ -475,26 +475,25 @@ presenting its technique as local experience.
   expected: the custom 404 template renders <str>49</str>
 - **htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape** — `GET /?location={{7*7}} and then GET /?location={{_self}}`
   expected: the page renders 49 in place of the value, and _self renders __string_template__ followed by a hash: the parameter is compiled as template source
-- **htb-neonify-erb-ssti-newline-filter-bypass** — `POST / with neon=abc
-<%= 7*7 %>`
+- **htb-neonify-erb-ssti-newline-filter-bypass** — `POST / with neon=abc\n<%= 7*7 %>`
   expected: the glow output renders 49
 
 ### Traps this tree has already paid for
 
 - A partial configuration overwrite loses the socket and bricks the instance permanently — and the re-solve proved this step is not needed at all.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- base64url decoding in the browser fails without manual padding.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The bot re-logs in per visit, so stolen cookies expire quickly; verify with an authenticated page immediately.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- Restoring the overwritten template does not un-cache it: workers that already cached the malicious version keep serving it until the instance restarts. Say so rather than assuming the write was undone.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The input sanitiser may cover request.args and request.form but not request.files, so an uploaded filename reaches os.path.join unfiltered.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The handed-over host:port may speak TLS; a plain http request answering '400 The plain HTTP request was sent to HTTPS port' is the tell.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
 - a slash in the payload breaks the route pattern (<str> does not match slashes); slash-free shell commands are the easy route  *(htb-const-flask-jinja2-lipsum-rce)*
-- {{config}} and environ list only environment sections, not the flag  *(htb-const-flask-jinja2-lipsum-rce)*
-- the lipsum.__globals__ namespace gives os and any module without needing a real subconversation  *(htb-const-flask-jinja2-lipsum-rce)*
 - measure the jail, do not read it off the Dockerfile. This image sets LD_PRELOAD to a GNU libiconv build, which is the precondition for the well-known iconv memory-corruption bypass, but at runtime getenv('LD_PRELOAD') is EMPTY. Believing the Dockerfile would have sent the solve into a heap-grooming   *(htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape)*
+- puts inside eval goes to server stdout, not into the template output  *(htb-neonify-erb-ssti-newline-filter-bypass)*
+- MySQL case-insensitive collations make 't' equal 'T'; case-exact extraction needs a binary comparison  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
+- the two rejection messages mean opposite things and look equally final. 'dont bite the hand that feeds you human' is the filter; 'report to the nearest galactic federation agency' is a caught ParseError, which means the character got through. Thirty characters that appear blocked in a naive sweep ar  *(htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce)*
+- the (!(&(1=0)(userPassword=...)) shape is a blanket bypass, not a character oracle  *(htb-phonebook-ldap-prefix-oracle)*
+- grouped concatenation needs an explicit ordering or rows arrive in a different order each query  *(htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli)*
+- a broad filter fired before the update semantics are understood mass-updates the collection and can cost the instance  *(htb-secnotes-mongoose-rename-prototype-pollution-local-gate)*
+- The bundle sends the raw token as the Authorization header with NO 'Bearer ' prefix; using Bearer gets 'Not authenticated' and reads like an authorization bug rather than a client mistake.  *(htb-speednet-graphql-dev-mutation-idor-alias-2fa-bypass)*
+- Testing the input only at submission time proves nothing about a second-order bug. Every direct probe of the username here returned a normal page while the injection already worked in the deferred job.  *(pico-crystal-peak-second-order-sqli-async-report)*
+- the insert is parameterised and accepts the payload silently, so testing the request that stores the value shows nothing and the flow looks safe  *(picoctf-expense-tracker-second-order-sqli-async-report-union)*
 
-*36 more in the cards above; open the card before working its chain.*
+*46 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 46 of 58 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
@@ -507,6 +506,6 @@ presenting its technique as local experience.
 - **2026-09-27 · pcalc · confirmed** (`web-command-injection`) — **Confirming probe that worked** > GET /?formula=_   (a single underscore, nothing else) Expected: the page renders _ . An undefined constant became its own name, so the runtime is PHP 7.x and the hig
 - **2026-09-27 · Jerryboree · confirmed** (`web-ssti`) — **Confirming probe that worked** > GET /?location={{7*7}} and then GET /?location={{_self}} Expected: the page renders 49 in place of the value, and _self renders __string_template__ followed by a has
 
-*10 cards, 48 traps, 2 confirmed notes.*
+*12 cards, 58 traps, 2 confirmed notes.*
 
 <!-- FORGED:END -->

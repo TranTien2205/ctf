@@ -88,5 +88,10 @@
     "always read error bodies: this app leaked the fetched file inside a non-200 message"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.58,
+    "derived_by": "backfill_classification.py"
+  }
 }

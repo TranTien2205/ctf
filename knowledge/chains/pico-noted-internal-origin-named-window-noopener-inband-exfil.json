@@ -91,5 +91,13 @@
     "a top-level data: URL does not execute when Chrome is given it as a command-line argument but does under the bot's CDP-driven navigation; test the path the bot actually uses",
     "with no egress, make the payload post its own step-by-step diagnostics back through the app; that converts a silent black box into a debugger"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-csrf",
+    "confidence": 0.46,
+    "secondary": [
+      "web-xss"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

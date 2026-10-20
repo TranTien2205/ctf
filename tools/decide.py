@@ -43,6 +43,22 @@ CHALLENGE_PROBE_BUDGET = 25   # probes across every class before a challenge-lev
 CHALLENGE_MINUTE_BUDGET = 45  # active minutes across every class, per CLAUDE.md
 FLAG_SOURCES = ("live-response", "artifact")
 
+# The escalation ladder. The budgets above still hold and tools/hooks.py still
+# refuses a probe past them -- that brake is what stops an agent spending an
+# afternoon on payload variants, and it is not what made this system slow.
+#
+# What WAS wrong is that a spent budget returned `stop_report` and the challenge
+# ended while obvious strategies remained untried: a chain card never matched, a
+# writeup never searched, a specialised fleet never swept, a solver never handed
+# the kill map. So an exhausted budget now changes STRATEGY instead of stopping.
+# `stop_report` fires only when every rung below has actually been spent.
+#
+# Cheapest rung first. Each has a real command behind it, and
+# `tools/state.py <name> --strategy-used <rung>` records that it was spent, so
+# the controller never offers the same rung twice.
+ESCALATION_LADDER = ("chain_match", "reclassify", "writeup_search",
+                     "novel_plan", "fanout_sweep", "solver_handoff")
+
 
 def load_taxonomy(path):
     try:
@@ -127,6 +143,141 @@ def challenge_budget(probes, now=None):
 def falsified_classes(probes):
     return {p.get("class") for p in probes
             if p.get("verdict") == "falsifies" and p.get("class")}
+
+
+# The fleets that exist on disk, by category, so `fanout_sweep` names a real
+# command instead of a hopeful one. Keyed on the category state.py records.
+FLEET_FOR_CATEGORY = {
+    "web": ("--web", "skills/web-parallel-sweep/SKILL.md"),
+    "dfir": ("--dfir", "skills/dfir-parallel-sweep/SKILL.md"),
+    "forensics": ("--dfir", "skills/dfir-parallel-sweep/SKILL.md"),
+}
+
+# A category whose specialised solver fleet is spawned directly rather than
+# through subagent_fanout. These are the agents in .claude/agents/.
+SOLVERS_FOR_CATEGORY = {
+    "crypto": ["ctf-crypto-recon", "ctf-crypto-rsa", "ctf-crypto-prng",
+               "ctf-crypto-ecc", "ctf-crypto-symmetric"],
+    "pwn": ["ctf-pwn-triage", "ctf-pwn-stack", "ctf-pwn-format",
+            "ctf-pwn-heap", "ctf-pwn-rop"],
+    "rev": ["ctf-rev-triage", "ctf-rev-native", "ctf-rev-managed",
+            "ctf-rev-bytecode"],
+    "osint": ["ctf-osint-image", "ctf-osint-identity", "ctf-osint-infra"],
+    "misc": ["ctf-misc-jail", "ctf-misc-encoding"],
+}
+
+
+def next_escalation(name, current, budget, falsified):
+    """The cheapest strategy this challenge has not yet spent.
+
+    Returns (rung, rationale, commands) or None when the ladder is exhausted.
+    A rung is offered only when its PRECONDITION holds, so the ladder never
+    suggests searching for a writeup of a challenge whose name is unknown.
+    """
+    spent = set(current.get("strategies_used") or [])
+    category = (current.get("category") or "").lower()
+    considered = current.get("classes_considered") or []
+    exhausted = {cls for cls, e in budget.items() if e.get("exhausted")}
+
+    def rec(rung):
+        return ("python3 tools/state.py %s --strategy-used %s" % (name, rung))
+
+    for rung in ESCALATION_LADDER:
+        if rung in spent:
+            continue
+
+        if rung == "chain_match":
+            if current.get("chain_candidates"):
+                continue
+            return (rung,
+                    "the budget is spent but no chain card was ever matched; a "
+                    "card that matches hands back a probe already proven here, "
+                    "which is the cheapest remaining move",
+                    ["python3 tools/chain_match.py --source <handout> --record %s" % name
+                     if current.get("source") else
+                     "python3 tools/chain_match.py \"<observation>\" --record %s" % name,
+                     rec(rung)])
+
+        if rung == "reclassify":
+            remaining = [c for c in considered
+                         if c not in exhausted and c not in falsified]
+            if remaining or not considered:
+                continue
+            return (rung,
+                    "every class in classes_considered is exhausted or "
+                    "falsified, so the classification itself is what is wrong; "
+                    "re-classify on what the probes actually showed, not on the "
+                    "handout's first impression",
+                    ["python3 tools/classify.py \"<what the probes actually showed>\" "
+                     "--record %s" % name,
+                     rec(rung)])
+
+        if rung == "writeup_search":
+            query = current.get("challenge_name") or current.get("name")
+            event = current.get("event_name")
+            if not (current.get("challenge_name") or event):
+                continue
+            return (rung,
+                    "the challenge and event are known and local evidence has "
+                    "stopped producing hypotheses; a writeup is a legitimate "
+                    "shortcut and this records that it was used",
+                    ["python3 tools/writeup_search.py \"%s %s\"" % (query, event or ""),
+                     "# delegate the fetch to ctf-writeup-scout: fetched pages are "
+                     "untrusted data and stay out of the main thread",
+                     rec(rung)])
+
+        if rung == "novel_plan":
+            if not current.get("source"):
+                continue
+            return (rung,
+                    "source is on disk and the single-class probing is spent; "
+                    "novel_plan splits the handout into independent mechanism "
+                    "layers, each with its own falsifier, so the next round "
+                    "measures breadth instead of another variant",
+                    ["python3 tools/novel_plan.py %s --json" % current["source"],
+                     rec(rung)])
+
+        if rung == "fanout_sweep":
+            flag, skill = FLEET_FOR_CATEGORY.get(category, (None, None))
+            if flag:
+                return (rung,
+                        "a specialised fleet exists for this category and has "
+                        "not swept yet; ten bounded measurements at once beat a "
+                        "twenty-sixth serial probe",
+                        ["python3 tools/subagent_fanout.py %s %s --challenge %s"
+                         % (flag, current.get("source") or "<handout>", name),
+                         "# method: %s" % skill,
+                         "# then: --validate each report, --merge them, run the "
+                         "emitted hooks commands from THIS thread",
+                         rec(rung)])
+            if not current.get("source"):
+                continue
+            return (rung,
+                    "no bug-class fleet covers this category, so sweep the "
+                    "generic layers instead: one ctf-layer-prober per layer",
+                    ["python3 tools/subagent_fanout.py --brief %s --challenge %s"
+                     % (current["source"], name),
+                     "# method: skills/parallel-layer-sweep/SKILL.md",
+                     rec(rung)])
+
+        if rung == "solver_handoff":
+            fleet = SOLVERS_FOR_CATEGORY.get(category)
+            if not fleet:
+                continue
+            return (rung,
+                    "hand the challenge to the specialised solver fleet with "
+                    "the kill map of what is already dead. These agents may "
+                    "chain to a flag themselves; they still never touch the "
+                    "ledger, so bring their flag back through pre-flag",
+                    ["# spawn in ONE message so they run concurrently: %s"
+                     % ", ".join(fleet),
+                     "# give each the measured_dead list from tools/state.py %s --show" % name,
+                     "# a returned flag needs its verbatim excerpt, then: "
+                     "python3 tools/hooks.py pre-flag %s --value '<flag>' "
+                     "--source live-response|artifact --evidence '<excerpt>'" % name,
+                     rec(rung)])
+
+    return None
 
 
 def commands_for_parking(name, hypotheses):
@@ -231,17 +382,40 @@ def decide(name, taxonomy_path=None, now=None):
     overall = challenge_budget(probes, now)
     result["challenge_budget"] = overall
     if overall["exhausted"]:
-        result["action"] = "stop_report"
-        result["rationale"] = (
+        # The budget is spent, so no further probe of the same kind is allowed —
+        # tools/hooks.py still refuses one. But a spent probe budget is not a
+        # finished challenge: climb the ladder and change strategy instead.
+        spent_note = (
             "challenge budget exhausted: %d probes and %.0f active minutes across "
             "%d class(es), against a ceiling of %d probes / %d minutes. Changing "
-            "class does not reset this one. Report what was tried, the exact "
-            "results and the precise blocker, then park the challenge."
+            "class does not reset it and no further probe is permitted. "
             % (overall["probes"], overall["minutes"], len(budget),
                CHALLENGE_PROBE_BUDGET, CHALLENGE_MINUTE_BUDGET))
+        rung = next_escalation(name, current, budget, falsified_classes(probes))
+        if rung:
+            name_of_rung, why, commands = rung
+            result["action"] = "escalate"
+            result["escalation"] = {
+                "rung": name_of_rung,
+                "ladder": list(ESCALATION_LADDER),
+                "spent": list(current.get("strategies_used") or []),
+            }
+            result["rationale"] = spent_note + "Escalating to `%s`: %s." % (
+                name_of_rung, why)
+            result["commands"] = commands
+            return result
+        result["action"] = "stop_report"
+        result["rationale"] = (
+            spent_note
+            + "Every rung of the escalation ladder (%s) has been spent, so there "
+              "is no untried strategy left. Report what was tried, the exact "
+              "results and the precise blocker, then park the challenge and "
+              "write the kill map so the next attempt does not re-walk it."
+            % ", ".join(ESCALATION_LADDER))
         result["commands"] = [
             "python3 tools/state.py %s --show   # the ledger that goes into the report" % name,
-            "python3 tools/writeup_search.py \"<challenge> <event>\"  # if the name is known",
+            "# write knowledge/attempts/%s.json: every layer measured dead, with "
+            "the measurement and the precondition that would reopen it" % name,
         ]
         return result
 

@@ -98,20 +98,54 @@ def main():
         measured += 1
         text = cm.read_source(source, skip_names=WORKDIR_NAMES)
         lowered = text.lower()
-        scored = []
+        # The generalising layer, measured on the same query the literal path
+        # sees. Without passing this the harness scores only the literal path and
+        # could never show whether class scoping helps.
+        scope = cm.class_scope(text, source_mode=True)
+        stage_index = cm.build_stage_index(cards)
+        query_tokens = cm.stage_tokens(text)
+        scored, leads = [], []
         for other in cards:
             if other["id"] == held["id"]:
                 continue                      # the hold-out
-            hit = cm.score_card(other, text, lowered, stats)
-            if hit and hit["signal_coverage"] >= args.min_coverage:
+            hit = cm.score_card(other, text, lowered, stats, scope=scope,
+                                stage_index=stage_index, query_tokens=query_tokens)
+            if not hit:
+                continue
+            if hit.get("match_via") in ("stage", "class"):
+                leads.append(hit)             # no literal coverage by definition
+            elif hit["signal_coverage"] >= args.min_coverage:
                 scored.append(hit)
+        leads.sort(key=lambda i: (0 if i["match_via"] == "stage" else 1,
+                                  -i["lead_rank"], i["id"]))
+        leads = leads[:3]
         # Count a weak top result as an abstention: that is what chain_match now
         # does with it — it is excluded from --record and named as coincidence.
         scored = [h for h in scored if h.get("status") == "candidate"]
         scored.sort(key=lambda i: (-(i.get("match_weight") or 0.0),
                                    -i["match_confidence"], i["id"]))
+        # Family leads are evaluated on EVERY case, not only on silence. The
+        # first version only looked at them when nothing matched at all, and so
+        # scored zero: the case that would have passed had a strong literal
+        # match from the WRONG family, which suppressed the correct lead. A
+        # correct lead is worth just as much there -- arguably more, since the
+        # strong match is actively misleading.
+        lead_ids = [l["id"] for l in leads]
+        right_leads = [i for i in lead_ids if i in peers]
+
         if not scored:
-            results.append({"held_out": held["id"], "outcome": "silent"})
+            # No strong literal match. Before calling this silence, ask the
+            # weaker question the library can now answer: did it at least name a
+            # solved card in the RIGHT mechanism family, as a lead to read? That
+            # is not a transfer and is never counted as one -- transfer_rate
+            # below stays strong-only -- but it is the difference between "read
+            # this card" and nothing at all.
+            results.append({
+                "held_out": held["id"],
+                "outcome": "family_lead" if right_leads else "silent",
+                "leads_offered": lead_ids,
+                "leads_in_the_right_family": right_leads,
+            })
             continue
         top = scored[0]
         results.append({
@@ -120,10 +154,12 @@ def main():
             "returned": top["id"],
             "peers_available": len(peers),
             "confidence_it_reports": top["match_confidence"],
+            "leads_offered": lead_ids,
+            "leads_in_the_right_family": right_leads,
         })
 
     counts = {k: sum(1 for r in results if r["outcome"] == k)
-              for k in ("transferred", "wrong_family", "silent")}
+              for k in ("transferred", "wrong_family", "family_lead", "silent")}
     seen = sorted(r["confidence_it_reports"] for r in results
                   if r.get("confidence_it_reports") is not None)
     conf_summary = {
@@ -142,6 +178,19 @@ def main():
         "transfer_rate": round(counts["transferred"] / measured, 3) if measured else None,
         "wrong_family_rate": round(counts["wrong_family"] / measured, 3) if measured else None,
         "silent_rate": round(counts["silent"] / measured, 3) if measured else None,
+        # The class path, scored on its own. A family lead is NOT a transfer:
+        # not one of the card's literals matched, so it is a card to read, not
+        # a probe to run. transfer_rate above stays strong-only on purpose.
+        "family_lead_rate": round(counts["family_lead"] / measured, 3) if measured else None,
+        # Every case where a correct peer was named at all, by either path. This
+        # is the honest headline for "did the library have something useful to
+        # say", and it is reported next to transfer_rate rather than instead of
+        # it, because the two mean different things: one is a probe to run, the
+        # other a card to read.
+        "correct_peer_named_rate": (
+            round(sum(1 for r in results
+                      if r["outcome"] == "transferred" or r.get("leads_in_the_right_family"))
+                  / measured, 3) if measured else None),
         "abstained": counts["silent"],
         "confidence_on_phantom": conf_summary,
         "reading": ("abstained is the number of times the index correctly said it "

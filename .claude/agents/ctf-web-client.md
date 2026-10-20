@@ -521,41 +521,41 @@ presenting its technique as local experience.
 
 - **htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce** — `send two interleaved profile updates and observe which address receives which token`
   expected: a token belonging to one address arrives at the other
+- **htb-fullstackconf-blind-stored-xss-socketio-oracle** — `open the push channel, leave it idle briefly to confirm it stays silent, then submit an image element with an error handler as the stored value and keep the channel open for about two minutes`
+  expected: a frame arrives on the channel carrying the reward payload
 - **htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read** — `submit, as the stored content, exactly: <meta http-equiv="refresh" content="0;url=http://<your collector>/marker">`
   expected: a request for /marker arrives at your collector from a headless browser user agent, within seconds of the submission
 - **htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce** — `Send the same token-gated API request twice, once plain and once with the proxy-added header listed in the Connection header. Pick the endpoint out of the source first: a 404 on both arms means the pa`
   expected: The plain request is rejected (401) and the hop-by-hop one is accepted (200).
-- **htb-ssos-oauth-registration-race-cookie-swap-json-csrf** — `hammer POST /api/register for the fixed bot account with your own password and confirm it returns 200 before the bot reaches its registerUser step`
-  expected: the registration succeeds and your credentials work at /api/login
 
 ### Traps this tree has already paid for
 
 - A partial configuration overwrite loses the socket and bricks the instance permanently — and the re-solve proved this step is not needed at all.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- base64url decoding in the browser fails without manual padding.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The bot re-logs in per visit, so stolen cookies expire quickly; verify with an authenticated page immediately.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- Restoring the overwritten template does not un-cache it: workers that already cached the malicious version keep serving it until the instance restarts. Say so rather than assuming the write was undone.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The input sanitiser may cover request.args and request.form but not request.files, so an uploaded filename reaches os.path.join unfiltered.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The handed-over host:port may speak TLS; a plain http request answering '400 The plain HTTP request was sent to HTTPS port' is the tell.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- an element whose handler fires while a plain script element does not is the signature of insertion through an HTML property rather than a parser, so carry the handler-based payload first and do not read a failing script element as the value being escaped  *(htb-fullstackconf-blind-stored-xss-socketio-oracle)*
 - a dead callback host is indistinguishable from a broken payload, and this is the trap that cost the most here. The free ssh tunnel used carried traffic for roughly a minute after it was established and then silently stopped while the ssh process stayed alive and the public hostname merely timed out.  *(htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read)*
+- the bot runs on a fixed schedule; place the poisoned state first, then poll  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
+- the registration race alone is dead: if you pre-register the student but never swap the cookie, the bot authorizes as teacher and the flag is written to an unreadable teacher account  *(htb-ssos-oauth-registration-race-cookie-swap-json-csrf)*
+- ngrok's free tier is unusable as the listener here. Its browser interstitial fires on the bot's Chrome user agent, answers 200 with its own HTML, and the request never reaches your server; a curl test passes and hides the problem. Measured: same URL, curl reaches the listener, browser user agent doe  *(htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind)*
+- ngrok inserts an interstitial that headless bots cannot pass; a plain SSH reverse tunnel does not  *(htb-tornadoservice-bot-csrf-class-pollution)*
+- target=_blank carries implicit noopener, which puts the new window in a SEPARATE browsing-context group so window.open('',name) cannot resolve the name and silently returns a blank window; the symptom is indistinguishable from popup blocking -- use a NAMED target  *(pico-noted-internal-origin-named-window-noopener-inband-exfil)*
+- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- one silent run is not a negative on a bot-driven target: the first attempt with a payload that was later proven to work saw nothing for ninety seconds, and the difference was never explained, so re-run before discarding a payload  *(htb-fullstackconf-blind-stored-xss-socketio-oracle)*
 - fetch().then(...) in the payload produces no hit AND no error, because the bot's goto resolves on network idle and browser.close() tears the page down before the promise settles. That silence reads exactly like a payload that never ran. Use a synchronous XMLHttpRequest.  *(htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read)*
-- a failed angular expression is silent. Keep the expression string single-quoted with double quotes inside -- the one form proven to work here -- because a backslash-escaped variant parses as nothing and reports nothing. Avoid regexes in the expression too: braces inside {{ }} are an avoidable risk,   *(htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read)*
-- always include a catch that navigates with the error text. Without it every failure mode looks the same from outside.  *(htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read)*
+- the polyglot only works when the archive bytes are overlaid at the offset the scanner reads  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
 
-*28 more in the cards above; open the card before working its chain.*
+*37 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 37 of 49 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
 - overwriting server configuration or an imported module can permanently break the instance  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- the submission is an ordinary newsletter registration and each payload stores one row that a shared renderer will execute. Keep the payload to a harmless dialog, never a redirect, a request to an outside host, or anything that changes state, because other players' sessions are re  *(htb-fullstackconf-blind-stored-xss-socketio-oracle)*
 - Every attempt writes a row and launches a browser on the target: the submission endpoint calls the bot synchronously in its handler, so one submission is one Chrome launch. Keep the rate to a few per minute and the attempt count low. The app wipes its own table after each bot vis  *(htb-galactic-times-pug-unescaped-stored-xss-cdnjs-angular-csp-bypass-localhost-bot-read)*
-- overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
 
 ### Confirmed field notes
 
 - **2026-09-27 · The Galactic Times · confirmed** (`web-xss`) — **Confirming probe that worked** > submit, as the stored content, exactly: <meta http-equiv="refresh" content="0;url=http://<your collector>/marker"> Expected: a request for /marker arrives at your co
 - **2026-09-27 · Stylish · confirmed** (`web-xs-leaks`) — **Confirming probe that worked** > submit a stylesheet containing a single @font-face with an absolute URL on a host you control and font-family applied to body, then wait for the bot Expected: one re
 
-*6 cards, 40 traps, 2 confirmed notes.*
+*8 cards, 49 traps, 2 confirmed notes.*
 
 <!-- FORGED:END -->

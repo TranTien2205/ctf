@@ -69,7 +69,7 @@
     {
       "step": 3,
       "stage": "pivot",
-      "action": "point the same location at the unix socket: /assets/unix:/run/redis/redis.sock:%22<lua>%22%200%20<hex>  \u2014 nginx accepts unix:<path>:<uri>, percent-DECODES the uri, and passes the HTTP method through as the first inline token",
+      "action": "point the same location at the unix socket: /assets/unix:/run/redis/redis.sock:%22<lua>%22%200%20<hex>  — nginx accepts unix:<path>:<uri>, percent-DECODES the uri, and passes the HTTP method through as the first inline token",
       "why": "a header-based 302 redirect (as published) is unnecessary: percent-decoding supplies the literal spaces the Redis inline protocol needs, so no external server is required for the write"
     },
     {
@@ -123,5 +123,13 @@
     "getExportedMap()'s base64 read is a dead end: the result goes into a local variable and mail() is handed the undefined $this->body, so it exfiltrates nothing",
     "keep the map small and the handler coordinates off-canvas: imagecopymerge with a negative dst_x still clips and rewrites columns from dst_y down, which perturbs the palette"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.49,
+    "secondary": [
+      "web-deserialization"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

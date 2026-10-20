@@ -1,5 +1,6 @@
 ---
 name: osint-triage
+evidence_level: catalogue
 description: >
   OSINT router for CTF challenges whose answer lives in public sources: a photo
   to geolocate, a handle to pivot, a domain or certificate to trace, a document
@@ -10,6 +11,15 @@ environment: [ctf, lab]
 ---
 
 # OSINT — Router
+
+**Catalogue class.** The taxonomy classes that route here — `osint-media-metadata`, `osint-identity-pivot`, `osint-infra-records` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
 
 A CTF OSINT challenge gives you a small artifact and expects one specific fact.
 The work is: find the single most unique thing in the artifact, then follow it

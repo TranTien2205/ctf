@@ -40,6 +40,17 @@ def request(url, method="GET", headers=None, body=None, timeout=10,
         body = body.encode("utf-8", "surrogateescape")
     hdrs = {"User-Agent": UA}
     hdrs.update(headers or {})
+    # Headers http.client manages itself and will OVERRIDE on the wire, whatever
+    # urllib.request.Request reports back from header_items(). Measured on a live
+    # target: `Connection: X-Real-IP` bypassed an API token check -- curl and a
+    # raw socket both answered 200 {"trades":[]} where the plain request answered
+    # 401 -- and this layer answered 401 for the identical call, because
+    # http.client replaced the Connection header with its own. The request that
+    # went out was not the request asked for, so the 401 was a confident answer
+    # to a different question. Report it rather than hide it; tools/web/
+    # http_probe.py refuses to confirm on a probe whose headers were dropped.
+    _MANAGED = ("connection", "content-length", "transfer-encoding", "host")
+    dropped = sorted(k for k in (headers or {}) if k.lower() in _MANAGED)
     req = urllib.request.Request(url, data=body, headers=hdrs,
                                  method=method.upper())
     opener_args = {"context": _UNVERIFIED} if insecure and url.startswith("https") else {}
@@ -72,13 +83,17 @@ def request(url, method="GET", headers=None, body=None, timeout=10,
                 "body": raw.decode("utf-8", "replace"),
                 "body_bytes": raw,
                 "elapsed": round(time.monotonic() - started, 4),
+                # Non-empty means the response answers a DIFFERENT request than
+                # the one asked for. Never treat such a response as evidence.
+                "headers_not_sent": dropped,
             }
     except Exception as exc:                       # transport, DNS, TLS, timeout
         return {"ok": False, "url": url, "method": method.upper(),
                 "status": None, "headers": {}, "headers_all": [], "set_cookies": [],
                 "body": "", "body_bytes": b"",
                 "length": 0, "error": "%s: %s" % (type(exc).__name__, exc),
-                "elapsed": round(time.monotonic() - started, 4)}
+                "elapsed": round(time.monotonic() - started, 4),
+                "headers_not_sent": dropped}
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

@@ -10,7 +10,14 @@
     "solved_at": "2026-09-18",
     "assistance": "self-solved"
   },
-  "stack": ["flask", "python", "python2", "werkzeug", "pickle", "alpine"],
+  "stack": [
+    "flask",
+    "python",
+    "python2",
+    "werkzeug",
+    "pickle",
+    "alpine"
+  ],
   "preconditions": {
     "all_of": [
       "the client holds a cookie or parameter that decodes to a serialized object graph rather than to plain data",
@@ -84,5 +91,10 @@
     "the class named in the default cookie is usually decorative and carries no behaviour, so time spent reconstructing it is wasted; the value simply has to be replaced",
     "the deserialization happens before any route logic when it is wired into a pre-request handler, so every path on the site carries the primitive, not only the one that renders it"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-deserialization",
+    "confidence": 0.54,
+    "derived_by": "backfill_classification.py"
+  }
 }

@@ -1,5 +1,6 @@
 ---
 name: rev-triage
+evidence_level: catalogue
 description: >
   Reverse engineering router. Use when a binary, bytecode, managed assembly,
   packed sample or firmware image must be understood: identify, decompile, find
@@ -10,6 +11,15 @@ environment: [ctf, lab]
 ---
 
 # Reverse Engineering — Router
+
+**Catalogue class.** The taxonomy classes that route here — `rev-native-check`, `rev-managed-code`, `rev-bytecode-vm` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
 
 Goal: understand the logic well enough to produce the accepted input. Memory
 corruption is a different job — use `../pwn-binary-triage/`.

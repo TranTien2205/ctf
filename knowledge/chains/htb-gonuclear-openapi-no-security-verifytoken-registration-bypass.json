@@ -1,0 +1,121 @@
+{
+  "id": "htb-gonuclear-openapi-no-security-verifytoken-registration-bypass",
+  "source_note": "solved/gonuclear.md",
+  "challenge": {
+    "name": "GoNuclear Internal Vault",
+    "platform": "HTB",
+    "event": "HTB",
+    "category": "web",
+    "solved_at": "2026-10-06",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "nginx-1.22.1",
+    "fastapi",
+    "flask",
+    "python",
+    "openapi-3.1.0",
+    "oauth2-password-bearer"
+  ],
+  "preconditions": {
+    "all_of": [
+      "the app publishes its own API specification on a reachable path, typically /openapi.json or /api/openapi.json for FastAPI",
+      "at least one operation in that specification carries NO security key while others carry one",
+      "that unauthenticated operation returns a field whose value is a credential or a one-time token rather than a public attribute",
+      "a gate elsewhere in the app consumes that token: email verification, password reset, invite acceptance or MFA enrolment"
+    ],
+    "any_of": [
+      "login refuses with a state message such as Inactive user rather than a credential error, naming the gate",
+      "the front-end never calls the unauthenticated operation, so it appears nowhere in the bundle and only the specification lists it"
+    ]
+  },
+  "signals": [
+    "openapi.json",
+    "swagger.json",
+    "OAuth2PasswordBearer",
+    "openapi\": \"3.1.0",
+    "verifyToken",
+    "Inactive user",
+    "Could not validate credentials",
+    "email-verify",
+    "userDetails",
+    "UserDetailsResponse",
+    "Direct FastAPI URL",
+    "access_token",
+    "token_type\":\"bearer",
+    "is_verified"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "recon",
+      "action": "ask for the published specification before enumerating anything: GET /openapi.json, /api/openapi.json, /swagger.json, /v3/api-docs, /swagger/v1/swagger.json",
+      "why": "a published specification IS the attack surface, so finding one replaces enumeration entirely. The front-end is a worse source: the entry page here linked only one script, that script contained no fetch call at all, and the API client sat in a second script that only an inner page linked"
+    },
+    {
+      "step": 2,
+      "stage": "primitive",
+      "action": "read the security key of every operation, not the path list. Record which operations declare no security while their siblings do",
+      "why": "an operation with no security is reachable with no credentials. This is one field in a static document and it is the whole bug; extracting the path list and stopping is what turns a ninety-second solve into a forty-minute one"
+    },
+    {
+      "step": 3,
+      "stage": "primitive",
+      "action": "follow $ref into components.schemas and read the RESPONSE field names of that unauthenticated operation; look for token, verifyToken, secret, key, hash, otp, code or session",
+      "why": "an unauthenticated read is only interesting when what it returns is a credential. A name-shaped match is enough to decide whether to send the request"
+    },
+    {
+      "step": 4,
+      "stage": "bypass",
+      "action": "create your own account, call the unauthenticated operation with your own identifier, and read your own token out of the response",
+      "why": "using your own account keeps the probe read-only against other users and needs no guessed email. The token is the gate's own secret, so the gate is now open"
+    },
+    {
+      "step": 5,
+      "stage": "escalate",
+      "action": "spend the token on the operation that consumes it, then authenticate normally and read what the gate was protecting",
+      "why": "the state message on login names the gate before the bypass and stops naming it afterwards, which is the cheapest confirmation that the bypass is what changed"
+    },
+    {
+      "step": 6,
+      "stage": "falsify",
+      "action": "before reporting an ownership bug, check whether the protected objects are simply marked public. List them and read the owner and the public flag",
+      "why": "here every file was owner_id 1 with is_public true, so a verified account reads them all and there is no missing ownership check on the identifier. Reporting an IDOR that is not there is the trap this step exists to close"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "POST /api/userDetails with {\"email\":\"<an account you created>\"} and NO Authorization header",
+    "expected": "200 with a body containing a credential-shaped field for that account, for example \"verifyToken\":\"<uuid>\", proving the operation the specification declared without security really is unauthenticated and really returns a secret",
+    "falsifier": "401 or 403, or a 200 whose body carries only public attributes. Then the missing security key is a documentation artefact rather than a bug, and the specification's other unauthenticated operations are the remaining surface"
+  },
+  "blast_radius": "every step is read-only except the account you create yourself. Registration adds one row on a shared instance, which is what the app invites, and verifying that account touches only its own row. Do not call the unauthenticated operation with another player's or a seeded user's identifier and then spend their token: that consumes a one-time secret belonging to someone else and can lock a seeded account out of the intended path for every other player. Read your own and leave theirs alone.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "GET /api/files/5/download on the live instance returned 33 bytes, content-disposition: attachment; filename=\"flag.txt\", whose body was the flag string. Supporting observations from the same run: POST /api/userDetails with no Authorization header returned \"verifyToken\":\"03c8dfa6-97f2-4750-bc7e-68504f2d1fd3\"; POST /api/login before verification returned {\"detail\":\"Inactive user\"} and after verification returned an access_token; GET /api/openapi.json returned 200 with 8 paths of which only /userDetails, /login, /register and /email-verify lacked a security key."
+  },
+  "reuse_when": [
+    "a target serves its own API specification and at least one operation in it declares no security while siblings do",
+    "a response schema in that specification names a field that is a token rather than an attribute",
+    "an account state gate stands between registration and use, and login reports that state rather than a credential error",
+    "a FastAPI, Flask-RESTX, Spring or ASP.NET app is reachable in a configuration that still publishes its docs route"
+  ],
+  "known_traps": [
+    "the entry page is not the endpoint inventory. /static/script.js here held no fetch call whatsoever; the API client was in /static/api.js, linked only from an inner page, so recon that follows links from / alone cannot reach it",
+    "extracting the path list from the specification and stopping is the expensive mistake. The security key, and the response field names behind $ref, are where the bug is",
+    "do not report an ownership bug without checking the public flag. Every file here was owner_id 1 with is_public true, so a verified account legitimately read them all and no check on {file_id} was missing",
+    "login answering with a state message such as Inactive user rather than a credential error is the signal that names the gate; a credential error would mean the gate is elsewhere",
+    "piping curl with -w into the same file as the body makes the JSON unparseable with Extra data, which reads as a server error rather than a tooling mistake. Write the body with -o and the status with a separate -w",
+    "a ten-agent fan-out over this target spent 42 minutes and 1.1M tokens to arrive at the same specification one agent fetched in the first wave. A published specification means the surface is known, so it must END a sweep rather than begin one",
+    "an HTB instance expires. The first host answered 200 for roughly fifty minutes and then refused the connection outright, which looks exactly like a blocked probe until you test the port"
+  ],
+  "flag": null,
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-auth-session",
+    "secondary": [
+      "web-info-disclosure",
+      "web-idor"
+    ],
+    "confidence": 0.9
+  }
+}

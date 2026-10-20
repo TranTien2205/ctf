@@ -20,6 +20,7 @@ property the whole write gate rests on.
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -34,7 +35,14 @@ BUNDLE = os.path.join(FIX, "bundle")
 TL = os.path.join(FIX, "timeline")
 JOURNAL = os.path.join(TL, "journal_sample.jsonl")
 UNPLACEABLE = os.path.join(TL, "epoch_unplaceable.csv")
+LINUX = os.path.join(FIX, "linux")
+AUTHLOG = os.path.join(LINUX, "auth.log")
+WTMP = os.path.join(LINUX, "wtmp")
+WTMP_CUT = os.path.join(LINUX, "wtmp.truncated")
+CLOUDTRAIL = os.path.join(FIX, "cloudtrail")
+PCAP = os.path.join(FIX, "pcap", "triage_sample.pcap")
 CASES = []
+HAVE_TSHARK = shutil.which("tshark") is not None
 
 
 def run(tool, argv):
@@ -108,7 +116,8 @@ def main():
     args = ap.parse_args()
     v = args.verbose
 
-    missing = [p for p in (EVTX, DAMAGED, BUNDLE, TL, JOURNAL, UNPLACEABLE)
+    missing = [p for p in (EVTX, DAMAGED, BUNDLE, TL, JOURNAL, UNPLACEABLE,
+                           AUTHLOG, WTMP, WTMP_CUT, CLOUDTRAIL)
                if not os.path.exists(p)]
     if missing:
         fkit.jprint({"mode": "tools-forensics-selftest", "verdict": "FAIL",
@@ -291,6 +300,210 @@ def main():
                        % (o["merged"]["rows_total"], o["unparsed"]["total"],
                           [smp["time_value"] for smp in o["unparsed"]["samples"]])), v)
 
+    # ---- linux_auth ---------------------------------------------------------
+    # wtmp is the only Linux artifact here that carries a real UTC epoch, so the
+    # round trip through struct.unpack and time.gmtime is checked against values
+    # written by calendar.timegm rather than trusted.
+    case("linux-auth: wtmp unpacks 384-byte utmp records and dates them UTC",
+         "linux_auth.py", ["--wtmp", WTMP, "--challenge", "st", "--limit", "0"],
+         lambda o, c: (o["records_total"] == 4
+                       and o["sources"][0]["whole_records"] == 4
+                       and o["records"][0]["ut_type"] == "BOOT_TIME"
+                       and [r["time_utc"] for r in o["records"]
+                            if r["ut_type"] == "USER_PROCESS"]
+                       == ["2024-03-06 06:32:45", "2024-03-06 06:38:14"],
+                       "n=%s types=%s times=%s"
+                       % (o["records_total"], [r["ut_type"] for r in o["records"]],
+                          [r["time_utc"] for r in o["records"]])), v)
+
+    case("linux-auth: a truncated wtmp tail is COUNTED, not dropped",
+         "linux_auth.py", ["--wtmp", WTMP_CUT, "--challenge", "st"],
+         lambda o, c: (o["records_total"] == 3
+                       and any("trailing bytes" in p for p in o["problems"]),
+                       "n=%s problems=%s" % (o["records_total"], o["problems"])), v)
+
+    case("linux-auth: ranks the address whose failures were FOLLOWED by an "
+         "acceptance, not the loudest one",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--summary", "--challenge", "st"],
+         lambda o, c: (o["address_ranking"][0]["ip"] == "198.51.100.77"
+                       and o["address_ranking"][0]["succeeded_after_failures"] is True
+                       and o["address_ranking"][1]["succeeded_after_failures"] is False,
+                       "ranking=%s" % [(r["ip"], r["failed"], r["accepted"],
+                                        r["succeeded_after_failures"])
+                                       for r in o["address_ranking"]]), v)
+
+    # Three numbers in one log all read like a session id. A tool that collapses
+    # them answers the session-number question with a PID.
+    case("linux-auth: the logind session number, the sshd session id and the PID "
+         "stay apart",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--event", "logind-session",
+                           "--event", "sshd-session", "--challenge", "st",
+                           "--limit", "0"],
+         # a dict keyed by event would collapse the two logind sessions, so the
+         # whole ordered list is asserted: 37 for root, 41 for the added account,
+         # and the sshd `id 0` kept distinct from both and from the PID
+         lambda o, c: ([(r["event"], r.get("session"), r.get("id"), r.get("pid"))
+                        for r in o["records"]]
+                       == [("logind-session", "37", None, 1123),
+                           ("sshd-session", None, "0", 2455),
+                           ("logind-session", "41", None, 1123)],
+                       "records=%s" % [(r["event"], r.get("session"), r.get("id"),
+                                        r.get("pid")) for r in o["records"]]), v)
+
+    case("linux-auth: a timestamp answer is REFUSED when the log has no year",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--event", "accepted",
+                           "--user", "root", "--challenge", "st",
+                           "--answer", "time_parsed"],
+         lambda o, c: ("????" in o["answer"]["value"]
+                       and "no year" in o["answer"]["refused"]
+                       and "pre_flag" not in o,
+                       "answer=%s pre_flag=%s" % (o["answer"], "pre_flag" in o)), v)
+
+    case("linux-auth: --year makes that same timestamp answerable",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--year", "2024", "--event",
+                           "accepted", "--user", "root", "--challenge", "st",
+                           "--answer", "time_parsed"],
+         lambda o, c: (o["answer"]["value"] == "2024-03-06 06:32:44"
+                       and "refused" not in o["answer"] and "pre_flag" in o,
+                       "answer=%s" % o["answer"]), v)
+
+    case("linux-auth: the sudo command is returned verbatim",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--event", "sudo",
+                           "--challenge", "st", "--answer", "command"],
+         lambda o, c: (o["answer"]["value"].startswith("/usr/bin/curl ")
+                       and o["answer"]["value"] in o["records"][0]["raw"],
+                       "answer=%r" % o["answer"].get("value")), v)
+
+    # ---- cloudtrail_query ---------------------------------------------------
+    case("cloudtrail: walks a GZIPPED nested delivery and counts what it skipped",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--challenge", "st"],
+         lambda o, c: (o["files_considered"] == 2 and o["records_total"] == 5
+                       and o["files_skipped"] == 2
+                       and {s["why"] for s in o["skipped_examples"]}
+                       == {"extension is not JSON", "digest or hidden file"},
+                       "files=%s recs=%s skipped=%s"
+                       % (o["files_considered"], o["records_total"],
+                          [s["why"] for s in o["skipped_examples"]])), v)
+
+    case("cloudtrail: a call carrying errorCode is an ATTEMPT and cannot answer",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--event-name", "CreateUser",
+                                 "--challenge", "st", "--answer",
+                                 "requestParameters.userName"],
+         lambda o, c: ("AccessDenied" in o["answer"]["refused"]
+                       and "pre_flag" not in o,
+                       "answer=%s" % o["answer"]), v)
+
+    case("cloudtrail: --succeeded-only answers from the call that worked",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--event-name", "CreateUser",
+                                 "--succeeded-only", "--challenge", "st",
+                                 "--answer", "requestParameters.userName"],
+         lambda o, c: (o["answer"]["value"] == "svc-report"
+                       and "refused" not in o["answer"] and "pre_flag" in o
+                       and o["records"][0]["errorCode"] is None,
+                       "answer=%s" % o["answer"]), v)
+
+    case("cloudtrail: the assuming identity is surfaced, not only the session arn",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--event-name",
+                                 "AttachUserPolicy", "--challenge", "st"],
+         lambda o, c: (o["records"][0]["principal"]["sessionIssuer.arn"]
+                       == "arn:aws:iam::111122223333:role/deploy-role"
+                       and o["records"][0]["principal"]["arn"]
+                       != o["records"][0]["principal"]["sessionIssuer.arn"],
+                       "principal=%s" % o["records"][0]["principal"]), v)
+
+    case("cloudtrail: first_succeeded_non_read skips the denied call and the reads",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--summary",
+                                 "--challenge", "st"],
+         lambda o, c: (o["summary"]["first_succeeded_non_read"]["eventTime"]
+                       == "2026-09-27T10:12:30Z"
+                       and o["summary"]["first_succeeded_non_read"]["errorCode"] is None,
+                       "first=%s" % (o["summary"]["first_succeeded_non_read"] or {}
+                                     ).get("eventTime")), v)
+
+    # ---- pcap_triage --------------------------------------------------------
+    # tshark is present on this box today, but these cases must not FAIL on a
+    # machine where it is absent -- a missing parser is a fact about the box. The
+    # honest-degradation path is asserted either way, below.
+    if HAVE_TSHARK and os.path.exists(PCAP):
+        # The case that matters most here. tshark prints byte counts with
+        # thousands separators past 999, so a \d+ regex drops exactly the biggest
+        # conversation -- measured: the largest of three rows was the one that did
+        # not parse, and the output looked complete.
+        case("pcap: parses every conversation row INCLUDING the one whose byte "
+             "count has a thousands separator",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st"],
+             lambda o, c: (o["conversations_total"] == 3
+                           and o["conversation_rows_unparsed"] == 0
+                           and o["conversations"][0]["bytes_a_to_b"] == 5016,
+                           "total=%s unparsed=%s top_out=%s"
+                           % (o["conversations_total"], o["conversation_rows_unparsed"],
+                              o["conversations"][0]["bytes_a_to_b"])), v)
+
+        case("pcap: the two directions stay apart and a one-sided flow has no ratio",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st"],
+             lambda o, c: (o["conversations"][0]["bytes_b_to_a"] == 56
+                           and o["conversations"][0]["larger_direction"] == "a_to_b"
+                           and o["conversations"][0]["ratio_larger_to_smaller"] == 89.57
+                           and any(x["one_sided"] and x["ratio_larger_to_smaller"] is None
+                                   for x in o["conversations"]),
+                           "top=%s" % o["conversations"][0]), v)
+
+        # A near-constant interval must read as a low stdev over median. The
+        # fixture beacons every 30s with a 50ms jitter.
+        case("pcap: periodicity is reported as a variance, with the sample count",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st",
+                                "--beacon-peer", "203.0.113.9"],
+             lambda o, c: (o["beacon"]["samples"] == 6
+                           and abs(o["beacon"]["median_gap_seconds"] - 30.05) < 0.2
+                           and o["beacon"]["stdev_over_median"] < 0.01,
+                           "beacon=%s" % {k: o["beacon"].get(k) for k in
+                                          ("samples", "median_gap_seconds",
+                                           "stdev_seconds", "stdev_over_median")}), v)
+
+        # frame.time_utc is NOT a field in this tshark build: tshark exits 1 having
+        # printed nothing, which reads exactly like a capture with no DNS. The
+        # tool must therefore both use a valid field AND be able to report a
+        # rejected one rather than returning a silent empty.
+        case("pcap: a name IS recovered with the valid time field, and no field "
+             "query was rejected",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st", "--names"],
+             lambda o, c: (o["names"]["distinct_dns_names"] == ["files.example.net"]
+                           and o["names"]["field_errors"] == []
+                           and all(o["names"]["field_queries_ok"].values())
+                           and o["names"]["dns_queries"][0]["time_utc"]
+                           == "2026-09-21 14:16:50",
+                           "names=%s errors=%s utc=%s"
+                           % (o["names"]["distinct_dns_names"],
+                              o["names"]["field_errors"],
+                              o["names"]["dns_queries"][0].get("time_utc")
+                              if o["names"]["dns_queries"] else None)), v)
+
+        case("pcap: an invalid display filter is reported as a field error, not as "
+             "an empty capture",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st",
+                                "--display-filter", "no.such.field==1"],
+             lambda o, c: (o["display_filter"]["rows"] == 0
+                           and o["display_filter"]["parser_ok"] is False
+                           and bool(o["display_filter"]["field_error"]),
+                           "df=%s" % o["display_filter"]), v)
+
+        case("GATE: pcap refuses to confirm on a needle that matched nothing",
+             "pcap_triage.py", ["--input", PCAP, "--challenge", "st", "--contains",
+                                "no-such-string-anywhere", "--on-match", "confirms",
+                                "--on-miss", "confirms", "--evidence-kind", "impact"],
+             no_confirm, v)
+
+    # Always asserted, tshark or not: a capture that is not there cannot confirm.
+    case("GATE: pcap refuses to confirm when the capture is missing",
+         "pcap_triage.py", ["--input", os.path.join(FIX, "pcap", "no-such.pcap"),
+                            "--challenge", "st", "--on-match", "confirms",
+                            "--on-miss", "confirms", "--evidence-kind", "impact"],
+         lambda o, c: (o["verdict"] != "confirms"
+                       and "confirms" not in (o.get("post_probe_argv") or [])
+                       and o.get("parser_ok") is False and c == 0,
+                       "parser_ok=%s verdict=%s exit=%s"
+                       % (o.get("parser_ok"), o.get("verdict"), c)), v)
+
     # ---- the invariant the write gate rests on ------------------------------
     case("GATE: inventory refuses to confirm (it ran no parser)",
          "artifact_inventory.py",
@@ -314,6 +527,32 @@ def main():
                        and o.get("parser_ok") is False and c == 0,
                        "parser_ok=%s verdict=%s exit=%s"
                        % (o.get("parser_ok"), o.get("verdict"), c)), v)
+
+    case("GATE: linux_auth refuses to confirm when the filter matched nothing",
+         "linux_auth.py", ["--authlog", AUTHLOG, "--ip", "192.0.2.99",
+                           "--challenge", "st", "--on-match", "confirms",
+                           "--on-miss", "confirms", "--evidence-kind", "impact"],
+         no_confirm, v)
+
+    # A missing artifact is availability evidence, exactly as a timeout is. The
+    # tool must still exit 0 and still refuse: a parser that never ran cannot
+    # say anything about the host.
+    case("GATE: linux_auth refuses to confirm when no artifact parsed at all",
+         "linux_auth.py", ["--wtmp", os.path.join(LINUX, "no-such-wtmp"),
+                           "--challenge", "st", "--on-match", "confirms",
+                           "--on-miss", "confirms", "--evidence-kind", "impact"],
+         lambda o, c: (o["verdict"] != "confirms"
+                       and "confirms" not in (o.get("post_probe_argv") or [])
+                       and o.get("parser_ok") is False and c == 0,
+                       "parser_ok=%s verdict=%s exit=%s"
+                       % (o.get("parser_ok"), o.get("verdict"), c)), v)
+
+    case("GATE: cloudtrail refuses to confirm when the filter matched nothing",
+         "cloudtrail_query.py", ["--input", CLOUDTRAIL, "--event-name",
+                                 "NoSuchApiCall", "--challenge", "st",
+                                 "--on-match", "confirms", "--on-miss", "confirms",
+                                 "--evidence-kind", "impact"],
+         no_confirm, v)
 
     case("GATE: timeline refuses to confirm on a needle that matched nothing",
          "timeline_merge.py", tl_sources + ["--challenge", "st", "--contains",

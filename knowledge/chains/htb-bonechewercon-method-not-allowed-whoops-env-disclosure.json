@@ -84,5 +84,10 @@
     "the same parameter sent on the supported method is not reflected at all and the response is byte-for-byte identical to the plain page, so there is no injection surface to chase",
     "a plain fixed-length session id means a server-side session driver, so a leaked application key does not enable a session forge on this target"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-auth-session",
+    "confidence": 0.46,
+    "derived_by": "backfill_classification.py"
+  }
 }

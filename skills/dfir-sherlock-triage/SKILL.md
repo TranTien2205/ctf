@@ -29,10 +29,15 @@ An investigation bundle, not a puzzle. The artifacts are honest, the container i
 what it claims, and the answer is a fact about what happened - who authenticated,
 what ran, what persisted, what left. This file routes; it never answers.
 
-**Evidence level: catalogue.** Nothing in this tree has solved a Sherlock yet.
-`tools/chain_match.py` abstains on a DFIR observation across all existing cards.
-Everything here is standard published knowledge plus what was measured on this
-box. Do not present any of it as local experience.
+**Evidence level: catalogue, with one exception.** As of 2026-10-01 exactly one
+Sherlock has been solved here — Brutus, a Linux `auth.log` + `wtmp` pair — so
+`dfir-authentication-trace` is **verified** and holds one chain card, while the
+other six `dfir-*` classes are still **catalogue**. Read that narrowly: the solve
+covered the Linux authentication artifacts only. Nothing here has yet solved a
+Windows event log, a registry hive, a memory image, a capture or a cloud trail,
+and no EVTX or registry parser is even installed on this box. Everything outside
+that one card is standard published knowledge plus what was measured here — do not
+present it as local experience.
 
 ## Read this first
 

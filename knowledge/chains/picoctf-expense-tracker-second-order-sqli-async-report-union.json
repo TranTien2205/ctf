@@ -97,5 +97,10 @@
     "the chosen value is also used to build the artifact filename, so a payload containing a path separator breaks file creation instead of reaching the query",
     "omitting a required registration field returns a bare bad-request page with no field named, which reads like a broken request rather than a missing input"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-sqli",
+    "confidence": 0.71,
+    "derived_by": "backfill_classification.py"
+  }
 }

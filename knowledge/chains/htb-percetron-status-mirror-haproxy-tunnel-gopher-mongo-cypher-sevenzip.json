@@ -121,5 +121,10 @@
     "a certificate commonName is capped at 64 characters, which constrains the injected path and forces the block-comment form"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-parser-differential",
+    "confidence": 0.54,
+    "derived_by": "backfill_classification.py"
+  }
 }

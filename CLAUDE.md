@@ -32,8 +32,12 @@ see `CLAUDE_CODE.md`.
 | What a previous attempt already proved dead | `knowledge/attempts/` |
 | Closing several layers at once, safely | `tools/subagent_fanout.py` + `.claude/agents/` + `skills/parallel-layer-sweep/` |
 | **Running the fleet so an hour becomes fifteen minutes** | **`ORCHESTRATION.md`** |
+| **Many challenges, one clock: which to attack, in parallel, which to drop** | **`tools/contest/` + `tools/contest/RUNBOOK.md`** |
+| **Fanning out the fleet in one command instead of ten manual spawns** | **`.claude/workflows/web-sweep.js` and `solver-fleet.js`** |
+| A spent probe budget with strategies still untried | `tools/decide.py` answers `escalate`; spend the rung with `tools/state.py --strategy-used` |
 | Where a subagent may write, and where it may not | `/home/kali/ctf-work` (full rights) vs this repo (read-only) — `tools/workspace.py` |
 | Running a web challenge as ten measurements at once | `tools/subagent_fanout.py --web` + the ten `.claude/agents/ctf-web-*` + `skills/web-parallel-sweep/` |
+| Running a Sherlock as eight measurements at once | `tools/subagent_fanout.py --dfir` + the eight `.claude/agents/ctf-dfir-*` + `skills/dfir-parallel-sweep/` |
 | Turning a solve into a better skill | `LEARNING_LOOP.md` + `tools/classify_solve.py` |
 | Running an attack-defense contest | `tools/ad/RUNBOOK.md` + `tools/ad/tick.py` |
 | Accepting a change to this system | `test/run_all.sh` |
@@ -140,7 +144,7 @@ an evidence level, and it changes how much weight its skill's content deserves:
 
 ## Chains already verified here
 
-58 verified chains live in `knowledge/chains/`, derived from `solved/`. That is
+72 verified chains live in `knowledge/chains/`, derived from `solved/`. That is
 a large enough library that a new web challenge usually matches one: run the
 matcher before inventing a hypothesis, and pass `--record <challenge>` so
 `tools/decide.py` returns the card's own probe first. Do not
@@ -158,7 +162,7 @@ emits the shape `tools/hooks.py` wants — check with `python3 tools/web/selftes
 
 | Instead of hand-rolling | Run |
 |---|---|
-| a probe plus a hand-copied excerpt | `tools/web/http_probe.py` — holds request and response together for `post-probe` |
+| a probe plus a hand-copied excerpt | `tools/web/http_probe.py` — holds request and response together and emits the whole `post-probe` command with `--response` filled in. `post-probe` now REQUIRES that on a `confirms` verdict and checks the evidence is a substring of it, so a hand-assembled command means pasting the response yourself |
 | 40 encodings of a blocked byte, by hand | `tools/web/sanitizer_fuzz.py` — differential sweep; records how many cases proved a negative |
 | a loop over a proven file-read | `tools/web/read_loop.py` — wordlist walk, baseline-classified |
 | an id-enumeration loop | `tools/web/id_sweep.py` — existence oracle |
@@ -205,9 +209,17 @@ output from a tool that was not run.
    or field is the most common cause.
 2. Change mechanism layer, not payload variant.
 3. `tools/chain_match.py`, then `tools/writeup_search.py`.
-4. Park the challenge and return later. `tools/decide.py` now enforces this
+4. Do not park it yet — **escalate**. `tools/decide.py` enforces the budget
    rather than stating it: five probes or fifteen active minutes per mechanism
    class, and twenty-five probes or forty-five active minutes for the whole
    challenge. Relabelling the class does not reset the challenge ceiling, and
    time spent parked is not charged — a revived challenge resumes with its
    budget intact.
+
+   But a spent budget is no longer the end of the challenge. The controller
+   answers `escalate` and names the cheapest untried strategy, in this order:
+   `chain_match`, `reclassify`, `writeup_search`, `novel_plan`, `fanout_sweep`,
+   `solver_handoff`. Spend one, record it with
+   `tools/state.py <challenge> --strategy-used <rung>`, and go again.
+   `stop_report` fires only once every rung is spent, and then the kill map
+   belongs in `knowledge/attempts/<challenge>.json`.

@@ -358,40 +358,40 @@ presenting its technique as local experience.
 
 - **htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce** — `send two interleaved profile updates and observe which address receives which token`
   expected: a token belonging to one address arrives at the other
+- **htb-nextpath-duplicate-param-array-file-read** — `GET /api/team?id=1 then GET /api/team?id=99999 and read the error`
+  expected: a valid id returns image/png; a missing id returns an ENOENT error naming the constructed path
 - **htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli** — `request the static prefix with a single trailing dot-dot segment and compare the response with the normal static path`
   expected: a file outside the static root is returned
 - **htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce** — `Send the same token-gated API request twice, once plain and once with the proxy-added header listed in the Connection header. Pick the endpoint out of the source first: a 404 on both arms means the pa`
   expected: The plain request is rejected (401) and the hop-by-hop one is accepted (200).
-- **htb-red-island-ssrf-gopher-redis-lua-rce** — `submit a loopback URL in the fetch field and read the full response body, including error text`
-  expected: content or an error that proves the server performed the fetch
 
 ### Traps this tree has already paid for
 
 - A partial configuration overwrite loses the socket and bricks the instance permanently — and the re-solve proved this step is not needed at all.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The HTML sanitiser escapes ampersands in stored text, so query strings must be built at runtime.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- base64url decoding in the browser fails without manual padding.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The bot re-logs in per visit, so stolen cookies expire quickly; verify with an authenticated page immediately.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- Restoring the overwritten template does not un-cache it: workers that already cached the malicious version keep serving it until the instance restarts. Say so rather than assuming the write was undone.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The input sanitiser may cover request.args and request.form but not request.files, so an uploaded filename reaches os.path.join unfiltered.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
-- The handed-over host:port may speak TLS; a plain http request answering '400 The plain HTTP request was sent to HTTPS port' is the tell.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- a direct traversal string is rejected; the duplicate-parameter array form is required  *(htb-nextpath-duplicate-param-array-file-read)*
 - MySQL case-insensitive collations make 't' equal 'T'; case-exact extraction needs a binary comparison  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
-- a linear charset scan is far too slow; binary search costs about seven probes per character  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
-- a string replace applied after formatting cannot match the placeholder it was meant to replace  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
 - the bot runs on a fixed schedule; place the poisoned state first, then poll  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
+- the gopher payload length prefix must equal the exact byte length of the Lua string  *(htb-red-island-ssrf-gopher-redis-lua-rce)*
+- the challenge theme named a filter and made a WAF-bypass chain the top local match, but there was no filter at all and the plainest payload worked; probe the plain payload before the encoded one  *(htb-xxe-content-type-branch-simplexml-noent-file-read)*
+- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- path.join prefixes the base directory, so the traversal must climb out of it  *(htb-nextpath-duplicate-param-array-file-read)*
+- a linear charset scan is far too slow; binary search costs about seven probes per character  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
+- the polyglot only works when the archive bytes are overlaid at the offset the scanner reads  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
+- always read error bodies: this app leaked the fetched file inside a non-200 message  *(htb-red-island-ssrf-gopher-redis-lua-rce)*
+- reading PHP source with the plain file scheme breaks the XML parse because the source contains angle brackets, so a base64 stream filter is required and its absence looks like an unreadable file  *(htb-xxe-content-type-branch-simplexml-noent-file-read)*
 
-*10 more in the cards above; open the card before working its chain.*
+*16 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 16 of 28 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
 - overwriting server configuration or an imported module can permanently break the instance  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- read-only file disclosure; no writes and no shared state is modified, so the chain is safe to run once per target  *(htb-nextpath-duplicate-param-array-file-read)*
 - read-only extraction; the forged session affects only the attacker's own requests  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
-- overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance  *(htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce)*
 
 ### Confirmed field notes
 
 - **2026-09-21 · NextPath · confirmed** (`file-read-primitives`) — **Confirming probe that worked** > GET /api/team?id=1 then GET /api/team?id=99999 and read the error Expected: a valid id returns image/png; a missing id returns an ENOENT error naming the constructed
 
-*5 cards, 22 traps, 1 confirmed note.*
+*6 cards, 28 traps, 1 confirmed note.*
 
 <!-- FORGED:END -->

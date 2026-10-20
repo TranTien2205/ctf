@@ -70,6 +70,62 @@ def _rank_text(text, classes):
     return classifier.rank(hits, classes, classifier.load_signal_stats())
 
 
+def reviewed_primary(card, classes):
+    """The card's own reviewed class, shaped like a _rank_text result.
+
+    Only a label with NO `derived_by` marker counts. One written by
+    tools/backfill_classification.py was proposed at a measured 91% precision,
+    which is good enough to scope retrieval and not good enough to decide where
+    a solve is filed -- so a derived label falls through to the signal ranking
+    below and the two can disagree in the open.
+
+    A reviewed label naming a class the taxonomy no longer has is ignored rather
+    than trusted, because filing into a class that does not exist fails later
+    and more confusingly than ranking afresh here.
+    """
+    block = card.get("classification") or {}
+    primary = block.get("primary")
+    if not primary or block.get("derived_by"):
+        return None
+    index = {entry["id"]: entry for entry in classes}
+    entry = index.get(primary)
+    if not entry:
+        return None
+    secondary = [c for c in (block.get("secondary") or []) if c in index]
+    # ONE entry, not the primary plus its secondaries. The first version
+    # returned all of them with score None, and cmd_record's tie detector
+    # compares score and coverage -- so every None read as equal, the reviewed
+    # primary looked tied with its own secondaries, and filing the first real
+    # solve after the change was refused with "the evidence does not decide
+    # between these classes". A reviewed label is by definition not ambiguous:
+    # a human already decided. The secondaries stay on the card and are carried
+    # here as metadata, which is where "also considered" belongs.
+    # Carry the class's real taxonomy fields, the same ones rank() provides, so
+    # downstream code that reads evidence_level or verified_by does not have to
+    # know where the decision came from.
+    return [{
+        "class": primary,
+        "name": entry["name"],
+        "evidence_level": entry["evidence_level"],
+        "verified_by": entry.get("verified_by", []),
+        "skill": entry.get("skill"),
+        "first_probe": entry.get("first_probe"),
+        "falsifier": entry.get("falsifier"),
+        "blast_radius": entry.get("blast_radius"),
+        "score": None,
+        "coverage": None,
+        "signals_matched": 0,
+        "signals_defined": (len(entry.get("observation_signals", []))
+                            + len(entry.get("source_signals", []))),
+        "evidence": [{"signal": "classification.primary",
+                      "matched": "reviewed on the chain card"}],
+        "decided_by": "the card's reviewed classification, not a signal vote",
+        "confidence_on_card": block.get("confidence"),
+        "secondary_on_card": secondary,
+        "status": "candidate",
+    }]
+
+
 def classify_card(card, taxonomy):
     """Classify from the card's own signals and its solved note, nothing else.
 
@@ -83,8 +139,21 @@ def classify_card(card, taxonomy):
 
     The full text is still ranked, and is used when the opening stages name no
     class at all, so a card whose opener is written vaguely still gets filed.
+
+    BEFORE ANY OF THAT, the card's own reviewed label wins. `classification`
+    with no `derived_by` marker was written by a reviewer and the card schema
+    calls it authoritative and the only place a secondary class is recorded.
+    This function used to never reference it: measured, 23 of 72 cards carried
+    one and every single filing recomputed a weaker answer over the top of it
+    from one opening sentence. A label a human checked against the evidence is
+    better than a regex vote, and discarding it was the bug.
     """
     classes = taxonomy["classes"]
+
+    reviewed = reviewed_primary(card, classes)
+    if reviewed:
+        return reviewed
+
     opening = _rank_text(opening_text(card), classes)
     if opening:
         return opening
@@ -109,8 +178,14 @@ def render_entry(card, primary, others):
         "- source note: `%s`" % card["source_note"],
         "- chain card: `%s`" % card["_path"],
         "- verification: %s — %s" % (card["verification"]["status"], card["verification"]["evidence"]),
-        "- classified as: `%s` (score %s, %d signals matched)" % (
-            primary["class"], primary["score"], primary["signals_matched"]),
+        # A reviewed label has no score and no matched-signal count, because no
+        # signal vote decided it. Printing "score None, 0 signals matched" would
+        # read as a weak match when it is the strongest provenance available.
+        ("- classified as: `%s` — %s" % (primary["class"], primary["decided_by"]))
+        if primary.get("decided_by") else
+        ("- classified as: `%s` (score %s, %d signals matched)" % (
+            primary["class"], primary["score"],
+            primary.get("signals_matched") or 0)),
     ]
     if others:
         lines.append("- also matched: " + ", ".join(

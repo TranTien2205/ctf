@@ -11,8 +11,9 @@ The file for three question shapes the other depth files do not own:
 
 Evidence level: catalogue for the rule and query languages - they are published
 specifications. Everything marked **measured** below was run on this box on
-2026-09-28 and the number is what came back. Nothing in this tree has solved a
-Sherlock, so no part of this is local experience.
+2026-09-28 and the number is what came back. The one Sherlock solved here (Brutus,
+2026-10-01) was answered from Linux `auth.log` and `wtmp` with no rule engine and
+no SIEM involved, so no part of THIS file is local experience.
 
 ## 1. Writing a Sigma rule
 

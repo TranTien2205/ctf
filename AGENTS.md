@@ -17,9 +17,9 @@ belongs to the other toolkit and is out of scope here.
 ```
 ~/ctf-v2/
   tools/           classify · chain_match · decide · hooks · state · skill_audit …
-  skills/          66 skills: 11 routers + 32 bug classes + method/reference  ← pull one
-  knowledge/       bug-classes.json (32 classes) · chains/ (69 verified cards)
-  solved/          56 solved challenges, with evidence ancestry
+  skills/          68 skills: 11 routers + 32 bug classes + method/reference  ← pull one
+  knowledge/       bug-classes.json (32 classes) · chains/ (72 verified cards)
+  solved/          59 solved challenges, with evidence ancestry
   challenges/      handout source and per-challenge state.json
 ```
 
@@ -54,7 +54,7 @@ Then pick exactly one branch:
 | Tool | Use it when |
 |---|---|
 | `classify.py` | name the bug class from the signals; white-box output carries `file:line`. Signals are weighted by how rare they are across the handouts on disk, so a pattern matching most challenges cannot outvote a precise one; re-run `--rebuild-stats` after editing the taxonomy |
-| `chain_match.py` | has this shape been solved here before; the card carries the probe and the traps. `--record <challenge>` writes the candidates into the ledger so `decide.py` returns the card's probe before any invented one |
+| `chain_match.py` | has this shape been solved here before; the card carries the probe and the traps. `--record <challenge>` writes the candidates into the ledger so `decide.py` returns the card's probe before any invented one. **Two routes, and they mean different things.** A literal match on the card's own `signals` can be graded `candidate` and recorded. A `family_leads` entry was reached by matching the card's `chain[]` prose -- the mechanism vocabulary -- against the target, is always graded `weak`, is never recordable, and is a card to READ rather than a probe to run. It exists because card-level transfer to an unseen challenge measures 0.0: a card's signals are literals from its own handout, which a new challenge sharing the mechanism does not share. Measured top-3 accuracy of the stage route: 25%, against a 12.5% ceiling for class agreement alone |
 | `plan.py` | nothing yet, and you need the first three hypotheses |
 | **`decide.py`** | **what the next step is** — the controller, see section 3 |
 | **`hooks.py`** | **verify each step** — the only write gate for a verdict or a flag |
@@ -68,7 +68,7 @@ Then pick exactly one branch:
 | `system_eval.py` | offline actionability tests for classification, dispatch, skills and decisions |
 | `observation_eval.py` | black-box recall of classify.py against observations a solver would actually type. system_eval's classification cases are written in the taxonomy's own vocabulary, so they pass whatever the signals look like; this one is phrased the way a challenge looks before source, and five verified chains supply its labels |
 | `chain_match_eval.py` | retrieval quality of chain_match: top-1, MRR and how many wrong cards outrank the right one |
-| `holdout_eval.py` | the question chain_match_eval cannot ask: hold each card out of the index, query with its own handout, and see whether the library abstains or invents. It measured 0 abstentions and a median 0.65 confidence on a card that was not the answer; that is what the strong/weak grade in chain_match now fixes |
+| `holdout_eval.py` | the question chain_match_eval cannot ask: hold each card out of the index, query with its own handout, and see whether the library abstains or invents. It measured 0 abstentions and a median 0.65 confidence on a card that was not the answer; that is what the strong/weak grade in chain_match now fixes. It reports the two retrieval routes separately and on purpose: `transfer_rate` is strong-only and still **0.0**, while `correct_peer_named_rate` counts every case where a correct peer was named by either route and is **0.188**, up from 0. `silent_rate` fell from 0.688 to 0.562. A lead is not a transfer, so the first number is never allowed to absorb the second |
 | `learning_report.py` | show proposed versus confirmed local knowledge and the miss backlog |
 | `web_probe.py` / `web_enum.py` | basic web probing and enumeration |
 | `tools/web/` | speed primitives that emit the shape `hooks.py` wants: `http_probe` (probe + verbatim excerpt), `sanitizer_fuzz` (differential encoding sweep, records negatives), `read_loop` (proven file-read walk), `id_sweep`, `pdf_text`. `python3 tools/web/selftest.py` proves them offline |
@@ -82,6 +82,8 @@ Then pick exactly one branch:
 | `tools/subagent_fanout.py --web` | a WEB target, split by bug-class family instead of by generic layer: one brief per `ctf-web-*` subagent, built from the taxonomy's own fields, ordered read-only first and write-shaped last, and short-circuited when a chain card is a strong match |
 | `tools/subagent_fanout.py` | a layered white-box handout, to be closed in parallel rather than one layer at a time. `--brief <handout>` turns `novel_plan.py` layers into one brief per subagent, each with its own falsifier and the layers a kill map already closed; `--contract` is the single source of truth for what a subagent returns; `--validate` refuses a report whose evidence is not a verbatim response excerpt; `--merge` prints the `hooks.py` commands for the MAIN thread. It never writes state.json |
 | `knowledge/attempts/` | the kill map of a challenge worked but NOT solved: every layer measured dead, with the measurement and the precondition that would reopen it. `knowledge/chains/` only accepts a solve, so without this the next attempt re-walks the same dead layers |
+| `tools/contest/` | **a whole contest, not one challenge** — the plane that answers "twenty challenges, eight hours, which first". `board.py` holds `contests/<event>/board.json` and merges a re-ingested scoreboard without wiping a solve; `triage.py` ranks by points per expected minute, where the estimate is built from `ORCHESTRATION.md`'s measured 7-10 minute agent round-trip, the solve count when the platform publishes one, a strong chain-card match, and category strength **read off disk at runtime** (web carries 20 verified classes and 34 cards, DFIR carries one, crypto/pwn/rev carry none); `dispatch.py` says how many challenges to start and how wide each, bounded by the harness cap of `min(16, cpus-2)` and by the rule that the main thread must drive a spine rather than wait. `RUNBOOK.md` is the first thirty minutes. `python3 tools/contest/selftest.py` proves it offline, including that every agent the dispatch plan names exists on disk. It never writes `challenges/<name>/state.json` and never runs the flag gate |
+| `.claude/workflows/` | **the fan-out, automated**. `subagent_fanout.py` only PRINTS briefs — measured, the path from challenge to flag was 13 steps of which 3 were automatic, and every launch, report hand-off and ledger write was manual. `web-sweep.js` runs the fan-out, short-circuits on a strong chain card, runs recon alone first, sweeps only the families whose source signals actually fired, and returns `commands_for_the_main_thread`. `solver-fleet.js` runs a crypto/pwn/rev/osint/misc fleet whose agents may chain to a flag themselves, then **checks in plain JavaScript that the claimed flag really appears inside the claimed bytes** and downgrades it if not. Neither writes state; two regression tests prove they name only agents that exist and never delegate the gate |
 | `tools/ad/` | **attack-defense only**, and deliberately a sibling plane: it does not write `challenges/<name>/state.json` and does not go through `tools/hooks.py`. `sla_check` runs the service's own health checks and `--compare` refuses a patch that broke something which previously passed -- including a check that was deleted or renamed; `flag_farm` runs one exploit against every listed team each tick, holds a flag as *pending* until the scoreboard really accepts it, and prints `immune`, the teams that have already patched; `traffic_mine` ranks your own capture against the checker's baseline and hands back a replay command; `cap_split` turns a capture into the raw requests `traffic_mine` wants, which a `tshark follow` dump cannot do without carrying the victim's response into the replay. `tick` reads one service's ledger and answers which ONE of the runbook's three steady-state questions is unanswered, availability first -- a red or unmeasured service outranks every attack action, and a structural guard makes reordering the rules unable to switch that off. `tools/ad/RUNBOOK.md` is the first thirty minutes, `tools/ad/PREFLIGHT.md` is what to install tonight and what degrades without it, and `agent/ad-roles.md` indexes the five read-only subagents in `.claude/agents/ad-*.md`. `host_snapshot.sh` plus `host_diff.py` replace the absent `debsums` and `aide`: a change on EVERY host is the image, a change on ONE host of eight is a person, and every collector is wrapped in `timeout` because the first design was measured unrunnable. `secret_inventory.py` groups credentials by value fingerprint so the widely-shared one is rotated while there is still time to fix what it breaks, and it never prints more than four characters of a value. `sh lab/ad-range/dryrun.sh` rehearses all of it offline in one command. `python3 tools/ad/selftest.py` proves the decision logic offline and `python3 tools/ad/agent_lint.py` proves the subagents still carry their prohibitions |
 
 ---
@@ -105,7 +107,9 @@ deterministic tools:
    next step)          quote a proving excerpt;
         │              a timeout is never a confirm)
         ▼
-  run_probe / novel_plan / switch_class / verify_flag / record_solve / stop_report
+  run_probe / novel_plan / switch_class / verify_flag / record_solve
+  escalate   <-- a spent budget changes STRATEGY instead of ending the challenge
+  stop_report <-- only once every escalation rung has been spent
 
 When source is recorded and no solved chain matches, the controller answers
 `novel_plan` before any single-class probe: it reads the source, names the
@@ -118,10 +122,20 @@ boundary in front of it. Record the handout with
 Hard rules — breaking one breaks the control loop:
 
 - **Every verdict goes through `tools/hooks.py post-probe`.** `--verdict confirms`
-  requires `--evidence` to be a verbatim excerpt of the response,
-  `--hypothesis-id`, `--class`, and `--evidence-kind class|impact`. A login
-  redirect, registration success, or form render is surface evidence and cannot
-  confirm a bug class. A timeout or a connection reset is never a confirm.
+  requires `--hypothesis-id`, `--class`, `--evidence-kind class|impact`,
+  `--evidence`, and **`--response`: the bytes the evidence was read from.** The
+  gate asserts the evidence is a substring of that response, so the quote is
+  **checked rather than trusted**. Until this existed, post-probe had no
+  response input at all and any plausible sentence passed the "verbatim
+  excerpt" rule — the machine validated the SHAPE of a claim and never its
+  truth. A login redirect, registration success, or form render is surface
+  evidence and cannot confirm a bug class. A timeout or a connection reset is
+  never a confirm.
+
+  `tools/web/http_probe.py` is the sanctioned path because it is the one
+  component that holds the request and the response together: it emits the whole
+  `post-probe` command with `--response` already filled in, so nothing is
+  retyped. Hand-assembling the command means pasting the response yourself.
 - **A flag enters state only through `tools/hooks.py pre-flag`**, with
   `--source live-response|artifact`.
 - **A class becomes `confirmed` only after `tools/hooks.py pre-confirm` passes**
@@ -141,6 +155,35 @@ Hard rules — breaking one breaks the control loop:
 
 One question per iteration: *does this probe produce a distinguishing signal?*
 If not, verdict `inconclusive` and change the mechanism — not the syntax.
+
+### The escalation ladder — a spent budget is not a finished challenge
+
+The budgets above still hold and `tools/hooks.py` still refuses a probe past
+them. That brake is what stops an afternoon of payload variants, and it is not
+what made this system slow.
+
+What *was* wrong is that a spent budget returned `stop_report` and the challenge
+ended while obvious strategies remained untried: a chain card never matched, a
+writeup never searched, a specialised fleet never swept, a solver never handed
+the kill map. So `tools/decide.py` now answers **`escalate`** and names the
+cheapest untried rung:
+
+```text
+chain_match → reclassify → writeup_search → novel_plan → fanout_sweep → solver_handoff
+```
+
+A rung is offered only when its precondition holds, so it never suggests
+searching for a writeup of a challenge whose name is unknown. Spend one and
+record it, or the controller will keep offering it:
+
+```bash
+python3 tools/decide.py <challenge>                      # names the rung
+python3 tools/state.py <challenge> --strategy-used <rung>
+```
+
+`stop_report` fires only once every rung is spent. At that point write the kill
+map to `knowledge/attempts/<challenge>.json` so the next attempt does not
+re-walk dead layers.
 
 ### Low-reliability agent protocol
 
@@ -183,7 +226,7 @@ calls rule out nothing or if a value would have to be guessed.
 
 ---
 
-## 3b. Subagents — sixteen of them, all read-only on this tree
+## 3b. Subagents — the fleet, and what each is allowed to touch
 
 **How to actually use them is `ORCHESTRATION.md`** — the wave structure, what never
 to delegate, and the measured cost of one agent (7-10 minutes) that every other
@@ -200,13 +243,44 @@ off-limits because `tools/decide.py` enforces five probes per class and
 twenty-five per challenge, which parallel writers would spend in one round.
 Agents measure; the main thread records.
 
-`.claude/agents/` holds sixteen bounded subagents: six general, and ten
-web-specialised. Each is a `reader` and a `writer`; none is the machine that
-verifies. **None has a Write or Edit tool**, so no subagent can change this
-repository, and every one is told not to run `tools/hooks.py` or
-`tools/state.py` — ten probers writing one `state.json` in parallel would spend
-the per-class probe budget that `tools/decide.py` exists to protect. A regression
-test enforces all three properties on every file in that directory.
+`.claude/agents/` holds the fleet, grouped by what one probe distinguishes:
+
+| Group | Count | Shape |
+|---|---|---|
+| general scouts | 4 | `ctf-recon`, `ctf-killmap-scout`, `ctf-layer-prober`, `ctf-writeup-scout` |
+| web families | 10 | `ctf-web-*`, split by bug class, **measure-only** |
+| DFIR families | 8 | `ctf-dfir-*`, split by artifact family, **measure-only** |
+| crypto | 6 | `ctf-crypto-*`, split by the real attack families in `crypto_attack.py` |
+| pwn | 5 | `ctf-pwn-*`, split by corruption primitive |
+| rev | 4 | `ctf-rev-*`, split by runtime |
+| osint, misc | 5 | `ctf-osint-*`, `ctf-misc-*` |
+| attack-defense | 5 | `ad-*`, the only **tool-level** read-only group |
+
+**Be precise about what is actually enforced, because the earlier wording here
+was wrong.** It claimed none of them has a `Write` tool. Measured: every
+`ctf-*` agent carries `Bash, Write, Read, Grep, Glob` — it has to, because its
+workspace in `/home/kali/ctf-work` is where it writes exploits and saves
+responses. Only the five `ad-*` agents are restricted at the tool level, to
+`Read, Grep, Glob`.
+
+What IS true and enforced:
+
+- **No agent has an `Edit` tool.** That part of the old claim held.
+- A write into `tools/`, `skills/`, `knowledge/` or `test/` trips the
+  `PostToolUse` gate hook in `.claude/settings.json`, which runs the suite and
+  reports the failure against the offending file.
+- Every agent prompt forbids `tools/hooks.py` and `tools/state.py`. That one is
+  **prose, not a tool restriction**, so treat it as a convention the fleet
+  keeps rather than a wall. `tools/ad/agent_lint.py` proves the `ad-*` tool
+  lists mechanically; nothing lints the `ctf-*` tool lists, which is the
+  honest gap.
+
+**Measure-only versus solver.** The `ctf-web-*` and `ctf-dfir-*` families hand
+back a measurement and the main thread chains it, because a web chain usually
+crosses several classes. The crypto, pwn, rev, osint and misc fleets are
+**solvers**: the chain normally lives inside one family, so they may carry their
+own findings to a flag and return it. Either way the flag comes back as a
+*candidate* with its verbatim bytes, and only the main thread runs `pre-flag`.
 
 | Agent | Use it for |
 |---|---|
@@ -240,6 +314,11 @@ a known answer beats ten parallel guesses. The method is
 | `ctf-web-parser` | parser-differential · cache-poisoning | the same bytes down two paths; never poisons a key another player will request |
 | `ctf-web-client` | xss · csrf · cors · xs-leaks | asks WHO renders the payload first, and stops if the answer is nobody |
 | `ctf-web-race` | race-condition · logic-flaw (TOCTOU) | the one write-shaped family: it proposes, the main thread executes with `--write-ack` |
+
+`tools/subagent_fanout.py --dfir` splits an artifact BUNDLE by artifact family
+instead of bug class: eight briefs, one per `ctf-dfir-*` agent, built from the
+taxonomy and the artifact inventory. No family is write-shaped. Method:
+`skills/dfir-parallel-sweep/SKILL.md`.
 
 The sweep itself is `skills/parallel-layer-sweep/SKILL.md`, and the contract every
 report must satisfy is `python3 tools/subagent_fanout.py --contract`.

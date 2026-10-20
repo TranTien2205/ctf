@@ -44,3 +44,70 @@ CONSTRUCTED and NOT verifiable on this box:
   $J, $LogFile, $I..., wtmp, *.raw, auth.log
             name-classified only. These formats have no signature at
             offset 0 that this tool claims to know.
+
+--------------------------------------------------------------------------------
+linux/ and cloudtrail/ -- added 2026-09-30 with tools/forensics/linux_auth.py and
+tools/forensics/cloudtrail_query.py.
+
+ALL OF IT IS SYNTHETIC AND WAS AUTHORED HERE. None of it is copied from an HTB
+Sherlock: a real bundle's lines carry the graded answers, and committing those
+would put a graded secret in this repository. Every address is from a reserved
+documentation range (RFC 5737: 198.51.100.0/24, 203.0.113.0/24) and every account
+name is invented.
+
+linux/auth.log
+    Hand-written syslog lines covering the shapes linux_auth.py claims to parse:
+    a failed-password run from one address, a pam_unix authentication failure, an
+    Invalid user line, an Accepted password, the THREE different session-like
+    numbers (sshd PID in brackets, `Starting session: ... id 0`, and
+    systemd-logind `New session 37`), useradd/groupadd/usermod, a sudo COMMAND
+    line, and a Disconnected line. There is deliberately a second source address
+    with ONE failure and no acceptance, so the address ranking has a loser to
+    rank below the winner.
+    It has no year and no timezone offset, because the real format has neither.
+
+linux/wtmp
+    Four 384-byte struct utmp records packed on this box with
+    struct.Struct("<h2xi32s4s32s256shhiii4i20s"), whose calcsize was asserted to
+    be 384 before the file was written: BOOT_TIME, a USER_PROCESS for root from
+    198.51.100.77, its DEAD_PROCESS, and a second USER_PROCESS. The tv_sec values
+    were produced with calendar.timegm, so they are real UTC epochs and the
+    round-trip through time.gmtime is checked by the selftest rather than assumed.
+    The struct layout is the Linux/x86_64 ABI from utmp.h; the 2 bytes of padding
+    after ut_type are encoded explicitly because "<" disables struct alignment.
+
+linux/wtmp.truncated
+    The same file cut to 3 whole records plus a 97-byte tail. It exists so the
+    "a trailing partial record is COUNTED, not dropped" property has a test: a
+    truncated wtmp is itself a finding, and a parser that silently discards the
+    tail hides it.
+
+cloudtrail/
+    A delivery tree in the real shape --
+    AWSLogs/<acct>/CloudTrail/<region>/<y>/<m>/<d>/*.json.gz -- holding five
+    records across two GZIPPED files, plus two files that must be SKIPPED and
+    counted: a CloudTrail-Digest/.../digest.json (a digest is not an event) and a
+    README.txt (not JSON). The records include an AccessDenied CreateUser
+    immediately followed by a successful one, so "a failed call is not an action"
+    is testable, and three records made by an AssumedRole session whose
+    sessionContext.sessionIssuer.arn is the identity that actually matters.
+
+pcap/triage_sample.pcap -- added 2026-10-01 with tools/forensics/pcap_triage.py.
+    SYNTHETIC, written here with scapy.wrpcap; no real traffic. 12 packets, all
+    addresses from reserved documentation ranges (192.0.2.0/24, 198.51.100.0/24,
+    203.0.113.0/24):
+      - 6 packets to 203.0.113.9 at a 30-second interval with a 50 ms jitter, so
+        periodicity is measurable as a LOW stdev over median (0.0016 here) rather
+        than asserted;
+      - 4 large packets OUT to 198.51.100.77 (5016 bytes) against 56 bytes back,
+        which is the exfiltration shape AND the row whose byte count tshark prints
+        as "5,016" -- a thousands separator. That row is the reason the conv-table
+        regex uses [\d,]+: measured here, a \d+ group dropped exactly this row,
+        the largest of the three, and the output looked complete;
+      - one DNS query for files.example.net, which exists so the --names path has
+        something to find. It also caught that `-e frame.time_utc` is not a valid
+        field in this tshark build: tshark exits 1 printing nothing, which reads
+        identically to a capture with no DNS.
+    The expected UTC string in the selftest (2026-09-21 14:16:50) is the epoch
+    rendered with time.gmtime, NOT tshark's own rendering -- `frame.time` prints
+    local time (EDT was observed on this box), which is the timezone trap.

@@ -136,5 +136,13 @@
     "SubtleCrypto is undefined outside a secure context, so in-browser crypto works on a loopback origin and nowhere else; it cannot be rehearsed.",
     "Poisoning the slot before the automation has passed its login page replaces the form it drives and the run aborts, so the poisoned page must carry a working copy of that form."
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-request-smuggling",
+    "confidence": 0.46,
+    "secondary": [
+      "web-cache-poisoning"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

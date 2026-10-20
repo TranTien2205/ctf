@@ -132,6 +132,27 @@ def hook_post_probe(args, current, path):
             raise Refused(
                 "a timeout or a dead connection is never a confirmation; it "
                 "is evidence about availability, not about the bug")
+        # The guarantee this gate is named for, finally enforced rather than
+        # asserted. Until now post-probe had no --response input at all, so
+        # "verdict=confirms must quote the response substring that proves it"
+        # was checked only as: non-empty, not timeout-shaped, right
+        # evidence_kind. Any plausible sentence passed. The machine validated
+        # the SHAPE of the claim and never its truth.
+        response = (getattr(args, "response", None) or "")
+        if not response.strip():
+            raise Refused(
+                "verdict=confirms needs --response: the bytes the evidence was "
+                "read from, so this gate can check the quote instead of "
+                "trusting it. tools/web/http_probe.py holds the request and the "
+                "response together and emits the whole command for you; paste "
+                "its output rather than retyping anything")
+        if args.evidence not in response:
+            raise Refused(
+                "the evidence is not a substring of --response, so it was "
+                "summarised, reconstructed or retyped rather than quoted. "
+                "Paste the excerpt from the tool's own output. (evidence %d "
+                "chars, response %d chars)"
+                % (len(args.evidence), len(response)))
     probe = {"request": args.request,
              "result": args.result or args.verdict,
              "time": time.time(),
@@ -245,6 +266,10 @@ def build_parser():
     post.add_argument("--request", default="")
     post.add_argument("--verdict", required=True)
     post.add_argument("--evidence")
+    post.add_argument("--response",
+                      help="the bytes the evidence was read from. REQUIRED with "
+                           "--verdict confirms, because that is the only way "
+                           "this gate can check the quote rather than trust it")
     post.add_argument("--evidence-kind", choices=EVIDENCE_KINDS)
     post.add_argument("--result")
     post.add_argument("--class", dest="class")

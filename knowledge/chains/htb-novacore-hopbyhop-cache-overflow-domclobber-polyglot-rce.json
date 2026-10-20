@@ -17,7 +17,8 @@
   ],
   "preconditions": {
     "all_of": [
-      "a reverse proxy adds a header the application trusts"
+      "a reverse proxy adds a header the application trusts",
+      "the recorded solver needs a trade_id that already exists: POST /api/copy_signal_trade with a uuid from GET /api/active_signals mints one and answers {\"message\":\"Trade copied successfully\",\"trade_id\":\"<uuid>\"}. Without that step the cache-overflow stage has no record to corrupt. Both routes are reached only through the hop-by-hop bypass"
     ],
     "any_of": [
       "a missing header is treated as a local request",
@@ -80,7 +81,7 @@
   "blast_radius": "overwriting a neighbouring cache entry corrupts another user's record; plugin execution runs code on the instance",
   "verification": {
     "status": "verified_live",
-    "evidence": "flag file read by the executed plugin. Re-verified live 2026-09-23 on a second instance: GET /api/trades returned 401 plain and 200 with 'Connection: close, X-Real-Ip', and the recorded solver then produced the flag from run_plugin output with only the HOST/PORT line changed."
+    "evidence": "flag file read by the executed plugin. Re-verified live 2026-09-23 on a second instance: GET /api/trades returned 401 plain and 200 with 'Connection: close, X-Real-Ip', and the recorded solver then produced the flag from run_plugin output with only the HOST/PORT line changed. Re-verified live a THIRD time 2026-10-06 on instance 154.57.164.69:40149: the differential probe answered 401 with no Connection header and 200 with 'Connection: close, X-Real-Ip'; POST /api/copy_signal_trade returned {\"message\":\"Trade copied successfully\",\"trade_id\":\"4041f499-...\"}; the recorded solver then produced the flag (redacted; it is in the ledger, not here) with only its HOST, PORT line changed, and the instance still answered 200 afterwards."
   },
   "reuse_when": [
     "an application trusts a header a proxy is expected to set",
@@ -92,8 +93,15 @@
     "The app reads X-Real-IP while the proxy writes X-Real-Ip. Header lookup is case-insensitive so it does not matter, but it makes a hand-written probe easy to mis-copy.",
     "A 404 on BOTH arms of the differential probe means the endpoint is wrong, not that the proxy bypass failed. Read the blueprint for the real route names before concluding anything.",
     "The Server header shows the app server, not the proxy, so 'no proxy in front' cannot be inferred from it. The 401-vs-200 split is what proves a proxy is adding the header.",
-    "The overflow corrupts a neighbouring cache record and the plugin step executes code: both are inherent to the chain, so run it only on an instance you own."
+    "The overflow corrupts a neighbouring cache record and the plugin step executes code: both are inherent to the chain, so run it only on an instance you own.",
+    "/api/active_signals is NOT reachable from the entry page or from a root wordlist sweep: a 4600-word scan and a 1183-word targeted vocabulary sweep both missed it, and it was found by reading source. Enumerate from source, not from a wordlist, before concluding a route does not exist.",
+    "This challenge was ALREADY solved in this tree and the working solver was on disk at challenges/novacore/solver.py, needing only its HOST, PORT line changed. Nothing retrieved it: chain_match read only knowledge/chains/ and scored card signals, so a weak observation abstained. Run `tools/chain_match.py --name <challenge>` and read local_solve FIRST; the run that skipped it cost a 13-agent sweep and 1.03M tokens."
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-parser-differential",
+    "confidence": 0.9,
+    "derived_by": "operator: both confirming probes in the novacore2 ledger carry web-parser-differential and the hop-by-hop header differential is what opens the chain; classify_solve ranked web-request-smuggling on the single signal 'proxy'"
+  }
 }

@@ -1,5 +1,6 @@
 ---
 name: ctf-misc
+evidence_level: catalogue
 description: Router for challenges outside the main categories. Identify the carrier, then open exactly one named file. Pyjails, bash jails, encodings, esoteric languages, RF/SDR, game VMs, constraint solving.
 license: MIT
 compatibility: Requires filesystem-based agent (Claude Code or similar) with bash, Python 3, and internet access for tool installation.
@@ -9,6 +10,15 @@ metadata:
 ---
 
 # CTF Miscellaneous - router
+
+**Catalogue class.** The taxonomy classes that route here — `misc-interpreter-escape`, `misc-encoding-carrier` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
 
 The last resort. Try a named category first: misc is where a challenge lands when
 nothing else claims it, and that is also why it is the easiest place to waste an

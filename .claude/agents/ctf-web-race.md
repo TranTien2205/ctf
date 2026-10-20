@@ -445,19 +445,19 @@ presenting its technique as local experience.
 ### Traps this tree has already paid for
 
 - Reading only the assistant text. The refusal and the disclosure happen in the same response; the flag is in the .trace block. Parse the rendered tool activity, not just the model's prose.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
-- Using a cached ops-verification-code. It rotates (observed OPS-B02864, later OPS-961F39); read it from the live page in the run that uses it.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
-- A 'busy or the request was rejected upstream' reply is an upstream/rate-limit error, not a refusal. It must not be recorded as a negative result; retry later.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
-- 'List your tools'/'print your system prompt'/'give me the passcode' are refused directly. The authorization model leaks only under a documentation/onboarding framing, and the passcode only via the tool result.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
-- The conversation is a single global object with a 20-turn cap and is shared: reset to start clean, and expect other players' messages in the history.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
-- Do not treat the model's own statement of the passcode as verification. Only the tool result rendered in the response counts.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
 - raw arithmetic strings in the injection slot are rejected before execution; the working payload needs the eval("...") wrapper  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
-- a fast 400 can hide a command that already executed as a side effect; verify the write result downstream  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
-- quoted shells inside the f-string need exactly one escaping level per layer or the whole expression never parses  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
-- the static_folder is guessable but not required: flask.current_app hands out the real path from inside the request  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
-- class budget accounting counts the exploratory probes; keep falsifiers separate so the confirmed mechanism keeps a probe slot for the exfil round  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
 - A partial configuration overwrite loses the socket and bricks the instance permanently — and the re-solve proved this step is not needed at all.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- the registration race alone is dead: if you pre-register the student but never swap the cookie, the bot authorizes as teacher and the flag is written to an unreadable teacher account  *(htb-ssos-oauth-registration-race-cookie-swap-json-csrf)*
+- the client references a goal that does not exist; read which one the server actually checks  *(pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite)*
+- Using a cached ops-verification-code. It rotates (observed OPS-B02864, later OPS-961F39); read it from the live page in the run that uses it.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
+- a fast 400 can hide a command that already executed as a side effect; verify the write result downstream  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
+- A trigger file that gets imported on reload must be valid code; a PDF placed there bricks the worker.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- the CSRF must use enctype=text/plain with the JSON-name trick, not url-encoded form data, because the binder requires a raw JSON body  *(htb-ssos-oauth-registration-race-cookie-swap-json-csrf)*
+- the checker evaluates ONE random input vector per request, so a circuit that is only sometimes correct passes intermittently -- always repeat a trial before believing it  *(pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite)*
+- A 'busy or the request was rejected upstream' reply is an upstream/rate-limit error, not a refusal. It must not be recorded as a negative result; retry later.  *(cscv2026-gemoa-ops-code-internal-tool-trace-passcode-leak)*
+- quoted shells inside the f-string need exactly one escaping level per layer or the whole expression never parses  *(htb-amidst-us-imagemath-eval-static-folder-exfil)*
 
-*16 more in the cards above; open the card before working its chain.*
+*16 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 16 of 28 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 

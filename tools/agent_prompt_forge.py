@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rewrite each web subagent's prompt from what this tree has actually measured.
+"""Rewrite each specialist subagent's prompt from what this tree has measured.
 
 An agent definition written by hand is a role description. It ages the moment a
 solve lands, because the thing a solve produces -- a chain card with its
@@ -17,9 +17,10 @@ touched: only the text between the two markers is replaced.
     python3 tools/agent_prompt_forge.py --check            # the gate's form
     python3 tools/agent_prompt_forge.py --from-solve <id>  # after a flag
 
-Class ownership is not restated here. It is read from `WEB_FAMILIES` in
-tools/subagent_fanout.py, which is the same table `--web` builds its briefs from,
-so the two can never disagree about which agent owns which class.
+Class ownership is not restated here. It is read from `WEB_FAMILIES` and
+`DFIR_FAMILIES` in tools/subagent_fanout.py, which are the same tables `--web` and
+`--dfir` build their briefs from, so the two can never disagree about which agent
+owns which class.
 """
 import argparse
 import glob
@@ -172,14 +173,31 @@ def forge(family, cards, tax):
                 lines.append("  expected: %s" % exp[:220])
         lines.append("")
 
-        traps, seen = [], set()
+        # Round-robin across cards, not card-by-card. Measured: ctf-web-parser
+        # owns 10 cards carrying 78 traps between them, MAX_TRAPS is 12, and the
+        # old concatenation filled all 12 from the first two or three cards --
+        # so a card filed later contributed NOTHING to the prompt while
+        # `--check` still reported nothing stale. That silently defeats the one
+        # step AGENTS.md says exists to make the fleet better after a solve.
+        # Taking trap[0] from every card before any card's trap[1] guarantees
+        # each card is represented, and it is deterministic and clone-stable
+        # because it depends on card order rather than on a filesystem mtime.
+        by_card, seen = [], set()
         for card in mine:
+            kept = []
             for t in (card.get("known_traps") or []):
                 key = t[:60]
                 if key in seen:
                     continue
                 seen.add(key)
-                traps.append((card["id"], t))
+                kept.append((card["id"], t))
+            if kept:
+                by_card.append(kept)
+        traps = []
+        for depth in range(max((len(k) for k in by_card), default=0)):
+            for kept in by_card:
+                if depth < len(kept):
+                    traps.append(kept[depth])
         if traps:
             lines.append("### Traps this tree has already paid for")
             lines.append("")
@@ -187,8 +205,11 @@ def forge(family, cards, tax):
                 lines.append("- %s  *(%s)*" % (t.strip().replace("\n", " ")[:300], cid))
             if len(traps) > MAX_TRAPS:
                 lines.append("")
-                lines.append("*%d more in the cards above; open the card before working its chain.*"
-                             % (len(traps) - MAX_TRAPS))
+                lines.append("*%d more in the cards above; open the card before working its chain. "
+                             "One trap per card is shown before any card's second, so every "
+                             "card here is represented -- but %d of %d are NOT in this prompt "
+                             "and the cards are the complete record.*"
+                             % (len(traps) - MAX_TRAPS, len(traps) - MAX_TRAPS, len(traps)))
             lines.append("")
 
         br = [(c["id"], c.get("blast_radius")) for c in mine if c.get("blast_radius")]
@@ -221,7 +242,14 @@ def apply_to(path, block):
     with open(path, encoding="utf-8") as fh:
         text = fh.read()
     if BEGIN in text and END in text:
-        new = re.sub(re.escape(BEGIN) + r".*?" + re.escape(END), block, text, flags=re.S)
+        # Splice literally. re.sub() would treat `block` as a REPLACEMENT
+        # TEMPLATE, so a backslash in any trap is read as an escape: a card
+        # quoting the PHP class App\Message\FileQueue crashed this with
+        # `re.PatternError: bad escape \M`. The block is forged content, never
+        # a pattern, so it must never pass through the regex engine.
+        head = text[:text.index(BEGIN)]
+        tail = text[text.index(END) + len(END):]
+        new = head + block + tail
     else:
         new = text.rstrip("\n") + "\n\n" + block + "\n"
     return new, new != text
@@ -249,7 +277,14 @@ def main():
         only = (card.get("classification") or {}).get("primary")
 
     report, stale = [], []
-    for family in fanout.WEB_FAMILIES:
+    # Both fleets, from the same tables the --web and --dfir briefs are built from,
+    # so an agent's class ownership can never disagree between the two tools. The
+    # DFIR families own only catalogue classes today and forge() handles that
+    # explicitly -- it emits "no chain card in this repository backs this family",
+    # which is the honest state and is stable, so --check stays green until a
+    # Sherlock is actually solved. Without this loop covering them, a DFIR solve
+    # would file a chain card that never reached the agent that needs it next.
+    for family in list(fanout.WEB_FAMILIES) + list(fanout.DFIR_FAMILIES):
         path = os.path.join(AGENTS, family["agent"] + ".md")
         if not os.path.isfile(path):
             report.append({"agent": family["agent"], "skipped": "no definition on disk"})

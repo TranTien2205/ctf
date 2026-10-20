@@ -37,6 +37,20 @@ PORTED = {
         "routes_to": ["web-triage", "parallel-layer-sweep", "white-box-intended-path"],
         "unlock_signals": r"ctf-web-|fan.?out|parallel (?:web )?sweep|subagent_fanout|ten families",
     },
+    "dfir-parallel-sweep": {
+        "layer": "reference", "categories": ["dfir"],
+        "use_when": ["an artifact bundle with many questions over one collection, so "
+                     "several artifact families each need their own bounded measurement",
+                     "a Sherlock is being worked one artifact family at a time and the "
+                     "clock is the blocker"],
+        "do_not_use_when": ["one question answerable from one artifact: open the router "
+                            "and read the one depth file",
+                            "nothing is extracted yet: --dfir wants the extracted directory",
+                            "chain_recall reports cards_exist: run that card's probe first"],
+        "routes_to": ["dfir-sherlock-triage", "parallel-layer-sweep",
+                      "ir-live-estate-triage"],
+        "unlock_signals": r"ctf-dfir-|fan.?out|parallel (?:dfir )?sweep|subagent_fanout|seven families|artifact family",
+    },
     "parallel-layer-sweep": {
         "layer": "reference", "categories": ["*"],
         "use_when": ["a multi-layer white-box handout and no strong chain match, so several "

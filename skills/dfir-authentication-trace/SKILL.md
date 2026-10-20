@@ -4,7 +4,7 @@ description: >
   Action-oriented depth skill for Authentication and logon trace. Use after the router or
   tools/classify.py names this class; start with the first probe and record the expected signal. Do
   not use it as proof of a finding. Confusable classes: dfir-execution-trace, dfir-network-exfil-trace.
-  Catalogue class: nothing in this toolkit has solved one yet.
+  Verified here by 1 chain card: the Brutus Sherlock, from auth.log and wtmp.
 tags: [dfir, forensics, event-logs, logon, kerberos, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
@@ -13,13 +13,20 @@ budget:
   stop_conditions:
     - "same artifact family: 3 attempts with no new record"
     - "the class falsifier is observed"
-evidence_level: catalogue
+evidence_level: verified
 ---
 # Authentication and logon trace
 
-**Catalogue class.** This toolkit has never solved one. What follows is standard published knowledge, not local experience - treat it as a
-starting point and record what happens in `field-notes.md`. Field names are quoted from the Microsoft Learn `EventData` XML per ID; Linux
-struct numbers were measured here today.
+**Verified here by 1 chain card**, and the distinction matters because it is
+partial. `knowledge/chains/htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp.json`
+solved the **Linux** half of this class — `auth.log` plus binary `wtmp`, 385 lines
+and 29 records, every answer recorded through `pre-flag --source artifact`. The
+**Windows** half of this file (4624, 4625, Kerberos, the logon-type table) is
+still standard published knowledge with no local solve behind it: no EVTX parser
+is even installed on this box. So treat the Linux sections as local experience and
+the Windows sections as a starting point, and record what happens in
+`field-notes.md`. Field names are quoted from the Microsoft Learn `EventData` XML
+per ID; Linux struct numbers were measured here.
 
 ## First probe
 ```bash

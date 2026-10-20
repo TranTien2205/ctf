@@ -81,5 +81,13 @@
     "test update semantics on your own object with the content fields omitted first"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-prototype-pollution",
+    "confidence": 0.5,
+    "secondary": [
+      "web-nosqli"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

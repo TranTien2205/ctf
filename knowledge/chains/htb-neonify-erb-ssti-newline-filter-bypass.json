@@ -87,5 +87,10 @@
     "encode payload internals with base64 because parentheses, quotes and dots are blocked"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssti",
+    "confidence": 0.75,
+    "derived_by": "backfill_classification.py"
+  }
 }

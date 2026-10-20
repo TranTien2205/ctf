@@ -87,5 +87,13 @@
     "a trailing request fragment is needed so the smuggled request is terminated"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.47,
+    "secondary": [
+      "web-request-smuggling"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

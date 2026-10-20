@@ -917,8 +917,10 @@
       "name": "Authentication and logon trace",
       "skill_dir": "dfir-authentication-trace",
       "category": "dfir",
-      "evidence_level": "catalogue",
-      "verified_by": [],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
+      ],
       "observation_signals": [
         "\\b(?:4624|4625|4634|4647|4648|4672|4776)\\b",
         "logon type\\s*\\d{1,2}|\\blogon types?\\b",
@@ -1118,6 +1120,560 @@
         "dfir-persistence-trace"
       ],
       "skill": "skills/dfir-antiforensics-trace/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "crypto-rsa",
+      "name": "RSA key or plaintext recovery",
+      "skill_dir": "crypto-triage",
+      "category": "crypto",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\brsa\\b",
+        "\\bmodulus\\b|\\bn\\s*=\\s*\\d{30,}",
+        "public exponent|\\be\\s*=\\s*(?:3|65537)\\b",
+        "\\bd\\s*<\\s*n|small private exponent|wiener",
+        "same modulus|common modulus|shared prime",
+        "next_?prime|primes are close|fermat",
+        "coppersmith|boneh.?durfee|hastad|broadcast",
+        "(?<![a-z0-9])(?:rsa\\ key\\ or\\ plaintext\\ recovery|crypto\\ rsa|rsa)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "from\\s+Crypto\\.PublicKey\\s+import\\s+RSA|RSA\\.construct|RSA\\.generate",
+        "pow\\s*\\([^,]+,\\s*(?:e|65537|3)\\s*,\\s*n\\)",
+        "getPrime\\s*\\(|next_?prime\\s*\\(",
+        "\\bphi\\s*=\\s*\\(\\s*p\\s*-\\s*1\\s*\\)\\s*\\*\\s*\\(\\s*q\\s*-\\s*1\\s*\\)",
+        "inverse\\s*\\(\\s*e\\s*,|pow\\s*\\(\\s*e\\s*,\\s*-1"
+      ],
+      "first_probe": "answer the six discriminators in order with python3 tools/crypto_attack.py list, then run the ONE attack they select: how many moduli, is e small, is d small, are the primes close, is part of a factor known, is phi shared",
+      "falsifier": "the attack's own stated applicability bound is exceeded -- for example d above the 0.292 bound for boneh-durfee, or a known-bits window above n**0.25 for coppersmith -- and no lattice parameter moves it",
+      "depth_refs": [
+        "skills/crypto-triage/references/rsa-attacks.md",
+        "skills/ctf-crypto/triage-rsa.md",
+        "skills/ctf-crypto/rsa-attacks.md"
+      ],
+      "confusable_with": [
+        "crypto-ecc-dlog"
+      ],
+      "skill": "skills/crypto-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "crypto-prng",
+      "name": "Predictable pseudorandom generator",
+      "skill_dir": "crypto-triage",
+      "category": "crypto",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\blcg\\b|linear congruential",
+        "\\blfsr\\b|feedback shift register|\\btaps?\\b",
+        "mersenne|mt19937|getrandbits",
+        "\\bseed(?:ed|ing)?\\b",
+        "keystream",
+        "predict(?:able|ed|ion)|next (?:output|token|value)",
+        "truncated output|high bits of",
+        "(?<![a-z0-9])(?:predictable\\ pseudorandom\\ generator|crypto\\ prng|prng)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "random\\.seed\\s*\\(|random\\.getrandbits\\s*\\(",
+        "\\(\\s*a\\s*\\*\\s*\\w+\\s*\\+\\s*b\\s*\\)\\s*%\\s*m|\\*\\s*A\\s*\\+\\s*C\\s*\\)\\s*%",
+        "state\\s*=\\s*\\(\\s*state\\s*[*+]",
+        "\\bxor\\b[^\\n]{0,40}\\bshift\\b|>>\\s*1\\s*\\^",
+        "time\\.time\\s*\\(\\s*\\)\\s*\\)?\\s*(?:as seed|\\))"
+      ],
+      "first_probe": "name the generator from source, count how many consecutive outputs you hold, then run the matching attack id (lcg-recover, lcg-unknown-modulus, lcg-truncated, berlekamp-massey, lfsr-recover, lfsr-predict, mt19937-clone)",
+      "falsifier": "predict one held-back output and compare: a generator whose next value you cannot produce exactly is not recovered, and mt19937-clone genuinely needs 624 consecutive 32-bit outputs",
+      "depth_refs": [
+        "skills/ctf-crypto/triage-prng.md",
+        "skills/ctf-crypto/prng-attacks.md",
+        "skills/ctf-crypto/prng.md"
+      ],
+      "confusable_with": [
+        "crypto-symmetric-oracle"
+      ],
+      "skill": "skills/crypto-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "crypto-ecc-dlog",
+      "name": "Curve, nonce or discrete-log recovery",
+      "skill_dir": "crypto-triage",
+      "category": "crypto",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\becdsa\\b|\\becc\\b|elliptic",
+        "secp256[kr]1|curve25519|\\bP-256\\b",
+        "\\bnonce\\b[^\\n]{0,30}(?:reuse|repeat|bias|short)",
+        "\\(\\s*r\\s*,\\s*s\\s*\\)|signature pair",
+        "discrete log|\\bdlog\\b|pohlig|smooth order",
+        "hidden number problem|\\bhnp\\b",
+        "(?<![a-z0-9])(?:curve,\\ nonce\\ or\\ discrete\\-log\\ recovery|crypto\\ ecc\\ dlog|ecc\\ dlog|ecc\\-dlog)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "from\\s+ecdsa\\s+import|SigningKey|VerifyingKey",
+        "\\bscalar_mult\\b|point_add|is_on_curve",
+        "\\bk\\s*=\\s*(?:randint|getrandbits|random)",
+        "\\bpow\\s*\\(\\s*g\\s*,\\s*\\w+\\s*,\\s*p\\s*\\)",
+        "\\by\\*\\*2\\s*%\\s*p|x\\*\\*3\\s*\\+\\s*a\\s*\\*\\s*x\\s*\\+\\s*b"
+      ],
+      "first_probe": "decide the discriminator first: a nonce REUSED across two signatures recovers the key in closed form with ecdsa-nonce-reuse and needs no lattice, a merely BIASED nonce is hnp or hnp-ecdsa, and a plain discrete log needs the smoothness check before bsgs or pohlig-hellman",
+      "falsifier": "re-derive the public point from the recovered private scalar and compare: a scalar that does not reproduce the supplied public key is not the key, and bsgs is out of reach above a group order of roughly 2**44",
+      "depth_refs": [
+        "skills/crypto-triage/references/ecc-attacks.md",
+        "skills/ctf-crypto/ecc-attacks.md",
+        "skills/ctf-crypto/lattice-and-lwe.md"
+      ],
+      "confusable_with": [
+        "crypto-rsa"
+      ],
+      "skill": "skills/crypto-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "crypto-symmetric-oracle",
+      "name": "Block, stream or MAC oracle",
+      "skill_dir": "crypto-triage",
+      "category": "crypto",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\becb\\b|\\bcbc\\b|\\bctr\\b|\\bgcm\\b",
+        "padding oracle|invalid padding|bad pad",
+        "\\biv\\b[^\\n]{0,30}(?:reuse|fixed|static|zero)",
+        "bit.?flip|cut.?and.?paste|block (?:shuffle|swap)",
+        "length extension|hash\\s*\\(\\s*secret",
+        "keystream reuse|same nonce|two.?time pad",
+        "identical (?:blocks|ciphertext blocks)",
+        "(?<![a-z0-9])(?:block,\\ stream\\ or\\ mac\\ oracle|crypto\\ symmetric\\ oracle|symmetric\\ oracle|symmetric\\-oracle)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "AES\\.new\\s*\\([^\\n]*MODE_(?:ECB|CBC|CTR)",
+        "MODE_ECB",
+        "\\bunpad\\s*\\(|\\bpad\\s*\\(",
+        "hashlib\\.(?:md5|sha1|sha256)\\s*\\(\\s*(?:secret|key)",
+        "\\biv\\s*=\\s*(?:b?[\\\"']\\\\x00|bytes\\s*\\(\\s*16)",
+        "cipher\\.encrypt\\s*\\(\\s*pad\\s*\\("
+      ],
+      "first_probe": "detect ECB in ONE request wherever you control plaintext -- identical plaintext blocks give identical ciphertext blocks -- then separate an invalid-pad answer from an invalid-MAC answer before writing any oracle loop",
+      "falsifier": "the mode is authenticated (GCM or an HMAC checked before decryption), so a tampered ciphertext is rejected identically whatever the padding, and no oracle exists to query",
+      "depth_refs": [
+        "skills/crypto-triage/references/block-cipher.md",
+        "skills/crypto-triage/references/hash-attacks.md",
+        "skills/ctf-crypto/modern-ciphers.md"
+      ],
+      "confusable_with": [
+        "crypto-prng",
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/crypto-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "pwn-stack-overflow",
+      "name": "Stack memory corruption",
+      "skill_dir": "pwn-binary-triage",
+      "category": "pwn",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "segmentation fault|\\bsigsegv\\b|core dumped",
+        "stack smashing detected|\\*\\*\\* stack",
+        "\\bcanary\\b",
+        "ret2win|return address",
+        "buffer overflow|off.?by.?one",
+        "\\bgets\\s*\\(|\\bstrcpy\\s*\\(",
+        "(?<![a-z0-9])(?:stack\\ memory\\ corruption|pwn\\ stack\\ overflow|stack\\ overflow|stack\\-overflow)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\bgets\\s*\\(",
+        "\\bstrcpy\\s*\\(|\\bstrcat\\s*\\(",
+        "scanf\\s*\\(\\s*\\\"%s\\\"",
+        "read\\s*\\([^,]+,[^,]+,\\s*0x[0-9a-f]{3,}",
+        "char\\s+\\w+\\s*\\[\\s*(?:8|16|32|64|128)\\s*\\]",
+        "memcpy\\s*\\([^,]+,[^,]+,\\s*\\w+\\s*\\)"
+      ],
+      "first_probe": "run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a pattern you generate yourself -- pwntools is absent here",
+      "falsifier": "the read is bounded by a length the input cannot influence, so no write reaches saved state; note that a STATIC binary carries __stack_chk_fail even when built -fno-stack-protector, so confirm a canary from the %fs:0x28 load in the disassembly rather than from the import",
+      "depth_refs": [
+        "skills/ctf-pwn/overflow-basics.md",
+        "skills/pwn-binary-triage/SKILL.md"
+      ],
+      "confusable_with": [
+        "pwn-format-string",
+        "pwn-code-reuse"
+      ],
+      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "pwn-format-string",
+      "name": "Format-string read or write",
+      "skill_dir": "pwn-binary-triage",
+      "category": "pwn",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "%p%p|%[0-9]+\\$p|\\bformat string\\b",
+        "%n\\b|%hn\\b|%hhn\\b",
+        "leaked (?:stack|address|pointer)",
+        "printf[^\\n]{0,30}user|echo(?:es|ed) (?:back|input)",
+        "(?<![a-z0-9])(?:format\\-string\\ read\\ or\\ write|pwn\\ format\\ string|format\\ string|format\\-string)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "printf\\s*\\(\\s*\\w+\\s*\\)\\s*;",
+        "fprintf\\s*\\([^,]+,\\s*\\w+\\s*\\)",
+        "snprintf\\s*\\([^,]+,[^,]+,\\s*\\w+\\s*\\)",
+        "syslog\\s*\\([^,]+,\\s*\\w+\\s*\\)"
+      ],
+      "first_probe": "send a handful of %p in one request and read the leaked words back, which is the cheapest confirmation in pwn, then locate your own buffer with %N$p before deciding read against write",
+      "falsifier": "the format argument is a literal and the user value is an argument to it, so nothing is interpreted; and full RELRO reported by tools/pwn_triage.py closes the GOT-overwrite route whatever the leak is worth",
+      "depth_refs": [
+        "skills/ctf-pwn/format-string.md",
+        "skills/pwn-binary-triage/SKILL.md"
+      ],
+      "confusable_with": [
+        "pwn-stack-overflow"
+      ],
+      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "pwn-heap-corruption",
+      "name": "Heap allocator corruption",
+      "skill_dir": "pwn-binary-triage",
+      "category": "pwn",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "use.?after.?free|\\buaf\\b",
+        "double free",
+        "\\btcache\\b|\\bfastbin\\b|unsorted bin",
+        "malloc\\(\\): |free\\(\\): invalid",
+        "corrupted (?:size|chunk|top)",
+        "chunk (?:header|metadata)|overlapping chunks",
+        "(?<![a-z0-9])(?:heap\\ allocator\\ corruption|pwn\\ heap\\ corruption|heap\\ corruption|heap\\-corruption)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\bfree\\s*\\(\\s*\\w+\\s*\\)\\s*;(?![^\\n]*=\\s*NULL)",
+        "\\bmalloc\\s*\\(|\\bcalloc\\s*\\(|\\brealloc\\s*\\(",
+        "\\[\\s*idx\\s*\\]|\\[\\s*index\\s*\\]",
+        "struct\\s+\\w+\\s*\\*\\s*\\w+\\s*\\[\\s*\\d+\\s*\\]"
+      ],
+      "first_probe": "answer the glibc version question first, because tcache behaviour, double-free detection and fd mangling differ sharply across versions, then map the allocation lifecycle and name the primitive the bug gives before choosing any technique",
+      "falsifier": "the pointer is cleared on free and every index is bounds-checked, so no freed object is reachable; gdb is absent here, so runtime confirmation is radare2 in debug mode or observable program behaviour",
+      "depth_refs": [
+        "skills/ctf-pwn/heap-techniques.md",
+        "skills/ctf-pwn/heap-fsop.md"
+      ],
+      "confusable_with": [
+        "pwn-stack-overflow"
+      ],
+      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "pwn-code-reuse",
+      "name": "ROP and code reuse",
+      "skill_dir": "pwn-rop",
+      "category": "pwn",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\brop\\b|ret2libc|ret2csu|ret2plt|ret2dlresolve",
+        "\\bsrop\\b|sigreturn",
+        "\\bnx\\b|no.?execute",
+        "gadget",
+        "libc base|libc leak",
+        "pop (?:rdi|rsi|rdx)|\\bsyscall\\b",
+        "(?<![a-z0-9])(?:rop\\ and\\ code\\ reuse|pwn\\ code\\ reuse|code\\ reuse|code\\-reuse)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "system\\s*\\(|execve\\s*\\(",
+        "/bin/sh",
+        "mprotect\\s*\\(",
+        "\\bplt\\b|\\bgot\\b"
+      ],
+      "first_probe": "this class presupposes control of the instruction pointer, so confirm that first; then read the protections to decide whether a leak is needed at all, and build the leak chain and verify the leaked value looks like a libc address before chaining further",
+      "falsifier": "the gadgets present cannot express the call -- no controllable argument register, or no writable page to pivot into -- which tools/pwn_triage.py reports from the executable segments it actually scanned, since ROPgadget and ropper are absent here",
+      "depth_refs": [
+        "skills/pwn-rop/references/rop-chains.md",
+        "skills/pwn-rop/references/ret2libc.md",
+        "skills/ctf-pwn/rop-and-shellcode.md"
+      ],
+      "confusable_with": [
+        "pwn-stack-overflow",
+        "pwn-format-string"
+      ],
+      "skill": "skills/pwn-rop/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "rev-native-check",
+      "name": "Native deciding check",
+      "skill_dir": "rev-triage",
+      "category": "rev",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\belf\\b|\\bpe32\\b|\\bmach-?o\\b",
+        "wrong (?:flag|password|key)|try again|incorrect",
+        "stripped|not stripped",
+        "disassembl|decompil",
+        "\\bradare2\\b|\\br2\\b|objdump",
+        "\\bupx\\b|packed|high entropy",
+        "(?<![a-z0-9])(?:native\\ deciding\\ check|rev\\ native\\ check|native\\ check|native\\-check)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\bstrcmp\\s*\\(|\\bmemcmp\\s*\\(|\\bstrncmp\\s*\\(",
+        "for\\s*\\([^)]*\\)\\s*\\{[^}]*\\^\\s*0x[0-9a-f]{2}",
+        "if\\s*\\(\\s*\\w+\\s*!=\\s*0x[0-9a-f]+\\s*\\)",
+        "__stack_chk|_FORTIFY_SOURCE"
+      ],
+      "first_probe": "locate the input read, follow the value to the comparison, and quote the disassembly that carries it: a described check is not a measured one. r2 -A then afl then pdf @ main; gdb is absent, so r2 -d is the debugger",
+      "falsifier": "the comparison is against a value computed at run time from something you cannot observe or supply, so replicating the check in python cannot produce the input",
+      "depth_refs": [
+        "skills/ctf-reverse/patterns-ctf.md",
+        "skills/ctf-reverse/tools.md",
+        "skills/rev-triage/references/packer-analysis.md"
+      ],
+      "confusable_with": [
+        "rev-bytecode-vm",
+        "pwn-stack-overflow"
+      ],
+      "skill": "skills/rev-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "rev-managed-code",
+      "name": "Managed runtime decompilation",
+      "skill_dir": "rev-triage",
+      "category": "rev",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\.net\\b|\\bclr\\b|\\bil\\b\\s|assembly",
+        "\\bjava\\b|\\.class\\b|\\.jar\\b|cafebabe",
+        "\\bc#\\b|mscorlib|System\\.",
+        "obfuscat(?:ed|or)|renamed symbols|control.?flow flattening",
+        "ilspy|dnspy|javap|jadx",
+        "(?<![a-z0-9])(?:managed\\ runtime\\ decompilation|rev\\ managed\\ code|managed\\ code|managed\\-code)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\bnamespace\\s+\\w+|\\bpublic\\s+static\\s+void\\s+Main",
+        "\\bpackage\\s+[\\w.]+;|public\\s+class\\s+\\w+",
+        "System\\.Security\\.Cryptography|javax\\.crypto",
+        "Convert\\.FromBase64String|Base64\\.getDecoder"
+      ],
+      "first_probe": "confirm the runtime from the header and quote the bytes -- a PE with a non-zero CLR data directory, or the 0xCAFEBABE magic -- then decompile with what exists here: ilspycmd for .NET, javap plus unzip for Java. jadx, procyon and mono are absent",
+      "falsifier": "the assembly is a thin native stub and the logic is in an unmanaged module, so no managed decompiler reaches it and the work belongs to rev-native-check",
+      "depth_refs": [
+        "skills/rev-triage/references/managed-code.md",
+        "skills/ctf-reverse/languages-platforms.md"
+      ],
+      "confusable_with": [
+        "rev-native-check",
+        "rev-bytecode-vm"
+      ],
+      "skill": "skills/rev-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "rev-bytecode-vm",
+      "name": "Script bytecode or custom VM",
+      "skill_dir": "rev-triage",
+      "category": "rev",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\.pyc\\b|marshal|code object|co_consts",
+        "uncompyle|pycdc|decompyle|\\bdis\\b module",
+        "opcode|dispatch (?:loop|table)|\\bvm\\b",
+        "obfuscated (?:script|javascript|python)",
+        "\\bwasm\\b|webassembly|\\blua\\b|luac",
+        "(?<![a-z0-9])(?:script\\ bytecode\\ or\\ custom\\ vm|rev\\ bytecode\\ vm|bytecode\\ vm|bytecode\\-vm)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\bmarshal\\.loads\\s*\\(|\\bdis\\.dis\\s*\\(",
+        "while\\s+\\w+\\s*<\\s*len\\s*\\(\\s*(?:code|prog|bc)",
+        "\\bopcode\\s*=\\s*|\\bops\\s*=\\s*\\{",
+        "\\beval\\s*\\(\\s*(?:base64|zlib|codecs)",
+        "exec\\s*\\(\\s*(?:bytes|compile|marshal)"
+      ],
+      "first_probe": "for a .pyc read the header magic and name the python version before running any decompiler, falling back to the stdlib dis module on the unmarshalled code object when uncompyle6 refuses; for a custom VM recover the OPCODE TABLE before reading one instruction of its program",
+      "falsifier": "the dispatch loop is data-driven from a table that is itself generated at run time, so a static table recovery is incomplete and the program must be traced instead",
+      "depth_refs": [
+        "skills/rev-triage/references/vm-analysis.md",
+        "skills/ctf-reverse/patterns-runtime.md"
+      ],
+      "confusable_with": [
+        "rev-managed-code",
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/rev-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "osint-media-metadata",
+      "name": "Media and document metadata",
+      "skill_dir": "osint-triage",
+      "category": "osint",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\bexif\\b|exiftool|metadata",
+        "\\bgps\\b|latitude|longitude|geoloc",
+        "thumbnail|\\bmake\\b[^\\n]{0,20}\\bmodel\\b",
+        "creator tool|producer|\\bauthor\\b",
+        "photo|image|screenshot|\\bpdf\\b|\\bdocx\\b",
+        "(?<![a-z0-9])(?:media\\ and\\ document\\ metadata|osint\\ media\\ metadata|media\\ metadata|media\\-metadata)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "run exiftool and read ALL of its output rather than grepping one tag, then binwalk and strings for appended or embedded data; steghide, zsteg and outguess are absent here, so never claim an extraction with them",
+      "falsifier": "the metadata was stripped on upload and the carrier holds no appended data, so the answer is only in the visible frame and becomes a hypothesis rather than a measurement",
+      "depth_refs": [
+        "skills/ctf-osint/geolocation-and-media.md",
+        "skills/osint-triage/references/tool-commands.md"
+      ],
+      "confusable_with": [
+        "osint-identity-pivot",
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/osint-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "osint-identity-pivot",
+      "name": "Identity and handle pivot",
+      "skill_dir": "osint-triage",
+      "category": "osint",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\busername\\b|\\bhandle\\b|\\bprofile\\b",
+        "email (?:address|pattern|format)",
+        "\\bgithub\\b|\\bgitlab\\b|commit author",
+        "key fingerprint|\\bpgp\\b|\\bgpg\\b|ssh-rsa",
+        "social media|pivot(?:ing)? (?:from|to)",
+        "(?<![a-z0-9])(?:identity\\ and\\ handle\\ pivot|osint\\ identity\\ pivot|identity\\ pivot|identity\\-pivot)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "Author:\\s|author_email|committer",
+        "-----BEGIN PGP|ssh-(?:rsa|ed25519)\\s"
+      ],
+      "first_probe": "extract the single most UNIQUE pivot and normalise it -- compute the key fingerprint rather than eyeballing it -- then produce an ordered plan of at most six queries, each with its source and the one fact it would confirm, for ctf-writeup-scout to run",
+      "falsifier": "the pivot is too generic to separate from unrelated accounts, which is a measurement about the pivot and means a different one must be extracted rather than the same one searched harder",
+      "depth_refs": [
+        "skills/ctf-osint/social-media.md",
+        "skills/osint-triage/references/email-pattern-detection.md",
+        "skills/osint-triage/references/legal-considerations.md"
+      ],
+      "confusable_with": [
+        "osint-media-metadata",
+        "osint-infra-records"
+      ],
+      "skill": "skills/osint-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "osint-infra-records",
+      "name": "Domain, DNS and certificate records",
+      "skill_dir": "osint-triage",
+      "category": "osint",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "\\bdns\\b|\\btxt record\\b|\\bcname\\b|\\bmx\\b|\\bsrv\\b",
+        "\\bwhois\\b|registrar|registration date",
+        "certificate|\\bsan\\b|subject alternative",
+        "subdomain|nameserver|\\bns\\b record",
+        "certificate transparency|passive dns",
+        "(?<![a-z0-9])(?:domain,\\ dns\\ and\\ certificate\\ records|osint\\ infra\\ records|infra\\ records|infra\\-records)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "query TXT first because that is where a flag is actually planted, then sweep the record types that can carry data, then whois, then the certificate and its subject alternative names, which routinely leak the sibling hostname that is the real next step",
+      "falsifier": "every record type returns only operational data and the certificate names no host the challenge did not already supply, so the answer is not in the live records and only an archived or transparency source could carry it",
+      "depth_refs": [
+        "skills/ctf-osint/web-and-dns.md",
+        "skills/ctf-misc/dns.md"
+      ],
+      "confusable_with": [
+        "osint-identity-pivot"
+      ],
+      "skill": "skills/osint-triage/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "misc-interpreter-escape",
+      "name": "Restricted interpreter escape",
+      "skill_dir": "ctf-misc",
+      "category": "misc",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "pyjail|\\bjail\\b|sandbox",
+        "__builtins__|__import__|__class__|__subclasses__",
+        "blocked|forbidden|not allowed|rejected",
+        "\\beval\\s*\\(|\\bexec\\s*\\(|\\bcompile\\s*\\(",
+        "\\brbash\\b|restricted shell|allowlist|charset",
+        "(?<![a-z0-9])(?:restricted\\ interpreter\\ escape|misc\\ interpreter\\ escape|interpreter\\ escape|interpreter\\-escape)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "\\beval\\s*\\(\\s*(?:input|request|data)",
+        "\\bexec\\s*\\(\\s*(?:input|request|data)",
+        "__builtins__\\s*[:=]\\s*(?:\\{\\}|None)",
+        "ast\\.parse|ast\\.walk|ast\\.NodeVisitor",
+        "(?:BLOCKED|BANNED|FORBIDDEN|blacklist)\\s*=\\s*[\\[\\(]"
+      ],
+      "first_probe": "MAP THE FILTER before writing an escape: send single probe characters and short tokens until the blocked bytes, names and node types are known and the layer the check runs at is named, because that mapping is the challenge and the escape is mechanical afterwards",
+      "falsifier": "the check runs on the parsed AST and rejects every node type that can reach an attribute or a call, so no expression in the remaining grammar reaches a live object",
+      "depth_refs": [
+        "skills/ctf-misc/pyjails.md",
+        "skills/ctf-misc/jails-and-shells.md",
+        "skills/ctf-misc/bashjails.md"
+      ],
+      "confusable_with": [
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/ctf-misc/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "misc-encoding-carrier",
+      "name": "Encoding or carrier puzzle",
+      "skill_dir": "ctf-misc",
+      "category": "misc",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "base(?:16|32|64|85|58)\\b|\\bhex\\b|\\bascii85\\b",
+        "\\bmorse\\b|\\bbinary\\b text|\\brot13\\b",
+        "brainfuck|whitespace|malbolge|esoteric",
+        "vigen[eè]re|substitution|transposition|caesar",
+        "index of coincidence|letter frequency",
+        "layered|nested|stacked encoding|peel",
+        "(?<![a-z0-9])(?:encoding\\ or\\ carrier\\ puzzle|misc\\ encoding\\ carrier|encoding\\ carrier|encoding\\-carrier)(?![a-z0-9])"
+      ],
+      "source_signals": [
+        "base64\\.b(?:64|32|85)decode|binascii\\.(?:unhexlify|a2b)",
+        "codecs\\.decode|\\.decode\\s*\\(\\s*[\\\"']rot_?13",
+        "zlib\\.decompress|gzip\\.decompress",
+        "str\\.maketrans|\\.translate\\s*\\("
+      ],
+      "first_probe": "IDENTIFY THE CARRIER before decoding: the alphabet, the distinct-character count and the length modulus separate base64 from base32 from base85 from hex from a custom alphabet in one command, and the index of coincidence separates a substitution from a transposition from a Vigenere",
+      "falsifier": "the alphabet and length match no standard carrier and the index of coincidence is outside the natural-language range, so it is neither a standard encoding nor a classical cipher and the structure of the container is the real hiding place",
+      "depth_refs": [
+        "skills/ctf-misc/encoding-and-cipher.md",
+        "skills/ctf-misc/encodings.md",
+        "skills/ctf-crypto/classic-ciphers.md"
+      ],
+      "confusable_with": [
+        "misc-interpreter-escape",
+        "crypto-symmetric-oracle"
+      ],
+      "skill": "skills/ctf-misc/SKILL.md",
       "blast_radius": null
     }
   ]

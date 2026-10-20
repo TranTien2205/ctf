@@ -139,5 +139,13 @@
     "A filename randomised at boot has to be globbed, which is why the chain needs execution rather than the read alone.",
     "The Next 15 bypass header needs the middleware name repeated up to the recursion limit; a single occurrence does not trip it."
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-ssrf",
+    "confidence": 0.46,
+    "secondary": [
+      "web-parser-differential"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

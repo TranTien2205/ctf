@@ -407,43 +407,43 @@ presenting its technique as local experience.
 
 ### First probes that actually opened a chain here
 
+- **htb-artificial-university-grpc-attribute-pollution-eval** — `Create an order whose price is 0 through the branch that takes the price from the request, then call the success endpoint with a payment_id that starts with a slash and navigates the privileged browse`
+  expected: The record appears under your own account, proving the bot ran, that the price gate is satisfiable, and that the leading slash escapes the fixed prefix.
 - **htb-depotprint-dupkey-gate-formatstring-supervisor-jwt** — `GET /render.php?target=http://127.0.0.1:5000/status&target=https://example.com&label=D&note=x and read the produced PDF`
   expected: the PDF contains the text 'depotprint render worker online'
-- **htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce** — `POST /communicate.php with url=0://127.0.0.1:80;motherland.com:80/ and data[action]=edit&data[new_name]=ZZTESTZZ, then GET /`
-  expected: GET / renders 'Yo, ZZTESTZZ' — the host-confusion reached loopback AND the REMOTE_ADDR-gated edit accepted the request, proving both the SSRF and the pivot in one shot
-- **htb-red-island-ssrf-gopher-redis-lua-rce** — `submit a loopback URL in the fetch field and read the full response body, including error text`
-  expected: content or an error that proves the server performed the fetch
-- **htb-screencrack-domain-loopback-ssrf-gopher-redis-laravel-queue-forge-system-injection** — `POST /api/get-html with {"site":"gopher://<a domain that resolves to 127.0.0.1>:6379/_%2A1%0D%0A%244%0D%0APING%0D%0A%2A1%0D%0A%244%0D%0AQUIT%0D%0A"}, then GET the returned /src/<uuid>.txt`
-  expected: the saved file contains +PONG — the host filter was bypassed by a name, the scheme was never checked, and the QUIT trailer made the reply readable
+- **htb-dusty-alleys-http10-host-vhost-leak-ssrf-to-header-mirror** — `request the reflecting endpoint using the older protocol version with an empty host header, and compare the reflected host with the one returned by an ordinary request`
+  expected: the reflected host is an internal domain name rather than the address that was dialled
+- **htb-imagetok-bcrypt-truncation-phar-soapclient-gopher-mysql** — `pad the signed blob so the identity field sits past byte (72 - secret length), rewrite it to the privileged value, keep the original signature and replay it`
+  expected: the server accepts the blob and re-issues a freshly signed cookie carrying the privileged identity
 
 ### Traps this tree has already paid for
 
+- An embedded font program's own /FontMatrix overrides the one in the font dictionary, defusing the font-matrix injection with no visible error. Blank it in place and keep the byte length so the stream lengths stay valid.  *(htb-artificial-university-grpc-attribute-pollution-eval)*
 - the raw QUERY_STRING forwarding means percent-encoded bytes reach the worker unchanged; werkzeug decodes them once  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
-- a stored {format} payload only explodes the NEXT time /queue is rendered, not at insert time  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
-- Chrome percent-encodes braces in the displayed URL; the same_document comparison survives via unquote  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
-- httpbin-style redirect chains die against same_document; the parser split does not need a redirector  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
-- the PDF text layer is glyph-IDs mapped by ToUnicode; decode bfchar and bfrange or the text reads as garbage  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
+- the loopback target must be addressed by the name the application expects: an address literal made the fetcher fail with an invalid status code error, while the name on the same port succeeded  *(htb-dusty-alleys-http10-host-vhost-leak-ssrf-to-header-mirror)*
+- PHP urldecodes the POST body, so a percent-encoded payload carried in a form field must be DOUBLE-encoded (% -> %25) or it arrives as raw bytes; the chain will execute perfectly and silently insert nothing  *(htb-imagetok-bcrypt-truncation-phar-soapclient-gopher-mysql)*
 - parse_url strips the port into its own key, so a :port in the submitted URL never reaches curl when only ['host'] is forwarded. An early port sweep across 1/22/80/3306/8080 that returns identical timeouts is measuring nothing -- the port was discarded before curl saw it.  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- the pivot needs TWO things, not one: communicate.php:19 turns data[] into the POST body with http_build_query(), and communicate.php:16-23 forwards the caller's own Cookie: PHPSESSID=$sessCookie. That forwarded cookie is why index.php restores $_SESSION['id'] and editName updates the ATTACKER's row.  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- 0://[::ffff:127.0.0.1].motherland.com:80/ passes both gates and connects, but every port times out with 0 bytes: curl takes the bracketed IPv6 literal and nothing answers it in this container. 0://[127.0.0.1].motherland.com/ does reach loopback but Apache answers 400 because the Host header becomes   *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- the REMOTE_ADDR check is a STRICT allowlist -- index.php:45 is  if ($_SERVER['REMOTE_ADDR'] != '127.0.0.1')  -- so the origin must be exactly 127.0.0.1. Public writeups describe it as a blocklist that bans 127.0.0.2 and lets every other loopback address through; that is wrong, and believing it makes  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- filter_var(FILTER_VALIDATE_URL) is stricter for http:// than for an unknown scheme: percent-encoded and bracketed hosts rejected under http:// are accepted under 0://. If a host shape is rejected, retry it with a junk scheme before discarding it. filter_var runs FIRST (communicate.php:11) and the ho  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- the visible Key and Value inputs are not the wire format -- js/sendForm.js rewrites them to data[<key>]=<value> and communicate.php:19 runs http_build_query($data). Probing with key=/value= still exercises the URL gate, so URL findings stay valid, but the SSRF body does nothing until the array shape  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- CURLOPT_TIMEOUT is 1 second (communicate.php:24), so every server-side request has a one-second budget; a 'timed out after ~1000ms with 0 bytes' error says nothing about whether the target exists.  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
+- A gopher request to a datastore never returns, because the datastore does not close the connection and the outbound client has no timeout. The write has already happened: treat the client-side timeout as success and verify with a read, or append a quit command to the payload.  *(htb-neurosync-next-middleware-bypass-curl-ssrf-gopher-redis-signed-osexec)*
+- Reading an empty cache slot is destructive: a backend response with ttl <= 0 is turned into an uncacheable hit-for-miss object with a 120s lifetime by the builtin VCL, which swallows every later write to that slot.  *(htb-omniwatch-varnish-urlless-cachekey-zig-crlf-poison-jwt-forge)*
+- The visible first request must target a route the proxy actually forwards. Routes the proxy serves itself (/, /server-status here) never open an upstream connection, so nothing is smuggled and the probe looks like a clean falsification when it is not.  *(htb-proxy-smuggling-exec-stderr-oracle)*
+- the gopher payload length prefix must equal the exact byte length of the Lua string  *(htb-red-island-ssrf-gopher-redis-lua-rce)*
+- count the class-name length by hand and then check it against a real payload. This solve first pushed O:22:"App\Message\FileQueue" -- the name is 21 bytes -- so PHP's unserialize rejected it and the job silently did nothing. The mistake was invisible until LRANGE showed the app's own payload spellin  *(htb-screencrack-domain-loopback-ssrf-gopher-redis-laravel-queue-forge-system-injection)*
+- writeup-assisted, but two published details are stale: writeup_search named the technique; the chain was re-derived from source and improved twice: the external redirect server is unnecessary (nginx percent-decodes the unix: uri), and the published IDAT pixel array no longer survives GD/zlib so the   *(htb-spell-orsterra-nginx-unixsocket-redis-messenger-pop-plte-rce)*
+- the injected content length must count the body bytes exactly  *(htb-weather-app-ssrf-crlf-request-smuggling-upsert)*
 
-*12 more in the cards above; open the card before working its chain.*
+*66 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 66 of 78 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
+- Moderate and mostly reversible if handled deliberately. The injected expression runs as root inside the container, so anything it writes persists for the life of the instance. Copying the flag into a served directory makes it readable by anyone who can reach the instance, so remo  *(htb-artificial-university-grpc-attribute-pollution-eval)*
 - arbitrary request forgery through a behind-the-gate chrome; the leaked signing key impersonates supervisors until the container restarts  *(htb-depotprint-dupkey-gate-formatstring-supervisor-jwt)*
-- Step 7 WRITES a PHP file into the webroot as the mysql user and gives command execution as www-data; pick a unique filename, because INTO OUTFILE refuses an existing path and a second trigger then only produces SQL errors. The injected name persists in the database and re-runs on  *(htb-interstellar-parseurl-curl-host-confusion-ssrf-localhost-edit-stored-proc-sqli-outfile-rce)*
-- eval on the shared Redis instance affects every player's session; prefer read-only Lua first  *(htb-red-island-ssrf-gopher-redis-lua-rce)*
+- read-only. Every step is a GET, and the server-side fetch should be pointed only at the challenge's own loopback services. Do not aim the url parameter at anything outside the supplied instance, and do not use it as a general relay.  *(htb-dusty-alleys-http10-host-vhost-leak-ssrf-to-header-mirror)*
 
 ### Confirmed field notes
 
 - **2026-09-26 · Interstellar · confirmed** (`web-ssrf`) — **Confirming probe that worked** > POST /communicate.php with url=0://127.0.0.1:80;motherland.com:80/ and data[action]=edit&data[new_name]=ZZTESTZZ, then GET / Expected: GET / renders 'Yo, ZZTESTZZ' —
 - **2026-09-26 · ScreenCrack · confirmed** (`web-ssrf`) — **Confirming probe that worked** > POST /api/get-html with {"site":"gopher://<a domain that resolves to 127.0.0.1>:6379/_%2A1%0D%0A%244%0D%0APING%0D%0A%2A1%0D%0A%244%0D%0AQUIT%0D%0A"}, then GET the re
 
-*5 cards, 24 traps, 2 confirmed notes.*
+*13 cards, 78 traps, 2 confirmed notes.*
 
 <!-- FORGED:END -->

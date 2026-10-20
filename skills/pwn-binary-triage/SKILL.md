@@ -1,5 +1,6 @@
 ---
 name: pwn-binary-triage
+evidence_level: catalogue
 description: >
   Binary exploitation router for authorized CTF challenges. Use when an ELF or PE
   takes input and the goal is memory corruption. Identify the protections, prove
@@ -9,6 +10,15 @@ environment: [ctf, lab]
 ---
 
 # Binary Exploitation — Router
+
+**Catalogue class.** The taxonomy classes that route here — `pwn-stack-overflow`, `pwn-format-string`, `pwn-heap-corruption` — are
+all `catalogue`: this toolkit has never solved one, and the measured count of
+chain cards in this category is zero. What follows is standard published
+knowledge plus the tools actually installed on this machine, not local
+experience. Never say a technique here worked here. Record what really
+happens in `field-notes.md`, and the label rises to `verified` only through a
+chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+
 
 Goal: turn an input into control of execution. If the binary only has to be
 *understood* — a licence check, an encoded flag, a VM — that is reversing, and

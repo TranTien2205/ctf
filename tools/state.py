@@ -14,6 +14,12 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PRIORITY = 50
 # A revived branch comes back below a fresh one until new evidence raises it.
 REVIVE_PRIORITY = 40
+# The escalation rungs tools/decide.py can offer. Duplicated here rather than
+# imported because decide.py imports THIS module, so importing it back would be
+# circular. test/regression.py asserts the two tuples stay identical -- a rung
+# spelled differently in one file would silently disable that strategy forever.
+ESCALATION_LADDER = ("chain_match", "reclassify", "writeup_search",
+                     "novel_plan", "fanout_sweep", "solver_handoff")
 
 
 def path_for(name):
@@ -52,6 +58,9 @@ def main():
     ap.add_argument("--challenge-name",
                     help="the challenge's real name, for the writeup-search rule")
     ap.add_argument("--event", help="the event it came from, for the writeup-search rule")
+    ap.add_argument("--strategy-used", choices=ESCALATION_LADDER,
+                    help="record that an escalation strategy has been spent, so "
+                         "tools/decide.py never offers the same rung twice")
     ap.add_argument("--hypothesis")
     ap.add_argument("--bug-class", help="taxonomy class owned by the hypothesis")
     ap.add_argument("--probe")
@@ -91,6 +100,8 @@ def main():
         ap.error("invalid decisions; state not changed")
     if "searches" in state and not isinstance(state["searches"], list):
         ap.error("invalid searches; state not changed")
+    if "strategies_used" in state and not isinstance(state["strategies_used"], list):
+        ap.error("invalid strategies_used; state not changed")
     for hypothesis in state["hypotheses"]:
         hypothesis.setdefault("id", uuid.uuid4().hex)
     selected = None
@@ -140,6 +151,18 @@ def main():
         state["challenge_name"] = args.challenge_name
     if args.event:
         state["event_name"] = args.event
+    if args.strategy_used:
+        # Idempotent: spending the same rung twice is a no-op rather than a
+        # duplicate, so a repeated command cannot make the ladder look longer
+        # than it is. Written as an explicit assignment into the state dict
+        # because test/regression.py proves every key decide.py reads has a
+        # writer by looking for exactly that shape -- a setdefault/append pair
+        # reads as dead to it, and a dead controller rule is the bug that test
+        # exists to catch.
+        spent = list(state.get("strategies_used") or [])
+        if args.strategy_used not in spent:
+            spent.append(args.strategy_used)
+        state["strategies_used"] = spent
     if args.hypothesis:
         created = {"id": uuid.uuid4().hex, "name": args.hypothesis,
                    "bug_class": args.bug_class, "status": "open",

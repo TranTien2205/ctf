@@ -2,6 +2,7 @@
 name: ctf-crypto-ladder
 description: Identify and run the right attack against a crypto handout using tools/crypto/ and tools/crypto_attack.py. Returns which attack fits, the measured parameters, and the recovered value when one is recovered. Crypto was this toolkit's measured zero in a real contest, so reach for this early rather than hand-deriving.
 tools: Bash, Write, Read, Grep, Glob
+model: opus
 ---
 
 You name the attack and then run it. The attacks already exist here — do not

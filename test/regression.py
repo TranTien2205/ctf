@@ -21,6 +21,7 @@ import json
 import re
 import sys
 import argparse
+import shlex
 import subprocess
 import tempfile
 import unittest
@@ -1006,6 +1007,156 @@ class ContractTests(unittest.TestCase):
         self.assertEqual(dangling, [],
                          "a document names a tool that does not exist: %s" % dangling[:6])
 
+    def test_every_workflow_script_spawns_an_agent_that_exists(self):
+        """A workflow that names an absent subagent cannot run at all.
+
+        .claude/workflows/*.js drive the fleet through agentType, which resolves
+        against .claude/agents/. A typo or an aspirational name is not a runtime
+        warning -- the spawn fails mid-wave, after the earlier agents have
+        already cost their 7-10 minutes each. The fleet lists are duplicated in
+        the scripts (the sandbox has no filesystem, so they cannot be read from
+        disk at run time), which is exactly the kind of duplication that rots, so
+        it is proven here instead of trusted.
+        """
+        workflows = ROOT / ".claude" / "workflows"
+        if not workflows.is_dir():
+            self.skipTest("no .claude/workflows/ in this tree")
+        agents = {p.stem for p in (ROOT / ".claude" / "agents").glob("*.md")}
+        self.assertTrue(agents, "no subagents on disk to check against")
+
+        # Quoted 'ctf-*' / 'ad-*' literals are the agent names a script can pass
+        # as agentType; anything else in these files is prose.
+        named = re.compile(r"['\"]((?:ctf|ad)-[a-z0-9-]+)['\"]")
+        missing, checked = [], 0
+        for path in sorted(workflows.glob("*.js")):
+            text = path.read_text(encoding="utf-8")
+            for name in sorted(set(named.findall(text))):
+                checked += 1
+                if name not in agents:
+                    missing.append("%s -> %s" % (path.name, name))
+        self.assertGreater(checked, 0,
+                           "the extractor found no agent names in any workflow "
+                           "script; it has stopped matching and proves nothing")
+        self.assertEqual(sorted(set(missing)), [],
+                         "a workflow script spawns a subagent that is not in "
+                         ".claude/agents/: %s" % sorted(set(missing)))
+
+    def test_a_workflow_return_envelope_only_reads_module_scope_variables(self):
+        """The most expensive failure shape there is, and it happened.
+
+        web-sweep.js declared `let held = []` inside the Sweep phase block and
+        read it in the final `return {...}`. Every one of thirteen agents
+        finished -- 1.03M tokens, 28 minutes, zero agent errors -- and the run
+        then died with `ReferenceError: held is not defined` while assembling the
+        result, so the whole thing was lost. `node --check` passes such a script
+        because the syntax is valid; only scope is wrong.
+
+        A variable the envelope reads is part of the envelope's scope, not the
+        phase's. This checks that cheaply and offline.
+        """
+        workflows = ROOT / ".claude" / "workflows"
+        if not workflows.is_dir():
+            self.skipTest("no .claude/workflows/ in this tree")
+
+        declared_re = re.compile(r"(?m)^(?:const|let|var)\s+([A-Za-z_$][\w$]*)")
+        # `key: name` or `key: name.something(...)` where the value starts with a
+        # bare identifier. A value that starts with a quote is a string literal
+        # and is skipped, which is what kept `python3` out of an earlier version.
+        reads_re = re.compile(r"^\s*[A-Za-z_$][\w$]*:\s*([A-Za-z_$][\w$]*)\b")
+        builtins = {"true", "false", "null", "undefined", "args", "Object",
+                    "Array", "JSON", "Math", "String", "Number", "Boolean"}
+
+        checked, missing = 0, []
+        for path in sorted(workflows.glob("*.js")):
+            text = path.read_text(encoding="utf-8")
+            declared = set(declared_re.findall(text))
+            # ONLY the module-level envelopes, at column zero. An earlier
+            # version matched every `return {` at any indentation and so flagged
+            # returns inside helper functions, where the names it complained
+            # about were parameters and locals genuinely in scope -- four false
+            # positives in solver-fleet.js alone. A nested return is checked by
+            # the engine's own scoping; it is the top-level one that can read a
+            # block-scoped variable and die after the agents have all finished.
+            for match in re.finditer(r"(?m)^return \{$", text):
+                indent = ""
+                tail = text[match.end():]
+                end = tail.find("\n" + indent + "}")
+                body = tail[:end if end >= 0 else len(tail)]
+                for line in body.splitlines():
+                    hit = reads_re.match(line)
+                    if not hit:
+                        continue
+                    name = hit.group(1)
+                    if name in builtins or name in declared:
+                        continue
+                    checked += 1
+                    missing.append("%s: envelope reads %r, declared nowhere at "
+                                   "module scope" % (path.name, name))
+            checked += 1
+
+        self.assertGreater(checked, 0,
+                           "the extractor matched no return envelope; it has "
+                           "stopped working and proves nothing")
+        self.assertEqual(sorted(set(missing)), [],
+                         "a workflow result would die with ReferenceError AFTER "
+                         "every agent finished: %s" % sorted(set(missing))[:4])
+
+    def test_no_workflow_script_delegates_the_ledger(self):
+        """The one rule the speed rebuild must not quietly break.
+
+        tools/decide.py enforces twenty-five probes per challenge, and ten agents
+        recording probes in parallel would spend that in one round and force a
+        class switch on classes nobody worked. So a workflow may COLLECT
+        measurements and PRINT the commands, but it must never tell an agent to
+        run the write gate itself. A script that did would look like a speed-up
+        and would silently disable the controller.
+        """
+        workflows = ROOT / ".claude" / "workflows"
+        if not workflows.is_dir():
+            self.skipTest("no .claude/workflows/ in this tree")
+        offenders = []
+        for path in sorted(workflows.glob("*.js")):
+            # Block-aware, because a line scanner cannot tell the two uses apart
+            # and the first version flagged the SANCTIONED one. A command inside
+            # a returned `the_main_thread_must_now` array is the whole point of
+            # these workflows; the same command inside an agent() prompt is the
+            # thing that would silently disable the controller. So track whether
+            # we are inside an agent() argument list and only judge there.
+            depth, in_agent = 0, False
+            for number, line in enumerate(
+                    path.read_text(encoding="utf-8").splitlines(), 1):
+                lowered = line.lower()
+                if not in_agent and re.search(r"\bagent\s*\(", line):
+                    in_agent, depth = True, 0
+                if in_agent:
+                    depth += line.count("(") - line.count(")")
+                    if depth <= 0 and not re.search(r"\bagent\s*\($", line.strip()):
+                        # the call closed on this line; judge it, then leave
+                        pass
+                if "hooks.py" not in lowered and "state.py" not in lowered:
+                    if in_agent and depth <= 0:
+                        in_agent = False
+                    continue
+                if not in_agent:
+                    # emitted for the main thread, not handed to an agent
+                    continue
+                # A comment is documentation, not a delegation. These files
+                # explain at length WHY the gate is not delegated, so without
+                # this the test flags its own rationale.
+                if lowered.lstrip().startswith(("//", "*", "/*", "#")):
+                    continue
+                # Naming the gate as forbidden, or printing a command for the
+                # MAIN thread to run, is the correct use and must stay allowed.
+                allowed = ("never", "not run", "do not", "must now", "candidate",
+                           "main thread", "forbid", "python3 tools/hooks.py "
+                           "pre-flag", "# ", "gate")
+                if any(token in lowered for token in allowed):
+                    continue
+                offenders.append("%s:%d %s" % (path.name, number, line.strip()[:90]))
+        self.assertEqual(offenders, [],
+                         "a workflow script appears to delegate tools/hooks.py "
+                         "or tools/state.py to a subagent: %s" % offenders)
+
     def test_every_tool_flag_named_in_prose_exists(self):
         """The path test's sibling, one level down: the FLAGS have to be real too.
 
@@ -1805,8 +1956,88 @@ class OrchestratorTests(unittest.TestCase):
         self.assertFalse(any(b["exhausted"] for b in budgets.values()),
                          "no single class is over its own cap, which is the point")
         decision = decide_mod.decide("hopper", now=start + 60 * len(probes))
-        self.assertEqual(decision["action"], "stop_report")
+        # The ceiling still fires and still forbids a further probe. What changed
+        # is what the controller does about it: a spent probe budget is not a
+        # finished challenge, so it changes STRATEGY instead of reporting defeat.
+        self.assertEqual(decision["action"], "escalate")
         self.assertIn("challenge budget exhausted", decision["rationale"])
+        self.assertIn("no further probe is permitted", decision["rationale"])
+
+    def test_the_escalation_ladder_ends_in_a_stop_and_not_a_loop(self):
+        """Removing the stop would make the controller loop for ever.
+
+        "Keep going until the flag" is implemented as a ladder of real
+        strategies, not as an unbounded retry: each rung is offered once,
+        tools/state.py --strategy-used records that it was spent, and when every
+        rung is spent the controller stops and asks for the kill map. Without
+        this test the ladder could silently re-offer a rung and never terminate.
+        """
+        start = 1000.0
+        probes = [{"request": "GET /?p=%d" % i, "result": "inconclusive",
+                   "time": start + i * 60, "verdict": "inconclusive",
+                   "class": "web-ssti"}
+                  for i in range(decide_mod.CHALLENGE_PROBE_BUDGET)]
+        seen, spent = [], []
+        for _ in range(len(decide_mod.ESCALATION_LADDER) + 2):
+            self.write_state("ladder", {
+                "category": "crypto", "challenge_name": "Nameless",
+                "event_name": "SomeCTF", "source": "challenges/ladder/handout",
+                "classes_considered": ["web-ssti"],
+                "hypotheses": [{"id": "h1", "name": "n", "status": "open",
+                                "bug_class": "web-ssti", "priority": 50,
+                                "time": start}],
+                "probes": probes, "strategies_used": list(spent)})
+            decision = decide_mod.decide("ladder", now=start + 60 * len(probes))
+            if decision["action"] != "escalate":
+                break
+            rung = decision["escalation"]["rung"]
+            self.assertNotIn(rung, spent, "the ladder re-offered a spent rung")
+            self.assertTrue(decision["commands"],
+                            "an escalation with no command is not a strategy")
+            self.assertTrue(
+                any("--strategy-used %s" % rung in c for c in decision["commands"]),
+                "a rung must tell the operator how to record that it was spent, "
+                "or the ladder cannot advance")
+            seen.append(rung)
+            spent.append(rung)
+        self.assertEqual(decision["action"], "stop_report",
+                         "the ladder must terminate, not loop")
+        self.assertTrue(seen, "the ladder offered nothing at all")
+        self.assertEqual(seen, [r for r in decide_mod.ESCALATION_LADDER if r in seen],
+                         "rungs must be offered cheapest-first, in ladder order")
+
+    def test_the_two_ladder_definitions_cannot_drift(self):
+        """state.py duplicates the ladder because decide.py imports it.
+
+        A rung spelled differently in one file would be silently unrecordable,
+        so that strategy would be offered for ever and the ladder would never
+        terminate. One number in one place, proven rather than trusted.
+        """
+        self.assertEqual(tuple(decide_mod.ESCALATION_LADDER),
+                         tuple(state.ESCALATION_LADDER))
+
+    def test_the_probe_brake_still_refuses_past_the_ceiling(self):
+        """Escalation is additive: it must not have loosened the brake.
+
+        The ladder changes what decide.py ADVISES when the budget is spent. It
+        must not make hooks.py accept a twenty-sixth probe, or "change strategy"
+        would quietly become "keep probing".
+        """
+        start = 1000.0
+        probes = [{"request": "GET /?p=%d" % i, "result": "inconclusive",
+                   "time": start + i * 60, "verdict": "inconclusive",
+                   "class": "web-ssti"}
+                  for i in range(decide_mod.CHALLENGE_PROBE_BUDGET)]
+        self.write_state("braked", {
+            "hypotheses": [{"id": "h1", "name": "n", "status": "open",
+                            "bug_class": "web-ssti", "priority": 50,
+                            "time": start}],
+            "probes": probes})
+        code = hooks_mod.main(["pre-probe", "braked", "--request",
+                               "GET /a-brand-new-mechanism",
+                               "--hypothesis-id", "h1"])
+        self.assertEqual(code, 2,
+                         "the challenge ceiling must still refuse a probe")
 
     def test_a_novel_white_box_challenge_plans_its_layers_first(self):
         """The case this system was worst at: source, but no chain that fits.
@@ -1863,10 +2094,53 @@ class OrchestratorTests(unittest.TestCase):
                                     "--verdict", "confirms",
                                     "--evidence", "49 appeared in the page",
                                     "--evidence-kind", "class",
+                                    "--response",
+                                    "HTTP/1.1 200 OK\n\n<p>49 appeared in the page</p>",
                                     "--hypothesis-id", "h1", "--class", "web-ssti"), 0)
         recorded = self.read_state("t6")["probes"][-1]
         self.assertEqual(recorded["verdict"], "confirms")
         self.assertIn("49", recorded["evidence"])
+
+    def test_a_confirmation_is_checked_against_the_response_not_trusted(self):
+        """The guarantee this gate is named for, and it used to be unenforceable.
+
+        post-probe had no --response input at all, so "verdict=confirms must
+        quote the response substring that proves it" was checked only as:
+        non-empty, not timeout-shaped, right evidence_kind. Any plausible
+        sentence passed, and the machine validated the SHAPE of the claim while
+        never seeing its truth. tools/web/http_probe.py is the one component
+        that holds the request and the response together, which is why it is the
+        sanctioned path and why it now emits --response itself.
+        """
+        self.write_state("t6r", {
+            "hypotheses": [{"id": "h1", "name": "ssti", "status": "open",
+                            "bug_class": "web-ssti"}], "probes": []})
+        common = ("post-probe", "t6r", "--verdict", "confirms",
+                  "--evidence-kind", "class", "--class", "web-ssti",
+                  "--hypothesis-id", "h1")
+
+        # No response at all: there is nothing to check the quote against.
+        self.assertEqual(self.hooks(*common, "--request", "GET /a",
+                                    "--evidence", "49 rendered"), 2)
+
+        # A response that does NOT contain the evidence: summarised, retyped or
+        # reconstructed. This is the case the old gate could never see.
+        self.assertEqual(self.hooks(*common, "--request", "GET /b",
+                                    "--evidence", "the template evaluated 7*7",
+                                    "--response", "HTTP/1.1 200 OK\n\n<p>49</p>"), 2)
+
+        # A genuine verbatim quote is accepted, and stored.
+        self.assertEqual(self.hooks(*common, "--request", "GET /c",
+                                    "--evidence", "<p>49</p>",
+                                    "--response", "HTTP/1.1 200 OK\n\n<p>49</p>"), 0)
+        recorded = self.read_state("t6r")["probes"][-1]
+        self.assertEqual(recorded["verdict"], "confirms")
+        self.assertIn("49", recorded["evidence"])
+
+        # The response is a check, not a second copy of the evidence: it must
+        # not be written into the ledger, which would double every probe's size
+        # and store response bytes the proof standard never asked us to keep.
+        self.assertNotIn("response", recorded)
 
     def test_hooks_reject_duplicate_and_write_shaped_probes(self):
         self.write_state("t7", {"hypotheses": [{"id": "h1", "name": "ssti",
@@ -1921,6 +2195,7 @@ class OrchestratorTests(unittest.TestCase):
                                     "--verdict", "confirms",
                                     "--evidence", "49 rendered",
                                     "--evidence-kind", "class",
+                                    "--response", "HTTP/1.1 200 OK\n\n49 rendered",
                                     "--class", "web-ssti",
                                     "--hypothesis-id", "h1"), 0)
         self.assertEqual(self.hooks("pre-confirm", "t8",
@@ -2099,6 +2374,171 @@ class KnowledgeScaleTests(unittest.TestCase):
                          "knowledge/bug-classes.json, so classify.py cannot route "
                          "to it: %s" % orphans)
 
+    def test_http_probe_refuses_a_verdict_when_urllib_dropped_a_header(self):
+        """A response to a request that was not sent is not evidence.
+
+        Measured on a live box: `Connection: X-Real-IP` bypassed an API token
+        check -- curl and a raw socket both answered 200 {"trades":[]} where the
+        plain request answered 401 -- and tools/web/http_probe.py answered 401
+        for the identical call, because http.client replaces the Connection
+        header with its own. urllib.request.Request even reports the header back
+        from header_items(), so nothing looked wrong. A confident negative about
+        a request that never went out is worse than a failure, and it blinds the
+        tool for exactly web-parser-differential and web-request-smuggling,
+        where manipulating that header IS the technique.
+        """
+        sys.path.insert(0, str(ROOT / "tools" / "web"))
+        import httpkit
+
+        # The error path is enough and needs no network: an unroutable port
+        # fails fast, and headers_not_sent is reported on both paths.
+        dead = "http://127.0.0.1:1/never"
+        got = httpkit.request(dead, headers={"Connection": "X-Real-IP"},
+                              timeout=2)
+        self.assertEqual(got.get("headers_not_sent"), ["Connection"],
+                         "httpkit must report a header http.client overrides")
+
+        clean = httpkit.request(dead, headers={"X-Custom": "1"}, timeout=2)
+        self.assertEqual(clean.get("headers_not_sent"), [],
+                         "an ordinary header is sent and must not be reported "
+                         "as dropped")
+
+        for managed in ("Content-Length", "Transfer-Encoding", "Host"):
+            got = httpkit.request(dead, headers={managed: "x"}, timeout=2)
+            self.assertEqual(got.get("headers_not_sent"), [managed],
+                             "%s is managed by http.client too" % managed)
+
+        # And the probe must act on it rather than only report it.
+        source = (ROOT / "tools" / "web" / "http_probe.py").read_text(
+            encoding="utf-8")
+        self.assertIn("headers_not_sent", source,
+                      "http_probe ignores the dropped-header signal")
+        self.assertIn("DIFFERENT request", source,
+                      "the downgrade must say why the verdict is void")
+        self.assertNotIn('if dropped and verdict == "confirms"', source,
+                         "the guard must be unconditional: the real case was a "
+                         "MISS caused by the dropped header, so gating it on "
+                         "confirms let a confident negative through")
+
+    def test_validate_refuses_prose_in_the_class_field(self):
+        """`class` becomes `post-probe --class`, so prose there is unrunnable.
+
+        Measured on the first live fleet run: the bundle family answered with a
+        150-character explanation in this field -- "web-source-map (skill name;
+        NOT an id in knowledge/bug-classes.json ...)" -- and --merge passed it
+        through verbatim, so three of ten emitted commands could not be run. A
+        family that owns no taxonomy class says so with null, which the contract
+        already asks for.
+        """
+        import subagent_fanout as fanout
+
+        base = {
+            "layer_id": "bundle", "challenge": "t", "files_read": [],
+            "falsifier_outcome": "broken", "conclusion": "hypothesis",
+            "cost_minutes": 1, "probes": [],
+        }
+
+        prose = dict(base, **{"class": "web-source-map (skill name; NOT an id in "
+                                       "knowledge/bug-classes.json)"})
+        problems, _ = fanout.validate_report(prose)
+        self.assertTrue(any("not an id" in p for p in problems),
+                        "prose in `class` was accepted: %s" % problems)
+
+        # null is the correct answer for a family that owns no class, and must
+        # keep passing or the recon and bundle families become unreportable.
+        problems, _ = fanout.validate_report(dict(base, **{"class": None}))
+        self.assertEqual(problems, [], "class null must stay valid: %s" % problems)
+
+        # a real id passes
+        taxonomy = json.loads(
+            (ROOT / "knowledge" / "bug-classes.json").read_text(encoding="utf-8"))
+        real = taxonomy["classes"][0]["id"]
+        problems, _ = fanout.validate_report(dict(base, **{"class": real}))
+        self.assertEqual(problems, [],
+                         "a real taxonomy id was refused: %s" % problems)
+
+    def test_the_web_sweep_stops_when_the_app_publishes_its_own_spec(self):
+        """The stop condition the first live run paid 1.1M tokens to learn.
+
+        On GoNuclear the sweep spawned twelve agents over 42 minutes; the answer
+        was a 7 KB /api/openapi.json declaring an operation with no `security`
+        and a response field named `verifyToken`. A fan-out maps an UNKNOWN
+        surface, so a published spec must END the sweep, not precede it.
+        """
+        path = ROOT / ".claude" / "workflows" / "web-sweep.js"
+        if not path.is_file():
+            self.skipTest("no web-sweep workflow in this tree")
+        text = path.read_text(encoding="utf-8")
+
+        for token in ("openapi.json", "swagger.json", "api-docs",
+                      "has_security", "short_circuit"):
+            self.assertIn(token, text,
+                          "web-sweep.js no longer looks for a published spec (%s)"
+                          % token)
+        self.assertIn("published_api_spec", text,
+                      "the spec short-circuit must name itself in the result so a "
+                      "reader can tell a stop from a completed sweep")
+        self.assertIn("forceSweep", text,
+                      "the stop condition needs a documented bypass for when the "
+                      "spec turns out to be a dead end")
+        # The cap that stops this workflow disagreeing with dispatch.py.
+        self.assertIn("MAX_WIDTH", text,
+                      "web-sweep.js must cap its wave like "
+                      "tools/contest/dispatch.py does; without it the two "
+                      "components disagree and the extra agents only queue")
+        self.assertIn("families_held_over_width_cap", text,
+                      "what the cap dropped must be reported, or a truncated "
+                      "sweep reads as a complete one")
+
+    def test_merge_emits_a_command_the_gate_will_actually_accept(self):
+        """Found by running the fleet for real, not by reading the code.
+
+        tools/hooks.py post-probe was hardened to REQUIRE --response on a
+        `confirms` verdict and to assert the evidence is a substring of it.
+        tools/subagent_fanout.py --merge builds those commands, and it was not
+        updated: on the first live fleet run it emitted ten confirming commands,
+        not one carried --response, and the gate refused every single one. The
+        excerpt was already in the report -- it only had to be passed through.
+
+        A merge that emits an unrunnable command is worse than one that emits
+        nothing, because the failure surfaces at the end of a 40-minute sweep.
+        """
+        import subagent_fanout as fanout
+
+        report = {
+            "layer_id": "client", "challenge": "t", "class": "web-cors",
+            "files_read": [], "falsifier_outcome": "broken",
+            "conclusion": "hypothesis", "cost_minutes": 1,
+            "probes": [{
+                "request": "GET /api/files",
+                "transport": "ok", "status": 401,
+                "response_excerpt": "HTTP/1.1 401\naccess-control-allow-origin: https://evil.example\n",
+                "evidence": "access-control-allow-origin: https://evil.example",
+                "evidence_kind": "class", "verdict": "confirms",
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "client.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            merged = fanout.merge([str(path)], "t")
+
+        confirming = [c for c in merged["commands_for_the_main_thread"]
+                      if "--verdict confirms" in c]
+        self.assertTrue(confirming, "merge emitted no confirming command to check")
+        for command in confirming:
+            self.assertIn("--response", command,
+                          "a confirming post-probe command without --response is "
+                          "refused by the gate: %s" % command[:120])
+
+        # And the response it passes must really contain the evidence, or the
+        # command is refused for the second reason instead of the first.
+        argv = shlex.split(confirming[0], comments=True)
+        evidence = argv[argv.index("--evidence") + 1]
+        response = argv[argv.index("--response") + 1]
+        self.assertIn(evidence, response,
+                      "merge passed a response that does not contain its own "
+                      "evidence, so the gate will reject the quote")
+
     def test_subagent_reports_cannot_claim_more_than_they_measured(self):
         """The fan-out validator is the only thing between model prose and the ledger.
 
@@ -2224,6 +2664,170 @@ class KnowledgeScaleTests(unittest.TestCase):
                       hit["strong_chain_match"].get("do_this_instead", ""),
                       "the short circuit does not say to run the card's own probe")
 
+    def test_dfir_family_map_resolves_and_covers_every_dfir_class(self):
+        """The DFIR counterpart of the web family map, plus two stricter checks.
+
+        Same failure to prevent: a family naming a class id that nothing defines
+        spawns an agent briefed on a class nobody wrote. Two things are checked
+        here that the web test does not, because this category is newer and both
+        were real mistakes while it was built:
+
+        (a) COVERAGE. Every `dfir-*` class in the taxonomy must be owned by at
+            least one family. A class with no family is a class the sweep silently
+            never measures -- and `dfir-persistence-trace` was briefly in that
+            state, reachable only through an agent that reads EVTX.
+        (b) A SHARED CLASS MUST BE SPLIT EXPLICITLY. Three DFIR classes are owned
+            by two families each (event-log versus on-disk, Windows versus Linux,
+            cleared-log versus timestamp). Both families must carry an `owns`
+            field saying which half, or two agents measure the same artifact and
+            the main thread cannot tell which report answered the question.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import subagent_fanout as fan
+
+        taxonomy = {c["id"]: c for c in json.loads(
+            (ROOT / "knowledge" / "bug-classes.json").read_text(encoding="utf-8"))["classes"]}
+        named = [cid for spec in fan.DFIR_FAMILIES for cid in spec["classes"]]
+        self.assertTrue(named, "the dfir family map names no classes at all")
+        unknown = sorted(set(named) - set(taxonomy))
+        self.assertEqual(unknown, [],
+                         "the dfir family map names classes absent from the "
+                         "taxonomy: %s" % unknown)
+        for cid in set(named):
+            self.assertEqual(taxonomy[cid].get("category"), "dfir",
+                             "%s is in the dfir family map but its taxonomy "
+                             "category is %r" % (cid, taxonomy[cid].get("category")))
+
+        # (a) coverage: no dfir class may be left without a family
+        dfir_classes = {cid for cid, cls in taxonomy.items()
+                        if cls.get("category") == "dfir"}
+        uncovered = sorted(dfir_classes - set(named))
+        self.assertEqual(uncovered, [],
+                         "these dfir classes have no family, so --dfir would never "
+                         "brief an agent on them: %s" % uncovered)
+
+        # (b) a class owned by two families must have both halves named
+        counts = {}
+        for spec in fan.DFIR_FAMILIES:
+            for cid in spec["classes"]:
+                counts.setdefault(cid, []).append(spec)
+        for cid, specs in counts.items():
+            if len(specs) < 2:
+                continue
+            for spec in specs:
+                self.assertTrue(
+                    spec.get("owns"),
+                    "%s is owned by %d families, so %r must carry an `owns` field "
+                    "saying which half it measures" % (cid, len(specs),
+                                                       spec["family"]))
+
+        agents_dir = ROOT / ".claude" / "agents"
+        for spec in fan.DFIR_FAMILIES:
+            self.assertTrue((agents_dir / (spec["agent"] + ".md")).is_file(),
+                            "dfir family %r spawns %r, which has no definition "
+                            "under .claude/agents" % (spec["family"], spec["agent"]))
+
+        # An investigation reads supplied artifacts, so there is no target to
+        # mutate and no family may be write-shaped.
+        write_shaped = [s["family"] for s in fan.DFIR_FAMILIES if s.get("write_shaped")]
+        self.assertEqual(write_shaped, [],
+                         "no dfir family may be write-shaped: an investigation "
+                         "reads artifacts; got %s" % write_shaped)
+
+        # with no bundle there is no artifact inventory, but every taxonomy field
+        # the brief promises must still be present
+        bare = fan.dfir_briefs(None, None, "t")
+        self.assertEqual(bare["families"], len(fan.DFIR_FAMILIES))
+        self.assertEqual(bare["launch_order"][0], "recon",
+                         "recon must be briefed first: every other dfir family "
+                         "routes against its inventory")
+        for brief in bare["briefs"]:
+            self.assertEqual(brief["artifacts_that_fired"], [],
+                             "%s invented an artifact hit with no bundle supplied"
+                             % brief["family"])
+            self.assertIn("pre-flag", brief["recording_rule"],
+                          "%s does not say a dfir answer is recorded with pre-flag"
+                          % brief["family"])
+            for cls in brief["classes"]:
+                self.assertNotIn("_missing_from_taxonomy", cls,
+                                 "%s carries an unresolved class: %s"
+                                 % (brief["family"], cls))
+                self.assertTrue(cls.get("first_probe"),
+                                "%s has no first_probe from the taxonomy" % cls["id"])
+                self.assertTrue(cls.get("falsifier"),
+                                "%s has no falsifier from the taxonomy" % cls["id"])
+
+        # The sweep skill's family table must match the code. Measured: adding the
+        # eighth family left the skill saying "seven families" with a seven-row
+        # table, which is the kind of drift a reader believes over the code.
+        sweep = (ROOT / "skills" / "dfir-parallel-sweep" / "SKILL.md")
+        if sweep.is_file():
+            text = sweep.read_text(encoding="utf-8")
+            rows = [l for l in text.splitlines()
+                    if l.startswith("| ") and "ctf-dfir-" in l]
+            listed = {l.split("|")[1].strip() for l in rows}
+            declared = {s["family"] for s in fan.DFIR_FAMILIES}
+            self.assertEqual(
+                listed, declared,
+                "skills/dfir-parallel-sweep/SKILL.md's family table disagrees with "
+                "DFIR_FAMILIES: missing %s, extra %s"
+                % (sorted(declared - listed), sorted(listed - declared)))
+
+        # chain recall must state its own emptiness rather than looking broken
+        recall = bare["chain_recall"]
+        self.assertNotIn("error", recall,
+                         "dfir chain recall reported an error: %s" % recall)
+        self.assertIn(recall.get("status"), ("cannot_fire", "cards_exist"),
+                      "dfir chain recall returned no usable status: %s" % recall)
+
+    def test_dfir_merge_emits_pre_flag_not_post_probe(self):
+        """A DFIR answer comes from an artifact, so the command that records it
+        differs from the web one -- and emitting the wrong one is silent.
+
+        `tools/hooks.py post-probe` records a verdict about a bug class; a
+        Sherlock answer is a fact read from a supplied artifact and enters state
+        through `pre-flag --source artifact`. A merge that emitted post-probe for
+        a dfir class would hand the operator a command that records the wrong
+        kind of thing, so this pins the branch.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import subagent_fanout as fan
+
+        report = {
+            "layer_id": "linux", "challenge": "sher-q1",
+            "class": "dfir-authentication-trace",
+            "falsifier_outcome": "broken",
+            "probes": [{
+                "request": "linux_auth.py --authlog auth.log --event accepted",
+                "transport": "ok", "status": 0,
+                "response_excerpt": "Mar  6 06:32:44 web-01 sshd[2455]: Accepted "
+                                    "password for root from 198.51.100.77 port 53184 ssh2",
+                "evidence": "Accepted password for root from 198.51.100.77",
+                "evidence_kind": "impact", "verdict": "confirms",
+            }],
+        }
+        problems, norm = fan.validate_report(report)
+        self.assertEqual(problems, [], "the fixture report should validate: %s" % problems)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "linux.json")
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(report, fh)
+            out = fan.merge([path], "sher")
+        self.assertEqual(out["rejected"], [], "merge rejected a valid report: %s"
+                         % out["rejected"])
+        joined = "\n".join(out["commands_for_the_main_thread"])
+        self.assertIn("pre-flag", joined,
+                      "a dfir class did not produce a pre-flag command: %s" % joined)
+        self.assertIn("--source artifact", joined,
+                      "the dfir pre-flag command must record --source artifact")
+        self.assertNotIn("post-probe", joined,
+                         "a dfir class must NOT be recorded with post-probe: %s" % joined)
+        # the answer VALUE is the one field a tool must not guess
+        self.assertIn("<ANSWER>", joined,
+                      "the pre-flag template must leave the answer value for the "
+                      "main thread to fill, not invent it")
+
     def test_subagent_capability_matches_the_invariant(self):
         """What a subagent may do, and the one thing it may never do.
 
@@ -2289,6 +2893,170 @@ class KnowledgeScaleTests(unittest.TestCase):
         self.assertTrue(writers,
                         "no subagent can write at all -- that is the state that made "
                         "the fleet unable to take any step past recon")
+
+    # Tools CLAUDE.md records as measured absent on this machine. An agent told
+    # to run one of these fails at the shell, and the failure looks like the
+    # technique not working rather than the tool not existing.
+    ABSENT_TOOLS = ("pwntools", "gdb", "ROPgadget", "ropper", "one_gadget",
+                    "checksec", "patchelf", "strace", "ltrace", "angr",
+                    "unicorn", "keystone", "ropper", "pyelftools", "z3", "sage",
+                    "fpylll", "gmpy2", "jadx", "procyon", "mono", "decompyle3",
+                    "pycdc", "steghide", "zsteg", "outguess", "foremost",
+                    "yara", "volatility3", "stem", "pytesseract")
+
+    def test_no_subagent_is_told_to_run_a_tool_this_box_does_not_have(self):
+        """Measured twice while building this fleet, both times silently.
+
+        `skills/pwn-rop/SKILL.md` carried whole "ROPgadget Commands" and "ropper
+        Commands" sections for tools CLAUDE.md records as ABSENT, and an
+        authored crypto agent put `--list` in a bash block for a subcommand that
+        is not a flag. Neither is caught by the tool-path or tool-flag tests,
+        because those only read `python3 tools/...` lines.
+
+        The rule is narrow on purpose: naming a tool as absent is correct and is
+        what these files should do. Only RUNNING it is a violation, so this
+        looks for the tool as the first token of a line inside a fenced code
+        block, which is the shape of an instruction.
+        """
+        offenders = []
+        for path in sorted((ROOT / ".claude" / "agents").glob("*.md")):
+            text = path.read_text(encoding="utf-8")
+            for block in re.findall(r"```(?:bash|sh|console)?\n(.*?)```", text, re.S):
+                for line in block.splitlines():
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        continue
+                    first = re.split(r"[\s|;&]", stripped.lstrip("$ "))[0]
+                    first = first.rsplit("/", 1)[-1]
+                    if first in self.ABSENT_TOOLS:
+                        offenders.append("%s: %s" % (path.name, stripped[:70]))
+        self.assertEqual(sorted(set(offenders)), [],
+                         "a subagent is told to run a tool measured absent on this "
+                         "machine: %s" % sorted(set(offenders))[:6])
+
+    def test_every_subagent_pins_a_model(self):
+        """An unpinned agent silently falls back to the session default.
+
+        Measured: `ctf-crypto-ladder` and `ctf-pwn-triage` shipped with no
+        `model:` line at all, so the two hardest-reasoning categories in the
+        tree ran on whatever the session happened to be using. Crypto is this
+        toolkit's measured zero in a real contest, which makes it the worst
+        place for that to be left to chance.
+        """
+        missing = []
+        for path in sorted((ROOT / ".claude" / "agents").glob("*.md")):
+            head = re.match(r"^---\n(.*?)\n---\n",
+                            path.read_text(encoding="utf-8"), re.S)
+            if not head or not re.search(r"(?m)^model:\s*\S+", head.group(1)):
+                missing.append(path.name)
+        self.assertEqual(missing, [],
+                         "these subagents pin no model and inherit the session's: %s"
+                         % missing)
+
+    def test_every_solver_subagent_returns_the_flag_contract(self):
+        """A solver may reach a flag, so its report has to carry the proof.
+
+        The crypto, pwn, rev, osint and misc fleets differ from the measure-only
+        ctf-web-* and ctf-dfir-* families: they are permitted to chain their own
+        findings to a flag. That is only safe because the flag comes back with
+        the bytes it was read from and the command that produced them, which
+        `.claude/workflows/solver-fleet.js` then checks mechanically before a
+        human sees it. An agent whose return block omits those keys hands back a
+        flag nobody can check.
+        """
+        required = ("flag_candidate", "flag_source", "flag_evidence",
+                    "flag_command", "measured_dead", "next_lead")
+        solver = re.compile(r"^ctf-(crypto|pwn|rev|osint|misc)-")
+        checked, offenders = 0, []
+        for path in sorted((ROOT / ".claude" / "agents").glob("*.md")):
+            if not solver.match(path.stem) or path.stem.endswith("-ladder"):
+                continue
+            checked += 1
+            text = path.read_text(encoding="utf-8")
+            for key in required:
+                if key not in text:
+                    offenders.append("%s is missing %s" % (path.name, key))
+        self.assertGreater(checked, 10,
+                           "only %d solver agents were checked; the pattern has "
+                           "stopped matching and this proves nothing" % checked)
+        self.assertEqual(sorted(offenders), [],
+                         "a solver subagent's return block cannot be verified: %s"
+                         % sorted(offenders)[:6])
+
+    def test_a_stage_lead_is_a_card_to_read_and_never_a_probe_to_run(self):
+        """The transfer path, and the bound that makes it safe to ship.
+
+        A card's `signals` are literals from its own handout, so a new challenge
+        sharing the MECHANISM shares none of them: tools/holdout_eval.py measures
+        card-level transfer at 0.0. Its `chain[]` prose is mechanism vocabulary
+        instead, and matching on that reaches the right peer about a quarter of
+        the time in the top three -- measured against
+        test/baselines/mechanism_families.json.
+
+        A quarter is nowhere near enough to grade a match `candidate`. That
+        grade gates --record and hands decide.py a probe, so being wrong three
+        times in four would be worse than silence. This test is the bound: a
+        stage lead must stay weak, must say why, and must never be recordable.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import chain_match as cm
+        cards = [c for c in cm.load_chains() if "_error" not in c]
+        self.assertTrue(cards, "no chain cards to index")
+
+        index = cm.build_stage_index(cards)
+        self.assertGreater(len(index["units"]), 50,
+                           "the stage index covers almost no cards")
+        self.assertGreater(sum(len(u) for u in index["units"].values()), 1000,
+                           "the stage index holds too few terms to retrieve on")
+
+        # A card scored against its OWN stage prose must produce a lead, which
+        # proves the index and the scorer are wired to each other at all.
+        probe = max(cards, key=lambda c: len(index["units"].get(c["id"]) or ()))
+        tokens = cm.stage_tokens(cm.stage_text(probe))
+        weight, hits = cm.stage_lead_score(probe, tokens, index)
+        self.assertGreater(weight, 0.0,
+                           "a card does not even match its own stage prose")
+        self.assertGreaterEqual(hits, cm.STAGE_MIN_HITS)
+
+        # And the lead it produces is weak, explained, and not recordable.
+        lead = cm.score_card(probe, "nothing matches here", "nothing matches here",
+                             None, source_mode=True, scope={},
+                             stage_index=index, query_tokens=tokens)
+        self.assertIsNotNone(lead, "a stage overlap must surface as a lead")
+        self.assertEqual(lead["match_via"], "stage")
+        self.assertEqual(lead["status"], "weak",
+                         "a stage lead must never be graded candidate: that "
+                         "grade gates --record and feeds decide.py a probe")
+        self.assertEqual(lead["signals_matched"], [],
+                         "a stage lead matched no literal by definition")
+        self.assertEqual(lead["signal_coverage"], 0.0)
+        self.assertLessEqual(lead["match_confidence"], 0.30,
+                             "a lead must not report a confidence that reads "
+                             "like a literal match")
+        self.assertIn("do NOT run its probe", lead["why_weak"])
+
+        # record_candidates is the gate between a match and the ledger: a weak
+        # entry must not pass it, or a 25%-accurate lead would drive the loop.
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            (root / "challenges" / "leadonly").mkdir(parents=True)
+            (root / "challenges" / "leadonly" / "state.json").write_text(
+                json.dumps({"schema_version": 1, "name": "leadonly",
+                            "hypotheses": [], "probes": [], "next_action": None}),
+                encoding="utf-8")
+            # record_candidates imports `state` inside the function, so the
+            # module object in sys.modules is what it will use.
+            with patch.object(cm, "ROOT", str(root)), \
+                    patch.object(state, "ROOT", str(root)):
+                out = cm.record_candidates("leadonly", [lead])
+            self.assertFalse(out.get("recorded"),
+                             "a weak stage lead was written into the ledger")
+            written = json.loads(
+                (root / "challenges" / "leadonly" / "state.json").read_text(
+                    encoding="utf-8"))
+            self.assertFalse(written.get("chain_candidates"),
+                             "a weak lead reached state['chain_candidates'], "
+                             "which decide.py rule 6 turns into a probe")
 
     def test_every_retrieval_alias_re_proves_itself(self):
         """An alias file is a place to smuggle in a wrong pairing, so re-measure.
@@ -2381,6 +3149,223 @@ class KnowledgeScaleTests(unittest.TestCase):
             "%.3f < floor %.3f. Fix the matcher or the card's signals; do not "
             "lower the floor to make this pass."
             % (report["top1_rate"], floor))
+
+
+class LocalSolveRecallTests(unittest.TestCase):
+    """The cheapest retrieval route, and the one the tree did not have.
+
+    Measured, which is why these exist: a target named NovaCore was worked with
+    a 13-agent sweep for 1.03M tokens while `solved/novacore.md` and a 498-line
+    working `challenges/novacore/solver.py` sat on this disk the whole time. The
+    flag came, in the end, from that solver with its host and port line edited.
+    chain_match reads only knowledge/chains/ and scores card SIGNALS against an
+    observation, so nothing in the tree ever asked the simplest question: has a
+    challenge of THIS NAME already been solved here?
+    """
+
+    def test_a_matching_name_is_found(self):
+        hit = chain_match.local_solve("novacore")
+        self.assertIsNotNone(hit, "solved/novacore.md is on disk and must be found")
+        self.assertIn("solved/novacore.md", hit["notes"])
+
+    def test_a_suffixed_respawn_finds_the_original(self):
+        # The case that actually cost the tokens: a re-spawned instance is
+        # registered as <name>2 while the solve sits under <name>.
+        hit = chain_match.local_solve("novacore2")
+        self.assertIsNotNone(hit, "a suffixed name must still find the original solve")
+        self.assertIn("solved/novacore.md", hit["notes"])
+        self.assertIn("challenges/novacore/solver.py", hit["solvers"])
+
+    def test_an_unseen_name_stays_silent(self):
+        # Abstention matters more than recall here: a false hit sends the next
+        # agent to read a solve for a different challenge.
+        self.assertIsNone(chain_match.local_solve("zzz-never-seen-here"))
+
+    def test_a_short_or_empty_name_cannot_match(self):
+        # A 1-3 character name would substring-match most of the corpus.
+        for name in ("", None, "a", "ab", "abc"):
+            self.assertIsNone(chain_match.local_solve(name),
+                              "%r is too short to match on safely" % (name,))
+
+    def test_every_solved_note_finds_itself_and_few_others(self):
+        notes = sorted(p.name[:-3] for p in (ROOT / "solved").glob("*.md"))
+        self.assertGreater(len(notes), 20, "corpus too small to measure")
+        for name in notes:
+            hit = chain_match.local_solve(name)
+            self.assertIsNotNone(hit, "%s must find its own note" % name)
+            self.assertIn("solved/%s.md" % name, hit["notes"])
+            # A name may legitimately match a sibling of the same challenge
+            # family (red-island / red-island-2), so the bound is low, not one.
+            self.assertLessEqual(
+                len(hit["notes"]), 3,
+                "%s matched %d notes; the prefix rule is too loose and a false "
+                "hit sends the next agent to the wrong solve: %s"
+                % (name, len(hit["notes"]), hit["notes"]))
+
+    def test_the_check_owns_next_action_ahead_of_every_similarity_score(self):
+        # A recorded solve for this exact name must not be printed underneath a
+        # "no strong match, plan from source" verdict -- that is how it was
+        # missed. It has to be the instruction, not a field.
+        proc = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "chain_match.py"),
+             "--source", "challenges/novacore2", "--json"],
+            capture_output=True, text=True, cwd=str(ROOT))
+        self.assertIn(proc.returncode, (0, 1), proc.stderr[:400])
+        report = json.loads(proc.stdout)
+        self.assertEqual(report["input"]["name_checked"], "novacore2",
+                         "the name must be derived from the source path")
+        self.assertIsNotNone(report["local_solve"])
+        self.assertIn("solved/novacore.md", report["next_action"])
+        self.assertNotIn("no solved chain is a strong match", report["next_action"])
+
+    def test_the_scout_is_told_to_run_it_first(self):
+        # The tool existing is not the fix; the agent that runs first has to
+        # know about it. Measured before this: 0 references to solver.py.
+        body = (ROOT / ".claude" / "agents" / "ctf-killmap-scout.md").read_text(
+            encoding="utf-8")
+        self.assertIn("local_solve", body)
+        self.assertIn("solver.py", body)
+        self.assertIn("--name", body)
+
+class EveryChainCardValidatesTests(unittest.TestCase):
+    """The gate validated a card when one was WRITTEN and never the library.
+
+    Measured: 21 of 73 cards on disk failed their own schema, because
+    backfill_classification.py wrote a `classification.derived_by` key that
+    knowledge/chain-schema.json forbade with additionalProperties:false. The
+    writer and the schema disagreed for 21 cards and nothing reported it,
+    because validate_card.py is only ever pointed at one file by hand. A
+    knowledge base whose own schema rejects a third of it cannot be trusted to
+    reject anything, so the whole library is checked here.
+    """
+
+    def test_every_chain_card_satisfies_the_chain_schema(self):
+        cards = sorted((ROOT / "knowledge" / "chains").glob("*.json"))
+        self.assertGreater(len(cards), 60, "chain library unexpectedly small")
+        # In-process: 73 subprocesses took 72 seconds, and this runs on the
+        # gate for every change.
+        sys.path.insert(0, str(ROOT / "tools"))
+        import validate_card
+        failures = []
+        for card in cards:
+            try:
+                data = json.loads(card.read_text(encoding="utf-8"))
+            except ValueError as exc:
+                failures.append((card.name, "unparseable: %s" % exc))
+                continue
+            errors = validate_card.validate(data)
+            if errors:
+                failures.append((card.name, errors))
+        self.assertEqual(
+            failures, [],
+            "%d of %d chain cards fail their own schema. Fix the card or the "
+            "schema -- but do not leave the writer and the schema disagreeing, "
+            "which is how 21 cards were invalid without anyone noticing:\n%s"
+            % (len(failures), len(cards),
+               "\n".join("  %s: %s" % f for f in failures[:10])))
+
+    def test_no_card_in_the_library_carries_a_real_flag(self):
+        # validate_card.py already owns the detector and knows that `HTB{...}`
+        # is how these cards redact; a second regex here would be a second
+        # definition of the same rule, which is how the two rarity scorers in
+        # this tree drifted apart. Reuse the one that ships.
+        sys.path.insert(0, str(ROOT / "tools"))
+        import validate_card
+        leaked = [card.name
+                  for card in sorted((ROOT / "knowledge" / "chains").glob("*.json"))
+                  if validate_card._looks_like_a_real_flag(
+                      card.read_text(encoding="utf-8"))]
+        self.assertEqual(leaked, [],
+                         "flag-shaped strings in chain cards: %s" % leaked)
+
+
+class ForgedTrapsRepresentEveryCardTests(unittest.TestCase):
+    """Step 5b must not silently drop a card it was run for.
+
+    AGENTS.md section 5 says agent_prompt_forge exists so "a card's known_traps
+    reach the agent that meets the same trap next". Measured: ctf-web-parser
+    owns 10 cards carrying 78 traps, MAX_TRAPS is 12, and the forge concatenated
+    them card-by-card -- so the first two or three cards filled the quota and a
+    card filed afterwards contributed nothing, while `--check` reported nothing
+    stale. Running the step after a solve was a no-op for every mature family.
+    """
+
+    def _families(self):
+        sys.path.insert(0, str(ROOT / "tools"))
+        import subagent_fanout
+        return list(subagent_fanout.WEB_FAMILIES) + list(subagent_fanout.DFIR_FAMILIES)
+
+    def test_every_owned_card_contributes_at_least_one_trap(self):
+        sys.path.insert(0, str(ROOT / "tools"))
+        import agent_prompt_forge as forge
+        cards, tax = forge.load_cards(), forge.taxonomy()
+        checked = 0
+        for family in self._families():
+            owned = [c for c in forge.cards_for(family["classes"], cards, tax)
+                     if c.get("known_traps")]
+            if len(owned) < 2:
+                continue
+            block = forge.forge(family, cards, tax)
+            if "### Traps this tree has already paid for" not in block:
+                continue
+            section = block.split("### Traps this tree has already paid for")[1]
+            section = section.split("### ")[0]
+            shown = set(re.findall(r"\*\((\S+?)\)\*", section))
+            missing = sorted({c["id"] for c in owned} - shown)
+            # Every card may not fit when a family owns more cards than
+            # MAX_TRAPS; the invariant is that nothing is dropped while room
+            # remains, which round-robin guarantees.
+            if len(owned) <= forge.MAX_TRAPS:
+                self.assertEqual(
+                    missing, [],
+                    "%s: %d of %d owned cards contribute no trap to the forged "
+                    "prompt while room remained. Traps must be taken one per "
+                    "card before any card's second, or filing a new card does "
+                    "nothing for the fleet: %s"
+                    % (family["agent"], len(missing), len(owned), missing))
+            checked += 1
+        self.assertGreater(checked, 0, "no family had enough cards to measure")
+
+    def test_a_backslash_in_a_trap_does_not_crash_the_forge(self):
+        """apply_to() spliced the block in with re.sub(), where the block is a
+        REPLACEMENT TEMPLATE -- so a backslash in any card's trap was read as an
+        escape. A card quoting the PHP class App\\Message\\FileQueue crashed the
+        gate with `re.PatternError: bad escape \\M`, and it stayed hidden only
+        because that trap fell beyond MAX_TRAPS until the ordering changed.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import agent_prompt_forge as forge
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "agent.md")
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write("hand-written top\n\n%s\nold\n%s\n\nhand-written tail\n"
+                         % (forge.BEGIN, forge.END))
+            block = "%s\nO:22:\"App\\Message\\FileQueue\" and a \\g<0> too\n%s" % (
+                forge.BEGIN, forge.END)
+            new, changed = forge.apply_to(path, block)
+        self.assertTrue(changed)
+        self.assertIn(r"App\Message\FileQueue", new,
+                      "the backslashes must survive verbatim, not be interpreted")
+        self.assertIn(r"\g<0>", new,
+                      "a regex group reference in card text must stay literal")
+        self.assertIn("hand-written top", new)
+        self.assertIn("hand-written tail", new)
+
+    def test_the_prompt_states_how_many_traps_it_left_out(self):
+        # Silent truncation is what made the old behaviour invisible.
+        sys.path.insert(0, str(ROOT / "tools"))
+        import agent_prompt_forge as forge
+        cards, tax = forge.load_cards(), forge.taxonomy()
+        for family in self._families():
+            owned = forge.cards_for(family["classes"], cards, tax)
+            total = sum(len(c.get("known_traps") or []) for c in owned)
+            if total <= forge.MAX_TRAPS:
+                continue
+            block = forge.forge(family, cards, tax)
+            self.assertIn("NOT in this prompt", block,
+                          "%s truncates traps without saying so" % family["agent"])
+            return
+        self.skipTest("no family exceeds MAX_TRAPS")
 
 
 if __name__ == "__main__":

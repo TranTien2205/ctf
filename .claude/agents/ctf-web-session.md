@@ -537,37 +537,37 @@ presenting its technique as local experience.
 
 ### First probes that actually opened a chain here
 
+- **htb-bonechewercon-method-not-allowed-whoops-env-disclosure** — `submit the entry form using the method it declares and compare the response size with the normal page`
+  expected: a response an order of magnitude larger than the normal page, containing a framework exception name and labelled diagnostic sections
 - **htb-desire-session-file-path-traversal-via-username-cookie** — `Log in normally, then repeat one authenticated request with the plaintext username cookie replaced by a string that is not a registered account (for example nosuchuser_zzz), and again with the session`
   expected: the junk session cookie is accepted while the unknown username returns a server error. That asymmetry says the identity is the plaintext cookie and that it is dereferenced server-side, which is what makes it a candidate 
+- **htb-gonuclear-openapi-no-security-verifytoken-registration-bypass** — `POST /api/userDetails with {"email":"<an account you created>"} and NO Authorization header`
+  expected: 200 with a body containing a credential-shaped field for that account, for example "verifyToken":"<uuid>", proving the operation the specification declared without security really is unauthenticated and really returns a 
 - **htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce** — `GET /Home/Setting three times: with no Cookie header, with Token=garbage, and with Token=<base64url {"alg":"none","typ":"JWT"}>.<base64url {"username":"n0ne_f0rged","ID":"1","iss":"NexusVoid"}>. (trai`
   expected: the first two answer 302 to /, the third answers 200 and the page contains id="username" value="n0ne_f0rged" -- a username that belongs to no account
-- **htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli** — `request the static prefix with a single trailing dot-dot segment and compare the response with the normal static path`
-  expected: a file outside the static root is returned
-- **htb-ssos-oauth-registration-race-cookie-swap-json-csrf** — `hammer POST /api/register for the fixed bot account with your own password and confirm it returns 200 before the bot reaches its registerUser step`
-  expected: the registration succeeds and your credentials work at /api/login
 
 ### Traps this tree has already paid for
 
+- the page's maintenance notice and the maintenance middleware in the stack trace both suggest a maintenance-mode bypass, but the application is not in maintenance mode and returns 200; that is flavour text, not the bug  *(htb-bonechewercon-method-not-allowed-whoops-env-disclosure)*
 - mholt/archiver v3.5.0 SILENTLY SKIPS a zip entry whose name escapes the destination: the response is a normal 202 and nothing is written. The tell is that re-uploading the same escaping entry never produces the 'file already exists' error that a clean entry produces on its second upload. Read that a  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- Because the extractor refuses to overwrite, the 'file already exists: <path>' error is a clean file-existence oracle -- but only inside the destination. Escaping probes always answer 202, so a sweep for files at the application root reads as 'nothing is there' whatever is actually there. Run a contr  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- A username cookie the application cannot resolve gives Fiber's bare 'Internal Server Error', while the handler's own failures give JSON. The two 500s mean different things: the bare one is the redis lookup missing, so it also confirms that the cookie is the key.  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- sessionID is sha256 of the SERVER's clock in whole seconds. One candidate hash is a coin flip; put the hashes for a few seconds either side of the login into the same archive and the race disappears.  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- The registration filter blocks / . and \ in the username, which makes the account name look safe and hides that the same value travels back as an unvalidated cookie. Check the cookie separately from the field that set it.  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- FLAG is an environment variable (ENV FLAG= in the Dockerfile), not a file, so no amount of arbitrary file WRITING reaches it directly -- the only route is to satisfy the Role == "admin" test that guards the template.  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- mholt/archiver v3's Zip.CheckPath is a STRING prefix test, not a path-boundary test: to,_ = filepath.Abs(to); if !strings.HasPrefix(filepath.Join(to, filename), to). An entry named ../<username>ZZ/f therefore resolves to a SIBLING directory that still shares the prefix and IS written -- measured her  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- A zip SYMLINK entry (external_attr 0o120777<<16) is honoured by extractFile -> writeNewSymbolicLink, and its name only has to satisfy the same prefix test. Planting ../<username>S with content '/' makes every absolute path reachable as ../<username>S/<abs> -- measured as 'file already exists: files/  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- The username cookie needs an entry in REDIS, not a row in the SSO database: /register rejects / . and \ so no account can ever carry a dot segment, and probing the cookie alone reads as 'must be an existing user'. PrepareSession (http.go:73-75) writes redis[username] before the password is checked,   *(htb-desire-session-file-path-traversal-via-username-cookie)*
+- the entry page is not the endpoint inventory. /static/script.js here held no fetch call whatsoever; the API client was in /static/api.js, linked only from an inner page, so recon that follows links from / alone cannot reach it  *(htb-gonuclear-openapi-no-security-verifytoken-registration-bypass)*
 - the wrong first move here is attacking the HS256 key, and it is an expensive one: 14,448,372 candidates from SecLists scraped-JWT-secrets.txt and rockyou.txt produced no match. The token looks like a signing problem and is not one -- the signature is never checked, so no key search can succeed. Read  *(htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce)*
+- MySQL case-insensitive collations make 't' equal 'T'; case-exact extraction needs a binary comparison  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
+- the registration race alone is dead: if you pre-register the student but never swap the cookie, the bot authorizes as teacher and the flag is written to an unreadable teacher account  *(htb-ssos-oauth-registration-race-cookie-swap-json-csrf)*
+- ngrok inserts an interstitial that headless bots cannot pass; a plain SSH reverse tunnel does not  *(htb-tornadoservice-bot-csrf-class-pollution)*
+- the same parameter sent on the supported method is not reflected at all and the response is byte-for-byte identical to the plain page, so there is no injection surface to chase  *(htb-bonechewercon-method-not-allowed-whoops-env-disclosure)*
+- Because the extractor refuses to overwrite, the 'file already exists: <path>' error is a clean file-existence oracle -- but only inside the destination. Escaping probes always answer 202, so a sweep for files at the application root reads as 'nothing is there' whatever is actually there. Run a contr  *(htb-desire-session-file-path-traversal-via-username-cookie)*
+- extracting the path list from the specification and stopping is the expensive mistake. The security key, and the response field names behind $ref, are where the bug is  *(htb-gonuclear-openapi-no-security-verifytoken-registration-bypass)*
 - there is no admin surface to reach by impersonation, so do not go looking for one. /Home/Market, /Home/Trending, /Home/Collection, /Home/Wallet, /Home/Admin, /Home/Dashboard, /Home/Profile, /Home/Orders, /Home/Seller, /Home/Flag and /Admin all answer 404, although the nav bar lists market, trending,  *(htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce)*
-- the wrong first move here is attacking the HS256 key. The token looks like a signing problem and it is not one: the signature is never checked, so a key search is wasted no matter how long it runs. Read the middleware before touching the crypto.  *(htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce)*
+- a linear charset scan is far too slow; binary search costs about seven probes per character  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
 
-*23 more in the cards above; open the card before working its chain.*
+*33 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 33 of 45 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
+- read-only. The request raises an exception and reaches no application logic, so nothing is created or modified. Treat every credential in the disclosed configuration as live and do not connect to the services it names; they are usually bound to the container's own loopback and ar  *(htb-bonechewercon-method-not-allowed-whoops-env-disclosure)*
 - Registration and the archive upload both write, and neither the Go service nor the Node SSO exposes a delete route, so every account and every extracted file stays on the shared instance. Use one throwaway account and one small archive. The forged session file lands in YOUR OWN f  *(htb-desire-session-file-path-traversal-via-username-cookie)*
-- Every step writes. The planted row is an INSERT at an ID no real account holds yet, so it displaces nothing, but it CANNOT be removed with the same primitive: the INSERT branch only runs when the ID owns no row, so a second attempt at that ID takes the UPDATE branch instead. Pick  *(htb-nexusvoid-jwt-middleware-no-return-claim-sqli-jsonnet-typenamehandling-process-setter-rce)*
-- read-only extraction; the forged session affects only the attacker's own requests  *(htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli)*
+- every step is read-only except the account you create yourself. Registration adds one row on a shared instance, which is what the app invites, and verifying that account touches only its own row. Do not call the unauthenticated operation with another player's or a seeded user's i  *(htb-gonuclear-openapi-no-security-verifytoken-registration-bypass)*
 
 ### Confirmed field notes
 
@@ -575,6 +575,6 @@ presenting its technique as local experience.
 - **2026-09-27 · Nexus Void · confirmed** (`web-auth-session`) — **Confirming probe that worked** > GET /Home/Setting three times: with no Cookie header, with Token=garbage, and with Token=<base64url {"alg":"none","typ":"JWT"}>.<base64url {"username":"n0ne_f0rged",
 - **undated · Desire · confirmed** (`web-auth-session`) — **Confirming probe that worked** > Log in normally, then repeat one authenticated request with the plaintext username cookie replaced by a string that is not a registered account (for example nosuchus
 
-*5 cards, 35 traps, 3 confirmed notes.*
+*7 cards, 45 traps, 3 confirmed notes.*
 
 <!-- FORGED:END -->

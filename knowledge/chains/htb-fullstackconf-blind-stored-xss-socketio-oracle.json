@@ -89,5 +89,10 @@
     "confirm the channel is one that stays open until the server has data before treating its silence as a result",
     "a comment declaring the push channel is not part of the challenge is misleading; it is not part of the bug but it is the entire exfiltration path"
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-xss",
+    "confidence": 0.47,
+    "derived_by": "backfill_classification.py"
+  }
 }

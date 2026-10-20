@@ -61,11 +61,37 @@ code when it does not. Prefer sources that actually serve: GitHub and GitLab
 repositories and issues, official advisories, vendor docs, and a project's own
 changelog.
 
+## Step zero: is this exact challenge already solved on this disk?
+
+Before the classifier, before the matcher, before anything. It is one command
+and it is the question this agent exists to answer:
+
+```bash
+python3 tools/chain_match.py --source <handout> --name <challenge>
+ls -d challenges/<challenge>* solved/<challenge>*.md 2>/dev/null
+```
+
+Read the `local_solve` field FIRST. When it is not null, this tree already holds
+a solved note, a working solver, or both, for a challenge of this name. Read
+every path it lists before you measure anything, and report them at the top of
+your return — a recorded solve for this exact name outranks every similarity
+score underneath it.
+
+A suffixed name is the normal case, not an edge case: a re-spawned instance is
+registered as `<name>2` while the solve sits under `<name>`, so the check is
+prefix-based on purpose. When a `challenges/<name>/solver.py` exists, say so and
+quote the lines that carry the target's host and port, because a previous
+solver usually needs nothing else changed.
+
+Measured cost of skipping this step: a 13-agent sweep and 1.03M tokens spent on
+a challenge whose own 498-line working solver was already on disk, with the
+flag in the end coming from running that solver with one line edited.
+
 ## Run exactly these, and read the complete JSON of each
 
 ```bash
 python3 tools/classify.py --source <handout>
-python3 tools/chain_match.py --source <handout>
+python3 tools/chain_match.py --source <handout> --name <challenge>
 python3 tools/gadget_lookup.py --lockfile <handout>/package-lock.json   # if one exists
 ls knowledge/attempts/ && cat knowledge/attempts/<any that look related>.json
 ```
@@ -81,6 +107,11 @@ One fenced ```json block:
 
 ```json
 {
+  "local_solve": {
+    "notes": ["solved/<name>.md"],
+    "solvers": ["challenges/<name>/solver.py"],
+    "what_it_needs_changed": "<the host/port lines, verbatim, or null>"
+  },
   "solved_here_before": true,
   "chain_card": "knowledge/chains/<id>.json",
   "status": "candidate|weak   (chain_match.py's own grade)",

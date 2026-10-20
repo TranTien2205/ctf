@@ -1,10 +1,49 @@
-# PREFLIGHT — the night before
+# PREFLIGHT — before 2026-10-16
 
-One screen. Do it tonight: apt availability on the contest network is unknown and
-there is no second chance at 09:00. Every claim here was measured on this box on
-2026-09-29; re-measure anything you are about to depend on.
+**The brief is no longer a reconstruction.** The organisers have confirmed: eight
+hours on **2026-10-16**, onsite, one machine per person, and the estate has been
+taken over and ransomware-encrypted — you restore service, patch, and attack the
+other teams, all three at once. And the line that changes the most:
 
-## 1. Install, in this order
+> teams connect only to the organiser's private network, with **no connection to
+> the internet**; no phones and no 3G/4G/5G devices during the contest.
+
+## 0. What no internet means, before anything else
+
+Read this first, because it decides what the rest of this toolkit is for.
+
+**The tools work. The agents do not.** Measured today, not assumed: the whole
+control plane passed inside a network namespace with only loopback and no route
+anywhere —
+
+```bash
+unshare -rn python3 tools/ad/selftest.py                      # 87/87
+unshare -rn sh -c 'ip link set lo up; sh lab/ad-range/dryrun.sh'   # 14/14
+```
+
+No tool under `tools/ad/` reaches the public internet. The only two that open a
+socket at all are `sla_check` (your own service) and `flag_farm` (the scoreboard),
+and both live on the organiser's network.
+
+**What dies on the contest network, so do not plan around it:**
+
+| Dead on the day | Why |
+|---|---|
+| any AI assistant, including this one | it reaches an API over the internet. With no internet there is no agent on the contest machine |
+| `tools/writeup_search.py` | fetches public pages |
+| `tools/crawl.py`, `tools/import_external.py`, `tools/github_pilot.py`, `tools/lab_sync.py` | all fetch |
+| the `ctf-writeup-scout` subagent | external search |
+| `sudo apt install`, `pip install`, `docker pull` | no package mirror, no registry |
+
+So the artifacts that matter on 2026-10-16 are the ones a **human reads and a
+deterministic tool executes**: `tools/ad/RUNBOOK.md` printed, this file worked
+through beforehand, and `python3 tools/ad/tick.py` to answer "what next" when
+there is no agent to ask. The skills and the subagents are for the **fifteen days
+before** — rehearsal, not contest.
+
+Every claim below was measured on this box; re-measure anything you depend on.
+
+## 1. Install now, not on the day — there is no package mirror on that network
 
 The one install that removes the largest blind spot. If the estate turns out to be
 Windows-heavy, `tools/forensics/evtx_query.py` currently degrades to
@@ -15,8 +54,14 @@ sudo apt install python3-evtx libevtx-utils
 python3 -c "import Evtx; print('evtx parser present')"
 ```
 
-Measured candidates tonight: `python3-evtx` **8.1.0-1**, `libevtx-utils`
-**20251118-1+b1**. Both are in this box's lists.
+Measured candidates: `python3-evtx` **8.1.0-1**, `libevtx-utils`
+**20251118-1+b1**. Both are in this box's lists **today**, and neither will be
+reachable on the contest network. Install and verify the import now.
+
+Also pull and keep locally, for the same reason, anything the rehearsal estate
+needs: `docker image ls` should already show the base image
+`lab/ad-range/compose.yml` uses before 2026-10-16, because `docker pull` will fail
+on the day.
 
 ## 2. What you cannot install, so stop planning around it
 
@@ -41,9 +86,19 @@ Measured candidates tonight: `python3-evtx` **8.1.0-1**, `libevtx-utils`
 - `pip` is EXTERNALLY-MANAGED: a plain `pip install` refuses. Use
   `sudo apt install python3-<name>`, or a venv.
 
-## 3. Prove the plumbing, offline, tonight
+## 3. Prove the plumbing offline — and prove it IS offline
 
-Not tomorrow. Each of these runs with no network:
+Not on the day. Each of these runs with no network, and the first pair proves that
+claim rather than asserting it:
+
+```bash
+unshare -rn python3 tools/ad/selftest.py
+unshare -rn sh -c 'ip link set lo up; cd $(pwd) && sh lab/ad-range/dryrun.sh'
+```
+
+`unshare -rn` needs no root here (measured) and gives a namespace with no route
+out, so anything that silently reached the internet fails there and passes
+outside. Then the ordinary runs:
 
 ```bash
 python3 tools/ad/selftest.py          # expect cases == passed, failed []

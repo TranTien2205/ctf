@@ -48,6 +48,12 @@ MIN_DESCRIPTION = 40
 # an agent is most likely to reason its way around.
 PROHIBITION_ANCHOR = "these are not preferences"
 
+# A line that forbids a path rather than recommending one. Check 6 skips these: the
+# agents are all told "do not run `tools/hooks.py`", and a bundle that ships only
+# tools/ad does not contain it -- failing on a forbidden file is backwards.
+NEGATED = re.compile(r"\b(?:do not|don't|never|must not|may not|off-limits|"
+                     r"forbidden|stay off|without)\b", re.IGNORECASE)
+
 
 def split_frontmatter(text):
     """(frontmatter dict, body) or (None, reason)."""
@@ -172,11 +178,20 @@ def check_agent(path, prohibition_text):
                  "%d numbered prohibition line(s) are not byte-identical to "
                  "agent/ad-prohibitions.md; re-copy the block" % len(missing))
 
-    # 6. every repository path the prose names has to exist, or the agent sends the
-    #    operator to a file that is not there
-    for ref in sorted(set(re.findall(r"tools/[A-Za-z0-9_./-]+\.(?:py|md|sh)", text))):
-        if not os.path.isfile(os.path.join(ROOT, ref)):
-            fail("paths", "names %s, which does not exist" % ref)
+    # 6. every repository path the prose RECOMMENDS has to exist, or the agent sends
+    #    the operator to a file that is not there.
+    #
+    #    A path named inside a PROHIBITION is exempt, and that exemption is the whole
+    #    reason this is line-by-line rather than a scan of the whole text: every one of
+    #    these agents is told "do not run `tools/hooks.py`", and hooks.py legitimately
+    #    does not exist in a minimal bundle of tools/ad alone. Failing on a file the
+    #    agent is forbidden to touch is backwards.
+    for line in text.split("\n"):
+        if NEGATED.search(line):
+            continue
+        for ref in sorted(set(re.findall(r"tools/[A-Za-z0-9_./-]+\.(?:py|md|sh)", line))):
+            if not os.path.isfile(os.path.join(ROOT, ref)):
+                fail("paths", "names %s, which does not exist" % ref)
 
     # 7. the deliberate placeholder. A warning, never a failure: the estate's real
     #    path is unknown until the day, and narrowing it by hand is a preflight step.

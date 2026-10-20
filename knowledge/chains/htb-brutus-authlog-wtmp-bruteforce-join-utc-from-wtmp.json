@@ -1,0 +1,144 @@
+{
+  "id": "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp",
+  "source_note": "solved/htb-brutus.md",
+  "challenge": {
+    "name": "Brutus",
+    "platform": "HackTheBox",
+    "event": "HTB Sherlocks",
+    "category": "forensics",
+    "solved_at": "2026-10-01",
+    "assistance": "self-solved"
+  },
+  "stack": [
+    "linux-auth.log-syslog",
+    "wtmp-struct-utmp-384-byte",
+    "openssh-sshd",
+    "systemd-logind",
+    "sudo",
+    "shadow-utils-useradd"
+  ],
+  "preconditions": {
+    "all_of": [
+      "the bundle is a Linux authentication artifact pair: a text auth.log (or secure) and a binary wtmp",
+      "the question set asks who authenticated, from where, when, and what the session then did",
+      "at least one source address produced failed password attempts AND a later acceptance"
+    ],
+    "any_of": [
+      "a UTC timestamp is requested, which only wtmp can answer",
+      "a session number is requested, which only the systemd-logind record carries",
+      "an account or group was created during the window"
+    ]
+  },
+  "signals": [
+    "auth.log",
+    "wtmp",
+    "Failed password for",
+    "Accepted password for",
+    "pam_unix(sshd:auth): authentication failure",
+    "pam_unix(sshd:session): session opened for user",
+    "systemd-logind",
+    "New session",
+    "Removed session",
+    "Starting session: shell on pts",
+    "useradd",
+    "new user: name=",
+    "usermod",
+    "add '",
+    "' to group 'sudo'",
+    "sudo:",
+    "COMMAND=",
+    "Invalid user",
+    "Disconnected from"
+  ],
+  "chain": [
+    {
+      "step": 1,
+      "stage": "inventory",
+      "action": "classify the bundle with tools/forensics/artifact_inventory.py; confirm the pair is a text auth.log plus a binary wtmp and that no absent parser is needed",
+      "why": "this is the one DFIR family on this box that needs no install, so it is the cheapest to work and the first worth trying"
+    },
+    {
+      "step": 2,
+      "stage": "rank",
+      "action": "run tools/forensics/linux_auth.py --authlog <log> --summary and read succeeded_after_failures per address, not the failure count",
+      "why": "the address with the most failures is the loudest scanner; the one that answers the question is the address whose failures are FOLLOWED by an acceptance"
+    },
+    {
+      "step": 3,
+      "stage": "identify",
+      "action": "filter --event accepted to name the account, keeping the raw line as the evidence excerpt",
+      "why": "the acceptance is what proves entry; a failure count is evidence about scanning only"
+    },
+    {
+      "step": 4,
+      "stage": "pivot",
+      "action": "filter the wtmp records with --ut-type USER_PROCESS plus --ip <the address from step 2> and --user <the account from step 3>",
+      "why": "the bundle holds interactive sessions from a legitimate administrator at a different address across several weeks, so an unfiltered pick of the latest login selects a legitimate session. The pivot narrows 29 records to 1"
+    },
+    {
+      "step": 5,
+      "stage": "timestamp",
+      "action": "read time_utc from that single wtmp record, never a parsed auth.log time",
+      "why": "auth.log carries no year and no timezone offset at all; wtmp carries tv_sec, a real UTC epoch. This is the only artifact in the pair that can answer a UTC question"
+    },
+    {
+      "step": 6,
+      "stage": "session",
+      "action": "filter --event logind-session and select the New session record belonging to that account and time",
+      "why": "three numbers in this log read like a session id - the sshd PID, the sshd `id N`, and logind New session N - and only the logind one is the session number asked for"
+    },
+    {
+      "step": 7,
+      "stage": "persistence",
+      "action": "filter --event useradd and --event group-member for the account created and the group it was added to",
+      "why": "the new-user line names the account; the usermod line names the privilege. They are two different answers from two different records"
+    },
+    {
+      "step": 8,
+      "stage": "execution",
+      "action": "filter --event sudo and quote the COMMAND= value verbatim",
+      "why": "a sudo line records the command as REQUESTED; it is not proof the command succeeded, so the claim must stay at what was run"
+    }
+  ],
+  "first_confirming_probe": {
+    "request": "python3 tools/forensics/linux_auth.py --authlog <auth.log> --summary --challenge <name>",
+    "expected": "address_ranking holds at least one entry with succeeded_after_failures true, carrying both a failure count and first_accepted_line as a verbatim auth.log line",
+    "falsifier": "every address with failed attempts has accepted 0, so no brute force succeeded on this host and the authentication-trace class is closed for this bundle"
+  },
+  "blast_radius": "none: every artifact is supplied and read-only, there is no target to mutate and no live host involved. The only real risk in this category is the opposite one - answering a UTC question from auth.log, whose times carry no year and no timezone, which produces a confidently wrong answer rather than any damage.",
+  "verification": {
+    "status": "verified_live",
+    "evidence": "Each answer was read from a supplied artifact and recorded through tools/hooks.py pre-flag --source artifact, with the record excerpt pasted from tools/forensics/linux_auth.py output rather than retyped; the tool builds each record's raw line from the unpacked bytes so the excerpt and the artifact cannot disagree. tools/decide.py returned record_solve for Brutus-q3. Answer VALUES are deliberately not recorded in this card or in solved/htb-brutus.md: a Sherlock answer is a graded secret exactly as a flag is, and both files are committed. Measured coverage: 385 auth.log lines parsed with 0 unparsed, 29 wtmp records, and 7 of the 8 questions answerable directly from the two artifacts."
+  },
+  "reuse_when": [
+    "the bundle is a Linux authentication pair - auth.log or secure, plus wtmp or btmp - rather than Windows event logs",
+    "a question asks which source address brute-forced the host and which account it reached",
+    "a question asks for a UTC login time and the only candidates are a host-local syslog and a binary utmp",
+    "a question asks for an SSH session NUMBER",
+    "a question asks what account was added for persistence, or what was run through sudo",
+    "an attack-defense estate must be checked for who logged in and what they left behind, where these are the only authentication artifacts a Linux host produces"
+  ],
+  "known_traps": [
+    "auth.log carries NO YEAR and NO TIMEZONE OFFSET; a tool that assumes the current year is wrong by whole years and looks right, so a UTC timestamp must come from wtmp, whose tv_sec is a real UTC epoch",
+    "ranking source addresses by failure count names the loudest scanner, not the one that got in; order on failures FOLLOWED by an acceptance",
+    "three numbers in one auth.log all read like a session id - the sshd PID in brackets, `Starting session: shell on pts/N ... id 0`, and systemd-logind `New session N` - and only the last is the session number a question means",
+    "the wtmp set contains legitimate administrator sessions from a different address spanning weeks, so the attacker record must be selected by the address recovered from the brute-force question; without that pivot the latest interactive login is a legitimate one",
+    "there are several logind New session records, so the one for the compromised account still has to be chosen by user and time rather than taken as the only match",
+    "btmp holds FAILED logins while wtmp holds successful ones; reporting a btmp record as a login is a wrong answer, so always record which file a record came from",
+    "a trailing partial record in wtmp means the file is truncated or still being written, which is itself a finding - a parser that silently drops the tail hides it",
+    "a sudo COMMAND= line records what was requested, not that it succeeded",
+    "a rotated log is several files (auth.log.1, auth.log.2.gz) and the earliest event is often in one nobody opened; state which files were actually read",
+    ".bash_history has no timestamps unless HISTTIMEFORMAT was set and is written on shell exit, so a still-open session may be absent entirely",
+    "one question in this Sherlock asks for a MITRE ATT&CK sub-technique id, which appears in NO artifact: it is published knowledge, so recording it through pre-flag --source artifact would claim an artifact read that never happened"
+  ],
+  "flag": null,
+  "schema_version": 1,
+  "classification": {
+    "primary": "dfir-authentication-trace",
+    "secondary": [
+      "dfir-persistence-trace",
+      "dfir-execution-trace"
+    ],
+    "confidence": 0.9
+  }
+}

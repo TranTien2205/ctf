@@ -1,22 +1,28 @@
 {
-  "generated_at": "2026-09-30T00:35:30",
+  "generated_at": "2026-10-05T21:17:58",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 67,
+    "skills": 84,
     "review": 0,
-    "warn": 0,
-    "local_evidence_present": 21,
-    "local_evidence_stub": 11,
+    "warn": 5,
+    "local_evidence_present": 38,
+    "local_evidence_stub": 10,
     "local_evidence_missing": 0,
     "actionable_skills": 20,
-    "basic_skills": 12
+    "basic_skills": 28
   },
   "review": [],
-  "warn": [],
+  "warn": [
+    "crypto-triage",
+    "crypto-ecc-dlog",
+    "crypto-prng",
+    "crypto-rsa",
+    "crypto-symmetric-oracle"
+  ],
   "skills": [
     {
       "id": "ctf-playbook",
@@ -52,11 +58,13 @@
       "id": "crypto-triage",
       "layer": "router",
       "path": "skills/crypto-triage/SKILL.md",
-      "flags": [],
+      "flags": [
+        "router/entry bloated: 166 lines"
+      ],
       "score": null,
-      "verdict": "thin-by-design",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 157
+      "lines": 166
     },
     {
       "id": "ctf-misc",
@@ -66,7 +74,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 123
+      "lines": 133
     },
     {
       "id": "dfir-sherlock-triage",
@@ -76,7 +84,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 123
+      "lines": 128
     },
     {
       "id": "forensics-triage",
@@ -106,7 +114,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 77
+      "lines": 87
     },
     {
       "id": "pwn-binary-triage",
@@ -116,7 +124,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 74
+      "lines": 84
     },
     {
       "id": "rev-triage",
@@ -126,7 +134,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 98
+      "lines": 108
     },
     {
       "id": "web-triage",
@@ -167,6 +175,78 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 125
+    },
+    {
+      "id": "crypto-ecc-dlog",
+      "layer": "depth",
+      "path": "skills/crypto-triage/SKILL.md",
+      "flags": [
+        "no traps/pitfalls/discipline",
+        "no operational probe contract",
+        "diluted: 100% overlap with crypto-prng"
+      ],
+      "score": 60,
+      "verdict": "warn",
+      "local_evidence": "present",
+      "lines": 166,
+      "actionability": "basic",
+      "nearest_neighbour": "crypto-prng",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "crypto-prng",
+      "layer": "depth",
+      "path": "skills/crypto-triage/SKILL.md",
+      "flags": [
+        "no traps/pitfalls/discipline",
+        "no operational probe contract",
+        "diluted: 100% overlap with crypto-ecc-dlog"
+      ],
+      "score": 60,
+      "verdict": "warn",
+      "local_evidence": "present",
+      "lines": 166,
+      "actionability": "basic",
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "crypto-rsa",
+      "layer": "depth",
+      "path": "skills/crypto-triage/SKILL.md",
+      "flags": [
+        "no traps/pitfalls/discipline",
+        "no operational probe contract",
+        "diluted: 100% overlap with crypto-ecc-dlog"
+      ],
+      "score": 60,
+      "verdict": "warn",
+      "local_evidence": "present",
+      "lines": 166,
+      "actionability": "basic",
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "crypto-symmetric-oracle",
+      "layer": "depth",
+      "path": "skills/crypto-triage/SKILL.md",
+      "flags": [
+        "no traps/pitfalls/discipline",
+        "no operational probe contract",
+        "diluted: 100% overlap with crypto-ecc-dlog"
+      ],
+      "score": 60,
+      "verdict": "warn",
+      "local_evidence": "present",
+      "lines": 166,
+      "actionability": "basic",
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
     },
     {
       "id": "ctf-ai-ml",
@@ -270,17 +350,16 @@
       "layer": "depth",
       "path": "skills/dfir-authentication-trace/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "field-notes is a template stub (16 lines)"
+        "no operational probe contract"
       ],
-      "score": 80,
+      "score": 90,
       "verdict": "pass",
-      "local_evidence": "stub",
-      "lines": 214,
+      "local_evidence": "present",
+      "lines": 221,
       "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.026,
-      "trust": "catalogue-or-unreviewed"
+      "nearest_neighbour": "web-parser-differential",
+      "overlap": 0.017,
+      "trust": "local-confirmed"
     },
     {
       "id": "dfir-cloud-audit-trace",
@@ -390,6 +469,141 @@
       "lines": 134
     },
     {
+      "id": "misc-encoding-carrier",
+      "layer": "depth",
+      "path": "skills/ctf-misc/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with misc-interpreter-escape"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 133,
+      "actionability": "basic",
+      "nearest_neighbour": "misc-interpreter-escape",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "misc-interpreter-escape",
+      "layer": "depth",
+      "path": "skills/ctf-misc/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with misc-encoding-carrier"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 133,
+      "actionability": "basic",
+      "nearest_neighbour": "misc-encoding-carrier",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "osint-identity-pivot",
+      "layer": "depth",
+      "path": "skills/osint-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with osint-infra-records"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 87,
+      "actionability": "basic",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "osint-infra-records",
+      "layer": "depth",
+      "path": "skills/osint-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with osint-identity-pivot"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 87,
+      "actionability": "basic",
+      "nearest_neighbour": "osint-identity-pivot",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "osint-media-metadata",
+      "layer": "depth",
+      "path": "skills/osint-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with osint-identity-pivot"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 87,
+      "actionability": "basic",
+      "nearest_neighbour": "osint-identity-pivot",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "pwn-code-reuse",
+      "layer": "depth",
+      "path": "skills/pwn-rop/SKILL.md",
+      "flags": [
+        "no operational probe contract"
+      ],
+      "score": 90,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 225,
+      "actionability": "basic",
+      "nearest_neighbour": "pwn-format-string",
+      "overlap": 0.049,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "pwn-format-string",
+      "layer": "depth",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with pwn-heap-corruption"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 84,
+      "actionability": "basic",
+      "nearest_neighbour": "pwn-heap-corruption",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "pwn-heap-corruption",
+      "layer": "depth",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with pwn-format-string"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 84,
+      "actionability": "basic",
+      "nearest_neighbour": "pwn-format-string",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
       "id": "pwn-rop",
       "layer": "depth",
       "path": "skills/pwn-rop/SKILL.md",
@@ -397,7 +611,75 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 148
+      "lines": 225
+    },
+    {
+      "id": "pwn-stack-overflow",
+      "layer": "depth",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with pwn-format-string"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 84,
+      "actionability": "basic",
+      "nearest_neighbour": "pwn-format-string",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "rev-bytecode-vm",
+      "layer": "depth",
+      "path": "skills/rev-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with rev-managed-code"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 108,
+      "actionability": "basic",
+      "nearest_neighbour": "rev-managed-code",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "rev-managed-code",
+      "layer": "depth",
+      "path": "skills/rev-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with rev-bytecode-vm"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 108,
+      "actionability": "basic",
+      "nearest_neighbour": "rev-bytecode-vm",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
+    },
+    {
+      "id": "rev-native-check",
+      "layer": "depth",
+      "path": "skills/rev-triage/SKILL.md",
+      "flags": [
+        "no operational probe contract",
+        "diluted: 100% overlap with rev-bytecode-vm"
+      ],
+      "score": 75,
+      "verdict": "pass",
+      "local_evidence": "present",
+      "lines": 108,
+      "actionability": "basic",
+      "nearest_neighbour": "rev-bytecode-vm",
+      "overlap": 1.0,
+      "trust": "local-confirmed"
     },
     {
       "id": "web-auth-session",
@@ -826,6 +1108,16 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 140
+    },
+    {
+      "id": "dfir-parallel-sweep",
+      "layer": "reference",
+      "path": "skills/dfir-parallel-sweep/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 220
     },
     {
       "id": "parallel-layer-sweep",

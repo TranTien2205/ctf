@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 876,000 tokens across 347 files. Opening
+The depth corpus is roughly 882,000 tokens across 348 files. Opening
 `skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -109,7 +109,7 @@ Not vulnerability classes: each one is a family of artifacts that answers one ki
 
 | Class | Evidence | Closed when (falsifier) | Skill |
 |---|---|---|---|
-| Authentication and logon trace | catalogue | no authentication record names a source address or an account outside th | `skills/dfir-authentication-trace/SKILL.md` |
+| Authentication and logon trace | verified | no authentication record names a source address or an account outside th | `skills/dfir-authentication-trace/SKILL.md` |
 | Process execution trace | catalogue | no event 1 | `skills/dfir-execution-trace/SKILL.md` |
 | Host persistence trace | catalogue | every autostart entry and service image path resolves to a signed vendor | `skills/dfir-persistence-trace/SKILL.md` |
 | Filesystem metadata timeline | catalogue | no file was created | `skills/dfir-filesystem-timeline/SKILL.md` |
@@ -145,6 +145,7 @@ that file and this table would drift.
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |
 | `skills/white-box-intended-path/SKILL.md` | depth | ~2.6k | see registry use_when |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
+| `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.0k | see registry use_when |
 | `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.2k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
 | `skills/web-parallel-sweep/SKILL.md` | reference | ~2.0k | see registry use_when |

@@ -10,7 +10,13 @@
     "solved_at": "2026-09-23",
     "assistance": "writeup-assisted"
   },
-  "stack": ["flask", "werkzeug", "sqlite", "pandas", "jinja2"],
+  "stack": [
+    "flask",
+    "werkzeug",
+    "sqlite",
+    "pandas",
+    "jinja2"
+  ],
   "preconditions": {
     "all_of": [
       "A value the attacker chooses at registration is stored and later reused by a different code path.",
@@ -96,5 +102,10 @@
     "An obfuscated table name may be encoded rather than random; decoding it is free and here it read 'h3r3_n0_f14g', which was a joke and not a reason to skip the table.",
     "On a shared instance another player's artifacts may already contain the answer. Treat that as a lead only, and reproduce it with a marker of your own before recording it."
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "web-sqli",
+    "confidence": 0.57,
+    "derived_by": "backfill_classification.py"
+  }
 }

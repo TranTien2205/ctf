@@ -201,3 +201,33 @@ Falsifier: tampering with the username cookie changes nothing, or the session co
 **Blast radius**: Registration and the archive upload both write, and neither the Go service nor the Node SSO exposes a delete route, so every account and every extracted file stays on the shared instance. Use one throwaway account and one small archive. The forged session file lands in YOUR OWN files/<account>/ directory, so nobody else's session is touched, and the redis key written by the wrong-password login is the traversal string rather than a real username -- it cannot log anyone else out. archiver refuses to overwrite an existing file, so a repeat upload of the same entry name fails with 500 rather than corrupting anything.
 
 - status: confirmed
+
+## 2026-10-06 · GoNuclear Internal Vault · proposed
+
+- source note: `solved/gonuclear.md`
+- chain card: `knowledge/chains/htb-gonuclear-openapi-no-security-verifytoken-registration-bypass.json`
+- verification: verified_live — GET /api/files/5/download on the live instance returned 33 bytes, content-disposition: attachment; filename="flag.txt", whose body was the flag string. Supporting observations from the same run: POST /api/userDetails with no Authorization header returned "verifyToken":"03c8dfa6-97f2-4750-bc7e-68504f2d1fd3"; POST /api/login before verification returned {"detail":"Inactive user"} and after verification returned an access_token; GET /api/openapi.json returned 200 with 8 paths of which only /userDetails, /login, /register and /email-verify lacked a security key.
+- classified as: `web-auth-session` — the card's reviewed classification, not a signal vote
+- signals that fired: reviewed on the chain card
+
+**Confirming probe that worked**
+
+> POST /api/userDetails with {"email":"<an account you created>"} and NO Authorization header
+
+Expected: 200 with a body containing a credential-shaped field for that account, for example "verifyToken":"<uuid>", proving the operation the specification declared without security really is unauthenticated and really returns a secret
+
+Falsifier: 401 or 403, or a 200 whose body carries only public attributes. Then the missing security key is a documentation artefact rather than a bug, and the specification's other unauthenticated operations are the remaining surface
+
+**Traps recorded on this solve**
+
+- the entry page is not the endpoint inventory. /static/script.js here held no fetch call whatsoever; the API client was in /static/api.js, linked only from an inner page, so recon that follows links from / alone cannot reach it
+- extracting the path list from the specification and stopping is the expensive mistake. The security key, and the response field names behind $ref, are where the bug is
+- do not report an ownership bug without checking the public flag. Every file here was owner_id 1 with is_public true, so a verified account legitimately read them all and no check on {file_id} was missing
+- login answering with a state message such as Inactive user rather than a credential error is the signal that names the gate; a credential error would mean the gate is elsewhere
+- piping curl with -w into the same file as the body makes the JSON unparseable with Extra data, which reads as a server error rather than a tooling mistake. Write the body with -o and the status with a separate -w
+- a ten-agent fan-out over this target spent 42 minutes and 1.1M tokens to arrive at the same specification one agent fetched in the first wave. A published specification means the surface is known, so it must END a sweep rather than begin one
+- an HTB instance expires. The first host answered 200 for roughly fifty minutes and then refused the connection outright, which looks exactly like a blocked probe until you test the port
+
+**Blast radius**: every step is read-only except the account you create yourself. Registration adds one row on a shared instance, which is what the app invites, and verifying that account touches only its own row. Do not call the unauthenticated operation with another player's or a seeded user's identifier and then spend their token: that consumes a one-time secret belonging to someone else and can lock a seeded account out of the intended path for every other player. Read your own and leave theirs alone.
+
+- status: proposed

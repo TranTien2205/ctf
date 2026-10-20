@@ -90,5 +90,10 @@
     "the response content type is image/png even when the body is text"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "file-read-primitives",
+    "confidence": 0.55,
+    "derived_by": "backfill_classification.py"
+  }
 }
