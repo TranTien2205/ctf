@@ -1,0 +1,14 @@
+{
+  "note": "Minimum counts. The gate fails if any of these regresses, which catches a server, a class, a skill or a command silently disappearing in a refactor. Raise a number when the thing it counts is genuinely added, never to make the gate pass.",
+  "minimum": {
+    "tools": 57,
+    "servers": 10,
+    "proof_classes": 21,
+    "playbook_classes": 21,
+    "skills": 18,
+    "workflows": 4,
+    "model_profiles": 12,
+    "cli_commands": 17,
+    "proof_cases": 60
+  }
+}

