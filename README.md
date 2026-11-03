@@ -132,6 +132,13 @@ because no browser confirmed execution.
 Read `ARCHITECTURE.md` for how the planes fit together and what each one is
 measured on, and `EVIDENCE_POLICY.md` for what may be claimed.
 
+`docs/DIAGRAMS.md` draws the same structure as Mermaid, which GitHub renders:
+the four planes, one command through the gate, how a grade is decided, a
+hypothesis from open to closed, the orchestrator, what this machine actually
+routes to, the six refusals, and the one live model run that has been measured.
+`docs/vi/SO-DO.md` is the Vietnamese edition, and `docs/vi/TONG-QUAN.md` the
+Vietnamese overview.
+
 ## The models
 
 `argus fleet` prints what is reachable on this machine and what each kind of task
