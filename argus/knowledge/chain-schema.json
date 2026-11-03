@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/argus/knowledge/chain-schema.json",
+  "title": "argus chain card",
+  "description": "One chain that worked, derived from a confirmed finding and the probes that reached it. A card exists to make the second run against a stack cheaper than the first: it says what the stack looked like, where the input was, which ladder steps fired, which probe first discriminated, and what shape of proof settled it. It is deliberately useless as a shortcut past proof — it carries no target, no credential, no extracted row and no proof output, so reusing it can only produce a hypothesis, never a finding. `argus/knowledge/chains.py` reads this file: the property list here is the allowed-key list the validator enforces, so a field added to a card without being added here is refused rather than silently stored.",
+  "version": 1,
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "slug",
+    "title",
+    "vuln_class",
+    "stack",
+    "entry_point",
+    "steps",
+    "first_discriminating_probe",
+    "proof",
+    "preconditions",
+    "blast_radius",
+    "reuse",
+    "source_digest",
+    "recorded"
+  ],
+  "properties": {
+    "schema": {
+      "type": "integer",
+      "description": "card schema version; 1 is the only one that exists."
+    },
+    "slug": {
+      "type": "string",
+      "description": "the card's filename stem, and its identity in the corpus: class, entry-point shape, leading stack product, and eight characters of source_digest. It names a shape, never a target.",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,99}$"
+    },
+    "title": {
+      "type": "string",
+      "description": "one line a model reads first: the class, the entry-point shape and the product it was found on."
+    },
+    "vuln_class": {
+      "type": "string",
+      "description": "a class in the proof matrix. A card for a class the matrix does not know is refused, because there would be no requirement to reuse it under."
+    },
+    "severity": {
+      "type": "string",
+      "description": "the severity the finding carried. A default from the matrix, not a measurement of this target's exposure."
+    },
+    "stack": {
+      "type": "object",
+      "description": "what the service was observed to be running. Server banner, declared framework markers, version strings, and the normalised markers `match` compares against a new target. A page title and a content type are deliberately absent: both change with the deployment, so matching on them ranks the wrong cards first.",
+      "additionalProperties": false,
+      "required": ["markers"],
+      "properties": {
+        "server": {"type": "string", "description": "the Server header as observed."},
+        "powered_by": {"type": "string", "description": "the X-Powered-By header as observed."},
+        "framework": {"type": "array", "items": {"type": "string"},
+                      "description": "framework markers the fingerprint named, e.g. django, laravel, tomcat."},
+        "versions": {"type": "array", "items": {"type": "string"},
+                     "description": "product/version pairs observed in the banners, e.g. werkzeug/2.0.1."},
+        "markers": {"type": "array", "items": {"type": "string"},
+                    "description": "normalised `product:`, `version:` and `major:` markers. These are what scoring compares, and a card with none of them is unmatchable and refused."}
+      }
+    },
+    "entry_point": {
+      "type": "object",
+      "description": "where the input was, never what was put in it. The parameter name and its location are the shape worth reusing; the payload that worked is not, because a payload reused without re-proving is exactly the shortcut this card must not offer.",
+      "additionalProperties": false,
+      "required": ["location"],
+      "properties": {
+        "location": {"type": "string", "description": "query, body, header, cookie, path, or unknown."},
+        "param": {"type": "string", "description": "the parameter or field name, as observed."},
+        "method": {"type": "string", "description": "the HTTP method, when the finding recorded one."},
+        "path_shape": {"type": "string", "description": "the request path with numeric and identifier-shaped segments replaced by :id."},
+        "note": {"type": "string", "description": "one line on how the value reached the sink, in the words of the hypothesis that was confirmed."}
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "the probes that actually fired against this hypothesis, in the order the ledger recorded them, with the ladder step each one was. This is the cheap half of the card: it shows which steps were needed and which were skipped on a stack of this shape. It is required and may be empty: a finding proven through ledger.add_evidence alone — a proxy request, a browser session, a source read — has no broker probes, and an empty list says that honestly where an absent key would read as a forgotten field.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["n", "tool", "result"],
+        "properties": {
+          "n": {"type": "integer"},
+          "step": {"type": "string", "description": "the ladder step name, or empty when the probe named none."},
+          "tool": {"type": "string"},
+          "tier": {"type": "string", "description": "the risk tier the ladder gives this step."},
+          "result": {"type": "string", "description": "signal, no-signal, error or refused, as recorded."}
+        }
+      }
+    },
+    "first_discriminating_probe": {
+      "type": "object",
+      "description": "the first probe that came back `signal`. It is the one to run first on a new target of this shape, because it is the one that was observed to separate this stack from a stack where the class is absent.",
+      "additionalProperties": false,
+      "properties": {
+        "n": {"type": "integer"},
+        "step": {"type": "string"},
+        "tool": {"type": "string"},
+        "tier": {"type": "string"},
+        "why": {"type": "string", "description": "the ladder's reason for the step, or a statement that no probe on this hypothesis returned a signal."}
+      }
+    },
+    "proof": {
+      "type": "object",
+      "description": "the shape of proof that settled it, and the requirement it had to meet. The check names are carried; the check details are not, because those hold the nonce, the identity line and the table that were the proof.",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"type": "string", "description": "the proof matrix verifier shape, e.g. command_output, data_extraction, file_read."},
+        "requirement": {"type": "string", "description": "the class requirement, copied from the matrix so the card cannot be read as having met it."},
+        "checks_passed": {"type": "array", "items": {"type": "string"},
+                          "description": "the names of the checks that passed on the original finding. Names only."}
+      }
+    },
+    "preconditions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "plain language, one line each: what has to be true of a new target before this chain is worth a probe. Nothing checks them for you, which is why `match` also reports the markers the card needs and the target has not been seen to have."
+    },
+    "blast_radius": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "what reusing this chain can damage on a shared instance. Derived from the proof shape, not measured on the original target: it states what the class puts in reach, so that the decision to go past the benign proof is made by a human who read it."
+    },
+    "reuse": {
+      "type": "string",
+      "description": "the standing caveat: a match is a candidate, and the class's proof requirement is unchanged by the card existing."
+    },
+    "source_digest": {
+      "type": "string",
+      "description": "sha256 of engagement name and finding id, truncated. It makes a card traceable by whoever still has the engagement, and carries neither the engagement's name nor the client's. `harvest` uses it to tell an already-written card from a new one.",
+      "pattern": "^[0-9a-f]{8,64}$"
+    },
+    "recorded": {"type": "string", "description": "when the card was written, ISO-8601 UTC."}
+  },
+  "x-must-not-carry": [
+    "the target's hostname or address — a card is about a shape, and a shape that names a host invites the next agent to probe that host",
+    "any credential, in any field — the ledger stores a secret's kind and position, and a card does not even store that",
+    "any extracted row — five rows is a proof for the engagement that took them, and a corpus of other people's rows is a breach with a schema",
+    "any flag-shaped string — it is the answer to someone's exercise, not knowledge about a stack",
+    "the proof output itself — a nonce, a uid= line or a dumped table in a card is a claim that the card has proven something, which it has not",
+    "a payload that worked — the entry-point shape is reusable, the literal value is a shortcut past the class's proof"
+  ],
+  "x-forbidden-field-names": [
+    "address", "body_span", "callback_payload", "command", "cookie", "cookies",
+    "credential", "engagement", "evidence", "evidence_id", "evidence_ids", "flag",
+    "host", "hostname", "ip", "nonce", "password", "payload", "proof_output",
+    "request", "response", "row_count", "rows", "secret", "secret_value",
+    "stderr_span", "stdout_span", "target", "targets", "token", "url", "urls"
+  ],
+  "x-refusals": {
+    "unknown-field": "a key the schema does not declare, at any depth. A card is read by agents that trust it; an undeclared field is unreviewed content in a trusted file, and the obvious place to park the payload that worked is a key inside a step.",
+    "missing-field": "a required key absent, or empty. An empty field reads as 'there was nothing here' rather than 'this was not written'. `steps` is the exception: a finding proven through ledger.add_evidence alone has no broker probes, and refusing it would make the corpus a record of what the broker ran rather than of what was proven.",
+    "type": "a value whose type the schema does not declare, including an item of the wrong type inside a declared array. A marker that is not a string is the shape that makes ranking raise rather than refuse.",
+    "schema-version": "a card version this reader does not know.",
+    "bad-slug": "a slug that is not 1-100 characters of a-z 0-9 . _ - starting alphanumeric. The slug becomes a filename, so it is checked rather than trusted.",
+    "refused-class": "the class is one the proof matrix refuses to prove at all, the way `dos` is. The corpus is checked in and outlives the engagement, so it is the one route by which a refused class could return as a ranked suggestion with steps under it.",
+    "forbidden-field": "a key from x-forbidden-field-names. These are the field names the evidence records use for the things a card must not carry, so the name alone is enough to refuse.",
+    "secret-shape": "text that argus.util.redact rewrites, an Authorization-shaped assignment, or a private key header.",
+    "address-literal": "an IPv4 or IPv6 literal, or an absolute URL. A card needs neither, and both name a target.",
+    "proof-output": "a uid=/whoami line, an /etc/passwd row, or a probe nonce.",
+    "flag-shape": "something in the shape NAME{...}.",
+    "engagement-hostname": "a host named by the engagement's targets or scope, or the engagement's own name.",
+    "unmatchable": "no stack marker, so the card can never be ranked against a target and would only ever be read by accident.",
+    "not-confirmed": "the finding is a candidate. A card records what settled; a candidate's chain is the part that did not.",
+    "class-not-in-matrix": "the class has no proof requirement here, so there is nothing to reuse the card under.",
+    "over-long": "a field or a card past its bound. Bounded collection applies to what is written down as well as to what is read.",
+    "could-not-write": "not a judgement about the card: the finding could not be read, or the corpus file could not be written. Reported per finding so that a harvest reports the cards it did write."
+  }
+}

