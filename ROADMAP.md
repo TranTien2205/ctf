@@ -46,9 +46,31 @@ These all run; what is missing is a test that would notice if they stopped.
      that billing route, and `_terminal_provider_error` in the loop stops on a
      402 instead of spending two more round trips to re-learn it.
 
-  So the adapter, the argument construction and the event parsing are measured.
-  What is still untested is a **whole task** driven by a live model through
-  either CLI: the loop has only ever been driven by the scripted mock.
+  5. A **whole task** then ran through it. `deepseek-v4-pro` via
+     `opencode-go`, six steps, against the loopback fixture, with the task
+     "prove or kill command injection in the host parameter of /ping":
+
+     | | |
+     |---|---|
+     | step 1 | `ledger.open_hypothesis` — opened the `rce` hypothesis |
+     | step 2 | `proof.requirement` — read what the class needs before probing it |
+     | step 3 | `http.probe` — the baseline |
+     | step 4 | `proof.exec_marker` — nonce echoed, `uid=1000(kali)`, graded `proven` |
+     | step 5 | `ledger.record_finding` — recorded as confirmed |
+     | step 6 | `ledger.read_evidence` — re-read its own record |
+
+     Two probes, no refusals, one confirmed finding, 54k tokens, $0.017, 777
+     seconds. **129 seconds per step**, which is the measurement that matters
+     for this backend: the CLI is stateless, so each step re-sends the whole
+     prompt and pays a process start. A key-based provider through
+     `runtime/providers/anthropic_api.py` or `openai_api.py` would not, and that
+     path still has no live run behind it.
+
+  So the loop, the text dialect, the tool rendering, the broker gate and the
+  ledger all hold up with a real model on the other end. What is still untested:
+  a delegated task through `claude -p` or `opencode run --auto` with our MCP
+  server as the agent's own tools (`orchestrator/runner.py`), and any live run
+  through the HTTP provider adapters.
 - **The planner against a real model.** The validator is tested with a
   deliberately bad plan; the prompt has not been given to a live planner.
 - **Cross-family verification against a real model.** The prompt and the
