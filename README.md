@@ -167,6 +167,12 @@ cannot produce one should not be running.
   internet target.
 - **`argus/broker/exec.py` is not a sandbox.** It is argv-only with timeouts and
   output caps; a tool it runs can still reach the filesystem and the network.
+- **The tools need a writable temp directory.** sqlmap, nmap and ffuf all write
+  their own scratch into the system one, and on a host whose `/tmp` is a full
+  tmpfs they are killed mid-run — which reads exactly like a broken target.
+  Measured here: an end-to-end run died with SIGKILL at `sqlmap --dump` with 0
+  bytes free. Set `ARGUS_TMPDIR=/some/path/with/room` and the broker points every
+  tool it starts at that directory instead.
 - **The scope is checked as written.** `resolve: true` additionally checks
   resolved addresses, and an engagement that cares about DNS rebinding must
   enable it.

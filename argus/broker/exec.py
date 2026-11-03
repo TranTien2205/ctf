@@ -106,6 +106,17 @@ def run(argv: list[str], timeout: int = config.TOOL_TIMEOUT_DEFAULT, stdin: str 
     env.pop("OPENAI_API_KEY", None)
     env.pop("DEEPSEEK_API_KEY", None)
     env.pop("GEMINI_API_KEY", None)
+    # Where the tools put their own scratch. sqlmap, nmap and ffuf all write into
+    # the system temp directory, and on a machine whose `/tmp` is a full tmpfs
+    # they are killed mid-run — measured here: an end-to-end run died with
+    # SIGKILL at `sqlmap --dump` with 0 bytes free, which reads exactly like a
+    # broken target. `ARGUS_TMPDIR` points them somewhere with room. It is an
+    # explicit override rather than a silent default, because a tool writing
+    # somewhere the operator did not choose is its own kind of surprise.
+    scratch = os.environ.get("ARGUS_TMPDIR")
+    if scratch:
+        os.makedirs(scratch, exist_ok=True)
+        env.update({"TMPDIR": scratch, "TMP": scratch, "TEMP": scratch})
     if env_extra:
         env.update({str(k): str(v) for k, v in env_extra.items()})
 

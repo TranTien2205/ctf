@@ -302,6 +302,40 @@ def test_runtime() -> None:
                   "/" in (loaded.opencode_name or ""), loaded.opencode_name or "(none)")
 
 
+# --- the tool plane's scratch ------------------------------------------------
+
+def test_tool_scratch() -> None:
+    section("tool scratch")
+    import os
+    from argus.broker import exec as ex
+
+    scratch = str(Path(__file__).resolve().parent.parent / "engagements" / ".scratch-check")
+    previous = os.environ.get("ARGUS_TMPDIR")
+    try:
+        os.environ["ARGUS_TMPDIR"] = scratch
+        result = ex.run(["env"])
+        lines = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        for name in ("TMPDIR", "TMP", "TEMP"):
+            check(f"a tool's {name} points at ARGUS_TMPDIR", lines.get(name) == scratch,
+                  str(lines.get(name)))
+        check("the scratch directory is created rather than assumed",
+              Path(scratch).is_dir())
+        for leaked in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "DEEPSEEK_API_KEY",
+                       "GEMINI_API_KEY"):
+            check(f"a tool never sees {leaked}", leaked not in lines)
+    finally:
+        if previous is None:
+            os.environ.pop("ARGUS_TMPDIR", None)
+        else:
+            os.environ["ARGUS_TMPDIR"] = previous
+        shutil.rmtree(scratch, ignore_errors=True)
+    result = ex.run(["env"])
+    lines = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    check("without the override a tool keeps the inherited temp directory",
+          lines.get("TMPDIR", os.environ.get("TMPDIR", "")) == os.environ.get("TMPDIR", ""),
+          str(lines.get("TMPDIR")))
+
+
 def main() -> int:
     test_scope()
     test_proof_matrix()
@@ -310,6 +344,7 @@ def main() -> int:
     test_refusals()
     test_locking()
     test_runtime()
+    test_tool_scratch()
     print(f"\n{COUNT - len(FAILURES)}/{COUNT} unit checks passed")
     if FAILURES:
         print("\nFAILURES:")
