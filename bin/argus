@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# argus — the one command. Keeps the repository on PYTHONPATH so it runs from
+# anywhere without being installed.
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+export PYTHONPATH="${ROOT}${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m argus.cli "$@"
