@@ -1,0 +1,91 @@
+{
+  "name": "api-authz",
+  "description": "An authorization sweep over an API with two supplied identities: object-level, function-level and tenancy. Needs two credentials; without them the workflow refuses rather than guessing, because one account cannot demonstrate this class.",
+  "variables": ["target", "actor_a", "actor_b"],
+  "tasks": [
+    {
+      "id": "authz-01-surface",
+      "kind": "recon",
+      "title": "Enumerate the API surface of {{target}} as {{actor_a}}",
+      "goal": "List every endpoint, method and identifier-bearing parameter on {{target}}: query parameters, path segments, JSON body fields, headers and cookies that look like primary keys. Record each as surface. Note which endpoints change state.",
+      "target": "{{target}}",
+      "mode": "active",
+      "role": "breadth",
+      "max_steps": 16,
+      "done_when": [
+        "every identifier-bearing input is in the ledger",
+        "state-changing endpoints are marked as such"
+      ]
+    },
+    {
+      "id": "authz-02-baseline",
+      "kind": "probe",
+      "title": "Establish what each identity is entitled to",
+      "goal": "For {{actor_a}} and {{actor_b}}, record their own object ids and what a legitimate read returns. Record an unauthenticated request and a request for an id that cannot exist. These four shapes are the controls every later claim depends on.",
+      "target": "{{target}}",
+      "mode": "active",
+      "role": "executor",
+      "inputs": ["authz-01-surface"],
+      "max_steps": 14,
+      "done_when": [
+        "a control record exists for: own read, unauthenticated read, nonexistent id",
+        "each record names its actor"
+      ]
+    },
+    {
+      "id": "authz-03-cross",
+      "kind": "probe",
+      "title": "Cross-read: {{actor_a}} against {{actor_b}}'s objects",
+      "goal": "For each identifier-bearing input, have {{actor_a}} request {{actor_b}}'s object. Every record names the actor AND the accessed_subject, and the body span must contain what identifies the owner. A 200 alone is not evidence of whose data it was.",
+      "target": "{{target}}",
+      "vuln_class": "idor",
+      "mode": "active",
+      "role": "executor",
+      "inputs": ["authz-02-baseline"],
+      "max_steps": 24,
+      "done_when": [
+        "each input is either a proven cross-read or falsified with an observation",
+        "every claim has its entitlement control on record"
+      ]
+    },
+    {
+      "id": "authz-04-function",
+      "kind": "probe",
+      "title": "Function-level: can {{actor_a}} perform {{actor_b}}'s privileged action",
+      "goal": "For each state-changing endpoint, read the state, act as {{actor_a}} on {{actor_b}}'s object, then read it again. The after-read is what proves it. Record the three phases with phase=before, action, after and name the owner.",
+      "target": "{{target}}",
+      "vuln_class": "csrf",
+      "mode": "intrusive",
+      "role": "executor",
+      "inputs": ["authz-02-baseline"],
+      "max_steps": 20,
+      "done_when": [
+        "each privileged action is proven with three phases or falsified",
+        "anything changed is recorded and reverted"
+      ]
+    },
+    {
+      "id": "authz-90-review",
+      "kind": "review",
+      "title": "Review every authorization claim",
+      "goal": "For each finding, check that the evidence names two identities, that the control is present, and that the claim is not broader than the records support.",
+      "mode": "passive",
+      "role": "reviewer",
+      "after_all": true,
+      "max_steps": 14,
+      "done_when": ["every confirmed finding carries a cross-verification record"]
+    },
+    {
+      "id": "authz-91-report",
+      "kind": "report",
+      "title": "Write the authorization report",
+      "goal": "Report per endpoint, not per payload. Say which endpoints were tested with two identities, which were tested with one and therefore not demonstrated, and which were not reached at all.",
+      "mode": "passive",
+      "role": "report",
+      "after_all": true,
+      "inputs": ["authz-90-review"],
+      "max_steps": 10,
+      "done_when": ["coverage is stated per endpoint"]
+    }
+  ]
+}

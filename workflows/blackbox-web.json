@@ -1,0 +1,76 @@
+{
+  "name": "blackbox-web",
+  "description": "A black-box web application engagement: breadth first, one hypothesis per input, then prove or kill each class. The scheduler expands this with one task per open hypothesis as classification produces them, so the task list here is the skeleton rather than the whole run.",
+  "variables": ["target"],
+  "tasks": [
+    {
+      "id": "bw-01-recon",
+      "kind": "recon",
+      "title": "Map the surface of {{target}}",
+      "goal": "Walk the recon ladder on {{target}}: ports, service fingerprint, content discovery, parameter discovery, javascript mining, template scan. Record every input, path and candidate as surface. Open no hypotheses and probe no class.",
+      "target": "{{target}}",
+      "mode": "active",
+      "role": "breadth",
+      "max_steps": 18,
+      "done_when": [
+        "every recon ladder step has a recorded probe",
+        "every parameter, form and endpoint found is in the ledger as surface",
+        "the stack and its versions are recorded, with the source of each version"
+      ]
+    },
+    {
+      "id": "bw-02-bundle",
+      "kind": "research",
+      "title": "Read the shipped javascript of {{target}} for what the HTML does not link",
+      "goal": "Read every bundle recon found and extract endpoints, parameter names, feature flags, role names and credential shapes. Record each as surface with source=javascript. Report any endpoint that implies an admin or internal function.",
+      "target": "{{target}}",
+      "mode": "active",
+      "role": "long_context",
+      "inputs": ["bw-01-recon"],
+      "max_steps": 12,
+      "done_when": [
+        "every endpoint referenced from a bundle is in the ledger",
+        "any credential shape is reported by kind and position, redacted"
+      ]
+    },
+    {
+      "id": "bw-03-classify",
+      "kind": "classify",
+      "title": "One class and one falsifier per input on {{target}}",
+      "goal": "For each surface item worth testing, open exactly one falsifiable hypothesis: a class from the proof matrix, the entry point, the statement, and the observation that would kill it. Park the rest by name with the reason. Probe nothing. Read proof.requirement for each class you open so the hypothesis names evidence that can actually be collected.",
+      "target": "{{target}}",
+      "mode": "passive",
+      "role": "executor",
+      "inputs": ["bw-01-recon", "bw-02-bundle"],
+      "max_steps": 20,
+      "done_when": [
+        "every surface item is either a hypothesis or explicitly parked",
+        "each hypothesis names a class, an entry point and a falsifier",
+        "no class was opened that the proof matrix refuses"
+      ]
+    },
+    {
+      "id": "bw-90-review",
+      "kind": "review",
+      "title": "Adversarial review of every confirmed finding",
+      "goal": "Re-read the evidence behind each confirmed finding, without reading the reasoning that produced it, and say whether the evidence on its own establishes the claim. Record agreement or disagreement with ledger.cross_verify. Disagreement is a useful outcome.",
+      "mode": "passive",
+      "role": "reviewer",
+      "after_all": true,
+      "max_steps": 14,
+      "done_when": ["every confirmed finding carries a cross-verification record"]
+    },
+    {
+      "id": "bw-91-report",
+      "kind": "report",
+      "title": "Write the report",
+      "goal": "Render the report, then state what was proven with its evidence ids, what is a candidate and the exact check each candidate is missing, and what was never tested. Bound every absence with its coverage.",
+      "mode": "passive",
+      "role": "report",
+      "after_all": true,
+      "inputs": ["bw-90-review"],
+      "max_steps": 10,
+      "done_when": ["report.md written", "every absence in it is bounded by what was not tested"]
+    }
+  ]
+}

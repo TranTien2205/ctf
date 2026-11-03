@@ -1,0 +1,41 @@
+{
+  "name": "passive-only",
+  "description": "What can be established without touching the target: scope sanity, passive enumeration, prior knowledge and the proof requirements for whatever is likely. For an engagement whose window has not opened, or a client who has not yet authorised active testing.",
+  "variables": ["target"],
+  "tasks": [
+    {
+      "id": "pass-01-prior",
+      "kind": "research",
+      "title": "What is already known about this shape",
+      "goal": "Call knowledge.chain_match for the stack, read the proof matrix for the classes it implies, and write down which inputs would need to exist for each class to be worth testing. Touch nothing.",
+      "target": "{{target}}",
+      "mode": "passive",
+      "role": "long_context",
+      "max_steps": 10,
+      "done_when": ["a candidate class list exists, each with the input it would need"]
+    },
+    {
+      "id": "pass-02-plan",
+      "kind": "classify",
+      "title": "Write the hypotheses the active window will test",
+      "goal": "Open the hypotheses that passive knowledge already justifies, each with a falsifier and the proof requirement noted. Park the rest. Run no probe: the engagement is not active yet.",
+      "target": "{{target}}",
+      "mode": "passive",
+      "role": "executor",
+      "inputs": ["pass-01-prior"],
+      "max_steps": 12,
+      "done_when": ["every hypothesis names a class, an entry point and a falsifier"]
+    },
+    {
+      "id": "pass-91-report",
+      "kind": "report",
+      "title": "Write the pre-engagement note",
+      "goal": "State what is known, what is assumed, what the active window would test first and in what order, and what this note cannot establish because nothing was touched.",
+      "mode": "passive",
+      "role": "report",
+      "after_all": true,
+      "max_steps": 8,
+      "done_when": ["the note distinguishes known from assumed throughout"]
+    }
+  ]
+}
