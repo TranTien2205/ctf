@@ -1,0 +1,17 @@
+# runtime output: ledgers, evidence, transcripts, reports
+engagements/
+
+# python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# the fixture's sandbox files, recreated on every run
+test/fixtures/vulnapp-files/
+
+# local credentials, if anyone ever puts them here rather than ~/.config/argus
+credentials.json
+*.key
+*.pem
+.integration/

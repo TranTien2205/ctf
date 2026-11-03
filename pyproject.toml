@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argus"
+version = "0.1.0"
+description = "An evidence-gated, multi-model penetration-testing agent system"
+readme = "README.md"
+requires-python = ">=3.11"
+# Intentionally empty. Everything in argus/ runs on the standard library: an
+# engagement should not fail on a pip install, and the tool plane's dependencies
+# are the pentest tools themselves, which are installed by the operating system.
+dependencies = []
+
+[project.optional-dependencies]
+# Only for proof.browser_exec; without it that tool refuses with instructions
+# for driving a browser through an MCP server instead.
+browser = ["playwright>=1.40"]
+# Only for authoring workflows in YAML; the shipped workflows are JSON.
+yaml = ["PyYAML>=6"]
+
+[project.scripts]
+argus = "argus.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["argus*"]
