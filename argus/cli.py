@@ -162,10 +162,17 @@ def cmd_run(args) -> int:
 
 
 def cmd_agent(args) -> int:
+    from .runtime import profile as profile_mod
     from .runtime.loop import Harness
-    harness = Harness(args.engagement, args.model, provider=args.provider,
-                      provider_kwargs={"model_prefix": args.opencode_prefix}
-                      if args.opencode_prefix else None)
+    model_profile = profile_mod.load(args.model)
+    provider = args.provider or model_profile.provider
+    # The billing route is in the profile; deriving it here means `argus agent`
+    # does not need the prefix spelled out, the way the orchestrator's runner
+    # already does not.
+    prefix = args.opencode_prefix or (model_profile.opencode_name or "").split("/")[0]
+    kwargs = {"model_prefix": prefix} if provider == "opencode" and prefix else None
+    harness = Harness(args.engagement, args.model, provider=provider,
+                      provider_kwargs=kwargs)
     result = harness.run(task=args.task or "", max_steps=args.max_steps)
     _print(result.to_dict(), args.json, result.render())
     return 0
