@@ -1,0 +1,338 @@
+{
+  "version": 1,
+  "note": "One harness profile per model. The fields that matter are not the model's name but how its loop has to be shaped: how many steps it gets, how much tool output it can read without losing the thread, how often the contract has to be restated, and whether it can be trusted with several tool calls in one turn. The strengths list is a ROUTING HYPOTHESIS, not a measurement — `argus eval` is what turns it into one, and the router reads this file, so correcting it is a JSON edit.",
+  "defaults": {
+    "tool_dialect": "openai",
+    "max_steps": 24,
+    "observation_cap": 9000,
+    "history_chars": 90000,
+    "restate_contract_every": 6,
+    "plan_first": true,
+    "one_tool_per_step": true,
+    "temperature": 0.2,
+    "max_output_tokens": 4096,
+    "retry": 2,
+    "compaction": "digest",
+    "cost_per_mtok": {
+      "input": 0.0,
+      "output": 0.0
+    },
+    "strengths": [],
+    "notes": "",
+    "family": "unknown",
+    "opencode_name": ""
+  },
+  "models": {
+    "claude-opus-5-5": {
+      "provider": "anthropic",
+      "display": "Opus 5.5",
+      "tool_dialect": "anthropic",
+      "context_window": 200000,
+      "max_output_tokens": 16000,
+      "max_steps": 48,
+      "observation_cap": 14000,
+      "history_chars": 160000,
+      "restate_contract_every": 12,
+      "plan_first": false,
+      "one_tool_per_step": false,
+      "reasoning": "high",
+      "cost_per_mtok": {
+        "input": 5.0,
+        "output": 25.0
+      },
+      "strengths": [
+        "planning",
+        "exploit-chaining",
+        "ambiguous-evidence",
+        "cross-verification"
+      ],
+      "notes": "The planner. Expensive per token and cheap per solved problem: it is the one model worth spending on a decision that sets the direction of everything after it. Do not let it do breadth work.",
+      "family": "claude",
+      "opencode_name": "anthropic/claude-opus-5-5"
+    },
+    "claude-sonnet-5-5": {
+      "provider": "anthropic",
+      "display": "Sonnet 5.5",
+      "tool_dialect": "anthropic",
+      "context_window": 200000,
+      "max_output_tokens": 12000,
+      "max_steps": 36,
+      "observation_cap": 12000,
+      "history_chars": 140000,
+      "restate_contract_every": 10,
+      "plan_first": false,
+      "one_tool_per_step": false,
+      "cost_per_mtok": {
+        "input": 1.0,
+        "output": 5.0
+      },
+      "strengths": [
+        "tool-use",
+        "exploitation",
+        "long-sessions",
+        "writing-tools"
+      ],
+      "notes": "The default executor: good tool discipline and long enough sessions to finish a class on its own.",
+      "family": "claude",
+      "opencode_name": "anthropic/claude-sonnet-5-5"
+    },
+    "claude-haiku-5-5": {
+      "provider": "anthropic",
+      "display": "Haiku 5.5",
+      "tool_dialect": "anthropic",
+      "context_window": 200000,
+      "max_output_tokens": 8000,
+      "max_steps": 18,
+      "observation_cap": 7000,
+      "history_chars": 60000,
+      "restate_contract_every": 5,
+      "plan_first": true,
+      "one_tool_per_step": true,
+      "cost_per_mtok": {
+        "input": 0.25,
+        "output": 1.25
+      },
+      "strengths": [
+        "breadth",
+        "parsing",
+        "triage",
+        "one-class-sweeps"
+      ],
+      "notes": "Breadth, not depth. Give it one class, one target and a ladder it only has to follow.",
+      "family": "claude",
+      "opencode_name": "anthropic/claude-haiku-5-5"
+    },
+    "deepseek-v4-pro": {
+      "provider": "opencode",
+      "display": "DeepSeek V4 Pro",
+      "tool_dialect": "text",
+      "context_window": 128000,
+      "max_steps": 30,
+      "observation_cap": 9000,
+      "history_chars": 90000,
+      "restate_contract_every": 6,
+      "plan_first": true,
+      "one_tool_per_step": true,
+      "cost_per_mtok": {
+        "input": 0.3,
+        "output": 1.2
+      },
+      "strengths": [
+        "source-reading",
+        "code-reasoning",
+        "cheap-depth",
+        "cross-family-review"
+      ],
+      "notes": "Strong on reading code for the sink that explains a signal, and from a different family than Claude, which is what makes its review of a Claude finding worth having. Routed through opencode-go rather than the direct `deepseek/` provider: measured 2026-11-03, the direct route answered HTTP 402 Insufficient Balance on this machine while opencode-go served the same model. A billing route is part of a model's reachability, so it belongs in the profile rather than in someone's memory.",
+      "family": "deepseek",
+      "opencode_name": "opencode-go/deepseek-v4-pro"
+    },
+    "deepseek-flash": {
+      "provider": "opencode",
+      "display": "DeepSeek Flash",
+      "tool_dialect": "text",
+      "context_window": 128000,
+      "max_steps": 16,
+      "observation_cap": 6000,
+      "history_chars": 50000,
+      "restate_contract_every": 4,
+      "cost_per_mtok": {
+        "input": 0.07,
+        "output": 0.3
+      },
+      "strengths": [
+        "bulk-parsing",
+        "summarising",
+        "surface-triage"
+      ],
+      "notes": "For the work that is reading, not deciding. Routed through opencode-go for the same reason as deepseek-v4-pro.",
+      "family": "deepseek",
+      "opencode_name": "opencode-go/deepseek-v4.1-flash"
+    },
+    "gemini-3.1-pro-preview": {
+      "provider": "opencode",
+      "display": "Gemini 3.1 Pro",
+      "tool_dialect": "text",
+      "context_window": 1000000,
+      "max_steps": 28,
+      "observation_cap": 30000,
+      "history_chars": 400000,
+      "restate_contract_every": 8,
+      "plan_first": true,
+      "one_tool_per_step": true,
+      "cost_per_mtok": {
+        "input": 1.25,
+        "output": 10.0
+      },
+      "strengths": [
+        "huge-context",
+        "whole-bundle-reading",
+        "documentation-research",
+        "many-artifacts"
+      ],
+      "notes": "The one to hand an entire JS bundle, a full nuclei run or a vendor advisory set. Its context is the capability; use it for the reads that would compact anything else.",
+      "family": "gemini",
+      "opencode_name": "google/gemini-3.1-pro-preview"
+    },
+    "gemini-3.5-flash": {
+      "provider": "opencode",
+      "display": "Gemini 3.5 Flash",
+      "tool_dialect": "text",
+      "context_window": 1000000,
+      "max_steps": 18,
+      "observation_cap": 20000,
+      "history_chars": 200000,
+      "restate_contract_every": 5,
+      "cost_per_mtok": {
+        "input": 0.3,
+        "output": 2.5
+      },
+      "strengths": [
+        "cheap-huge-context",
+        "log-reading",
+        "diffing-artifacts"
+      ],
+      "notes": "Cheap breadth over large artifacts.",
+      "family": "gemini",
+      "opencode_name": "google/gemini-3.5-flash"
+    },
+    "gpt-6-luna": {
+      "provider": "opencode",
+      "display": "GPT-6 (luna)",
+      "tool_dialect": "text",
+      "context_window": 256000,
+      "max_steps": 32,
+      "observation_cap": 11000,
+      "history_chars": 120000,
+      "restate_contract_every": 8,
+      "plan_first": false,
+      "one_tool_per_step": true,
+      "cost_per_mtok": {
+        "input": 1.25,
+        "output": 10.0
+      },
+      "strengths": [
+        "exploit-writing",
+        "protocol-detail",
+        "cross-family-review"
+      ],
+      "notes": "A third family, which matters for review: two models that agree because they share a prior are not a check.",
+      "family": "openai",
+      "opencode_name": "opencode-go/gpt-6-luna"
+    },
+    "kimi-k3.1-pro": {
+      "provider": "opencode",
+      "display": "Kimi K3.1 Pro",
+      "tool_dialect": "text",
+      "context_window": 256000,
+      "max_steps": 24,
+      "observation_cap": 10000,
+      "history_chars": 100000,
+      "cost_per_mtok": {
+        "input": 0.6,
+        "output": 2.5
+      },
+      "strengths": [
+        "long-context",
+        "cheap-depth",
+        "tool-scripting"
+      ],
+      "notes": "",
+      "family": "kimi",
+      "opencode_name": "opencode-go/kimi-k3.1-pro"
+    },
+    "glm-5.3": {
+      "provider": "opencode",
+      "display": "GLM 5.3",
+      "tool_dialect": "text",
+      "context_window": 200000,
+      "max_steps": 22,
+      "observation_cap": 9000,
+      "cost_per_mtok": {
+        "input": 0.4,
+        "output": 1.6
+      },
+      "strengths": [
+        "cheap-depth",
+        "code-reasoning"
+      ],
+      "notes": "",
+      "family": "glm",
+      "opencode_name": "opencode-go/glm-5.3"
+    },
+    "mock": {
+      "provider": "mock",
+      "display": "scripted mock",
+      "tool_dialect": "mock",
+      "context_window": 8000,
+      "max_steps": 12,
+      "observation_cap": 2000,
+      "history_chars": 8000,
+      "cost_per_mtok": {
+        "input": 0.0,
+        "output": 0.0
+      },
+      "strengths": [
+        "testing"
+      ],
+      "notes": "Replays a scripted sequence of tool calls. The harness's own test double.",
+      "family": "mock"
+    },
+    "beam-free": {
+      "provider": "opencode",
+      "display": "opencode beam (free tier)",
+      "family": "opencode-free",
+      "opencode_name": "opencode/beam-free",
+      "tool_dialect": "text",
+      "context_window": 128000,
+      "max_steps": 14,
+      "observation_cap": 6000,
+      "history_chars": 40000,
+      "restate_contract_every": 3,
+      "plan_first": true,
+      "one_tool_per_step": true,
+      "cost_per_mtok": {
+        "input": 0.0,
+        "output": 0.0
+      },
+      "strengths": [],
+      "notes": "Free tier. Measured 2026-11-03: a trivial prompt returned NO text at all within 150 seconds, so it is not usable for validation today and is kept here as a named, measured dead end rather than a hopeful entry. opencode-go/deepseek-v4-pro is the cheap route that actually answered."
+    }
+  },
+  "roles": {
+    "planner": [
+      "claude-opus-5-5",
+      "gpt-6-luna",
+      "deepseek-v4-pro"
+    ],
+    "executor": [
+      "claude-sonnet-5-5",
+      "deepseek-v4-pro",
+      "gpt-6-luna",
+      "kimi-k3.1-pro"
+    ],
+    "breadth": [
+      "claude-haiku-5-5",
+      "deepseek-flash",
+      "gemini-3.5-flash",
+      "glm-5.3"
+    ],
+    "long_context": [
+      "gemini-3.1-pro-preview",
+      "gemini-3.5-flash",
+      "kimi-k3.1-pro"
+    ],
+    "reviewer": [
+      "deepseek-v4-pro",
+      "gpt-6-luna",
+      "claude-opus-5-5"
+    ],
+    "report": [
+      "claude-sonnet-5-5",
+      "claude-opus-5-5"
+    ],
+    "smoke": [
+      "mock"
+    ]
+  }
+}
