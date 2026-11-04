@@ -33,8 +33,15 @@ These all run; what is missing is a test that would notice if they stopped.
   reporting, but no key was configured on the build machine, so no live
   completion has gone through them here. The mock provider is what the loop is
   tested against.
-- **The two CLI backends.** Measured on 2026-11-03, in this order, because each
-  failure explained the next:
+- **The two CLI backends.** Measured on 2026-11-03 against `opencode` 1.18.34
+  and `claude` 2.1.317, in this order, because each failure explained the next.
+  The version matters: everything below is a property of a CLI's output format,
+  so an upgrade can invalidate it silently. Re-checked on 2026-11-04 against
+  `opencode` 1.19.5 — `--format`, `--pure`, `-m`, `--variant` and `--auto` all
+  still exist, `opencode auth list` still parses, and one live call through
+  `runtime/providers/opencode_cli.py` still returned a parsed tool call. That
+  re-check is a command, not a belief: it is the first thing to run after any
+  upgrade of either CLI.
   1. `opencode run` without `--pure` returned `Invalid value for 'tools':
      maximum number of items is 128` — the host's own global MCP configuration,
      not the model. That is why the adapter passes `--pure`.
