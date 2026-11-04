@@ -72,6 +72,55 @@ class TaskResult:
         return {k: v for k, v in self.__dict__.items()}
 
 
+ARGUS_AGENT = "argus-pentest"
+# opencode's own tools that can reach a target or the filesystem without passing
+# the broker. Denying them is what keeps "every target-touching command goes
+# through the gate" true on the delegation path.
+OPENCODE_BUILTIN_DENY = ("bash", "edit", "write", "patch", "webfetch", "websearch")
+# Where opencode reads configuration that `OPENCODE_CONFIG` merges with, most
+# specific last. Project-level files are relative to the directory the agent runs
+# in, which for us is always the repository root.
+OPENCODE_CONFIG_PATHS = (
+    "~/.config/opencode/opencode.jsonc",
+    "~/.config/opencode/opencode.json",
+    "opencode.jsonc",
+    "opencode.json",
+)
+
+
+def _inherited_opencode_servers() -> set[str]:
+    """Every MCP server name a delegated opencode agent would inherit.
+
+    JSONC, so comments are stripped before parsing. A file that will not parse is
+    skipped rather than fatal: failing to start an agent because the user has a
+    trailing comma somewhere would be the wrong trade, and the consequence of a
+    miss is one server left enabled, which `opencode mcp list` shows.
+    """
+    import re
+    found: set[str] = set()
+    for raw_path in OPENCODE_CONFIG_PATHS:
+        path = Path(raw_path).expanduser()
+        if not path.is_absolute():
+            path = config.ROOT / raw_path
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        text = re.sub(r"(?m)^\s*//.*$", "", text)
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            found |= {str(name) for name in (data.get("mcp") or {})}
+            servers = ((data.get("mcp") or {}).get("servers")
+                       if isinstance(data.get("mcp"), dict) else None)
+            if isinstance(servers, dict):
+                found |= {str(name) for name in servers}
+    return found
+
+
 def tool_filter_for(kind: str):
     prefixes = TOOL_SETS.get(kind)
     if not prefixes:
@@ -210,17 +259,53 @@ class Runner:
         return str(path)
 
     def mcp_config_opencode(self) -> str:
+        """Write the config a delegated opencode agent runs under.
+
+        `OPENCODE_CONFIG` does not replace the user's configuration, it **merges**
+        with it. Measured on 2026-11-04 with opencode 1.19.5: pointing it at a
+        config that registers only `argus`, `opencode mcp list` answered with six
+        servers — argus plus the five already in `~/.config/opencode/`. So a
+        delegated agent reached burp, ghidra, playwright and rea as well, and the
+        claim this runner exists to keep — that the only tools an agent can reach
+        are ours, behind the ledger gate — was not true on this path.
+
+        The fix is to name them and switch them off. There is no "do not merge"
+        key in the schema, so the inherited servers are discovered and each one is
+        written back disabled. That is verifiable: `opencode mcp list` under this
+        config must show argus connected and every other server disabled.
+        """
+        inherited = _inherited_opencode_servers()
+        servers: dict = {name: {"enabled": False} for name in inherited if name != "argus"}
+        servers["argus"] = {
+            "type": "local",
+            "command": ["python3", "-m", "argus.broker.serve", "all",
+                        "--engagement", self.engagement],
+            "environment": {"PYTHONPATH": str(config.ROOT),
+                            "ARGUS_ENGAGEMENT": self.engagement},
+            "enabled": True,
+        }
         path = config.Paths(self.engagement).dir / "opencode.json"
         write_json(path, {
             "$schema": "https://opencode.ai/config.json",
-            "mcp": {"argus": {
-                "type": "local",
-                "command": ["python3", "-m", "argus.broker.serve", "all",
-                            "--engagement", self.engagement],
-                "environment": {"PYTHONPATH": str(config.ROOT),
-                                "ARGUS_ENGAGEMENT": self.engagement},
-                "enabled": True}},
+            "mcp": servers,
+            # opencode's builtin tools are a separate hole: its own bash can reach
+            # a target without passing the broker. `AgentConfig.tools` is the
+            # documented switch for that and the schema marks it deprecated in
+            # favour of `permission`, so both are written. NEITHER IS VERIFIED
+            # HERE — confirming it needs a delegated agent run, which is the open
+            # item in ROADMAP.md. Until then the MCP surface is controlled and the
+            # builtin surface is only asked for.
+            "agent": {ARGUS_AGENT: {
+                "description": "Pentest execution under the argus ledger gate.",
+                "tools": {name: False for name in OPENCODE_BUILTIN_DENY},
+                "permission": {"bash": "deny", "edit": "deny", "webfetch": "deny",
+                               "websearch": "deny", "external_directory": "deny"},
+            }},
         })
+        if inherited:
+            self.bus.emit("runner.opencode-config", {
+                "inherited_servers_disabled": sorted(n for n in inherited if n != "argus"),
+                "note": "OPENCODE_CONFIG merges with the user config rather than replacing it"})
         return str(path)
 
     def _cli_claude(self, task: dict, route, brief: str, result: TaskResult) -> None:

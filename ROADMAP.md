@@ -74,10 +74,32 @@ These all run; what is missing is a test that would notice if they stopped.
      path still has no live run behind it.
 
   So the loop, the text dialect, the tool rendering, the broker gate and the
-  ledger all hold up with a real model on the other end. What is still untested:
-  a delegated task through `claude -p` or `opencode run --auto` with our MCP
-  server as the agent's own tools (`orchestrator/runner.py`), and any live run
-  through the HTTP provider adapters.
+  ledger all hold up with a real model on the other end.
+
+- **The delegation path's tool surface**, which turned out to be a defect rather
+  than a gap. On 2026-11-04, with opencode 1.19.5, `opencode mcp list` run under
+  the config `orchestrator/runner.py` generates answered with **six** servers:
+  `argus`, plus the five already in `~/.config/opencode/` — burp, context7,
+  ghidra, playwright, rea. `OPENCODE_CONFIG` merges with the user's
+  configuration; it does not replace it. A delegated agent therefore reached
+  tools that never pass the ledger gate, so the one claim this runner exists to
+  keep was false on that path.
+
+  The schema has no "do not merge" key, so the inherited servers are now
+  discovered and each one written back disabled. Re-measured: the five inherited
+  servers each shown `○ disabled`, and `argus` alone shown `✓ connected`.
+  `test/unit.py` holds it that way.
+
+  What is **still** unverified on that path: opencode's own builtin tools. Its
+  `bash` can reach a target without the broker. The config now denies them two
+  ways — `agent.tools` and `agent.permission`, the second because the schema
+  marks the first deprecated — and neither denial has been confirmed to take
+  effect, because confirming it needs a delegated agent run. The `claude` path
+  does not have this hole: `--disallowed-tools` is enforced by that CLI and
+  `--allowed-tools mcp__argus` is a real allowlist.
+
+  Still untested: a whole delegated task through either CLI with a live model,
+  and any live run through the HTTP provider adapters.
 - **The planner against a real model.** The validator is tested with a
   deliberately bad plan; the prompt has not been given to a live planner.
 - **Cross-family verification against a real model.** The prompt and the

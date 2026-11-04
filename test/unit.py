@@ -336,6 +336,49 @@ def test_tool_scratch() -> None:
           str(lines.get("TMPDIR")))
 
 
+# --- the delegation path's tool surface --------------------------------------
+
+def test_delegated_tool_surface() -> None:
+    section("delegated tool surface")
+    from argus.orchestrator.runner import (ARGUS_AGENT, OPENCODE_BUILTIN_DENY, Runner,
+                                           _inherited_opencode_servers)
+
+    name = "t-unit-delegate"
+    shutil.rmtree(Paths(name).dir, ignore_errors=True)
+    hooks.open_engagement(name, "delegation surface", {"in_scope": ["127.0.0.1"]},
+                          tiers=["passive", "active"], authorisation="unit test")
+    runner = Runner(name)
+
+    claude_config = read_json(runner.mcp_config_claude(), {})
+    servers = (claude_config.get("mcpServers") or {})
+    check("the claude config registers argus and nothing else", list(servers) == ["argus"],
+          str(list(servers)))
+
+    opencode_config = read_json(runner.mcp_config_opencode(), {})
+    mcp = opencode_config.get("mcp") or {}
+    check("the opencode config enables argus", (mcp.get("argus") or {}).get("enabled") is True)
+    # `OPENCODE_CONFIG` MERGES with the user's configuration rather than replacing
+    # it: measured 2026-11-04 on opencode 1.19.5, `opencode mcp list` answered
+    # with argus plus the five servers already in ~/.config/opencode. A delegated
+    # agent therefore reached tools that never pass the ledger gate, which is the
+    # one thing this runner exists to prevent. Each inherited server is now
+    # written back disabled, and this is the check that keeps it that way.
+    inherited = {server for server in _inherited_opencode_servers() if server != "argus"}
+    missing = [server for server in inherited
+               if (mcp.get(server) or {}).get("enabled") is not False]
+    check("every inherited opencode MCP server is explicitly disabled", not missing,
+          f"left enabled: {missing}" if missing else f"disabled {len(inherited)}: "
+          f"{sorted(inherited)}")
+    agent = (opencode_config.get("agent") or {}).get(ARGUS_AGENT) or {}
+    denied = agent.get("tools") or {}
+    check("the delegated opencode agent is asked to give up its own shell",
+          all(denied.get(tool) is False for tool in OPENCODE_BUILTIN_DENY),
+          str(denied))
+    check("and the same denial is expressed as a permission",
+          (agent.get("permission") or {}).get("bash") == "deny",
+          str(agent.get("permission")))
+
+
 def main() -> int:
     test_scope()
     test_proof_matrix()
@@ -345,6 +388,7 @@ def main() -> int:
     test_locking()
     test_runtime()
     test_tool_scratch()
+    test_delegated_tool_surface()
     print(f"\n{COUNT - len(FAILURES)}/{COUNT} unit checks passed")
     if FAILURES:
         print("\nFAILURES:")
