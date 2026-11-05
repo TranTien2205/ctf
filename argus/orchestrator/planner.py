@@ -182,15 +182,29 @@ def plan_with_model(engagement: str, provider, model: str, profile=None,
     if not completion.ok:
         return PlanOutcome({}, [f"fatal: planner provider failed: {completion.error}"], "", model)
     plan, problems = parse_and_validate(completion.text, engagement)
+    # A provider may answer a pinned model with a different one. Measured
+    # 2026-11-05: `claude -p --model claude-opus-5-5` was flagged `cyber` and the
+    # CLI retried the whole session on claude-opus-4-8. Recording the pinned name
+    # as the author would be exactly the kind of invented fact this system is
+    # built to refuse, so the model that answered is the model named.
+    safeguard = (completion.raw or {}).get("safeguard") or []
+    answered_by = next((note.get("fallback_model") for note in safeguard
+                        if note.get("fallback_model")), "") or model
+    note = "planned by a model; validated against scope and the proof matrix"
+    if answered_by != model:
+        note += (f"; {model} was pinned but the provider answered with {answered_by}"
+                 f" ({'/'.join(str(safeguard[0].get(k, '?')) for k in ('trigger', 'category'))},"
+                 f" scope {safeguard[0].get('scope', '?')})")
     plan.update({"engagement": engagement, "objective": state.data["objective"],
-                 "created": now_iso(), "created_by": f"model:{model}",
-                 "note": "planned by a model; validated against scope and the proof matrix"})
+                 "created": now_iso(), "created_by": f"model:{answered_by}",
+                 "pinned_model": model, "safeguard": safeguard, "note": note})
     cost = profile.cost(completion.input_tokens, completion.output_tokens)
     if plan.get("tasks"):
         _write(engagement, plan)
-        bus.emit("plan.created", {"by": model, "tasks": len(plan["tasks"]),
+        bus.emit("plan.created", {"by": answered_by, "pinned": model,
+                                  "safeguard": safeguard, "tasks": len(plan["tasks"]),
                                   "problems": problems, "cost_usd": round(cost, 4)})
-    return PlanOutcome(plan, problems, completion.text, model, cost)
+    return PlanOutcome(plan, problems, completion.text, answered_by, cost)
 
 
 def parse_and_validate(text: str, engagement: str) -> tuple[dict, list]:

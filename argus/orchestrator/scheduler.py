@@ -12,6 +12,8 @@ back until nothing else can be produced.
 """
 from __future__ import annotations
 
+import copy
+
 import json
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass, field
@@ -112,6 +114,12 @@ class Scheduler:
     def run(self, expand: bool = True) -> Summary:
         state = State.load(self.engagement)
         plan = planner_mod.load(self.engagement) or planner_mod.deterministic_plan(self.engagement)
+        # A dry run must leave the plan exactly as it found it. Measured
+        # 2026-11-05: it wrote `status: done` and a "would execute" result onto
+        # all twelve tasks, so the real run that followed found nothing ready and
+        # the plan could never be executed. Routing a plan is a question, not a
+        # step, so in a dry run every write lands on this copy instead of on disk.
+        self._scratch = copy.deepcopy(plan) if self.dry_run else None
         summary = Summary(self.engagement, self.policy, self.parallelism,
                           findings_before=len(state.data["findings"]))
         self.bus.emit("schedule.started", {"policy": self.policy,
@@ -121,22 +129,24 @@ class Scheduler:
         running: dict = {}
         with ThreadPoolExecutor(max_workers=self.parallelism) as pool:
             while True:
-                plan = planner_mod.load(self.engagement)
+                plan = self._plan()
                 ready = self._ready(plan, set(running.values()))
                 while ready and len(running) < self.parallelism and summary.tasks_run < self.max_tasks:
                     task = ready.pop(0)
-                    planner_mod.update_task(self.engagement, task["id"], status="running")
+                    self._update(task["id"], status="running")
                     route = self._route_for(task)
                     future = pool.submit(self.runner.execute, task, route)
                     running[future] = task["id"]
                     summary.tasks_run += 1
                 if not running:
-                    if expand and summary.tasks_run < self.max_tasks and planner_mod.expand(self.engagement):
+                    if (expand and not self.dry_run
+                            and summary.tasks_run < self.max_tasks
+                            and planner_mod.expand(self.engagement)):
                         continue
-                    final = self._after_all(planner_mod.load(self.engagement), set())
+                    final = self._after_all(self._plan(), set())
                     if final and summary.tasks_run < self.max_tasks:
                         for task in final:
-                            planner_mod.update_task(self.engagement, task["id"], status="running")
+                            self._update(task["id"], status="running")
                             route = self._route_for(task)
                             future = pool.submit(self.runner.execute, task, route)
                             running[future] = task["id"]
@@ -153,13 +163,13 @@ class Scheduler:
                     try:
                         result = future.result()
                     except Exception as error:                          # noqa: BLE001
-                        planner_mod.update_task(self.engagement, task_id, status="failed",
-                                                result={"summary": f"{type(error).__name__}: {error}"})
+                        self._update(task_id, status="failed",
+                                     result={"summary": f"{type(error).__name__}: {error}"})
                         summary.tasks_failed += 1
                         self.bus.emit("task.crashed", {"task": task_id, "error": str(error)})
                         continue
                     self._absorb(summary, task_id, result)
-                if expand:
+                if expand and not self.dry_run:
                     planner_mod.expand(self.engagement)
 
         final_state = State.load(self.engagement)
@@ -170,12 +180,26 @@ class Scheduler:
 
     # --- helpers -------------------------------------------------------------
 
+    def _plan(self) -> dict:
+        """The plan the loop reasons about: the scratch copy in a dry run."""
+        return self._scratch if self._scratch is not None else planner_mod.load(self.engagement)
+
+    def _update(self, task_id: str, **fields) -> None:
+        """Record a task's progress, on disk for a real run and in memory for a dry one."""
+        if self._scratch is not None:
+            for task in self._scratch.get("tasks") or []:
+                if task["id"] == task_id:
+                    task.update(fields)
+                    return
+            return
+        planner_mod.update_task(self.engagement, task_id, **fields)
+
     def _route_for(self, task: dict):
         exclude: tuple[str, ...] = ()
         if task.get("kind") == "review":
             exclude = tuple(sorted(self._families_that_produced_findings()))
         route = self.router.route(task, exclude_families=exclude)
-        planner_mod.update_task(self.engagement, task["id"], route=route.to_dict())
+        self._update(task["id"], route=route.to_dict())
         self.bus.emit("task.routed", route.to_dict())
         return route
 
@@ -192,9 +216,8 @@ class Scheduler:
         return {family for family in families if family and family != "unknown"}
 
     def _absorb(self, summary: Summary, task_id: str, result) -> None:
-        planner_mod.update_task(self.engagement, task_id,
-                                status="done" if result.ok else "failed",
-                                result=result.to_dict())
+        self._update(task_id, status="done" if result.ok else "failed",
+                     result=result.to_dict())
         if not result.ok:
             summary.tasks_failed += 1
         if result.runner == "none":

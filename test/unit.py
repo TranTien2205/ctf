@@ -336,6 +336,50 @@ def test_tool_scratch() -> None:
           str(lines.get("TMPDIR")))
 
 
+# --- a dry run is a question, not a step -------------------------------------
+
+def test_dry_run_leaves_the_plan_alone() -> None:
+    """`--dry-run` once marked every task done and made the plan unrunnable.
+
+    It wrote `status: done` plus a "would execute" result to disk, so the real
+    run that followed reported "nothing left that is ready" against a plan whose
+    twelve tasks had never touched a target. Routing is a question about a plan;
+    a question must not consume it.
+    """
+    section("dry run")
+    import json
+    from argus.orchestrator import planner as planner_mod
+    from argus.orchestrator.scheduler import Scheduler
+
+    name = "t-unit-dry-run"
+    shutil.rmtree(Paths(name).dir, ignore_errors=True)
+    try:
+        hooks.open_engagement(name, "dry run is side-effect free",
+                              {"in_scope": ["127.0.0.1"], "allowed_ports": [9]},
+                              tiers=["passive", "active"], authorisation="unit test")
+        hooks.add_target(name, "http://127.0.0.1:9/")
+        plan = planner_mod.deterministic_plan(name)
+        before = json.dumps(plan, sort_keys=True)
+        check("the plan starts with every task pending",
+              all(task["status"] == "pending" for task in plan["tasks"]),
+              str(sorted({task["status"] for task in plan["tasks"]})))
+
+        summary = Scheduler(name, policy="cheap", dry_run=True, parallelism=2).run(expand=False)
+        after = planner_mod.load(name)
+        statuses = sorted({task["status"] for task in after["tasks"]})
+        check("a dry run routes every task", summary.tasks_run == len(plan["tasks"]),
+              f"{summary.tasks_run} of {len(plan['tasks'])}")
+        check("a dry run calls no model and spends nothing", summary.cost_usd == 0.0,
+              str(summary.cost_usd))
+        check("a dry run leaves every task pending", statuses == ["pending"], str(statuses))
+        check("a dry run writes no fake result",
+              all(task.get("result") is None for task in after["tasks"]))
+        check("a dry run leaves the plan on disk byte-identical",
+              json.dumps(after, sort_keys=True) == before)
+    finally:
+        shutil.rmtree(Paths(name).dir, ignore_errors=True)
+
+
 # --- the delegation path's tool surface --------------------------------------
 
 def test_delegated_tool_surface() -> None:
@@ -388,6 +432,7 @@ def main() -> int:
     test_locking()
     test_runtime()
     test_tool_scratch()
+    test_dry_run_leaves_the_plan_alone()
     test_delegated_tool_surface()
     print(f"\n{COUNT - len(FAILURES)}/{COUNT} unit checks passed")
     if FAILURES:

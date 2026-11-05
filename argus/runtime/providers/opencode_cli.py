@@ -47,7 +47,22 @@ class OpenCodeProvider(Provider):
             return False, "opencode is not on PATH"
         return True, "opencode cli"
 
-    def _model(self, model: str) -> str:
+    def _model(self, profile) -> str:
+        """The name opencode knows, which is not always the name argus uses.
+
+        A profile carries both: `model` is the argus id the ledger records, and
+        `opencode_name` is the `provider/model` route opencode serves. Measured
+        2026-11-05: building the route from the argus id asked opencode for
+        `opencode-go/deepseek-flash`, which does not exist, and the CLI answered
+        "Unexpected server error" — so every run on that model failed with a
+        message that pointed at the server rather than at this line. It stayed
+        hidden because the only model measured before, `deepseek-v4-pro`, happens
+        to spell its argus id and its opencode suffix the same way.
+        """
+        named = (getattr(profile, "opencode_name", "") or "").strip()
+        if named:
+            return named
+        model = profile.model
         if "/" in model:
             return model
         return f"{self.model_prefix}/{model}" if self.model_prefix else model
@@ -58,7 +73,7 @@ class OpenCodeProvider(Provider):
         if not ok:
             return Completion(error=reason)
         prompt = render_prompt(system, messages, tools)
-        argv = ["opencode", "run", "--format", "json", "-m", self._model(profile.model)]
+        argv = ["opencode", "run", "--format", "json", "-m", self._model(profile)]
         if self.pure:
             argv.append("--pure")
         if profile.reasoning:

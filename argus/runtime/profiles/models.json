@@ -309,7 +309,8 @@
       "claude-sonnet-5-5",
       "deepseek-v4-pro",
       "gpt-6-luna",
-      "kimi-k3.1-pro"
+      "kimi-k3.1-pro",
+      "deepseek-flash"
     ],
     "breadth": [
       "claude-haiku-5-5",
