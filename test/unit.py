@@ -329,11 +329,87 @@ def test_tool_scratch() -> None:
         else:
             os.environ["ARGUS_TMPDIR"] = previous
         shutil.rmtree(scratch, ignore_errors=True)
-    result = ex.run(["env"])
-    lines = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
-    check("without the override a tool keeps the inherited temp directory",
-          lines.get("TMPDIR", os.environ.get("TMPDIR", "")) == os.environ.get("TMPDIR", ""),
-          str(lines.get("TMPDIR")))
+    # The override has to be cleared for this one rather than assumed absent.
+    # The gate is run with ARGUS_TMPDIR set whenever /tmp is a tmpfs small enough
+    # for sqlmap to fill, which is the case this feature exists for, and reading
+    # the live environment made the gate fail on the very machine that needs it.
+    override = os.environ.pop("ARGUS_TMPDIR", None)
+    try:
+        inherited = os.environ.get("TMPDIR", "")
+        result = ex.run(["env"])
+        lines = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+        check("without the override a tool keeps the inherited temp directory",
+              lines.get("TMPDIR", inherited) == inherited,
+              f"{lines.get('TMPDIR')} vs {inherited or '(unset)'}")
+    finally:
+        if override is not None:
+            os.environ["ARGUS_TMPDIR"] = override
+
+
+# --- openbot as the coordination plane ---------------------------------------
+
+def test_openbot_fleet() -> None:
+    """OpenBot coordinates; this repository still decides what counts.
+
+    Nothing here needs the app running: what is checked is the mapping between an
+    OpenBot agent and an argus role, the exit-code vocabulary the dispatcher
+    branches on, and that an unreachable control server is reported as a reason
+    rather than as an empty fleet.
+    """
+    section("openbot fleet")
+    from argus.orchestrator import openbot
+
+    ready, why = openbot.automation_ready()
+    check("an unreachable control server explains itself", bool(why.strip()), why[:90])
+    if not ready:
+        check("and names the files it looked for",
+              "automation" in why or "PATH" in why, why[:90])
+
+    # An agent is matched to an argus profile by either spelling of its model,
+    # because the profile is the only place that holds both.
+    agent = openbot.OpenBotAgent(id="a1", name="Flash",
+                                 model="opencode-go/deepseek-v4.1-flash")
+    check("an agent maps to the argus model by its opencode route",
+          agent.argus_model == "deepseek-flash", agent.argus_model or "(none)")
+    check("and inherits that model's roles",
+          "executor" in agent.roles(), str(agent.roles()))
+    pinned = openbot.OpenBotAgent(id="a2", name="Leader", model="claude-opus-5-5")
+    check("an agent maps by the argus id as well",
+          pinned.argus_model == "claude-opus-5-5", pinned.argus_model or "(none)")
+    check("the planner agent is offered the planner role",
+          "planner" in pinned.roles(), str(pinned.roles()))
+    unknown = openbot.OpenBotAgent(id="a3", name="Mystery", model="some/model-nobody-profiled")
+    check("an agent with no profile claims no role",
+          unknown.argus_model == "" and unknown.roles() == [])
+
+    # The exit codes are the whole control vocabulary, and each one means a
+    # different next move, so a wrong mapping sends work to the wrong place.
+    spent = openbot.Delivery(agent="Flash", exit_code=openbot.EXIT_FAILED,
+                             error="You have hit your usage limit. Resets at 14:00.")
+    check("a failed turn that names a usage limit is exhaustion", spent.exhausted)
+    check("and is not reported as done", not spent.ok)
+    refused = openbot.Delivery(agent="Flash", exit_code=openbot.EXIT_FAILED,
+                               error="the agent refused: out of scope")
+    check("a failed turn that is a decision is not exhaustion", not refused.exhausted,
+          refused.reason)
+    waiting = openbot.Delivery(agent="Leader", exit_code=openbot.EXIT_NEEDS_PERSON)
+    check("waiting for a person is neither done nor exhausted",
+          not waiting.ok and not waiting.exhausted, waiting.reason)
+    late = openbot.Delivery(agent="Leader", exit_code=openbot.EXIT_TIMEOUT)
+    check("a timeout is work still running, not quota",
+          not late.exhausted and late.reason == "timed-out", late.reason)
+    gone = openbot.Delivery(agent="Leader", exit_code=openbot.EXIT_UNREACHABLE)
+    check("an unreachable app is named as such", gone.reason == "openbot-unreachable",
+          gone.reason)
+
+    # This module reads the app's store and must never write it.
+    source = (Path(__file__).resolve().parent.parent
+              / "argus" / "orchestrator" / "openbot.py").read_text()
+    check("the app's database is only ever opened read-only",
+          source.count("sqlite3.connect") == source.count("mode=ro"),
+          f"{source.count('sqlite3.connect')} connect vs {source.count('mode=ro')} read-only")
+    for forbidden in ("insert into", "update ", "delete from", "drop table"):
+        check(f"and never issues {forbidden.strip()}", forbidden not in source.lower())
 
 
 # --- a dry run is a question, not a step -------------------------------------
@@ -433,6 +509,7 @@ def main() -> int:
     test_runtime()
     test_tool_scratch()
     test_dry_run_leaves_the_plan_alone()
+    test_openbot_fleet()
     test_delegated_tool_surface()
     print(f"\n{COUNT - len(FAILURES)}/{COUNT} unit checks passed")
     if FAILURES:

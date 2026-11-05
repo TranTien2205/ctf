@@ -9,8 +9,13 @@
               still holds.
     opencode   the same arrangement with opencode, which reaches a different set
               of credentials.
+    openbot    OpenBot's own agent runs the loop, dispatched by `openbot-cli`.
+              OpenBot holds the subscriptions and the per-agent workspace, so it
+              coordinates; the tools still come from our MCP server, so the gate
+              is still ours. It is the only runner that can move the work to
+              another account when the one behind an agent runs out.
 
-The brief is the handoff, and it is the same text in all three cases: the
+The brief is the handoff, and it is the same text in all four cases: the
 contract, what is already established, the task, the acceptance criteria, and
 what to write at the end. An agent that needs more than that was given a task
 that is not yet a task.
@@ -205,6 +210,8 @@ class Runner:
                 self._cli_claude(task, route, brief, result)
             elif route.runner == "opencode":
                 self._cli_opencode(task, route, brief, result)
+            elif route.runner == "openbot":
+                self._openbot(task, route, brief, result)
             else:
                 result.errors.append(f"unknown runner {route.runner!r}")
         except Exception as error:                                     # noqa: BLE001
@@ -357,6 +364,106 @@ class Runner:
             if route.profile else 0.0
         result.report_path = self.bus.write_report(
             task["id"], f"# {task['id']} — {model} via opencode\n\n{text or error or '(no output)'}\n")
+
+
+    # --- openbot's own agent, over the app's loopback control server ---------
+
+    def _openbot(self, task: dict, route, brief: str, result: TaskResult) -> None:
+        """Hand the task to the OpenBot agent configured for this model.
+
+        Three outcomes need acting on rather than only recording. A turn that
+        failed because the account behind the agent is spent is not the agent's
+        fault, so the work moves: first to another account on the same agent,
+        then to the next agent that can take the same role. A turn that timed out
+        is still running inside OpenBot, so its delivery id is kept and its
+        status asked for instead of the task being sent twice. A turn waiting for
+        a person is neither a success nor a failure and has to say so, because a
+        scheduler that retried it would only queue the same question again.
+        """
+        from .openbot import EXIT_NEEDS_PERSON, EXIT_TIMEOUT, Fleet
+
+        fleet = Fleet(timeout=self.timeout)
+        ready, why = fleet.available()
+        if not ready:
+            result.errors.append(f"openbot: {why}")
+            result.stop_reason = "openbot-unreachable"
+            return
+
+        candidates = [agent for agent in fleet.list_agents() if agent.argus_model == route.model]
+        candidates += [agent for agent in fleet.for_role(route.role) if agent not in candidates]
+        if not candidates:
+            result.errors.append(f"openbot: no agent is configured for {route.model} "
+                                 f"or for the role {route.role}")
+            result.stop_reason = "openbot-no-agent"
+            return
+
+        attempts: list[dict] = []
+        exhausted_every_one = True
+        for index, agent in enumerate(candidates):
+            delivery = fleet.dispatch(agent, brief, key=f"{self.engagement}:{task['id']}")
+            attempts.append({"agent": agent.name or agent.id, "model": agent.model,
+                             "exit": delivery.exit_code, "reason": delivery.reason,
+                             "delivery": delivery.delivery_id})
+            self.bus.emit("openbot.delivered", {"task": task["id"], **attempts[-1]})
+
+            if delivery.ok:
+                result.model = agent.argus_model or route.model
+                result.ok = True
+                result.stop_reason = "openbot-done"
+                result.summary = bound(delivery.text, 1200)
+                exhausted_every_one = False
+                break
+            if delivery.exit_code == EXIT_TIMEOUT:
+                result.stop_reason = "openbot-timed-out"
+                result.summary = bound(json.dumps(fleet.status(agent, delivery.delivery_id)), 1200)
+                result.errors.append(f"openbot: {agent.name} is still working on "
+                                     f"delivery {delivery.delivery_id}")
+                exhausted_every_one = False
+                break
+            if delivery.exit_code == EXIT_NEEDS_PERSON:
+                result.stop_reason = "openbot-needs-a-person"
+                result.errors.append(f"openbot: {agent.name} is waiting for a person")
+                exhausted_every_one = False
+                break
+
+            if delivery.exhausted:
+                moved = fleet.set_account(agent, "default")
+                self.bus.emit("openbot.account-switched",
+                              {"task": task["id"], "agent": agent.name or agent.id,
+                               "ok": moved, "why": bound(delivery.error or delivery.text, 300)})
+                if moved:
+                    retry = fleet.dispatch(agent, brief,
+                                           key=f"{self.engagement}:{task['id']}:retry")
+                    attempts.append({"agent": agent.name or agent.id, "model": agent.model,
+                                     "exit": retry.exit_code, "reason": retry.reason,
+                                     "delivery": retry.delivery_id, "after": "account-switch"})
+                    if retry.ok:
+                        result.model = agent.argus_model or route.model
+                        result.ok = True
+                        result.stop_reason = "openbot-done-after-account-switch"
+                        result.summary = bound(retry.text, 1200)
+                        exhausted_every_one = False
+                        break
+                result.errors.append(f"openbot: {agent.name} has nothing left: "
+                                     f"{bound(delivery.error or delivery.text, 200)}")
+                continue
+
+            result.errors.append(f"openbot: {agent.name} -> {delivery.reason}: "
+                                 f"{bound(delivery.error or delivery.text, 300)}")
+            result.stop_reason = f"openbot-{delivery.reason}"
+            exhausted_every_one = False
+            break
+        if exhausted_every_one:
+            result.stop_reason = "openbot-every-agent-exhausted"
+
+        result.input_tokens = len(brief) // 4
+        result.output_tokens = len(result.summary) // 4
+        result.cost_usd = route.profile.cost(result.input_tokens, result.output_tokens) \
+            if route.profile else 0.0
+        result.report_path = self.bus.write_report(
+            task["id"],
+            f"# {task['id']} - openbot\n\n```json\n{json.dumps(attempts, indent=2)}\n```\n\n"
+            f"{result.summary or '(no output)'}\n")
 
 
 def _claude_json(stdout: str) -> tuple[str, dict]:

@@ -252,6 +252,24 @@ def cmd_fleet(args) -> int:
     print("what can run here:")
     for key, value in availability.items():
         print(f"  {key}: {value}")
+    from .orchestrator import openbot as openbot_mod
+    print("\nopenbot, the coordination plane:")
+    ready, why = openbot_mod.automation_ready()
+    print(f"  control server: {'up at ' + why if ready else 'down — ' + why}")
+    registered = openbot_mod.mcp_servers_in_db()
+    argus_server = [row for row in registered if "argus" in row["name"].lower()]
+    print(f"  argus registered as an mcp server: "
+          f"{'yes, enabled' if argus_server and argus_server[0]['enabled'] else 'no'}"
+          f"{'' if registered else ' (no mcp server is registered at all)'}")
+    known = openbot_mod.agents_in_db()
+    dispatchable = {agent.id for agent in openbot_mod.Fleet().list_agents()} if ready else set()
+    if not known:
+        print("  agents: none in the app's store")
+    for agent in known:
+        print(f"  agent {agent.name:22} {agent.model:34} "
+              f"argus={agent.argus_model or '(no profile)':16} "
+              f"{'dispatchable' if agent.id in dispatchable else 'Local scripts off'} "
+              f"roles={','.join(agent.roles()) or '-'}")
     print(f"\nrouting under the {args.policy} policy:")
     print(f"  {'kind':10} {'runner':9} {'model':24} {'family':9} est.$")
     for kind in ROLE_FOR_KIND:

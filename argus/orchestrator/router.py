@@ -74,13 +74,35 @@ class Route:
 class Availability:
     """What can actually run on this machine right now, measured once."""
 
-    def __init__(self, probe_opencode: bool = True):
+    def __init__(self, probe_opencode: bool = True, probe_openbot: bool = True):
         self.keys = credentials.available()
         self.claude_cli = ex.which("claude") is not None
         self.opencode_cli = ex.which("opencode") is not None
         self.opencode_providers: set[str] = set()
         if probe_opencode and self.opencode_cli:
             self.opencode_providers = self._probe_opencode()
+        # OpenBot is a coordination plane rather than a provider: it reaches a
+        # model through an agent that already holds a subscription, so what makes
+        # a model reachable is an agent configured for it, not a key here.
+        self.openbot_agents: dict[str, str] = {}
+        self.openbot_reason = "not probed"
+        if probe_openbot:
+            self.openbot_agents, self.openbot_reason = self._probe_openbot()
+
+    @staticmethod
+    def _probe_openbot() -> tuple[dict[str, str], str]:
+        """Which argus models a dispatchable OpenBot agent exists for."""
+        try:
+            from .openbot import Fleet
+            fleet = Fleet()
+            ok, reason = fleet.available()
+            if not ok:
+                return {}, reason
+            found = {agent.argus_model: (agent.id or agent.name)
+                     for agent in fleet.list_agents() if agent.argus_model}
+            return found, reason
+        except Exception as error:                                     # noqa: BLE001
+            return {}, f"{type(error).__name__}: {error}"
 
     @staticmethod
     def _probe_opencode() -> set[str]:
@@ -111,6 +133,10 @@ class Availability:
         """(runner, why) pairs that can reach this model, best first."""
         out = []
         provider = model_profile.provider
+        agent = self.openbot_agents.get(model_profile.model)
+        if agent:
+            out.append(("openbot", f"openbot agent {agent} runs its own loop "
+                                   f"against our MCP server"))
         if provider in ("anthropic", "openai", "deepseek", "google", "openrouter"):
             if self.keys.get(provider, {}).get("present"):
                 out.append(("harness", f"{provider} key present, our loop keeps the ledger gate"))
@@ -129,7 +155,9 @@ class Availability:
     def to_dict(self) -> dict:
         return {"api_keys": {k: v["present"] for k, v in self.keys.items()},
                 "claude_cli": self.claude_cli, "opencode_cli": self.opencode_cli,
-                "opencode_credentials": sorted(self.opencode_providers)}
+                "opencode_credentials": sorted(self.opencode_providers),
+                "openbot_agents": dict(sorted(self.openbot_agents.items())),
+                "openbot": self.openbot_reason}
 
 
 class Router:
