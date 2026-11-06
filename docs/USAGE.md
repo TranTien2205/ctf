@@ -1,0 +1,82 @@
+# Usage
+
+## Install
+
+```bash
+pip install -e .          # needs Python 3.10+, one dep: httpx
+export ANTHROPIC_API_KEY=sk-ant-...
+# optional: ANTHROPIC_BASE_URL for a gateway, ARGUS_MODEL to change default
+```
+
+## Run
+
+```bash
+python -m argus run https://app.example
+python -m argus run https://app.example \
+    --scope api.example,cdn.example \   # extra in-scope hosts
+    --exclude /logout --exclude /admin/reset \
+    --header "Cookie: session=abc" \    # auth'd session (repeatable)
+    --header "Authorization: Bearer x" \
+    --goal "prioritize /api and the checkout flow" \
+    --rate 3 --max-requests 600 --max-time 3600
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--scope` | target host only | extra allowed hosts; subdomains included |
+| `--exclude` | none | path prefixes never touched |
+| `--header` | none | applied to every request (auth, custom UA) |
+| `--model` | `claude-sonnet-4-5` | any Anthropic model id |
+| `--max-turns` | 80 | LLM tool-call turns |
+| `--max-requests` | 400 | HTTP request budget |
+| `--max-time` | 2400 | wall-clock seconds |
+| `--rate` | 5 | requests/second cap |
+| `--allow-private` | auto if target private | permit RFC1918/loopback |
+| `--tls-verify` | off | verify certs (self-signed labs need off) |
+| `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
+| `--quiet` | off | suppress console trace |
+
+## Reading a run
+
+```
+sessions/20261106-101500-app.example/
+  report.md        ← start here
+  findings.json    ← same data, machine-readable
+  transcript.jsonl ← every request/response, cited by request_id
+  notes.md         ← the agent's working reasoning
+  agent.log        ← tool calls and agent text
+  summary.json     ← counts, severities
+```
+
+`python -m argus findings <session_dir>` reprints the table;
+`python -m argus report <session_dir>` re-renders `report.md`.
+
+## External tools
+
+If installed, the agent may call `sqlmap`, `nuclei`, `nmap`, `ffuf`, `curl`
+through `run_external` — args are scope-checked, runs are timeout-bounded
+(≤600s), output is truncated. Scanner claims are treated as *leads*: the
+agent must reproduce the issue via `http_request` to record a finding.
+
+## The lab
+
+`lab/vulnapp.py` is a stdlib-only vulnerable app planting one bug per probe
+family (XSS, SQLi error+bool, auth bypass, cmd injection, SSTI, LFI, open
+redirect, IDOR, bad CORS, weak JWT, .git disclosure). It's the fastest way
+to evaluate whether the agent finds what it should:
+
+```bash
+python lab/vulnapp.py 8777
+python -m argus run http://127.0.0.1:8777
+```
+
+`python selftest.py` does the whole thing offline with a scripted model —
+useful in CI or to verify a fresh checkout without an API key.
+
+## Interpreting severity
+
+The agent is instructed to rate honestly: confirmed RCE / auth bypass /
+sensitive data read → high-critical; verified primitives with unclear
+reach → medium; hygiene issues → low/info. A finding only exists if the
+excerpt proving it is inside a recorded response — if `report.md` says
+it, `transcript.jsonl` shows it.
