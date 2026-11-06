@@ -74,7 +74,8 @@ class TeamRun:
     # ------------------------------------------------------------- llm
     def _default_llm(self, role: str, name: str):
         return ClaudeClient(self.cfg.api_key, self.cfg.api_base, self.cfg.model,
-                            max_tokens=self.cfg.llm_max_tokens)
+                            max_tokens=self.cfg.llm_max_tokens,
+                            auth_token=self.cfg.auth_token)
 
     # ------------------------------------------------------------- spawn
     def _spawn_guarded(self, role: str, task: str) -> dict:

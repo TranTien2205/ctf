@@ -1,13 +1,18 @@
 """Configuration for an Argus run."""
 from __future__ import annotations
 
+import json
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_MODEL = "claude-sonnet-4-5"
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
+OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"
+# Public client id used by the Claude Code CLI for token refresh.
+OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 
 
 @dataclass
@@ -15,6 +20,7 @@ class Config:
     target: str
     model: str = DEFAULT_MODEL
     api_key: str = ""
+    auth_token: str = ""
     api_base: str = API_URL
     max_turns: int = 80
     max_requests: int = 400
@@ -37,9 +43,78 @@ class Config:
         return base
 
 
+def _claude_code_token() -> str:
+    """OAuth token from Claude Code (Pro/Max subscription), refreshed if stale."""
+    path = Path.home() / ".claude" / ".credentials.json"
+    if not path.exists():
+        return ""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        oauth = data.get("claudeAiOauth") or {}
+        token = oauth.get("accessToken") or ""
+        expires = int(oauth.get("expiresAt") or 0)
+        if token and expires > time.time() * 1000:
+            return token
+        refresh = oauth.get("refreshToken") or ""
+        if not (token and refresh):
+            return ""
+        import urllib.request
+        body = json.dumps({
+            "grant_type": "refresh_token",
+            "refresh_token": refresh,
+            "client_id": OAUTH_CLIENT_ID,
+        }).encode()
+        resp = urllib.request.urlopen(urllib.request.Request(
+            OAUTH_TOKEN_URL, data=body,
+            headers={"content-type": "application/json"}), timeout=15)
+        fresh = json.loads(resp.read())
+        oauth["accessToken"] = fresh.get("access_token", token)
+        oauth["refreshToken"] = fresh.get("refresh_token", refresh)
+        if fresh.get("expires_in"):
+            oauth["expiresAt"] = int(time.time() * 1000) + fresh["expires_in"] * 1000
+        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        return oauth["accessToken"]
+    except Exception:
+        return ""
+
+
+def _opencode_credential() -> tuple[str, str]:
+    """(api_key, auth_token) from OpenCode's auth store."""
+    candidates = [
+        Path.home() / ".local" / "share" / "opencode" / "auth.json",
+        Path(os.environ.get("LOCALAPPDATA", "")) / "opencode" / "auth.json",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            entry = (json.loads(path.read_text(encoding="utf-8")).get("anthropic") or {})
+        except Exception:
+            continue
+        if entry.get("type") == "oauth" and entry.get("access"):
+            return "", entry["access"]
+        if entry.get("key"):
+            return entry["key"], ""
+    return "", ""
+
+
+def resolve_auth(args) -> tuple[str, str]:
+    """(api_key, auth_token) — first source wins: CLI arg, env, Claude Code, OpenCode."""
+    key = getattr(args, "api_key", None) or os.environ.get("ANTHROPIC_API_KEY", "")
+    if key:
+        return key, ""
+    token = (getattr(args, "auth_token", None)
+             or os.environ.get("ANTHROPIC_AUTH_TOKEN")
+             or os.environ.get("CLAUDE_CODE_OAUTH_TOKEN")
+             or _claude_code_token())
+    if token:
+        return "", token
+    return _opencode_credential()
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    api_key, auth_token = resolve_auth(args)
     api_base = os.environ.get("ANTHROPIC_BASE_URL", API_URL).rstrip("/") + "/messages" \
         if os.environ.get("ANTHROPIC_BASE_URL") else API_URL
 
@@ -57,7 +132,8 @@ def load_config(args) -> Config:
     return Config(
         target=args.target,
         model=getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", DEFAULT_MODEL),
-        api_key=getattr(args, "api_key", None) or api_key,
+        api_key=api_key,
+        auth_token=auth_token,
         api_base=api_base,
         max_turns=args.max_turns,
         max_requests=args.max_requests,

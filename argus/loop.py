@@ -79,7 +79,8 @@ class AgentLoop:
             allowed=frozenset(allowed) if allowed else None,
         )
         self.llm = llm or ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
-                                       max_tokens=cfg.llm_max_tokens)
+                                       max_tokens=cfg.llm_max_tokens,
+                                       auth_token=cfg.auth_token)
         self.system = system or build_system(cfg, self.scope)
         self.seed = seed or build_seed(cfg)
         self.tools = TOOL_SCHEMAS if allowed is None else \

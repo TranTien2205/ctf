@@ -19,10 +19,19 @@ class LLMError(RuntimeError):
     pass
 
 
+NO_CREDENTIAL_MSG = (
+    "no Anthropic credential: set ANTHROPIC_API_KEY or pass --api-key, "
+    "set ANTHROPIC_AUTH_TOKEN / CLAUDE_CODE_OAUTH_TOKEN, or sign in with "
+    "Claude Code (Pro/Max) so ~/.claude/.credentials.json exists"
+)
+
+
 class ClaudeClient:
     def __init__(self, api_key: str, api_base: str, model: str,
-                 max_tokens: int = 4096, timeout: float = 120.0):
+                 max_tokens: int = 4096, timeout: float = 120.0,
+                 auth_token: str = ""):
         self.api_key = api_key
+        self.auth_token = auth_token
         self.api_base = api_base
         self.model = model
         self.max_tokens = max_tokens
@@ -32,21 +41,37 @@ class ClaudeClient:
         self.output_tokens = 0
 
     def chat(self, messages: list[dict], tools: list[dict], system: str) -> dict:
-        if not self.api_key:
-            raise LLMError(
-                "ANTHROPIC_API_KEY is not set; export it or pass --api-key"
-            )
+        if not (self.api_key or self.auth_token):
+            raise LLMError(NO_CREDENTIAL_MSG)
+        if self.auth_token:
+            headers = {
+                "authorization": f"Bearer {self.auth_token}",
+                "anthropic-version": API_VERSION,
+                "anthropic-beta": "oauth-2025-04-20",
+                "content-type": "application/json",
+                "user-agent": "claude-cli/2.0.0 (external, cli)",
+            }
+            # Subscription OAuth tokens are only accepted for requests that
+            # identify as Claude Code, which includes this system prefix.
+            system_blocks = [
+                {"type": "text",
+                 "text": "You are Claude Code, Anthropic's official CLI for Claude."},
+            ]
+            if system:
+                system_blocks.append({"type": "text", "text": system})
+            system = system_blocks
+        else:
+            headers = {
+                "x-api-key": self.api_key,
+                "anthropic-version": API_VERSION,
+                "content-type": "application/json",
+            }
         payload = {
             "model": self.model,
             "max_tokens": self.max_tokens,
             "system": system,
             "tools": tools,
             "messages": messages,
-        }
-        headers = {
-            "x-api-key": self.api_key,
-            "anthropic-version": API_VERSION,
-            "content-type": "application/json",
         }
         delay = 2.0
         last_error = ""

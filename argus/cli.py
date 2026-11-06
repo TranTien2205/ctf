@@ -22,6 +22,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--goal", help="Operator goal, e.g. 'focus on the /api surface'")
     p.add_argument("--model", help="Claude model id (default claude-sonnet-4-5)")
     p.add_argument("--api-key", help="Anthropic API key (else ANTHROPIC_API_KEY)")
+    p.add_argument("--auth-token",
+                   help="OAuth bearer token (Pro/Max; else ANTHROPIC_AUTH_TOKEN, "
+                        "Claude Code or OpenCode credential store)")
     p.add_argument("--max-turns", type=int, default=80)
     p.add_argument("--max-requests", type=int, default=400)
     p.add_argument("--max-time", type=float, default=2400,
@@ -94,7 +97,8 @@ def main(argv: list[str] | None = None) -> int:
         session = _reopen(sdir)
         cfg = load_config(argparse.Namespace(
             target="http://x", header=[], scope=[], exclude=[], model=None,
-            api_key=None, max_turns=0, max_requests=0, max_time=0, rate=0,
+            api_key=None, auth_token=None, max_turns=0, max_requests=0,
+            max_time=0, rate=0,
             session_dir="sessions", allow_private=True, tls_verify=False,
             no_external=True, goal="", llm_max_tokens=0))
         cfg.model = session.dir.name

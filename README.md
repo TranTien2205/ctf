@@ -8,10 +8,16 @@ cite verbatim bytes from a recorded request/response transcript.
 
 ```
 pip install -e .            # one dependency: httpx
-export ANTHROPIC_API_KEY=...
+export ANTHROPIC_API_KEY=...       # or just sign in to Claude Code — see below
 python -m argus run https://app.example --scope api.example \
     --header "Cookie: session=..." --goal "focus on /api"
 ```
+
+**Auth — no API key required.** Argus picks the first available credential:
+`--api-key`/`ANTHROPIC_API_KEY`, then `--auth-token`/`ANTHROPIC_AUTH_TOKEN`
+(Claude Pro/Max OAuth), then a signed-in **Claude Code**
+(`~/.claude/.credentials.json`, refreshed automatically), then **OpenCode**'s
+auth store. If you can run `claude` or `opencode`, `argus` just works.
 
 Or as a **team** — a lead agent coordinating role-specialized workers over a
 shared, typed lead queue:
