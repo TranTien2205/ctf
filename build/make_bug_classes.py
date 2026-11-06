@@ -1104,7 +1104,11 @@ def main():
         json.dump(document, handle, ensure_ascii=False, indent=2)
         handle.write("\n")
     verified = sum(1 for c in CLASSES if c["evidence_level"] == "verified")
-    print(json.dumps({"written": os.path.relpath(OUT, ROOT), "classes": len(CLASSES),
+    try:
+        written = os.path.relpath(OUT, ROOT)
+    except ValueError:
+        written = str(OUT)    # Windows: relpath raises when OUT sits on another drive
+    print(json.dumps({"written": written, "classes": len(CLASSES),
                       "verified": verified, "catalogue": len(CLASSES) - verified}))
 
 

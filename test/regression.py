@@ -1269,11 +1269,20 @@ class ContractTests(unittest.TestCase):
         every skill invisible from Claude Code with no error message.
         """
         link = ROOT / ".claude" / "skills"
-        self.assertTrue(link.is_symlink(),
-                        ".claude/skills must be a symlink, not a copy: a copy drifts")
-        self.assertEqual(os.readlink(str(link)), "../skills",
-                         "the symlink must stay relative so the tree can move")
-        self.assertTrue(link.is_dir(), ".claude/skills is a broken symlink")
+        if link.is_symlink():
+            self.assertEqual(os.readlink(str(link)), "../skills",
+                             "the symlink must stay relative so the tree can move")
+        elif os.path.isjunction(str(link)):
+            # Git checks the symlink out as a text file where Windows denies
+            # the privilege; a directory junction restores the same wiring --
+            # one tree, not a copy -- and realpath resolves through it.
+            self.assertEqual(os.path.realpath(str(link)),
+                             os.path.realpath(str(ROOT / "skills")),
+                             "the junction must land on skills/")
+        else:
+            self.fail(".claude/skills must be a symlink (a junction on "
+                      "Windows), not a copy: a copy drifts")
+        self.assertTrue(link.is_dir(), ".claude/skills is a broken link")
 
         on_disk = {p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")}
         via_link = {p.parent.name for p in link.glob("*/SKILL.md")}
@@ -3163,6 +3172,35 @@ class LocalSolveRecallTests(unittest.TestCase):
     challenge of THIS NAME already been solved here?
     """
 
+    @classmethod
+    def setUpClass(cls):
+        # These tests read challenges/novacore*/ as the recall path does, but
+        # challenges/ is gitignored scratch: a clone ships without it. Create
+        # the two fixtures the tests need when the solving machine's tree is
+        # absent; a machine that has the real ones is untouched either way.
+        cls._made = []
+        for rel, body in (
+                ("challenges/novacore/solver.py",
+                 "# stand-in for the recorded novacore solver\n"),
+                ("challenges/novacore2/app.py",
+                 "# re-spawned instance source for the name-check test\n")):
+            path = ROOT / rel
+            if not path.exists():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(body, encoding="utf-8")
+                cls._made.append(path)
+
+    @classmethod
+    def tearDownClass(cls):
+        for path in cls._made:
+            path.unlink(missing_ok=True)
+        # Drop only directories these fixtures emptied; never a populated one.
+        for rel in ("challenges/novacore", "challenges/novacore2", "challenges"):
+            try:
+                (ROOT / rel).rmdir()
+            except OSError:
+                pass
+
     def test_a_matching_name_is_found(self):
         hit = chain_match.local_solve("novacore")
         self.assertIsNotNone(hit, "solved/novacore.md is on disk and must be found")
@@ -3247,13 +3285,22 @@ class EveryChainCardValidatesTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "tools"))
         import validate_card
         failures = []
+        uncommitted = []
         for card in cards:
             try:
                 data = json.loads(card.read_text(encoding="utf-8"))
             except ValueError as exc:
                 failures.append((card.name, "unparseable: %s" % exc))
                 continue
-            errors = validate_card.validate(data)
+            errors = []
+            for error in validate_card.validate(data):
+                if (error.startswith("source_note does not exist")
+                        and absent_uncommitted(data.get("source_note", ""))):
+                    # The card cites a handout in a gitignored data tree;
+                    # absent by design on a clone, checked wherever present.
+                    uncommitted.append("%s -> %s" % (card.name, data["source_note"]))
+                    continue
+                errors.append(error)
             if errors:
                 failures.append((card.name, errors))
         self.assertEqual(
@@ -3263,6 +3310,10 @@ class EveryChainCardValidatesTests(unittest.TestCase):
             "which is how 21 cards were invalid without anyone noticing:\n%s"
             % (len(failures), len(cards),
                "\n".join("  %s: %s" % f for f in failures[:10])))
+        if uncommitted:
+            print("\n  note: %d chain card source_note(s) point into a "
+                  "gitignored data tree and were not checked: %s"
+                  % (len(uncommitted), uncommitted[:5]))
 
     def test_no_card_in_the_library_carries_a_real_flag(self):
         # validate_card.py already owns the detector and knows that `HTB{...}`

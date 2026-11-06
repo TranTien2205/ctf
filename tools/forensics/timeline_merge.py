@@ -196,22 +196,33 @@ def from_numeric(text):
         # below the microsecond resolution datetime has, so nothing is lost that
         # the output could have printed.
         return in_range(lambda: datetime.fromtimestamp(value / 1e9, UTC),
-                        text), "epoch_nanoseconds"
+                        text, seconds=value / 1e9), "epoch_nanoseconds"
     if magnitude >= US_THRESHOLD:
         return in_range(lambda: datetime.fromtimestamp(value / 1e6, UTC),
-                        text), "epoch_microseconds"
+                        text, seconds=value / 1e6), "epoch_microseconds"
     if magnitude >= MS_THRESHOLD:
         return in_range(lambda: datetime.fromtimestamp(value / 1000.0, UTC),
-                        text), "epoch_milliseconds"
-    return in_range(lambda: datetime.fromtimestamp(value, UTC), text), "epoch_seconds"
+                        text, seconds=value / 1000.0), "epoch_milliseconds"
+    return in_range(lambda: datetime.fromtimestamp(value, UTC),
+                    text, seconds=value), "epoch_seconds"
 
 
-def in_range(make, text):
+def in_range(make, text, seconds=None):
     """Keep the one useful message. A raw 'year must be in 1..9999' says nothing
     about what to do; 'this looks like a FILETIME' names the missing flag."""
     try:
         moment = make()
     except (ValueError, OSError, OverflowError):
+        moment = None
+    if moment is None and seconds is not None:
+        # Windows' C runtime refuses fromtimestamp outside ~year 3000 where
+        # POSIX still returns a date; arithmetic says WHICH date either way, so
+        # 'outside 1970..2200' names the problem identically on both.
+        try:
+            moment = PLAUSIBLE_LOW + timedelta(seconds=seconds)
+        except (ValueError, OverflowError):
+            moment = None
+    if moment is None:
         raise ValueError(OUT_OF_RANGE % text)
     if not (PLAUSIBLE_LOW <= moment < PLAUSIBLE_HIGH):
         raise ValueError("%s reads as %s, outside 1970..2200; %s"

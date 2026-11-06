@@ -5,7 +5,13 @@
 set -u
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 2
-PY="${PYTHON:-python3}"
+if [ -n "${PYTHON:-}" ]; then
+  PY="$PYTHON"
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  PY=python                    # Windows python.exe ships without a python3 alias
+fi
 fail=0
 
 hr() { printf '\n== %s ==\n' "$1"; }

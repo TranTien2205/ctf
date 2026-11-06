@@ -45,8 +45,18 @@ def _schema_errors(data, schema_name):
     from jsonschema import Draft202012Validator, FormatChecker
     with (ROOT / "knowledge" / schema_name).open() as handle:
         schema = json.load(handle)
+    checker = FormatChecker()
+    if "uri" not in checker.checkers:
+        # The real uri checker is an optional extra (rfc3987). On a clone
+        # without it the format silently passes, so "not a uri" validates --
+        # a malformed card admitted by an absent dependency, not a schema rule.
+        @checker.checks("uri")
+        def _uri(value):
+            return (isinstance(value, str)
+                    and re.fullmatch(r"[a-zA-Z][a-zA-Z0-9+.-]*://\S+", value)
+                    is not None)
     return [f"{e.json_path}: {e.message}"
-            for e in Draft202012Validator(schema, format_checker=FormatChecker()).iter_errors(data)]
+            for e in Draft202012Validator(schema, format_checker=checker).iter_errors(data)]
 
 
 def is_chain_card(data):

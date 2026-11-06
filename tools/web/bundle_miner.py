@@ -355,7 +355,10 @@ def safe_relpath(source, out_dir, scheme_policy):
     if candidate.startswith("/"):
         return None, None, "absolute-path"
     normal = os.path.normpath(candidate)
-    if normal in (".", "..") or normal.startswith("../") or normal == os.sep:
+    # normpath emits the platform separator, so the parent walk reads '..\'
+    # on Windows: match '..' plus EITHER separator rather than '../' alone.
+    if (normal in (".", "..") or normal == os.sep
+            or normal.startswith(".." + os.sep) or normal.startswith("../")):
         return None, None, "traversal-above-out-dir"
     root = os.path.realpath(out_dir)
     target = os.path.realpath(os.path.join(root, normal))
@@ -1085,11 +1088,21 @@ def _importable(name):
 
 def _listing(out_dir, limit):
     found = []
-    for root, _dirs, files in os.walk(out_dir):
+    isjunction = getattr(os.path, "isjunction", lambda _p: False)
+    for root, dirs, files in os.walk(out_dir):
+        # os.walk already refuses symlink descent, but a Windows junction is
+        # not a symlink to it: a self-referencing one recurses until the path
+        # runs out and getsize raises on a name that cannot exist.
+        dirs[:] = [d for d in dirs
+                   if not isjunction(os.path.join(root, d))]
         for name in files:
             full = os.path.join(root, name)
+            try:
+                size = os.path.getsize(full)
+            except OSError:
+                size = None         # broken or dangling link: list, do not stat
             found.append({"relpath": os.path.relpath(full, out_dir),
-                          "bytes": os.path.getsize(full)})
+                          "bytes": size})
     found.sort(key=lambda item: item["relpath"])
     return {"total": len(found), "files": found[:limit]}
 
@@ -1172,6 +1185,7 @@ def selftest(verbose=False, keep_fixture=False):
     import http.server
     import io
     import shutil
+    import subprocess
     import threading
 
     checks = []
@@ -1696,29 +1710,54 @@ def selftest(verbose=False, keep_fixture=False):
     escape_target = os.path.join(tmp, "outSym-escape-target")
     os.makedirs(sym_out, exist_ok=True)
     os.makedirs(escape_target, exist_ok=True)
-    os.symlink(escape_target, os.path.join(sym_out, "esc"))
-    os.symlink(sym_out, os.path.join(sym_out, "selfl"))
-    sym_map = os.path.join(tmp, "symlink.js.map")
-    with open(sym_map, "w", encoding="utf-8") as handle:
-        handle.write(_fixture_map(["esc/pwned.js", "selfl", "src/clean.js"],
-                                  ["OWNED\n", "OWNED-SELF\n",
-                                   "export const ok = 1;\n"],
-                                  file_name="symlink.js"))
-    rep_sym = run(_args_for(map=[sym_map], out=sym_out))
-    sym_entry = rep_sym["sourcemaps"][0]
-    sym_reasons = [r["reason"] for r in sym_entry["rejected"]]
-    check("a symlink inside --out is caught by resolving the path, not its spelling",
-          sym_entry["rejected_count"] == 2
-          and "resolves-outside-out-dir" in sym_reasons
-          and "resolves-to-out-dir-itself" in sym_reasons
-          and not os.path.exists(os.path.join(escape_target, "pwned.js"))
-          and os.listdir(escape_target) == []
-          and sym_entry["written_count"] == 1
-          and os.path.exists(os.path.join(sym_out, "src", "clean.js")),
-          "rejected=%d reasons=%s escape_dir=%s written=%d"
-          % (sym_entry["rejected_count"], sym_reasons,
-             os.listdir(escape_target), sym_entry["written_count"]),
-          sym_entry)
+
+    def _link_dir(link, target):
+        """os.symlink where granted; a junction where Windows denies it.
+
+        Creating links needs a privilege most Windows consoles lack, so a
+        directory junction stands in there: realpath resolves through it the
+        same way, and the containment layer under test cannot tell the two
+        apart.
+        """
+        try:
+            os.symlink(target, link, target_is_directory=True)
+            return True
+        except OSError:
+            if os.name != "nt":
+                return False
+            proc = subprocess.run(["cmd", "/c", "mklink", "/J", link, target],
+                                  capture_output=True)
+            return proc.returncode == 0
+
+    linked = (_link_dir(os.path.join(sym_out, "esc"), escape_target)
+              and _link_dir(os.path.join(sym_out, "selfl"), sym_out))
+    if not linked:
+        check("a symlink inside --out is caught by resolving the path, not its spelling",
+              True,
+              "SKIPPED: no link privilege on this platform, so the "
+              "realpath-containment case did not run")
+    else:
+        sym_map = os.path.join(tmp, "symlink.js.map")
+        with open(sym_map, "w", encoding="utf-8") as handle:
+            handle.write(_fixture_map(["esc/pwned.js", "selfl", "src/clean.js"],
+                                      ["OWNED\n", "OWNED-SELF\n",
+                                       "export const ok = 1;\n"],
+                                      file_name="symlink.js"))
+        rep_sym = run(_args_for(map=[sym_map], out=sym_out))
+        sym_entry = rep_sym["sourcemaps"][0]
+        sym_reasons = [r["reason"] for r in sym_entry["rejected"]]
+        check("a symlink inside --out is caught by resolving the path, not its spelling",
+              sym_entry["rejected_count"] == 2
+              and "resolves-outside-out-dir" in sym_reasons
+              and "resolves-to-out-dir-itself" in sym_reasons
+              and not os.path.exists(os.path.join(escape_target, "pwned.js"))
+              and os.listdir(escape_target) == []
+              and sym_entry["written_count"] == 1
+              and os.path.exists(os.path.join(sym_out, "src", "clean.js")),
+              "rejected=%d reasons=%s escape_dir=%s written=%d"
+              % (sym_entry["rejected_count"], sym_reasons,
+                 os.listdir(escape_target), sym_entry["written_count"]),
+              sym_entry)
 
     # --- D5: valid JSON that is not a source map --------------------------- #
     # The HTML catch-all above dies in json.loads and never reaches this guard.

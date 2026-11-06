@@ -1,0 +1,16 @@
+Mar  6 06:31:12 lab-host sshd[2401]: Failed password for root from 198.51.100.77 port 5222 ssh2
+Mar  6 06:31:14 lab-host sshd[2401]: Failed password for root from 198.51.100.77 port 5222 ssh2
+Mar  6 06:31:17 lab-host sshd[2401]: Invalid user admin from 198.51.100.77 port 5222
+Mar  6 06:31:20 lab-host sshd[2401]: pam_unix(sshd:auth): authentication failure; logname= uid=0 euid=0 tty=ssh ruser= rhost=198.51.100.77  user=root
+Mar  6 06:31:33 lab-host sshd[2402]: Failed password for backup from 203.0.113.66 port 38841 ssh2
+Mar  6 06:32:44 lab-host sshd[2455]: Accepted password for root from 198.51.100.77 port 5222 ssh2
+Mar  6 06:32:45 lab-host systemd-logind[1123]: New session 37 of user root.
+Mar  6 06:32:46 lab-host sshd[2455]: Starting session: shell on pts/0 for root from 198.51.100.77 port 5222 id 0
+Mar  6 06:32:47 lab-host sshd[2455]: pam_unix(sshd:session): session opened for user root by (uid=0)
+Mar  6 06:32:51 lab-host useradd[2501]: new group: name=analyst, GID=1001
+Mar  6 06:32:52 lab-host useradd[2501]: new user: name=analyst, UID=1001, GID=1001, home=/home/analyst, shell=/bin/bash
+Mar  6 06:32:53 lab-host usermod[2510]: add 'analyst' to group 'sudo'
+Mar  6 06:33:05 lab-host sshd[2602]: Accepted password for analyst from 198.51.100.77 port 5330 ssh2
+Mar  6 06:33:10 lab-host systemd-logind[1123]: New session 41 of user analyst.
+Mar  6 06:33:20 lab-host sudo: analyst : TTY=pts/0 ; PWD=/home/analyst ; USER=root ; COMMAND=/usr/bin/curl http://203.0.113.5/health
+Mar  6 06:35:02 lab-host sshd[2455]: Disconnected from 198.51.100.77 port 5222

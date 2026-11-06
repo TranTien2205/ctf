@@ -24,8 +24,12 @@ def main():
                 if a.negative: status="failed"; break
                 time.sleep(.01)
     finally:
-        os.killpg(proc.pid,signal.SIGTERM)
+        if hasattr(os,"killpg"): os.killpg(proc.pid,signal.SIGTERM)
+        else: proc.terminate()         # Windows has no killpg; terminate the child
         try: proc.wait(1)
-        except subprocess.TimeoutExpired: os.killpg(proc.pid,signal.SIGKILL); proc.wait()
+        except subprocess.TimeoutExpired:
+            if hasattr(os,"killpg"): os.killpg(proc.pid,signal.SIGKILL)
+            else: proc.kill()
+            proc.wait()
     print(json.dumps({"mode":"reference replay" if a.mode=="reference" else a.mode,"verification":verified,"wall_seconds":time.monotonic()-start,"status":status,"error":error,"evidence":None},sort_keys=True)); return 0 if (status=="verified") != a.negative else 1
 if __name__=="__main__": sys.exit(main())

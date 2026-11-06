@@ -42,7 +42,10 @@ def record(name, argv, cwd, timeout):
                 process.wait(timeout=timeout)
                 result["status"] = "completed"
             except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
+                if hasattr(os, "killpg"):
+                    os.killpg(process.pid, signal.SIGKILL)
+                else:
+                    process.kill()      # Windows: no process groups to signal
                 process.wait()
                 result["status"] = "timeout"
             result["returncode"] = process.returncode

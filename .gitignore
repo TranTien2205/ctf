@@ -7,6 +7,9 @@ venv/
 # Disposable caches and logs
 cache/
 *.log
+# ...but never swallow a committed test fixture: *.log ate
+# tools/forensics/fixtures/linux/auth.log on the very checkout that needed it.
+!tools/forensics/fixtures/**/*.log
 *.sqlite3-journal
 # Hand-redirected gate output. *.log above covers the well-named case; these are
 # the ad-hoc names that leaked into the tree root.
@@ -42,6 +45,8 @@ Writeup/
 # Large vendored binaries: keep them out of history
 tools/ghidra-dist/
 *.zip
+# ...except committed test fixtures the selftest gates on.
+!tools/forensics/fixtures/*.zip
 *.tar.gz
 *.iso
 *.vmdk

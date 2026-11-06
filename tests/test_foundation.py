@@ -111,7 +111,11 @@ class FoundationTests(unittest.TestCase):
                     state.path_for(name)
             self.assertEqual(Path(state.path_for("Offlinea")).parent.name, "offlinea")
             (self.root / "challenges").mkdir()
-            (self.root / "challenges/linked").symlink_to(self.root, target_is_directory=True)
+            try:
+                (self.root / "challenges/linked").symlink_to(self.root, target_is_directory=True)
+            except OSError as exc:
+                self.skipTest("creating a symlink needs a privilege this "
+                              "platform does not grant: %s" % exc)
             with self.assertRaises(ValueError):
                 state.path_for("linked")
 
@@ -197,9 +201,13 @@ class FoundationTests(unittest.TestCase):
                 promote_card.promote(self.card(), {"accept": True}, ROOT)
             with self.assertRaises(ValueError):
                 promote_card.promote(self.card(), {"accept": False}, self.root / "cards")
-            (self.root / "outside").symlink_to(ROOT, target_is_directory=True)
-            with self.assertRaises(ValueError):
-                promote_card.promote(self.card(), {"accept": True}, self.root / "outside")
+            try:
+                (self.root / "outside").symlink_to(ROOT, target_is_directory=True)
+            except OSError:
+                pass   # no link privilege: the realpath layer stays POSIX-only here
+            else:
+                with self.assertRaises(ValueError):
+                    promote_card.promote(self.card(), {"accept": True}, self.root / "outside")
 
     def test_run_recording_and_timeout(self):
         with patch.object(state, "ROOT", str(self.root)), patch.object(run, "ROOT", str(self.root)):

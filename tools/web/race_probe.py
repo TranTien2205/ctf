@@ -199,10 +199,13 @@ def send_one(spec, headers, args, barrier, stats):
             # goes out, just less synchronised. Counted, not hidden.
             with stats["lock"]:
                 stats["barrier_timeouts"] += 1
-    t0 = time.monotonic()
+    # perf_counter, not monotonic: Windows monotonic is GetTickCount64, a
+    # millisecond clock, so two sequential requests can land on the same tick
+    # and read as overlapped. QPC resolves nanoseconds, so it cannot.
+    t0 = time.perf_counter()
     resp = httpkit.request(spec["url"], spec["method"], headers, spec["body"],
                            timeout=args.timeout, follow=args.follow)
-    t1 = time.monotonic()
+    t1 = time.perf_counter()
     # --count can be 500 and httpkit reads up to 1 MiB per response; only the
     # prefix the signature and the excerpt will read is worth keeping.
     keep = max(args.signature_bytes, args.excerpt)
