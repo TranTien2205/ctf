@@ -9,7 +9,7 @@ one tree serve both, with no second copy of anything.
 
 | Piece | What it is | Why |
 |---|---|---|
-| `.claude/skills` | a relative symlink to `../skills` | Claude Code discovers skills only under `.claude/skills/<name>/SKILL.md`; the symlink puts all 46 there without duplicating a file |
+| `.claude/skills` | a relative symlink to `../skills` | Claude Code discovers skills only under `.claude/skills/<name>/SKILL.md`; the symlink puts every `skills/*/SKILL.md` there without duplicating a file |
 | `@AGENTS.md` at the top of `CLAUDE.md` | an import line | Claude Code reads `CLAUDE.md` and never `AGENTS.md`; the import pulls the bootstrap contract in |
 | `.claude/commands/*.md` | five slash commands | the workflows that are easy to skip: starting a challenge, classifying, deciding the next step, closing the learning loop, running the gate |
 
@@ -52,7 +52,7 @@ Inside a Claude Code session:
 From a shell, without starting a session:
 
 ```bash
-ls .claude/skills/*/SKILL.md | wc -l    # expect 46
+ls .claude/skills/*/SKILL.md | wc -l    # expect the count of skills/*/SKILL.md
 readlink .claude/skills                  # expect ../skills
 grep -c '@AGENTS.md' CLAUDE.md           # expect 1
 python3 test/regression.py               # includes the wiring checks
@@ -84,6 +84,18 @@ if a command file names a tool that does not exist.
    ```bash
    ln -sfn ../skills .claude/skills
    ```
+
+   **On Windows**, git checks the symlink out as a text file containing
+   `../skills`, because creating real symlinks needs Developer Mode or an
+   elevated shell. The equivalent link that needs no privilege is a junction,
+   created from the repo root in `cmd.exe`:
+   ```cmd
+   rmdir .claude\skills 2>nul & del .claude\skills 2>nul & mklink /J .claude\skills skills
+   git update-index --skip-worktree .claude/skills
+   ```
+   The junction resolves `../skills` identically for readers, and
+   `--skip-worktree` keeps git from treating the machine-specific link type as
+   a content change. A POSIX checkout is unaffected either way.
 2. `/skill-doctor` reports frontmatter parse errors; every skill here needs at
    least `name` and `description`.
 3. Unknown frontmatter keys are ignored, not rejected, so `budget`,
