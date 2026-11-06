@@ -40,6 +40,104 @@ python selftest.py                  # offline check, no API key needed
 
 ## Architecture
 
+### System diagram
+
+```
+                    ┌──────────────────────────────────────────┐
+                    │                OPERATOR                  │
+                    │   argus run <target> | argus team <t>    │
+                    └─────────────────────┬────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼─────────────────────┐
+│                  LLM LAYER (Claude tool_use)                  │
+│                                                               │
+│   run mode:                                                   │
+│   ┌─────────────────────────────────────────────────────┐     │
+│   │ single AgentLoop: think -> tool_call -> observe     │     │
+│   └─────────────────────────────────────────────────────┘     │
+│                                                               │
+│   team mode:                                                  │
+│   ┌──────────┐  spawn/steer  ┌─────────┐                      │
+│   │   LEAD   │──────────────▶│ workers │                      │
+│   │strategist│◀────board─────┤ recon   │                      │
+│   └──────────┘   requests    │ exploit │                      │
+│                              │ report  │                      │
+│                              └────┬────┘                      │
+└───────────────────────────────────┼───────────────────────────┘
+              emit_lead             │          pull_leads
+        ┌───────────────────────────▼───────────────────────────┐
+        │         SHARED BLACKBOARD  (team/board.py)            │
+        │  LeadQueue: typed + deduped + prioritized leads       │
+        │  notes · agent status · spawn requests · findings     │
+        └───────────────────────────┬───────────────────────────┘
+                                    │ dispatch (role-gated)
+        ┌───────────────────────────▼───────────────────────────┐
+        │              TOOL LAYER  (tools/registry.py)          │
+        │                                                       │
+        │  web.py      http_request · crawl · js_recon ·        │
+        │              fingerprint                              │
+        │  probes.py   sqli · time · ssti · lfi · redirect ·    │
+        │              cors · method · reflection               │
+        │  analysis.py jwt_decode · load_skill · notes ·        │
+        │              record_finding · run_external · finish   │
+        │  team.py     emit_lead · pull_leads · board ·         │
+        │              spawn_worker · wordlist_fuzz ·           │
+        │              run_exploit                              │
+        └───────────────────────────┬───────────────────────────┘
+                                    │ every request funnels through
+        ┌───────────────────────────▼───────────────────────────┐
+        │            GuardedClient  (httpclient.py)             │
+        │  ┌─────────────┐ ┌──────────────┐ ┌────────────────┐  │
+        │  │ ScopeGuard  │ │ RateLimiter  │ │  Transcript    │  │
+        │  │ (fail-      │ │ (shared rps) │ │  recording     │  │
+        │  │  closed)    │ │              │ │                │  │
+        │  └─────────────┘ └──────────────┘ └────────────────┘  │
+        └───────────────────────────┬───────────────────────────┘
+                                    ▼
+                          TARGET (in-scope only)
+                                    │
+        ┌───────────────────────────▼───────────────────────────┐
+        │   SESSION OUTPUT  (sessions/<ts>-<host>/)             │
+        │   transcript.jsonl · findings.json · notes.md ·       │
+        │   report.md · summary.json · agent.log                │
+        └───────────────────────────────────────────────────────┘
+
+        ┌───────────────────────────────────────────────────────┐
+        │   RESOURCES (extend without code changes)             │
+        │   resources/wordlists/*.txt   -> wordlist_fuzz        │
+        │   resources/exploits/<id>/    -> run_exploit          │
+        │     manifest.json + script    (scope-checked,         │
+        │                               timeout, proof_marker)  │
+        └───────────────────────────────────────────────────────┘
+```
+
+### Data flow — a request never escapes the guardrails
+
+```
+agent proposes http_request {url, method}
+        │
+        ▼
+dispatcher (role card allows this tool?)
+        │
+        ▼
+ScopeGuard ── host in allowlist? path not excluded? private ok?
+        │  (NO  -> request refused before it is sent)
+        ▼
+RateLimiter ── global rps budget shared by ALL workers
+        │
+        ▼
+send + record -> transcript.jsonl (request_id)
+        │
+        ▼
+response truncated, returned to agent as tool_result
+        │
+        ▼
+record_finding {evidence_excerpt} -> verbatim substring check
+against the recorded response -- otherwise rejected
+```
+
+### File map
+
 ```
 CLI (argus run | argus team)
   ├── run:  loop.py     messages -> Claude tool_use -> tool_result -> finish
