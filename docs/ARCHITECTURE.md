@@ -62,12 +62,58 @@ Design choices and why:
 - Different model: `ClaudeClient` is ~40 lines of HTTP; `llm.ScriptedClient`
   shows the duck-typed interface (`chat(messages, tools, system)`).
 
+## Team mode (`argus team`)
+
+A second plane over the same primitives: a **lead** agent coordinates
+role-specialized **workers** through a shared blackboard.
+
+```
+        ┌─────────── lead (AgentLoop, LEAD card) ───────────┐
+        │  read_board · spawn_worker · emit_lead · finish    │
+        └──────┬─────────────────────────────┬──────────────┘
+               │ spawn (thread, own loop)     │ steer notes
+        ┌──────▼───────┐             ┌────────▼────────┐
+        │ recon worker │ emit_lead  │ exploit worker  │
+        │ crawl/js/fuzz├───────────►│ pull→probe→proof│
+        └──────────────┘  LEADQUEUE └────────┬────────┘
+                                             │ record_finding
+                                  ┌──────────▼──────────┐
+                                  │ report worker       │
+                                  │ findings → summary  │
+                                  └─────────────────────┘
+            ━━━ shared, code-enforced, never prompt-level ━━━
+        ScopeGuard · RateLimiter · Session(transcript) · Board
+```
+
+- **Two LLM levels, deliberately.** Lead → workers is the deepest the org
+  chart gets. A worker that needs help posts a `request_worker` to the
+  board; the lead decides whether to spawn. Sub-division inside a worker
+  is tool fan-out (crawl + js_recon + fuzz in parallel calls), not another
+  LLM tier - each extra tier is another place to re-interpret intent.
+- **Leads are typed artifacts, not chat.** `emit_lead` pushes a deduped,
+  prioritized `Lead{kind,url,params,method,tech,source}`. The exploit
+  worker never receives "the recon guy said maybe SQLi" - it receives the
+  exact URL, params and the request_id it was seen at. Shared artifacts
+  beat shared conversation: no context pollution, no hearsay findings.
+- **Streaming pipeline.** `pull_leads` blocks while recon runs and returns
+  `closed` only when the queue is closed AND drained - exploit starts on
+  the first lead, not after recon finishes.
+- **Role gating is dispatch-level.** Each card's `tools` set is enforced in
+  `dispatch`, not just advertised to the model: a recon worker literally
+  cannot call `record_finding`; only the lead's card carries
+  `spawn_worker`/`finish_engagement`.
+- **Shared guardrails.** One `ScopeGuard`, one `RateLimiter`, one
+  `Session`. N workers can't N-fold the request rate; every exchange is
+  tagged with its agent name in the transcript.
+- **`run_exploit` runs manifests, not magic.** `resources/exploits/<id>/`
+  holds `manifest.json` (command template, `affects`, `proof_marker`
+  regex) + script. Target URL is scope-checked before substitution; a
+  `proof=True` run id is citable as finding evidence.
+
 ## What it deliberately does not do
 
 - No exploit payloads that persist (no webshells, no shells period).
 - No authentication-agnostic scanning of foreign hosts — scope is explicit.
-- No parallel agent fan-out inside a run; one loop, one target, one
-  transcript keeps evidence clean. Parallelizing across targets is a
-  wrapper-script concern.
-- `run_external` is a lead generator, not evidence: scanner claims are
-  verified through `http_request` before `record_finding` accepts them.
+- `run_external` and `run_exploit` output is a lead, not evidence:
+  scanner claims are verified through `http_request` (or a manifest's
+  `proof_marker`) before `record_finding` accepts them.

@@ -28,41 +28,77 @@ def _truncate_result(result: dict) -> str:
 
 
 class AgentLoop:
-    def __init__(self, cfg: Config, llm=None, quiet: bool = False):
+    """One agent's tool-use loop.
+
+    Single-agent mode constructs its own scope/session/client (the defaults).
+    Team mode injects the shared infra plus a role's tool subset, a role
+    prompt, a custom seed and a stop event - the loop mechanics stay the same.
+    """
+
+    def __init__(self, cfg: Config, llm=None, quiet: bool = False, *,
+                 scope: ScopeGuard | None = None,
+                 session: Session | None = None,
+                 client: GuardedClient | None = None,
+                 board=None,
+                 agent_name: str = "agent",
+                 role: str = "",
+                 allowed=None,
+                 system: str | None = None,
+                 seed: str | None = None,
+                 stop_event=None,
+                 report: bool = True):
         self.cfg = cfg
         self.quiet = quiet
-        self.scope = ScopeGuard(
+        self.agent_name = agent_name
+        self.stop_event = stop_event
+        self.report_enabled = report
+        self.scope = scope or ScopeGuard(
             cfg.target, extra_hosts=cfg.scope_hosts,
             exclude_paths=cfg.exclude_paths, allow_private=cfg.allow_private,
         )
-        self.session = Session(cfg.session_dir, cfg.target, meta={
+        self.session = session or Session(cfg.session_dir, cfg.target, meta={
             "model": cfg.model, "goal": cfg.goal,
             "scope": cfg.scope_hosts, "max_turns": cfg.max_turns,
         })
         skills_dir = Path(__file__).parent / "skills"
-        from .ratelimit import RateLimiter
-        self.ctx = Context(
-            cfg=cfg, scope=self.scope, session=self.session,
-            client=GuardedClient(
+        if client is None:
+            from .ratelimit import RateLimiter
+            client = GuardedClient(
                 self.scope, self.session, RateLimiter(cfg.rate_rps),
                 default_headers=cfg.resolved_headers(),
                 tls_verify=cfg.tls_verify, max_requests=cfg.max_requests,
-            ),
-            skills_dir=skills_dir,
+                agent=agent_name,
+            )
+            self._owns_client = True
+        else:
+            self._owns_client = False
+        self.ctx = Context(
+            cfg=cfg, scope=self.scope, session=self.session,
+            client=client, skills_dir=skills_dir,
+            board=board, agent_name=agent_name, role=role,
+            allowed=frozenset(allowed) if allowed else None,
         )
         self.llm = llm or ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
                                        max_tokens=cfg.llm_max_tokens)
-        self.system = build_system(cfg, self.scope)
+        self.system = system or build_system(cfg, self.scope)
+        self.seed = seed or build_seed(cfg)
+        self.tools = TOOL_SCHEMAS if allowed is None else \
+            [s for s in TOOL_SCHEMAS if s["name"] in allowed]
         self._last_error = ""
 
     def _log(self, msg: str) -> None:
         if not self.quiet:
-            print(msg, flush=True)
-        with (self.session.dir / "agent.log").open("a", encoding="utf-8") as fh:
-            fh.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+            print(f"[{self.agent_name}] {msg}", flush=True)
+        fname = "agent.log" if self.agent_name == "agent" else \
+            f"agent-{self.agent_name}.log"
+        try:
+            with (self.session.dir / fname).open("a", encoding="utf-8") as fh:
+                fh.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
+        except OSError:
+            pass
 
     def run(self) -> dict:
-        messages: list[dict] = [{"role": "user", "content": build_seed(self.cfg)}]
+        messages: list[dict] = [{"role": "user", "content": self.seed}]
         started = time.monotonic()
         turns = 0
         nudges = 0
@@ -70,6 +106,9 @@ class AgentLoop:
 
         while True:
             if self.ctx.finished:
+                break
+            if self.stop_event is not None and self.stop_event.is_set():
+                self._log("team stop event set; finishing")
                 break
             if turns >= self.cfg.max_turns or \
                     time.monotonic() - started >= self.cfg.max_time_s:
@@ -82,7 +121,7 @@ class AgentLoop:
                 nudges += 1
 
             try:
-                response = self.llm.chat(messages, TOOL_SCHEMAS, self.system)
+                response = self.llm.chat(messages, self.tools, self.system)
             except Exception as exc:
                 self._log(f"LLM error: {exc}")
                 self._last_error = str(exc)
@@ -126,15 +165,19 @@ class AgentLoop:
             messages.append({"role": "user", "content": results})
 
         self._log(f"done in {turns} turns; findings={len(self.session.findings)}")
-        self.ctx.client.close()
-        from .report.markdown import render_report
-        report_path = render_report(self.session, self.cfg, self.ctx.finish_summary)
+        if self._owns_client:
+            self.ctx.client.close()
+        report_path = ""
+        if self.report_enabled:
+            from .report.markdown import render_report
+            report_path = str(render_report(
+                self.session, self.cfg, self.ctx.finish_summary))
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
             "requests": self.session._seq,
             "findings": len(self.session.findings),
-            "report": str(report_path),
+            "report": report_path,
             "llm_tokens": {"in": self.llm.input_tokens, "out": self.llm.output_tokens},
             "summary": self.ctx.finish_summary,
             "error": self._last_error or None,

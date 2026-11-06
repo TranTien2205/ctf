@@ -22,7 +22,13 @@ family — if you change a probe, update the lab and its test together.
 - `argus/httpclient.py` — the only socket; scope + rate + transcript
 - `argus/session.py` — evidence store; findings need verbatim excerpts
 - `argus/tools/` — tool schemas (registry.py) + implementations
+  (`team.py` holds the multi-agent tools)
+- `argus/team/` — multi-agent plane: `leads.py` (typed work queue),
+  `board.py` (blackboard), `cards.py` + `roles/` (worker definitions),
+  `coordinator.py` (threads + watchdog). Entry: `argus team`.
 - `argus/skills/*.md` — methodology modules loaded via `load_skill`
+- `resources/wordlists/` — `wordlist_fuzz` lists (add file = add list)
+- `resources/exploits/<id>/` — `run_exploit` manifests + scripts
 - `argus/report/` — report.md renderer
 - `lab/`, `tests/`, `selftest.py`
 
@@ -33,5 +39,10 @@ family — if you change a probe, update the lab and its test together.
 - Every tool must be registered in `tools/registry.py` (`_impl` + schema).
 - New bug class → add `argus/skills/<name>.md` + INDEX row; keep the
   format: when / first probes / confirm / bypasses / falsifier / severity.
+- New role → a card in `argus/team/cards.py` + a `roles/<name>.md` prompt.
+  Tool restrictions belong in the card's `tools` set (enforced in
+  `dispatch`), never only in the prompt.
 - Findings must keep the verbatim-evidence gate. Do not weaken it.
+- Team communication goes through the board/lead queue as typed artifacts —
+  do not pipe one agent's raw context into another.
 - No new runtime dependencies without strong cause — `httpx` is enough.

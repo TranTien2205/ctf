@@ -30,11 +30,13 @@ class GuardedClient:
         default_headers: dict[str, str] | None = None,
         tls_verify: bool = False,
         max_requests: int = 400,
+        agent: str = "",
     ):
         self.scope = scope
         self.session = session
         self.rate = rate_limiter
         self.max_requests = max_requests
+        self.agent = agent
         self.sent = 0
         self._client = httpx.Client(
             verify=tls_verify,
@@ -103,6 +105,7 @@ class GuardedClient:
                      "body": body.decode("utf-8", "replace") if isinstance(body, bytes) else body},
             response=response_data,
             note=note,
+            agent=self.agent,
         )
 
         out = {

@@ -114,6 +114,36 @@ def main() -> int:
           Path(result["report"]).exists()
           and "sqlite3.OperationalError" in Path(result["report"]).read_text())
 
+    # --- team mode: lead pipeline + role gating + exploit runner ----------
+    from argus.team.board import Board
+    from argus.team.leads import Lead, LeadQueue
+    from argus.tools import team as teamtools
+
+    q = LeadQueue()
+    check("lead queue dedups",
+          q.push(Lead(kind="endpoint", url=base + "/a")) is True
+          and q.push(Lead(kind="endpoint", url=base + "/a")) is False)
+    q.close()
+    leads, closed = q.pull(wait_s=0)
+    check("lead queue drains on close", len(leads) == 1)
+    _, closed = q.pull(wait_s=0)
+    check("lead queue reports closed+empty", closed is True)
+
+    ctx.board = Board(s)
+    out = teamtools.emit_lead(ctx, kind="endpoint", url=base + "/item?id=1",
+                              params=["id"])
+    check("emit_lead queues in-scope work", out.get("queued") is True)
+    out = teamtools.emit_lead(ctx, kind="endpoint", url="http://x.invalid/")
+    check("emit_lead rejects out-of-scope", "error" in out)
+    out = teamtools.wordlist_fuzz(ctx, base_url=base, wordlist="api-paths",
+                                  max_words=10)
+    check("wordlist_fuzz hits hidden paths",
+          out["tested"] == 10 and len(out["interesting"]) >= 1)
+    out = teamtools.run_exploit(ctx, "lab-auth-bypass", base)
+    check("exploit runner proves manifest", out.get("proof") is True)
+    out = teamtools.run_exploit(ctx, "lab-auth-bypass", "http://x.invalid/")
+    check("exploit runner scope-checks target", "error" in out)
+
     client.close()
     srv.shutdown()
 

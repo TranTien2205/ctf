@@ -36,6 +36,41 @@ python -m argus run https://app.example \
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
 | `--quiet` | off | suppress console trace |
 
+## Team mode
+
+```bash
+python -m argus team https://app.example \
+    --recon 1 --exploit 2 --max-workers 6 \
+    --goal "focus on /api" --rate 3
+```
+
+A lead agent steers role workers over a shared board: recon emits typed
+leads the moment it finds surface, exploit workers pull and verify them in
+parallel, and the lead spawns more workers (or a report writer) as needed.
+All `run` flags apply; per-worker turn/request budgets come from
+`--max-turns`/`--max-requests`, and `--max-time` bounds the engagement.
+
+Team-only flags:
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--recon` | 1 | initial recon workers |
+| `--exploit` | 1 | initial exploit workers |
+| `--report-workers` | 0 | report writers at start (the lead can still spawn one) |
+| `--max-workers` | 6 | concurrent worker cap |
+
+The session dir gains `agent-<name>.log` per member plus the shared
+`transcript.jsonl` (each entry tagged with its agent), `findings.json`,
+and `report.md`.
+
+## Resources
+
+`resources/wordlists/<name>.txt` — wordlists for `wordlist_fuzz`; add a
+file to add a list. `resources/exploits/<id>/` — PoC manifests
+(`command`, `affects`, `proof_marker`) for `run_exploit`; add a directory
+to add an exploit. Both are data, not code — extending coverage needs no
+code change.
+
 ## Reading a run
 
 ```

@@ -46,6 +46,18 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="run an autonomous assessment")
     _add_run_args(p_run)
 
+    p_team = sub.add_parser(
+        "team", help="run a lead-orchestrated team assessment (multi-agent)")
+    _add_run_args(p_team)
+    p_team.add_argument("--recon", type=int, default=1,
+                        help="initial recon workers (default 1)")
+    p_team.add_argument("--exploit", type=int, default=1,
+                        help="initial exploit workers (default 1)")
+    p_team.add_argument("--report-workers", type=int, default=0,
+                        help="initial report workers (default 0)")
+    p_team.add_argument("--max-workers", type=int, default=6,
+                        help="cap on concurrently running workers (default 6)")
+
     p_rep = sub.add_parser("report", help="re-render report.md for a session dir")
     p_rep.add_argument("session_dir")
 
@@ -64,6 +76,17 @@ def main(argv: list[str] | None = None) -> int:
         result = loop.run()
         print(json.dumps(result, indent=2))
         return 1 if result.get("error") else 0
+
+    if args.cmd == "team":
+        from .team.coordinator import TeamRun
+        cfg = load_config(args)
+        team = TeamRun(cfg, quiet=args.quiet,
+                       n_recon=args.recon, n_exploit=args.exploit,
+                       n_report=args.report_workers,
+                       max_workers=args.max_workers)
+        result = team.run()
+        print(json.dumps(result, indent=2))
+        return 1 if result.get("lead_error") else 0
 
     if args.cmd == "report":
         from .report.markdown import render_report

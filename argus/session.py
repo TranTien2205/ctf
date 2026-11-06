@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 import urllib.parse
 from pathlib import Path
@@ -30,6 +31,7 @@ class Session:
         self._seq = 0
         self._transcript: dict[str, dict] = {}
         self.findings: list[dict] = []
+        self._lock = threading.Lock()
         (self.dir / "meta.json").write_text(
             json.dumps({"id": self.id, "target": target, "started": self.started, **meta},
                        indent=2, ensure_ascii=False)
@@ -57,33 +59,40 @@ class Session:
         request: dict,
         response: dict,
         note: str = "",
+        agent: str = "",
     ) -> str:
         """Append one request/response pair. Returns its request id (r<n>)."""
-        self._seq += 1
-        rid = f"r{self._seq}"
-        entry = {
-            "id": rid,
-            "ts": round(time.time(), 3),
-            "tool": tool,
-            "request": request,
-            "response": response,
-        }
-        if note:
-            entry["note"] = note
-        self._transcript[rid] = entry
-        with self.transcript_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        return rid
+        with self._lock:
+            self._seq += 1
+            rid = f"r{self._seq}"
+            entry = {
+                "id": rid,
+                "ts": round(time.time(), 3),
+                "tool": tool,
+                "request": request,
+                "response": response,
+            }
+            if agent:
+                entry["agent"] = agent
+            if note:
+                entry["note"] = note
+            self._transcript[rid] = entry
+            with self.transcript_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            return rid
 
-    def record_event(self, kind: str, detail: dict) -> str:
+    def record_event(self, kind: str, detail: dict, agent: str = "") -> str:
         """Record a non-HTTP event (external tool run, error). Returns r<n>."""
-        self._seq += 1
-        rid = f"r{self._seq}"
-        entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind, **detail}
-        self._transcript[rid] = entry
-        with self.transcript_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        return rid
+        with self._lock:
+            self._seq += 1
+            rid = f"r{self._seq}"
+            entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind, **detail}
+            if agent:
+                entry["agent"] = agent
+            self._transcript[rid] = entry
+            with self.transcript_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+            return rid
 
     def get_exchange(self, rid: str) -> dict | None:
         return self._transcript.get(rid)
@@ -94,6 +103,17 @@ class Session:
             return ""
         resp = entry.get("response") or {}
         return resp.get("body", "") or ""
+
+    def evidence_text(self, rid: str) -> str:
+        """Verbatim bytes a finding may quote: response body or event output."""
+        entry = self._transcript.get(rid)
+        if not entry:
+            return ""
+        resp = entry.get("response") or {}
+        body = resp.get("body", "") or ""
+        if body:
+            return body
+        return entry.get("output", "") or ""
 
     # ------------------------------------------------------------------
     # Findings
@@ -120,7 +140,7 @@ class Session:
         excerpt = (evidence_excerpt or "").strip()
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
-        if not any(excerpt in self.response_body(r) for r in evidence_ids):
+        if not any(excerpt in self.evidence_text(r) for r in evidence_ids):
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
@@ -136,15 +156,17 @@ class Session:
             "remediation": remediation.strip(),
             "ts": round(time.time(), 3),
         }
-        self.findings.append(finding)
-        self.findings_path.write_text(
-            json.dumps(self.findings, indent=2, ensure_ascii=False)
-        )
+        with self._lock:
+            self.findings.append(finding)
+            self.findings_path.write_text(
+                json.dumps(self.findings, indent=2, ensure_ascii=False)
+            )
         return finding
 
     def note(self, text: str) -> None:
-        with self.notes_path.open("a", encoding="utf-8") as fh:
-            fh.write(text.rstrip() + "\n\n")
+        with self._lock:
+            with self.notes_path.open("a", encoding="utf-8") as fh:
+                fh.write(text.rstrip() + "\n\n")
 
     def stats(self) -> dict:
         return {

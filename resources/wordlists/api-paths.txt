@@ -1,0 +1,21 @@
+# API-ish paths for wordlist_fuzz on targets with an API surface
+api
+api/v1
+api/v2
+api/users
+api/user
+api/me
+api/data
+api/auth
+api/login
+api/token
+api/search
+api/items
+api/health
+api/status
+api/config
+api/admin
+api/docs
+openapi.json
+swagger.json
+graphql

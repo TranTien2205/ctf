@@ -19,11 +19,15 @@ class Context:
     skills_dir: object  # Path
     finished: bool = False
     finish_summary: str = ""
+    board: object = None        # team.Board; None in single-agent mode
+    agent_name: str = "agent"
+    role: str = ""              # team role card name ("lead", "recon", ...)
+    allowed: object = None      # frozenset of permitted tool names (None = all)
 
 
 # Tool functions are imported lazily inside _impl() to keep module import cheap.
 def _impl(name: str) -> Callable:
-    from . import analysis, probes, web  # noqa: F401
+    from . import analysis, probes, team, web  # noqa: F401
     table = {
         "http_request": web.http_request,
         "crawl": web.crawl,
@@ -44,6 +48,18 @@ def _impl(name: str) -> Callable:
         "record_finding": analysis.record_finding,
         "run_external": analysis.run_external,
         "finish": analysis.finish,
+        "emit_lead": team.emit_lead,
+        "pull_leads": team.pull_leads,
+        "read_board": team.read_board,
+        "post_board_note": team.post_board_note,
+        "request_worker": team.request_worker,
+        "spawn_worker": team.spawn_worker,
+        "list_workers": team.list_workers,
+        "read_findings": team.read_findings,
+        "finish_engagement": team.finish_engagement,
+        "wordlist_fuzz": team.wordlist_fuzz,
+        "run_exploit": team.run_exploit,
+        "list_exploits": team.list_exploits,
     }
     return table[name]
 
@@ -273,11 +289,139 @@ TOOL_SCHEMAS: list[dict] = [
         {"summary": {**_STR, "description": "Final assessment summary"}},
         ["summary"],
     ),
+    # ------------------------------------------------------------ team
+    _schema(
+        "emit_lead",
+        "Publish a typed lead to the team queue: an endpoint/parameter set "
+        "worth attacking. Emit immediately on discovery - exploit workers are "
+        "blocked waiting for these. Duplicates are dropped automatically.",
+        {
+            "kind": {**_STR, "description": "endpoint | param | credential | note"},
+            "url": {**_STR, "description": "In-scope URL (include the real query string)"},
+            "params": {**_STRARR, "description": "Parameter names worth testing"},
+            "method": {**_STR, "description": "HTTP method (default GET)"},
+            "tech": {**_STR, "description": "Observed stack hints, e.g. 'express, json'"},
+            "note": {**_STR, "description": "Why it is interesting (one line)"},
+            "source": {**_STR, "description": "request_id where it was observed"},
+            "priority": {**_INT, "description": "0 highest .. 9 lowest (default 5)"},
+        },
+        ["kind", "url"],
+    ),
+    _schema(
+        "pull_leads",
+        "Take the next batch of leads from the team queue. Blocks up to "
+        "wait_s for work; returns closed=true once the queue is closed and "
+        "drained - then call finish().",
+        {
+            "max_n": {**_INT, "description": "Max leads to take (default 5, cap 10)"},
+            "wait_s": {**_INT, "description": "Seconds to block waiting (default 20, cap 60)"},
+        },
+        [],
+    ),
+    _schema(
+        "read_board",
+        "Snapshot of the shared board: pending leads, agents and status, "
+        "worker spawn requests, recent notes, findings so far.",
+        {},
+        [],
+    ),
+    _schema(
+        "post_board_note",
+        "Post a note every team member can read via read_board: priorities, "
+        "dead ends, observed defenses, prompt-injection sightings.",
+        {"text": {**_STR, "description": "The note text"}},
+        ["text"],
+    ),
+    _schema(
+        "request_worker",
+        "Ask the lead for a specialist worker (recon|exploit|report) with a "
+        "concrete sub-task and reason. The lead decides; check read_board.",
+        {
+            "role": {**_STR, "description": "recon | exploit | report"},
+            "task": {**_STR, "description": "Concrete sub-task for the new worker"},
+            "reason": {**_STR, "description": "Why current capacity is insufficient"},
+        },
+        ["role", "task"],
+    ),
+    _schema(
+        "spawn_worker",
+        "(lead) Spawn a worker thread with a role and a concrete task. "
+        "recon produces leads; exploit consumes them; report writes the "
+        "final narrative. Subject to the team max_workers cap.",
+        {
+            "role": {**_STR, "description": "recon | exploit | report"},
+            "task": {**_STR, "description": "Concrete task, e.g. 'map /api/* and emit leads per param'"},
+        },
+        ["role", "task"],
+    ),
+    _schema(
+        "list_workers",
+        "(lead) List spawned agents: role, task, status, turns, requests, findings.",
+        {},
+        [],
+    ),
+    _schema(
+        "read_findings",
+        "List every recorded finding (id, severity, category, url, evidence).",
+        {},
+        [],
+    ),
+    _schema(
+        "finish_engagement",
+        "(lead) End the whole engagement: closes the lead queue (exploit "
+        "workers drain and finish) and writes the final summary.",
+        {"summary": {**_STR, "description": "Honest final summary for the report"}},
+        ["summary"],
+    ),
+    _schema(
+        "wordlist_fuzz",
+        "Wordlist-driven discovery: mode=path tries base_url/<word>, "
+        "mode=param tries base_url?param=<word>. Every request is scoped, "
+        "rated and budgeted. Returns statuses that are not 404.",
+        {
+            "base_url": {**_STR, "description": URL_DESC},
+            "wordlist": {**_STR, "description": "Stem of a file in resources/wordlists/ (e.g. dirs-small, params)"},
+            "mode": {**_STR, "description": "path | param (default path)"},
+            "param": {**_STR, "description": "Parameter name for mode=param"},
+            "max_words": {**_INT, "description": "Words to try (default 80, cap 400)"},
+            "statuses": {**_STR, "description": "Optional '200,301,403' to keep only these statuses"},
+        },
+        ["base_url"],
+    ),
+    _schema(
+        "list_exploits",
+        "List exploit manifests under resources/exploits/ (id, title, "
+        "affects fingerprint, CVE).",
+        {},
+        [],
+    ),
+    _schema(
+        "run_exploit",
+        "Run a manifest-declared exploit script against an in-scope target. "
+        "Timeout-bounded, output recorded. proof=true only when the "
+        "manifest's proof_marker regex matches the output.",
+        {
+            "exploit_id": {**_STR, "description": "Directory name under resources/exploits/"},
+            "target": {**_STR, "description": URL_DESC},
+            "args": {**_STR, "description": "Extra args substituted into {args} in the manifest command"},
+            "timeout_s": {**_INT, "description": "Max run seconds (default 60, cap 300)"},
+        },
+        ["exploit_id", "target"],
+    ),
 ]
+
+
+def schemas_for(names) -> list[dict]:
+    """Tool schemas restricted to a name set (a role card)."""
+    wanted = set(names)
+    return [s for s in TOOL_SCHEMAS if s["name"] in wanted]
 
 
 def dispatch(ctx: Context, name: str, arguments: dict) -> dict:
     """Run one tool call; never raises - errors come back as dicts."""
+    if ctx.allowed is not None and name not in ctx.allowed:
+        return {"error": f"tool {name} is not available to role "
+                         f"'{ctx.agent_name}'"}
     try:
         fn = _impl(name)
     except KeyError:
