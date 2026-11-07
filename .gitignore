@@ -85,3 +85,8 @@ id_rsa*
 
 # Transient review digest produced by hand for the field-note queue; regenerate, never commit.
 REVIEW_QUEUE.md
+
+# Runtime artifacts: agent session logs and lab fixtures created at run time.
+sessions/
+lab/fakefs/
+lab/www/
