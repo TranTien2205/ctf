@@ -3,7 +3,7 @@ name: rev-native-check
 description: >
   Action-oriented depth skill for Native deciding check. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: rev-bytecode-vm, pwn-stack-overflow.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, rev-native-check, ctf, bug-class]
+tags: [rev, rev-native-check, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

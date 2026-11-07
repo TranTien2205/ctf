@@ -3,7 +3,7 @@ name: pwn-stack-overflow
 description: >
   Action-oriented depth skill for Stack memory corruption. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: pwn-format-string, pwn-code-reuse.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, pwn-stack-overflow, ctf, bug-class]
+tags: [pwn, pwn-stack-overflow, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

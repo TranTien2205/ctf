@@ -3,7 +3,7 @@ name: rev-bytecode-vm
 description: >
   Action-oriented depth skill for Script bytecode or custom VM. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: rev-managed-code, misc-encoding-carrier.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, rev-bytecode-vm, ctf, bug-class]
+tags: [rev, rev-bytecode-vm, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

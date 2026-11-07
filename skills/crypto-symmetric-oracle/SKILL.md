@@ -3,7 +3,7 @@ name: crypto-symmetric-oracle
 description: >
   Action-oriented depth skill for Block, stream or MAC oracle. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: crypto-prng, misc-encoding-carrier.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, crypto-symmetric-oracle, ctf, bug-class]
+tags: [crypto, crypto-symmetric-oracle, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

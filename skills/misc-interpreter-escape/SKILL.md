@@ -3,7 +3,7 @@ name: misc-interpreter-escape
 description: >
   Action-oriented depth skill for Restricted interpreter escape. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: misc-encoding-carrier.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, misc-interpreter-escape, ctf, bug-class]
+tags: [misc, misc-interpreter-escape, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

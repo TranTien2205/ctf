@@ -3,7 +3,7 @@ name: crypto-prng
 description: >
   Action-oriented depth skill for Predictable pseudorandom generator. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: crypto-symmetric-oracle.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, crypto-prng, ctf, bug-class]
+tags: [crypto, crypto-prng, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3

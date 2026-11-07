@@ -3,7 +3,7 @@ name: osint-identity-pivot
 description: >
   Action-oriented depth skill for Identity and handle pivot. Use after the router or tools/classify.py names this class; start with the first probe and record the expected signal. Do not use it as proof of a finding. Confusable classes: osint-media-metadata, osint-infra-records.
   Catalogue class: nothing in this toolkit has solved one yet.
-tags: [web, osint-identity-pivot, ctf, bug-class]
+tags: [osint, osint-identity-pivot, ctf, bug-class]
 environment: [ctf, lab, authorized-testing]
 budget:
   stuck_threshold: 3
