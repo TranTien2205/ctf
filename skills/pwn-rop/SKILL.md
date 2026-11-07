@@ -20,13 +20,14 @@ budget:
 
 # ROP Chain Construction
 
-**Catalogue class.** The taxonomy classes that route here — `pwn-code-reuse` — are
-all `catalogue`: this toolkit has never solved one, and the measured count of
-chain cards in this category is zero. What follows is standard published
+**Catalogue classes.** The taxonomy classes routed through this file — `pwn-code-reuse` — each
+carry their own depth card (`../<class>/SKILL.md`) and their own `field-notes.md`,
+and all are `catalogue`: this toolkit has never solved one, and the measured
+count of chain cards in this category is zero. What follows is standard published
 knowledge plus the tools actually installed on this machine, not local
 experience. Never say a technique here worked here. Record what really
-happens in `field-notes.md`, and the label rises to `verified` only through a
-chain card and `tools/classify_solve.py`, never by editing the taxonomy.
+happens in the class's own `field-notes.md`, and the label rises to `verified`
+only through a chain card and `tools/classify_solve.py`, never by editing the taxonomy.
 
 ## Read this before the Quick Reference below
 

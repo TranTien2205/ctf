@@ -50,5 +50,5 @@ grep -rn "^## .*<keyword>" skills/ctf-crypto/ | head
 **Boneh-Durfee** appears nowhere in `../../ctf-crypto/`. The nearest coverage is
 `../../ctf-crypto/advanced-math.md` section `Coppersmith's Method (Close Private Keys)`,
 the same small-`d` lattice family but not the Boneh-Durfee construction. Treat
-`crypto_attack.py boneh_durfee --help` as the primary reference and record what
+`crypto_attack.py boneh-durfee --help` as the primary reference and record what
 actually worked in `../field-notes.md`.

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-05T21:17:58",
+  "generated_at": "2026-11-07T19:42:57",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,21 +8,15 @@
   "summary": {
     "skills": 84,
     "review": 0,
-    "warn": 5,
-    "local_evidence_present": 38,
-    "local_evidence_stub": 10,
+    "warn": 0,
+    "local_evidence_present": 22,
+    "local_evidence_stub": 26,
     "local_evidence_missing": 0,
-    "actionable_skills": 20,
-    "basic_skills": 28
+    "actionable_skills": 36,
+    "basic_skills": 12
   },
   "review": [],
-  "warn": [
-    "crypto-triage",
-    "crypto-ecc-dlog",
-    "crypto-prng",
-    "crypto-rsa",
-    "crypto-symmetric-oracle"
-  ],
+  "warn": [],
   "skills": [
     {
       "id": "ctf-playbook",
@@ -58,13 +52,11 @@
       "id": "crypto-triage",
       "layer": "router",
       "path": "skills/crypto-triage/SKILL.md",
-      "flags": [
-        "router/entry bloated: 166 lines"
-      ],
+      "flags": [],
       "score": null,
-      "verdict": "warn",
+      "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 166
+      "lines": 160
     },
     {
       "id": "ctf-misc",
@@ -74,7 +66,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 133
+      "lines": 134
     },
     {
       "id": "dfir-sherlock-triage",
@@ -114,7 +106,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 87
+      "lines": 88
     },
     {
       "id": "pwn-binary-triage",
@@ -124,7 +116,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 84
+      "lines": 85
     },
     {
       "id": "rev-triage",
@@ -134,7 +126,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 108
+      "lines": 109
     },
     {
       "id": "web-triage",
@@ -179,74 +171,66 @@
     {
       "id": "crypto-ecc-dlog",
       "layer": "depth",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-ecc-dlog/SKILL.md",
       "flags": [
-        "no traps/pitfalls/discipline",
-        "no operational probe contract",
-        "diluted: 100% overlap with crypto-prng"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 60,
-      "verdict": "warn",
-      "local_evidence": "present",
-      "lines": 166,
-      "actionability": "basic",
-      "nearest_neighbour": "crypto-prng",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 87,
+      "actionability": "operational",
+      "nearest_neighbour": "crypto-symmetric-oracle",
+      "overlap": 0.2,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "crypto-prng",
       "layer": "depth",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-prng/SKILL.md",
       "flags": [
-        "no traps/pitfalls/discipline",
-        "no operational probe contract",
-        "diluted: 100% overlap with crypto-ecc-dlog"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 60,
-      "verdict": "warn",
-      "local_evidence": "present",
-      "lines": 166,
-      "actionability": "basic",
-      "nearest_neighbour": "crypto-ecc-dlog",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 89,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.197,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "crypto-rsa",
       "layer": "depth",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-rsa/SKILL.md",
       "flags": [
-        "no traps/pitfalls/discipline",
-        "no operational probe contract",
-        "diluted: 100% overlap with crypto-ecc-dlog"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 60,
-      "verdict": "warn",
-      "local_evidence": "present",
-      "lines": 166,
-      "actionability": "basic",
-      "nearest_neighbour": "crypto-ecc-dlog",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 97,
+      "actionability": "operational",
+      "nearest_neighbour": "crypto-symmetric-oracle",
+      "overlap": 0.181,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "crypto-symmetric-oracle",
       "layer": "depth",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-symmetric-oracle/SKILL.md",
       "flags": [
-        "no traps/pitfalls/discipline",
-        "no operational probe contract",
-        "diluted: 100% overlap with crypto-ecc-dlog"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 60,
-      "verdict": "warn",
-      "local_evidence": "present",
-      "lines": 166,
-      "actionability": "basic",
-      "nearest_neighbour": "crypto-ecc-dlog",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 84,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.201,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "ctf-ai-ml",
@@ -357,7 +341,7 @@
       "local_evidence": "present",
       "lines": 221,
       "actionability": "basic",
-      "nearest_neighbour": "web-parser-differential",
+      "nearest_neighbour": "osint-infra-records",
       "overlap": 0.017,
       "trust": "local-confirmed"
     },
@@ -373,7 +357,7 @@
       "local_evidence": "stub",
       "lines": 213,
       "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
+      "nearest_neighbour": "rev-managed-code",
       "overlap": 0.025,
       "trust": "catalogue-or-unreviewed"
     },
@@ -406,8 +390,8 @@
       "local_evidence": "stub",
       "lines": 201,
       "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.03,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.031,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -423,7 +407,7 @@
       "local_evidence": "stub",
       "lines": 216,
       "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
+      "nearest_neighbour": "osint-infra-records",
       "overlap": 0.033,
       "trust": "catalogue-or-unreviewed"
     },
@@ -440,7 +424,7 @@
       "local_evidence": "stub",
       "lines": 201,
       "actionability": "basic",
-      "nearest_neighbour": "web-open-redirect",
+      "nearest_neighbour": "osint-infra-records",
       "overlap": 0.02,
       "trust": "catalogue-or-unreviewed"
     },
@@ -471,137 +455,130 @@
     {
       "id": "misc-encoding-carrier",
       "layer": "depth",
-      "path": "skills/ctf-misc/SKILL.md",
+      "path": "skills/misc-encoding-carrier/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with misc-interpreter-escape"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 133,
-      "actionability": "basic",
-      "nearest_neighbour": "misc-interpreter-escape",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 83,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.197,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "misc-interpreter-escape",
       "layer": "depth",
-      "path": "skills/ctf-misc/SKILL.md",
+      "path": "skills/misc-interpreter-escape/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with misc-encoding-carrier"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 133,
-      "actionability": "basic",
-      "nearest_neighbour": "misc-encoding-carrier",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 86,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.196,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "osint-identity-pivot",
       "layer": "depth",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-identity-pivot/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with osint-infra-records"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 87,
-      "actionability": "basic",
+      "local_evidence": "stub",
+      "lines": 83,
+      "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "overlap": 0.199,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "osint-infra-records",
       "layer": "depth",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-infra-records/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with osint-identity-pivot"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 87,
-      "actionability": "basic",
-      "nearest_neighbour": "osint-identity-pivot",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 80,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-media-metadata",
+      "overlap": 0.212,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "osint-media-metadata",
       "layer": "depth",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-media-metadata/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with osint-identity-pivot"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 87,
-      "actionability": "basic",
-      "nearest_neighbour": "osint-identity-pivot",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 84,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.212,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "pwn-code-reuse",
       "layer": "depth",
-      "path": "skills/pwn-rop/SKILL.md",
+      "path": "skills/pwn-code-reuse/SKILL.md",
       "flags": [
-        "no operational probe contract"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 90,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 225,
-      "actionability": "basic",
-      "nearest_neighbour": "pwn-format-string",
-      "overlap": 0.049,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 83,
+      "actionability": "operational",
+      "nearest_neighbour": "pwn-heap-corruption",
+      "overlap": 0.204,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "pwn-format-string",
       "layer": "depth",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-format-string/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with pwn-heap-corruption"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 84,
-      "actionability": "basic",
+      "local_evidence": "stub",
+      "lines": 81,
+      "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "overlap": 0.219,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "pwn-heap-corruption",
       "layer": "depth",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-heap-corruption/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with pwn-format-string"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 84,
-      "actionability": "basic",
+      "local_evidence": "stub",
+      "lines": 83,
+      "actionability": "operational",
       "nearest_neighbour": "pwn-format-string",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "overlap": 0.219,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "pwn-rop",
@@ -611,75 +588,71 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 225
+      "lines": 226
     },
     {
       "id": "pwn-stack-overflow",
       "layer": "depth",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-stack-overflow/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with pwn-format-string"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 84,
-      "actionability": "basic",
-      "nearest_neighbour": "pwn-format-string",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 82,
+      "actionability": "operational",
+      "nearest_neighbour": "pwn-heap-corruption",
+      "overlap": 0.207,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "rev-bytecode-vm",
       "layer": "depth",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-bytecode-vm/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with rev-managed-code"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 108,
-      "actionability": "basic",
+      "local_evidence": "stub",
+      "lines": 86,
+      "actionability": "operational",
       "nearest_neighbour": "rev-managed-code",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "overlap": 0.197,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "rev-managed-code",
       "layer": "depth",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-managed-code/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with rev-bytecode-vm"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 108,
-      "actionability": "basic",
-      "nearest_neighbour": "rev-bytecode-vm",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 82,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.208,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "rev-native-check",
       "layer": "depth",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-native-check/SKILL.md",
       "flags": [
-        "no operational probe contract",
-        "diluted: 100% overlap with rev-bytecode-vm"
+        "field-notes is a template stub (16 lines)"
       ],
-      "score": 75,
+      "score": 80,
       "verdict": "pass",
-      "local_evidence": "present",
-      "lines": 108,
-      "actionability": "basic",
-      "nearest_neighbour": "rev-bytecode-vm",
-      "overlap": 1.0,
-      "trust": "local-confirmed"
+      "local_evidence": "stub",
+      "lines": 82,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.207,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-auth-session",
@@ -749,8 +722,8 @@
       "local_evidence": "stub",
       "lines": 97,
       "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.191,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.194,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -805,8 +778,8 @@
       "local_evidence": "present",
       "lines": 96,
       "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.182,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.185,
       "trust": "local-confirmed"
     },
     {
@@ -821,8 +794,8 @@
       "local_evidence": "stub",
       "lines": 105,
       "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.042,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.045,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -895,8 +868,8 @@
       "local_evidence": "stub",
       "lines": 87,
       "actionability": "operational",
-      "nearest_neighbour": "web-cors",
-      "overlap": 0.191,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.195,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -1023,8 +996,8 @@
       "local_evidence": "stub",
       "lines": 93,
       "actionability": "operational",
-      "nearest_neighbour": "web-open-redirect",
-      "overlap": 0.172,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.179,
       "trust": "catalogue-or-unreviewed"
     },
     {

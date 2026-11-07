@@ -19,8 +19,8 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 882,000 tokens across 348 files. Opening
-`skills/ctf-pwn/` alone is about 114,000. A router is 100–1,300 tokens and a
+The depth corpus is roughly 922,000 tokens across 385 files. Opening
+`skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
 whatever that file happened to describe.
@@ -56,16 +56,16 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 
 | Observed evidence | Router | Tokens | Next |
 |---|---|---|---|
-| ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.4k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
+| ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
-| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `ctf-crypto` |
-| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.1k | — |
-| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.7k | `ctf-forensics`, `ctf-malware` |
-| PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.6k | `ctf-forensics`, `ctf-malware` |
+| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.4k | `ctf-crypto` |
+| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | — |
+| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `ctf-forensics`, `ctf-malware` |
+| PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.7k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
-| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~0.9k | `ctf-osint` |
-| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~0.8k | `pwn-rop`, `ctf-pwn` |
-| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~0.9k | `ctf-reverse`, `ctf-malware` |
+| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `ctf-osint` |
+| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-rop`, `ctf-pwn` |
+| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.1k | `ctf-reverse`, `ctf-malware` |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.0k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
@@ -117,6 +117,57 @@ Not vulnerability classes: each one is a family of artifacts that answers one ki
 | Cloud audit trail | catalogue | every recorded action belongs to a service principal or an automation ro | `skills/dfir-cloud-audit-trace/SKILL.md` |
 | Anti-forensics and log tampering trace | catalogue | record identifiers are contiguous across the whole window | `skills/dfir-antiforensics-trace/SKILL.md` |
 
+## CRYPTO bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| RSA key or plaintext recovery | catalogue | the attack's own stated applicability bound is exceeded -- for example d | `skills/crypto-rsa/SKILL.md` |
+| Predictable pseudorandom generator | catalogue | predict one held-back output and compare: a generator whose next value y | `skills/crypto-prng/SKILL.md` |
+| Curve, nonce or discrete-log recovery | catalogue | re-derive the public point from the recovered private scalar and compare | `skills/crypto-ecc-dlog/SKILL.md` |
+| Block, stream or MAC oracle | catalogue | the mode is authenticated (GCM or an HMAC checked before decryption) | `skills/crypto-symmetric-oracle/SKILL.md` |
+
+## PWN bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Stack memory corruption | catalogue | the read is bounded by a length the input cannot influence | `skills/pwn-stack-overflow/SKILL.md` |
+| Format-string read or write | catalogue | the format argument is a literal and the user value is an argument to it | `skills/pwn-format-string/SKILL.md` |
+| Heap allocator corruption | catalogue | the pointer is cleared on free and every index is bounds-checked | `skills/pwn-heap-corruption/SKILL.md` |
+| ROP and code reuse | catalogue | the gadgets present cannot express the call -- no controllable argument  | `skills/pwn-code-reuse/SKILL.md` |
+
+## REV bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Native deciding check | catalogue | the comparison is against a value computed at run time from something yo | `skills/rev-native-check/SKILL.md` |
+| Managed runtime decompilation | catalogue | the assembly is a thin native stub and the logic is in an unmanaged modu | `skills/rev-managed-code/SKILL.md` |
+| Script bytecode or custom VM | catalogue | the dispatch loop is data-driven from a table that is itself generated a | `skills/rev-bytecode-vm/SKILL.md` |
+
+## OSINT bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Media and document metadata | catalogue | the metadata was stripped on upload and the carrier holds no appended da | `skills/osint-media-metadata/SKILL.md` |
+| Identity and handle pivot | catalogue | the pivot is too generic to separate from unrelated accounts | `skills/osint-identity-pivot/SKILL.md` |
+| Domain, DNS and certificate records | catalogue | every record type returns only operational data and the certificate name | `skills/osint-infra-records/SKILL.md` |
+
+## MISC bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Restricted interpreter escape | catalogue | the check runs on the parsed AST and rejects every node type that can re | `skills/misc-interpreter-escape/SKILL.md` |
+| Encoding or carrier puzzle | catalogue | the alphabet and length match no standard carrier and the index of coinc | `skills/misc-encoding-carrier/SKILL.md` |
+
 Full signal lists, first probes and blast-radius notes are in
 `knowledge/bug-classes.json`. Do not copy them here — the classifier reads
 that file and this table would drift.
@@ -129,15 +180,15 @@ that file and this table would drift.
 | `skills/ad-planted-backdoor-hunt/SKILL.md` | depth | ~1.6k | see registry use_when |
 | `skills/ad-traffic-mining/SKILL.md` | depth | ~1.6k | see registry use_when |
 | `skills/ctf-ai-ml/SKILL.md` | depth | ~1.8k | the AI/IoT sub-type is decided |
-| `skills/ctf-crypto/SKILL.md` | depth | ~2.7k | the primitive parameters are collected |
+| `skills/ctf-crypto/SKILL.md` | depth | ~2.8k | the primitive parameters are collected |
 | `skills/ctf-forensics/SKILL.md` | depth | ~2.7k | the artifact type is identified |
 | `skills/ctf-malware/SKILL.md` | depth | ~2.1k | obfuscated script, PE/.NET sample, or captured C2 traffic |
 | `skills/ctf-osint/SKILL.md` | depth | ~2.4k | one unique pivot is extracted |
-| `skills/ctf-pwn/SKILL.md` | depth | ~4.7k | the crash is reproduced and a named technique is needed |
-| `skills/ctf-reverse/SKILL.md` | depth | ~3.2k | the runtime or packer is named |
-| `skills/ctf-web/SKILL.md` | depth | ~2.7k | a narrower web class lacked the variant; open one named file |
+| `skills/ctf-pwn/SKILL.md` | depth | ~4.8k | the crash is reproduced and a named technique is needed |
+| `skills/ctf-reverse/SKILL.md` | depth | ~3.3k | the runtime or packer is named |
+| `skills/ctf-web/SKILL.md` | depth | ~2.8k | a narrower web class lacked the variant; open one named file |
 | `skills/mcp-agent-security/SKILL.md` | depth | ~1.6k | the target is an LLM, an agent, or a tool server |
-| `skills/pwn-rop/SKILL.md` | depth | ~0.9k | instruction-pointer control is proven and NX forces code reuse |
+| `skills/pwn-rop/SKILL.md` | depth | ~1.9k | instruction-pointer control is proven and NX forces code reuse |
 | `skills/web-chromedriver/SKILL.md` | depth | ~1.0k | an admin bot exists and a client-side payload needs debugging |
 | `skills/web-info-disclosure/SKILL.md` | depth | ~0.7k | an exposed file, debug route, or verbose error is observed |
 | `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
@@ -145,10 +196,10 @@ that file and this table would drift.
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |
 | `skills/white-box-intended-path/SKILL.md` | depth | ~2.6k | see registry use_when |
 | `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
-| `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.0k | see registry use_when |
-| `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.2k | see registry use_when |
+| `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.1k | see registry use_when |
+| `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.3k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
-| `skills/web-parallel-sweep/SKILL.md` | reference | ~2.0k | see registry use_when |
+| `skills/web-parallel-sweep/SKILL.md` | reference | ~2.1k | see registry use_when |
 
 ## Skills that are not routed to automatically
 

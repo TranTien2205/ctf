@@ -1125,7 +1125,7 @@
     {
       "id": "crypto-rsa",
       "name": "RSA key or plaintext recovery",
-      "skill_dir": "crypto-triage",
+      "skill_dir": "crypto-rsa",
       "category": "crypto",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1156,13 +1156,13 @@
       "confusable_with": [
         "crypto-ecc-dlog"
       ],
-      "skill": "skills/crypto-triage/SKILL.md",
+      "skill": "skills/crypto-rsa/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "crypto-prng",
       "name": "Predictable pseudorandom generator",
-      "skill_dir": "crypto-triage",
+      "skill_dir": "crypto-prng",
       "category": "crypto",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1193,13 +1193,13 @@
       "confusable_with": [
         "crypto-symmetric-oracle"
       ],
-      "skill": "skills/crypto-triage/SKILL.md",
+      "skill": "skills/crypto-prng/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "crypto-ecc-dlog",
       "name": "Curve, nonce or discrete-log recovery",
-      "skill_dir": "crypto-triage",
+      "skill_dir": "crypto-ecc-dlog",
       "category": "crypto",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1229,13 +1229,13 @@
       "confusable_with": [
         "crypto-rsa"
       ],
-      "skill": "skills/crypto-triage/SKILL.md",
+      "skill": "skills/crypto-ecc-dlog/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "crypto-symmetric-oracle",
       "name": "Block, stream or MAC oracle",
-      "skill_dir": "crypto-triage",
+      "skill_dir": "crypto-symmetric-oracle",
       "category": "crypto",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1268,13 +1268,13 @@
         "crypto-prng",
         "misc-encoding-carrier"
       ],
-      "skill": "skills/crypto-triage/SKILL.md",
+      "skill": "skills/crypto-symmetric-oracle/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "pwn-stack-overflow",
       "name": "Stack memory corruption",
-      "skill_dir": "pwn-binary-triage",
+      "skill_dir": "pwn-stack-overflow",
       "category": "pwn",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1305,13 +1305,13 @@
         "pwn-format-string",
         "pwn-code-reuse"
       ],
-      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "skill": "skills/pwn-stack-overflow/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "pwn-format-string",
       "name": "Format-string read or write",
-      "skill_dir": "pwn-binary-triage",
+      "skill_dir": "pwn-format-string",
       "category": "pwn",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1337,13 +1337,13 @@
       "confusable_with": [
         "pwn-stack-overflow"
       ],
-      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "skill": "skills/pwn-format-string/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "pwn-heap-corruption",
       "name": "Heap allocator corruption",
-      "skill_dir": "pwn-binary-triage",
+      "skill_dir": "pwn-heap-corruption",
       "category": "pwn",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1371,13 +1371,13 @@
       "confusable_with": [
         "pwn-stack-overflow"
       ],
-      "skill": "skills/pwn-binary-triage/SKILL.md",
+      "skill": "skills/pwn-heap-corruption/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "pwn-code-reuse",
       "name": "ROP and code reuse",
-      "skill_dir": "pwn-rop",
+      "skill_dir": "pwn-code-reuse",
       "category": "pwn",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1407,13 +1407,13 @@
         "pwn-stack-overflow",
         "pwn-format-string"
       ],
-      "skill": "skills/pwn-rop/SKILL.md",
+      "skill": "skills/pwn-code-reuse/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "rev-native-check",
       "name": "Native deciding check",
-      "skill_dir": "rev-triage",
+      "skill_dir": "rev-native-check",
       "category": "rev",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1443,13 +1443,13 @@
         "rev-bytecode-vm",
         "pwn-stack-overflow"
       ],
-      "skill": "skills/rev-triage/SKILL.md",
+      "skill": "skills/rev-native-check/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "rev-managed-code",
       "name": "Managed runtime decompilation",
-      "skill_dir": "rev-triage",
+      "skill_dir": "rev-managed-code",
       "category": "rev",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1477,13 +1477,13 @@
         "rev-native-check",
         "rev-bytecode-vm"
       ],
-      "skill": "skills/rev-triage/SKILL.md",
+      "skill": "skills/rev-managed-code/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "rev-bytecode-vm",
       "name": "Script bytecode or custom VM",
-      "skill_dir": "rev-triage",
+      "skill_dir": "rev-bytecode-vm",
       "category": "rev",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1512,13 +1512,13 @@
         "rev-managed-code",
         "misc-encoding-carrier"
       ],
-      "skill": "skills/rev-triage/SKILL.md",
+      "skill": "skills/rev-bytecode-vm/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "osint-media-metadata",
       "name": "Media and document metadata",
-      "skill_dir": "osint-triage",
+      "skill_dir": "osint-media-metadata",
       "category": "osint",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1541,13 +1541,13 @@
         "osint-identity-pivot",
         "misc-encoding-carrier"
       ],
-      "skill": "skills/osint-triage/SKILL.md",
+      "skill": "skills/osint-media-metadata/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "osint-identity-pivot",
       "name": "Identity and handle pivot",
-      "skill_dir": "osint-triage",
+      "skill_dir": "osint-identity-pivot",
       "category": "osint",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1574,13 +1574,13 @@
         "osint-media-metadata",
         "osint-infra-records"
       ],
-      "skill": "skills/osint-triage/SKILL.md",
+      "skill": "skills/osint-identity-pivot/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "osint-infra-records",
       "name": "Domain, DNS and certificate records",
-      "skill_dir": "osint-triage",
+      "skill_dir": "osint-infra-records",
       "category": "osint",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1602,13 +1602,13 @@
       "confusable_with": [
         "osint-identity-pivot"
       ],
-      "skill": "skills/osint-triage/SKILL.md",
+      "skill": "skills/osint-infra-records/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "misc-interpreter-escape",
       "name": "Restricted interpreter escape",
-      "skill_dir": "ctf-misc",
+      "skill_dir": "misc-interpreter-escape",
       "category": "misc",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1637,13 +1637,13 @@
       "confusable_with": [
         "misc-encoding-carrier"
       ],
-      "skill": "skills/ctf-misc/SKILL.md",
+      "skill": "skills/misc-interpreter-escape/SKILL.md",
       "blast_radius": null
     },
     {
       "id": "misc-encoding-carrier",
       "name": "Encoding or carrier puzzle",
-      "skill_dir": "ctf-misc",
+      "skill_dir": "misc-encoding-carrier",
       "category": "misc",
       "evidence_level": "catalogue",
       "verified_by": [],
@@ -1673,7 +1673,7 @@
         "misc-interpreter-escape",
         "crypto-symmetric-oracle"
       ],
-      "skill": "skills/ctf-misc/SKILL.md",
+      "skill": "skills/misc-encoding-carrier/SKILL.md",
       "blast_radius": null
     }
   ]

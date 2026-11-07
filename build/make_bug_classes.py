@@ -712,7 +712,7 @@ CLASSES = [
     # class names a probe the tree can run today.
     {
         "id": "crypto-rsa", "name": "RSA key or plaintext recovery",
-        "skill_dir": "crypto-triage", "category": "crypto",
+        "skill_dir": "crypto-rsa", "category": "crypto",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\brsa\b", r"\bmodulus\b|\bn\s*=\s*\d{30,}",
                                 r"public exponent|\be\s*=\s*(?:3|65537)\b",
@@ -734,7 +734,7 @@ CLASSES = [
     },
     {
         "id": "crypto-prng", "name": "Predictable pseudorandom generator",
-        "skill_dir": "crypto-triage", "category": "crypto",
+        "skill_dir": "crypto-prng", "category": "crypto",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\blcg\b|linear congruential",
                                 r"\blfsr\b|feedback shift register|\btaps?\b",
@@ -756,7 +756,7 @@ CLASSES = [
     },
     {
         "id": "crypto-ecc-dlog", "name": "Curve, nonce or discrete-log recovery",
-        "skill_dir": "crypto-triage", "category": "crypto",
+        "skill_dir": "crypto-ecc-dlog", "category": "crypto",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\becdsa\b|\becc\b|elliptic",
                                 r"secp256[kr]1|curve25519|\bP-256\b",
@@ -778,7 +778,7 @@ CLASSES = [
     },
     {
         "id": "crypto-symmetric-oracle", "name": "Block, stream or MAC oracle",
-        "skill_dir": "crypto-triage", "category": "crypto",
+        "skill_dir": "crypto-symmetric-oracle", "category": "crypto",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\becb\b|\bcbc\b|\bctr\b|\bgcm\b",
                                 r"padding oracle|invalid padding|bad pad",
@@ -802,7 +802,7 @@ CLASSES = [
     # --------------------------------------------------------------------- pwn
     {
         "id": "pwn-stack-overflow", "name": "Stack memory corruption",
-        "skill_dir": "pwn-binary-triage", "category": "pwn",
+        "skill_dir": "pwn-stack-overflow", "category": "pwn",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"segmentation fault|\bsigsegv\b|core dumped",
                                 r"stack smashing detected|\*\*\* stack",
@@ -821,7 +821,7 @@ CLASSES = [
     },
     {
         "id": "pwn-format-string", "name": "Format-string read or write",
-        "skill_dir": "pwn-binary-triage", "category": "pwn",
+        "skill_dir": "pwn-format-string", "category": "pwn",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"%p%p|%[0-9]+\$p|\bformat string\b",
                                 r"%n\b|%hn\b|%hhn\b",
@@ -838,7 +838,7 @@ CLASSES = [
     },
     {
         "id": "pwn-heap-corruption", "name": "Heap allocator corruption",
-        "skill_dir": "pwn-binary-triage", "category": "pwn",
+        "skill_dir": "pwn-heap-corruption", "category": "pwn",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"use.?after.?free|\buaf\b", r"double free",
                                 r"\btcache\b|\bfastbin\b|unsorted bin",
@@ -857,7 +857,7 @@ CLASSES = [
     },
     {
         "id": "pwn-code-reuse", "name": "ROP and code reuse",
-        "skill_dir": "pwn-rop", "category": "pwn",
+        "skill_dir": "pwn-code-reuse", "category": "pwn",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\brop\b|ret2libc|ret2csu|ret2plt|ret2dlresolve",
                                 r"\bsrop\b|sigreturn", r"\bnx\b|no.?execute",
@@ -875,7 +875,7 @@ CLASSES = [
     # --------------------------------------------------------------------- rev
     {
         "id": "rev-native-check", "name": "Native deciding check",
-        "skill_dir": "rev-triage", "category": "rev",
+        "skill_dir": "rev-native-check", "category": "rev",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\belf\b|\bpe32\b|\bmach-?o\b",
                                 r"wrong (?:flag|password|key)|try again|incorrect",
@@ -895,7 +895,7 @@ CLASSES = [
     },
     {
         "id": "rev-managed-code", "name": "Managed runtime decompilation",
-        "skill_dir": "rev-triage", "category": "rev",
+        "skill_dir": "rev-managed-code", "category": "rev",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\.net\b|\bclr\b|\bil\b\s|assembly",
                                 r"\bjava\b|\.class\b|\.jar\b|cafebabe",
@@ -914,7 +914,7 @@ CLASSES = [
     },
     {
         "id": "rev-bytecode-vm", "name": "Script bytecode or custom VM",
-        "skill_dir": "rev-triage", "category": "rev",
+        "skill_dir": "rev-bytecode-vm", "category": "rev",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\.pyc\b|marshal|code object|co_consts",
                                 r"uncompyle|pycdc|decompyle|\bdis\b module",
@@ -935,7 +935,7 @@ CLASSES = [
     # ------------------------------------------------------------------- osint
     {
         "id": "osint-media-metadata", "name": "Media and document metadata",
-        "skill_dir": "osint-triage", "category": "osint",
+        "skill_dir": "osint-media-metadata", "category": "osint",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\bexif\b|exiftool|metadata",
                                 r"\bgps\b|latitude|longitude|geoloc",
@@ -951,7 +951,7 @@ CLASSES = [
     },
     {
         "id": "osint-identity-pivot", "name": "Identity and handle pivot",
-        "skill_dir": "osint-triage", "category": "osint",
+        "skill_dir": "osint-identity-pivot", "category": "osint",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\busername\b|\bhandle\b|\bprofile\b",
                                 r"email (?:address|pattern|format)",
@@ -969,7 +969,7 @@ CLASSES = [
     },
     {
         "id": "osint-infra-records", "name": "Domain, DNS and certificate records",
-        "skill_dir": "osint-triage", "category": "osint",
+        "skill_dir": "osint-infra-records", "category": "osint",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"\bdns\b|\btxt record\b|\bcname\b|\bmx\b|\bsrv\b",
                                 r"\bwhois\b|registrar|registration date",
@@ -986,7 +986,7 @@ CLASSES = [
     # -------------------------------------------------------------------- misc
     {
         "id": "misc-interpreter-escape", "name": "Restricted interpreter escape",
-        "skill_dir": "ctf-misc", "category": "misc",
+        "skill_dir": "misc-interpreter-escape", "category": "misc",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"pyjail|\bjail\b|sandbox",
                                 r"__builtins__|__import__|__class__|__subclasses__",
@@ -1007,7 +1007,7 @@ CLASSES = [
     },
     {
         "id": "misc-encoding-carrier", "name": "Encoding or carrier puzzle",
-        "skill_dir": "ctf-misc", "category": "misc",
+        "skill_dir": "misc-encoding-carrier", "category": "misc",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"base(?:16|32|64|85|58)\b|\bhex\b|\bascii85\b",
                                 r"\bmorse\b|\bbinary\b text|\brot13\b",

@@ -38,9 +38,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1399,
+      "skill_tokens": 1428,
       "depth_files": 3,
-      "depth_tokens": 1955,
+      "depth_tokens": 2010,
       "use_when": [
         "a new challenge starts and the category is not yet fixed",
         "several challenges compete for time in a timed contest"
@@ -68,7 +68,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1426,
+      "skill_tokens": 1456,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -96,7 +96,7 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 861,
+      "skill_tokens": 878,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -120,9 +120,9 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 3169,
+      "skill_tokens": 3358,
       "depth_files": 8,
-      "depth_tokens": 5193,
+      "depth_tokens": 5368,
       "use_when": [
         "ciphertext, a modulus, a nonce, a key, or a hash is supplied",
         "a custom encryption routine must be broken rather than reversed"
@@ -142,9 +142,9 @@
       "categories": [
         "misc"
       ],
-      "skill_tokens": 2078,
-      "depth_files": 17,
-      "depth_tokens": 49696,
+      "skill_tokens": 2260,
+      "depth_files": 18,
+      "depth_tokens": 51148,
       "use_when": [
         "the challenge is a jail, an encoding chain, a game or VM, a DNS puzzle, or a programming constraint"
       ],
@@ -160,9 +160,9 @@
       "categories": [
         "dfir"
       ],
-      "skill_tokens": 1765,
+      "skill_tokens": 1797,
       "depth_files": 11,
-      "depth_tokens": 42177,
+      "depth_tokens": 42945,
       "use_when": [
         "a bundle of honest system artifacts is supplied and the task is a numbered list of investigation questions",
         "EVTX, registry hives, $MFT, prefetch, a KAPE triage collection or CloudTrail logs are present"
@@ -183,9 +183,9 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 642,
+      "skill_tokens": 660,
       "depth_files": 7,
-      "depth_tokens": 4796,
+      "depth_tokens": 4971,
       "use_when": [
         "a PCAP, disk image, memory dump, log set, document, or media file is supplied",
         "something is believed to be hidden inside a container format"
@@ -206,9 +206,9 @@
       "categories": [
         "dfir"
       ],
-      "skill_tokens": 1902,
+      "skill_tokens": 1941,
       "depth_files": 1,
-      "depth_tokens": 364,
+      "depth_tokens": 371,
       "use_when": [
         "a live estate has already been hit and both recovery and investigation are scored",
         "services are down, files are encrypted, and a clock is running"
@@ -236,9 +236,9 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 895,
-      "depth_files": 8,
-      "depth_tokens": 7446,
+      "skill_tokens": 1070,
+      "depth_files": 9,
+      "depth_tokens": 7961,
       "use_when": [
         "the challenge supplies a name, handle, photo, domain, or document and the answer lives in public sources"
       ],
@@ -257,9 +257,9 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 822,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 994,
+      "depth_files": 1,
+      "depth_tokens": 219,
       "use_when": [
         "an ELF/PE binary accepts input and the goal is memory corruption",
         "a crash, checksec output, or libc version is part of the evidence"
@@ -280,9 +280,9 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 928,
-      "depth_files": 5,
-      "depth_tokens": 3863,
+      "skill_tokens": 1104,
+      "depth_files": 6,
+      "depth_tokens": 4210,
       "use_when": [
         "a binary, bytecode, managed assembly, packed sample, or firmware image must be understood",
         "a check function or embedded algorithm has to be replicated"
@@ -303,9 +303,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1968,
+      "skill_tokens": 1999,
       "depth_files": 4,
-      "depth_tokens": 2336,
+      "depth_tokens": 2387,
       "use_when": [
         "an HTTP target, a web framework, or web source code is supplied",
         "a route, request parameter, cookie, or template is under discussion"
@@ -356,7 +356,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1452,
+      "skill_tokens": 1484,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -380,7 +380,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1561,
+      "skill_tokens": 1594,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -405,7 +405,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1578,
+      "skill_tokens": 1608,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -424,16 +424,16 @@
     },
     {
       "id": "crypto-ecc-dlog",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-ecc-dlog/SKILL.md",
       "layer": "depth",
       "categories": [
         "crypto"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3169,
-      "depth_files": 8,
-      "depth_tokens": 5193,
+      "skill_tokens": 956,
+      "depth_files": 1,
+      "depth_tokens": 161,
       "use_when": [
         "a probe or source read produced this class's signal: decide the discriminator first: a nonce REUSED across two signatures recovers the key in closed form with ecdsa-nonce-reuse and needs no lattice, a merely BIASED nonce is hnp or hnp-ecdsa, and a plain discrete log needs the smoothness check before bsgs or pohlig-hellman"
       ],
@@ -450,16 +450,16 @@
     },
     {
       "id": "crypto-prng",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-prng/SKILL.md",
       "layer": "depth",
       "categories": [
         "crypto"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3169,
-      "depth_files": 8,
-      "depth_tokens": 5193,
+      "skill_tokens": 952,
+      "depth_files": 1,
+      "depth_tokens": 160,
       "use_when": [
         "a probe or source read produced this class's signal: name the generator from source, count how many consecutive outputs you hold, then run the matching attack id (lcg-recover, lcg-unknown-modulus, lcg-truncated, berlekamp-massey, lfsr-recover, lfsr-predict, mt19937-clone)"
       ],
@@ -476,16 +476,16 @@
     },
     {
       "id": "crypto-rsa",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-rsa/SKILL.md",
       "layer": "depth",
       "categories": [
         "crypto"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3169,
-      "depth_files": 8,
-      "depth_tokens": 5193,
+      "skill_tokens": 1074,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: answer the six discriminators in order with python3 tools/crypto_attack.py list, then run the ONE attack they select: how many moduli, is e small, is d small, are the primes close, is part of a factor known, is phi shared"
       ],
@@ -502,16 +502,16 @@
     },
     {
       "id": "crypto-symmetric-oracle",
-      "path": "skills/crypto-triage/SKILL.md",
+      "path": "skills/crypto-symmetric-oracle/SKILL.md",
       "layer": "depth",
       "categories": [
         "crypto"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3169,
-      "depth_files": 8,
-      "depth_tokens": 5193,
+      "skill_tokens": 925,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: detect ECB in ONE request wherever you control plaintext -- identical plaintext blocks give identical ciphertext blocks -- then separate an invalid-pad answer from an invalid-MAC answer before writing any oracle loop"
       ],
@@ -534,9 +534,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1798,
+      "skill_tokens": 1829,
       "depth_files": 3,
-      "depth_tokens": 16099,
+      "depth_tokens": 16482,
       "use_when": [
         "the sink is a model, a prompt pipeline, or a serialised model format and the sub-type is already identified"
       ],
@@ -554,9 +554,9 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 2728,
+      "skill_tokens": 2758,
       "depth_files": 23,
-      "depth_tokens": 97074,
+      "depth_tokens": 99172,
       "use_when": [
         "the primitive and its parameters are collected and a named attack has to be implemented"
       ],
@@ -575,9 +575,9 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 2686,
+      "skill_tokens": 2719,
       "depth_files": 20,
-      "depth_tokens": 85200,
+      "depth_tokens": 87175,
       "use_when": [
         "the artifact type is identified and a container-specific extraction is required"
       ],
@@ -597,9 +597,9 @@
         "rev",
         "forensics"
       ],
-      "skill_tokens": 2080,
+      "skill_tokens": 2126,
       "depth_files": 3,
-      "depth_tokens": 7388,
+      "depth_tokens": 7596,
       "use_when": [
         "an obfuscated script, a PE/.NET sample, or captured C2 traffic has to be understood"
       ],
@@ -617,9 +617,9 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 2352,
+      "skill_tokens": 2402,
       "depth_files": 3,
-      "depth_tokens": 12786,
+      "depth_tokens": 13065,
       "use_when": [
         "one unique pivot has been extracted and a specific source has to be worked"
       ],
@@ -637,9 +637,9 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 4738,
+      "skill_tokens": 4792,
       "depth_files": 18,
-      "depth_tokens": 109578,
+      "depth_tokens": 111773,
       "use_when": [
         "the primitive is known and a specific heap, kernel, format-string, or sandbox technique is needed"
       ],
@@ -658,9 +658,9 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 3210,
+      "skill_tokens": 3253,
       "depth_files": 18,
-      "depth_tokens": 97067,
+      "depth_tokens": 99378,
       "use_when": [
         "a specific language runtime, packer, VM obfuscator, or anti-analysis trick has been identified"
       ],
@@ -679,9 +679,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2733,
+      "skill_tokens": 2775,
       "depth_files": 18,
-      "depth_tokens": 94007,
+      "depth_tokens": 95936,
       "use_when": [
         "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
       ],
@@ -702,9 +702,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5508,
+      "skill_tokens": 5562,
       "depth_files": 1,
-      "depth_tokens": 157,
+      "depth_tokens": 161,
       "use_when": [
         "a probe or source read produced this class's signal: look for Security 1102 and, whether or not it is present, read the event record identifiers in order and report the largest discontinuity"
       ],
@@ -731,9 +731,9 @@
       "verified_by": [
         "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
       ],
-      "skill_tokens": 4710,
+      "skill_tokens": 4765,
       "depth_files": 1,
-      "depth_tokens": 1095,
+      "depth_tokens": 1108,
       "use_when": [
         "a probe or source read produced this class's signal: filter the event set to 4624 and read the LogonType and IpAddress fields of the first match",
         "a chain card already proves this class here: htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
@@ -758,9 +758,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4046,
+      "skill_tokens": 4098,
       "depth_files": 1,
-      "depth_tokens": 152,
+      "depth_tokens": 156,
       "use_when": [
         "a probe or source read produced this class's signal: extract eventTime, eventName, sourceIPAddress and userIdentity.arn from every record, sort by time, and read the first action that is not a read"
       ],
@@ -785,9 +785,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5287,
+      "skill_tokens": 5345,
       "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_tokens": 157,
       "use_when": [
         "a probe or source read produced this class's signal: filter to Sysmon event 1 or Security 4688 and read the CommandLine and ParentImage of the first match"
       ],
@@ -812,9 +812,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3831,
+      "skill_tokens": 3881,
       "depth_files": 1,
-      "depth_tokens": 154,
+      "depth_tokens": 158,
       "use_when": [
         "a probe or source read produced this class's signal: build a bodyfile from the filesystem metadata and read the entries inside the intrusion window in chronological order"
       ],
@@ -839,9 +839,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4914,
+      "skill_tokens": 4967,
       "depth_files": 1,
-      "depth_tokens": 155,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: read the per-peer byte counts in each direction and identify the peer with the largest outbound volume, then join it to the owning process"
       ],
@@ -866,9 +866,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4930,
+      "skill_tokens": 4980,
       "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_tokens": 157,
       "use_when": [
         "a probe or source read produced this class's signal: read the Run and RunOnce values and the Services subkeys from the SOFTWARE and SYSTEM hives, and compare each image path against the intrusion window"
       ],
@@ -896,9 +896,9 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-ssrf-gopher-redis-lua-rce"
       ],
-      "skill_tokens": 1498,
+      "skill_tokens": 1534,
       "depth_files": 4,
-      "depth_tokens": 4610,
+      "depth_tokens": 4696,
       "use_when": [
         "a probe or source read produced this class's signal: an absolute path to a file the target certainly has, before trying any traversal",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-ssrf-gopher-redis-lua-rce"
@@ -921,9 +921,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1612,
+      "skill_tokens": 1645,
       "depth_files": 4,
-      "depth_tokens": 3562,
+      "depth_tokens": 3631,
       "use_when": [
         "the challenge target is an LLM, an agent, or a tool server",
         "an external skill or MCP bundle is being reviewed before install"
@@ -940,16 +940,16 @@
     },
     {
       "id": "misc-encoding-carrier",
-      "path": "skills/ctf-misc/SKILL.md",
+      "path": "skills/misc-encoding-carrier/SKILL.md",
       "layer": "depth",
       "categories": [
         "misc"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 2078,
-      "depth_files": 17,
-      "depth_tokens": 49696,
+      "skill_tokens": 964,
+      "depth_files": 1,
+      "depth_tokens": 158,
       "use_when": [
         "a probe or source read produced this class's signal: IDENTIFY THE CARRIER before decoding: the alphabet, the distinct-character count and the length modulus separate base64 from base32 from base85 from hex from a custom alphabet in one command, and the index of coincidence separates a substitution from a transposition from a Vigenere"
       ],
@@ -967,16 +967,16 @@
     },
     {
       "id": "misc-interpreter-escape",
-      "path": "skills/ctf-misc/SKILL.md",
+      "path": "skills/misc-interpreter-escape/SKILL.md",
       "layer": "depth",
       "categories": [
         "misc"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 2078,
-      "depth_files": 17,
-      "depth_tokens": 49696,
+      "skill_tokens": 946,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: MAP THE FILTER before writing an escape: send single probe characters and short tokens until the blocked bytes, names and node types are known and the layer the check runs at is named, because that mapping is the challenge and the escape is mechanical afterwards"
       ],
@@ -993,16 +993,16 @@
     },
     {
       "id": "osint-identity-pivot",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-identity-pivot/SKILL.md",
       "layer": "depth",
       "categories": [
         "osint"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 895,
-      "depth_files": 8,
-      "depth_tokens": 7446,
+      "skill_tokens": 940,
+      "depth_files": 1,
+      "depth_tokens": 158,
       "use_when": [
         "a probe or source read produced this class's signal: extract the single most UNIQUE pivot and normalise it -- compute the key fingerprint rather than eyeballing it -- then produce an ordered plan of at most six queries, each with its source and the one fact it would confirm, for ctf-writeup-scout to run"
       ],
@@ -1020,16 +1020,16 @@
     },
     {
       "id": "osint-infra-records",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-infra-records/SKILL.md",
       "layer": "depth",
       "categories": [
         "osint"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 895,
-      "depth_files": 8,
-      "depth_tokens": 7446,
+      "skill_tokens": 830,
+      "depth_files": 1,
+      "depth_tokens": 161,
       "use_when": [
         "a probe or source read produced this class's signal: query TXT first because that is where a flag is actually planted, then sweep the record types that can carry data, then whois, then the certificate and its subject alternative names, which routinely leak the sibling hostname that is the real next step"
       ],
@@ -1046,16 +1046,16 @@
     },
     {
       "id": "osint-media-metadata",
-      "path": "skills/osint-triage/SKILL.md",
+      "path": "skills/osint-media-metadata/SKILL.md",
       "layer": "depth",
       "categories": [
         "osint"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 895,
-      "depth_files": 8,
-      "depth_tokens": 7446,
+      "skill_tokens": 897,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: run exiftool and read ALL of its output rather than grepping one tag, then binwalk and strings for appended or embedded data; steghide, zsteg and outguess are absent here, so never claim an extraction with them"
       ],
@@ -1073,16 +1073,16 @@
     },
     {
       "id": "pwn-code-reuse",
-      "path": "skills/pwn-rop/SKILL.md",
+      "path": "skills/pwn-code-reuse/SKILL.md",
       "layer": "depth",
       "categories": [
         "pwn"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 861,
-      "depth_files": 2,
-      "depth_tokens": 1472,
+      "skill_tokens": 920,
+      "depth_files": 1,
+      "depth_tokens": 156,
       "use_when": [
         "a probe or source read produced this class's signal: this class presupposes control of the instruction pointer, so confirm that first; then read the protections to decide whether a leak is needed at all, and build the leak chain and verify the leaked value looks like a libc address before chaining further"
       ],
@@ -1100,16 +1100,16 @@
     },
     {
       "id": "pwn-format-string",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-format-string/SKILL.md",
       "layer": "depth",
       "categories": [
         "pwn"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 822,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 853,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: send a handful of %p in one request and read the leaked words back, which is the cheapest confirmation in pwn, then locate your own buffer with %N$p before deciding read against write"
       ],
@@ -1126,16 +1126,16 @@
     },
     {
       "id": "pwn-heap-corruption",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-heap-corruption/SKILL.md",
       "layer": "depth",
       "categories": [
         "pwn"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 822,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 882,
+      "depth_files": 1,
+      "depth_tokens": 158,
       "use_when": [
         "a probe or source read produced this class's signal: answer the glibc version question first, because tcache behaviour, double-free detection and fd mangling differ sharply across versions, then map the allocation lifecycle and name the primitive the bug gives before choosing any technique"
       ],
@@ -1157,9 +1157,9 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 861,
-      "depth_files": 2,
-      "depth_tokens": 1472,
+      "skill_tokens": 1856,
+      "depth_files": 3,
+      "depth_tokens": 1746,
       "use_when": [
         "control of the instruction pointer is proven and NX forces code reuse"
       ],
@@ -1173,16 +1173,16 @@
     },
     {
       "id": "pwn-stack-overflow",
-      "path": "skills/pwn-binary-triage/SKILL.md",
+      "path": "skills/pwn-stack-overflow/SKILL.md",
       "layer": "depth",
       "categories": [
         "pwn"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 822,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 901,
+      "depth_files": 1,
+      "depth_tokens": 158,
       "use_when": [
         "a probe or source read produced this class's signal: run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a pattern you generate yourself -- pwntools is absent here"
       ],
@@ -1200,16 +1200,16 @@
     },
     {
       "id": "rev-bytecode-vm",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-bytecode-vm/SKILL.md",
       "layer": "depth",
       "categories": [
         "rev"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 928,
-      "depth_files": 5,
-      "depth_tokens": 3863,
+      "skill_tokens": 957,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: for a .pyc read the header magic and name the python version before running any decompiler, falling back to the stdlib dis module on the unmarshalled code object when uncompyle6 refuses; for a custom VM recover the OPCODE TABLE before reading one instruction of its program"
       ],
@@ -1227,16 +1227,16 @@
     },
     {
       "id": "rev-managed-code",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-managed-code/SKILL.md",
       "layer": "depth",
       "categories": [
         "rev"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 928,
-      "depth_files": 5,
-      "depth_tokens": 3863,
+      "skill_tokens": 862,
+      "depth_files": 1,
+      "depth_tokens": 159,
       "use_when": [
         "a probe or source read produced this class's signal: confirm the runtime from the header and quote the bytes -- a PE with a non-zero CLR data directory, or the 0xCAFEBABE magic -- then decompile with what exists here: ilspycmd for .NET, javap plus unzip for Java. jadx, procyon and mono are absent"
       ],
@@ -1254,16 +1254,16 @@
     },
     {
       "id": "rev-native-check",
-      "path": "skills/rev-triage/SKILL.md",
+      "path": "skills/rev-native-check/SKILL.md",
       "layer": "depth",
       "categories": [
         "rev"
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 928,
-      "depth_files": 5,
-      "depth_tokens": 3863,
+      "skill_tokens": 885,
+      "depth_files": 1,
+      "depth_tokens": 157,
       "use_when": [
         "a probe or source read produced this class's signal: locate the input read, follow the value to the comparison, and quote the disassembly that carries it: a described check is not a measured one. r2 -A then afl then pdf @ main; gdb is absent, so r2 -d is the debugger"
       ],
@@ -1292,9 +1292,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1696,
+      "skill_tokens": 1740,
       "depth_files": 5,
-      "depth_tokens": 10398,
+      "depth_tokens": 11455,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -1321,9 +1321,9 @@
       "verified_by": [
         "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
-      "skill_tokens": 851,
+      "skill_tokens": 872,
       "depth_files": 1,
-      "depth_tokens": 2836,
+      "depth_tokens": 2871,
       "use_when": [
         "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
         "a chain card already proves this class here: htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
@@ -1345,9 +1345,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 999,
+      "skill_tokens": 1023,
       "depth_files": 1,
-      "depth_tokens": 635,
+      "depth_tokens": 651,
       "use_when": [
         "a challenge has an admin bot and a client-side payload needs debugging",
         "the challenge itself exposes a WebDriver or Selenium endpoint"
@@ -1374,9 +1374,9 @@
       "verified_by": [
         "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
       ],
-      "skill_tokens": 973,
+      "skill_tokens": 996,
       "depth_files": 2,
-      "depth_tokens": 5765,
+      "depth_tokens": 5813,
       "use_when": [
         "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
         "a chain card already proves this class here: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
@@ -1400,9 +1400,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 924,
+      "skill_tokens": 948,
       "depth_files": 2,
-      "depth_tokens": 1418,
+      "depth_tokens": 1433,
       "use_when": [
         "a probe or source read produced this class's signal: repeat an authenticated request with a foreign Origin and read whether the origin is reflected alongside credentials"
       ],
@@ -1429,9 +1429,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 971,
+      "skill_tokens": 996,
       "depth_files": 1,
-      "depth_tokens": 768,
+      "depth_tokens": 780,
       "use_when": [
         "a probe or source read produced this class's signal: a cross-origin form whose content type the endpoint still accepts, submitted by the viewer you control",
         "a chain card already proves this class here: htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -1459,9 +1459,9 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1272,
+      "skill_tokens": 1307,
       "depth_files": 7,
-      "depth_tokens": 5025,
+      "depth_tokens": 5186,
       "use_when": [
         "a probe or source read produced this class's signal: identify the format from the blob's own magic before touching any gadget",
         "a chain card already proves this class here: htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput, htb-py2-pickle-cookie-reduce-rce-rendered-output"
@@ -1488,9 +1488,9 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
       ],
-      "skill_tokens": 1399,
+      "skill_tokens": 1434,
       "depth_files": 7,
-      "depth_tokens": 6162,
+      "depth_tokens": 6282,
       "use_when": [
         "a probe or source read produced this class's signal: a benign marker file first; the question is where it is stored and what later reads or executes it",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
@@ -1514,9 +1514,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 942,
+      "skill_tokens": 965,
       "depth_files": 2,
-      "depth_tokens": 3914,
+      "depth_tokens": 3954,
       "use_when": [
         "a probe or source read produced this class's signal: one introspection query; if it is disabled, one field-suggestion error to recover names"
       ],
@@ -1541,9 +1541,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1042,
+      "skill_tokens": 1068,
       "depth_files": 7,
-      "depth_tokens": 3366,
+      "depth_tokens": 3485,
       "use_when": [
         "a probe or source read produced this class's signal: create an object as one identity, then request its identifier as a second identity"
       ],
@@ -1566,9 +1566,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 728,
+      "skill_tokens": 747,
       "depth_files": 1,
-      "depth_tokens": 153,
+      "depth_tokens": 157,
       "use_when": [
         "the flag or the next step may sit in an exposed file or debug endpoint",
         "a 403, verbose error, debug header, or a shipped .git or archive is observed"
@@ -1595,9 +1595,9 @@
       "verified_by": [
         "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
       ],
-      "skill_tokens": 773,
+      "skill_tokens": 793,
       "depth_files": 1,
-      "depth_tokens": 562,
+      "depth_tokens": 573,
       "use_when": [
         "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped",
         "a chain card already proves this class here: pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
@@ -1624,9 +1624,9 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 844,
+      "skill_tokens": 865,
       "depth_files": 3,
-      "depth_tokens": 1220,
+      "depth_tokens": 1245,
       "use_when": [
         "a probe or source read produced this class's signal: send the filter pinned to an object you created, with every write field omitted, and read what comes back",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
@@ -1653,9 +1653,9 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 771,
+      "skill_tokens": 790,
       "depth_files": 1,
-      "depth_tokens": 1389,
+      "depth_tokens": 1408,
       "use_when": [
         "a probe or source read produced this class's signal: walk the whole flow once and record every redirect, parameter and cookie set, before changing any of them",
         "a chain card already proves this class here: htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -1680,9 +1680,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 865,
+      "skill_tokens": 886,
       "depth_files": 1,
-      "depth_tokens": 151,
+      "depth_tokens": 155,
       "use_when": [
         "a probe or source read produced this class's signal: one external destination in the redirect parameter, following the response Location header exactly"
       ],
@@ -1709,9 +1709,9 @@
       "verified_by": [
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 763,
+      "skill_tokens": 782,
       "depth_files": 1,
-      "depth_tokens": 6920,
+      "depth_tokens": 6986,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1740,9 +1740,9 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 1141,
+      "skill_tokens": 1170,
       "depth_files": 1,
-      "depth_tokens": 2535,
+      "depth_tokens": 2567,
       "use_when": [
         "a probe or source read produced this class's signal: pollute one harmless property, then read it back through a path that should not have it",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate, htb-tornadoservice-bot-csrf-class-pollution, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -1770,9 +1770,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 807,
+      "skill_tokens": 828,
       "depth_files": 2,
-      "depth_tokens": 1848,
+      "depth_tokens": 1878,
       "use_when": [
         "a probe or source read produced this class's signal: two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
@@ -1798,9 +1798,9 @@
       "verified_by": [
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1041,
+      "skill_tokens": 1066,
       "depth_files": 1,
-      "depth_tokens": 2758,
+      "depth_tokens": 2792,
       "use_when": [
         "a probe or source read produced this class's signal: one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
         "a chain card already proves this class here: htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1823,9 +1823,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 653,
+      "skill_tokens": 670,
       "depth_files": 1,
-      "depth_tokens": 152,
+      "depth_tokens": 156,
       "use_when": [
         "the front-end is a bundled SPA and the only available source",
         "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"
@@ -1852,9 +1852,9 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1648,
+      "skill_tokens": 1686,
       "depth_files": 13,
-      "depth_tokens": 17159,
+      "depth_tokens": 17590,
       "use_when": [
         "a probe or source read produced this class's signal: one syntax marker, then a matched true/false pair against the same input",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
@@ -1881,9 +1881,9 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce",
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1232,
+      "skill_tokens": 1263,
       "depth_files": 6,
-      "depth_tokens": 6841,
+      "depth_tokens": 6983,
       "use_when": [
         "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
         "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"
@@ -1912,9 +1912,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
-      "skill_tokens": 958,
+      "skill_tokens": 985,
       "depth_files": 7,
-      "depth_tokens": 4751,
+      "depth_tokens": 4886,
       "use_when": [
         "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
         "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
@@ -1939,9 +1939,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 914,
+      "skill_tokens": 937,
       "depth_files": 2,
-      "depth_tokens": 4166,
+      "depth_tokens": 4265,
       "use_when": [
         "a probe or source read produced this class's signal: read the setup contract and the solved condition first; that names the exact state you must reach"
       ],
@@ -1960,9 +1960,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 770,
+      "skill_tokens": 788,
       "depth_files": 1,
-      "depth_tokens": 151,
+      "depth_tokens": 155,
       "use_when": [
         "the target opens a ws:// or wss:// channel, or uses Socket.IO or SockJS",
         "a live feature carries the flag path and the cookie is HttpOnly"
@@ -1989,9 +1989,9 @@
       "verified_by": [
         "htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
       ],
-      "skill_tokens": 1852,
+      "skill_tokens": 1888,
       "depth_files": 2,
-      "depth_tokens": 2810,
+      "depth_tokens": 2837,
       "use_when": [
         "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
         "a chain card already proves this class here: htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
@@ -2020,9 +2020,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 1196,
+      "skill_tokens": 1223,
       "depth_files": 7,
-      "depth_tokens": 6997,
+      "depth_tokens": 7166,
       "use_when": [
         "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
@@ -2049,9 +2049,9 @@
       "verified_by": [
         "htb-xxe-content-type-branch-simplexml-noent-file-read"
       ],
-      "skill_tokens": 978,
+      "skill_tokens": 1003,
       "depth_files": 1,
-      "depth_tokens": 600,
+      "depth_tokens": 610,
       "use_when": [
         "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed",
         "a chain card already proves this class here: htb-xxe-content-type-branch-simplexml-noent-file-read"
@@ -2074,9 +2074,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 3261,
+      "skill_tokens": 3317,
       "depth_files": 1,
-      "depth_tokens": 160,
+      "depth_tokens": 165,
       "use_when": [
         "a chain turns on what a pinned, vendored or containerised dependency actually does",
         "a negative result has to be recordable as a measured boundary, not an opinion"
@@ -2098,9 +2098,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2580,
+      "skill_tokens": 2626,
       "depth_files": 1,
-      "depth_tokens": 158,
+      "depth_tokens": 162,
       "use_when": [
         "a high-value, low-solve white-box challenge whose author-deliberate oddities are unexplained",
         "one mechanism budget is spent with no impact and no anomaly newly explained"
@@ -2121,7 +2121,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1198,
+      "skill_tokens": 1232,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -2139,7 +2139,7 @@
       "categories": [
         "dfir"
       ],
-      "skill_tokens": 3052,
+      "skill_tokens": 3107,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -2165,7 +2165,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1230,
+      "skill_tokens": 1257,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [
@@ -2191,9 +2191,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1008,
+      "skill_tokens": 1032,
       "depth_files": 2,
-      "depth_tokens": 2055,
+      "depth_tokens": 2104,
       "use_when": [
         "a skill is being added, promoted, or considered for deletion",
         "a field note is being reviewed, or a class raised from catalogue"
@@ -2210,7 +2210,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2030,
+      "skill_tokens": 2070,
       "depth_files": 0,
       "depth_tokens": 0,
       "use_when": [

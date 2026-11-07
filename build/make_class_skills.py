@@ -522,6 +522,648 @@ and any function that is reachable before initialisation.
 - Never assume a private key, RPC URL, or contract address from another
   challenge; use only values supplied for this instance.
 """,
+    "crypto-rsa": """## Recognise
+
+The handout gives numbers, not a service: one or more moduli `n`, a public
+exponent `e`, and one or more ciphertexts. Write the parameter sheet before
+choosing anything — modulus bit length, `e`, how many moduli, how many
+messages, and whether any value repeats across them.
+
+## The discriminator table
+
+Answer in order; the first yes picks the attack id for `tools/crypto_attack.py`.
+
+| Observation | Attack id |
+|---|---|
+| several moduli from the same generator, none factorable alone | `batch-gcd` |
+| the same message encrypted to several recipients under small `e` | `hastad` |
+| one modulus reused with two exponents | `common-modulus` |
+| primes `p`, `q` generated close together (`next_prime` after `p`) | `fermat` |
+| `d` small, `e` full-size | `wiener`, then `boneh-durfee` below its bound |
+| part of a factor or of the message known | `coppersmith-high-bits` / `coppersmith-core` |
+| `e` = 3 and the message short enough that `m**e < n` | `eth-root` / `small-e-root` |
+| `p - 1` smooth | `pollard-pm1` |
+
+If only a private operation is missing — you hold `d`, `phi`, or the factors —
+`factor-from-d` or `rsa-decrypt` finishes directly.
+
+## Confirm
+
+A recovered plaintext or factor is confirmed when it passes a check the handout
+verifies by itself: `pow(m, e, n)` reproduces the ciphertext, or the product of
+the recovered factors reproduces `n` exactly. A plausible-looking plaintext that
+fails that check is a candidate, not a recovery.
+
+## Traps
+
+- Bounds are the attack. `boneh-durfee` fails silently above its `d` bound and
+  `coppersmith` above its known-bits window; check the applicability line each
+  attack prints before waiting on the lattice.
+- A shared-prime batch needs at least two moduli; a single `n` never reaches
+  `batch-gcd`.
+- `e = 3` alone means nothing — the shortcut applies only when `m**e < n`, so
+  padded messages route back to `hastad` or `coppersmith`.
+
+## Operational probe
+
+```bash
+python3 tools/crypto_attack.py list        # every attack id and its applicability
+python3 tools/crypto_attack.py <attack-id> --help
+```
+
+Feed the parameter sheet, not guesses: a wrong bit length routes to the wrong
+lattice bound.
+""",
+    "crypto-prng": """## Recognise
+
+The generator is the target, not the cipher. Source names it (`LCG`, `LFSR`,
+`mt19937`, `random.getrandbits`) or the shape does: outputs that look uniform
+but repeat the generator across tickets, nonces or keys.
+
+## Confirm
+
+Record consecutive outputs — the attack tables index on them. Then name the
+matching attack id from `tools/crypto_attack.py list`:
+
+| Generator and what you hold | Attack id |
+|---|---|
+| LCG with modulus `m`, multiplier `a`, increment `c` | `lcg-recover` |
+| LCG with modulus unknown but outputs untruncated | `lcg-unknown-modulus` |
+| LCG leaking only high bits | `lcg-truncated` |
+| LFSR keystream bits | `berlekamp-massey`, then `lfsr-predict` |
+| LFSR where the taps are unknown | `lfsr-recover` |
+| MT19937 with 624 consecutive 32-bit outputs | `mt19937-clone` |
+
+Confirmation is a predicted held-back output reproduced exactly — never a
+statistical argument. If the next value cannot be produced bit-for-bit, the
+generator is not recovered.
+
+## Traps
+
+- Outputs must be **consecutive and raw**. A `mod`, a hex encoding, or a float
+  division between the state and your observation changes the required count or
+  breaks the clone entirely.
+- MT19937 needs the full 624-word state window; 623 outputs leave you one word
+  short, not one output short.
+- A time-seeded generator is a seed search, not a state recovery — bound the
+  seed window from the challenge's stated epoch before brute-forcing.
+
+## Operational probe
+
+```bash
+python3 tools/crypto_attack.py list        # id, family, applicability
+python3 tools/crypto_attack.py <attack-id> --help
+```
+
+Count outputs before running anything: the applicability line on each attack
+says exactly how many it needs.
+""",
+    "crypto-ecc-dlog": """## Recognise
+
+The handout carries curve parameters, ECDSA signature pairs `(r, s)`, or a
+discrete-log statement (`y = g**x mod p`). Name the group first — curve name,
+order, generator — because the discriminator below reads differently on each.
+
+## The discriminator
+
+| Observation | Route |
+|---|---|
+| the same `r` across two signatures | `ecdsa-nonce-reuse` — closed form, no lattice |
+| a nonce that is biased, short, or partially known across several signatures | `hnp` / `hnp-ecdsa` — a lattice problem |
+| a group order that factors smoothly | `pohlig-hellman` |
+| a small order or bounded exponent | `bsgs` — out of reach above ~2**44 |
+
+The reused-nonce case is the most common CTF shape and the cheapest to check:
+two signatures, same `r`, gives `k` in one division and the private key in one
+more.
+
+## Confirm
+
+Re-derive the public point from the recovered scalar and compare it with the
+supplied public key. A scalar that does not reproduce the public key is not the
+key, whatever the algebra looked like.
+
+## Traps
+
+- Nonce **reuse** means identical `r`, not similar nonces. Similarity is the
+  biased case and needs the lattice route with several signatures — one
+  signature never feeds `hnp-ecdsa`.
+- `pohlig-hellman` runs per-factor of the order; check smoothness first with
+  `smoothness` before committing.
+- On Weierstrass curves, validate that supplied points lie on the curve —
+  invalid-curve attacks exist only when the server skips that check.
+
+## Operational probe
+
+```bash
+python3 tools/crypto_attack.py list        # ecdsa / dlog / lattice families
+python3 tools/crypto_attack.py smoothness --help
+```
+""",
+    "crypto-symmetric-oracle": """## Recognise
+
+You control plaintext and read ciphertext (or the reverse through a service):
+an ECB/CBC/CTR token, a MAC tag, a decrypt endpoint. The first question is
+always which oracle you actually hold — encrypt, decrypt, padding-check, or
+verify.
+
+## Confirm
+
+Detect ECB in **one** request: submit 32+ identical bytes and look for
+identical ciphertext blocks. Then separate the oracle answers — an
+invalid-padding response that differs from an invalid-MAC response is the whole
+padding-oracle precondition.
+
+| Oracle or reuse | Route |
+|---|---|
+| ECB with attacker-controlled plaintext | block cut-and-paste / chosen-plaintext dictionary |
+| CBC with a distinguishable padding error | padding oracle decryption |
+| a reused IV or nonce under CTR/stream | keystream reuse, `crib-drag` |
+| `MD5`/`SHA1` used as `hash(secret || message)` | `length-extension` |
+| two messages under one keystream | XOR them; the keystream cancels |
+
+## Traps
+
+- Authenticated modes close the class: GCM, or any HMAC checked **before**
+  decryption, rejects a tampered ciphertext identically and no oracle exists.
+- ECB needs a controlled block boundary — a fixed server prefix shifts your
+  alignment by its length mod 16.
+- A generic 500 is not a padding oracle. Only a response that distinguishes
+  padding-bad from MAC-bad carries the signal.
+
+## Operational probe
+
+```bash
+python3 tools/crypto_attack.py list        # xor / hash / helper families
+python3 tools/crypto_attack.py crib-drag --help
+python3 tools/crypto_attack.py length-extension --help
+```
+""",
+    "misc-interpreter-escape": """## Recognise
+
+Input is evaluated: a pyjail, a restricted `eval`/`exec`, a filtered shell, or
+a REPL that names a blocked word in its error. The error message is the first
+map of the filter — read it before writing anything.
+
+## Confirm
+
+Map the filter **before** the escape. Send single characters and short tokens
+until you know whether the check is a string blacklist, a parsed-AST rule, or a
+sandbox below the interpreter. Each layer has a different escape shape:
+
+| Filter layer | Escape shape |
+|---|---|
+| string blacklist on names | `getattr`, `getattr(obj, "attr"[::-1])`, `chr()` joins |
+| blocked brackets or quotes | f-strings, format specs, `().__class__` chains, `subclasses()` walk |
+| AST node rejection | only the grammar the checker forgot: decorators, `with`, exception args |
+| shell keyword block | `$IFS`, globs, `${var:offset:1}`, command substitution |
+
+Confirmation is code execution you observe: `id`, a read of the flag path, or
+output the jail claims to forbid.
+
+## Traps
+
+- An AST check rejects **node types**, not strings — a blacklisted word can
+  still be reachable through `__builtins__`, `getattr`, or an object that
+  carries it as an attribute.
+- `__subclasses__` walks are index-fragile: enumerate them at run time instead
+  of hard-coding an index from a different build.
+- A jail that echoes errors is free recon — quote the rejection in your notes;
+  it names the exact layer.
+
+## Operational probe
+
+```text
+1+1                     # does it evaluate at all?
+"".__class__            # attribute access alive?
+().__class__.__mro__    # how far does the chain climb?
+globals()               # namespace readable?
+```
+""",
+    "misc-encoding-carrier": """## Recognise
+
+A blob with no obvious attack surface: identify the carrier **before** decoding.
+Alphabet, distinct-character count, and length modulus separate base64 from
+base32 from base85 from hex from base58 at a glance; the index of coincidence
+separates an encoding from a classical cipher.
+
+## Confirm
+
+Run the standard decoders first — a blob that decodes cleanly under one of them
+was an encoding, not a cipher, and the class closes. Only when every standard
+carrier fails, compute IC: near the natural-language range it is a substitution
+problem (`../ctf-crypto/classic-ciphers.md`); far below it suggests
+polyalphabetic or layered.
+
+| Carrier | Tell |
+|---|---|
+| hex | even length, alphabet `[0-9a-f]` |
+| base64 | alphabet size 64, `=` padding, length ≡ 0 mod 4 |
+| base32 | `[A-Z2-7]`, `=` padding in groups of 8 |
+| base85 / z85 | no padding, wider symbol set |
+| rot-N / Caesar | IC of natural text, shifted letter frequencies |
+
+## Traps
+
+- Decode **twice**: `base64(hex(...))` and friends are the standard trick.
+- `+`/`/` versus `-`/`_` distinguishes standard base64 from URL-safe; wrong
+  alphabet fails silently.
+- An odd-length "hex" string is usually base64 *of* hex, or a nibble-aligned
+  custom table — check distinct-character count, not vibes.
+
+## Operational probe
+
+```bash
+python3 -c "import base64,binascii; d=open('blob.txt','rb').read().strip(); \
+[print(n, getattr(base64,n)(d)[:60]) for n in ('b64decode','b32decode','b85decode','a85decode') \
+ if __import__('contextlib').suppress(Exception) or False]"
+strings blob.txt | grep -i "flag{"
+```
+""",
+    "osint-media-metadata": """## Recognise
+
+A media or document file is the handout and the question asks for a fact about
+it — where, when, on what device, or what was inside before it was shared.
+
+## Confirm
+
+Read **all** of the metadata, not one guessed tag: `exiftool` prints every
+group, and the answer is often in an odd corner (`ThumbnailImage`,
+`HistoryParameters`, a software string). Then the container itself — `binwalk`
+and `strings` find appended archives and embedded payloads that metadata never
+shows.
+
+| Evidence surface | What it answers |
+|---|---|
+| EXIF / XMP groups | device, time, GPS, authoring software |
+| embedded thumbnail | what the image showed before a crop or blur edit |
+| appended data after the format's end marker | hidden archive or second file |
+| document revision/author fields | identity and edit history |
+
+Confirmation is the fact read verbatim from the file — a guess about what a GPS
+coordinate names is a hypothesis until a map source confirms it.
+
+## Traps
+
+- Platforms strip metadata on upload; a clean file is evidence the question is
+  in the visible frame, not that you missed a flag.
+- The embedded thumbnail survives edits the main image does not — compare it.
+- `steghide`, `zsteg` and `outguess` cover the common carriers but are not
+  installed everywhere; `binwalk -e` and `strings` are the baseline that always
+  runs.
+
+## Operational probe
+
+```bash
+exiftool -a -u -g1 <file>
+binwalk -e <file>
+strings -n 6 <file> | grep -iE "flag|gps|key"
+```
+""",
+    "osint-identity-pivot": """## Recognise
+
+The pivot is a handle, an email, a name, or a key fingerprint, and the question
+asks for a different attribute of the same identity — another account, a real
+name, a location, a domain.
+
+## Confirm
+
+Extract the **single most unique** pivot and normalise it: compute a key
+fingerprint rather than eyeballing a key, derive the email pattern rather than
+guessing one address. Then an ordered plan — at most six sources, each chosen
+for what it can uniquely add — worked one source at a time.
+
+| Pivot | First pivots it buys |
+|---|---|
+| a rare handle | other platforms where the same handle exists |
+| an email | the local-part as a handle; the domain's own records |
+| a name + org | professional records, conference talks, commits |
+| a PGP or SSH key | keyserver uid packets, `authorized_keys` strings in repos |
+
+Confirmation is two attributes that corroborate each other — a handle match
+alone is a lead, not an identity.
+
+## Traps
+
+- A pivot too generic to separate from unrelated people is a measurement about
+  the pivot: extract a rarer one instead of forcing the search.
+- Avatars and bios get reused — a reverse image match is often a stronger pivot
+  than the handle itself.
+- Record every negative result with the query that produced it, so no source is
+  queried twice and a later claim can cite the dead end.
+
+## Operational probe
+
+Work the plan, not the search bar: one query per source, verbatim results into
+notes, and public sources only —
+`../osint-triage/references/legal-considerations.md` bounds what is in scope.
+""",
+    "osint-infra-records": """## Recognise
+
+A domain, host, or certificate is supplied and the answer lives in records —
+DNS, registration, certificates, or passive aggregators.
+
+## Confirm
+
+Query `TXT` first — that is where a flag is actually planted — then sweep the
+record types that carry data, then `whois` and the certificate subject and its
+SAN list.
+
+| Record or source | What it can carry |
+|---|---|
+| `TXT` / `SPF` / `DKIM` | planted strings, verification tokens, mail policy |
+| `NS`, `SOA`, `CAA` | the operators behind the zone |
+| `whois` | registrar, dates, contact pattern |
+| certificate transparency (`crt.sh`) | every SAN ever issued — internal names included |
+| `SRV`, `MX` | service discovery, mail host names |
+
+## Traps
+
+- A wildcard record inflates subdomain enumeration — confirm a found name with
+  a real query before counting it.
+- Record answers change; note the TTL and the resolver used.
+- `dig`/`host` may be absent — `nslookup -type=TXT` is the fallback that exists
+  nearly everywhere.
+
+## Operational probe
+
+```bash
+dig TXT <domain> +short        # or: nslookup -type=TXT <domain>
+dig ANY <domain> +short
+whois <domain>
+curl -s "https://crt.sh/?q=%25.<domain>&output=json"
+```
+""",
+    "pwn-stack-overflow": """## Recognise
+
+A native binary takes input and something reads past the buffer: `gets`, an
+unbounded `scanf %s`, `strcpy`, a `read` with a length the caller trusts. The
+prize is the saved return address; the first deliverable is the exact offset to
+it.
+
+## Confirm
+
+`tools/pwn_triage.py` **first** — it reports every protection with the evidence
+that decided it, and the protection sheet decides the whole chain. Then measure
+the offset with a cyclic/de Bruijn pattern and prove control: the saved return
+address holds your four marker bytes.
+
+| Protection | What it changes |
+|---|---|
+| canary | a smashing write trips `__stack_chk_fail` before the return |
+| PIE | no absolute gadget or data address until a leak lands |
+| NX | the payload is code reuse — `../pwn-code-reuse/` — not shellcode |
+| full RELRO | closes GOT as a write target |
+
+## Traps
+
+- A **static** binary can carry the `__stack_chk_fail` symbol without the check
+  being enabled — read the protections report, not the string table.
+- The length field may be attacker-influenced but bounded elsewhere; a read
+  capped below the saved-state distance is not this class.
+- Send the cyclic pattern once and record the fault address; guessing offsets
+  burns the probe budget.
+
+## Operational probe
+
+```bash
+python3 tools/pwn_triage.py ./chal
+r2 -A ./chal && afl
+# cyclic(offset-pattern) -> crash -> read faulted RIP, recover exact offset
+```
+""",
+    "pwn-format-string": """## Recognise
+
+User input lands where a format string belongs: `printf(buf)`, `fprintf(f, buf)`,
+`snprintf(dst, n, buf)` with no format argument of its own. The cheapest
+confirmation in pwn lives here.
+
+## Confirm
+
+Send a short run of `%p` and read the leaked words back — a `%p` that returns a
+stack pointer confirms the primitive in one probe. Then locate your own buffer:
+`AAAA.%N$p` scanning `N` until `0x41414141` returns, which fixes the argument
+offset every `%n` write depends on.
+
+| Primitive | What it buys |
+|---|---|
+| `%p` / `%x` reads | stack, libc and binary addresses — the leak |
+| `%s` at a planted pointer | arbitrary read |
+| `%n` / `%hn` / `%hhn` | arbitrary write — GOT entry, return address, `__malloc_hook` on old glibc |
+
+## Traps
+
+- The format argument being a **literal** closes the class — `printf("%s", buf)`
+  interprets nothing.
+- Full RELRO closes the GOT route; the remaining targets are the saved return
+  and allocator hooks.
+- On x86-64 the first several variadic arguments live in registers — the stack
+  offset you measured for `%p` is not argument index zero.
+- A blind format string returns no output; it needs a crash oracle and is a
+  different budget, not a harder version of this class.
+
+## Operational probe
+
+```text
+%p.%p.%p.%p            # leaked words?
+AAAA.%N$p              # N where 0x41414141 returns = buffer offset
+```
+""",
+    "pwn-heap-corruption": """## Recognise
+
+The bug lives between allocated objects: use-after-free, double-free, an
+overflow that reaches chunk metadata, or an index that reads/writes past an
+allocation. The first question is never the bug — it is the allocator version.
+
+## Confirm
+
+Answer the glibc version first (`libc.so.6` shipped, `strings` version line, or
+the challenge's stated base image): tcache behaviour, double-free detection and
+fd mangling differ sharply across versions, and a technique written for 2.27
+dies silently on 2.36.
+
+| Version feature | Consequence |
+|---|---|
+| tcache bins (2.26+) | freed chunks go to per-thread bins first |
+| tcache count check (2.29+) | naive double-free is detected |
+| safe-linking (2.32+) | fd pointers are mangled — a leak is required to aim them |
+| unsorted-bin leak | first free of a larger chunk leaks libc pointers |
+
+Then map the allocation layout — which chunks you allocate, free, and in what
+order — and drive the corruption to overlapping chunks or a poisoned `fd`.
+
+## Traps
+
+- A pointer cleared on free and bounds-checked indexes close the class — no
+  freed object is reachable.
+- `gdb` is absent here: `r2 -d ./chal` with `dmh` commands is the runtime heap
+  view.
+- Heap feng shui is order-sensitive; script the alloc/free sequence rather than
+  clicking through it interactively.
+
+## Operational probe
+
+```bash
+python3 tools/pwn_triage.py ./chal
+r2 -d ./chal          # dmh, dmhf for the heap walk
+```
+""",
+    "pwn-code-reuse": """## Recognise
+
+This class presupposes control of the instruction pointer — a confirmed stack
+or format-string overwrite — with NX on, so the payload is borrowed code, not
+injected code.
+
+## Confirm
+
+Read the protection sheet `tools/pwn_triage.py` already produced: PIE or ASLR
+decides whether a leak is needed at all, RELRO decides whether GOT is a
+reachable write, and its gadget report names what the binary can express.
+
+| Shape | Route |
+|---|---|
+| dynamic binary, libc supplied or leakable | ret2libc — `system`, `execve` gadgets |
+| static binary | syscall gadgets or `int 0x80` |
+| no `pop rdi` but `__libc_csu_init` present | ret2csu — the universal call primitive |
+| write what/where needed | GOT entry, `.data`, or a `read` into a writable page |
+
+Confirmation is the target action observed — a shell prompt, a read of the flag
+path — never a clean exit after the chain.
+
+## Traps
+
+- On x86-64 a `ret` gadget before the final call fixes stack alignment; a chain
+  that crashes inside `system` on `movaps` is an alignment bug, not a bad chain.
+- The remote libc must match — leak a resolved symbol and identify the version
+  (`tools/gadget_lookup.py`, libc database) before hard-coding offsets.
+- `ROPgadget`/`ropper` are absent here; `r2 /R` and the `pwn_triage.py` gadget
+  report are the local answer.
+
+## Operational probe
+
+```bash
+python3 tools/pwn_triage.py ./chal      # protections + gadgets in one report
+r2 -c "/R pop rdi" ./chal
+```
+""",
+    "rev-native-check": """## Recognise
+
+A native binary reads input and prints a verdict. The work is locating **the
+deciding check** — the one comparison the flag actually passes through — and
+replicating it, not describing the whole binary.
+
+## Confirm
+
+Locate the input read, follow the value to the comparison, and quote the
+disassembly that carries it. Then replicate the check in Python and verify: a
+replicated check that produces the accepted input is the solve; a described
+check is not a measured one.
+
+| Pattern | Where it usually sits |
+|---|---|
+| literal `strcmp`/`memcmp` | the answer is one `strings` away or one xref from the read |
+| per-character transform then compare | replicate the transform in Python |
+| table-driven check | dump the table, invert the mapping |
+| anti-debug or packer wrapper | `../rev-triage/references/packer-analysis.md` first — the check is underneath |
+
+## Traps
+
+- A comparison against a value computed at run time from something you cannot
+  supply means replication cannot produce the input — that is the class
+  falsifier, not a harder instance.
+- `radare2` is the dynamic story here: `r2 -d` debugs, `r2 -A` analyses, `pdf @
+  main` disassembles. There is no `gdb`.
+- Read the xrefs **to** the success/failure strings — they walk you backwards
+  to the check faster than `afl` walks you forwards.
+
+## Operational probe
+
+```bash
+r2 -A ./chal
+r2 -c "afl; iz" ./chal          # functions, then strings — find the verdict text
+```
+""",
+    "rev-managed-code": """## Recognise
+
+The binary is managed: a PE with a non-zero CLR data directory, a `0xCAFEBABE`
+class file, a dex, or a Python-packed executable. Decompilers exist for every
+one of these — the job is matching the tool to the runtime.
+
+## Confirm
+
+Prove the runtime from the header **bytes**, quote them, then decompile with
+what exists:
+
+| Artifact | Tool family |
+|---|---|
+| PE + CLR directory | dnSpy / ILSpy / `ilspycmd` — and the binary often still carries unobfuscated metadata |
+| `.class` / `.jar` | cfr / procyon / `javap -c` as the always-available floor |
+| `.dex` / `.apk` | jadx |
+| PyInstaller / py2exe bundle | extract the `.pyc`, then `../rev-bytecode-vm/` |
+
+Confirmation is the deciding check read in decompiled form and replicated —
+recompute the accepted input, do not narrate the algorithm.
+
+## Traps
+
+- A managed-looking binary can be a thin native stub: if the CLR directory is
+  empty or the jar is only a launcher, the work belongs to `../rev-native-check/`.
+- Obfuscators rename everything — follow data flow to the check, not
+  identifier names.
+- Single-file .NET bundles need the embedded assemblies extracted before the
+  decompiler sees real code.
+
+## Operational probe
+
+```bash
+file ./chal
+rabin2 -I ./chal | grep -i clr     # CLR data directory non-zero?
+strings ./chal | grep -iE "dotnet|mscoree|java|kotlin"
+```
+""",
+    "rev-bytecode-vm": """## Recognise
+
+The logic lives in bytecode: a `.pyc`, a `.class`, a serialised code object, or
+a custom VM with its own dispatch loop. The bytecode is the program — disassemble
+it, then replicate the check.
+
+## Confirm
+
+For `.pyc`, read the header magic and name the Python version **before** running
+any decompiler — the marshal format is version-locked and a wrong-version load
+crashes or silently misreads. The stdlib `dis` module on the unmarshalled code
+object is the floor that always works.
+
+| Bytecode | Route |
+|---|---|
+| `.pyc` matching your interpreter | `marshal.loads` past the header, then `dis.dis` |
+| `.pyc` for another version | a version-matched decompiler, or read the magic and fetch that interpreter |
+| custom VM | recover the opcode table from the dispatch loop, then trace |
+
+Confirmation is the accepted input produced from the disassembly — a table you
+recovered but never inverted is recon, not a solve.
+
+## Traps
+
+- A dispatch loop driven by a table generated **at run time** makes static table
+  recovery incomplete — trace the program instead of reading the table.
+- `uncompyle6`/`decompyle3` cover old Python versions only; `dis` covers the one
+  installed, and the magic word says which that should be.
+- `.pyc` headers are 12 or 16 bytes depending on version — skip the wrong count
+  and `marshal.loads` fails before the code object even parses.
+
+## Operational probe
+
+```bash
+python3 -c "import importlib.util,struct; d=open('x.pyc','rb').read(); \
+print(d[:4].hex(), 'header', 16 if importlib.util.MAGIC_NUMBER!=d[:4] else 'check')"
+python3 - <<'PY'
+import dis, marshal
+d = open('x.pyc','rb').read()
+dis.dis(marshal.loads(d[16:]))
+PY
+```
+""",
 }
 
 
