@@ -80,6 +80,12 @@ def main(argv: list[str] | None = None) -> int:
     p_skills = sub.add_parser("skills", help="list knowledge modules")
     p_skills.set_defaults(list_skills=True)
 
+    p_demo = sub.add_parser(
+        "demo", help="offline scripted run against the bundled lab - "
+                     "exercises the full pipeline with no API key")
+    p_demo.add_argument("--session-dir", default="sessions")
+    p_demo.add_argument("--quiet", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "run":
@@ -134,7 +140,94 @@ def main(argv: list[str] | None = None) -> int:
             print(p.stem)
         return 0
 
+    if args.cmd == "demo":
+        return _demo(args)
+
     return 2
+
+
+def _demo(args) -> int:
+    """Offline demo for presentations/defense: spins up the lab and runs a
+    scripted agent sequence through the real loop - scope guard, probes,
+    evidence gate, findings and report all live. No API key needed."""
+    import sys as _sys
+    import threading
+    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lab"))
+    import vulnapp  # noqa: E402
+
+    from .llm import ScriptedClient
+    from .config import Config
+
+    srv = vulnapp.make_server(0)
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def _t(i, name, **kw):
+        return {"id": f"d{i}", "name": name, "type": "tool_use", "input": kw}
+
+    # Request numbering is deterministic: sqli=4 (r1-r4), reflection=1 (r5),
+    # idor=3 (r6-r8), xfh=1 (r9).
+    script = [
+        {"text": "Baseline-diffed probes first: /item looks injectable.",
+         "tool_calls": [_t(1, "probe_sqli", url=base + "/item?id=1",
+                          param="id")]},
+        {"tool_calls": [_t(2, "record_finding",
+                         title="SQL injection in /item id parameter",
+                         severity="high", category="sqli",
+                         url=base + "/item?id=1",
+                         evidence_ids=["r2"],
+                         evidence_excerpt="sqlite3.OperationalError",
+                         description="The quote probe produces a raw sqlite "
+                                     "error - unsanitized input reaches the "
+                                     "query.",
+                         remediation="Use parameterized queries.")],
+         "text": "Error channel confirms SQLi - recording with verbatim "
+                 "evidence."},
+        {"tool_calls": [_t(3, "probe_reflection",
+                         url=base + "/search?q=x", param="q")],
+         "text": "Now the reflected-parameter family."},
+        {"tool_calls": [_t(4, "record_finding",
+                         title="Reflected XSS in /search q parameter",
+                         severity="medium", category="xss",
+                         url=base + "/search?q=x",
+                         evidence_ids=["r5"],
+                         evidence_excerpt="<>'\"&=/",
+                         description="Canary chars < > \" ' reflect "
+                                     "unescaped in html context.",
+                         remediation="Output-encode by context; add CSP.")],
+         "text": "Reflected with unescaped special chars - XSS lead."},
+        {"tool_calls": [_t(5, "probe_idor", url=base + "/api/user/2")],
+         "text": "Object-level authorization next."},
+        {"tool_calls": [_t(6, "record_finding",
+                         title="IDOR: /api/user/<id> serves any user object",
+                         severity="high", category="idor",
+                         url=base + "/api/user/2",
+                         evidence_ids=["r7"],
+                         evidence_excerpt="\"username\"",
+                         description="Neighboring ids return other users' "
+                                     "objects with no authorization check.",
+                         remediation="Enforce per-object ownership checks.")],
+         "text": "Neighbor id returns a different principal - IDOR."},
+        {"tool_calls": [_t(7, "probe_xfh", url=base + "/reset")]},
+        {"tool_calls": [_t(8, "finish",
+                         summary="Demo run: SQLi + XSS + IDOR verified with "
+                                 "verbatim evidence; host-header reflection "
+                                 "left as a lead for manual follow-up.")]},
+    ]
+    cfg = Config(target=base, allow_private=True,
+                 session_dir=Path(args.session_dir),
+                 model="scripted-demo", max_turns=12, rate_rps=0)
+    result = AgentLoop(cfg, llm=ScriptedClient(script),
+                       quiet=args.quiet).run()
+    srv.shutdown()
+    print("\n=== demo complete ===")
+    fpath = Path(result["session_dir"]) / "findings.json"
+    if fpath.exists():
+        for f in json.loads(fpath.read_text(encoding="utf-8")):
+            print(f"  [{f['severity'].upper()}] {f['title']}")
+    print(f"  findings={result['findings']}  requests={result['requests']}")
+    print(f"  report: {result['report']}")
+    return 0
 
 
 def _reopen(sdir: Path) -> Session:

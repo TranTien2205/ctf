@@ -129,6 +129,12 @@ def test_cache_probe(lab_url, ctx):
     assert "cache-poisoning candidate" in out["verdict"], out
 
 
+def test_ppoll_probe(lab_url, ctx):
+    out = probes.probe_ppoll(ctx, lab_url + "/api/config",
+                             lab_url + "/api/config")
+    assert "prototype-pollution candidate" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

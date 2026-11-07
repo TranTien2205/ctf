@@ -711,3 +711,31 @@ def probe_cache(ctx: Context, url: str) -> dict:
         verdict = "no cache/xfh signal"
     return {"verdict": verdict, "clean_id": clean["request_id"],
             "reflect_id": refl["request_id"]}
+
+
+def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
+    """Prototype-pollution check: POST a __proto__ merge payload to the
+    mutating endpoint, then re-read a reflecting endpoint. A key that
+    appears only after the merge is the signal."""
+    canary = _marker("pp")
+    before = ctx.client.send("GET", check_url, tool="probe_ppoll",
+                             note="pre-merge baseline")
+    poll = ctx.client.send(
+        "POST", pollute_url,
+        headers={"Content-Type": "application/json"},
+        body=_json.dumps({"__proto__": {canary: "polluted"}}),
+        tool="probe_ppoll", note="__proto__ merge")
+    after = ctx.client.send("GET", check_url, tool="probe_ppoll",
+                            note="post-merge read")
+    polluted = (canary in (after.get("body") or "")
+                and canary not in (before.get("body") or ""))
+    if polluted:
+        verdict = ("prototype-pollution candidate: __proto__ key merged "
+                   "server-side and surfaced on a different object")
+    elif canary in (poll.get("body") or ""):
+        verdict = ("server echoes __proto__ input but no cross-object "
+                   "pollution observed")
+    else:
+        verdict = "no prototype-pollution signal"
+    return {"verdict": verdict, "before_id": before["request_id"],
+            "pollute_id": poll["request_id"], "after_id": after["request_id"]}

@@ -37,6 +37,17 @@ python -m argus run https://app.example \
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
 | `--quiet` | off | suppress console trace |
 
+## Offline demo
+
+```bash
+python -m argus demo          # scripted run on the bundled lab, no API key
+```
+
+Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
+agent loop, and lands three evidence-gated findings (SQLi, XSS, IDOR) in a
+normal session dir - use it to demo the pipeline at a defense without
+spending tokens.
+
 ## Team mode
 
 ```bash

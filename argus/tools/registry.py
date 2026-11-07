@@ -53,6 +53,7 @@ def _impl(name: str) -> Callable:
         "probe_race": probes.probe_race,
         "probe_deserialize": probes.probe_deserialize,
         "probe_cache": probes.probe_cache,
+        "probe_ppoll": probes.probe_ppoll,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -358,6 +359,19 @@ TOOL_SCHEMAS: list[dict] = [
         "the header is unkeyed input into a shared cache.",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
+    ),
+    _schema(
+        "probe_ppoll",
+        "Prototype-pollution check: POSTs a __proto__ merge payload to a "
+        "mutating endpoint, then re-reads a reflecting endpoint. A key "
+        "appearing only after the merge is the signal.",
+        {
+            "pollute_url": {**_STR, "description": URL_DESC +
+                            " The POST merge endpoint."},
+            "check_url": {**_STR, "description": URL_DESC +
+                          " A GET endpoint that renders config/objects."},
+        },
+        ["pollute_url", "check_url"],
     ),
     _schema(
         "jwt_decode",

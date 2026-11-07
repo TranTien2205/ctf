@@ -20,6 +20,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /redeem               race condition (unlocked check-then-act)
     GET  /import?data=         deserialization (magic bytes -> parser error)
     GET  /cached               cache poisoning (X-Forwarded-Host unkeyed)
+    GET+POST /api/config       prototype pollution (__proto__ merge)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -310,6 +311,11 @@ const API_KEY = 'lab_key_0123456789abcdef';
             else:
                 self._send(body="imported: " + v[:80])
 
+        elif path == "/api/config":
+            cfg = dict(self._usercfg)
+            cfg.update(type(self)._pp)    # polluted keys leak into every object
+            self._send(body=json.dumps(cfg), ctype="application/json")
+
         elif path == "/cached":
             # cache keyed on path only: X-Forwarded-Host is unkeyed input
             if path not in self._cache:
@@ -409,6 +415,18 @@ const API_KEY = 'lab_key_0123456789abcdef';
             self._send(body=json.dumps({"url": f"/uploads/{fname}"}),
                        ctype="application/json")
             return
+        if path == "/api/config":
+            # vulnerable merge: __proto__ keys land on the shared prototype
+            b = self._body()
+            if isinstance(b, dict):
+                for k, v in b.items():
+                    if k == "__proto__" and isinstance(v, dict):
+                        type(self)._pp.update(v)
+                    else:
+                        self._usercfg[k] = v
+            self._send(body=json.dumps({"merged": True}),
+                       ctype="application/json")
+            return
         if path == "/api/login":
             # simulated NoSQL query: a dict password is treated as a query
             # operator document (mongo-style $ne/$gt/$regex -> always true)
@@ -467,6 +485,8 @@ def make_server(port: int = 0):
     Handler.db = _init_db()
     Handler._coupons = 1
     Handler._cache = {}
+    Handler._pp = {}
+    Handler._usercfg = {"theme": "dark", "lang": "en"}
     os.makedirs(WWW, exist_ok=True)
     os.makedirs(os.path.join(FAKEFS, "etc"), exist_ok=True)
     with open(os.path.join(WWW, "welcome.txt"), "w") as fh:

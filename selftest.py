@@ -142,6 +142,10 @@ def main() -> int:
           "deserialization surface" in out["verdict"])
     out = probes.probe_cache(ctx, base + "/cached")
     check("cache probe sees unkeyed xfh", "candidate" in out["verdict"])
+    out = probes.probe_ppoll(ctx, base + "/api/config",
+                             base + "/api/config")
+    check("ppoll probe sees merged key",
+          "prototype-pollution candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient
