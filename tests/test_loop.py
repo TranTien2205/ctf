@@ -72,3 +72,22 @@ def test_scope_enforced_through_loop(lab_url, tmp_path):
     result = loop.run()
     # the out-of-scope call must have been refused, not sent
     assert result["requests"] == 0
+
+
+def test_loop_resume_seed_carries_findings(lab_url, tmp_path):
+    """--resume: the new run's seed names prior findings so the model
+    builds on them instead of re-verifying."""
+    from argus.session import Session
+    s = Session(tmp_path, lab_url, meta={})
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof-bytes"})
+    s.add_finding("Old bug", "high", "sqli", lab_url + "/item",
+                  [rid], "proof-bytes", "d", "r")
+
+    script = [{"tool_calls": [_call("finish", {"summary": "resumed"})]}]
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 resume=str(s.dir), max_turns=10, rate_rps=0)
+    llm = ScriptedClient(script)
+    result = AgentLoop(cfg, llm=llm, quiet=True).run()
+    seed = llm.seen_messages[0][0]["content"]
+    assert "RESUMES" in seed and "Old bug" in seed
+    assert result["findings"] == 1  # prior finding still counted

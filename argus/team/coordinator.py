@@ -74,6 +74,19 @@ class TeamRun:
         self._counts = {"recon": 0, "exploit": 0, "report": 0}
         self._initial = {"recon": max(0, n_recon), "exploit": max(0, n_exploit)}
 
+    def _resume_note(self) -> str:
+        """When resuming, workers must know prior findings exist - the
+        dedup gate would reject re-verified ones anyway."""
+        if not (getattr(self.session, "resumed", False)
+                and self.session.findings):
+            return ""
+        prior = "\n".join(
+            f"- {f['id']} [{f['severity']}] {f['title']} ({f['url']})"
+            for f in self.session.findings[:15])
+        return (f"\n\nThis run RESUMES session {self.session.id}. "
+                f"Prior findings are already recorded - build on them, "
+                f"do not re-verify:\n{prior}")
+
     # ------------------------------------------------------------- llm
     def _default_llm(self, role: str, name: str):
         return ClaudeClient(self.cfg.api_key, self.cfg.api_base, self.cfg.model,
@@ -115,6 +128,7 @@ class TeamRun:
                 f"team assessment of {self.cfg.target}.\n"
                 f"Task from the lead: {task}\n"
                 f"{'Pull work with pull_leads().' if card.name == 'exploit' else 'Begin your task now.'}")
+        seed += self._resume_note()
         loop = AgentLoop(
             wcfg, llm=self._llm_factory(card.name, name),
             quiet=self.quiet, scope=self.scope, session=self.session,
@@ -152,6 +166,7 @@ class TeamRun:
             target=self.cfg.target, goal_line=goal_line,
             authz="Authorization: operator-declared; the scope guard enforces "
                   "it technically for every worker's requests too.")
+        seed += self._resume_note()
         loop = AgentLoop(
             self.cfg, llm=self._llm_factory("lead", name),
             quiet=self.quiet, scope=self.scope, session=self.session,
