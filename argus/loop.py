@@ -60,7 +60,7 @@ class AgentLoop:
         self.session = session or Session(cfg.session_dir, cfg.target, meta={
             "model": cfg.model, "goal": cfg.goal,
             "scope": cfg.scope_hosts, "max_turns": cfg.max_turns,
-        })
+        }, resume=Path(cfg.resume) if cfg.resume else None)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:
             from .ratelimit import RateLimiter
@@ -90,6 +90,14 @@ class AgentLoop:
                                        auth_token=cfg.auth_token)
         self.system = system or build_system(cfg, self.scope)
         self.seed = seed or build_seed(cfg)
+        if getattr(self.session, "resumed", False) and seed is None \
+                and self.session.findings:
+            prior = "\n".join(
+                f"- {f['id']} [{f['severity']}] {f['title']} ({f['url']})"
+                for f in self.session.findings[:20])
+            self.seed += (f"\n\nThis run RESUMES session {self.session.id}. "
+                          f"Prior findings already recorded - do not re-verify "
+                          f"them, build on them:\n{prior}")
         self.tools = TOOL_SCHEMAS if allowed is None else \
             [s for s in TOOL_SCHEMAS if s["name"] in allowed]
         self._last_error = ""

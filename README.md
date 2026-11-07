@@ -222,7 +222,7 @@ Each run writes `sessions/<ts>-<host>/`:
 | file | content |
 |---|---|
 | `transcript.jsonl` | every request/response + tool events |
-| `findings.json` | confirmed findings (evidence-gated) |
+| `findings.json` | confirmed findings (evidence-gated, deduped) |
 | `notes.md` | the agent's working reasoning |
 | `report.md` | final human report, generated on finish |
 | `summary.json` | machine-readable result |

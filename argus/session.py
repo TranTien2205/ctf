@@ -30,7 +30,12 @@ def _finding_key(category: str, url: str) -> tuple:
 
 
 class Session:
-    def __init__(self, base_dir: Path, target: str, meta: dict):
+    def __init__(self, base_dir: Path, target: str, meta: dict,
+                 resume: Path | None = None):
+        self._lock = threading.Lock()
+        if resume is not None:
+            self._resume(Path(resume), target, meta)
+            return
         host = urllib.parse.urlparse(target).hostname or "target"
         self.id = time.strftime("%Y%m%d-%H%M%S") + "-" + _slug(host)
         self.dir = Path(base_dir) / self.id
@@ -39,12 +44,55 @@ class Session:
         self._seq = 0
         self._transcript: dict[str, dict] = {}
         self.findings: list[dict] = []
-        self._lock = threading.Lock()
+        self.resumed = False
         (self.dir / "meta.json").write_text(
             json.dumps({"id": self.id, "target": target, "started": self.started, **meta},
                        indent=2, ensure_ascii=False)
         )
         (self.dir / "notes.md").write_text(f"# Working notes - {target}\n\n")
+
+    def _resume(self, sdir: Path, target: str, meta: dict) -> None:
+        """Continue an existing session dir: transcript, findings and request
+        ids all carry over, so the evidence chain and dedup stay intact."""
+        if not sdir.is_dir():
+            raise FileNotFoundError(f"cannot resume: {sdir} is not a session dir")
+        self.dir = sdir
+        self.id = sdir.name
+        self.resumed = True
+        self.started = time.time()
+        self._seq = 0
+        self._transcript = {}
+        self.findings = []
+        mpath = sdir / "meta.json"
+        if mpath.exists():
+            try:
+                old = json.loads(mpath.read_text(encoding="utf-8"))
+                self.started = float(old.get("started") or self.started)
+            except (ValueError, OSError):
+                pass
+        tpath = sdir / "transcript.jsonl"
+        if tpath.exists():
+            for line in tpath.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                self._transcript[entry["id"]] = entry
+                suffix = entry["id"][1:]
+                if suffix.isdigit():
+                    self._seq = max(self._seq, int(suffix))
+        fpath = sdir / "findings.json"
+        if fpath.exists():
+            try:
+                self.findings = json.loads(fpath.read_text(encoding="utf-8"))
+            except (ValueError, OSError):
+                self.findings = []
+        if not (sdir / "notes.md").exists():
+            (sdir / "notes.md").write_text(f"# Working notes - {target}\n\n")
+        self.note(f"> session resumed ({len(self._transcript)} prior exchanges, "
+                  f"{len(self.findings)} prior findings)")
 
     @property
     def transcript_path(self) -> Path:

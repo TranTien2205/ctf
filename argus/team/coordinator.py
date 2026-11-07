@@ -60,7 +60,8 @@ class TeamRun:
             exclude_paths=cfg.exclude_paths, allow_private=cfg.allow_private)
         self.session = Session(cfg.session_dir, cfg.target, meta={
             "model": cfg.model, "goal": cfg.goal, "mode": "team",
-            "scope": cfg.scope_hosts, "max_turns": cfg.max_turns})
+            "scope": cfg.scope_hosts, "max_turns": cfg.max_turns},
+            resume=Path(cfg.resume) if cfg.resume else None)
         self.rate = RateLimiter(cfg.rate_rps)
         from ..mcp import MCPManager, discover_config_path
         self.mcp = MCPManager(discover_config_path(cfg.mcp_config))

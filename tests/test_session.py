@@ -63,3 +63,27 @@ def test_finding_records_agent(tmp_path):
     f = s.add_finding("x", "low", "c", "http://t/a", [rid], "proof", "d", "r",
                       agent="exploit-2")
     assert f["agent"] == "exploit-2"
+
+
+def test_session_resume(tmp_path):
+    s = Session(tmp_path, "http://t.local", meta={})
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
+    s.add_finding("x", "low", "sqli", "http://t/item?id=1",
+                  [rid], "proof", "d", "r")
+
+    s2 = Session(tmp_path, "http://t.local", meta={}, resume=s.dir)
+    assert s2.resumed and s2.id == s.id
+    assert s2.get_exchange(rid) is not None          # old evidence intact
+    rid2 = s2.record_exchange("t", {}, {"status": 200, "body": "more"})
+    assert rid2 == "r2"                              # ids continue, not reset
+    # dedup still applies across the resume boundary
+    with pytest.raises(ValueError, match="duplicate"):
+        s2.add_finding("x2", "low", "sqli", "http://t/item?id=9",
+                       [rid2], "more", "d", "r")
+    f = s2.add_finding("new", "low", "c", "http://t/other",
+                       [rid2], "more", "d", "r")
+    assert f["id"] == "F02"                          # finding ids continue
+    # verbatim gate also reaches back across the boundary
+    f2 = s2.add_finding("cites old", "low", "lfi", "http://t/old",
+                        [rid], "proof", "d", "r")
+    assert f2["id"] == "F03"

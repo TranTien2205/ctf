@@ -37,6 +37,7 @@ class Config:
     max_response_bytes: int = 200_000
     llm_max_tokens: int = 4096
     mcp_config: str = ""
+    resume: str = ""
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -94,8 +95,13 @@ def _opencode_credential() -> tuple[str, str]:
             continue
         if entry.get("type") == "oauth" and entry.get("access"):
             return "", entry["access"]
-        if entry.get("key"):
-            return entry["key"], ""
+        key = entry.get("key") or ""
+        # OpenCode may store a gateway-scoped key rather than a raw
+        # Anthropic key; only trust non-sk-ant keys when the user also
+        # pointed the API base at a gateway.
+        if key and (key.startswith("sk-ant-")
+                    or os.environ.get("ANTHROPIC_BASE_URL")):
+            return key, ""
     return "", ""
 
 
@@ -150,4 +156,5 @@ def load_config(args) -> Config:
         goal=getattr(args, "goal", "") or "",
         llm_max_tokens=args.llm_max_tokens,
         mcp_config=getattr(args, "mcp_config", "") or "",
+        resume=getattr(args, "resume", "") or "",
     )

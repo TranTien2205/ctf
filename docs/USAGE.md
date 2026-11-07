@@ -91,6 +91,14 @@ compare `run` vs `team` on speed, coverage and cost.
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`.
 
+## Resuming a run
+
+`--resume <session_dir>` continues an earlier session: transcript,
+findings, request ids and finding ids all carry over, so the evidence
+chain and findings dedup stay intact across the boundary. The new seed
+lists prior findings so the agent builds on them instead of re-verifying.
+Works for both `run` and `team`.
+
 ## External tools
 
 If installed, the agent may call `sqlmap`, `nuclei`, `nmap`, `ffuf`, `curl`

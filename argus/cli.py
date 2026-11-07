@@ -41,6 +41,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--mcp-config",
                    help="Path to mcp.json declaring MCP tool servers "
                         "(else ARGUS_MCP_CONFIG or ./mcp.json)")
+    p.add_argument("--resume",
+                   help="Session dir to continue: transcript, findings and "
+                        "request ids carry over; evidence chain stays intact")
     p.add_argument("--quiet", action="store_true")
 
 
