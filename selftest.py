@@ -130,6 +130,9 @@ def main() -> int:
     check("csrf probe flags tokenless form", "csrf" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/reset")
     check("xfh probe sees reflected host", "candidate" in out["verdict"])
+    out = probes.probe_nosqli(ctx, base + "/api/login",
+                              '{"username":"admin","password":"x"}', "password")
+    check("nosqli probe flips auth", "nosqli candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient

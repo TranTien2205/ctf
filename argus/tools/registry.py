@@ -47,6 +47,7 @@ def _impl(name: str) -> Callable:
         "probe_xxe": probes.probe_xxe,
         "probe_csrf": probes.probe_csrf,
         "probe_xfh": probes.probe_xfh,
+        "probe_nosqli": probes.probe_nosqli,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -285,6 +286,20 @@ TOOL_SCHEMAS: list[dict] = [
         "Location header (password-reset poisoning, cache poisoning).",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
+    ),
+    _schema(
+        "probe_nosqli",
+        "NoSQL operator injection check: POSTs a JSON baseline then swaps "
+        "the parameter for $ne/$gt/$regex operator objects; a flipped "
+        "status or body means the server evaluated the operator.",
+        {
+            "url": {**_STR, "description": URL_DESC},
+            "data": {**_STR, "description": "JSON body template, e.g. "
+                                            '{"username":"x","password":"y"}'},
+            "param": {**_STR, "description": "Body parameter to inject "
+                                             "operators into"},
+        },
+        ["url", "data", "param"],
     ),
     _schema(
         "jwt_decode",

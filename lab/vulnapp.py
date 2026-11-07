@@ -15,6 +15,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /api/user/<id>        IDOR (any id served)
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     POST /xml                  XXE (simulated external-entity resolution)
+    POST /api/login            NoSQLi ($ne/$gt operator password bypass)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -335,6 +336,31 @@ const API_KEY = 'lab_key_0123456789abcdef';
                 out = raw.replace(f"&{name};", content)
             self._send(body=f"<response><echo>{out}</echo></response>",
                        ctype="application/xml")
+            return
+        if path == "/api/login":
+            # simulated NoSQL query: a dict password is treated as a query
+            # operator document (mongo-style $ne/$gt/$regex -> always true)
+            b = self._body()
+            u = b.get("username", "") if isinstance(b, dict) else ""
+            pw = b.get("password", "") if isinstance(b, dict) else ""
+            if isinstance(pw, dict) and any(str(k).startswith("$")
+                                            for k in pw):
+                row = self.db.execute(
+                    "SELECT role FROM users WHERE username = ?",
+                    (u,)).fetchone()
+                self._send(body=json.dumps(
+                    {"ok": True, "role": row[0] if row else "user"}),
+                    ctype="application/json")
+                return
+            row = self.db.execute(
+                "SELECT role FROM users WHERE username = ? AND password = ?",
+                (u, str(pw))).fetchone()
+            if row:
+                self._send(body=json.dumps({"ok": True, "role": row[0]}),
+                           ctype="application/json")
+            else:
+                self._send(401, json.dumps({"ok": False}),
+                           ctype="application/json")
             return
         if path == "/graphql":
             b = self._body()

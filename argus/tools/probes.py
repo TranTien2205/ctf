@@ -515,3 +515,38 @@ def probe_xfh(ctx: Context, url: str) -> dict:
                if where else "no host-header reflection")
     return {"verdict": verdict, "request_id": r["request_id"],
             "canary": canary, "reflected_in": where}
+
+
+def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
+    """NoSQL operator injection matched-pair: baseline JSON body, then the
+    same body with the param replaced by $ne/$gt/$regex operator objects.
+    A status/body flip means the server evaluated the operator."""
+    hdr = {"Content-Type": "application/json"}
+    try:
+        template = _json.loads(data)
+    except ValueError:
+        return {"error": "data must be a JSON object, e.g. "
+                         '{"username":"x","password":"y"}'}
+    if not isinstance(template, dict):
+        return {"error": "data must be a JSON object"}
+    base = ctx.client.send("POST", url, headers=hdr, body=data,
+                           tool="probe_nosqli", note="json baseline")
+    operators = [{"$ne": None}, {"$gt": ""}, {"$regex": ".*"}]
+    hits = []
+    for op in operators:
+        doc = dict(template)
+        doc[param] = op
+        r = ctx.client.send("POST", url, headers=hdr,
+                            body=_json.dumps(doc), tool="probe_nosqli",
+                            note=f"operator {next(iter(op))}")
+        sim = _similarity(r.get("body") or "", base.get("body") or "")
+        hits.append({"op": next(iter(op)), "status": r["status"],
+                     "request_id": r["request_id"],
+                     "similarity_to_base": sim,
+                     "differs": r["status"] != base["status"] or sim < 0.7})
+    flip = next((h for h in hits if h["differs"]), None)
+    verdict = ("nosqli candidate: operator payload flipped the response "
+               f"({flip['op']} status {flip['status']} vs baseline "
+               f"{base['status']})" if flip else "no nosqli signal")
+    return {"verdict": verdict, "base_id": base["request_id"],
+            "results": hits}
