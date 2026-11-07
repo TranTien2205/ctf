@@ -299,3 +299,51 @@ def probe_method(ctx: Context, url: str) -> dict:
     out["verdict"] = ("writable method confirmed" if out.get("put_verified")
                       else f"methods: {allow or 'none advertised'}")
     return out
+
+
+_ID_RE = re.compile(r"(?<![\w.-])(\d{1,12})(?![\w.-])")
+
+
+def probe_idor(ctx: Context, url: str) -> dict:
+    """IDOR matched-pair: fetch the object, then the same URL with the
+    numeric id +/-1. A different object at the same access level means
+    access control is per-object (or missing)."""
+    p = urllib.parse.urlparse(url)
+    where, target = "path", p.path
+    m = _ID_RE.search(target)
+    if not m:
+        where, target = "query", p.query
+        m = _ID_RE.search(target)
+    if not m:
+        return {"error": "no numeric id found in url; pass e.g. "
+                         "/item?id=7 or /user/42/profile"}
+    base = ctx.client.send("GET", url, tool="probe_idor", note="own object")
+
+    def _shift(delta: int) -> dict:
+        new_id = str(int(m.group(1)) + delta)
+        comp = target[:m.start(1)] + new_id + target[m.end(1):]
+        u2 = urllib.parse.urlunparse(
+            p._replace(**{where: comp}))
+        return ctx.client.send("GET", u2, tool="probe_idor",
+                               note=f"id {new_id} (id{delta:+d})")
+
+    neighbors = [_shift(d) for d in (1, -1)]
+    results = []
+    for r in neighbors:
+        other = r.get("body", "")
+        sim = _similarity(other, base.get("body", ""))
+        results.append({"request_id": r["request_id"], "status": r["status"],
+                        "similarity_to_base": sim,
+                        "accessible": r["status"] == 200})
+    ok = [r for r in results if r["accessible"]]
+    verdict = "no other object accessible"
+    if ok and all(r["similarity_to_base"] < 0.98 for r in ok):
+        verdict = ("idor candidate: neighboring object ids return 200 with "
+                   "different content - verify the object isn't yours")
+    elif ok:
+        verdict = ("neighbors accessible but content ~identical - check "
+                   "whether ids even select an object")
+    return {"verdict": verdict, "base_id": base["request_id"],
+            "results": results,
+            "note": "confirm before recording: the second object must belong "
+                    "to a different principal (name/id inside the body)"}

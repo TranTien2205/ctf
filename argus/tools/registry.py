@@ -42,6 +42,7 @@ def _impl(name: str) -> Callable:
         "probe_redirect": probes.probe_redirect,
         "probe_cors": probes.probe_cors,
         "probe_method": probes.probe_method,
+        "probe_idor": probes.probe_idor,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -229,6 +230,16 @@ TOOL_SCHEMAS: list[dict] = [
         "OPTIONS check: reports Allow/Access-Control-Allow-Methods and tries "
         "PUT of a harmless canary file to detect writable methods.",
         {"url": {**_STR, "description": URL_DESC}},
+        ["url"],
+    ),
+    _schema(
+        "probe_idor",
+        "IDOR / broken object-level authorization check: fetches the object "
+        "at the numeric id in the URL, then id+1 and id-1. A different "
+        "object returned at the same access level is an IDOR lead - verify "
+        "the second object belongs to a different principal.",
+        {"url": {**_STR, "description": URL_DESC +
+                 " Must contain a numeric object id (path or query)."}},
         ["url"],
     ),
     _schema(

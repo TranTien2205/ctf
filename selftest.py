@@ -120,6 +120,8 @@ def main() -> int:
     out = probes.probe_cors(ctx, base + "/api/data")
     check("cors probe sees credentialed reflection",
           "credentials" in out["verdict"])
+    out = probes.probe_idor(ctx, base + "/api/user/2")
+    check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient

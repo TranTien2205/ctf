@@ -60,6 +60,16 @@ def test_redirect_probe(lab_url, ctx):
     assert out["verdict"] == "open redirect"
 
 
+def test_idor_probe(lab_url, ctx):
+    out = probes.probe_idor(ctx, lab_url + "/api/user/2")
+    assert "idor candidate" in out["verdict"], out
+
+
+def test_idor_probe_query_id(lab_url, ctx):
+    out = probes.probe_idor(ctx, lab_url + "/api/user/2?x=1")
+    assert "idor candidate" in out["verdict"] or "neighbors" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]
