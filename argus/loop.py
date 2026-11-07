@@ -60,6 +60,9 @@ class AgentLoop:
         self.session = session or Session(cfg.session_dir, cfg.target, meta={
             "model": cfg.model, "goal": cfg.goal,
             "scope": cfg.scope_hosts, "max_turns": cfg.max_turns,
+            "max_requests": cfg.max_requests, "rate_rps": cfg.rate_rps,
+            "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
+            "tls_verify": cfg.tls_verify,
         }, resume=Path(cfg.resume) if cfg.resume else None)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:
