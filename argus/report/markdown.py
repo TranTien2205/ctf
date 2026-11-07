@@ -23,12 +23,17 @@ def _excerpt(text: str, needle: str, span: int = 300) -> str:
     return text[start: idx + len(needle) + span]
 
 
-def render_report(session: Session, cfg: Config, summary: str = "") -> Path:
+def render_report(session: Session, cfg: Config, summary: str = "",
+                  extra: dict | None = None) -> Path:
+    extra = dict(extra or {})
     findings = sorted(session.findings,
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))
     counts: dict[str, int] = {}
     for f in findings:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
+    first_ts = min((f.get("ts", 0) for f in findings), default=0)
+    ttf = round(first_ts - session.started, 1) \
+        if first_ts and session.started else None
 
     lines = [
         f"# Penetration Test Report - {session.id}",
@@ -104,6 +109,28 @@ def render_report(session: Session, cfg: Config, summary: str = "") -> Path:
                 "",
             ]
 
+    agents = extra.get("agents")
+    if agents:
+        lines += [
+            "## Agent metrics",
+            "",
+            "| Agent | Role | Status | Turns | Requests | Tokens in/out | LLM calls | Findings |",
+            "|---|---|---|---|---|---|---|---|",
+        ]
+        by_agent: dict[str, int] = {}
+        for f in findings:
+            if f.get("agent"):
+                by_agent[f["agent"]] = by_agent.get(f["agent"], 0) + 1
+        for name, a in agents.items():
+            tok = a.get("tokens") or {}
+            lines.append(
+                f"| {name} | {a.get('role', '')} | {a.get('status', '')} | "
+                f"{a.get('turns', 0)} | {a.get('requests', 0)} | "
+                f"{tok.get('in', 0)}/{tok.get('out', 0)} | "
+                f"{a.get('llm_calls', 0)} | {by_agent.get(name, 0)} |")
+        if ttf is not None:
+            lines += ["", f"**Time to first finding:** {ttf}s", ""]
+
     lines += [
         "## Methodology",
         "",
@@ -124,6 +151,8 @@ def render_report(session: Session, cfg: Config, summary: str = "") -> Path:
         "findings": findings,
         "counts": counts,
         "requests": session._seq,
+        "time_to_first_finding_s": ttf,
+        **extra,
     }
     (session.dir / "summary.json").write_text(
         json.dumps(summary_json, indent=2, ensure_ascii=False))

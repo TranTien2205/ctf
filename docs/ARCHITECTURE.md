@@ -50,7 +50,9 @@ Design choices and why:
 - The **transcript** is append-only JSONL; findings reference it by id.
 - **Web content is untrusted data.** The system prompt teaches the model
   to treat in-page instructions as prompt-injection attempts and keep
-  working the assessment.
+  working the assessment. MCP server output gets the same treatment —
+  `mcp_call` results are flagged `untrusted` and logged as transcript
+  events.
 
 ## Extension points
 
@@ -59,6 +61,8 @@ Design choices and why:
   `ctx.client.send` — then scope, rate limit and evidence are free.
 - New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`.
 - New report format: `argus/report/` takes `Session` + `Config`.
+- External tool providers: drop a server into `mcp.json` — `argus/mcp.py`
+  speaks stdio JSON-RPC, `mcp_list`/`mcp_call` expose it to every role.
 - Different model: `ClaudeClient` is ~40 lines of HTTP; `llm.ScriptedClient`
   shows the duck-typed interface (`chat(messages, tools, system)`).
 
@@ -109,6 +113,13 @@ role-specialized **workers** through a shared blackboard.
   holds `manifest.json` (command template, `affects`, `proof_marker`
   regex) + script. Target URL is scope-checked before substitution; a
   `proof=True` run id is citable as finding evidence.
+- **Findings dedup across workers.** `Session.add_finding` rejects a
+  second finding with the same normalized bug class + endpoint + params —
+  two exploit workers can't double-count the same bug.
+- **Per-agent metrics.** `summary.json` carries each agent's turns,
+  requests, LLM calls, token usage and credited findings, plus
+  `time_to_first_finding_s` — the measurement surface for comparing
+  single-agent `run` against the streaming `team` pipeline.
 
 ## What it deliberately does not do
 

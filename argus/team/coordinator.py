@@ -62,6 +62,8 @@ class TeamRun:
             "model": cfg.model, "goal": cfg.goal, "mode": "team",
             "scope": cfg.scope_hosts, "max_turns": cfg.max_turns})
         self.rate = RateLimiter(cfg.rate_rps)
+        from ..mcp import MCPManager, discover_config_path
+        self.mcp = MCPManager(discover_config_path(cfg.mcp_config))
         self.board = Board(self.session)
         self.board.set_spawner(self._spawn_guarded)
         self._llm_factory = llm_factory or self._default_llm
@@ -110,7 +112,7 @@ class TeamRun:
         loop = AgentLoop(
             self.cfg, llm=self._llm_factory(card.name, name),
             quiet=self.quiet, scope=self.scope, session=self.session,
-            client=self._mk_client(name), board=self.board,
+            client=self._mk_client(name), board=self.board, mcp=self.mcp,
             agent_name=name, role=card.name, allowed=card.tools,
             system=system, seed=seed,
             stop_event=self.board.stop, report=False)
@@ -125,6 +127,8 @@ class TeamRun:
             self.board.update_agent(
                 name, status="done", turns=res.get("turns", 0),
                 requests=loop.ctx.client.sent,
+                tokens=res.get("llm_tokens"),
+                llm_calls=res.get("llm_calls", 0),
                 error=res.get("error"))
 
         t = threading.Thread(target=_run, name=name, daemon=True)
@@ -144,7 +148,7 @@ class TeamRun:
         loop = AgentLoop(
             self.cfg, llm=self._llm_factory("lead", name),
             quiet=self.quiet, scope=self.scope, session=self.session,
-            client=self._mk_client(name), board=self.board,
+            client=self._mk_client(name), board=self.board, mcp=self.mcp,
             agent_name=name, role="lead", allowed=LEAD.tools, system=system,
             seed=seed, stop_event=self.board.stop, report=False)
 
@@ -155,9 +159,12 @@ class TeamRun:
                 res = {"error": f"{type(exc).__name__}: {exc}", "turns": 0}
             with self._lock:
                 self._results[name] = res
-            self.board.update_agent(name, status="done",
-                                    turns=res.get("turns", 0),
-                                    error=res.get("error"))
+            self.board.update_agent(
+                name, status="done", turns=res.get("turns", 0),
+                requests=loop.ctx.client.sent,
+                tokens=res.get("llm_tokens"),
+                llm_calls=res.get("llm_calls", 0),
+                error=res.get("error"))
             # if the lead dies without finishing, close the pipeline anyway
             self.board.leads.close()
             self.board.engagement_done.set()
@@ -206,11 +213,25 @@ class TeamRun:
         for name, t in self._threads.items():
             if t.is_alive():
                 self.board.update_agent(name, status="killed")
+        self.mcp.close()
+
+        # final per-agent metrics pass: findings credited by agent name
+        for name in self.board.agents():
+            n = sum(1 for f in self.session.findings if f.get("agent") == name)
+            self.board.update_agent(name, findings=n)
 
         from ..report.markdown import render_report
         lead_res = self._results.get("lead", {})
         summary = lead_res.get("summary") or ""
-        report_path = render_report(self.session, cfg, summary)
+        tok_in = sum((r.get("llm_tokens") or {}).get("in", 0)
+                     for r in self._results.values())
+        tok_out = sum((r.get("llm_tokens") or {}).get("out", 0)
+                      for r in self._results.values())
+        calls = sum(r.get("llm_calls", 0) or 0 for r in self._results.values())
+        report_path = render_report(self.session, cfg, summary, extra={
+            "mode": "team", "agents": self.board.agents(),
+            "llm_calls": calls, "llm_tokens": {"in": tok_in, "out": tok_out},
+        })
         return {
             "mode": "team",
             "session_dir": str(self.session.dir),
@@ -218,6 +239,8 @@ class TeamRun:
             "requests": self.session._seq,
             "findings": len(self.session.findings),
             "report": str(report_path),
+            "llm_calls": calls,
+            "llm_tokens": {"in": tok_in, "out": tok_out},
             "lead_summary": summary,
             "lead_error": lead_res.get("error"),
             "elapsed_s": round(time.monotonic() - started, 1),

@@ -40,3 +40,26 @@ def test_severity_enum(tmp_path):
     rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
     with pytest.raises(ValueError):
         s.add_finding("bad", "superultra", "x", "u", [rid], "proof", "d", "r")
+
+
+def test_finding_dedup_same_class_endpoint(tmp_path):
+    s = _sess(tmp_path)
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
+    s.add_finding("sqli on /item", "high", "SQLi", "http://t/item?id=1",
+                  [rid], "proof", "d", "r")
+    # same bug class + same endpoint+params = duplicate, even with new evidence
+    with pytest.raises(ValueError, match="duplicate of F01"):
+        s.add_finding("sqli again", "medium", "sqli",
+                      "http://t/item?id=2", [rid], "proof", "d", "r")
+    # a different parameter IS a distinct finding
+    f = s.add_finding("sqli on q", "high", "sqli", "http://t/item?q=x",
+                      [rid], "proof", "d", "r")
+    assert f["id"] == "F02"
+
+
+def test_finding_records_agent(tmp_path):
+    s = _sess(tmp_path)
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
+    f = s.add_finding("x", "low", "c", "http://t/a", [rid], "proof", "d", "r",
+                      agent="exploit-2")
+    assert f["agent"] == "exploit-2"

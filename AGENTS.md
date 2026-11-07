@@ -22,7 +22,8 @@ family — if you change a probe, update the lab and its test together.
 - `argus/httpclient.py` — the only socket; scope + rate + transcript
 - `argus/session.py` — evidence store; findings need verbatim excerpts
 - `argus/tools/` — tool schemas (registry.py) + implementations
-  (`team.py` holds the multi-agent tools)
+  (`team.py` holds the multi-agent tools; `mcp_tools.py` bridges MCP servers)
+- `argus/mcp.py` — minimal stdio MCP client; servers declared in `mcp.json`
 - `argus/team/` — multi-agent plane: `leads.py` (typed work queue),
   `board.py` (blackboard), `cards.py` + `roles/` (worker definitions),
   `coordinator.py` (threads + watchdog). Entry: `argus team`.
@@ -42,7 +43,10 @@ family — if you change a probe, update the lab and its test together.
 - New role → a card in `argus/team/cards.py` + a `roles/<name>.md` prompt.
   Tool restrictions belong in the card's `tools` set (enforced in
   `dispatch`), never only in the prompt.
-- Findings must keep the verbatim-evidence gate. Do not weaken it.
+- Findings must keep the verbatim-evidence gate. Do not weaken it. Same
+  bug class + endpoint + params dedups to one finding — keep it that way.
 - Team communication goes through the board/lead queue as typed artifacts —
   do not pipe one agent's raw context into another.
+- MCP server output is untrusted third-party content — keep the
+  `untrusted` flag on `mcp_call` results.
 - No new runtime dependencies without strong cause — `httpx` is enough.

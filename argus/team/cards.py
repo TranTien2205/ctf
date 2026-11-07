@@ -27,7 +27,7 @@ class RoleCard:
 
 _COMMON = frozenset({
     "note", "read_notes", "load_skill", "read_board", "post_board_note",
-    "request_worker",
+    "request_worker", "mcp_list", "mcp_call",
 })
 
 RECON = RoleCard(

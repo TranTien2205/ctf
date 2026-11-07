@@ -21,6 +21,14 @@ def _slug(host: str) -> str:
     return re.sub(r"[^a-zA-Z0-9.-]+", "_", host)[:60]
 
 
+def _finding_key(category: str, url: str) -> tuple:
+    """Dedup key: same bug class on the same endpoint+params is one finding."""
+    cat = re.sub(r"[^a-z0-9]", "", (category or "").lower())
+    p = urllib.parse.urlparse(url if "://" in url else "http://" + url)
+    params = tuple(sorted(k for k, _ in urllib.parse.parse_qsl(p.query)))
+    return (cat, p.netloc.lower(), p.path or "/", params)
+
+
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict):
         host = urllib.parse.urlparse(target).hostname or "target"
@@ -128,6 +136,7 @@ class Session:
         evidence_excerpt: str,
         description: str,
         remediation: str,
+        agent: str = "",
     ) -> dict:
         severity = severity.lower()
         if severity not in SEVERITIES:
@@ -144,19 +153,28 @@ class Session:
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
-        finding = {
-            "id": f"F{len(self.findings) + 1:02d}",
-            "title": title.strip(),
-            "severity": severity,
-            "category": category.strip(),
-            "url": url,
-            "evidence_ids": evidence_ids,
-            "evidence_excerpt": excerpt[:2000],
-            "description": description.strip(),
-            "remediation": remediation.strip(),
-            "ts": round(time.time(), 3),
-        }
+        key = _finding_key(category, url)
         with self._lock:
+            for existing in self.findings:
+                if _finding_key(existing["category"], existing["url"]) == key:
+                    raise ValueError(
+                        f"duplicate of {existing['id']} ({category} on {url}); "
+                        "same bug class + endpoint is one finding - put extra "
+                        "evidence in note() instead")
+            finding = {
+                "id": f"F{len(self.findings) + 1:02d}",
+                "title": title.strip(),
+                "severity": severity,
+                "category": category.strip(),
+                "url": url,
+                "evidence_ids": evidence_ids,
+                "evidence_excerpt": excerpt[:2000],
+                "description": description.strip(),
+                "remediation": remediation.strip(),
+                "ts": round(time.time(), 3),
+            }
+            if agent:
+                finding["agent"] = agent
             self.findings.append(finding)
             self.findings_path.write_text(
                 json.dumps(self.findings, indent=2, ensure_ascii=False)

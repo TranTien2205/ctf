@@ -36,6 +36,7 @@ class Config:
     goal: str = ""
     max_response_bytes: int = 200_000
     llm_max_tokens: int = 4096
+    mcp_config: str = ""
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -148,4 +149,5 @@ def load_config(args) -> Config:
         external_tools=not args.no_external,
         goal=getattr(args, "goal", "") or "",
         llm_max_tokens=args.llm_max_tokens,
+        mcp_config=getattr(args, "mcp_config", "") or "",
     )

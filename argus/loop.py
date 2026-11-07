@@ -40,6 +40,7 @@ class AgentLoop:
                  session: Session | None = None,
                  client: GuardedClient | None = None,
                  board=None,
+                 mcp=None,
                  agent_name: str = "agent",
                  role: str = "",
                  allowed=None,
@@ -72,10 +73,16 @@ class AgentLoop:
             self._owns_client = True
         else:
             self._owns_client = False
+        if mcp is None:
+            from .mcp import MCPManager, discover_config_path
+            mcp = MCPManager(discover_config_path(cfg.mcp_config))
+            self._owns_mcp = True
+        else:
+            self._owns_mcp = False
         self.ctx = Context(
             cfg=cfg, scope=self.scope, session=self.session,
             client=client, skills_dir=skills_dir,
-            board=board, agent_name=agent_name, role=role,
+            board=board, mcp=mcp, agent_name=agent_name, role=role,
             allowed=frozenset(allowed) if allowed else None,
         )
         self.llm = llm or ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
@@ -168,17 +175,24 @@ class AgentLoop:
         self._log(f"done in {turns} turns; findings={len(self.session.findings)}")
         if self._owns_client:
             self.ctx.client.close()
+        if self._owns_mcp and self.ctx.mcp is not None:
+            self.ctx.mcp.close()
         report_path = ""
         if self.report_enabled:
             from .report.markdown import render_report
             report_path = str(render_report(
-                self.session, self.cfg, self.ctx.finish_summary))
+                self.session, self.cfg, self.ctx.finish_summary,
+                extra={"mode": "team" if self.ctx.board is not None else "single",
+                       "llm_calls": self.llm.calls,
+                       "llm_tokens": {"in": self.llm.input_tokens,
+                                      "out": self.llm.output_tokens}}))
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
             "requests": self.session._seq,
             "findings": len(self.session.findings),
             "report": report_path,
+            "llm_calls": self.llm.calls,
             "llm_tokens": {"in": self.llm.input_tokens, "out": self.llm.output_tokens},
             "summary": self.ctx.finish_summary,
             "error": self._last_error or None,

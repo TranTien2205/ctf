@@ -38,6 +38,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--no-external", action="store_true",
                    help="Disable sqlmap/nuclei/nmap/ffuf/curl wrapper")
     p.add_argument("--llm-max-tokens", type=int, default=4096)
+    p.add_argument("--mcp-config",
+                   help="Path to mcp.json declaring MCP tool servers "
+                        "(else ARGUS_MCP_CONFIG or ./mcp.json)")
     p.add_argument("--quiet", action="store_true")
 
 

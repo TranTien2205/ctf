@@ -1,6 +1,7 @@
 """Team mode: lead queue, blackboard, role gating, exploit runner, e2e."""
 from __future__ import annotations
 
+import json
 import threading
 import time
 from pathlib import Path
@@ -191,3 +192,13 @@ def test_team_e2e(tmp_path, lab_url):
     # exploit worker actually sent probes through the shared transcript
     assert result["requests"] > 5
     assert Path(result["report"]).exists()
+    # per-agent metrics landed on the board and in summary.json
+    assert result["agents"]["exploit-1"]["requests"] > 0
+    assert "llm_calls" in result["agents"]["recon-1"]
+    assert result["llm_calls"] >= 3
+    sj = json.loads((Path(result["session_dir"]) / "summary.json")
+                    .read_text(encoding="utf-8"))
+    assert sj["mode"] == "team"
+    assert "time_to_first_finding_s" in sj
+    assert sj["llm_tokens"]["in"] >= 0
+    assert "agents" in sj

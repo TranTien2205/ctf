@@ -80,8 +80,13 @@ sessions/20261106-101500-app.example/
   transcript.jsonl ← every request/response, cited by request_id
   notes.md         ← the agent's working reasoning
   agent.log        ← tool calls and agent text
-  summary.json     ← counts, severities
+  summary.json     ← counts, severities, per-agent metrics,
+                     time_to_first_finding_s, llm token totals
 ```
+
+In team mode `summary.json` also carries `agents` — each worker's turns,
+requests, LLM calls, token usage and credited findings — the data needed to
+compare `run` vs `team` on speed, coverage and cost.
 
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`.
@@ -92,6 +97,18 @@ If installed, the agent may call `sqlmap`, `nuclei`, `nmap`, `ffuf`, `curl`
 through `run_external` — args are scope-checked, runs are timeout-bounded
 (≤600s), output is truncated. Scanner claims are treated as *leads*: the
 agent must reproduce the issue via `http_request` to record a finding.
+
+## MCP tool servers
+
+`mcp_list` / `mcp_call` bridge external MCP servers (search, fetch, CVE
+data) declared in `mcp.json`, `--mcp-config`, or `ARGUS_MCP_CONFIG`:
+
+```json
+{"servers": {"search": {"command": ["npx", "-y", "some-search-mcp"]}}}
+```
+
+Servers spawn lazily, one subprocess each, shared across workers. Output is
+flagged untrusted and logged as `mcp_call` transcript events.
 
 ## The lab
 

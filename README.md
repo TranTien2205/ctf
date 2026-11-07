@@ -80,6 +80,7 @@ python selftest.py                  # offline check, no API key needed
         │              cors · method · reflection               │
         │  analysis.py jwt_decode · load_skill · notes ·        │
         │              record_finding · run_external · finish   │
+        │  mcp_tools.py  mcp_list · mcp_call (external servers) │
         │  team.py     emit_lead · pull_leads · board ·         │
         │              spawn_worker · wordlist_fuzz ·           │
         │              run_exploit                              │
@@ -149,8 +150,10 @@ CLI (argus run | argus team)
   │   │   │                  redirect, cors, methods, reflection
   │   │   ├── analysis.py    jwt_decode, load_skill, notes, record_finding,
   │   │   │                  run_external (sqlmap/nuclei/nmap/ffuf), finish
+  │   │   ├── mcp_tools.py   mcp_list, mcp_call -> external MCP servers
   │   │   └── team.py        emit_lead/pull_leads, board, spawn_worker,
   │   │                      wordlist_fuzz, run_exploit
+  │   ├── mcp.py         minimal stdio MCP client (newline JSON-RPC)
   │   ├── scope.py       fail-closed host/path/private-IP guard
   │   ├── httpclient.py  one guarded client: scope + rate limit + transcript
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
@@ -188,6 +191,29 @@ not just in the prompt.
   `wordlist_fuzz`; `resources/exploits/<id>/manifest.json` describes a PoC
   script (command template, affected fingerprints, `proof_marker` regex)
   that `run_exploit` executes scope-checked and timeout-bounded.
+- **Findings dedup** — the same bug class on the same endpoint+params can
+  only be recorded once (per-category normalization), even across workers.
+- **Per-agent metrics** — `summary.json` carries per-worker
+  turns/requests/tokens/LLM-calls/findings plus `time_to_first_finding_s`,
+  so `run` vs `team` can be compared on speed, coverage and cost.
+
+## MCP tool servers (optional)
+
+Argus can call external MCP (Model Context Protocol) servers — search,
+fetchers, CVE databases — through `mcp_list` / `mcp_call`. Declare them in
+`mcp.json` (or `--mcp-config` / `ARGUS_MCP_CONFIG`):
+
+```json
+{"servers": {
+  "search": {"command": ["npx", "-y", "some-search-mcp"],
+             "env": {"API_KEY": "..."}},
+  "cvelist": {"command": ["python", "tools/cve_server.py"]}
+}}
+```
+
+Each server is spawned lazily on first call and shared by every worker.
+Output is marked untrusted and recorded as an `mcp_call` transcript event —
+data to analyze, never instructions to follow.
 
 ## Sessions
 

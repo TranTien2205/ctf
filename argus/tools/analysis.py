@@ -101,7 +101,7 @@ def record_finding(ctx: Context, title: str, severity: str, category: str,
         title=title, severity=severity, category=category, url=url,
         evidence_ids=list(evidence_ids or []),
         evidence_excerpt=evidence_excerpt, description=description,
-        remediation=remediation,
+        remediation=remediation, agent=ctx.agent_name,
     )
     return {"recorded": finding["id"], "title": finding["title"],
             "severity": finding["severity"]}
