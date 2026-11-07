@@ -80,6 +80,9 @@ def main(argv: list[str] | None = None) -> int:
     p_skills = sub.add_parser("skills", help="list knowledge modules")
     p_skills.set_defaults(list_skills=True)
 
+    p_sess = sub.add_parser("sessions", help="list past session dirs")
+    p_sess.add_argument("--session-dir", default="sessions")
+
     p_demo = sub.add_parser(
         "demo", help="offline scripted run against the bundled lab - "
                      "exercises the full pipeline with no API key")
@@ -140,6 +143,32 @@ def main(argv: list[str] | None = None) -> int:
         sdir = Path(__file__).parent / "skills"
         for p in sorted(sdir.glob("*.md")):
             print(p.stem)
+        return 0
+
+    if args.cmd == "sessions":
+        root = Path(args.session_dir)
+        rows = []
+        for d in sorted(root.iterdir()) if root.exists() else []:
+            if not d.is_dir():
+                continue
+            row = {"dir": d.name}
+            summ = d / "summary.json"
+            if summ.exists():
+                try:
+                    s = json.loads(summ.read_text(encoding="utf-8"))
+                    row.update(mode=s.get("mode", "single"),
+                               findings=len(s.get("findings") or []),
+                               requests=s.get("requests", "?"))
+                except Exception:
+                    pass
+            rows.append(row)
+        if not rows:
+            print("no sessions yet")
+            return 0
+        for r in rows:
+            print(f"{r['dir']}  {r.get('mode','?'):<6} "
+                  f"findings={r.get('findings','?')} "
+                  f"requests={r.get('requests','?')}")
         return 0
 
     if args.cmd == "demo":

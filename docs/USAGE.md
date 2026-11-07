@@ -104,7 +104,9 @@ requests, LLM calls, token usage and credited findings — the data needed to
 compare `run` vs `team` on speed, coverage and cost.
 
 `python -m argus findings <session_dir>` reprints the table;
-`python -m argus report <session_dir>` re-renders `report.md`.
+`python -m argus report <session_dir>` re-renders `report.md`;
+`python -m argus sessions` lists every session dir with mode, finding and
+request counts.
 
 ## Resuming a run
 
