@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-07T19:48:43",
+  "generated_at": "2026-11-07T20:26:32",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -196,8 +196,8 @@
       "local_evidence": "stub",
       "lines": 89,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.197,
+      "nearest_neighbour": "crypto-symmetric-oracle",
+      "overlap": 0.196,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -228,8 +228,8 @@
       "local_evidence": "stub",
       "lines": 84,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.201,
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 0.2,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -459,7 +459,7 @@
       "lines": 83,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.197,
+      "overlap": 0.195,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -475,7 +475,7 @@
       "lines": 86,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.196,
+      "overlap": 0.194,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -629,7 +629,7 @@
       "lines": 82,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.208,
+      "overlap": 0.206,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -644,8 +644,8 @@
       "local_evidence": "stub",
       "lines": 82,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.207,
+      "nearest_neighbour": "pwn-format-string",
+      "overlap": 0.206,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -713,7 +713,7 @@
       "lines": 97,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.194,
+      "overlap": 0.192,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -769,7 +769,7 @@
       "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.185,
+      "overlap": 0.184,
       "trust": "local-confirmed"
     },
     {
@@ -853,7 +853,7 @@
       "lines": 87,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.195,
+      "overlap": 0.194,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -977,7 +977,7 @@
       "lines": 93,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.179,
+      "overlap": 0.178,
       "trust": "catalogue-or-unreviewed"
     },
     {
