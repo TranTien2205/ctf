@@ -63,6 +63,18 @@ won.
   that the requests genuinely overlap.
 - If the first attempt does not land, re-roll rather than escalating the rate.
 
+## Operational probe
+
+```bash
+python3 tools/web/race_probe.py --url "$BASE/api/redeem"   --method POST --body '{"code":"XYZ"}' -H 'Cookie: session=...'   --concurrency 20 --count 20 --baseline-count 5 --challenge <name>
+```
+
+Record the serial baseline FIRST: a signature that also appears serially is
+not a race. Then the concurrent run — `max_in_flight`, the count of
+identical-success responses, and the exact status/body split versus baseline.
+Confirmation is an effect that cannot occur serially: two redeems of one
+single-use code, a balance decremented past zero, a second accepted vote.
+
 ## Routing
 
 Shares signals with: `../web-logic-flaw/`. Check those before committing to this one.

@@ -191,6 +191,19 @@ An alert names a signature, not a byte count. Pivot on `flow_id`, which both the
 - SNI and `http.host` are client claims - what the process asked for, not where the bytes went. `ip.dst` is the observation.
 - `scapy` 2.6.1 is installed: walk a large capture with `PcapReader`, not `rdpcap`, which loads the whole file.
 
+## Operational probe
+
+```bash
+python3 tools/forensics/pcap_triage.py --input capture.pcapng     --challenge <sherlock>-qN --class dfir-network-exfil-trace
+capinfos -a -e -c -z capture.pcapng
+tshark -r capture.pcapng -q -z io,phs -z endpoints,ip
+```
+
+Record: `endpoints,ip` `Tx Bytes` per host is the "how much left this host"
+answer — never a hand sum. Beacon cadence is a period measurement over
+timestamps, not a feeling about regular spacing. Confirmed = a flow or volume
+figure quoted from the tool output.
+
 ## Routing
 Shares signals with `../dfir-execution-trace/` (the process behind the socket) and `../dfir-cloud-audit-trace/`
 (an API call, not a byte count). Check those first. Depth, one named file at a time:

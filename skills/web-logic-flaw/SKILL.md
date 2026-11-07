@@ -60,6 +60,19 @@ inconclusive.
 - Keep the first test on an account or object you created. Do not change roles,
   balances, or another player's records until the field boundary is proven.
 
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -X POST "$BASE/cart" -d 'productId=2&quantity=-1'
+curl -i -b "$JAR" "$BASE/cart"
+```
+
+Record the state before and after the malformed step, verbatim from the
+response: price, quantity, role, or step position. Confirmation is a state the
+application's own rules forbid — a negative total charged, a skipped step the
+server accepted, an object modified beyond the caller's authority. An error
+page or a silently-corrected value is a rejected hypothesis, not a near miss.
+
 ## Routing
 
 Shares signals with: `../web-idor/`, `../web-race-condition/`. Check those before committing to this one.

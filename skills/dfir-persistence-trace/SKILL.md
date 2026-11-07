@@ -177,6 +177,19 @@ persistence - **5860** `Operation_TemporaryEssStarted`, **5857** `Operation_Star
 - **Prefetch proves the payload ran, not that the mechanism fired.** Read the mechanism off the parent alone: `svchost.exe -k netsvcs`, `taskeng.exe`, `WerFault.exe`, `wmiprvse.exe` (Sysmon 1 `ParentImage`, or `TaskScheduler/Operational` 129).
 - **After a 1102**, task XML creation still shows in `$J` - `../ctf-forensics/windows.md:318-354`; checklist at `:481-498`.
 
+## Operational probe
+
+```bash
+python3 tools/forensics/evtx_query.py --input system.jsonl --event-id 7045     --order asc --challenge <sherlock>-q1 --answer ImagePath     --class dfir-persistence-trace --evidence-kind class
+python3 tools/forensics/evtx_query.py --input security.jsonl --event-id 4698     --order asc --challenge <sherlock>-qN
+python3 tools/forensics/artifact_inventory.py --path <bundle> --hash
+```
+
+Record: `ServiceName`, `ImagePath`, `ServiceType`, `StartType`, `AccountName`
+from each 7045; registry autostart values verbatim (full path, not the trimmed
+display name). A confirmed persistence claim names the mechanism AND quotes the
+record — a suspicious-looking path with no write record is a candidate.
+
 ## Routing
 
 Shares signals with `../dfir-execution-trace/` (what ran, once) and `../dfir-antiforensics-trace/`

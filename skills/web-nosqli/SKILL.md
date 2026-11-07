@@ -63,6 +63,18 @@ assignment paths, not rename targets. See `../web-prototype-pollution/SKILL.md`.
 - An operator that works in the shell may be blocked by the ODM's strict mode;
   the error text usually names which.
 
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -H 'Content-Type: application/json'   -d '{"noteId": {"$ne": null}}' "$BASE/api/notes"
+```
+
+Pin the operator payload to an object you created, then read the returned set:
+`$ne: null` on an id you do not own proves the operator is evaluated only if
+documents you did not create come back. Record the verbatim matched-count or
+the returned ids. An identical response to the baseline is a negative — the
+value never reached a query operator.
+
 ## Routing
 
 Shares signals with: `../web-sqli/`, `../web-prototype-pollution/`. Check those before committing to this one.

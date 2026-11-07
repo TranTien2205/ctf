@@ -58,6 +58,18 @@ assignment paths, not rename targets. See `../web-prototype-pollution/SKILL.md`.
   the instance. Pin the filter to your own object id, every time.
 - An operator that works in the shell may be blocked by the ODM's strict mode;
   the error text usually names which.
+
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -H 'Content-Type: application/json'   -d '{"noteId": {"$ne": null}}' "$BASE/api/notes"
+```
+
+Pin the operator payload to an object you created, then read the returned set:
+`$ne: null` on an id you do not own proves the operator is evaluated only if
+documents you did not create come back. Record the verbatim matched-count or
+the returned ids. An identical response to the baseline is a negative — the
+value never reached a query operator.
 """,
     "web-command-injection": """## Recognise
 
@@ -99,6 +111,20 @@ Use one named reference after the sink is confirmed:
   argv element is not a bypass challenge. Read the call boundary first.
 - Output-free injection plus a blocked outbound channel remains inconclusive
   unless the timing delta is repeatable and attributable.
+
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=127.0.0.1;id'
+curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=$(sleep%205)'
+```
+
+Record the verbatim output block for an injected `id`, or the measured delay
+for blind sinkholes — compare against a 5x serial baseline, not a single
+sample. Confirmation is command output (uid=... in the response) or a
+repeatable timing delta the baseline cannot explain. A 500 or a quoted
+literal is a rejected hypothesis.
+
 """,
     "web-xxe": """## Recognise
 
@@ -195,6 +221,39 @@ applies.
   than a header. Read which one it is before spending the budget.
 - A rule that matches an unanchored pattern, or compares with containment rather
   than equality, is bypassable without any protocol trick at all.
+
+## Operational probe
+
+```bash
+printf 'POST /search HTTP/1.1
+
+Host: %s
+
+Content-Length: 4
+
+Transfer-Encoding: chunked
+
+
+
+5c
+
+GPOST / HTTP/1.1
+
+
+
+0
+
+
+
+' "$HOST" | nc "$HOST" 443
+```
+
+Send the ambiguous request once and record **both** raw status lines — the
+front-end's answer to the first request and what a second queued request
+proves about where the bytes were split. Confirmation requires a response that
+belongs to a request the front-end never saw (smuggled content reached the
+back-end as a new request). A single error or a dropped connection is not a
+differential.
 """,
     "web-csrf": """## Recognise
 
@@ -318,6 +377,19 @@ reused. A marker reflected only in the immediate response is not poisoning.
   response is cacheable before spending the budget.
 - Use a disposable path or an entry with a short, known lifetime; poisoning a
   shared flag or login page is an avoidable outage.
+
+## Operational probe
+
+```bash
+curl -i -H 'X-Forwarded-Host: canary.invalid' "$BASE/"      # write the poisoned entry
+curl -i "$BASE/"                                            # victim view, no probe header
+```
+
+Record the cache status header on both requests AND whether the canary value
+is reflected in the victim response. Confirmation requires all three: the
+probe request stored (HIT on the second identical request), the keyed input
+left out of the cache key, and the reflected value reaching a response the
+victim actually receives. A reflected header on a MISS is not a poisoning.
 """,
     "web-prototype-pollution": """## Recognise
 
@@ -391,6 +463,18 @@ won.
 - Parallel requests over one connection may serialise; use enough connections
   that the requests genuinely overlap.
 - If the first attempt does not land, re-roll rather than escalating the rate.
+
+## Operational probe
+
+```bash
+python3 tools/web/race_probe.py --url "$BASE/api/redeem"   --method POST --body '{"code":"XYZ"}' -H 'Cookie: session=...'   --concurrency 20 --count 20 --baseline-count 5 --challenge <name>
+```
+
+Record the serial baseline FIRST: a signature that also appears serially is
+not a race. Then the concurrent run — `max_in_flight`, the count of
+identical-success responses, and the exact status/body split versus baseline.
+Confirmation is an effect that cannot occur serially: two redeems of one
+single-use code, a balance decremented past zero, a second accepted vote.
 """,
     "web-logic-flaw": """## Recognise
 
@@ -424,6 +508,19 @@ inconclusive.
   handler before spending the budget.
 - Keep the first test on an account or object you created. Do not change roles,
   balances, or another player's records until the field boundary is proven.
+
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -X POST "$BASE/cart" -d 'productId=2&quantity=-1'
+curl -i -b "$JAR" "$BASE/cart"
+```
+
+Record the state before and after the malformed step, verbatim from the
+response: price, quantity, role, or step position. Confirmation is a state the
+application's own rules forbid — a negative total charged, a skipped step the
+server accepted, an object modified beyond the caller's authority. An error
+page or a silently-corrected value is a rejected hypothesis, not a near miss.
 """,
     "web-oauth-sso": """## Recognise
 
@@ -455,6 +552,18 @@ cookie writes, not in any single request.
 - A registration step inside the flow can be raced; see `../web-race-condition/`.
 - Changing a redirect target usually invalidates the code. Test the validation
   first with a harmless variation.
+
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -L "$BASE/oauth/callback?code=AAAA&state=BBBB"
+```
+
+Replay the callback with a `state` the provider never issued for this session,
+then with the code swapped for another user's (if a second account exists).
+Record the verbatim status line and any session issued. Confirmation: a
+session or token issued against a mismatched state or a foreign code. A 400
+naming the mismatch closes the path — record it as the falsifier.
 """,
     "web-graphql": """## Recognise
 

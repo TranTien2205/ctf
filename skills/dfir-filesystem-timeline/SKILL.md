@@ -184,6 +184,19 @@ ext4, and `../ctf-forensics/linux-forensics.md` has no inode-timestamp material 
   has been parsed in this tree. Every offset above is from the cited specification; only the sleuthkit,
   mactime, debugfs and timeline_merge numbers were measured locally.
 
+## Operational probe
+
+```bash
+python3 tools/forensics/timeline_merge.py --source body.txt:time:macb     --format csv --since <question_window> --gap 3600 --challenge <sherlock>-qN
+fls -o <part_offset> -m C: -r image.dd > body.txt
+mactime -y -d -b body.txt | grep -i '<name_from_the_question>'
+```
+
+Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
+times) — a patched Created/Modified shows as a disagreement between the two,
+which is the answer to a timestomp question. Confirmed = a timeline row quoted
+with its inode and attribute source; a bare filename match is surface evidence.
+
 ## Routing
 
 Shares signals with `../dfir-antiforensics-trace/` (the divergence itself is the question) and

@@ -207,6 +207,20 @@ order.
   `--local` breaks it. **An empty 4688 command line** is command-line auditing being off, not nothing running - hand it to the execution
   class.
 
+## Operational probe
+
+```bash
+python3 tools/forensics/evtx_query.py --input security.jsonl --event-id 4624     --field-contains LogonType=10 --challenge <sherlock>-qN --answer IpAddress
+python3 tools/forensics/evtx_query.py --input security.jsonl --event-id 4625     --field-contains SubStatus=0xc000006a --challenge <sherlock>-qN --answer IpAddress
+python3 tools/forensics/linux_auth.py --authlog auth.log --wtmp wtmp --year 2024     --challenge <sherlock>-qN
+```
+
+Record: `LogonType` first (it decides what every other field means), then
+`TargetLogonId` for the 4634/4672/4964 joins, `LogonGuid` for 4648/4964. A
+confirmed answer is a quoted record carrying account, address and type — a
+4625 count alone is not a logon. Paste `answer.pre_flag_argv` verbatim; never
+retype the excerpt.
+
 ## Routing
 Shares signals with `../dfir-execution-trace/` (a 4688 or Sysmon 1 command line is the answer) and `../dfir-network-exfil-trace/` (the
 address is a destination, not a source). Router and depth `../dfir-sherlock-triage/` (`SKILL.md`, `../dfir-sherlock-triage/windows-event-logs.md`,

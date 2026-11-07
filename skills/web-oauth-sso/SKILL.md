@@ -58,6 +58,18 @@ cookie writes, not in any single request.
 - Changing a redirect target usually invalidates the code. Test the validation
   first with a harmless variation.
 
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -L "$BASE/oauth/callback?code=AAAA&state=BBBB"
+```
+
+Replay the callback with a `state` the provider never issued for this session,
+then with the code swapped for another user's (if a second account exists).
+Record the verbatim status line and any session issued. Confirmation: a
+session or token issued against a mismatched state or a foreign code. A 400
+naming the mismatch closes the path — record it as the falsifier.
+
 ## Routing
 
 Shares signals with: `../web-auth-session/`, `../web-open-redirect/`. Check those before committing to this one.

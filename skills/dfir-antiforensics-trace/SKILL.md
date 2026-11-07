@@ -59,8 +59,8 @@ python3 tools/forensics/evtx_query.py --input converted.jsonl --challenge <c> \
     --event-id 1102 --event-id 104 --event-id 1100 --event-id 4719 --event-id 1013
 ```
 
-reports `"matched": 0` (both `--input` and `--challenge` are required by its argparse, so neither can be dropped); and `python3 tools/forensics/artifact_inventory.py
---path <bundle> --challenge <c>` names no `registry-transaction-log`, `recycle-bin` or Defender tree. Nothing was erased; the emptiness is collection scope, and the
+reports `"matched": 0` (both `--input` and `--challenge` are required by its argparse, so neither can be dropped); and
+`python3 tools/forensics/artifact_inventory.py --path <bundle> --challenge <c>` names no `registry-transaction-log`, `recycle-bin` or Defender tree. Nothing was erased; the emptiness is collection scope, and the
 question belongs to `../dfir-execution-trace/` or `../dfir-filesystem-timeline/`.
 
 ## Recognise and confirm
@@ -198,6 +198,19 @@ hash it, and that is the answer.
   First probe above and `tools/forensics/evtx_query.py` over an already-converted JSONL are the whole EVTX capability here.
 - An absent artifact is not tampering. `../dfir-filesystem-timeline/` measured that a freshly formatted NTFS volume lists no `$J` at all, because the journal is
   created on first use.
+
+## Operational probe
+
+```bash
+python3 tools/forensics/evtx_query.py --input security.jsonl --event-id 1102     --challenge <sherlock>-qN --answer TimeCreated
+python3 tools/forensics/timeline_merge.py --source <rows>.csv:time     --gap <seconds> --challenge <sherlock>-qN
+```
+
+Record: the record-identifier gap (an EventRecordID sequence that skips) is
+the signature an erase cannot remove; a 1102 event names WHO cleared and when.
+Defender 1116 quarantine is a recovery path, not a loss — the sample is
+retrievable. Confirmed = the gap interval or the clearing record quoted
+verbatim; absence of logs is itself the evidence.
 
 ## Routing
 

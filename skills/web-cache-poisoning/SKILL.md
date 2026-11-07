@@ -64,6 +64,19 @@ reused. A marker reflected only in the immediate response is not poisoning.
 - Use a disposable path or an entry with a short, known lifetime; poisoning a
   shared flag or login page is an avoidable outage.
 
+## Operational probe
+
+```bash
+curl -i -H 'X-Forwarded-Host: canary.invalid' "$BASE/"      # write the poisoned entry
+curl -i "$BASE/"                                            # victim view, no probe header
+```
+
+Record the cache status header on both requests AND whether the canary value
+is reflected in the victim response. Confirmation requires all three: the
+probe request stored (HIT on the second identical request), the keyed input
+left out of the cache key, and the reflected value reaching a response the
+victim actually receives. A reflected header on a MISS is not a poisoning.
+
 ## Routing
 
 Shares signals with: `../web-parser-differential/`. Check those before committing to this one.
