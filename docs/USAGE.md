@@ -106,7 +106,9 @@ compare `run` vs `team` on speed, coverage and cost.
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
 `python -m argus sessions` lists every session dir with mode, finding and
-request counts.
+request counts; `python -m argus compare <dirA> <dirB>` prints a side-by-side
+metrics table (mode, findings, requests, time-to-first-finding, endpoints
+touched, llm calls, workers, tokens) for run-vs-team experiments.
 
 ## Resuming a run
 

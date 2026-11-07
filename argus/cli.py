@@ -83,6 +83,12 @@ def main(argv: list[str] | None = None) -> int:
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
 
+    p_cmp = sub.add_parser(
+        "compare", help="compare two sessions' metrics side by side "
+                        "(e.g. run vs team for the experiment chapter)")
+    p_cmp.add_argument("dir_a")
+    p_cmp.add_argument("dir_b")
+
     p_demo = sub.add_parser(
         "demo", help="offline scripted run against the bundled lab - "
                      "exercises the full pipeline with no API key")
@@ -169,6 +175,40 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
                   f"requests={r.get('requests','?')}")
+        return 0
+
+    if args.cmd == "compare":
+        def _summ(d):
+            p = Path(d) / "summary.json"
+            if not p.exists():
+                return {"dir": Path(d).name}
+            s = json.loads(p.read_text(encoding="utf-8"))
+            agents = s.get("agents") or {}
+            if isinstance(agents, dict):
+                agents = list(agents.values())
+            return {
+                "dir": Path(d).name, "mode": s.get("mode", "single"),
+                "findings": len(s.get("findings") or []),
+                "requests": s.get("requests", 0),
+                "ttf": s.get("time_to_first_finding_s"),
+                "coverage": len((s.get("coverage") or {}).get("endpoints") or []),
+                "llm_calls": s.get("llm_calls", 0),
+                "tokens": (s.get("llm_tokens") or {}),
+                "workers": len(agents),
+            }
+        a, b = _summ(args.dir_a), _summ(args.dir_b)
+        keys = [("mode", "mode"), ("findings", "findings"),
+                ("requests", "requests"),
+                ("ttf", "time_to_first_finding_s"),
+                ("coverage", "endpoints_touched"),
+                ("llm_calls", "llm_calls"), ("workers", "workers")]
+        print(f"{'metric':<24} {'A':<32} {'B':<32}")
+        print(f"{'':24} {a['dir']:<32} {b['dir']:<32}")
+        for k, label in keys:
+            print(f"{label:<24} {str(a.get(k)):<32} {str(b.get(k)):<32}")
+        for who, s in (("A", a), ("B", b)):
+            t = s.get("tokens") or {}
+            print(f"tokens({who}){'':18} in={t.get('in',0)} out={t.get('out',0)}")
         return 0
 
     if args.cmd == "demo":
