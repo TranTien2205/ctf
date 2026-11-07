@@ -51,8 +51,11 @@ class ScopeGuard:
         self.include_subdomains = include_subdomains
         # Labs run on loopback; if the target is private, private stays allowed
         # for this session. Otherwise it must be explicitly requested.
-        self.allow_private = allow_private or _is_private_host(parsed.hostname)
-        self._private_cache: dict[str, bool] = {parsed.hostname.lower(): False}
+        target_private = _is_private_host(parsed.hostname)
+        self.allow_private = allow_private or target_private
+        # seed the cache with the target's real resolution
+        self._private_cache: dict[str, bool] = {
+            parsed.hostname.lower(): target_private}
 
     def host_allowed(self, host: str) -> bool:
         host = host.lower()

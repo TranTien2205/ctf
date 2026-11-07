@@ -72,6 +72,9 @@ class GuardedClient:
         resp = None
         chain: list[dict] = []
         blocked_to = ""
+        # passing timeout=None to httpx builds Timeout(None) - an INFINITE
+        # wait that overrides the client default; only pass it when set.
+        tkw = {} if timeout is None else {"timeout": timeout}
         try:
             resp = self._client.request(
                 method.upper(),
@@ -79,7 +82,7 @@ class GuardedClient:
                 headers=req_headers,
                 content=body,
                 follow_redirects=False,
-                timeout=timeout,
+                **tkw,
             )
             # Manual redirect following: letting httpx follow automatically
             # would skip the scope check on each Location - a 302 to a
@@ -98,9 +101,10 @@ class GuardedClient:
                 m2 = "GET" if resp.status_code in (301, 302, 303) \
                     else method.upper()
                 b2 = None if m2 == "GET" else body
+                self.rate.wait()  # each hop is a real request on the wire
                 resp = self._client.request(
                     m2, nxt, headers=req_headers, content=b2,
-                    follow_redirects=False, timeout=timeout)
+                    follow_redirects=False, **tkw)
                 hops += 1
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             raw = resp.content[:BODY_CAP]

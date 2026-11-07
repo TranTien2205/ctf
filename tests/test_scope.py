@@ -182,6 +182,34 @@ def test_ffuf_arg_guards(ctx, tmp_path):
     assert f(["-u", "http://x/FUZZ", "-mc", "200"]) is None
 
 
+def test_send_timeout_never_infinite(ctx):
+    """send(timeout=None) must NOT pass timeout=None to httpx - that
+    builds Timeout(None), an infinite wait overriding the 15s default."""
+    calls = []
+
+    class _Resp:
+        status_code = 200
+        headers = {}
+        content = b""
+        encoding = "utf-8"
+        url = "http://127.0.0.1/"
+
+    orig = ctx.client._client.request
+
+    def spy(method, url, **kw):
+        calls.append(kw)
+        return _Resp()
+
+    ctx.client._client.request = spy
+    try:
+        ctx.client.send("GET", "http://127.0.0.1/")
+        ctx.client.send("GET", "http://127.0.0.1/", timeout=3.0)
+    finally:
+        ctx.client._client.request = orig
+    assert "timeout" not in calls[0]          # client default applies
+    assert calls[1]["timeout"] == 3.0
+
+
 def test_nuclei_arg_guards(ctx, tmp_path):
     """nuclei -l target files are scope-checked; a hand-made template
     file and code templates are refused; built-in template names pass."""
