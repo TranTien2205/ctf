@@ -120,8 +120,27 @@ def resolve_auth(args) -> tuple[str, str]:
     return _opencode_credential()
 
 
+def _load_dotenv(path: Path = Path(".env")) -> None:
+    """Populate os.environ from a .env file (KEY=VALUE lines, # comments,
+    optional quotes). Never overrides variables already set."""
+    if not path.exists():
+        return
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+    except OSError:
+        pass
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
+    _load_dotenv()
     api_key, auth_token = resolve_auth(args)
     api_base = os.environ.get("ANTHROPIC_BASE_URL", API_URL).rstrip("/") + "/messages" \
         if os.environ.get("ANTHROPIC_BASE_URL") else API_URL
