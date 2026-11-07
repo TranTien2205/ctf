@@ -65,18 +65,36 @@ class MCPClient:
         self._tools: list[dict] | None = None
 
     # ------------------------------------------------------------ plumbing
+    # the base environment handed to a server is scrubbed of secrets -
+    # an MCP subprocess must not inherit ANTHROPIC_API_KEY and friends;
+    # servers get credentials only via their own 'env' spec.
+    _SECRET_RE = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL",
+                  "CREDS")
+
     def _start(self) -> None:
         if self._proc is not None and self._proc.poll() is None:
             return
         self._proc = None
         self._pending.clear()
-        env = dict(os.environ)
+        env = {k: v for k, v in os.environ.items()
+               if not any(s in k.upper() for s in self._SECRET_RE)}
         env.update(self.env_extra)
-        self._proc = subprocess.Popen(
-            self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL, env=env, bufsize=0)
-        threading.Thread(target=self._reader_loop, daemon=True).start()
-        self._initialize()
+        try:
+            self._proc = subprocess.Popen(
+                self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, env=env, bufsize=0)
+            threading.Thread(target=self._reader_loop, daemon=True).start()
+            self._initialize()
+        except Exception:
+            # never leave a half-started server around - next call retries
+            try:
+                if self._proc:
+                    self._proc.kill()
+            except Exception:
+                pass
+            self._proc = None
+            self._tools = None
+            raise
 
     def _reader_loop(self) -> None:
         proc = self._proc
@@ -89,8 +107,9 @@ class MCPClient:
             except ValueError:
                 continue
             rid = msg.get("id")
-            if rid in self._pending:
-                self._pending[rid].put(msg)
+            q = self._pending.get(rid)
+            if q is not None:
+                q.put(msg)
             # notifications and orphaned responses are dropped
 
     def _write(self, msg: dict) -> None:

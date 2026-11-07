@@ -87,3 +87,14 @@ def test_session_resume(tmp_path):
     f2 = s2.add_finding("cites old", "low", "lfi", "http://t/old",
                         [rid], "proof", "d", "r")
     assert f2["id"] == "F03"
+
+
+def test_session_resume_wrong_target_refused(tmp_path):
+    """Resuming a session recorded against a different target would mix
+    two engagements' evidence - it must fail loudly."""
+    s = Session(tmp_path, "http://a.local", meta={})
+    with pytest.raises(ValueError, match="target"):
+        Session(tmp_path, "http://b.local", meta={}, resume=s.dir)
+    # same target still resumes fine
+    s2 = Session(tmp_path, "http://a.local", meta={}, resume=s.dir)
+    assert s2.resumed

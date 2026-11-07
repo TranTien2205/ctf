@@ -3,6 +3,7 @@ wordlist-driven fuzzing, and the resources/exploits manifest runner."""
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import time
@@ -207,19 +208,49 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
         ctx.scope.check(target)  # the script may only see in-scope targets
     except Exception as exc:
         return {"error": f"target rejected by scope guard: {exc}"}
+    # {args} is free text smuggled into the command line - it must not
+    # carry a foreign URL/host past the guard either
+    from .analysis import _URL_RE, _HOST_RE, _split_args
+    for u in _URL_RE.findall(args or ""):
+        try:
+            ctx.scope.check(u)
+        except Exception as exc:
+            return {"error": f"args rejected by scope guard: {exc}"}
+    for tok in _split_args(args or ""):
+        if tok.startswith("-"):
+            continue
+        host = tok.split(":")[0]
+        if _HOST_RE.fullmatch(host):
+            try:
+                ctx.scope.check("http://" + host)
+            except Exception as exc:
+                return {"error": f"args rejected by scope guard: {exc}"}
     cmd_tpl = manifest.get("command")
     if not cmd_tpl:
         return {"error": "manifest has no command"}
     cmd = [part.replace("{target}", target).replace("{args}", args or "")
            for part in cmd_tpl]
-    cmd[0] = str(edir / cmd[0]) if not Path(cmd[0]).is_absolute() else cmd[0]
+    if Path(cmd[0]).is_absolute():
+        script = Path(cmd[0])
+    else:
+        script = (edir / cmd[0]).resolve()
+        # relative entry points stay inside the exploit's own directory
+        if not script.is_relative_to(edir.resolve()):
+            return {"error": "manifest command escapes the exploit dir"}
+    cmd[0] = str(script)
     if cmd[0].endswith(".py"):
         import sys
         cmd = [sys.executable] + cmd
     timeout_s = max(5, min(int(timeout_s or manifest.get("timeout_s", 60)), 300))
     try:
+        # exploit PoCs are the least-trusted local code (often downloaded)
+        # - scrub credentials from the environment they inherit
+        from ..mcp import MCPClient
+        env = {k: v for k, v in os.environ.items()
+               if not any(s in k.upper() for s in MCPClient._SECRET_RE)}
         proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout_s, errors="replace", cwd=str(edir))
+                              timeout=timeout_s, errors="replace",
+                              cwd=str(edir), env=env)
         output = (proc.stdout or "") + \
             ("\n[stderr]\n" + proc.stderr if proc.stderr else "")
     except subprocess.TimeoutExpired:

@@ -67,9 +67,16 @@ class Session:
         if mpath.exists():
             try:
                 old = json.loads(mpath.read_text(encoding="utf-8"))
-                self.started = float(old.get("started") or self.started)
             except (ValueError, OSError):
-                pass
+                old = {}
+            self.started = float(old.get("started") or self.started)
+            old_target = old.get("target")
+            # resuming against a different target would conflate two
+            # engagements' evidence and findings - refuse loudly
+            if old_target and old_target != target:
+                raise ValueError(
+                    f"cannot resume {sdir.name}: session target "
+                    f"{old_target!r} != current target {target!r}")
         tpath = sdir / "transcript.jsonl"
         if tpath.exists():
             for line in tpath.read_text(encoding="utf-8").splitlines():

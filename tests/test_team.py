@@ -142,6 +142,54 @@ def test_run_exploit_scope(ctx):
     assert "error" in out
 
 
+def test_run_exploit_args_scope(ctx, lab_url):
+    """{args} is free text on the command line - a foreign URL/host in it
+    must not slip past the scope guard."""
+    ctx.board = Board(ctx.session)
+    out = teamtools.run_exploit(ctx, "lab-auth-bypass", lab_url,
+                                args="--next http://evil.example/x")
+    assert "scope" in out["error"]
+    out = teamtools.run_exploit(ctx, "lab-auth-bypass", lab_url,
+                                args="evil.example")
+    assert "scope" in out["error"]
+    out = teamtools.run_exploit(ctx, "lab-auth-bypass", lab_url,
+                                args="--verbose")
+    assert "scope" not in out.get("error", "")
+
+
+def test_run_exploit_env_scrubbed(ctx, lab_url, tmp_path, monkeypatch):
+    """Exploit PoCs may come from the internet - they must not inherit
+    credentials from the process environment."""
+    import argus.tools.team as tt
+    d = tmp_path / "envcheck"
+    d.mkdir()
+    (d / "manifest.json").write_text(
+        '{"id":"envcheck","command":["probe.py","{target}"],'
+        '"proof_marker":"ok"}')
+    (d / "probe.py").write_text(
+        "import os\n"
+        "print('SEEN=' + os.environ.get('MY_API_KEY','<absent>'))\n"
+        "print('ok')\n")
+    monkeypatch.setenv("MY_API_KEY", "topsecret")
+    monkeypatch.setattr(tt, "EXPLOITS", tmp_path)
+    out = tt.run_exploit(ctx, "envcheck", lab_url)
+    assert out.get("proof") is True, out
+    assert "SEEN=<absent>" in out["output"]
+    assert "topsecret" not in out["output"]
+
+
+def test_run_exploit_command_escape(ctx, lab_url, tmp_path, monkeypatch):
+    """A manifest whose relative command leaves its own dir is refused."""
+    import argus.tools.team as tt
+    d = tmp_path / "esc"
+    d.mkdir()
+    (d / "manifest.json").write_text(
+        '{"id":"esc","command":["../outside.py","{target}"]}')
+    monkeypatch.setattr(tt, "EXPLOITS", tmp_path)
+    out = tt.run_exploit(ctx, "esc", lab_url)
+    assert "escapes" in out["error"]
+
+
 # ------------------------------------------------------------ e2e team
 
 def _tool(name, **inp):
