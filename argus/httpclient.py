@@ -43,6 +43,7 @@ class GuardedClient:
         tls_verify: bool = False,
         max_requests: int = 400,
         agent: str = "",
+        proxy: str = "",
     ):
         self.scope = scope
         self.session = session
@@ -50,11 +51,16 @@ class GuardedClient:
         self.max_requests = max_requests
         self.agent = agent
         self.sent = 0
+        # Operator-level proxy (--proxy): routes target traffic through an
+        # intercepting proxy such as Burp/ZAP for live inspection. This is
+        # NOT reachable by the model - external-tool proxy flags stay
+        # refused in the arg guards.
         self._client = httpx.Client(
             verify=tls_verify,
             follow_redirects=False,
             timeout=httpx.Timeout(15.0, connect=8.0),
             headers=default_headers or {},
+            proxy=proxy or None,
         )
 
     def send(

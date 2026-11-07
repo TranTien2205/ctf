@@ -68,7 +68,7 @@ class AgentLoop:
                 self.scope, self.session, RateLimiter(cfg.rate_rps),
                 default_headers=cfg.resolved_headers(),
                 tls_verify=cfg.tls_verify, max_requests=cfg.max_requests,
-                agent=agent_name,
+                agent=agent_name, proxy=cfg.proxy,
             )
             self._owns_client = True
         else:

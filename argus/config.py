@@ -38,6 +38,7 @@ class Config:
     llm_max_tokens: int = 4096
     mcp_config: str = ""
     resume: str = ""
+    proxy: str = ""
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -157,4 +158,5 @@ def load_config(args) -> Config:
         llm_max_tokens=args.llm_max_tokens,
         mcp_config=getattr(args, "mcp_config", "") or "",
         resume=getattr(args, "resume", "") or "",
+        proxy=getattr(args, "proxy", "") or "",
     )

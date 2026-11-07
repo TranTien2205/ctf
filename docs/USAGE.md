@@ -31,6 +31,7 @@ python -m argus run https://app.example \
 | `--max-requests` | 400 | HTTP request budget |
 | `--max-time` | 2400 | wall-clock seconds |
 | `--rate` | 5 | requests/second cap |
+| `--proxy` | none | route via Burp/ZAP for inspection |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |

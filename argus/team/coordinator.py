@@ -114,7 +114,8 @@ class TeamRun:
             self.scope, self.session, self.rate,
             default_headers=self.cfg.resolved_headers(),
             tls_verify=self.cfg.tls_verify,
-            max_requests=max_requests or self.cfg.max_requests, agent=name)
+            max_requests=max_requests or self.cfg.max_requests, agent=name,
+            proxy=self.cfg.proxy)
 
     def _start_worker(self, name: str, card, task: str) -> None:
         self.board.register(name, card.name, task)

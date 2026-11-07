@@ -30,6 +30,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-time", type=float, default=2400,
                    help="Wall-clock budget in seconds")
     p.add_argument("--rate", type=float, default=5.0, help="Requests/second cap")
+    p.add_argument("--proxy",
+                   help="Route target traffic through a proxy for inspection "
+                        "(e.g. Burp/ZAP at http://127.0.0.1:8080)")
     p.add_argument("--session-dir", default="sessions")
     p.add_argument("--allow-private", action="store_true",
                    help="Permit private/loopback targets (auto-allowed if target is private)")

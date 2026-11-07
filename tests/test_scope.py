@@ -247,6 +247,42 @@ def test_redirect_hops_count_against_budget(lab_url, tmp_path):
         client.send("GET", lab_url + "/")
 
 
+def test_proxy_routes_traffic(lab_url, tmp_path):
+    """--proxy must actually route target traffic through the proxy -
+    the operator's inspection point (Burp/ZAP) depends on it."""
+    import threading
+    import urllib.request
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    hits = []
+
+    class _ForwardProxy(BaseHTTPRequestHandler):
+        def do_GET(self):
+            hits.append(self.path)
+            data = urllib.request.urlopen(self.path, timeout=5).read()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+
+    proxy = ThreadingHTTPServer(("127.0.0.1", 0), _ForwardProxy)
+    threading.Thread(target=proxy.serve_forever, daemon=True).start()
+    try:
+        cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path)
+        scope = ScopeGuard(cfg.target, allow_private=True)
+        session = Session(tmp_path, cfg.target, meta={})
+        client = GuardedClient(scope, session, RateLimiter(0),
+                               proxy=f"http://127.0.0.1:{proxy.server_address[1]}")
+        out = client.send("GET", lab_url + "/")
+        assert out["status"] == 200
+        assert hits and hits[0].startswith("http://127.0.0.1:")
+    finally:
+        proxy.shutdown()
+
+
 def test_nuclei_arg_guards(ctx, tmp_path):
     """nuclei -l target files are scope-checked; a hand-made template
     file and code templates are refused; built-in template names pass."""
