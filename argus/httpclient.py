@@ -113,6 +113,10 @@ class GuardedClient:
                     else method.upper()
                 b2 = None if m2 == "GET" else body
                 self.rate.wait()  # each hop is a real request on the wire
+                if self.sent >= self.max_requests:
+                    chain[-1]["budget_exhausted"] = True
+                    break
+                self.sent += 1
                 resp = self._client.request(
                     m2, nxt, headers=req_headers, content=b2,
                     follow_redirects=False, **tkw)
@@ -147,7 +151,7 @@ class GuardedClient:
                     self.session.record_exchange(
                         tool=tool,
                         request={"method": method.upper(), "url": url,
-                                 "headers": req_headers,
+                                 "headers": dict(resp.request.headers),
                                  "body": body.decode("utf-8", "replace")
                                  if isinstance(body, bytes) else body},
                         response={"status": resp.status_code,
@@ -162,10 +166,20 @@ class GuardedClient:
                     pass
             raise
 
+        # Record what the wire actually carried: httpx merges client-level
+        # default headers and the cookie jar silently, so req_headers alone
+        # would hide e.g. Authorization or session cookies from the audit.
+        sent_headers = req_headers
+        if resp is not None:
+            try:
+                sent_headers = dict(resp.request.headers)
+            except Exception:
+                pass
+
         rid = self.session.record_exchange(
             tool=tool,
             request={"method": method.upper(), "url": url,
-                     "headers": req_headers,
+                     "headers": sent_headers,
                      "body": body.decode("utf-8", "replace") if isinstance(body, bytes) else body},
             response=response_data,
             note=note,

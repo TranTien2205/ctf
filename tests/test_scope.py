@@ -5,7 +5,11 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from argus.config import Config
+from argus.httpclient import GuardedClient, RequestBudgetExhausted
+from argus.ratelimit import RateLimiter
 from argus.scope import ScopeError, ScopeGuard
+from argus.session import Session
 
 
 def test_in_scope_host_ok():
@@ -207,8 +211,40 @@ def test_send_timeout_never_infinite(ctx):
         ctx.client.send("GET", "http://127.0.0.1/", timeout=3.0)
     finally:
         ctx.client._client.request = orig
-    assert "timeout" not in calls[0]          # client default applies
+    assert "timeout" not in calls[0]
     assert calls[1]["timeout"] == 3.0
+
+
+def test_transcript_records_wire_headers(lab_url, tmp_path):
+    """Recorded request headers must reflect the wire - client default
+    headers (e.g. --header Authorization) and jar cookies included."""
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path)
+    scope = ScopeGuard(cfg.target, allow_private=True)
+    session = Session(tmp_path, cfg.target, meta={})
+    client = GuardedClient(scope, session, RateLimiter(0),
+                           default_headers={"Authorization": "Bearer t3st"},
+                           tls_verify=False)
+    out = client.send("GET", lab_url + "/")
+    entry = session.get_exchange(out["request_id"])
+    hdrs = {k.lower(): v for k, v in entry["request"]["headers"].items()}
+    assert hdrs.get("authorization") == "Bearer t3st"
+    assert hdrs.get("host", "").startswith("127.0.0.1")
+
+
+def test_redirect_hops_count_against_budget(lab_url, tmp_path):
+    """Each followed redirect is a real wire request and must consume the
+    request budget - otherwise a redirect loop multiplies the cap by 8."""
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path)
+    scope = ScopeGuard(cfg.target, allow_private=True)
+    session = Session(tmp_path, cfg.target, meta={})
+    client = GuardedClient(scope, session, RateLimiter(0),
+                           tls_verify=False, max_requests=2)
+    out = client.send("GET", lab_url + "/redirect?next=/item?id=1",
+                      follow_redirects=True)
+    assert out["status"] == 200
+    assert client.sent == 2                     # 1 initial + 1 hop
+    with pytest.raises(RequestBudgetExhausted):
+        client.send("GET", lab_url + "/")
 
 
 def test_nuclei_arg_guards(ctx, tmp_path):
