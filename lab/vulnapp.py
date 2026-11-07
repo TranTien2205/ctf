@@ -14,6 +14,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /redirect?next=       open redirect
     GET  /api/user/<id>        IDOR (any id served)
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
+    POST /xml                  XXE (simulated external-entity resolution)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -297,6 +298,33 @@ const API_KEY = 'lab_key_0123456789abcdef';
                                 f"</body></html>")
             else:
                 self._send(body="<html><body>Login failed.</body></html>")
+            return
+        if path == "/xml":
+            # simulated XXE-prone parser: external entities get "resolved"
+            # against the fake filesystem / a canned metadata service
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
+            m = re.search(r'<!ENTITY\s+(\w+)\s+SYSTEM\s+["\']([^"\']+)["\']',
+                          raw)
+            out = raw
+            if m:
+                name, uri = m.group(1), m.group(2)
+                if uri.startswith("file://"):
+                    target = os.path.normpath(
+                        os.path.join(FAKEFS, uri[7:].lstrip("/")))
+                    try:
+                        with open(target, encoding="utf-8",
+                                  errors="replace") as fh:
+                            content = fh.read(4096)
+                    except OSError:
+                        content = "[entity read failed]"
+                elif uri.startswith("http"):
+                    content = "ami-id\ninstance-id\nlocal-hostname\n"
+                else:
+                    content = ""
+                out = raw.replace(f"&{name};", content)
+            self._send(body=f"<response><echo>{out}</echo></response>",
+                       ctype="application/xml")
             return
         if path == "/graphql":
             b = self._body()

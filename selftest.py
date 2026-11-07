@@ -124,6 +124,8 @@ def main() -> int:
     check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
     out = probes.probe_ssrf(ctx, base + "/fetch?url=x", "url")
     check("ssrf probe sees self-fetch", "ssrf" in out["verdict"])
+    out = probes.probe_xxe(ctx, base + "/xml")
+    check("xxe probe resolves entity", "xxe candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient

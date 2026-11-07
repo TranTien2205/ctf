@@ -77,6 +77,11 @@ def test_ssrf_probe(lab_url, ctx):
     assert hits, out
 
 
+def test_xxe_probe(lab_url, ctx):
+    out = probes.probe_xxe(ctx, lab_url + "/xml")
+    assert "xxe candidate" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

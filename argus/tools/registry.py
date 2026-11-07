@@ -44,6 +44,7 @@ def _impl(name: str) -> Callable:
         "probe_method": probes.probe_method,
         "probe_idor": probes.probe_idor,
         "probe_ssrf": probes.probe_ssrf,
+        "probe_xxe": probes.probe_xxe,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -255,6 +256,16 @@ TOOL_SCHEMAS: list[dict] = [
                                              "(e.g. url, callback, image, dest)"},
         },
         ["url", "param"],
+    ),
+    _schema(
+        "probe_xxe",
+        "XXE check: POSTs a plain XML baseline then doctype payloads that "
+        "declare external entities (local file, Windows ini, cloud "
+        "metadata). Resolved entity bytes echoed in the response are the "
+        "signal.",
+        {"url": {**_STR, "description": URL_DESC +
+                 " Point it at an endpoint that accepts an XML body."}},
+        ["url"],
     ),
     _schema(
         "jwt_decode",
