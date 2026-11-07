@@ -79,9 +79,6 @@ def _parse_surface(html: str) -> _SurfaceParser:
 def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
     depth = max(0, min(int(depth or 2), 4))
     max_pages = max(1, min(int(max_pages or 40), 200))
-    start = urllib.parse.urlparse(url)
-    origin = f"{start.scheme}://{start.netloc}"
-
     seen: set[str] = set()
     queue: list[tuple[str, int]] = [(url, 0)]
     pages: list[dict] = []
@@ -132,7 +129,9 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
                     continue
                 absu = urllib.parse.urljoin(cur, link)
                 pu = urllib.parse.urlparse(absu)
-                if f"{pu.scheme}://{pu.netloc}" != origin:
+                # follow in-scope hosts (incl. declared subdomains), not just
+                # the start origin - scope.check still vets scheme/private
+                if not ctx.scope.host_allowed(pu.hostname or ""):
                     continue
                 if pu.path not in endpoints:
                     endpoints.add(pu.path or "/")

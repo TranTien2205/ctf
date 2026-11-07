@@ -185,11 +185,12 @@ def test_ffuf_arg_guards(ctx, tmp_path):
 def test_send_timeout_never_infinite(ctx):
     """send(timeout=None) must NOT pass timeout=None to httpx - that
     builds Timeout(None), an infinite wait overriding the 15s default."""
+    import httpx
     calls = []
 
     class _Resp:
         status_code = 200
-        headers = {}
+        headers = httpx.Headers()
         content = b""
         encoding = "utf-8"
         url = "http://127.0.0.1/"

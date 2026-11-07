@@ -18,6 +18,17 @@ BODY_CAP = 200_000  # bytes stored in transcript
 RETURN_CAP = 12_000  # chars returned to the model
 
 
+def _headers_dict(resp) -> dict:
+    """dict(headers) collapses multi-value headers; Set-Cookie is the one
+    whose values must stay separate (Expires dates carry commas, and
+    fingerprint parses each cookie's flags)."""
+    hdrs = dict(resp.headers)
+    sc = resp.headers.get_list("set-cookie")
+    if len(sc) > 1:
+        hdrs["set-cookie"] = sc
+    return hdrs
+
+
 class RequestBudgetExhausted(RuntimeError):
     pass
 
@@ -114,7 +125,7 @@ class GuardedClient:
                 text = raw.decode("utf-8", errors="replace")
             response_data = {
                 "status": resp.status_code,
-                "headers": dict(resp.headers),
+                "headers": _headers_dict(resp),
                 "body": text,
                 "elapsed_ms": elapsed_ms,
                 "final_url": str(resp.url),
@@ -140,7 +151,7 @@ class GuardedClient:
                                  "body": body.decode("utf-8", "replace")
                                  if isinstance(body, bytes) else body},
                         response={"status": resp.status_code,
-                                  "headers": dict(resp.headers),
+                                  "headers": _headers_dict(resp),
                                   "body": resp.text[:BODY_CAP],
                                   "redirects": chain,
                                   "blocked_redirect": True,

@@ -44,8 +44,8 @@ def _inject_body(data: str, param: str, value: str) -> str:
     """Replace param's value inside a urlencoded or JSON body template."""
     try:
         obj = _json.loads(data)
-        if isinstance(obj, dict) and param in obj:
-            obj[param] = value
+        if isinstance(obj, dict):
+            obj[param] = value  # append if absent, like the urlencoded path
             return _json.dumps(obj)
     except (ValueError, TypeError):
         pass
@@ -182,19 +182,24 @@ def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
     }
 
 
-_SSTI_PAYLOADS = [
-    ("jinja2/twig", "{{7*7}}", "49"),
-    ("erb/ejs", "<%= 7*7 %>", "49"),
-    ("freemarker/velocity", "${7*7}", "49"),
-    ("thymeleaf/spring", "${{7*7}}", "49"),
+_SSTI_TEMPLATES = [
+    ("jinja2/twig", "{{%d+%d}}"),
+    ("erb/ejs", "<%%= %d+%d %%>"),
+    ("freemarker/velocity", "${%d+%d}"),
+    ("thymeleaf/spring", "${{%d+%d}}"),
 ]
 
 
 def probe_ssti(ctx: Context, url: str, param: str, method: str = "GET",
                data: str | None = None) -> dict:
     base = _send(ctx, url, param, _marker("s"), method, data, "probe_ssti", "baseline")
+    # a random arithmetic sum is virtually never present naturally -
+    # the classic "49" from {{7*7}} collides with dates/ids everywhere
+    a, b = random.randint(10000, 89999), random.randint(1000, 8999)
+    expect = str(a + b)
     hits = []
-    for family, payload, expect in _SSTI_PAYLOADS:
+    for family, tpl in _SSTI_TEMPLATES:
+        payload = tpl % (a, b)
         r = _send(ctx, url, param, payload, method, data, "probe_ssti", family)
         body = r.get("body", "")
         if expect in body and payload not in body:
