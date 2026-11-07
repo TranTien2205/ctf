@@ -46,7 +46,8 @@ EXPLOIT = RoleCard(
     tools=_COMMON | frozenset({
         "pull_leads", "http_request", "probe_reflection", "probe_sqli",
         "probe_time", "probe_ssti", "probe_lfi", "probe_redirect",
-        "probe_cors", "probe_method", "probe_idor", "jwt_decode", "run_external",
+        "probe_cors", "probe_method", "probe_idor", "probe_ssrf",
+        "jwt_decode", "run_external",
         "run_exploit", "list_exploits", "emit_lead", "record_finding", "finish",
     }),
     prompt_file="exploit.md",

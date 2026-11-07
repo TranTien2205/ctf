@@ -70,6 +70,13 @@ def test_idor_probe_query_id(lab_url, ctx):
     assert "idor candidate" in out["verdict"] or "neighbors" in out["verdict"], out
 
 
+def test_ssrf_probe(lab_url, ctx):
+    out = probes.probe_ssrf(ctx, lab_url + "/fetch?url=x", "url")
+    assert "ssrf" in out["verdict"], out
+    hits = [h for h in out["results"] if h["differs"]]
+    assert hits, out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

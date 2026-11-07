@@ -43,6 +43,7 @@ def _impl(name: str) -> Callable:
         "probe_cors": probes.probe_cors,
         "probe_method": probes.probe_method,
         "probe_idor": probes.probe_idor,
+        "probe_ssrf": probes.probe_ssrf,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -241,6 +242,19 @@ TOOL_SCHEMAS: list[dict] = [
         {"url": {**_STR, "description": URL_DESC +
                  " Must contain a numeric object id (path or query)."}},
         ["url"],
+    ),
+    _schema(
+        "probe_ssrf",
+        "Server-side request forgery check: injects an unresolvable canary "
+        "then internal URLs (self-fetch on the target's own port, loopback "
+        "name, cloud metadata endpoint) into the parameter and diffs each "
+        "response against the canary error.",
+        {
+            "url": {**_STR, "description": URL_DESC + " Include the query string."},
+            "param": {**_STR, "description": "Parameter that accepts a URL "
+                                             "(e.g. url, callback, image, dest)"},
+        },
+        ["url", "param"],
     ),
     _schema(
         "jwt_decode",

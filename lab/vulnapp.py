@@ -13,6 +13,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /download?file=       path traversal / file read
     GET  /redirect?next=       open redirect
     GET  /api/user/<id>        IDOR (any id served)
+    GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -33,6 +34,7 @@ import sys
 import threading
 import time
 import urllib.parse
+import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 LABDIR = os.path.dirname(os.path.abspath(__file__))
@@ -200,6 +202,16 @@ class Handler(BaseHTTPRequestHandler):
             nxt = p.get("next", "/")
             self._send(302, "<html><body>redirecting</body></html>",
                        headers={"Location": nxt})
+
+        elif path == "/fetch":
+            u = p.get("url", "")
+            try:
+                with urllib.request.urlopen(u, timeout=3) as resp:
+                    data = resp.read(4096)
+                self._send(body=b"FETCHED:\n" + data)
+            except Exception as exc:
+                self._send(502, f"fetch error for {u}: {exc}",
+                           ctype="text/plain")
 
         elif path.startswith("/api/user/"):
             uid = path.rsplit("/", 1)[-1]
