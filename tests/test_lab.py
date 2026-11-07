@@ -113,6 +113,22 @@ def test_graphql_introspect(lab_url, ctx):
     assert "User" in names, out
 
 
+def test_race_probe(lab_url, ctx):
+    out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
+    assert "race candidate" in out["verdict"], out
+    assert out["statuses"].get(200, 0) > 1, out
+
+
+def test_deserialize_probe(lab_url, ctx):
+    out = probes.probe_deserialize(ctx, lab_url + "/import?data=x", "data")
+    assert "deserialization surface" in out["verdict"], out
+
+
+def test_cache_probe(lab_url, ctx):
+    out = probes.probe_cache(ctx, lab_url + "/cached")
+    assert "cache-poisoning candidate" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

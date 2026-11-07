@@ -17,6 +17,9 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     POST /xml                  XXE (simulated external-entity resolution)
     POST /api/login            NoSQLi ($ne/$gt operator password bypass)
     POST /upload, GET /uploads file upload served back with active content-type
+    GET  /redeem               race condition (unlocked check-then-act)
+    GET  /import?data=         deserialization (magic bytes -> parser error)
+    GET  /cached               cache poisoning (X-Forwarded-Host unkeyed)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -284,6 +287,38 @@ const API_KEY = 'lab_key_0123456789abcdef';
                      else "application/octet-stream")
             self._send(body=data, ctype=ctype)
 
+        elif path == "/redeem":
+            # TOCTOU: check-then-act with no lock - concurrent requests all
+            # pass the guard before the first commits the decrement
+            if self._coupons > 0:
+                time.sleep(0.05)      # deterministic race window
+                type(self)._coupons -= 1
+                self._send(body=json.dumps(
+                    {"ok": True, "left": type(self)._coupons}))
+            else:
+                self._send(409, json.dumps({"ok": False}),
+                           ctype="application/json")
+
+        elif path == "/import":
+            # simulated vulnerable deserializer: magic-bytes payloads reach
+            # the parser and produce framework error strings
+            v = p.get("data", "")
+            if v.startswith(("rO0AB", "O:", "a:", "c__builtin__",
+                            "{", "!!", "\xac")):
+                self._send(500, "java.io.InvalidClassException: filter "
+                                "status - REJECTED", ctype="text/plain")
+            else:
+                self._send(body="imported: " + v[:80])
+
+        elif path == "/cached":
+            # cache keyed on path only: X-Forwarded-Host is unkeyed input
+            if path not in self._cache:
+                host = (self.headers.get("X-Forwarded-Host")
+                        or self.headers.get("Host") or "lab")
+                self._cache[path] = (f"<html><body>profile: "
+                                     f"http://{host}/me</body></html>")
+            self._send(body=self._cache[path])
+
         elif path == "/admin":
             self._send(403, "<html><body>Forbidden</body></html>")
 
@@ -430,6 +465,8 @@ const API_KEY = 'lab_key_0123456789abcdef';
 
 def make_server(port: int = 0):
     Handler.db = _init_db()
+    Handler._coupons = 1
+    Handler._cache = {}
     os.makedirs(WWW, exist_ok=True)
     os.makedirs(os.path.join(FAKEFS, "etc"), exist_ok=True)
     with open(os.path.join(WWW, "welcome.txt"), "w") as fh:

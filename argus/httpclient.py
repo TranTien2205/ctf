@@ -5,6 +5,7 @@ opens a socket to the target.
 """
 from __future__ import annotations
 
+import threading
 import time
 import urllib.parse
 
@@ -51,6 +52,9 @@ class GuardedClient:
         self.max_requests = max_requests
         self.agent = agent
         self.sent = 0
+        # probe_race fires concurrent sends through one client - the budget
+        # check+increment must be atomic or threads lose count
+        self._sent_lock = threading.Lock()
         # Operator-level proxy (--proxy): routes target traffic through an
         # intercepting proxy such as Burp/ZAP for live inspection. This is
         # NOT reachable by the model - external-tool proxy flags stay
@@ -76,12 +80,14 @@ class GuardedClient:
     ) -> dict:
         """Send one scoped request, record it, return a compact result."""
         self.scope.check(url)  # raises ScopeError before any byte is sent
-        if self.sent >= self.max_requests:
-            raise RequestBudgetExhausted(
-                f"request budget exhausted ({self.max_requests}); call finish"
-            )
         self.rate.wait()
-        self.sent += 1
+        with self._sent_lock:
+            if self.sent >= self.max_requests:
+                raise RequestBudgetExhausted(
+                    f"request budget exhausted ({self.max_requests}); "
+                    "call finish"
+                )
+            self.sent += 1
 
         req_headers = dict(headers or {})
         started = time.monotonic()
@@ -119,10 +125,11 @@ class GuardedClient:
                     else method.upper()
                 b2 = None if m2 == "GET" else body
                 self.rate.wait()  # each hop is a real request on the wire
-                if self.sent >= self.max_requests:
-                    chain[-1]["budget_exhausted"] = True
-                    break
-                self.sent += 1
+                with self._sent_lock:
+                    if self.sent >= self.max_requests:
+                        chain[-1]["budget_exhausted"] = True
+                        break
+                    self.sent += 1
                 resp = self._client.request(
                     m2, nxt, headers=req_headers, content=b2,
                     follow_redirects=False, **tkw)
