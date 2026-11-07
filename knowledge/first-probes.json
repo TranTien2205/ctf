@@ -1,9 +1,57 @@
 {
-  "ssrf-pdf-fetch": {"probe": "controlled short URL", "expected": "PDF response or timing difference", "next": "test renderer-supported schemes and internal-only targets"},
-  "ssti": {"probe": "{{7*7}}", "expected": "49 evaluated", "next": "identify template engine and flag sink"},
-  "sqli": {"probe": "' OR 1=1-- -", "expected": "response/row difference", "next": "fingerprint DBMS"},
-  "xss-admin-bot": {"probe": "harmless HTML marker", "expected": "reflection or bot callback", "next": "confirm execution context"},
-  "jwt": {"probe": "inspect header/payload without modifying token", "expected": "algorithm/claims", "next": "test only a documented weakness"},
-  "buffer-overflow": {"probe": "checksec and bounded cyclic input", "expected": "controlled crash", "next": "calculate offset"},
-  "rsa": {"probe": "collect n/e/c and key size", "expected": "weak parameter pattern", "next": "run deterministic attack"}
+  "ssrf-pdf-fetch": {
+    "probe": "controlled short URL",
+    "expected": "PDF response or timing difference",
+    "next": "test renderer-supported schemes and internal-only targets"
+  },
+  "ssti": {
+    "probe": "{{7*7}}",
+    "expected": "49 evaluated",
+    "next": "identify template engine and flag sink"
+  },
+  "sqli": {
+    "probe": "' OR 1=1-- -",
+    "expected": "response/row difference",
+    "next": "fingerprint DBMS"
+  },
+  "xss-admin-bot": {
+    "probe": "harmless HTML marker",
+    "expected": "reflection or bot callback",
+    "next": "confirm execution context"
+  },
+  "jwt": {
+    "probe": "inspect header/payload without modifying token",
+    "expected": "algorithm/claims",
+    "next": "test only a documented weakness"
+  },
+  "buffer-overflow": {
+    "probe": "checksec and bounded cyclic input",
+    "expected": "controlled crash",
+    "next": "calculate offset"
+  },
+  "rsa": {
+    "probe": "collect n/e/c and key size",
+    "expected": "weak parameter pattern",
+    "next": "run deterministic attack"
+  },
+  "artifact-inventory": {
+    "probe": "artifact_inventory.py --path <bundle> --hash",
+    "expected": "typed inventory with per-family counts",
+    "next": "one evtx_query/parser question at a time"
+  },
+  "pivot-extraction": {
+    "probe": "extract the one unique identifier in the handout",
+    "expected": "a pivot no other entry shares",
+    "next": "work one source at a time, stop on first hit"
+  },
+  "model-surface-map": {
+    "probe": "name the sink the model output reaches",
+    "expected": "a tool/eval/render sink under input control",
+    "next": "one harmless boundary probe"
+  },
+  "service-intake": {
+    "probe": "find the flag store and the checker's request shape",
+    "expected": "the path that reaches the flag and the SLA contract",
+    "next": "credential rotation, then planted-backdoor sweep"
+  }
 }

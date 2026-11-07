@@ -36,6 +36,10 @@ def main():
         "rev": [("validation-path", r"rev|binary|reverse|decompil\w*|disassembl\w*|packed|firmware|bytecode")],
         "forensics": [("artifact-analysis", r"pcap|memory|disk|stego|forensic")],
         "misc": [("encoding-constraint", r"jail|sandbox|encoding|vm|programming")],
+        "dfir": [("artifact-inventory", r"evtx|sysmon|registry|hive|\$?mft|prefetch|amcache|cloudtrail|sherlock|bundle")],
+        "osint": [("pivot-extraction", r"username|handle|domain|photo|image|geolocat\w*|whois|certificate")],
+        "ai": [("model-surface-map", r"llm|prompt|model|pickle|firmware|mqtt|coap|iot")],
+        "ad": [("service-intake", r"flag store|tick|vulnbox|checker|sla|patch|defen[cs]e|availability")],
     }
     for technique, pattern in rules.get(route["category"], []):
         hits = re.findall(r"(?<!\w)(?:" + pattern + r")(?!\w)", text, re.I)
