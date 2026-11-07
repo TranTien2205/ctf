@@ -82,6 +82,17 @@ def test_xxe_probe(lab_url, ctx):
     assert "xxe candidate" in out["verdict"], out
 
 
+def test_csrf_probe(lab_url, ctx):
+    out = probes.probe_csrf(ctx, lab_url + "/login")
+    assert "csrf" in out["verdict"], out
+    assert out["unprotected"], out
+
+
+def test_xfh_probe(lab_url, ctx):
+    out = probes.probe_xfh(ctx, lab_url + "/reset")
+    assert "host-header candidate" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

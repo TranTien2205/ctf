@@ -440,3 +440,78 @@ def probe_xxe(ctx: Context, url: str) -> dict:
         verdict = "no xxe signal"
     return {"verdict": verdict, "base_id": base["request_id"],
             "results": hits}
+
+
+_FORM_RE = re.compile(r"<form[^>]*>", re.I)
+_INPUT_RE = re.compile(r"<input[^>]*>", re.I)
+_CSRF_TOKEN_RE = re.compile(r"csrf|xsrf|token|nonce|authenticity|_key", re.I)
+
+
+def _forms(html: str) -> list[dict]:
+    """Minimal form inventory: method, action, hidden input names."""
+    forms = []
+    for m in _FORM_RE.finditer(html):
+        tag = m.group(0)
+        method = re.search(r'method=["\']?(\w+)', tag, re.I)
+        action = re.search(r'action=["\']([^"\']*)', tag, re.I)
+        end = html.find("</form>", m.end())
+        seg = html[m.end(): end if end > 0 else len(html)]
+        hidden = []
+        for itag in _INPUT_RE.finditer(seg):
+            t = re.search(r'type=["\']?(\w+)', itag.group(0), re.I)
+            nm = re.search(r'name=["\']([^"\']+)', itag.group(0), re.I)
+            if nm and (not t or t.group(1).lower() == "hidden"):
+                hidden.append(nm.group(1))
+        forms.append({"method": method.group(1).upper() if method else "GET",
+                      "action": action.group(1) if action else "",
+                      "hidden": hidden})
+    return forms
+
+
+def probe_csrf(ctx: Context, url: str) -> dict:
+    """CSRF surface check: POST forms without anti-CSRF tokens plus
+    session cookies missing SameSite=Lax/Strict."""
+    r = ctx.client.send("GET", url, tool="probe_csrf", note="form inventory")
+    body = r.get("body") or ""
+    forms = _forms(body)
+    post_forms = [f for f in forms if f["method"] == "POST"]
+    unprotected = [f for f in post_forms
+                   if not any(_CSRF_TOKEN_RE.search(n) for n in f["hidden"])]
+    sc = (r.get("headers") or {}).get("set-cookie") or []
+    if isinstance(sc, str):
+        sc = [sc]
+    weak_cookies = [c.split("=", 1)[0] for c in sc
+                    if "samesite" not in c.lower()]
+    if not post_forms:
+        verdict = "no state-changing forms"
+    elif not unprotected:
+        verdict = "post forms carry anti-csrf tokens"
+    elif weak_cookies:
+        verdict = ("csrf candidate: POST form(s) lack anti-CSRF token and "
+                   "session cookies lack SameSite -> "
+                   + ", ".join(f["action"] or "?" for f in unprotected))
+    else:
+        verdict = ("csrf lead: POST form(s) lack anti-CSRF token; no "
+                   "session cookie seen - confirm auth is cookie-based")
+    return {"verdict": verdict, "request_id": r["request_id"],
+            "post_forms": post_forms, "unprotected": unprotected,
+            "weak_cookies": weak_cookies}
+
+
+def probe_xfh(ctx: Context, url: str) -> dict:
+    """Host-header poisoning: X-Forwarded-Host canary reflected into the
+    body or Location means generated absolute links can be attacker-aimed
+    (password-reset poisoning, cache poisoning)."""
+    canary = f"{_marker('xfh')}.argus.invalid"
+    r = ctx.client.send("GET", url, headers={"X-Forwarded-Host": canary},
+                        tool="probe_xfh", note="xfh canary")
+    body = r.get("body") or ""
+    loc = (r.get("headers") or {}).get("location", "")
+    if isinstance(loc, list):
+        loc = " ".join(loc)
+    where = ("Location" if canary in loc
+             else "body" if canary in body else "")
+    verdict = (f"host-header candidate: X-Forwarded-Host reflected in {where}"
+               if where else "no host-header reflection")
+    return {"verdict": verdict, "request_id": r["request_id"],
+            "canary": canary, "reflected_in": where}

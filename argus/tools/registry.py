@@ -45,6 +45,8 @@ def _impl(name: str) -> Callable:
         "probe_idor": probes.probe_idor,
         "probe_ssrf": probes.probe_ssrf,
         "probe_xxe": probes.probe_xxe,
+        "probe_csrf": probes.probe_csrf,
+        "probe_xfh": probes.probe_xfh,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -265,6 +267,23 @@ TOOL_SCHEMAS: list[dict] = [
         "signal.",
         {"url": {**_STR, "description": URL_DESC +
                  " Point it at an endpoint that accepts an XML body."}},
+        ["url"],
+    ),
+    _schema(
+        "probe_csrf",
+        "CSRF surface check: inventories forms on the page, flags POST "
+        "forms without anti-CSRF hidden tokens, and checks session cookies "
+        "for missing SameSite=Lax/Strict.",
+        {"url": {**_STR, "description": URL_DESC +
+                 " Point it at a page containing the state-changing form."}},
+        ["url"],
+    ),
+    _schema(
+        "probe_xfh",
+        "Host-header poisoning check: sends an X-Forwarded-Host canary and "
+        "reports whether it is reflected into the response body or the "
+        "Location header (password-reset poisoning, cache poisoning).",
+        {"url": {**_STR, "description": URL_DESC}},
         ["url"],
     ),
     _schema(

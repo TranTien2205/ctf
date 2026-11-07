@@ -277,6 +277,16 @@ const API_KEY = 'lab_key_0123456789abcdef';
 <input name="username"><input name="password" type="password">
 <button>login</button></form></body></html>""")
 
+        elif path == "/reset":
+            # password-reset form that builds its action URL from Host /
+            # X-Forwarded-Host - the classic host-header poisoning shape
+            host = self.headers.get("X-Forwarded-Host") or \
+                self.headers.get("Host") or "lab"
+            self._send(body=f"""<html><body><h1>Reset password</h1>
+<form method="POST" action="http://{host}/reset">
+<input name="email"><button>send reset link</button>
+</form></body></html>""")
+
         else:
             self._send(404, "<html><body>not found</body></html>")
 

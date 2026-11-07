@@ -126,6 +126,10 @@ def main() -> int:
     check("ssrf probe sees self-fetch", "ssrf" in out["verdict"])
     out = probes.probe_xxe(ctx, base + "/xml")
     check("xxe probe resolves entity", "xxe candidate" in out["verdict"])
+    out = probes.probe_csrf(ctx, base + "/login")
+    check("csrf probe flags tokenless form", "csrf" in out["verdict"])
+    out = probes.probe_xfh(ctx, base + "/reset")
+    check("xfh probe sees reflected host", "candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient
