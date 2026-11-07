@@ -95,24 +95,30 @@ class TeamRun:
             self._start_worker(name, card, task or _DEFAULT_TASKS[role])
             return {"spawned": name, "role": role}
 
-    def _mk_client(self, name: str) -> GuardedClient:
+    def _mk_client(self, name: str, max_requests: int = 0) -> GuardedClient:
         return GuardedClient(
             self.scope, self.session, self.rate,
             default_headers=self.cfg.resolved_headers(),
             tls_verify=self.cfg.tls_verify,
-            max_requests=self.cfg.max_requests, agent=name)
+            max_requests=max_requests or self.cfg.max_requests, agent=name)
 
     def _start_worker(self, name: str, card, task: str) -> None:
         self.board.register(name, card.name, task)
-        system = build_system(self.cfg, self.scope) + "\n\n" + card.prompt()
+        import dataclasses
+        wcfg = dataclasses.replace(
+            self.cfg,
+            max_turns=card.turns or self.cfg.max_turns,
+            max_requests=card.requests or self.cfg.max_requests)
+        system = build_system(wcfg, self.scope) + "\n\n" + card.prompt()
         seed = (f"You are {name}, a {card.name} worker on an authorized "
                 f"team assessment of {self.cfg.target}.\n"
                 f"Task from the lead: {task}\n"
                 f"{'Pull work with pull_leads().' if card.name == 'exploit' else 'Begin your task now.'}")
         loop = AgentLoop(
-            self.cfg, llm=self._llm_factory(card.name, name),
+            wcfg, llm=self._llm_factory(card.name, name),
             quiet=self.quiet, scope=self.scope, session=self.session,
-            client=self._mk_client(name), board=self.board, mcp=self.mcp,
+            client=self._mk_client(name, card.requests), board=self.board,
+            mcp=self.mcp,
             agent_name=name, role=card.name, allowed=card.tools,
             system=system, seed=seed,
             stop_event=self.board.stop, report=False)

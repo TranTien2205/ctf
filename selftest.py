@@ -55,6 +55,9 @@ def main() -> int:
     check("finding rejects invented evidence",
           _raises(ValueError, lambda: s.add_finding(
               "t", "low", "x", "u", [rid], "not-present", "d", "r")))
+    check("finding dedups same class+endpoint",
+          _raises(ValueError, lambda: s.add_finding(
+              "t2", "low", "x", "u", [rid], "root:x", "d", "r")))
 
     # --- probe checks against live lab -----------------------------------
     from argus.config import Config
@@ -113,6 +116,27 @@ def main() -> int:
     check("report renders evidence",
           Path(result["report"]).exists()
           and "sqlite3.OperationalError" in Path(result["report"]).read_text())
+    sj = json.loads((Path(result["report"]).parent / "summary.json")
+                    .read_text(encoding="utf-8"))
+    check("summary carries run metrics",
+          "time_to_first_finding_s" in sj and sj.get("llm_calls") == 3)
+
+    # --- MCP bridge (fake stdio server) -----------------------------------
+    from argus.mcp import MCPManager
+    from argus.tools import mcp_tools
+    mcfg = tmp / "mcp.json"
+    mcfg.write_text(json.dumps({"servers": {"fake": {
+        "command": [sys.executable,
+                    str(ROOT / "tests" / "fake_mcp_server.py")]}}}))
+    mgr = MCPManager(mcfg)
+    try:
+        ctx.mcp = mgr
+        out = mcp_tools.mcp_call(ctx, "fake", "echo", {"hi": 1})
+        check("mcp_call roundtrips via stdio", "echo:" in out.get("output", ""))
+        out = mcp_tools.mcp_call(ctx, "ghost", "x", {})
+        check("mcp_call unknown server errors", "error" in out)
+    finally:
+        mgr.close()
 
     # --- team mode: lead pipeline + role gating + exploit runner ----------
     from argus.team.board import Board

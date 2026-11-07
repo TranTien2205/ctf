@@ -19,6 +19,8 @@ class RoleCard:
     tools: frozenset          # tool names this role may call
     prompt_file: str          # under roles/
     worker: bool = True       # False for the lead itself
+    turns: int = 0            # per-worker turn cap; 0 = inherit --max-turns
+    requests: int = 0         # per-worker request cap; 0 = inherit
 
     def prompt(self) -> str:
         path = ROLES_DIR / self.prompt_file
@@ -56,6 +58,7 @@ REPORT = RoleCard(
         "read_findings", "finish",
     }),
     prompt_file="report.md",
+    turns=15,                 # report reads, summarizes, exits
 )
 
 LEAD = RoleCard(
