@@ -16,3 +16,6 @@ NUL
 # lab runtime artifacts (recreated by make_server())
 lab/www/
 lab/fakefs/
+
+# MCP server configs may carry API keys in env blocks
+mcp.json
