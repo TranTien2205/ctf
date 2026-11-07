@@ -54,6 +54,38 @@ Design choices and why:
   `mcp_call` results are flagged `untrusted` and logged as transcript
   events.
 
+## Threat model (what each guard is for)
+
+The agent is autonomous; the guards assume the model will eventually try
+something outside the operator's intent - by mistake, by prompt injection,
+or by over-eager tool use. Each boundary is enforced in code, so no
+prompt wording can widen it.
+
+| Attack / failure | Guard | Where |
+|---|---|---|
+| request to an unauthorized host | scope-check before any byte is sent; redirect `Location` re-checked per hop | `ScopeGuard.check`, `GuardedClient.send` |
+| `file:`/`gopher:`/`ftp:` URL schemes | scheme allowlist `http`/`https` | `ScopeGuard.check` |
+| loopback/private pivot to infra | private-address refusal (`--allow-private` opts in; auto-allowed only when the declared target is itself private) | `ScopeGuard` |
+| flood the target | shared token bucket; redirect hops count too | `RateLimiter`, `GuardedClient` |
+| invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
+| scanner output treated as proof | `run_external`/`mcp_call` output is a lead until an `http_request` re-verifies or a `proof_marker` matches | tool notes + evidence gate |
+| exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to `resources/wordlists`+cwd; bundled shorts parsed | `run_external` arg guards |
+| smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
+| redirect connection out of scope | `curl --resolve/--connect-to/-x/proxies`, `nmap --proxies`, `ffuf -x`, `sqlmap --proxy/--tor` refused | arg guards |
+| foreign hosts inside arg files | `-iL`/`-r`/`-l`/`-m`/`--bulk-file`/nuclei `-l` contents scanned per host | `_file_target_check` |
+| local code execution via tool | `sqlmap --eval`, `nmap --script <path>`, `nuclei -t <file>`, `-code` refused | arg guards |
+| credential leak to subprocesses | `KEY/TOKEN/SECRET/PASSWORD/CREDENTIAL` env vars scrubbed for MCP servers and exploit PoCs | `MCPClient`, `run_exploit` |
+| exploit PoC escapes its dir / hits foreign host | relative manifest commands confined to `resources/exploits/<id>`; `{args}` scope-scanned | `run_exploit` |
+| worker exceeds its role | card `tools` set enforced at `dispatch`; only lead holds `spawn_worker`/`finish_engagement` | `cards.py`, `dispatch` |
+| resume mixes two engagements | `--resume` refuses a session whose `meta.json` target differs | `Session._resume` |
+| stalled target hangs a worker | explicit timeouts everywhere; `timeout=None` never reaches httpx | `GuardedClient`, `llm` retry |
+| raw context pollution | workers exchange typed artifacts (leads, notes), never conversation | `LeadQueue`, `Board` |
+
+Residuals accepted by design: DNS re-resolution between `check()` and
+connect (cache per host); an MCP server is operator-configured and may
+reach any URL itself - register only servers you trust; a model can still
+waste budget inside scope.
+
 ## Extension points
 
 - New probe: add a function in `tools/probes.py`, register in

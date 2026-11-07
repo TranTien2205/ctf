@@ -71,6 +71,36 @@ def main() -> int:
     ctx = Context(cfg=cfg, scope=scope, session=s, client=client,
                   skills_dir=ROOT / "argus" / "skills")
 
+    from argus.tools.analysis import (_curl_arg_check, _nmap_arg_check,
+                                      _ffuf_arg_check, _sqlmap_arg_check,
+                                      _nuclei_arg_check)
+    check("curl guard blocks file exfil",
+          bool(_curl_arg_check(ctx, ["-d", "@/etc/passwd", base])) and
+          bool(_curl_arg_check(ctx, ["-F", "f=@cfg", base])))
+    check("curl guard blocks config+proxy+redirect",
+          bool(_curl_arg_check(ctx, ["-K", "cfg", base])) and
+          bool(_curl_arg_check(ctx, ["-x", "http://p:8080", base])) and
+          bool(_curl_arg_check(ctx, ["--resolve", "x:80:1.2.3.4", base])))
+    check("curl guard parses bundled shorts",
+          bool(_curl_arg_check(ctx, ["-sK", "cfg", base])) and
+          bool(_curl_arg_check(ctx, ["-sd@x", base])))
+    check("curl guard allows plain args",
+          _curl_arg_check(ctx, ["-sS", "-d", "a=b@c.d", base]) is None)
+    check("sqlmap guard blocks --eval/-d/tamper-path",
+          bool(_sqlmap_arg_check(ctx, ["-u", base, "--eval", "x"])) and
+          bool(_sqlmap_arg_check(ctx, ["-u", base, "-d", "mysql://a@b/"])) and
+          bool(_sqlmap_arg_check(ctx, ["-u", base, "--tamper", "../x.py"])))
+    check("ffuf guard confines wordlists",
+          bool(_ffuf_arg_check(ctx, ["-w", "/etc/passwd:FUZZ", "-u", base])))
+    check("nmap guard blocks -iR and script paths",
+          bool(_nmap_arg_check(ctx, ["-iR", "100"])) and
+          bool(_nmap_arg_check(ctx, ["--script", "./x.nse", "127.0.0.1"])))
+    tf = tmp / "evil.yaml"
+    tf.write_text("id: x\n")
+    check("nuclei guard blocks template files+code",
+          bool(_nuclei_arg_check(ctx, ["-t", str(tf), "-u", base])) and
+          bool(_nuclei_arg_check(ctx, ["-code", "-u", base])))
+
     out = web.fingerprint(ctx, base)
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))
     out = web.crawl(ctx, base, depth=1)

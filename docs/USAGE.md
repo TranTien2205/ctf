@@ -106,6 +106,16 @@ through `run_external` — args are scope-checked, runs are timeout-bounded
 (≤600s), output is truncated. Scanner claims are treated as *leads*: the
 agent must reproduce the issue via `http_request` to record a finding.
 
+Some flags are refused outright (the full table is in
+`docs/ARCHITECTURE.md` → *Threat model*): local-file reads (`curl -d/-F/-b/-T`,
+`ffuf -w` outside `resources/wordlists`), config injection (`curl -K`,
+`sqlmap -c`), connection redirection (`--resolve`, `--connect-to`,
+proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
+— the hosts *inside* the file are scope-checked), local code exec
+(`sqlmap --eval`, `nmap --script <path>`), and file writes outside the
+working directory. If a run is refused, pick the in-scope equivalent —
+e.g. `-b name=value` instead of a cookie-jar path.
+
 ## MCP tool servers
 
 `mcp_list` / `mcp_call` bridge external MCP servers (search, fetch, CVE
