@@ -33,9 +33,11 @@ sent, and the model cannot widen it.
 ## Try it in 30 seconds (offline)
 
 ```bash
+python -m argus demo                # scripted full run on the lab - no API key
+python selftest.py                  # offline check, no API key needed
+# or point it at the lab yourself:
 python lab/vulnapp.py 8777          # deliberately vulnerable app, stdlib only
 python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
-python selftest.py                  # offline check, no API key needed
 ```
 
 ## Architecture
@@ -75,9 +77,12 @@ python selftest.py                  # offline check, no API key needed
         │              TOOL LAYER  (tools/registry.py)          │
         │                                                       │
         │  web.py      http_request · crawl · js_recon ·        │
-        │              fingerprint                              │
-        │  probes.py   sqli · time · ssti · lfi · redirect ·    │
-        │              cors · method · reflection               │
+        │              fingerprint · graphql_introspect         │
+        │  probes.py   sqli · nosqli · time · ssti · lfi ·      │
+        │              redirect · cors · method · reflection ·  │
+        │              idor · ssrf · xxe · csrf · xfh ·         │
+        │              upload · race · deserialize · cache ·    │
+        │              ppoll                                    │
         │  analysis.py jwt_decode · load_skill · notes ·        │
         │              record_finding · run_external · finish   │
         │  mcp_tools.py  mcp_list · mcp_call (external servers) │
@@ -145,9 +150,12 @@ CLI (argus run | argus team)
   │   ├── system.py      the pentest operating contract
   │   ├── llm.py         Anthropic Messages API (httpx, retries, budgets)
   │   ├── tools/         the agent's hands (JSON-schema'd)
-  │   │   ├── web.py         http_request, crawl, js_recon, fingerprint
-  │   │   ├── probes.py      matched-pair checks: sqli, time, ssti, lfi,
-  │   │   │                  redirect, cors, methods, reflection
+  │   │   ├── web.py         http_request, crawl, js_recon, fingerprint,
+  │   │   │                  graphql_introspect
+  │   │   ├── probes.py      matched-pair checks: sqli, nosqli, time, ssti,
+  │   │   │                  lfi, redirect, cors, methods, reflection, idor,
+  │   │   │                  ssrf, xxe, csrf, xfh, upload, race, deserialize,
+  │   │   │                  cache, prototype-pollution
   │   │   ├── analysis.py    jwt_decode, load_skill, notes, record_finding,
   │   │   │                  run_external (sqlmap/nuclei/nmap/ffuf), finish
   │   │   ├── mcp_tools.py   mcp_list, mcp_call -> external MCP servers
@@ -157,7 +165,7 @@ CLI (argus run | argus team)
   │   ├── scope.py       fail-closed host/path/private-IP guard
   │   ├── httpclient.py  one guarded client: scope + rate limit + transcript
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
-  │   ├── skills/        23 loadable methodology modules (sqli, ssrf, idor…)
+  │   ├── skills/        24 loadable methodology modules (sqli, ssrf, idor…)
   │   └── report/        report.md + summary.json, evidence embedded
   │
   └── team: team/coordinator.py   lead + role workers on shared infra
