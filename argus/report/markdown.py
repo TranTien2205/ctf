@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import time
+import urllib.parse
 from pathlib import Path
 
 from ..config import Config
@@ -23,9 +24,33 @@ def _excerpt(text: str, needle: str, span: int = 300) -> str:
     return text[start: idx + len(needle) + span]
 
 
+def _coverage(session: Session) -> dict:
+    """What the run actually exercised - endpoints touched (method + path +
+    param names, values stripped), probe families run, requests per tool."""
+    tools: dict[str, int] = {}
+    endpoints: set[str] = set()
+    probes: set[str] = set()
+    for e in session._transcript.values():
+        tool = e.get("tool") or e.get("kind") or "?"
+        tools[tool] = tools.get(tool, 0) + 1
+        if tool.startswith("probe_"):
+            probes.add(tool)
+        req = e.get("request")
+        if not req or not req.get("url"):
+            continue
+        p = urllib.parse.urlparse(req["url"])
+        names = sorted(k for k, _ in urllib.parse.parse_qsl(p.query))
+        endpoints.add(f"{req.get('method', 'GET')} {p.path or '/'}"
+                      + ("?" + "&".join(names) if names else ""))
+    return {"requests_by_tool": dict(sorted(tools.items())),
+            "endpoints": sorted(endpoints),
+            "probes": sorted(probes)}
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
+    coverage = _coverage(session)
     findings = sorted(session.findings,
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))
     counts: dict[str, int] = {}
@@ -131,6 +156,23 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         if ttf is not None:
             lines += ["", f"**Time to first finding:** {ttf}s", ""]
 
+    lines += ["", "## Test coverage", ""]
+    lines.append("| Tool | Requests |")
+    lines.append("|---|---|")
+    for tool, n in coverage["requests_by_tool"].items():
+        lines.append(f"| {tool} | {n} |")
+    lines += ["",
+              f"**Probe families run:** "
+              f"{', '.join(coverage['probes']) or 'none'}",
+              "",
+              f"**Endpoints exercised ({len(coverage['endpoints'])}):**", ""]
+    for ep in coverage["endpoints"][:80]:
+        lines.append(f"- `{ep}`")
+    if len(coverage["endpoints"]) > 80:
+        lines.append(f"- _...and {len(coverage['endpoints']) - 80} more "
+                     "(see summary.json)_")
+    lines.append("")
+
     lines += [
         "## Methodology",
         "",
@@ -152,6 +194,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "counts": counts,
         "requests": session._seq,
         "time_to_first_finding_s": ttf,
+        "coverage": coverage,
         **extra,
     }
     (session.dir / "summary.json").write_text(
