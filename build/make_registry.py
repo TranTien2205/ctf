@@ -300,15 +300,29 @@ def main():
             entry["unlock_signals"] = spec["unlock_signals"]
         skills.append(entry)
 
-    # 4. the web router routes to every web bug class plus the web-only ported skills
-    web_targets = sorted(cls["id"] for cls in taxonomy["classes"] if cls["category"] == "web")
-    web_targets += ["web-chromedriver", "ctf-web",
-                    "web-websocket", "web-source-map", "web-xs-leaks", "web-info-disclosure",
-                    "white-box-dependency-measurement", "white-box-intended-path"]
+    # 4. every category router routes to that category's bug classes plus its
+    #    own non-class depth targets. Without this, skill_select can never open
+    #    a non-web class card as depth_candidate -- the router simply does not
+    #    know it exists.
+    router_targets = {
+        "web-triage": ("web", ["web-chromedriver", "ctf-web",
+                               "web-websocket", "web-source-map", "web-xs-leaks",
+                               "web-info-disclosure", "white-box-dependency-measurement",
+                               "white-box-intended-path"]),
+        "crypto-triage": ("crypto", ["ctf-crypto"]),
+        "pwn-binary-triage": ("pwn", ["pwn-rop", "ctf-pwn"]),
+        "rev-triage": ("rev", ["ctf-reverse", "ctf-malware"]),
+        "osint-triage": ("osint", ["ctf-osint"]),
+        "ctf-misc": ("misc", []),
+        "dfir-sherlock-triage": ("dfir", ["ctf-forensics", "ctf-malware"]),
+    }
     by_id = {entry["id"]: entry for entry in skills}
     for entry in skills:
-        if entry["id"] == "web-triage":
-            entry["routes_to"] = [t for t in dict.fromkeys(web_targets) if t in by_id]
+        if entry["id"] in router_targets:
+            category, extras = router_targets[entry["id"]]
+            targets = sorted(cls["id"] for cls in taxonomy["classes"]
+                             if cls["category"] == category) + extras
+            entry["routes_to"] = [t for t in dict.fromkeys(targets) if t in by_id]
         if entry["id"] == "ai-iot-triage":
             entry["routes_to"] = [t for t in ["ctf-ai-ml", "mcp-agent-security",
                                               "web-deserialization", "rev-triage"] if t in by_id]

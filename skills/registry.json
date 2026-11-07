@@ -132,6 +132,10 @@
         "the data is an encoding rather than encryption: use ctf-misc"
       ],
       "routes_to": [
+        "crypto-ecc-dlog",
+        "crypto-prng",
+        "crypto-rsa",
+        "crypto-symmetric-oracle",
         "ctf-crypto"
       ]
     },
@@ -151,7 +155,10 @@
       "do_not_use_when": [
         "the challenge fits a named category: misc is the last resort, not the first"
       ],
-      "routes_to": []
+      "routes_to": [
+        "misc-encoding-carrier",
+        "misc-interpreter-escape"
+      ]
     },
     {
       "id": "dfir-sherlock-triage",
@@ -172,6 +179,13 @@
         "the sample must be executed or decompiled: use rev-triage"
       ],
       "routes_to": [
+        "dfir-antiforensics-trace",
+        "dfir-authentication-trace",
+        "dfir-cloud-audit-trace",
+        "dfir-execution-trace",
+        "dfir-filesystem-timeline",
+        "dfir-network-exfil-trace",
+        "dfir-persistence-trace",
         "ctf-forensics",
         "ctf-malware"
       ]
@@ -247,6 +261,9 @@
         "you would query a real person's data outside the challenge's stated scope"
       ],
       "routes_to": [
+        "osint-identity-pivot",
+        "osint-infra-records",
+        "osint-media-metadata",
         "ctf-osint"
       ]
     },
@@ -269,6 +286,10 @@
         "the binary is firmware to be unpacked: use rev-triage firmware reference"
       ],
       "routes_to": [
+        "pwn-code-reuse",
+        "pwn-format-string",
+        "pwn-heap-corruption",
+        "pwn-stack-overflow",
         "pwn-rop",
         "ctf-pwn"
       ]
@@ -292,6 +313,9 @@
         "the sample is live malware with C2 behaviour: use ctf-malware"
       ],
       "routes_to": [
+        "rev-bytecode-vm",
+        "rev-managed-code",
+        "rev-native-check",
         "ctf-reverse",
         "ctf-malware"
       ]
@@ -431,7 +455,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 956,
+      "skill_tokens": 957,
       "depth_files": 1,
       "depth_tokens": 161,
       "use_when": [
@@ -509,7 +533,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 925,
+      "skill_tokens": 926,
       "depth_files": 1,
       "depth_tokens": 159,
       "use_when": [
@@ -544,7 +568,7 @@
         "the AI/IoT sub-type has not been decided by the router"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the AI/IoT sub-type is decided by the router"
     },
     {
@@ -565,7 +589,7 @@
         "never read the whole directory; open one named file"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the primitive parameters are collected and a named attack must be implemented"
     },
     {
@@ -586,7 +610,7 @@
         "never read the whole directory; open one named file"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the artifact type is identified and a container-specific extraction is required"
     },
     {
@@ -607,7 +631,7 @@
         "the sample is a plain CTF crackme: use rev-triage"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the sample is obfuscated script, PE/.NET, or captured C2 traffic"
     },
     {
@@ -627,7 +651,7 @@
         "no pivot has been extracted yet"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "one unique pivot is extracted and a specific source must be worked"
     },
     {
@@ -648,7 +672,7 @@
         "never read the whole directory; open one named file"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the crash is reproduced and a named heap/kernel/format technique is needed"
     },
     {
@@ -669,7 +693,7 @@
         "never read the whole directory; open one named file"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "the runtime or packer is named and a specific technique is needed"
     },
     {
@@ -690,7 +714,7 @@
         "never read the whole directory; open one named file"
       ],
       "routes_to": [],
-      "unlock_signals": ".",
+      "unlock_signals": null,
       "manual_gate": "a narrower web-* depth skill did not contain the needed variant"
     },
     {
@@ -1000,7 +1024,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 944,
+      "skill_tokens": 945,
       "depth_files": 1,
       "depth_tokens": 158,
       "use_when": [
@@ -1053,7 +1077,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 897,
+      "skill_tokens": 898,
       "depth_files": 1,
       "depth_tokens": 159,
       "use_when": [

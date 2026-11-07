@@ -58,14 +58,14 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 |---|---|---|---|
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
-| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `ctf-crypto` |
-| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | — |
-| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `ctf-forensics`, `ctf-malware` |
+| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `crypto-ecc-dlog`, `crypto-prng`, `crypto-rsa` … |
+| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | `misc-encoding-carrier`, `misc-interpreter-escape` |
+| artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `dfir-antiforensics-trace`, `dfir-authentication-trace`, `dfir-cloud-audit-trace` … |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.7k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
-| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `ctf-osint` |
-| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-rop`, `ctf-pwn` |
-| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.1k | `ctf-reverse`, `ctf-malware` |
+| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-identity-pivot`, `osint-infra-records`, `osint-media-metadata` … |
+| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
+| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.1k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.0k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
