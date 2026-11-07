@@ -34,6 +34,7 @@ def _impl(name: str) -> Callable:
         "crawl": web.crawl,
         "js_recon": web.js_recon,
         "fingerprint": web.fingerprint,
+        "graphql_introspect": web.graphql_introspect,
         "probe_reflection": probes.probe_reflection,
         "probe_sqli": probes.probe_sqli,
         "probe_time": probes.probe_time,
@@ -145,6 +146,15 @@ TOOL_SCHEMAS: list[dict] = [
         "security-header audit, robots.txt and sitemap.xml. Sends at most 3 "
         "requests.",
         {"url": {**_STR, "description": URL_DESC}},
+        ["url"],
+    ),
+    _schema(
+        "graphql_introspect",
+        "POST a standard GraphQL introspection query and summarize the "
+        "schema: query/mutation/subscription roots, types and fields. A "
+        "refused or non-JSON answer is negative evidence.",
+        {"url": {**_STR, "description": URL_DESC +
+                 " Point at the GraphQL endpoint (e.g. /graphql)."}},
         ["url"],
     ),
     _schema(

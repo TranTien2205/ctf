@@ -1,6 +1,7 @@
 """Web surface tools: raw request, crawl, JS recon, passive fingerprint."""
 from __future__ import annotations
 
+import json as _json
 import re
 import urllib.parse
 from html.parser import HTMLParser
@@ -270,3 +271,43 @@ def fingerprint(ctx: Context, url: str) -> dict:
         "robots": robots,
         "sitemap": sitemap,
     }
+
+
+_INTROSPECTION = (
+    "{__schema{queryType{name} mutationType{name} subscriptionType{name}"
+    " types{name kind fields{name type{name kind ofType{name kind}}}}}}")
+
+
+def graphql_introspect(ctx: Context, url: str) -> dict:
+    """POST a standard introspection query and summarize the schema -
+    types, fields, mutation/subscription roots. A disabled endpoint or an
+    error body is reported as negative evidence."""
+    body = '{"query": ' + _json.dumps(_INTROSPECTION) + "}"
+    r = ctx.client.send("POST", url,
+                        headers={"Content-Type": "application/json"},
+                        body=body, tool="graphql_introspect",
+                        note="introspection query")
+    raw = r.get("body") or ""
+    try:
+        doc = _json.loads(raw)
+    except ValueError:
+        return {"verdict": "no schema (non-JSON response)",
+                    "request_id": r["request_id"], "status": r["status"]}
+    schema = ((doc.get("data") or {}).get("__schema"))
+    if not schema:
+        errs = [e.get("message", "?") for e in doc.get("errors") or []][:5]
+        return {"verdict": "introspection refused or empty",
+                "request_id": r["request_id"], "errors": errs}
+    types = [t for t in (schema.get("types") or [])
+             if t.get("name") and not t["name"].startswith("__")]
+    out_types = [{"name": t["name"], "kind": t.get("kind"),
+                  "fields": [f["name"] for f in (t.get("fields") or [])
+                             if f.get("name")][:40]}
+                 for t in types][:40]
+    return {"verdict": "schema introspected",
+            "request_id": r["request_id"],
+            "query_root": (schema.get("queryType") or {}).get("name"),
+            "mutation_root": (schema.get("mutationType") or {}).get("name"),
+            "subscription_root":
+                (schema.get("subscriptionType") or {}).get("name"),
+            "types": out_types}

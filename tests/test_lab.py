@@ -105,6 +105,14 @@ def test_upload_probe(lab_url, ctx):
     assert "upload candidate" in out["verdict"], out
 
 
+def test_graphql_introspect(lab_url, ctx):
+    from argus.tools import web
+    out = web.graphql_introspect(ctx, lab_url + "/graphql")
+    assert out["verdict"] == "schema introspected", out
+    names = {t["name"] for t in out["types"]}
+    assert "User" in names, out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]
