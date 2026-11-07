@@ -100,6 +100,11 @@ def test_nosqli_probe(lab_url, ctx):
     assert "nosqli candidate" in out["verdict"], out
 
 
+def test_upload_probe(lab_url, ctx):
+    out = probes.probe_upload(ctx, lab_url + "/upload")
+    assert "upload candidate" in out["verdict"], out
+
+
 def test_cors_probe(lab_url, ctx):
     out = probes.probe_cors(ctx, lab_url + "/api/data")
     assert "credentials" in out["verdict"]

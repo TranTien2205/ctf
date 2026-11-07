@@ -133,6 +133,8 @@ def main() -> int:
     out = probes.probe_nosqli(ctx, base + "/api/login",
                               '{"username":"admin","password":"x"}', "password")
     check("nosqli probe flips auth", "nosqli candidate" in out["verdict"])
+    out = probes.probe_upload(ctx, base + "/upload")
+    check("upload probe serves active file", "upload candidate" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient

@@ -48,6 +48,7 @@ def _impl(name: str) -> Callable:
         "probe_csrf": probes.probe_csrf,
         "probe_xfh": probes.probe_xfh,
         "probe_nosqli": probes.probe_nosqli,
+        "probe_upload": probes.probe_upload,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -300,6 +301,16 @@ TOOL_SCHEMAS: list[dict] = [
                                              "operators into"},
         },
         ["url", "data", "param"],
+    ),
+    _schema(
+        "probe_upload",
+        "Unrestricted-upload check: uploads a benign control plus SVG and "
+        "PHP canaries via multipart, then fetches each stored URL. A file "
+        "served back with its bytes intact is a stored-XSS / code-exec "
+        "lead depending on server stack.",
+        {"url": {**_STR, "description": URL_DESC +
+                 " Point it at the upload endpoint (POST)."}},
+        ["url"],
     ),
     _schema(
         "jwt_decode",

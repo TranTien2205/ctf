@@ -550,3 +550,55 @@ def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
                f"{base['status']})" if flip else "no nosqli signal")
     return {"verdict": verdict, "base_id": base["request_id"],
             "results": hits}
+
+
+def probe_upload(ctx: Context, url: str) -> dict:
+    """Unrestricted-upload check: a benign control plus active-content
+    files; the stored file being served back with bytes intact is the
+    signal (stored XSS / webshell depending on stack)."""
+    canary = _marker("upl")
+
+    def _multipart(fname: str, ctype: str, content: str):
+        b = "----argus" + canary
+        body = (f"--{b}\r\nContent-Disposition: form-data; name=\"file\"; "
+                f"filename=\"{fname}\"\r\nContent-Type: {ctype}\r\n\r\n"
+                f"{content}\r\n--{b}--\r\n")
+        return body, {"Content-Type": f"multipart/form-data; boundary={b}"}
+
+    payloads = [
+        ("control-txt", f"{canary}.txt", "text/plain", canary),
+        ("svg-xss", f"{canary}.svg", "image/svg+xml",
+         '<svg xmlns="http://www.w3.org/2000/svg">'
+         f"<script>/*{canary}*/alert(1)</script></svg>"),
+        ("php-rce", f"{canary}.php", "application/x-php",
+         f"<?php /*{canary}*/ echo 'x'; ?>"),
+    ]
+    results = []
+    for name, fname, ctype, content in payloads:
+        body, hdr = _multipart(fname, ctype, content)
+        up = ctx.client.send("POST", url, headers=hdr, body=body,
+                             tool="probe_upload", note=name)
+        entry = {"name": name, "status": up["status"],
+                 "request_id": up["request_id"], "served": False}
+        m = re.search(r'"(?:url|path|location|file)"\s*:\s*"([^"]+)"',
+                      up.get("body") or "")
+        if m:
+            entry["stored_path"] = m.group(1)
+            g = ctx.client.send("GET",
+                                urllib.parse.urljoin(url, m.group(1)),
+                                tool="probe_upload", note=f"fetch {name}")
+            entry["fetch_id"] = g["request_id"]
+            entry["served"] = canary in (g.get("body") or "")
+        results.append(entry)
+    served = [r for r in results if r["served"]]
+    active = [r for r in served if r["name"] != "control-txt"]
+    if active:
+        verdict = ("upload candidate: active file type stored and served "
+                   f"({', '.join(r['name'] for r in active)}) - stored "
+                   "XSS or code execution depending on server stack")
+    elif served:
+        verdict = ("uploads are stored and served; active types blocked "
+                   "or undisclosed - try extensions/content manually")
+    else:
+        verdict = "no upload accepted or stored path undisclosed"
+    return {"verdict": verdict, "results": results}

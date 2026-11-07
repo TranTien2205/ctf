@@ -16,6 +16,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     POST /xml                  XXE (simulated external-entity resolution)
     POST /api/login            NoSQLi ($ne/$gt operator password bypass)
+    POST /upload, GET /uploads file upload served back with active content-type
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -270,6 +271,19 @@ const API_KEY = 'lab_key_0123456789abcdef';
             self._send(body="User-agent: *\nDisallow: /debug\nDisallow: /admin",
                        ctype="text/plain")
 
+        elif path.startswith("/uploads/"):
+            target = os.path.normpath(os.path.join(WWW, path.lstrip("/")))
+            try:
+                with open(target, "rb") as fh:
+                    data = fh.read()
+            except OSError:
+                self._send(404, "<html><body>no such upload</body></html>")
+                return
+            ctype = ("image/svg+xml" if target.endswith(".svg")
+                     else "text/html" if target.endswith((".html", ".htm"))
+                     else "application/octet-stream")
+            self._send(body=data, ctype=ctype)
+
         elif path == "/admin":
             self._send(403, "<html><body>Forbidden</body></html>")
 
@@ -336,6 +350,29 @@ const API_KEY = 'lab_key_0123456789abcdef';
                 out = raw.replace(f"&{name};", content)
             self._send(body=f"<response><echo>{out}</echo></response>",
                        ctype="application/xml")
+            return
+        if path == "/upload":
+            # unsafe upload: stores attacker bytes under /uploads/ and
+            # serves them back with a content type derived from extension
+            n = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(n) if n else b""
+            hdr_end = raw.find(b"\r\n\r\n")
+            fname_m = re.search(rb'filename="([^"]+)"',
+                                raw[:hdr_end if hdr_end >= 0 else 400])
+            if hdr_end < 0 or not fname_m:
+                self._send(400, "no file", ctype="text/plain")
+                return
+            fname = os.path.basename(
+                fname_m.group(1).decode("utf-8", "replace"))
+            content = raw[hdr_end + 4:]
+            end = content.rfind(b"\r\n--")
+            if end >= 0:
+                content = content[:end]
+            os.makedirs(os.path.join(WWW, "uploads"), exist_ok=True)
+            with open(os.path.join(WWW, "uploads", fname), "wb") as fh:
+                fh.write(content)
+            self._send(body=json.dumps({"url": f"/uploads/{fname}"}),
+                       ctype="application/json")
             return
         if path == "/api/login":
             # simulated NoSQL query: a dict password is treated as a query
