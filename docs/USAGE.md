@@ -41,12 +41,15 @@ python -m argus run https://app.example \
 
 ```bash
 python -m argus demo          # scripted run on the bundled lab, no API key
+python -m argus demo --team   # same, through the lead/worker pipeline
 ```
 
 Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
 agent loop, and lands three evidence-gated findings (SQLi, XSS, IDOR) in a
 normal session dir - use it to demo the pipeline at a defense without
-spending tokens.
+spending tokens. `--team` runs the same assessment through TeamRun: a lead
+seeds the lead queue, a recon worker maps the surface, and an exploit worker
+pulls and verifies each lead, so the whole multi-agent flow is visible.
 
 ## Team mode
 

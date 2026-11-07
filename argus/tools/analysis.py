@@ -95,8 +95,9 @@ def read_notes(ctx: Context) -> dict:
 # ---------------------------------------------------------------- findings
 
 def record_finding(ctx: Context, title: str, severity: str, category: str,
-                   url: str, evidence_ids: list[str], evidence_excerpt: str,
-                   description: str, remediation: str) -> dict:
+                   url: str, evidence_excerpt: str,
+                   description: str, remediation: str,
+                   evidence_ids: list[str] | None = None) -> dict:
     finding = ctx.session.add_finding(
         title=title, severity=severity, category=category, url=url,
         evidence_ids=list(evidence_ids or []),

@@ -35,6 +35,15 @@ def test_finding_requires_some_evidence(tmp_path):
         s.add_finding("bad", "high", "x", "u", [], "x", "d", "r")
 
 
+def test_finding_autoresolves_evidence_id(tmp_path):
+    s = _sess(tmp_path)
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof bytes"})
+    f = s.add_finding("lfi", "high", "x", "u", [], "proof bytes", "d", "r")
+    assert f["evidence_ids"] == [rid]
+    with pytest.raises(ValueError):
+        s.add_finding("other", "high", "y", "u", [], "not recorded", "d", "r")
+
+
 def test_severity_enum(tmp_path):
     s = _sess(tmp_path)
     rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})

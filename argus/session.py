@@ -196,14 +196,22 @@ class Session:
         severity = severity.lower()
         if severity not in SEVERITIES:
             raise ValueError(f"severity must be one of {SEVERITIES}")
-        if not evidence_ids:
-            raise ValueError("a finding needs at least one evidence request id")
-        unknown = [r for r in evidence_ids if r not in self._transcript]
-        if unknown:
-            raise ValueError(f"unknown evidence request ids: {unknown}")
         excerpt = (evidence_excerpt or "").strip()
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
+        if not evidence_ids:
+            # Resolve the proving exchange from the excerpt itself - the
+            # verbatim gate is unchanged: the quote must exist in a recorded
+            # response/event. Cite the first entry that contains it.
+            evidence_ids = [r for r in self._transcript
+                            if excerpt in self.evidence_text(r)][:1]
+            if not evidence_ids:
+                raise ValueError(
+                    "evidence_excerpt is not a verbatim substring of any "
+                    "recorded response or event")
+        unknown = [r for r in evidence_ids if r not in self._transcript]
+        if unknown:
+            raise ValueError(f"unknown evidence request ids: {unknown}")
         if not any(excerpt in self.evidence_text(r) for r in evidence_ids):
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"

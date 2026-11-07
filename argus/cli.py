@@ -84,6 +84,8 @@ def main(argv: list[str] | None = None) -> int:
         "demo", help="offline scripted run against the bundled lab - "
                      "exercises the full pipeline with no API key")
     p_demo.add_argument("--session-dir", default="sessions")
+    p_demo.add_argument("--team", action="store_true",
+                        help="run the demo through the lead/worker pipeline")
     p_demo.add_argument("--quiet", action="store_true")
 
     args = parser.parse_args(argv)
@@ -217,8 +219,11 @@ def _demo(args) -> int:
     cfg = Config(target=base, allow_private=True,
                  session_dir=Path(args.session_dir),
                  model="scripted-demo", max_turns=12, rate_rps=0)
-    result = AgentLoop(cfg, llm=ScriptedClient(script),
-                       quiet=args.quiet).run()
+    if args.team:
+        result = _demo_team(cfg, base, _t, args, ScriptedClient)
+    else:
+        result = AgentLoop(cfg, llm=ScriptedClient(script),
+                           quiet=args.quiet).run()
     srv.shutdown()
     print("\n=== demo complete ===")
     fpath = Path(result["session_dir"]) / "findings.json"
@@ -228,6 +233,93 @@ def _demo(args) -> int:
     print(f"  findings={result['findings']}  requests={result['requests']}")
     print(f"  report: {result['report']}")
     return 0
+
+
+def _demo_team(cfg, base, _t, args, ScriptedClient):
+    """Same scripted assessment through the real lead/worker pipeline:
+    lead seeds the lead queue, a recon worker maps the surface, an exploit
+    worker pulls the leads and verifies each one. Findings cite evidence by
+    excerpt, resolved to the recorded exchange automatically - deterministic
+    despite workers sharing one transcript."""
+    from .team.coordinator import TeamRun
+
+    scripts = {
+        "lead": [
+            {"text": "Seeding the pipeline with the three most promising "
+                     "surfaces.",
+             "tool_calls": [
+                 _t("l1", "emit_lead", kind="param", url=base + "/item?id=1",
+                    params=["id"], note="sql-error surface on id"),
+                 _t("l2", "emit_lead", kind="param", url=base + "/search?q=x",
+                    params=["q"], note="reflected parameter"),
+                 _t("l3", "emit_lead", kind="endpoint",
+                    url=base + "/api/user/2", note="enumerable object ids")]},
+            {"text": "Leads queued; workers drain while I close out.",
+             "tool_calls": [_t("l4", "finish_engagement",
+                              summary="Team demo: recon mapped the surface, "
+                                      "exploit verified SQLi, XSS and IDOR "
+                                      "with verbatim evidence.")]},
+        ],
+        "recon": [
+            {"text": "Mapping stack and surface for the exploit workers.",
+             "tool_calls": [
+                 _t("r1", "fingerprint", url=base),
+                 _t("r2", "crawl", url=base, depth=1, max_pages=10)]},
+            {"tool_calls": [_t("r3", "note",
+                              text="Python http.server lab; /item, /search, "
+                                   "/api/user exposed."),
+                            _t("r4", "finish",
+                               summary="Surface mapped; leads seeded.")]},
+        ],
+        "exploit": [
+            {"text": "Pulling queued surface leads.",
+             "tool_calls": [_t("e1", "pull_leads", max_n=5)]},
+            {"text": "Confirming the injectable id parameter.",
+             "tool_calls": [_t("e2", "probe_sqli", url=base + "/item?id=1",
+                              param="id")]},
+            {"tool_calls": [_t("e3", "record_finding",
+                              title="SQL injection in /item id parameter",
+                              severity="high", category="sqli",
+                              url=base + "/item?id=1",
+                              evidence_excerpt="sqlite3.OperationalError",
+                              description="Quote probe yields a raw sqlite "
+                                          "error - unsanitized input reaches "
+                                          "the query.",
+                              remediation="Use parameterized queries.")]},
+            {"tool_calls": [_t("e4", "probe_reflection",
+                              url=base + "/search?q=x", param="q")]},
+            {"tool_calls": [_t("e5", "record_finding",
+                              title="Reflected XSS in /search q parameter",
+                              severity="medium", category="xss",
+                              url=base + "/search?q=x",
+                              evidence_excerpt="<>'\"&=/",
+                              description="Canary chars reflect unescaped "
+                                          "in html context.",
+                              remediation="Output-encode by context; "
+                                          "add CSP.")]},
+            {"tool_calls": [_t("e6", "probe_idor",
+                              url=base + "/api/user/2")]},
+            {"tool_calls": [_t("e7", "record_finding",
+                              title="IDOR: /api/user/<id> serves any user",
+                              severity="high", category="idor",
+                              url=base + "/api/user/2",
+                              evidence_excerpt="\"username\"",
+                              description="Neighboring ids return other "
+                                          "users' objects, no authz check.",
+                              remediation="Enforce per-object ownership "
+                                          "checks.")]},
+            {"tool_calls": [_t("e8", "finish",
+                              summary="3/3 leads verified with verbatim "
+                                      "evidence.")]},
+        ],
+    }
+
+    def _factory(role: str, _name: str):
+        return ScriptedClient(scripts.get(role, []))
+
+    cfg.max_turns = 15
+    return TeamRun(cfg, llm_factory=_factory, quiet=args.quiet,
+                   n_recon=1, n_exploit=1, n_report=0).run()
 
 
 def _reopen(sdir: Path) -> Session:
