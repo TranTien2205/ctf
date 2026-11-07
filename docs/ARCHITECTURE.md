@@ -36,7 +36,7 @@ Design choices and why:
 - **Baseline-diffed probes.** Each `probe_*` returns `verdict` +
   `request_ids`, never "you are vulnerable". The agent confirms and
   rates severity itself.
-- **Skills as retrievable knowledge.** 19 methodology modules (~2KB each)
+- **Skills as retrievable knowledge.** 23 methodology modules (~2KB each)
   load on demand via `load_skill`. Detection signals, first probes,
   confirmation criteria, bypasses, honest severity guidance.
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real

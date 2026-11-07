@@ -6,6 +6,7 @@ opens a socket to the target.
 from __future__ import annotations
 
 import time
+import urllib.parse
 
 import httpx
 
@@ -69,15 +70,38 @@ class GuardedClient:
         started = time.monotonic()
         error = None
         resp = None
+        chain: list[dict] = []
+        blocked_to = ""
         try:
             resp = self._client.request(
                 method.upper(),
                 url,
                 headers=req_headers,
                 content=body,
-                follow_redirects=follow_redirects,
+                follow_redirects=False,
                 timeout=timeout,
             )
+            # Manual redirect following: letting httpx follow automatically
+            # would skip the scope check on each Location - a 302 to a
+            # foreign host must be refused like any other out-of-scope URL.
+            hops = 0
+            while (follow_redirects and hops < 8 and resp.status_code
+                   in (301, 302, 303, 307, 308)):
+                loc = resp.headers.get("location", "")
+                if not loc:
+                    break
+                nxt = urllib.parse.urljoin(str(resp.url), loc)
+                blocked_to = nxt
+                self.scope.check(nxt)  # ScopeError -> recorded then raised
+                chain.append({"from": str(resp.url), "to": nxt,
+                              "status": resp.status_code})
+                m2 = "GET" if resp.status_code in (301, 302, 303) \
+                    else method.upper()
+                b2 = None if m2 == "GET" else body
+                resp = self._client.request(
+                    m2, nxt, headers=req_headers, content=b2,
+                    follow_redirects=False, timeout=timeout)
+                hops += 1
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             raw = resp.content[:BODY_CAP]
             try:
@@ -92,11 +116,36 @@ class GuardedClient:
                 "final_url": str(resp.url),
                 "truncated": len(resp.content) > BODY_CAP,
             }
+            if chain:
+                response_data["redirects"] = chain
         except httpx.HTTPError as exc:
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             error = f"{type(exc).__name__}: {exc}"
             response_data = {"status": 0, "headers": {}, "body": "",
                              "elapsed_ms": elapsed_ms, "error": error}
+        except Exception:
+            # A scope refusal mid-chain must still be auditable: record the
+            # last in-scope response so the transcript shows where the app
+            # tried to send us, then let the error propagate.
+            if resp is not None:
+                try:
+                    self.session.record_exchange(
+                        tool=tool,
+                        request={"method": method.upper(), "url": url,
+                                 "headers": req_headers,
+                                 "body": body.decode("utf-8", "replace")
+                                 if isinstance(body, bytes) else body},
+                        response={"status": resp.status_code,
+                                  "headers": dict(resp.headers),
+                                  "body": resp.text[:BODY_CAP],
+                                  "redirects": chain,
+                                  "blocked_redirect": True,
+                                  "blocked_to": blocked_to},
+                        note="redirect blocked by scope guard",
+                        agent=self.agent)
+                except Exception:
+                    pass
+            raise
 
         rid = self.session.record_exchange(
             tool=tool,

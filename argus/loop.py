@@ -100,6 +100,10 @@ class AgentLoop:
                           f"them, build on them:\n{prior}")
         self.tools = TOOL_SCHEMAS if allowed is None else \
             [s for s in TOOL_SCHEMAS if s["name"] in allowed]
+        if board is None:
+            from .tools.registry import BOARD_TOOLS
+            self.tools = [s for s in self.tools
+                          if s["name"] not in BOARD_TOOLS]
         self._last_error = ""
 
     def _log(self, msg: str) -> None:

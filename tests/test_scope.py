@@ -59,3 +59,19 @@ def test_private_target_autoallows():
     g = ScopeGuard("http://127.0.0.1:8777")
     assert g.allow_private
     g.check("http://127.0.0.1:8777/")
+
+
+def test_redirect_follow_stays_in_scope(ctx, lab_url):
+    """follow_redirects must scope-check every hop - a 302 to a foreign
+    host is refused, and the blocked hop lands in the transcript."""
+    out = ctx.client.send("GET", lab_url + "/redirect?next=/item?id=1",
+                          follow_redirects=True)
+    assert out["status"] == 200                    # in-scope hop followed
+
+    with pytest.raises(ScopeError):
+        ctx.client.send("GET",
+                        lab_url + "/redirect?next=http://evil.example/x",
+                        follow_redirects=True)
+    last = ctx.session._transcript[f"r{ctx.session._seq}"]
+    assert last["response"].get("blocked_redirect") is True
+    assert "evil.example" in last["response"].get("blocked_to", "")

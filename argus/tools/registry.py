@@ -67,6 +67,16 @@ def _impl(name: str) -> Callable:
     return table[name]
 
 
+# Tools that require a shared Board - hidden entirely in single-agent mode
+# (wordlist_fuzz / run_exploit / list_exploits live in team.py but only need
+# scope+session, so they stay available everywhere).
+BOARD_TOOLS = frozenset({
+    "emit_lead", "pull_leads", "read_board", "post_board_note",
+    "request_worker", "spawn_worker", "list_workers", "read_findings",
+    "finish_engagement",
+})
+
+
 _STR = {"type": "string"}
 _INT = {"type": "integer"}
 _BOOL = {"type": "boolean"}

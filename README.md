@@ -157,7 +157,7 @@ CLI (argus run | argus team)
   │   ├── scope.py       fail-closed host/path/private-IP guard
   │   ├── httpclient.py  one guarded client: scope + rate limit + transcript
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
-  │   ├── skills/        20 loadable methodology modules (sqli, ssrf, idor…)
+  │   ├── skills/        23 loadable methodology modules (sqli, ssrf, idor…)
   │   └── report/        report.md + summary.json, evidence embedded
   │
   └── team: team/coordinator.py   lead + role workers on shared infra
