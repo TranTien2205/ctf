@@ -23,7 +23,7 @@
       ],
       "observation_signals": [
         "\\bsql\\b",
-        "sqlite|mysql|mariadb|postgres|mssql|oracle",
+        "sqlite|mysql|mariadb|postgres|mssql|(?<!encrypt )(?<!decrypt )(?<!padding )(?<!padding-)(?<!chosen )(?<!cbc )(?<!ecb )(?<!aes )(?<!rsa )(?<!bleichenbacher )\\boracle\\b(?!\\s+(?:attack|loop|distinguish|encryption|decryption))",
         "\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b",
         "vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update)",
         "syntax error|sqlstate|you have an error in your sql",
@@ -1423,6 +1423,7 @@
         "stripped|not stripped",
         "disassembl|decompil",
         "\\bradare2\\b|\\br2\\b|objdump",
+        "\\bcrackme\\b|license key|serial\\b|strcmp|keygen",
         "\\bupx\\b|packed|high entropy",
         "(?<![a-z0-9])(?:native\\ deciding\\ check|rev\\ native\\ check|native\\ check|native\\-check)(?![a-z0-9])"
       ],

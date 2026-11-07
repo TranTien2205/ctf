@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 922,000 tokens across 385 files. Opening
+The depth corpus is roughly 924,000 tokens across 385 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -58,7 +58,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 |---|---|---|---|
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
-| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.4k | `ctf-crypto` |
+| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `ctf-crypto` |
 | jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | — |
 | artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `ctf-forensics`, `ctf-malware` |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.7k | `ctf-forensics`, `ctf-malware` |

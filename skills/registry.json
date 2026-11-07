@@ -66,7 +66,7 @@
       "path": "skills/ad-service-triage/SKILL.md",
       "layer": "router",
       "categories": [
-        "*"
+        "ad"
       ],
       "skill_tokens": 1456,
       "depth_files": 0,
@@ -120,7 +120,7 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 3358,
+      "skill_tokens": 3170,
       "depth_files": 8,
       "depth_tokens": 5368,
       "use_when": [
@@ -142,7 +142,7 @@
       "categories": [
         "misc"
       ],
-      "skill_tokens": 2260,
+      "skill_tokens": 2290,
       "depth_files": 18,
       "depth_tokens": 51148,
       "use_when": [
@@ -236,7 +236,7 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 1070,
+      "skill_tokens": 1100,
       "depth_files": 9,
       "depth_tokens": 7961,
       "use_when": [
@@ -257,7 +257,7 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 994,
+      "skill_tokens": 1024,
       "depth_files": 1,
       "depth_tokens": 219,
       "use_when": [
@@ -280,7 +280,7 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 1104,
+      "skill_tokens": 1134,
       "depth_files": 6,
       "depth_tokens": 4210,
       "use_when": [
@@ -702,7 +702,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5562,
+      "skill_tokens": 5722,
       "depth_files": 1,
       "depth_tokens": 161,
       "use_when": [
@@ -731,7 +731,7 @@
       "verified_by": [
         "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
       ],
-      "skill_tokens": 4765,
+      "skill_tokens": 4966,
       "depth_files": 1,
       "depth_tokens": 1108,
       "use_when": [
@@ -812,7 +812,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3881,
+      "skill_tokens": 4038,
       "depth_files": 1,
       "depth_tokens": 158,
       "use_when": [
@@ -839,7 +839,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4967,
+      "skill_tokens": 5099,
       "depth_files": 1,
       "depth_tokens": 159,
       "use_when": [
@@ -866,7 +866,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4980,
+      "skill_tokens": 5166,
       "depth_files": 1,
       "depth_tokens": 157,
       "use_when": [
@@ -1000,7 +1000,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 940,
+      "skill_tokens": 944,
       "depth_files": 1,
       "depth_tokens": 158,
       "use_when": [
@@ -1157,7 +1157,7 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 1856,
+      "skill_tokens": 1886,
       "depth_files": 3,
       "depth_tokens": 1746,
       "use_when": [
@@ -1261,7 +1261,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 885,
+      "skill_tokens": 889,
       "depth_files": 1,
       "depth_tokens": 157,
       "use_when": [
@@ -1276,7 +1276,7 @@
         "rev-bytecode-vm",
         "pwn-stack-overflow"
       ],
-      "unlock_signals": "(?:\\belf\\b|\\bpe32\\b|\\bmach-?o\\b)|(?:wrong (?:flag|password|key)|try again|incorrect)|(?:stripped|not stripped)|(?:disassembl|decompil)|(?:\\bradare2\\b|\\br2\\b|objdump)|(?:\\bupx\\b|packed|high entropy)|(?:(?<![a-z0-9])(?:native\\ deciding\\ check|rev\\ native\\ check|native\\ check|native\\-check)(?![a-z0-9]))|(?:\\bstrcmp\\s*\\(|\\bmemcmp\\s*\\(|\\bstrncmp\\s*\\()|(?:for\\s*\\([^)]*\\)\\s*\\{[^}]*\\^\\s*0x[0-9a-f]{2})|(?:if\\s*\\(\\s*\\w+\\s*!=\\s*0x[0-9a-f]+\\s*\\))|(?:__stack_chk|_FORTIFY_SOURCE)",
+      "unlock_signals": "(?:\\belf\\b|\\bpe32\\b|\\bmach-?o\\b)|(?:wrong (?:flag|password|key)|try again|incorrect)|(?:stripped|not stripped)|(?:disassembl|decompil)|(?:\\bradare2\\b|\\br2\\b|objdump)|(?:\\bcrackme\\b|license key|serial\\b|strcmp|keygen)|(?:\\bupx\\b|packed|high entropy)|(?:(?<![a-z0-9])(?:native\\ deciding\\ check|rev\\ native\\ check|native\\ check|native\\-check)(?![a-z0-9]))|(?:\\bstrcmp\\s*\\(|\\bmemcmp\\s*\\(|\\bstrncmp\\s*\\()|(?:for\\s*\\([^)]*\\)\\s*\\{[^}]*\\^\\s*0x[0-9a-f]{2})|(?:if\\s*\\(\\s*\\w+\\s*!=\\s*0x[0-9a-f]+\\s*\\))|(?:__stack_chk|_FORTIFY_SOURCE)",
       "bug_class": true
     },
     {
@@ -1321,7 +1321,7 @@
       "verified_by": [
         "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
-      "skill_tokens": 872,
+      "skill_tokens": 1022,
       "depth_files": 1,
       "depth_tokens": 2871,
       "use_when": [
@@ -1374,7 +1374,7 @@
       "verified_by": [
         "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
       ],
-      "skill_tokens": 996,
+      "skill_tokens": 1122,
       "depth_files": 2,
       "depth_tokens": 5813,
       "use_when": [
@@ -1595,7 +1595,7 @@
       "verified_by": [
         "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
       ],
-      "skill_tokens": 793,
+      "skill_tokens": 926,
       "depth_files": 1,
       "depth_tokens": 573,
       "use_when": [
@@ -1624,7 +1624,7 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 865,
+      "skill_tokens": 990,
       "depth_files": 3,
       "depth_tokens": 1245,
       "use_when": [
@@ -1653,7 +1653,7 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 790,
+      "skill_tokens": 911,
       "depth_files": 1,
       "depth_tokens": 1408,
       "use_when": [
@@ -1709,7 +1709,7 @@
       "verified_by": [
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 782,
+      "skill_tokens": 934,
       "depth_files": 1,
       "depth_tokens": 6986,
       "use_when": [
@@ -1770,7 +1770,7 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 828,
+      "skill_tokens": 980,
       "depth_files": 2,
       "depth_tokens": 1878,
       "use_when": [
@@ -1866,7 +1866,7 @@
       "routes_to": [
         "web-nosqli"
       ],
-      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|oracle)|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|(?<!encrypt )(?<!decrypt )(?<!padding )(?<!padding-)(?<!chosen )(?<!cbc )(?<!ecb )(?<!aes )(?<!rsa )(?<!bleichenbacher )\\boracle\\b(?!\\s+(?:attack|loop|distinguish|encryption|decryption)))|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
       "bug_class": true
     },
     {

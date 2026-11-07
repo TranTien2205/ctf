@@ -23,6 +23,7 @@ SKILLS = {
     "forensics": "skills/forensics-triage/SKILL.md", "osint": "skills/osint-triage/SKILL.md",
     "dfir": "skills/dfir-sherlock-triage/SKILL.md",
     "misc": "skills/ctf-misc/SKILL.md", "ai": "skills/ai-iot-triage/SKILL.md",
+    "ad": "skills/ad-service-triage/SKILL.md",
 }
 SIGNALS = (
     ("web-ssrf", r"ssrf|server-side fetch|url fetch|fetch|url parameter|pdf generator|pdf fetch|webhook|admin bot|headless|render url"),
@@ -40,6 +41,8 @@ SIGNALS = (
     ("dfir", r"sherlock|evtx|sysmon|prefetch|amcache|shimcache|usnjrnl|usn journal|\$mft|\$j\b|registry hive|ntuser\.dat|usrclass|cloudtrail|dfir|incident response|triage collection|kape|logon type|4624|4625|4688|4104|7045|scheduled task|script block|threat hunt|blue team"),
     ("osint", r"osint|geolocation|reverse image|whois|social media"),
     ("ai", r"llm|prompt injection|machine learning|model weights|iot|firmware|system prompt|pickle model|mqtt|coap|modbus"),
+    # Attack-defense contest briefs: scoreboard language no jeopardy row claims.
+    ("ad", r"attack.?defense|a&d|\bvulnbox\b|flag store|flag id|service checker|sla\b|tick\b|patch round|exploit farm|nop team|traffic dump|pcap dump"),
     # Misc is scored last in practice because it is the residual category, but
     # the score is a hit count, not an order, so every term here is one that
     # no other row claims. Eight keywords used to leave "brainfuck", "QR code"
@@ -132,7 +135,9 @@ def observation_route(text):
               "forensics": "identify artifact type and run metadata/strings before deep parsing",
               "misc": "normalize/decode the input and test the simplest constraint",
               "osint": "extract unique identifiers and pivot one source at a time",
-              "ai": "map input to model/tool sink and test a harmless boundary case"}
+              "ai": "map input to model/tool sink and test a harmless boundary case",
+              "ad": "find the flag store and what the checker needs before patching or attacking",
+              "dfir": "inventory the artifact bundle first, then answer one numbered question at a time"}
     return {"mode": "blackbox", "route": ranked[0] if ranked else None,
             "alternates": ranked[1:3],
             "next": probes.get(ranked[0]["category"] if ranked else "", "classify category manually"),

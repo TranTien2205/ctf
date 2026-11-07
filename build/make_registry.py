@@ -143,7 +143,7 @@ PORTED = {
     # --- attack-defense. A different game from jeopardy: the flag rotates every
     # --- tick, you are also the target, and availability is scored continuously.
     "ad-service-triage": {
-        "layer": "router", "categories": ["*"],
+        "layer": "router", "categories": ["ad"],
         "use_when": ["an attack-defense contest starts and a service needs triage",
                      "every team runs an identical copy of the service you are defending"],
         "do_not_use_when": ["a single jeopardy target with one flag: use ctf-playbook",

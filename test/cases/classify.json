@@ -68,6 +68,121 @@
       "observation": "nginx proxy_cache with a location regex for css js html json, X-Cache-Status header, authenticated pages cached by uri and args",
       "expect_top": "web-cache-poisoning",
       "origin": "EncoDecept: web cache deception confirmed live; an unauthenticated request received a cached authenticated page (X-Cache-Status: HIT)"
+    },
+    {
+      "observation": "RSA public key modulus n small exponent e ciphertext c",
+      "expect_top": "crypto-rsa",
+      "origin": "coverage: crypto depth class"
+    },
+    {
+      "observation": "seeded PRNG token mt19937 rand predictable outputs",
+      "expect_top": "crypto-prng",
+      "origin": "coverage: crypto depth class"
+    },
+    {
+      "observation": "ECDSA signatures reused nonce same r curve",
+      "expect_top": "crypto-ecc-dlog",
+      "origin": "coverage: crypto depth class"
+    },
+    {
+      "observation": "AES ECB encrypt oracle chosen plaintext append secret",
+      "expect_top": "crypto-symmetric-oracle",
+      "origin": "coverage: crypto depth class"
+    },
+    {
+      "observation": "pyjail prompt filters input by blacklist, __builtins__ emptied, need sandbox escape via __subclasses__",
+      "expect_top": "misc-interpreter-escape",
+      "origin": "coverage: misc depth class"
+    },
+    {
+      "observation": "encoded blob base64 hex rot13 layered carrier",
+      "expect_top": "misc-encoding-carrier",
+      "origin": "coverage: misc depth class"
+    },
+    {
+      "observation": "photo jpg exif gps geolocation",
+      "expect_top": "osint-media-metadata",
+      "origin": "coverage: osint depth class"
+    },
+    {
+      "observation": "username handle twitter github pivot person",
+      "expect_top": "osint-identity-pivot",
+      "origin": "coverage: osint depth class"
+    },
+    {
+      "observation": "domain dns whois certificate subdomain",
+      "expect_top": "osint-infra-records",
+      "origin": "coverage: osint depth class"
+    },
+    {
+      "observation": "ELF checksec no canary gets buffer overflow rip",
+      "expect_top": "pwn-stack-overflow",
+      "origin": "coverage: pwn depth class"
+    },
+    {
+      "observation": "printf user format string %p %n leak write",
+      "expect_top": "pwn-format-string",
+      "origin": "coverage: pwn depth class"
+    },
+    {
+      "observation": "glibc malloc free use-after-free tcache chunks",
+      "expect_top": "pwn-heap-corruption",
+      "origin": "coverage: pwn depth class"
+    },
+    {
+      "observation": "NX enabled ret2libc rop gadgets pop rdi",
+      "expect_top": "pwn-code-reuse",
+      "origin": "coverage: pwn depth class"
+    },
+    {
+      "observation": "ELF binary asks for key, prints wrong password, stripped, decompile in ghidra",
+      "expect_top": "rev-native-check",
+      "origin": "coverage: rev depth class"
+    },
+    {
+      "observation": "dotnet assembly dnspy decompile flag check",
+      "expect_top": "rev-managed-code",
+      "origin": "coverage: rev depth class"
+    },
+    {
+      "observation": "custom vm bytecode python pyc dis",
+      "expect_top": "rev-bytecode-vm",
+      "origin": "coverage: rev depth class"
+    },
+    {
+      "observation": "evtx security 4624 4625 logon auth.log wtmp",
+      "expect_top": "dfir-authentication-trace",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "sysmon event id 1 process creation commandline",
+      "expect_top": "dfir-execution-trace",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "7045 service installed persistence registry run key",
+      "expect_top": "dfir-persistence-trace",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "mft usn journal filesystem timeline timestomp",
+      "expect_top": "dfir-filesystem-timeline",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "conn.log zeek output shows dns tunnelling beacon interval to one destinationip",
+      "expect_top": "dfir-network-exfil-trace",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "cloudtrail consolelogin iam accesskey",
+      "expect_top": "dfir-cloud-audit-trace",
+      "origin": "coverage: dfir depth class"
+    },
+    {
+      "observation": "evtx 1102 log cleared timestomp",
+      "expect_top": "dfir-antiforensics-trace",
+      "origin": "coverage: dfir depth class"
     }
   ],
   "source_cases": [
