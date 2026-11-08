@@ -215,12 +215,30 @@ class AgentLoop:
                        (response.get("content") or [])
                        if isinstance(b, dict)] \
                 if isinstance(response, dict) else []
-            messages.append({"role": "assistant", "content": content})
+            # an empty assistant message or a non-str text field is
+            # rejected by the API on the next call - keep the history
+            # valid even when a gateway answered with mangled blocks
+            for _bi, b in enumerate(content):
+                if b.get("type") == "text" and \
+                        not isinstance(b.get("text"), str):
+                    b["text"] = str(b.get("text"))
+                elif b.get("type") == "tool_use":
+                    if not isinstance(b.get("input"), dict):
+                        b["input"] = {}   # schema requires an object
+                    if not isinstance(b.get("name"), str) or not b["name"]:
+                        b["name"] = "?"
+                    if not isinstance(b.get("id"), str) or not b["id"]:
+                        # tool_result needs a unique matching id
+                        b["id"] = f"x{turns}.{_bi}"
+            messages.append({"role": "assistant", "content":
+                             content or [{"type": "text", "text": "."}]})
 
             tool_uses = [b for b in content if b.get("type") == "tool_use"]
             for b in content:
-                if b.get("type") == "text" and b.get("text", "").strip():
-                    self._log(f"agent: {b['text'].strip()[:400]}")
+                txt = b.get("text")
+                if b.get("type") == "text" and \
+                        isinstance(txt, str) and txt.strip():
+                    self._log(f"agent: {txt.strip()[:400]}")
 
             if not tool_uses:
                 if isinstance(response, dict) and \
