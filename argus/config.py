@@ -136,6 +136,16 @@ def resolve_auth(args) -> tuple[str, str]:
     return _opencode_credential()
 
 
+# .env may carry credentials and tuning - never trust-redirecting keys.
+# ANTHROPIC_BASE_URL would send the API key to a hostile gateway, and
+# ARGUS_MCP_CONFIG names subprocesses to run: a .env inside an untrusted
+# project dir must not be able to set either.
+_DOTENV_ALLOWED = {
+    "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN",
+    "ARGUS_MODEL", "ARGUS_SECRETS",
+}
+
+
 def _load_dotenv(path: Path = Path(".env")) -> None:
     """Populate os.environ from a .env file (KEY=VALUE lines, # comments,
     optional quotes). Never overrides variables already set."""
@@ -148,7 +158,7 @@ def _load_dotenv(path: Path = Path(".env")) -> None:
                 continue
             k, v = line.split("=", 1)
             k, v = k.strip(), v.strip().strip('"').strip("'")
-            if k and k not in os.environ:
+            if k and k in _DOTENV_ALLOWED and k not in os.environ:
                 os.environ[k] = v
     except OSError:
         pass
