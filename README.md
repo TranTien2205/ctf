@@ -247,7 +247,8 @@ Each run writes `sessions/<ts>-<host>/`:
 
 | file | content |
 |---|---|
-| `transcript.jsonl` | every request/response + tool events |
+| `transcript.jsonl` | every request/response + tool events (operator
+secrets redacted: auth/cookie/token headers keep names, not values) |
 | `findings.json` | confirmed findings (evidence-gated, deduped) |
 | `notes.md` | the agent's working reasoning |
 | `report.md` | final human report, generated on finish |
