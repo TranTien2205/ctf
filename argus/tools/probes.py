@@ -962,6 +962,55 @@ def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
     return out
 
 
+def probe_massassign(ctx: Context, url: str, data: str,
+                     extra: str = '{"role":"admin","is_admin":true,'
+                                  '"admin":true,"verified":true}') -> dict:
+    """Mass-assignment check: POST the body template as-is, then again with
+    privilege-shaped fields the form never sends (role, is_admin, admin,
+    verified). If the server echoes or stores any injected field, the
+    endpoint binds untrusted input to the object model - a standard
+    privilege-escalation primitive."""
+    try:
+        extra_obj = _json.loads(extra or "{}")
+        if not isinstance(extra_obj, dict):
+            raise ValueError
+    except (ValueError, TypeError):
+        return {"error": "extra must be a JSON object, "
+                         'e.g. {"role":"admin"}'}
+    hdr = {"Content-Type": "application/json"}
+    base = ctx.client.send("POST", url, headers=hdr, body=data,
+                           tool="probe_massassign", note="baseline")
+    merged: dict | str = data
+    try:
+        obj = _json.loads(data or "{}")
+        if isinstance(obj, dict):
+            merged = _json.dumps({**obj, **extra_obj})
+    except (ValueError, TypeError):
+        pass  # non-JSON template: send it unchanged (documented below)
+    if merged == data:
+        return {"error": "data template is not a JSON object - "
+                         "mass assignment applies to JSON APIs"}
+    r = ctx.client.send("POST", url, headers=hdr, body=merged,
+                        tool="probe_massassign", note="with injected fields")
+    body = r.get("body") or ""
+    accepted = []
+    for k, v in extra_obj.items():
+        # the injected key AND its value appearing in the response means
+        # it was bound/stored - not merely ignored
+        if f'"{k}"' in body and _json.dumps(v) in body:
+            accepted.append(k)
+    verdict = (
+        "mass-assignment candidate: injected fields " +
+        ", ".join(accepted) +
+        " appear in the response - server binds untrusted fields"
+        if accepted else
+        "injected fields not reflected or stored - whitelist likely")
+    return {"verdict": verdict, "baseline_id": base["request_id"],
+            "injected_id": r["request_id"], "accepted_fields": accepted,
+            "note": "confirm with a read-back (GET the created object) "
+                    "that the field persisted, not just echoed"}
+
+
 def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
     """NoSQL operator injection matched-pair: baseline JSON body, then the
     same body with the param replaced by $ne/$gt/$regex operator objects.

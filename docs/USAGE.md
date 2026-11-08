@@ -119,6 +119,7 @@ verbatim evidence from a cited response.
 | CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
 | User enumeration | `probe_enum` | bogus vs real usernames - error text/status + timing differential |
 | Login rate-limit | `probe_lockout` | bounded bad-cred burst: 429/lockout text/latency = throttled |
+| Mass assignment | `probe_massassign` | injected privilege fields echoed/stored = server binds untrusted input |
 | JWT/session | `jwt_decode`, `jwt_forge` | decode, alg weaknesses, weak-secret crack, forge+verify chain |
 | GraphQL | `graphql_introspect` | POST introspection + GET ?query= fallback |
 | Recon | `fingerprint` `crawl` `js_recon` `wordlist_fuzz` | stack/links/forms/endpoints/secrets/sourcemaps |

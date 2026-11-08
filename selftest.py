@@ -197,6 +197,11 @@ def main() -> int:
                                data="username=x&password=y")
     check("lockout probe sees throttled login",
           "throttling observed" in out["verdict"])
+    out = probes.probe_massassign(
+        ctx, base + "/api/register",
+        data='{"username":"st1","password":"x"}')
+    check("massassign probe sees bound privilege fields",
+          "mass-assignment candidate" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/api/config", data="theme=x")
     check("csrf probe sees text/plain replay", "text/plain" in out["verdict"])
     out = probes.probe_cors(ctx, base + "/api/data")

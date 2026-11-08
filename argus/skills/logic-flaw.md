@@ -16,7 +16,8 @@ scanners miss it and agents find it.
    transaction twice; refresh the success page (see `race-condition` for
    the concurrent variant).
 4. **Parameter tampering** - ids and amounts in the URL/body of a POST
-   that the page never exposed; also mass-assignment of undeclared fields.
+   that the page never exposed; also mass-assignment of undeclared fields
+   (`probe_massassign` fires the privilege-field set at a JSON API).
 5. **Trust boundaries between subsystems** - cart total computed on the
    front-end; discount applied twice; currency conversion in your favor;
    email verified only on one service.

@@ -156,6 +156,14 @@ def test_lockout_probe(lab_url, ctx):
     assert out["attempts"] < 10, out  # broke early on the 429
 
 
+def test_massassign_probe(lab_url, ctx):
+    out = probes.probe_massassign(
+        ctx, lab_url + "/api/register",
+        data='{"username":"t1","password":"x"}')
+    assert "mass-assignment candidate" in out["verdict"], out
+    assert "role" in out["accepted_fields"], out
+
+
 def test_xfh_probe(lab_url, ctx):
     out = probes.probe_xfh(ctx, lab_url + "/reset")
     assert "host-header candidate" in out["verdict"], out

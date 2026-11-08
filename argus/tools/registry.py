@@ -60,6 +60,7 @@ def _impl(name: str) -> Callable:
         "probe_crlf": probes.probe_crlf,
         "probe_enum": probes.probe_enum,
         "probe_lockout": probes.probe_lockout,
+        "probe_massassign": probes.probe_massassign,
         "jwt_decode": analysis.jwt_decode,
         "jwt_forge": analysis.jwt_forge,
         "load_skill": analysis.load_skill,
@@ -483,6 +484,18 @@ TOOL_SCHEMAS: list[dict] = [
                                         "(default 'username')"},
          "tries": {**_STR, "description": "Attempts to send, 3-15 "
                                         "(default 10)"}},
+        ["url", "data"],
+    ),
+    _schema(
+        "probe_massassign",
+        "Mass-assignment check on a JSON API: POSTs the template plus "
+        "privilege-shaped fields (role, is_admin, admin, verified); the "
+        "injected key+value appearing in the response means the server "
+        "binds untrusted fields - follow up by reading the object back.",
+        {"url": {**_STR, "description": URL_DESC},
+         "data": {**_STR, "description": "JSON POST body template"},
+         "extra": {**_STR, "description": "JSON object of extra fields to "
+                                         "inject (default privilege set)"}},
         ["url", "data"],
     ),
     _schema(

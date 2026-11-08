@@ -51,9 +51,10 @@ formats.
 
 ## Registration / mass assignment
 
-Extra fields the form never sends: `role`, `is_admin`, `plan`, `verified`,
-`balance`. One extra property per request, then read back your profile -
-the change persisting IS the proof (see `logic-flaw`).
+`probe_massassign` POSTs the JSON template plus privilege fields the form
+never sends (`role`, `is_admin`, `admin`, `verified`). An injected field
+appearing in the response means the server binds untrusted input - then
+read the object back: persisting IS the proof (see `logic-flaw`).
 
 ## Severity guide
 

@@ -20,6 +20,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     hdr  X-Original-URL: /admin  middleware ACL bypass
                                (Location value is not sanitized)
     GET  /api/user/<id>        IDOR (any id served)
+    POST /api/register         mass-assignment: stores every sent field
     POST /api/order            IDOR in a JSON body ({"order": N} served)
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     POST /xml                  XXE (simulated external-entity resolution)
@@ -778,6 +779,21 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 self._send(401, json.dumps({"ok": False}),
                            ctype="application/json")
             return
+        if path == "/api/register":
+            # mass-assignment vuln: the endpoint stores EVERY field the
+            # caller sends - including role/admin - and echoes the record.
+            # A whitelist implementation would drop unknown keys.
+            b = self._body()
+            if not isinstance(b, dict) or not b.get("username"):
+                self._send(400, json.dumps({"error": "username required"}),
+                           ctype="application/json")
+                return
+            rec = dict(b)
+            rec["id"] = len(type(self)._registered) + 10
+            type(self)._registered.append(rec)
+            self._send(201, json.dumps({"created": rec}),
+                       ctype="application/json")
+            return
         if path == "/api/order":
             # POST-body IDOR: any order id is served regardless of caller
             b = self._body()
@@ -824,6 +840,7 @@ def make_server(port: int = 0):
     Handler._coupons = 1
     Handler._cache = {}
     Handler._lockout = {}
+    Handler._registered = []
     Handler._pp = {}
     Handler._usercfg = {"theme": "dark", "lang": "en"}
     os.makedirs(WWW, exist_ok=True)
