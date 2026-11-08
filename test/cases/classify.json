@@ -310,7 +310,7 @@
    "origin": "coverage: web-request-smuggling observation"
   },
   {
-   "observation": "the coupon redeem endpoint is check-then-act on a balance; two interleaved race requests oversell the single-use token",
+   "observation": "a race condition: two simultaneous requests both pass the balance check and oversell the token",
    "expect_top": "web-race-condition",
    "origin": "coverage: web-race-condition observation"
   },
