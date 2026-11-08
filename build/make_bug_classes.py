@@ -696,6 +696,22 @@ CLASSES = [
         "confusable_with": ["forensics-stego", "dfir-filesystem-timeline"],
     },
     {
+        "id": "forensics-log-analysis", "name": "Log file analysis",
+        "skill_dir": "forensics-log-analysis", "category": "forensics",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"log files?|access\.log|auth\.log|syslog|apache log|nginx log|"
+            r"iis log|\.log\b.{0,40}(?:flag|find|extract|analy)",
+            r"(?:what|which|when).{0,40}(?:ip|user|request|command|attack|"
+            r"exfil|download|uploaded|executed)"],
+        "source_signals": [],
+        "first_probe": "wc -l and head/tail first — bracket the timeframe and count the volume before greping, so a count claim has a baseline",
+        "falsifier": "the log is syntactically uniform — every line the same shape, no outlier entry, no anomaly against its own baseline",
+        "depth_refs": ["skills/forensics-log-analysis/references/README.md",
+                       "skills/forensics-log-analysis/references/pattern-order.md"],
+        "confusable_with": ["dfir-authentication-trace", "forensics-pcap-carve"],
+    },
+    {
         "id": "dfir-authentication-trace", "name": "Authentication and logon trace",
         "skill_dir": "dfir-authentication-trace", "category": "dfir",
         # The first DFIR class with local evidence, raised 2026-10-01 by the Brutus
@@ -1104,6 +1120,23 @@ CLASSES = [
         "confusable_with": ["osint-identity-pivot", "misc-encoding-carrier"],
     },
     {
+        "id": "osint-geolocation", "name": "Photo / video geolocation",
+        "skill_dir": "osint-geolocation", "category": "osint",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"geolocat|where (?:was|is|were).{0,40}(?:taken|photo|picture|"
+            r"filmed|located)|find (?:the )?(?:location|place|city|country|"
+            r"coordinates|street|building|landmark)",
+            r"reverse image|google lens|street view|satellite|terrain|"
+            r"landmark|signage|license plate|sun (?:position|angle|shadow)"],
+        "source_signals": [],
+        "first_probe": "reverse image search first — a hit names the place outright; only when that fails do you match terrain and signage by hand",
+        "falsifier": "no unique landmark, text, plate, sun angle or terrain feature distinguishes the frame, and reverse search returns only generic matches",
+        "depth_refs": ["skills/osint-geolocation/references/README.md",
+                       "skills/osint-geolocation/references/visual-pivots.md"],
+        "confusable_with": ["osint-media-metadata", "osint-identity-pivot"],
+    },
+    {
         "id": "osint-identity-pivot", "name": "Identity and handle pivot",
         "skill_dir": "osint-identity-pivot", "category": "osint",
         "evidence_level": "catalogue", "verified_by": [],
@@ -1138,6 +1171,23 @@ CLASSES = [
         "confusable_with": ["osint-identity-pivot"],
     },
     # -------------------------------------------------------------------- misc
+    {
+        "id": "misc-constraint-puzzle", "name": "Constraint / speed puzzle",
+        "skill_dir": "misc-constraint-puzzle", "category": "misc",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"nc\s+\S+|netcat|connect.{0,30}(?:port|service)|tcp service",
+            r"solve.{0,30}(?:puzzle|equation|maze|captcha|challenge).{0,30}"
+            r"(?:fast|time|second|round)",
+            r"programming|scripting|algorithm|automate|rounds? \d+|"
+            r"math.{0,20}puzzle"],
+        "source_signals": [],
+        "first_probe": "connect once and capture the exact protocol before writing a solver — guessing the format from the banner wastes the round budget",
+        "falsifier": "the service has no interactive protocol at all — a static page or a file, not a socket conversation",
+        "depth_refs": ["skills/misc-constraint-puzzle/references/README.md",
+                       "skills/misc-constraint-puzzle/references/protocol-first.md"],
+        "confusable_with": ["misc-interpreter-escape", "misc-encoding-carrier"],
+    },
     {
         "id": "misc-interpreter-escape", "name": "Restricted interpreter escape",
         "skill_dir": "misc-interpreter-escape", "category": "misc",

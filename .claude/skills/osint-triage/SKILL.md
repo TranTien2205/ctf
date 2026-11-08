@@ -64,7 +64,7 @@ hours and yields nothing. Discard it and take the next one.
 | Pivot | Source to work first | Depth |
 |---|---|---|
 | Handle or username | the platforms where that exact string exists, then the account's own posts | `../ctf-osint/social-media.md` |
-| Photo or video | reverse image search, then terrain and signage matching | `../ctf-osint/geolocation-and-media.md` |
+| Photo or video | class `osint-geolocation` (`../osint-geolocation/`), then reverse image search and terrain matching | `../ctf-osint/geolocation-and-media.md` |
 | Domain or host | certificate transparency, passive DNS, archived copies of the site | `../ctf-osint/web-and-dns.md` |
 | Document | embedded metadata, then the revision history if the format keeps one | `references/search-dorking-cheatsheet.md` |
 | Repository or commit | commit authors, timestamps, and content removed in later commits | `../ctf-osint/web-and-dns.md` |

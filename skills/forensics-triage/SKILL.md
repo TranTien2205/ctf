@@ -47,7 +47,7 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 - Memory dump → class `forensics-memory-analysis` (`../forensics-memory-analysis/`), depth `references/memory-analysis.md`
 - Disk image → class `forensics-disk-image` (`../forensics-disk-image/`), depth `references/disk-forensics.md`
 - Steganography → class `forensics-stego` (`../forensics-stego/`), depth `references/steganography.md`
-- Log files → `references/log-analysis.md`
+- Log files → class `forensics-log-analysis` (`../forensics-log-analysis/`), depth `references/log-analysis.md`
 - Suspicious binary → `references/malware-analysis.md`
 - Document/PE analysis → `references/document-analysis.md`
 

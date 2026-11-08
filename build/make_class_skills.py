@@ -1240,6 +1240,134 @@ print(len(t), sorted(f.items(),key=lambda x:-x[1])[:6], 'IC=%.4f'%ic)
 PY
 ```
 """,
+    "forensics-log-analysis": """## Recognise
+
+Log files are the handout (access.log, auth.log, syslog, a web or app log)
+and the question is a fact inside them: an IP, a user, a request, a command,
+the moment something happened. Extraction-shaped — find the line, quote it.
+
+## Confirm safely
+
+All reads are local. The evidence is the verbatim log line plus the count or
+baseline that makes it anomalous — one weird line among N normal ones.
+
+## Working order
+
+1. `wc -l` + `head`/`tail` — volume and timeframe, so every later claim has
+   a denominator.
+2. Distribution first, lines second: `cut`/`awk` the field of interest
+   (source IP, status, path, user-agent) into `sort | uniq -c | sort -rn` —
+   the anomaly is almost always a count outlier.
+3. `grep` the specific question terms (flag, admin, path, user) after the
+   distribution shows where normal lives.
+4. Reconstruct the sequence around the hit: `grep -n` gives line numbers;
+   read ±20 lines for the surrounding session.
+
+`references/pattern-order.md` maps question shape to the field to cut.
+
+## Traps
+
+- A timestamp-only grep misses the timezone story — check which zone the log
+  records before answering "when".
+- One log line rarely proves intent — the line before it (referer, prior
+  request) carries the context the question usually wants.
+- Rotated/compressed siblings (`*.log.1`, `*.log.gz`) hold the earlier
+  window — `zgrep`/`zcat` them; a single-file baseline can hide the anomaly
+  in a file you never read.
+
+## Operational probe
+
+```bash
+wc -l access.log && head -1 access.log && tail -1 access.log
+awk '{print $1}' access.log | sort | uniq -c | sort -rn | head
+awk '{print $9}' access.log | sort | uniq -c | sort -rn | head
+```
+""",
+    "osint-geolocation": """## Recognise
+
+A photo or video frame is the artifact and the question is where it was
+taken — a place, address, or coordinates. Geolocation is matching unique
+visual detail against public imagery, not guessing a city.
+
+## Confirm safely
+
+Reads only; a claimed location is proven by a public source showing the same
+unique feature — quote the matching detail and the source verbatim in the
+report.
+
+## Pivot order
+
+1. `exiftool` — embedded GPS coordinates end the challenge in one command;
+   record them before anything strips metadata.
+2. Reverse image search (Google Lens, Yandex, Bing visual) — a hit names
+   the place; check more than one engine.
+3. Text in frame: signage language, shop names, plates, road markings,
+   driving side, utility poles, terrain, vegetation.
+4. Sun and shadow: hemisphere from shadow direction, rough latitude from
+   length; combine with any timestamp metadata.
+5. Architecture/infrastructure style, then map the candidate area against
+   street-level imagery to confirm.
+
+`references/visual-pivots.md` carries the per-feature table.
+
+## Traps
+
+- Reverse-search hits on similar-looking places are leads, not answers —
+  confirm with an independent feature in the same frame.
+- Metadata can be planted or stripped-and-readded — a GPS tag that disagrees
+  with every visual cue is bait; trust the visuals.
+- Screenshots and re-uploads carry no EXIF — say so and go visual; do not
+  report a metadata negative as a geolocation negative.
+
+## Operational probe
+
+```bash
+exiftool photo.jpg | grep -iE "gps|location|date|comment"
+python3 -c "print(open('photo.jpg','rb').read()[:400])"  # sanity: real camera file?
+```
+""",
+    "misc-constraint-puzzle": """## Recognise
+
+A service address (`nc host port`), a socket protocol, and a puzzle that
+must be answered fast or in volume — math expressions, mazes, CAPTCHA-ish
+parsing, rounds of increasing difficulty. The bug is not in the service; the
+challenge is writing a correct, fast client.
+
+## Confirm safely
+
+All work is against the lab service. Evidence is the flag the service emits
+when the solver completes the rounds — the solver transcript is the proof.
+
+## Working order
+
+1. Connect once manually (`nc` or a raw socket) and capture the protocol
+   verbatim — banner, prompt, expected answer format, terminator, timeout.
+2. Write the solver against the CAPTURED format, not the guess: parse
+   exactly what arrived, compute, reply exactly as expected.
+3. Test on one round, then let it run — log every round so the last failing
+   round shows the format edge you missed.
+4. Only then optimize: timeouts, buffering, round-trip batching.
+
+`references/protocol-first.md` carries a stdlib client skeleton and the
+format edges that break solvers.
+
+## Traps
+
+- TCP is a stream, not messages — a read can return half a puzzle or two
+  puzzles at once; buffer until the prompt terminator, never assume one
+  recv() is one question.
+- The prompt terminator is usually `\n`, `> `, or `: ` — capture it verbatim
+  on the manual run; guessing it desyncs every later round.
+- Late rounds change the format (bigger numbers, new operators, wrapped
+  text) — log each round's raw bytes; the failure is a format drift, not
+  your math.
+
+## Operational probe
+
+```bash
+nc host 31337 | head -20   # capture banner + first prompt verbatim
+```
+""",
     "osint-media-metadata": """## Recognise
 
 A media or document file is the handout and the question asks for a fact about

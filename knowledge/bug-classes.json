@@ -1108,6 +1108,32 @@
       "blast_radius": null
     },
     {
+      "id": "forensics-log-analysis",
+      "name": "Log file analysis",
+      "skill_dir": "forensics-log-analysis",
+      "category": "forensics",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "log files?|access\\.log|auth\\.log|syslog|apache log|nginx log|iis log|\\.log\\b.{0,40}(?:flag|find|extract|analy)",
+        "(?:what|which|when).{0,40}(?:ip|user|request|command|attack|exfil|download|uploaded|executed)",
+        "(?<![a-z0-9])(?:forensics\\ log\\ analysis|log\\ file\\ analysis|log\\ analysis|log\\-analysis)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "wc -l and head/tail first — bracket the timeframe and count the volume before greping, so a count claim has a baseline",
+      "falsifier": "the log is syntactically uniform — every line the same shape, no outlier entry, no anomaly against its own baseline",
+      "depth_refs": [
+        "skills/forensics-log-analysis/references/README.md",
+        "skills/forensics-log-analysis/references/pattern-order.md"
+      ],
+      "confusable_with": [
+        "dfir-authentication-trace",
+        "forensics-pcap-carve"
+      ],
+      "skill": "skills/forensics-log-analysis/SKILL.md",
+      "blast_radius": null
+    },
+    {
       "id": "dfir-authentication-trace",
       "name": "Authentication and logon trace",
       "skill_dir": "dfir-authentication-trace",
@@ -1767,6 +1793,32 @@
       "blast_radius": null
     },
     {
+      "id": "osint-geolocation",
+      "name": "Photo / video geolocation",
+      "skill_dir": "osint-geolocation",
+      "category": "osint",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "geolocat|where (?:was|is|were).{0,40}(?:taken|photo|picture|filmed|located)|find (?:the )?(?:location|place|city|country|coordinates|street|building|landmark)",
+        "reverse image|google lens|street view|satellite|terrain|landmark|signage|license plate|sun (?:position|angle|shadow)",
+        "(?<![a-z0-9])(?:osint\\ geolocation|video\\ geolocation|geolocation|photo)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "reverse image search first — a hit names the place outright; only when that fails do you match terrain and signage by hand",
+      "falsifier": "no unique landmark, text, plate, sun angle or terrain feature distinguishes the frame, and reverse search returns only generic matches",
+      "depth_refs": [
+        "skills/osint-geolocation/references/README.md",
+        "skills/osint-geolocation/references/visual-pivots.md"
+      ],
+      "confusable_with": [
+        "osint-media-metadata",
+        "osint-identity-pivot"
+      ],
+      "skill": "skills/osint-geolocation/SKILL.md",
+      "blast_radius": null
+    },
+    {
       "id": "osint-identity-pivot",
       "name": "Identity and handle pivot",
       "skill_dir": "osint-identity-pivot",
@@ -1825,6 +1877,33 @@
         "osint-identity-pivot"
       ],
       "skill": "skills/osint-infra-records/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "misc-constraint-puzzle",
+      "name": "Constraint / speed puzzle",
+      "skill_dir": "misc-constraint-puzzle",
+      "category": "misc",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "nc\\s+\\S+|netcat|connect.{0,30}(?:port|service)|tcp service",
+        "solve.{0,30}(?:puzzle|equation|maze|captcha|challenge).{0,30}(?:fast|time|second|round)",
+        "programming|scripting|algorithm|automate|rounds? \\d+|math.{0,20}puzzle",
+        "(?<![a-z0-9])(?:misc\\ constraint\\ puzzle|constraint\\ puzzle|constraint\\-puzzle|speed\\ puzzle|constraint)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "connect once and capture the exact protocol before writing a solver — guessing the format from the banner wastes the round budget",
+      "falsifier": "the service has no interactive protocol at all — a static page or a file, not a socket conversation",
+      "depth_refs": [
+        "skills/misc-constraint-puzzle/references/README.md",
+        "skills/misc-constraint-puzzle/references/protocol-first.md"
+      ],
+      "confusable_with": [
+        "misc-interpreter-escape",
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/misc-constraint-puzzle/SKILL.md",
       "blast_radius": null
     },
     {

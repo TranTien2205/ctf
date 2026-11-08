@@ -149,7 +149,7 @@
       "categories": [
         "misc"
       ],
-      "skill_tokens": 2290,
+      "skill_tokens": 2311,
       "depth_files": 18,
       "depth_tokens": 51148,
       "use_when": [
@@ -159,6 +159,7 @@
         "the challenge fits a named category: misc is the last resort, not the first"
       ],
       "routes_to": [
+        "misc-constraint-puzzle",
         "misc-encoding-carrier",
         "misc-interpreter-escape"
       ]
@@ -200,7 +201,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 708,
+      "skill_tokens": 742,
       "depth_files": 7,
       "depth_tokens": 4971,
       "use_when": [
@@ -253,7 +254,7 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 1100,
+      "skill_tokens": 1111,
       "depth_files": 9,
       "depth_tokens": 7961,
       "use_when": [
@@ -264,6 +265,7 @@
         "you would query a real person's data outside the challenge's stated scope"
       ],
       "routes_to": [
+        "osint-geolocation",
         "osint-identity-pivot",
         "osint-infra-records",
         "osint-media-metadata",
@@ -999,6 +1001,33 @@
       "bug_class": true
     },
     {
+      "id": "forensics-log-analysis",
+      "path": "skills/forensics-log-analysis/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 918,
+      "depth_files": 3,
+      "depth_tokens": 634,
+      "use_when": [
+        "a probe or source read produced this class's signal: wc -l and head/tail first — bracket the timeframe and count the volume before greping, so a count claim has a baseline"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the log is syntactically uniform — every line the same shape, no outlier entry, no anomaly against its own baseline",
+        "the evidence fits one of these better: dfir-authentication-trace, forensics-pcap-carve",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-authentication-trace",
+        "forensics-pcap-carve"
+      ],
+      "unlock_signals": "(?:log files?|access\\.log|auth\\.log|syslog|apache log|nginx log|iis log|\\.log\\b.{0,40}(?:flag|find|extract|analy))|(?:(?:what|which|when).{0,40}(?:ip|user|request|command|attack|exfil|download|uploaded|executed))|(?:(?<![a-z0-9])(?:forensics\\ log\\ analysis|log\\ file\\ analysis|log\\ analysis|log\\-analysis)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
       "id": "forensics-memory-analysis",
       "path": "skills/forensics-memory-analysis/SKILL.md",
       "layer": "depth",
@@ -1104,6 +1133,33 @@
       "unlock_signals": "\\bmcp\\b|agent|llm|chatbot|system prompt|prompt injection|tool call|function calling"
     },
     {
+      "id": "misc-constraint-puzzle",
+      "path": "skills/misc-constraint-puzzle/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "misc"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 906,
+      "depth_files": 3,
+      "depth_tokens": 631,
+      "use_when": [
+        "a probe or source read produced this class's signal: connect once and capture the exact protocol before writing a solver — guessing the format from the banner wastes the round budget"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the service has no interactive protocol at all — a static page or a file, not a socket conversation",
+        "the evidence fits one of these better: misc-interpreter-escape, misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "misc-interpreter-escape",
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:nc\\s+\\S+|netcat|connect.{0,30}(?:port|service)|tcp service)|(?:solve.{0,30}(?:puzzle|equation|maze|captcha|challenge).{0,30}(?:fast|time|second|round))|(?:programming|scripting|algorithm|automate|rounds? \\d+|math.{0,20}puzzle)|(?:(?<![a-z0-9])(?:misc\\ constraint\\ puzzle|constraint\\ puzzle|constraint\\-puzzle|speed\\ puzzle|constraint)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
       "id": "misc-encoding-carrier",
       "path": "skills/misc-encoding-carrier/SKILL.md",
       "layer": "depth",
@@ -1154,6 +1210,33 @@
         "misc-encoding-carrier"
       ],
       "unlock_signals": "(?:pyjail|\\bjail\\b|sandbox)|(?:__builtins__|__import__|__class__|__subclasses__)|(?:blocked|forbidden|not allowed|rejected)|(?:\\beval\\s*\\(|\\bexec\\s*\\(|\\bcompile\\s*\\()|(?:\\brbash\\b|restricted shell|allowlist|charset)|(?:(?<![a-z0-9])(?:restricted\\ interpreter\\ escape|misc\\ interpreter\\ escape|interpreter\\ escape|interpreter\\-escape)(?![a-z0-9]))|(?:\\beval\\s*\\(\\s*(?:input|request|data))|(?:\\bexec\\s*\\(\\s*(?:input|request|data))|(?:__builtins__\\s*[:=]\\s*(?:\\{\\}|None))|(?:ast\\.parse|ast\\.walk|ast\\.NodeVisitor)|(?:(?:BLOCKED|BANNED|FORBIDDEN|blacklist)\\s*=\\s*[\\[\\(])",
+      "bug_class": true
+    },
+    {
+      "id": "osint-geolocation",
+      "path": "skills/osint-geolocation/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 911,
+      "depth_files": 3,
+      "depth_tokens": 660,
+      "use_when": [
+        "a probe or source read produced this class's signal: reverse image search first — a hit names the place outright; only when that fails do you match terrain and signage by hand"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no unique landmark, text, plate, sun angle or terrain feature distinguishes the frame, and reverse search returns only generic matches",
+        "the evidence fits one of these better: osint-media-metadata, osint-identity-pivot",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "osint-media-metadata",
+        "osint-identity-pivot"
+      ],
+      "unlock_signals": "(?:geolocat|where (?:was|is|were).{0,40}(?:taken|photo|picture|filmed|located)|find (?:the )?(?:location|place|city|country|coordinates|street|building|landmark))|(?:reverse image|google lens|street view|satellite|terrain|landmark|signage|license plate|sun (?:position|angle|shadow))|(?:(?<![a-z0-9])(?:osint\\ geolocation|video\\ geolocation|geolocation|photo)(?![a-z0-9]))",
       "bug_class": true
     },
     {

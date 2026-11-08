@@ -56,7 +56,7 @@ Open one. Never browse the directory.
 | Verilog, Gray code, SMS PDU, UTF-9, MaxiCode, exotic formats | `encodings-advanced.md` |
 | Data hidden in an image, audio, signal, capture or column of numbers | `data-hiding.md` |
 | QAM, IQ samples, carrier recovery, timing sync | `rf-sdr.md` |
-| A search problem, an oracle, a protocol to drive, a constraint system | `solvers.md` |
+| A search problem, an oracle, a protocol to drive, a constraint system | `solvers.md` (socket speed puzzles: class `misc-constraint-puzzle`, `../misc-constraint-puzzle/`) |
 | A Python prompt with the way out removed | `pyjails.md` |
 | A restricted shell | `bashjails.md` |
 | Any other restricted execution context; a shell you already hold | `jails-and-shells.md` |

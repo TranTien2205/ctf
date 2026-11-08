@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 965,000 tokens across 482 files. Opening
+The depth corpus is roughly 970,000 tokens across 494 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -59,11 +59,11 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
 | ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `crypto-classical`, `crypto-ecc-dlog`, `crypto-prng` … |
-| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | `misc-encoding-carrier`, `misc-interpreter-escape` |
+| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | `misc-constraint-puzzle`, `misc-encoding-carrier`, `misc-interpreter-escape` |
 | artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `dfir-antiforensics-trace`, `dfir-authentication-trace`, `dfir-cloud-audit-trace` … |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.7k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
-| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-identity-pivot`, `osint-infra-records`, `osint-media-metadata` … |
+| name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-geolocation`, `osint-identity-pivot`, `osint-infra-records` … |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.1k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.1k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
@@ -116,6 +116,7 @@ Open one only after its signal fired.
 | Capture carving / protocol extraction | catalogue | every exported object and followed stream is accounted for as normal tra | `skills/forensics-pcap-carve/SKILL.md` |
 | Memory image analysis | catalogue | process list | `skills/forensics-memory-analysis/SKILL.md` |
 | Disk image / filesystem carving | catalogue | live files | `skills/forensics-disk-image/SKILL.md` |
+| Log file analysis | catalogue | the log is syntactically uniform — every line the same shape | `skills/forensics-log-analysis/SKILL.md` |
 
 ## DFIR evidence families
 
@@ -171,6 +172,7 @@ Open one only after its signal fired.
 | Class | Evidence | Closed when (falsifier) | Skill |
 |---|---|---|---|
 | Media and document metadata | catalogue | the metadata was stripped on upload and the carrier holds no appended da | `skills/osint-media-metadata/SKILL.md` |
+| Photo / video geolocation | catalogue | no unique landmark | `skills/osint-geolocation/SKILL.md` |
 | Identity and handle pivot | catalogue | the pivot is too generic to separate from unrelated accounts | `skills/osint-identity-pivot/SKILL.md` |
 | Domain, DNS and certificate records | catalogue | every record type returns only operational data and the certificate name | `skills/osint-infra-records/SKILL.md` |
 
@@ -180,6 +182,7 @@ Open one only after its signal fired.
 
 | Class | Evidence | Closed when (falsifier) | Skill |
 |---|---|---|---|
+| Constraint / speed puzzle | catalogue | the service has no interactive protocol at all — a static page or a file | `skills/misc-constraint-puzzle/SKILL.md` |
 | Restricted interpreter escape | catalogue | the check runs on the parsed AST and rejects every node type that can re | `skills/misc-interpreter-escape/SKILL.md` |
 | Encoding or carrier puzzle | catalogue | the alphabet and length match no standard carrier and the index of coinc | `skills/misc-encoding-carrier/SKILL.md` |
 
