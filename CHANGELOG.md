@@ -29,7 +29,11 @@ system. All notable milestones on `agent-v2`.
 - Operator secrets never persist: `Authorization`/`Cookie`/`Set-Cookie`/
   `X-*-Token` and any `--header`-configured value are redacted at record
   time (transcript + logs) and re-redacted at render time (old sessions);
-  `--proxy` remains the wire-fidelity path.
+  `--proxy` remains the wire-fidelity path. `--secret`/`ARGUS_SECRETS`
+  declare credential *values* (login passwords posted in bodies, quoted
+  tokens) that `Session` redacts inside every artifact write — bodies,
+  event output, notes, meta.json, logs — while the model still sees the
+  real bytes.
 
 ### Probe coverage (26 matched-pair probes)
 - Injection: sqli (quoted/numeric/OR-pair/xpath/UNION), nosqli, ssti,
@@ -53,6 +57,13 @@ system. All notable milestones on `agent-v2`.
   worker-spawn requests, max_workers cap, per-role turn/request budgets.
 - Crash isolation per worker, lead-death closes the pipeline, watchdog +
   bounded joins, daemon threads — the team cannot wedge.
+- `mcp_call` scope-checks every http(s) URL inside its arguments — an
+  MCP fetch server cannot become a path around the scope guard, and the
+  block is recorded in the transcript.
+- External-tool args are scanned for URLs, bare hosts AND IPv6 literals
+  (`nmap ::1` no longer slips past `split(':')`), with per-tool flag
+  guards for local-file exfil, target-list files, redirect flags, and
+  local code exec.
 
 ### LLM layer
 - Auth chain: `--api-key`/`ANTHROPIC_API_KEY` → `ANTHROPIC_AUTH_TOKEN`/
@@ -72,7 +83,19 @@ system. All notable milestones on `agent-v2`.
   model's word over the transcript's bytes.
 
 ### Reports & artifacts
+- `argus diff <before> <after>`: retest comparison at finding level —
+  FIXED / STILL PRESENT (with severity drift + id pairs in `--json`) /
+  NEW, matched on class+host+path+params so fresh lab ports still line
+  up; warns when either input session has unverifiable findings.
+- `argus report/findings/diff` re-validate findings before trusting
+  them: bad rows are excluded from renders and marked `UNVERIFIED` in
+  listings; report refuses non-session and empty-transcript dirs rather
+  than fabricating a verifiable "session".
 - `report.md` + `report.html`: severities, CVSS, auto-mapped CWE,
+  OWASP Top 10 (2021) buckets, verbatim proof, embedded transcript
+  excerpts, coverage, constraints, agent metrics, notes appendix.
+  Dynamic code fences mean target bytes
+  cannot break out and inject fake report sections.
   verbatim proof, embedded transcript excerpts, coverage, constraints,
   agent metrics, notes appendix. Dynamic code fences mean target bytes
   cannot break out and inject fake report sections.
@@ -92,7 +115,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 99 offline checks.
-- `python -m pytest tests/ -q`: 122 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 129 tests (unit + live-lab + loop +
   team + MCP + CLI).
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
   no API key (5 evidence-gated findings each).
