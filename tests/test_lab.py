@@ -52,6 +52,16 @@ def test_sqli_probe_or_pair(lab_url, ctx):
     assert "OR pair" in out["verdict"], out
 
 
+def test_sqli_probe_union_cols(lab_url, ctx):
+    # items selects 2 columns; ORDER BY 3 is the first failing n
+    out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id", union_cols=6)
+    assert out["union"]["columns"] == 2, out["union"]
+    out2 = probes.probe_sqli(ctx, lab_url + "/product?id=1", "id",
+                             union_cols=6)
+    assert out2["union"]["columns"] == 2, out2["union"]
+    assert out2["union"]["context"] == "numeric", out2["union"]
+
+
 def test_time_probe_cmd(lab_url, ctx):
     out = probes.probe_time(ctx, lab_url + "/ping?host=1", "host", delay_s=2)
     assert "cmd" in out["verdict"]

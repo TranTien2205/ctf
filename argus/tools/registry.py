@@ -190,6 +190,10 @@ TOOL_SCHEMAS: list[dict] = [
             "param": {**_STR, "description": "Parameter to test"},
             "method": {**_STR, "description": "GET or POST (default GET)"},
             "data": {**_STR, "description": "POST body template; param value is replaced. A JSON object body is detected automatically"},
+            "union_cols": {**_INT, "description": "If >0, also run ORDER BY "
+                                                "enumeration up to this n to "
+                                                "bound the UNION SELECT "
+                                                "column count"},
         },
         ["url", "param"],
     ),

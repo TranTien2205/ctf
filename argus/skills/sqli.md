@@ -23,7 +23,9 @@ Baseline `1`, then `1'` (syntax probe), then a matched pair on the SAME input:
 
 1. Fingerprint DBMS once: MySQL `@@version`, Postgres `version()`, MSSQL
    `@@version`, Oracle `v$version`.
-2. UNION: find column count with `ORDER BY N` (raise N until error), then
+2. UNION: find column count with `ORDER BY N` (raise N until error) -
+   `probe_sqli(url, param, union_cols=10)` automates this in the context
+   (quoted/numeric) that matched - then
    `UNION SELECT NULL,...,marker` placing the marker in each position.
 3. information_schema: `table_name` from `information_schema.tables`, then
    `column_name` from `information_schema.columns where table_name='x'`.

