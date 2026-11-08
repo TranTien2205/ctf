@@ -258,6 +258,25 @@ class StructureTests(unittest.TestCase):
             self.assertIn(resolved, routers,
                           "ctf.py routes category %r but no router declares it" % category)
 
+    def test_every_router_is_reachable_from_ctf_py(self):
+        """The reverse direction: a router no ctf.py category resolves to is dead.
+
+        skill_select picks the FIRST router whose categories contain the routed
+        category, and ctf.py names exactly one skill path per category. A second
+        router that declares a category another router already owns is silently
+        unreachable: ir-live-estate-triage declared "dfir" while ctf.py mapped
+        dfir to dfir-sherlock-triage, so a ransom-note brief could never reach it.
+        """
+        for skill in registry()["skills"]:
+            if skill["layer"] != "router":
+                continue
+            reachable = [c for c in skill["categories"]
+                         if ctf.SKILLS.get(c) == skill["path"]]
+            self.assertTrue(reachable,
+                            "router %r is unreachable: none of its categories %r "
+                            "resolve to it in ctf.SKILLS" %
+                            (skill["id"], skill["categories"]))
+
     def test_index_only_names_paths_that_exist(self):
         text = read("skills/INDEX.md")
         for match in re.findall(r"`(skills/[A-Za-z0-9_./-]+\.md)`", text):
@@ -2637,14 +2656,31 @@ class KnowledgeScaleTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "tools"))
         import subagent_fanout as fan
 
-        taxonomy = {c["id"] for c in json.loads(
+        taxonomy = {c["id"]: c for c in json.loads(
             (ROOT / "knowledge" / "bug-classes.json").read_text(encoding="utf-8"))["classes"]}
         named = [cid for spec in fan.WEB_FAMILIES for cid in spec["classes"]]
         self.assertTrue(named, "the web family map names no classes at all")
-        unknown = sorted(set(named) - taxonomy)
+        unknown = sorted(set(named) - set(taxonomy))
         self.assertEqual(unknown, [],
                          "the web family map names classes absent from the taxonomy: %s"
                          % unknown)
+        for cid in set(named):
+            self.assertEqual(taxonomy[cid].get("category"), "web",
+                             "%s is in the web family map but its taxonomy "
+                             "category is %r" % (cid, taxonomy[cid].get("category")))
+
+        # coverage: every web class must be owned by a family or named here with
+        # the reason it cannot join one. The sweep probes over HTTP; web-web3
+        # needs chain RPC, so no HTTP family can measure it -- it is excluded
+        # explicitly instead of being a silent gap like dfir-persistence-trace
+        # once was on the dfir side.
+        out_of_sweep_scope = {"web-web3"}
+        web_classes = {cid for cid, cls in taxonomy.items()
+                       if cls.get("category") == "web"}
+        uncovered = sorted(web_classes - set(named) - out_of_sweep_scope)
+        self.assertEqual(uncovered, [],
+                         "these web classes have no family and no named exclusion, "
+                         "so --web would never brief an agent on them: %s" % uncovered)
 
         agents_dir = ROOT / ".claude" / "agents"
         for spec in fan.WEB_FAMILIES:

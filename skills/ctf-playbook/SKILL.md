@@ -56,6 +56,9 @@ early both burns context and anchors the next hypothesis.
 | Person, photo, domain, handle in public sources | `../osint-triage/` | `../ctf-osint/` |
 | Jail, encoding chain, game or VM, programming task | `../ctf-misc/` | one misc reference |
 | Obfuscated script, PE or .NET sample, C2 traffic | `../rev-triage/` | `../ctf-malware/` |
+| Scoreboard, flag store, tick, vulnbox, patch round | `../ad-service-triage/` | one `ad-*` |
+| Artifact bundle (EVTX, hives, $MFT, CloudTrail) with numbered questions | `../dfir-sherlock-triage/` | one `dfir-*` |
+| Live estate already hit: ransom, services down, handed root | `../ir-live-estate-triage/` | one `dfir-*` |
 
 Unsure? Do not guess and do not open several. Re-run
 `python3 tools/skill_select.py` with one more observation.

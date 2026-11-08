@@ -147,6 +147,16 @@
         "ctf-playbook-depth"
       ],
       "origin": "coverage: ad router"
+    },
+    {
+      "observation": "ransom note on the file server files encrypted services down handed root post-incident live estate",
+      "expect_router": "ir-live-estate-triage",
+      "forbid_open": [
+        "dfir-sherlock-triage",
+        "forensics-triage",
+        "ad-service-triage"
+      ],
+      "origin": "coverage: live-estate brief reaches the ir router"
     }
   ],
   "chain_match": [

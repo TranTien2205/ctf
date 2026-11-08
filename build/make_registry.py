@@ -186,7 +186,10 @@ PORTED = {
                            r"cron|suid|ld\.so\.preload|web shell|persistence"),
     },
     "ir-live-estate-triage": {
-        "layer": "router", "categories": ["dfir"],
+        # Own category: ctf.py routes "ir" here. It used to declare "dfir",
+        # which made it unreachable -- skill_select takes the first router
+        # whose categories match, and dfir-sherlock-triage sorts first.
+        "layer": "router", "categories": ["ir"],
         "use_when": ["a live estate has already been hit and both recovery and investigation are scored",
                      "services are down, files are encrypted, and a clock is running"],
         "do_not_use_when": ["the input is a closed artifact bundle with a numbered question list: "

@@ -50,15 +50,17 @@
         "a probe is already running and only needs interpretation"
       ],
       "routes_to": [
-        "web-triage",
+        "ad-service-triage",
+        "ai-iot-triage",
+        "crypto-triage",
+        "ctf-misc",
+        "dfir-sherlock-triage",
+        "forensics-triage",
+        "ir-live-estate-triage",
+        "osint-triage",
         "pwn-binary-triage",
         "rev-triage",
-        "crypto-triage",
-        "forensics-triage",
-        "osint-triage",
-        "ai-iot-triage",
-        "ctf-misc",
-        "ctf-malware"
+        "web-triage"
       ]
     },
     {
@@ -218,7 +220,7 @@
       "path": "skills/ir-live-estate-triage/SKILL.md",
       "layer": "router",
       "categories": [
-        "dfir"
+        "ir"
       ],
       "skill_tokens": 1941,
       "depth_files": 1,

@@ -24,6 +24,7 @@ SKILLS = {
     "dfir": "skills/dfir-sherlock-triage/SKILL.md",
     "misc": "skills/ctf-misc/SKILL.md", "ai": "skills/ai-iot-triage/SKILL.md",
     "ad": "skills/ad-service-triage/SKILL.md",
+    "ir": "skills/ir-live-estate-triage/SKILL.md",
 }
 SIGNALS = (
     ("web-ssrf", r"ssrf|server-side fetch|url fetch|fetch|url parameter|pdf generator|pdf fetch|webhook|admin bot|headless|render url"),
@@ -43,6 +44,13 @@ SIGNALS = (
     ("ai", r"llm|prompt injection|machine learning|model weights|iot|firmware|system prompt|pickle model|mqtt|coap|modbus"),
     # Attack-defense contest briefs: scoreboard language no jeopardy row claims.
     ("ad", r"attack.?defense|a&d|\bvulnbox\b|flag store|flag id|service checker|sla\b|tick\b|patch round|exploit farm|nop team|traffic dump|pcap dump"),
+    # A LIVE estate that has already been hit: you are handed root, services are
+    # down, and recovery is scored. The dfir row owns closed artifact bundles and
+    # the words "incident response"; this row owns the is-it-still-burning words
+    # no other category claims.
+    ("ir", r"ransom(?:ware| note)?|files? (?:are |were )?encrypt|services? (?:are |were )?down|"
+           r"post.?incident|live estate|handed root|root on (?:the |a )?(?:compromised |live )?host|"
+           r"recovery scored|availability scored|restore service|business continuity|defaced"),
     # Misc is scored last in practice because it is the residual category, but
     # the score is a hit count, not an order, so every term here is one that
     # no other row claims. Eight keywords used to leave "brainfuck", "QR code"
@@ -137,6 +145,7 @@ def observation_route(text):
               "osint": "extract unique identifiers and pivot one source at a time",
               "ai": "map input to model/tool sink and test a harmless boundary case",
               "ad": "find the flag store and what the checker needs before patching or attacking",
+              "ir": "bound the intake so evidence survives; inventory the live estate before answering questions",
               "dfir": "inventory the artifact bundle first, then answer one numbered question at a time"}
     return {"mode": "blackbox", "route": ranked[0] if ranked else None,
             "alternates": ranked[1:3],
