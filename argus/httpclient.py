@@ -291,9 +291,14 @@ class GuardedClient:
                 rid = self.session.record_exchange(
                     tool=tool,
                     request={"method": method, "url": url,
+                             # a dict collapses duplicate headers - and a
+                             # duplicated/conflicting header pair IS the
+                             # evidence here - so keep the wire text too
                              "headers": {l.split(": ", 1)[0]: l.split(": ", 1)[1]
                                          for l in lines[1:]},
                              "raw": True,
+                             "request_text": raw_req.decode(
+                                 "utf-8", "replace")[:4000],
                              "body": body.decode("utf-8", "replace")},
                     response={"status": status, "headers": rheaders,
                               "body": rbody, "elapsed_ms": elapsed},
