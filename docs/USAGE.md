@@ -32,7 +32,12 @@ python -m argus run https://app.example \
 | `--max-requests` | 400 | HTTP request budget |
 | `--max-time` | 2400 | wall-clock seconds |
 | `--rate` | 5 | requests/second cap |
+| `--goal` | full assessment | operator goal, injected into the system contract |
+| `--operator` | none | tester/org attribution written into meta + reports |
 | `--proxy` | none | route via Burp/ZAP for inspection |
+| `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
+| `--mcp-config` | none | extra MCP servers config file |
+| `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
