@@ -74,7 +74,9 @@ class ScopeGuard:
             parsed.hostname.lower(): target_private}
 
     def host_allowed(self, host: str) -> bool:
-        host = host.lower()
+        # a trailing dot is the DNS root marker - 't.example.' IS
+        # 't.example'; normalize or the same host reads as foreign
+        host = host.lower().rstrip(".")
         if host in self.allowed_hosts:
             return True
         if self.include_subdomains:

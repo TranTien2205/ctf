@@ -105,6 +105,18 @@ def test_private_target_autoallows():
     g.check("http://127.0.0.1:8777/")
 
 
+def test_trailing_dot_fqdn_matches():
+    """'t.example.' is the same DNS name as 't.example' (root marker) -
+    normalizing avoids a false denial on self-links, without opening
+    suffix-confusion (evil-t.example. still denied)."""
+    g = ScopeGuard("http://t.example", allow_private=True)
+    g._private_cache["t.example."] = False   # skip DNS in the unit check
+    g.check("http://t.example./")
+    assert g.host_allowed("T.EXAMPLE.")
+    assert not g.host_allowed("evil-t.example.")
+    assert not g.host_allowed(".")
+
+
 def test_ipv6_only_private_host_denied(monkeypatch):
     """A hostname resolving ONLY via AAAA to ::1 must not read as public -
     gethostbyname raised for v6-only answers, so the old check failed open."""
