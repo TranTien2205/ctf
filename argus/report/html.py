@@ -6,7 +6,8 @@ import html
 import time
 from pathlib import Path
 
-from ..session import Session, SEVERITIES, _cwe_of, _owasp_of
+from ..session import (Session, SEVERITIES, _cwe_of, _owasp_of,
+                        sanitized_findings)
 from .markdown import _tool_surface
 from ..config import Config
 from .markdown import _coverage, _SEV_ORDER
@@ -41,7 +42,7 @@ def _esc(s) -> str:
 def render_html(session: Session, cfg: Config, summary: str = "",
                 extra: dict | None = None) -> Path:
     coverage = _coverage(session)
-    findings = sorted(session.findings,
+    findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))
     counts: dict[str, int] = {}
     for f in findings:

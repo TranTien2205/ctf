@@ -8,7 +8,8 @@ import urllib.parse
 from pathlib import Path
 
 from ..config import Config
-from ..session import SEVERITIES, Session, _cwe_of, _owasp_of
+from ..session import (SEVERITIES, Session, _cwe_of, _owasp_of,
+                        sanitized_findings)
 from ..httpclient import _redact_headers
 
 _SEV_ORDER = {s: i for i, s in enumerate(SEVERITIES)}
@@ -108,7 +109,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         except (ValueError, OSError):
             pass
     coverage = _coverage(session)
-    findings = sorted(session.findings,
+    findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))
     counts: dict[str, int] = {}
     for f in findings:

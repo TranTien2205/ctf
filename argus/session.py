@@ -257,7 +257,8 @@ _CWE = {
 
 
 def _cwe_of(category: str) -> str:
-    return _CWE.get(re.sub(r"[^a-z0-9]", "", (category or "").lower()), "")
+    return _CWE.get(
+        re.sub(r"[^a-z0-9]", "", str(category or "").lower()), "")
 
 
 # CWE -> OWASP Top 10 (2021) bucket. This is the taxonomy audit reports
@@ -294,6 +295,30 @@ _OWASP = {
 
 def _owasp_of(cwe: str) -> str:
     return _OWASP.get(cwe or "", "")
+
+
+def sanitized_findings(rows) -> list[dict]:
+    """Findings view safe for renderers: every row a dict, every field a
+    str. findings.json is operator-editable - a hand-edited file must not
+    crash report/sarif/html rendering (verify still flags bad rows)."""
+    out = []
+    for f in rows or []:
+        if not isinstance(f, dict):
+            continue
+        g = dict(f)
+        for k in ("id", "severity", "title", "category", "url",
+                  "description", "remediation", "cvss", "cwe", "owasp",
+                  "agent", "evidence_excerpt"):
+            g[k] = str(g.get(k) or "")
+        ids = g.get("evidence_ids")
+        g["evidence_ids"] = [str(i) for i in ids] \
+            if isinstance(ids, list) else []
+        try:
+            g["ts"] = float(g.get("ts") or 0)
+        except (ValueError, TypeError):
+            g["ts"] = 0.0
+        out.append(g)
+    return out
 
 
 class Session:

@@ -7,7 +7,7 @@ import json
 import time
 from pathlib import Path
 
-from ..session import Session, _cwe_of, _owasp_of
+from ..session import Session, _cwe_of, _owasp_of, sanitized_findings
 
 _LEVEL = {"critical": "error", "high": "error", "medium": "warning",
           "low": "warning", "info": "note"}
@@ -17,14 +17,14 @@ _RANK = {"critical": 9.5, "high": 8.0, "medium": 5.5,
 
 def render_sarif(session: Session) -> Path:
     sev_order = list(_LEVEL)
-    findings = sorted(session.findings, key=lambda f:
-                      sev_order.index(f["severity"])
-                      if f["severity"] in sev_order else len(sev_order))
+    findings = sorted(sanitized_findings(session.findings), key=lambda f:
+                      sev_order.index(f.get("severity"))
+                      if f.get("severity") in sev_order else len(sev_order))
     rules: dict[str, dict] = {}
     results = []
     for f in findings:
         cwe = f.get("cwe") or _cwe_of(f.get("category"))
-        rule_id = cwe or (f.get("category") or "finding").lower()
+        rule_id = cwe or str(f.get("category") or "finding").lower()
         rules.setdefault(rule_id, {
             "id": rule_id,
             "name": f.get("category", "finding"),
@@ -36,22 +36,24 @@ def render_sarif(session: Session) -> Path:
                 f"https://cwe.mitre.org/data/definitions/{cwe.split('-')[1]}.html")
         results.append({
             "ruleId": rule_id,
-            "level": _LEVEL.get(f["severity"], "warning"),
-            "rank": _RANK.get(f["severity"], 5.0),
-            "message": {"text": f"{f['title']} - {f.get('description', '')}"},
+            "level": _LEVEL.get(f.get("severity"), "warning"),
+            "rank": _RANK.get(f.get("severity"), 5.0),
+            "message": {"text": f"{f.get('title')} - "
+                               f"{f.get('description', '')}"},
             "locations": [{"physicalLocation": {
-                "artifactLocation": {"uri": f["url"]}}}],
+                "artifactLocation": {"uri": str(f.get("url") or "")}}}],
             "partialFingerprints": {
-                "argus/finding": f["id"],
+                "argus/finding": f.get("id", "?"),
                 "argus/category": f.get("category", ""),
             },
             "properties": {
-                "argus-severity": f["severity"],
+                "argus-severity": f.get("severity", ""),
                 "cvss": f.get("cvss", ""),
                 "cwe": cwe,
                 "owasp": f.get("owasp") or _owasp_of(cwe),
                 "evidence_ids": f.get("evidence_ids", []),
-                "evidence_excerpt": (f.get("evidence_excerpt") or "")[:500],
+                "evidence_excerpt":
+                    str(f.get("evidence_excerpt") or "")[:500],
                 "remediation": f.get("remediation", ""),
                 "agent": f.get("agent", ""),
             },
