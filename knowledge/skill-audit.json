@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-11-07T20:26:32",
+  "generated_at": "2026-11-09T00:11:33",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 84,
+    "skills": 87,
     "review": 0,
     "warn": 0,
     "local_evidence_present": 22,
-    "local_evidence_stub": 26,
+    "local_evidence_stub": 29,
     "local_evidence_missing": 0,
-    "actionable_skills": 48,
+    "actionable_skills": 51,
     "basic_skills": 0
   },
   "review": [],
@@ -26,7 +26,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 117
+      "lines": 120
     },
     {
       "id": "ad-service-triage",
@@ -136,7 +136,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 123
+      "lines": 126
     },
     {
       "id": "ad-patch-without-breaking-sla",
@@ -178,10 +178,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 87,
+      "lines": 89,
       "actionability": "operational",
       "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.2,
+      "overlap": 0.195,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -194,10 +194,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 89,
+      "lines": 91,
       "actionability": "operational",
       "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.196,
+      "overlap": 0.192,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -210,10 +210,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 97,
+      "lines": 99,
       "actionability": "operational",
       "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.181,
+      "overlap": 0.177,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -226,10 +226,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 84,
+      "lines": 86,
       "actionability": "operational",
       "nearest_neighbour": "crypto-ecc-dlog",
-      "overlap": 0.2,
+      "overlap": 0.195,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -418,8 +418,8 @@
       "local_evidence": "stub",
       "lines": 214,
       "actionability": "operational",
-      "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.019,
+      "nearest_neighbour": "web-host-header",
+      "overlap": 0.02,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -456,10 +456,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 83,
+      "lines": 85,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.195,
+      "overlap": 0.191,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -472,10 +472,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 86,
+      "lines": 88,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.194,
+      "overlap": 0.19,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -488,10 +488,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 83,
+      "lines": 85,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.199,
+      "overlap": 0.195,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -504,10 +504,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 80,
+      "lines": 82,
       "actionability": "operational",
       "nearest_neighbour": "osint-media-metadata",
-      "overlap": 0.212,
+      "overlap": 0.207,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -520,10 +520,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 84,
+      "lines": 86,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.212,
+      "overlap": 0.207,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -536,10 +536,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 83,
+      "lines": 85,
       "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.204,
+      "overlap": 0.2,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -552,10 +552,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 81,
+      "lines": 83,
       "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.219,
+      "overlap": 0.215,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -568,10 +568,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 83,
+      "lines": 85,
       "actionability": "operational",
       "nearest_neighbour": "pwn-format-string",
-      "overlap": 0.219,
+      "overlap": 0.215,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -594,10 +594,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 82,
+      "lines": 84,
       "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.207,
+      "overlap": 0.203,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -610,10 +610,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 86,
+      "lines": 88,
       "actionability": "operational",
       "nearest_neighbour": "rev-managed-code",
-      "overlap": 0.197,
+      "overlap": 0.193,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -626,10 +626,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 82,
+      "lines": 84,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.206,
+      "overlap": 0.201,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -642,10 +642,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 82,
+      "lines": 84,
       "actionability": "operational",
       "nearest_neighbour": "pwn-format-string",
-      "overlap": 0.206,
+      "overlap": 0.201,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -670,10 +670,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 96,
+      "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "web-nosqli",
-      "overlap": 0.165,
+      "nearest_neighbour": "web-request-smuggling",
+      "overlap": 0.161,
       "trust": "local-confirmed"
     },
     {
@@ -696,8 +696,8 @@
       "local_evidence": "present",
       "lines": 106,
       "actionability": "operational",
-      "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.157,
+      "nearest_neighbour": "web-nosqli",
+      "overlap": 0.155,
       "trust": "local-confirmed"
     },
     {
@@ -713,7 +713,7 @@
       "lines": 97,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.192,
+      "overlap": 0.19,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -724,10 +724,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 101,
+      "lines": 105,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.166,
+      "overlap": 0.164,
       "trust": "local-confirmed"
     },
     {
@@ -769,8 +769,24 @@
       "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.184,
+      "overlap": 0.182,
       "trust": "local-confirmed"
+    },
+    {
+      "id": "web-host-header",
+      "layer": "depth",
+      "path": "skills/web-host-header/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 90,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.184,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-idor",
@@ -785,7 +801,7 @@
       "lines": 105,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.045,
+      "overlap": 0.044,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -796,7 +812,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 78
+      "lines": 80
     },
     {
       "id": "web-logic-flaw",
@@ -806,11 +822,27 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 92,
+      "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.172,
+      "overlap": 0.168,
       "trust": "local-confirmed"
+    },
+    {
+      "id": "web-mass-assignment",
+      "layer": "depth",
+      "path": "skills/web-mass-assignment/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 88,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.191,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "web-nosqli",
@@ -823,7 +855,7 @@
       "lines": 95,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.172,
+      "overlap": 0.17,
       "trust": "local-confirmed"
     },
     {
@@ -834,10 +866,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 90,
+      "lines": 94,
       "actionability": "operational",
       "nearest_neighbour": "web-race-condition",
-      "overlap": 0.178,
+      "overlap": 0.175,
       "trust": "local-confirmed"
     },
     {
@@ -850,10 +882,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 87,
+      "lines": 91,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.194,
+      "overlap": 0.189,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -864,10 +896,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 108,
+      "lines": 116,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.173,
+      "overlap": 0.16,
       "trust": "local-confirmed"
     },
     {
@@ -878,10 +910,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 115,
+      "lines": 122,
       "actionability": "operational",
       "nearest_neighbour": "web-nosqli",
-      "overlap": 0.157,
+      "overlap": 0.15,
       "trust": "local-confirmed"
     },
     {
@@ -895,7 +927,7 @@
       "lines": 94,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.178,
+      "overlap": 0.175,
       "trust": "local-confirmed"
     },
     {
@@ -906,10 +938,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 102,
+      "lines": 109,
       "actionability": "operational",
       "nearest_neighbour": "web-cache-poisoning",
-      "overlap": 0.164,
+      "overlap": 0.161,
       "trust": "local-confirmed"
     },
     {
@@ -920,7 +952,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 68
+      "lines": 70
     },
     {
       "id": "web-sqli",
@@ -947,7 +979,7 @@
       "lines": 123,
       "actionability": "operational",
       "nearest_neighbour": "web-request-smuggling",
-      "overlap": 0.11,
+      "overlap": 0.106,
       "trust": "local-confirmed"
     },
     {
@@ -965,6 +997,22 @@
       "trust": "local-confirmed"
     },
     {
+      "id": "web-user-enum",
+      "layer": "depth",
+      "path": "skills/web-user-enum/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 90,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.183,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
       "id": "web-web3",
       "layer": "depth",
       "path": "skills/web-web3/SKILL.md",
@@ -977,7 +1025,7 @@
       "lines": 93,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.178,
+      "overlap": 0.176,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -988,7 +1036,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 74
+      "lines": 76
     },
     {
       "id": "web-xs-leaks",
@@ -1026,10 +1074,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 101,
+      "lines": 105,
       "actionability": "operational",
       "nearest_neighbour": "web-oauth-sso",
-      "overlap": 0.157,
+      "overlap": 0.154,
       "trust": "local-confirmed"
     },
     {

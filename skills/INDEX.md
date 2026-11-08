@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 952,000 tokens across 450 files. Opening
+The depth corpus is roughly 957,000 tokens across 462 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -66,7 +66,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-identity-pivot`, `osint-infra-records`, `osint-media-metadata` … |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.1k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
-| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.0k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
+| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.1k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
 resort: try a named category first.
@@ -100,6 +100,9 @@ Open one only after a probe or a source read produced its signal.
 | Arbitrary file read / source disclosure | verified | the path is resolved and confined to a fixed directory | `skills/file-read-primitives/SKILL.md` |
 | Unrestricted file upload | verified | the stored file is renamed | `skills/web-file-upload/SKILL.md` |
 | GraphQL abuse | catalogue | introspection is off and errors reveal no field names | `skills/web-graphql/SKILL.md` |
+| User enumeration / auth throttling | catalogue | identical response text | `skills/web-user-enum/SKILL.md` |
+| Mass assignment / parameter binding | catalogue | the server ignores or rejects every undocumented field: the stored objec | `skills/web-mass-assignment/SKILL.md` |
+| Host / forwarded-header attacks | catalogue | no response element (Location | `skills/web-host-header/SKILL.md` |
 | Smart contract / web3 | catalogue | the solved condition depends on state no external caller can change | `skills/web-web3/SKILL.md` |
 | Cross-site leak / browser side channel | verified | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
 

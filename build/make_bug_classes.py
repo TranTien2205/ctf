@@ -518,6 +518,72 @@ CLASSES = [
         "confusable_with": ["web-idor", "web-logic-flaw"],
     },
     {
+        "id": "web-user-enum", "name": "User enumeration / auth throttling",
+        "skill_dir": "web-user-enum",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"username|user\s*(?:name|id|exists|taken|found)|account exists",
+            r"invalid (?:user|username|password|credentials)|no such user|"
+            r"user (?:not found|does not exist)",
+            r"rate.?limit|too many (?:attempts|requests|tries)|locked out|"
+            r"lockout|captcha|throttl",
+            r"login|sign.?in|password reset|forgot password|registration",
+            r"timing.{0,30}(?:attack|oracle|differential)"],
+        "source_signals": [
+            r"user(?:name)?s?\.get|find_one|get_user|user_exists|"
+            r"check_password|verify_password",
+            r"(?:rate.?limit|throttle|lockout|attempts?)\s*[<>=:]|"
+            r"time\.sleep|bcrypt|pbkdf2|scrypt|argon2"],
+        "first_probe": "one known-good username and one obviously-bad username against the same form, then the same bad username twice — compare message, status, and timing across the three",
+        "falsifier": "identical response text, status, and timing distribution for known-good, known-bad, and repeated-bad attempts, including the timing of the password-verification path",
+        "depth_refs": ["skills/web-user-enum/references/README.md",
+                       "skills/web-user-enum/references/differentials.md"],
+        "confusable_with": ["web-auth-session", "web-logic-flaw"],
+    },
+    {
+        "id": "web-mass-assignment", "name": "Mass assignment / parameter binding",
+        "skill_dir": "web-mass-assignment",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"mass.?assign|over.?post|parameter bind|hidden field",
+            r"role|admin|is_staff|privileged|permission|balance|credits?|price",
+            r"register|sign.?up|profile|update|settings|checkout|order|apply"],
+        "source_signals": [
+            r"request\.(?:body|json|args|form|data)|params\.permit|"
+            r"bind_param|model_bind|setattr|update_attributes|"
+            r"ObjectMapper|@RequestBody",
+            r"(?:role|admin|is_staff|balance|price|credits?)\s*[=:]{1,2}[^\n]{0,40}"
+            r"(?:request|params|body|data)\b"],
+        "first_probe": "repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back",
+        "falsifier": "the server ignores or rejects every undocumented field: the stored object is byte-identical to the control submission",
+        "depth_refs": ["skills/web-mass-assignment/references/README.md",
+                       "skills/web-mass-assignment/references/binding-shapes.md"],
+        "confusable_with": ["web-logic-flaw", "web-idor"],
+    },
+    {
+        "id": "web-host-header", "name": "Host / forwarded-header attacks",
+        "skill_dir": "web-host-header",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"x-forwarded-(?:host|server)|x-original-url|x-rewrite-url|"
+            r"x-host|forwarded: host|x-http-host",
+            r"password reset link|reset link|reset token|magic link|"
+            r"activation link|host header|host-header|header injection"],
+        "source_signals": [
+            r"request\.(?:host|headers?)|X-Forwarded|X-Original-URL|"
+            r"X-Rewrite-URL|SERVER_NAME|HTTP_HOST|get_host|url_for|"
+            r"reset_url|absolute_uri|build_absolute"],
+        "source_signals": [
+            r"request\.(?:host|headers?)|X-Forwarded|X-Original-URL|"
+            r"X-Rewrite-URL|SERVER_NAME|HTTP_HOST|get_host|url_for|"
+            r"reset_url|absolute_uri|build_absolute"],
+        "first_probe": "send the request twice, once with a controlled X-Forwarded-Host and once with a swapped Host — a reset-link or redirect reflecting your host is the signal",
+        "falsifier": "no response element (Location, link, cookie domain, generated URL) is built from any attacker-controlled host header on either request",
+        "depth_refs": ["skills/web-host-header/references/README.md",
+                       "skills/web-host-header/references/header-pairs.md"],
+        "confusable_with": ["web-parser-differential", "web-cache-poisoning"],
+    },
+    {
         "id": "web-web3", "name": "Smart contract / web3", "skill_dir": "web-web3",
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [r"solidity|\.sol\b|ethereum|web3|rpc endpoint|foundry|hardhat",

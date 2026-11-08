@@ -598,6 +598,142 @@ single endpoint instead of many routes. Cross-check with `../web-idor/`.
 - A rejected introspection query is not a secure GraphQL implementation; it only
   closes that discovery channel. Do not invent field names after a silent error.
 """,
+    "web-user-enum": """## Recognise
+
+A login, registration, reset or contact form whose response differs by whether
+the account exists. Three channels carry the difference: the error text
+("unknown user" vs "wrong password"), the status code or redirect target, and
+the response time — hashing runs only for users that exist.
+
+## Confirm safely
+
+Probe with accounts you control plus one obviously-bad name. A repeatable
+difference across three tries is a lead, not a finding — record the delta in
+bytes or milliseconds and quote both responses verbatim before confirming.
+
+Never probe enumeration by spraying a wordlist of real usernames on a shared
+target; rate limiting is itself the thing under test.
+
+## What the differential buys
+
+| Channel | Exploit |
+|---|---|
+| Distinct error text | direct enumeration — script one request per candidate |
+| Timing only | the server hashes known users' passwords and short-circuits unknown ones |
+| Same text, same time, still leaks | check Set-Cookie, redirect target, or an embedded boolean in the body |
+
+A found account is the opening: weak password policies, reset-flow bugs, or
+credential stuffing against it are usually the intended chain.
+
+## Traps
+
+- A generic error that LOOKS uniform may still differ by a whitespace or a
+  hidden field — diff the raw bodies, not the rendered page.
+- Timing noise swallows sub-10ms deltas on a remote target; measure the same
+  pair alternately several times and compare medians.
+- Absent rate limiting on the auth path is itself reportable, but only after a
+  bounded burst shows no throttle AND the account is not locked — a locked
+  account is evidence of the control, not its absence.
+
+## Operational probe
+
+```bash
+# known-good vs known-bad, same form fields
+curl -i -X POST -d 'user=admin&pass=x' "$BASE/login" > /tmp/good
+curl -i -X POST -d 'user=zzz-no-such&pass=x' "$BASE/login" > /tmp/bad
+diff /tmp/good /tmp/bad
+```
+""",
+    "web-mass-assignment": """## Recognise
+
+The handler binds the request body straight into a model. Registers, profile
+updates, orders and checkout forms are the usual shapes — anywhere a JSON or
+form payload is deserialized into an object that carries fields the form never
+renders: `role`, `is_admin`, `balance`, `price`, `status`.
+
+## Confirm safely
+
+Send the legitimate request twice: once verbatim (control), once with ONE extra
+field. Then read the object back through a GET or a later response. The field
+stored or honoured is the confirmation — not the 200.
+
+Only ever send fields whose semantics you can predict; a wrong type or a
+server-internal field can corrupt the object or the challenge state.
+
+## Carriers that matter
+
+| Carrier | Shape |
+|---|---|
+| JSON body | `{"user":"x","role":"admin"}` merged over defaults |
+| Form body | `role=admin` appended alongside declared fields |
+| Nested object | `{"billing":{"discount":100}}` — server-side merge reaches deep fields |
+| Array / repeated key | `role=user&role=admin` — binder picks first or last |
+
+`constructor.prototype`-style keys are NOT mass assignment — they pollute the
+prototype for every object; that is web-prototype-pollution.
+
+## Traps
+
+- A stored field that is never read anywhere is not a finding — prove the bound
+  field changes a decision (price, privilege, approval) before citing it.
+- Some frameworks bind form fields only when named with a model prefix
+  (`user[role]`); try the unprefixed and the prefixed name before concluding.
+- Read-back matters: a field accepted but discarded by the serializer is a
+  null result. Record it honestly.
+
+## Operational probe
+
+```bash
+curl -i -X POST -H 'Content-Type: application/json'   -d '{"username":"me","password":"x","role":"admin"}' "$BASE/api/register"
+curl -i "$BASE/api/me"   # read back: is role honoured?
+```
+""",
+    "web-host-header": """## Recognise
+
+The app builds URLs or applies middleware ACLs from request headers it trusts:
+`Host`, `X-Forwarded-Host`, `X-Forwarded-Server`, `X-Original-URL`,
+`X-Rewrite-URL`, `Forwarded: host=`. Password-reset links, absolute redirects,
+cookie domains and generated canonical URLs are the classic sinks; front-end
+ACLs that honour `X-Original-URL` are the modern one.
+
+## Confirm safely
+
+Send the request twice: once with a canary host in the suspect header, once
+with the header absent. The canary appearing in a Location, a generated link
+inside the body, or a Set-Cookie domain is the signal — quote the reflecting
+bytes verbatim.
+
+For the ACL-bypass shape, the canary is a path that 403s when requested
+directly: `X-Original-URL: /admin` returning the admin page is the finding.
+
+## Headers worth a request each
+
+| Header | What it poisons |
+|---|---|
+| `Host` | everything when the proxy ignores it — also try `Host: good` + `Host: evil` duplicated |
+| `X-Forwarded-Host` / `X-Host` | generated URLs, reset links |
+| `X-Original-URL` / `X-Rewrite-URL` | middleware rewrites + ACLs |
+| `Forwarded: host=evil` | RFC 7239 form, often honoured where the others are not |
+
+## Traps
+
+- A reflected host in the response is only a lead; the finding needs the host
+  reaching a decision (link the victim clicks, path the middleware applies,
+  domain a cookie binds to).
+- Password-reset poisoning requires a real reset flow — request a reset for
+  your OWN account and inspect the delivered link. Do not reset other
+  accounts.
+- Some frameworks read `Host` only after validating it against a server list;
+  a 400 on a bad host is a negative result, not a retry signal.
+
+## Operational probe
+
+```bash
+curl -i -H 'X-Forwarded-Host: evil.example' "$BASE/reset"   # link sink
+curl -i -H 'X-Original-URL: /admin' "$BASE/"                # middleware ACL
+curl -i -H 'Host: evil.example' "$BASE/robots.txt"          # canonical-URL sink
+```
+""",
     "web-web3": """## Recognise
 
 A Solidity source file, an RPC endpoint, and a setup contract. The challenge

@@ -87,6 +87,9 @@ Run `python3 tools/chain_match.py` before opening any depth skill.
 | A single endpoint taking a query document | GraphQL | one introspection query | `../web-graphql/` |
 | Solidity source, an RPC endpoint, a setup contract | Web3 | read the solved condition first | `../web-web3/` |
 | Extra fields accepted, a step that can be skipped | Logic flaw | one field the form never sends | `../web-logic-flaw/` |
+| Login, registration or reset responding differently for a real account; no throttle | User enum / throttling | one known-good vs one known-bad name, same form | `../web-user-enum/` |
+| A JSON or form body bound into a model with hidden fields | Mass assignment | one extra field, then read the object back | `../web-mass-assignment/` |
+| Reset links, redirects or middleware ACLs built from host headers | Host-header | one canary in X-Forwarded-Host and X-Original-URL | `../web-host-header/` |
 | A custom proxy, gateway or WAF in front of the app | Parser differential | compare how proxy and backend parse the same bytes | `../web-parser-differential/` |
 | A ws:// or wss:// channel, Socket.IO, or a live feature | WebSocket | open the channel from a foreign Origin and read the first message | `../web-websocket/` |
 | A bundled SPA and a `sourceMappingURL` or `/_next/static/` | Source map recon | fetch the bundle and its `.map`, extract endpoints | `../web-source-map/` |

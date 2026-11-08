@@ -221,8 +221,8 @@
   },
   {
    "observation": "the signup body accepts an is_admin=true field and mass assignment grants the role",
-   "expect_top": "web-logic-flaw",
-   "origin": "coverage: web-logic-flaw observation"
+   "expect_top": "web-mass-assignment",
+   "origin": "coverage: web-mass-assignment observation"
   },
   {
    "observation": "the login page honors ?next= and 302 redirects to an external callback= url",

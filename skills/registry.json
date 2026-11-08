@@ -329,7 +329,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1999,
+      "skill_tokens": 2124,
       "depth_files": 4,
       "depth_tokens": 2387,
       "use_when": [
@@ -350,8 +350,10 @@
         "web-deserialization",
         "web-file-upload",
         "web-graphql",
+        "web-host-header",
         "web-idor",
         "web-logic-flaw",
+        "web-mass-assignment",
         "web-nosqli",
         "web-oauth-sso",
         "web-open-redirect",
@@ -362,6 +364,7 @@
         "web-sqli",
         "web-ssrf",
         "web-ssti",
+        "web-user-enum",
         "web-web3",
         "web-xs-leaks",
         "web-xss",
@@ -1559,6 +1562,33 @@
       "bug_class": true
     },
     {
+      "id": "web-host-header",
+      "path": "skills/web-host-header/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 992,
+      "depth_files": 3,
+      "depth_tokens": 738,
+      "use_when": [
+        "a probe or source read produced this class's signal: send the request twice, once with a controlled X-Forwarded-Host and once with a swapped Host — a reset-link or redirect reflecting your host is the signal"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no response element (Location, link, cookie domain, generated URL) is built from any attacker-controlled host header on either request",
+        "the evidence fits one of these better: web-parser-differential, web-cache-poisoning",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-parser-differential",
+        "web-cache-poisoning"
+      ],
+      "unlock_signals": "(?:x-forwarded-(?:host|server)|x-original-url|x-rewrite-url|x-host|forwarded: host|x-http-host)|(?:password reset link|reset link|reset token|magic link|activation link|host header|host-header|header injection)|(?:(?<![a-z0-9])(?:forwarded\\-header\\ attacks|web\\ host\\ header|host\\ header|host\\-header|host)(?![a-z0-9]))|(?:request\\.(?:host|headers?)|X-Forwarded|X-Original-URL|X-Rewrite-URL|SERVER_NAME|HTTP_HOST|get_host|url_for|reset_url|absolute_uri|build_absolute)",
+      "bug_class": true
+    },
+    {
       "id": "web-idor",
       "path": "skills/web-idor/SKILL.md",
       "layer": "depth",
@@ -1637,6 +1667,33 @@
         "web-race-condition"
       ],
       "unlock_signals": "(?:registration|signup|checkout|coupon|workflow|approval)|(?:role|is_?admin|privilege|status)|(?:(?<![a-z0-9])(?:mass\\ assignment|web\\ logic\\ flaw|business\\ logic|logic\\ flaw|logic\\-flaw)(?![a-z0-9]))|(?:(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\))|(?:\\*\\*(?:request|data)\\b)|(?:setattr\\s*\\(\\s*\\w+\\s*,\\s*k)",
+      "bug_class": true
+    },
+    {
+      "id": "web-mass-assignment",
+      "path": "skills/web-mass-assignment/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 954,
+      "depth_files": 3,
+      "depth_tokens": 717,
+      "use_when": [
+        "a probe or source read produced this class's signal: repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the server ignores or rejects every undocumented field: the stored object is byte-identical to the control submission",
+        "the evidence fits one of these better: web-logic-flaw, web-idor",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-logic-flaw",
+        "web-idor"
+      ],
+      "unlock_signals": "(?:mass.?assign|over.?post|parameter bind|hidden field)|(?:role|admin|is_staff|privileged|permission|balance|credits?|price)|(?:register|sign.?up|profile|update|settings|checkout|order|apply)|(?:(?<![a-z0-9])(?:web\\ mass\\ assignment|parameter\\ binding|mass\\ assignment|mass\\-assignment)(?![a-z0-9]))|(?:request\\.(?:body|json|args|form|data)|params\\.permit|bind_param|model_bind|setattr|update_attributes|ObjectMapper|@RequestBody)|(?:(?:role|admin|is_staff|balance|price|credits?)\\s*[=:]{1,2}[^\\n]{0,40}(?:request|params|body|data)\\b)",
       "bug_class": true
     },
     {
@@ -1954,6 +2011,33 @@
         "web-command-injection"
       ],
       "unlock_signals": "(?:\\{\\{|\\$\\{|#\\{|<%=)|(?:jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b)|(?:template)|(?:\\b49\\b)|(?:(?<![a-z0-9])(?:server\\-side\\ template\\ injection|web\\ ssti|ssti)(?![a-z0-9]))|(?:render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params))|(?:eval\\s*\\(\\s*(?:template|tpl))",
+      "bug_class": true
+    },
+    {
+      "id": "web-user-enum",
+      "path": "skills/web-user-enum/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 986,
+      "depth_files": 3,
+      "depth_tokens": 761,
+      "use_when": [
+        "a probe or source read produced this class's signal: one known-good username and one obviously-bad username against the same form, then the same bad username twice — compare message, status, and timing across the three"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: identical response text, status, and timing distribution for known-good, known-bad, and repeated-bad attempts, including the timing of the password-verification path",
+        "the evidence fits one of these better: web-auth-session, web-logic-flaw",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-auth-session",
+        "web-logic-flaw"
+      ],
+      "unlock_signals": "(?:username|user\\s*(?:name|id|exists|taken|found)|account exists)|(?:invalid (?:user|username|password|credentials)|no such user|user (?:not found|does not exist))|(?:rate.?limit|too many (?:attempts|requests|tries)|locked out|lockout|captcha|throttl)|(?:login|sign.?in|password reset|forgot password|registration)|(?:timing.{0,30}(?:attack|oracle|differential))|(?:(?<![a-z0-9])(?:user\\ enumeration|auth\\ throttling|web\\ user\\ enum|user\\ enum|user\\-enum)(?![a-z0-9]))|(?:user(?:name)?s?\\.get|find_one|get_user|user_exists|check_password|verify_password)|(?:(?:rate.?limit|throttle|lockout|attempts?)\\s*[<>=:]|time\\.sleep|bcrypt|pbkdf2|scrypt|argon2)",
       "bug_class": true
     },
     {

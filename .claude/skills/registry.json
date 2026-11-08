@@ -1,0 +1,2343 @@
+{
+  "schema_version": 1,
+  "generated_from": "build/make_registry.py over the real skills/ tree and knowledge/bug-classes.json",
+  "token_estimate_method": "file bytes / 4; approximate, not measured by a tokenizer",
+  "load_policy": {
+    "order": [
+      "entry",
+      "router",
+      "depth",
+      "reference"
+    ],
+    "max_open_at_once": {
+      "entry": 1,
+      "router": 1,
+      "depth": 1,
+      "reference": 2
+    },
+    "rules": [
+      "Open exactly one entry skill (ctf-playbook) per challenge.",
+      "Open exactly one router for the selected category.",
+      "Do not open a depth skill before the first probe has produced a signal, unless the input format itself is unrecognised.",
+      "Open one depth reference file, not a whole depth directory.",
+      "If the router and the depth skill disagree, the router wins and the disagreement is recorded as an observation.",
+      "Never open a second category's router to 'check'; re-run tools/skill_select.py instead."
+    ]
+  },
+  "layers": {
+    "entry": "Classifies the challenge and manages contest time. Never solves.",
+    "router": "Maps one observed signal to one bug class and one cheapest probe. Short by design.",
+    "depth": "A bug class, or a large technique corpus. A bug-class skill is short and carries evidence_level; a corpus is gated.",
+    "reference": "A single file inside a depth or router directory."
+  },
+  "skills": [
+    {
+      "id": "ctf-playbook",
+      "path": "skills/ctf-playbook/SKILL.md",
+      "layer": "entry",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1509,
+      "depth_files": 3,
+      "depth_tokens": 2010,
+      "use_when": [
+        "a new challenge starts and the category is not yet fixed",
+        "several challenges compete for time in a timed contest"
+      ],
+      "do_not_use_when": [
+        "the category is already established by ctf.py or by given source",
+        "a probe is already running and only needs interpretation"
+      ],
+      "routes_to": [
+        "ad-service-triage",
+        "ai-iot-triage",
+        "crypto-triage",
+        "ctf-misc",
+        "dfir-sherlock-triage",
+        "forensics-triage",
+        "ir-live-estate-triage",
+        "osint-triage",
+        "pwn-binary-triage",
+        "rev-triage",
+        "web-triage"
+      ]
+    },
+    {
+      "id": "ad-service-triage",
+      "path": "skills/ad-service-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "ad"
+      ],
+      "skill_tokens": 1456,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "an attack-defense contest starts and a service needs triage",
+        "every team runs an identical copy of the service you are defending"
+      ],
+      "do_not_use_when": [
+        "a single jeopardy target with one flag: use ctf-playbook",
+        "the service is currently red: restore availability first"
+      ],
+      "routes_to": [
+        "ad-traffic-mining",
+        "ad-patch-without-breaking-sla",
+        "ad-planted-backdoor-hunt",
+        "ir-live-estate-triage",
+        "web-triage",
+        "white-box-intended-path"
+      ],
+      "unlock_signals": "attack.?defen[cs]e|attack-defense|scoreboard|tick|other teams|team host|flag rotat|availability|sla|uptime"
+    },
+    {
+      "id": "ai-iot-triage",
+      "path": "skills/ai-iot-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "ai"
+      ],
+      "skill_tokens": 878,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "an LLM/chatbot endpoint, a model file, or an embedded/IoT firmware or protocol capture is supplied"
+      ],
+      "do_not_use_when": [
+        "the model file is only a pickle to be weaponised: use web-deserialization",
+        "the firmware is a plain binary to reverse: use rev-triage"
+      ],
+      "routes_to": [
+        "ctf-ai-ml",
+        "mcp-agent-security",
+        "web-deserialization",
+        "rev-triage"
+      ]
+    },
+    {
+      "id": "crypto-triage",
+      "path": "skills/crypto-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "crypto"
+      ],
+      "skill_tokens": 3170,
+      "depth_files": 8,
+      "depth_tokens": 5368,
+      "use_when": [
+        "ciphertext, a modulus, a nonce, a key, or a hash is supplied",
+        "a custom encryption routine must be broken rather than reversed"
+      ],
+      "do_not_use_when": [
+        "the algorithm only has to be recovered from a binary: use rev-triage first",
+        "the data is an encoding rather than encryption: use ctf-misc"
+      ],
+      "routes_to": [
+        "crypto-ecc-dlog",
+        "crypto-prng",
+        "crypto-rsa",
+        "crypto-symmetric-oracle",
+        "ctf-crypto"
+      ]
+    },
+    {
+      "id": "ctf-misc",
+      "path": "skills/ctf-misc/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "misc"
+      ],
+      "skill_tokens": 2290,
+      "depth_files": 18,
+      "depth_tokens": 51148,
+      "use_when": [
+        "the challenge is a jail, an encoding chain, a game or VM, a DNS puzzle, or a programming constraint"
+      ],
+      "do_not_use_when": [
+        "the challenge fits a named category: misc is the last resort, not the first"
+      ],
+      "routes_to": [
+        "misc-encoding-carrier",
+        "misc-interpreter-escape"
+      ]
+    },
+    {
+      "id": "dfir-sherlock-triage",
+      "path": "skills/dfir-sherlock-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "dfir"
+      ],
+      "skill_tokens": 1797,
+      "depth_files": 11,
+      "depth_tokens": 42945,
+      "use_when": [
+        "a bundle of honest system artifacts is supplied and the task is a numbered list of investigation questions",
+        "EVTX, registry hives, $MFT, prefetch, a KAPE triage collection or CloudTrail logs are present"
+      ],
+      "do_not_use_when": [
+        "the container hides something and the task is recovery rather than investigation: use forensics-triage",
+        "the sample must be executed or decompiled: use rev-triage"
+      ],
+      "routes_to": [
+        "dfir-antiforensics-trace",
+        "dfir-authentication-trace",
+        "dfir-cloud-audit-trace",
+        "dfir-execution-trace",
+        "dfir-filesystem-timeline",
+        "dfir-network-exfil-trace",
+        "dfir-persistence-trace",
+        "ctf-forensics",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "forensics-triage",
+      "path": "skills/forensics-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "forensics"
+      ],
+      "skill_tokens": 660,
+      "depth_files": 7,
+      "depth_tokens": 4971,
+      "use_when": [
+        "a PCAP, disk image, memory dump, log set, document, or media file is supplied",
+        "something is believed to be hidden inside a container format"
+      ],
+      "do_not_use_when": [
+        "the capture is only used to read a protocol you already understand",
+        "the sample must be executed or decompiled: use rev-triage"
+      ],
+      "routes_to": [
+        "ctf-forensics",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "ir-live-estate-triage",
+      "path": "skills/ir-live-estate-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "ir"
+      ],
+      "skill_tokens": 1941,
+      "depth_files": 1,
+      "depth_tokens": 371,
+      "use_when": [
+        "a live estate has already been hit and both recovery and investigation are scored",
+        "services are down, files are encrypted, and a clock is running"
+      ],
+      "do_not_use_when": [
+        "the input is a closed artifact bundle with a numbered question list: use dfir-sherlock-triage",
+        "nothing is scored for availability, so the intake need not be bounded"
+      ],
+      "routes_to": [
+        "dfir-authentication-trace",
+        "dfir-execution-trace",
+        "dfir-persistence-trace",
+        "dfir-filesystem-timeline",
+        "dfir-network-exfil-trace",
+        "dfir-cloud-audit-trace",
+        "dfir-antiforensics-trace",
+        "ad-planted-backdoor-hunt"
+      ],
+      "unlock_signals": "ransom|encrypted files|ransom note|restore|recovery|incident response|post.?incident|live host|estate|root cause"
+    },
+    {
+      "id": "osint-triage",
+      "path": "skills/osint-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "osint"
+      ],
+      "skill_tokens": 1100,
+      "depth_files": 9,
+      "depth_tokens": 7961,
+      "use_when": [
+        "the challenge supplies a name, handle, photo, domain, or document and the answer lives in public sources"
+      ],
+      "do_not_use_when": [
+        "the challenge has a reachable target to probe: OSINT is not recon for an owned host",
+        "you would query a real person's data outside the challenge's stated scope"
+      ],
+      "routes_to": [
+        "osint-identity-pivot",
+        "osint-infra-records",
+        "osint-media-metadata",
+        "ctf-osint"
+      ]
+    },
+    {
+      "id": "pwn-binary-triage",
+      "path": "skills/pwn-binary-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 1024,
+      "depth_files": 1,
+      "depth_tokens": 219,
+      "use_when": [
+        "an ELF/PE binary accepts input and the goal is memory corruption",
+        "a crash, checksec output, or libc version is part of the evidence"
+      ],
+      "do_not_use_when": [
+        "the binary only has to be understood, not corrupted: use rev-triage",
+        "the binary is firmware to be unpacked: use rev-triage firmware reference"
+      ],
+      "routes_to": [
+        "pwn-code-reuse",
+        "pwn-format-string",
+        "pwn-heap-corruption",
+        "pwn-stack-overflow",
+        "pwn-rop",
+        "ctf-pwn"
+      ]
+    },
+    {
+      "id": "rev-triage",
+      "path": "skills/rev-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "rev"
+      ],
+      "skill_tokens": 1134,
+      "depth_files": 6,
+      "depth_tokens": 4210,
+      "use_when": [
+        "a binary, bytecode, managed assembly, packed sample, or firmware image must be understood",
+        "a check function or embedded algorithm has to be replicated"
+      ],
+      "do_not_use_when": [
+        "a memory-corruption primitive is the goal: use pwn-binary-triage",
+        "the sample is live malware with C2 behaviour: use ctf-malware"
+      ],
+      "routes_to": [
+        "rev-bytecode-vm",
+        "rev-managed-code",
+        "rev-native-check",
+        "ctf-reverse",
+        "ctf-malware"
+      ]
+    },
+    {
+      "id": "web-triage",
+      "path": "skills/web-triage/SKILL.md",
+      "layer": "router",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2124,
+      "depth_files": 4,
+      "depth_tokens": 2387,
+      "use_when": [
+        "an HTTP target, a web framework, or web source code is supplied",
+        "a route, request parameter, cookie, or template is under discussion"
+      ],
+      "do_not_use_when": [
+        "the artifact is a binary, capture, or ciphertext with no HTTP surface",
+        "the bug class is already confirmed by a probe: open that depth skill instead"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-auth-session",
+        "web-cache-poisoning",
+        "web-command-injection",
+        "web-cors",
+        "web-csrf",
+        "web-deserialization",
+        "web-file-upload",
+        "web-graphql",
+        "web-host-header",
+        "web-idor",
+        "web-logic-flaw",
+        "web-mass-assignment",
+        "web-nosqli",
+        "web-oauth-sso",
+        "web-open-redirect",
+        "web-parser-differential",
+        "web-prototype-pollution",
+        "web-race-condition",
+        "web-request-smuggling",
+        "web-sqli",
+        "web-ssrf",
+        "web-ssti",
+        "web-user-enum",
+        "web-web3",
+        "web-xs-leaks",
+        "web-xss",
+        "web-xxe",
+        "web-chromedriver",
+        "ctf-web",
+        "web-websocket",
+        "web-source-map",
+        "web-info-disclosure",
+        "white-box-dependency-measurement",
+        "white-box-intended-path"
+      ]
+    },
+    {
+      "id": "ad-patch-without-breaking-sla",
+      "path": "skills/ad-patch-without-breaking-sla/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1484,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "a bug is understood and a patch is about to go onto a live scored service",
+        "a patch has just been applied and nothing has verified the feature still works"
+      ],
+      "do_not_use_when": [
+        "no green baseline was saved, so there is nothing to compare against",
+        "the service is already red: this is recovery, not patching"
+      ],
+      "routes_to": [
+        "ad-service-triage",
+        "ad-planted-backdoor-hunt"
+      ],
+      "unlock_signals": "patch|hotfix|mitigat|rollback|revert|health check|availability|sla|regression|checker"
+    },
+    {
+      "id": "ad-planted-backdoor-hunt",
+      "path": "skills/ad-planted-backdoor-hunt/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1594,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "every team booted an identical image and it may carry a planted foothold",
+        "credentials have just been rotated and the first thirty minutes are free"
+      ],
+      "do_not_use_when": [
+        "the task is reconstructing what an attacker did: use ir-live-estate-triage",
+        "the sweep has not been bounded to hosts the event assigned you"
+      ],
+      "routes_to": [
+        "ad-patch-without-breaking-sla",
+        "dfir-persistence-trace",
+        "ir-live-estate-triage"
+      ],
+      "unlock_signals": "backdoor|planted|starting image|authorized_keys|systemd (unit|timer)|cron|suid|ld\\.so\\.preload|web shell|persistence"
+    },
+    {
+      "id": "ad-traffic-mining",
+      "path": "skills/ad-traffic-mining/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1608,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "another team is already attacking your service and the capture holds their payload",
+        "source reading has produced no hypothesis and the clock is the blocker"
+      ],
+      "do_not_use_when": [
+        "no baseline capture exists, so nothing can be ranked against normal",
+        "a candidate has already replayed against your own box and returned nothing"
+      ],
+      "routes_to": [
+        "ad-patch-without-breaking-sla",
+        "web-triage"
+      ],
+      "unlock_signals": "capture|pcap|dumpcap|tcpdump|tshark|replay|their exploit|inbound (request|traffic)|steal (the )?exploit"
+    },
+    {
+      "id": "crypto-ecc-dlog",
+      "path": "skills/crypto-ecc-dlog/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 974,
+      "depth_files": 3,
+      "depth_tokens": 898,
+      "use_when": [
+        "a probe or source read produced this class's signal: decide the discriminator first: a nonce REUSED across two signatures recovers the key in closed form with ecdsa-nonce-reuse and needs no lattice, a merely BIASED nonce is hnp or hnp-ecdsa, and a plain discrete log needs the smoothness check before bsgs or pohlig-hellman"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: re-derive the public point from the recovered private scalar and compare: a scalar that does not reproduce the supplied public key is not the key, and bsgs is out of reach above a group order of roughly 2**44",
+        "the evidence fits one of these better: crypto-rsa",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "crypto-rsa"
+      ],
+      "unlock_signals": "(?:\\becdsa\\b|\\becc\\b|elliptic)|(?:secp256[kr]1|curve25519|\\bP-256\\b)|(?:\\bnonce\\b[^\\n]{0,30}(?:reuse|repeat|bias|short))|(?:\\(\\s*r\\s*,\\s*s\\s*\\)|signature pair)|(?:discrete log|\\bdlog\\b|pohlig|smooth order)|(?:hidden number problem|\\bhnp\\b)|(?:(?<![a-z0-9])(?:curve,\\ nonce\\ or\\ discrete\\-log\\ recovery|crypto\\ ecc\\ dlog|ecc\\ dlog|ecc\\-dlog)(?![a-z0-9]))|(?:from\\s+ecdsa\\s+import|SigningKey|VerifyingKey)|(?:\\bscalar_mult\\b|point_add|is_on_curve)|(?:\\bk\\s*=\\s*(?:randint|getrandbits|random))|(?:\\bpow\\s*\\(\\s*g\\s*,\\s*\\w+\\s*,\\s*p\\s*\\))|(?:\\by\\*\\*2\\s*%\\s*p|x\\*\\*3\\s*\\+\\s*a\\s*\\*\\s*x\\s*\\+\\s*b)",
+      "bug_class": true
+    },
+    {
+      "id": "crypto-prng",
+      "path": "skills/crypto-prng/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 970,
+      "depth_files": 3,
+      "depth_tokens": 968,
+      "use_when": [
+        "a probe or source read produced this class's signal: name the generator from source, count how many consecutive outputs you hold, then run the matching attack id (lcg-recover, lcg-unknown-modulus, lcg-truncated, berlekamp-massey, lfsr-recover, lfsr-predict, mt19937-clone)"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: predict one held-back output and compare: a generator whose next value you cannot produce exactly is not recovered, and mt19937-clone genuinely needs 624 consecutive 32-bit outputs",
+        "the evidence fits one of these better: crypto-symmetric-oracle",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "crypto-symmetric-oracle"
+      ],
+      "unlock_signals": "(?:\\blcg\\b|linear congruential)|(?:\\blfsr\\b|feedback shift register|\\btaps?\\b)|(?:mersenne|mt19937|getrandbits)|(?:\\bseed(?:ed|ing)?\\b)|(?:keystream)|(?:predict(?:able|ed|ion)|next (?:output|token|value))|(?:truncated output|high bits of)|(?:(?<![a-z0-9])(?:predictable\\ pseudorandom\\ generator|crypto\\ prng|prng)(?![a-z0-9]))|(?:random\\.seed\\s*\\(|random\\.getrandbits\\s*\\()|(?:\\(\\s*a\\s*\\*\\s*\\w+\\s*\\+\\s*b\\s*\\)\\s*%\\s*m|\\*\\s*A\\s*\\+\\s*C\\s*\\)\\s*%)|(?:state\\s*=\\s*\\(\\s*state\\s*[*+])|(?:\\bxor\\b[^\\n]{0,40}\\bshift\\b|>>\\s*1\\s*\\^)|(?:time\\.time\\s*\\(\\s*\\)\\s*\\)?\\s*(?:as seed|\\)))",
+      "bug_class": true
+    },
+    {
+      "id": "crypto-rsa",
+      "path": "skills/crypto-rsa/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 1090,
+      "depth_files": 3,
+      "depth_tokens": 912,
+      "use_when": [
+        "a probe or source read produced this class's signal: answer the six discriminators in order with python3 tools/crypto_attack.py list, then run the ONE attack they select: how many moduli, is e small, is d small, are the primes close, is part of a factor known, is phi shared"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the attack's own stated applicability bound is exceeded -- for example d above the 0.292 bound for boneh-durfee, or a known-bits window above n**0.25 for coppersmith -- and no lattice parameter moves it",
+        "the evidence fits one of these better: crypto-ecc-dlog",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "crypto-ecc-dlog"
+      ],
+      "unlock_signals": "(?:\\brsa\\b)|(?:\\bmodulus\\b|\\bn\\s*=\\s*\\d{30,})|(?:public exponent|\\be\\s*=\\s*(?:3|65537)\\b)|(?:\\bd\\s*<\\s*n|small private exponent|wiener)|(?:same modulus|common modulus|shared prime)|(?:next_?prime|primes are close|fermat)|(?:coppersmith|boneh.?durfee|hastad|broadcast)|(?:(?<![a-z0-9])(?:rsa\\ key\\ or\\ plaintext\\ recovery|crypto\\ rsa|rsa)(?![a-z0-9]))|(?:from\\s+Crypto\\.PublicKey\\s+import\\s+RSA|RSA\\.construct|RSA\\.generate)|(?:pow\\s*\\([^,]+,\\s*(?:e|65537|3)\\s*,\\s*n\\))|(?:getPrime\\s*\\(|next_?prime\\s*\\()|(?:\\bphi\\s*=\\s*\\(\\s*p\\s*-\\s*1\\s*\\)\\s*\\*\\s*\\(\\s*q\\s*-\\s*1\\s*\\))|(?:inverse\\s*\\(\\s*e\\s*,|pow\\s*\\(\\s*e\\s*,\\s*-1)",
+      "bug_class": true
+    },
+    {
+      "id": "crypto-symmetric-oracle",
+      "path": "skills/crypto-symmetric-oracle/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 944,
+      "depth_files": 3,
+      "depth_tokens": 965,
+      "use_when": [
+        "a probe or source read produced this class's signal: detect ECB in ONE request wherever you control plaintext -- identical plaintext blocks give identical ciphertext blocks -- then separate an invalid-pad answer from an invalid-MAC answer before writing any oracle loop"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the mode is authenticated (GCM or an HMAC checked before decryption), so a tampered ciphertext is rejected identically whatever the padding, and no oracle exists to query",
+        "the evidence fits one of these better: crypto-prng, misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "crypto-prng",
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:\\becb\\b|\\bcbc\\b|\\bctr\\b|\\bgcm\\b)|(?:padding oracle|invalid padding|bad pad)|(?:\\biv\\b[^\\n]{0,30}(?:reuse|fixed|static|zero))|(?:bit.?flip|cut.?and.?paste|block (?:shuffle|swap))|(?:length extension|hash\\s*\\(\\s*secret)|(?:keystream reuse|same nonce|two.?time pad)|(?:identical (?:blocks|ciphertext blocks))|(?:(?<![a-z0-9])(?:block,\\ stream\\ or\\ mac\\ oracle|crypto\\ symmetric\\ oracle|symmetric\\ oracle|symmetric\\-oracle)(?![a-z0-9]))|(?:AES\\.new\\s*\\([^\\n]*MODE_(?:ECB|CBC|CTR))|(?:MODE_ECB)|(?:\\bunpad\\s*\\(|\\bpad\\s*\\()|(?:hashlib\\.(?:md5|sha1|sha256)\\s*\\(\\s*(?:secret|key))|(?:\\biv\\s*=\\s*(?:b?[\\\"']\\\\x00|bytes\\s*\\(\\s*16))|(?:cipher\\.encrypt\\s*\\(\\s*pad\\s*\\()",
+      "bug_class": true
+    },
+    {
+      "id": "ctf-ai-ml",
+      "path": "skills/ctf-ai-ml/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "ai"
+      ],
+      "skill_tokens": 1829,
+      "depth_files": 3,
+      "depth_tokens": 16482,
+      "use_when": [
+        "the sink is a model, a prompt pipeline, or a serialised model format and the sub-type is already identified"
+      ],
+      "do_not_use_when": [
+        "the AI/IoT sub-type has not been decided by the router"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the AI/IoT sub-type is decided by the router"
+    },
+    {
+      "id": "ctf-crypto",
+      "path": "skills/ctf-crypto/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "skill_tokens": 2758,
+      "depth_files": 23,
+      "depth_tokens": 99172,
+      "use_when": [
+        "the primitive and its parameters are collected and a named attack has to be implemented"
+      ],
+      "do_not_use_when": [
+        "parameters such as n, e, c, nonce, or key size are still unknown",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the primitive parameters are collected and a named attack must be implemented"
+    },
+    {
+      "id": "ctf-forensics",
+      "path": "skills/ctf-forensics/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "skill_tokens": 2719,
+      "depth_files": 20,
+      "depth_tokens": 87175,
+      "use_when": [
+        "the artifact type is identified and a container-specific extraction is required"
+      ],
+      "do_not_use_when": [
+        "file/strings/metadata triage has not been run",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the artifact type is identified and a container-specific extraction is required"
+    },
+    {
+      "id": "ctf-malware",
+      "path": "skills/ctf-malware/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev",
+        "forensics"
+      ],
+      "skill_tokens": 2126,
+      "depth_files": 3,
+      "depth_tokens": 7596,
+      "use_when": [
+        "an obfuscated script, a PE/.NET sample, or captured C2 traffic has to be understood"
+      ],
+      "do_not_use_when": [
+        "the sample is a plain CTF crackme: use rev-triage"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the sample is obfuscated script, PE/.NET, or captured C2 traffic"
+    },
+    {
+      "id": "ctf-osint",
+      "path": "skills/ctf-osint/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "skill_tokens": 2402,
+      "depth_files": 3,
+      "depth_tokens": 13065,
+      "use_when": [
+        "one unique pivot has been extracted and a specific source has to be worked"
+      ],
+      "do_not_use_when": [
+        "no pivot has been extracted yet"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "one unique pivot is extracted and a specific source must be worked"
+    },
+    {
+      "id": "ctf-pwn",
+      "path": "skills/ctf-pwn/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 4792,
+      "depth_files": 18,
+      "depth_tokens": 111773,
+      "use_when": [
+        "the primitive is known and a specific heap, kernel, format-string, or sandbox technique is needed"
+      ],
+      "do_not_use_when": [
+        "the crash has not been reproduced yet",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the crash is reproduced and a named heap/kernel/format technique is needed"
+    },
+    {
+      "id": "ctf-reverse",
+      "path": "skills/ctf-reverse/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev"
+      ],
+      "skill_tokens": 3253,
+      "depth_files": 18,
+      "depth_tokens": 99378,
+      "use_when": [
+        "a specific language runtime, packer, VM obfuscator, or anti-analysis trick has been identified"
+      ],
+      "do_not_use_when": [
+        "static triage has not yet named the runtime or the packer",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "the runtime or packer is named and a specific technique is needed"
+    },
+    {
+      "id": "ctf-web",
+      "path": "skills/ctf-web/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2775,
+      "depth_files": 18,
+      "depth_tokens": 95936,
+      "use_when": [
+        "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
+      ],
+      "do_not_use_when": [
+        "a narrower web-* depth skill covers the class: open that instead",
+        "never read the whole directory; open one named file"
+      ],
+      "routes_to": [],
+      "unlock_signals": null,
+      "manual_gate": "a narrower web-* depth skill did not contain the needed variant"
+    },
+    {
+      "id": "dfir-antiforensics-trace",
+      "path": "skills/dfir-antiforensics-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 5722,
+      "depth_files": 1,
+      "depth_tokens": 161,
+      "use_when": [
+        "a probe or source read produced this class's signal: look for Security 1102 and, whether or not it is present, read the event record identifiers in order and report the largest discontinuity"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: record identifiers are contiguous across the whole window, no 1102 or 104 exists, and the $STANDARD_INFORMATION and $FILE_NAME timestamps agree on every file created in the window",
+        "the evidence fits one of these better: dfir-filesystem-timeline, dfir-persistence-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-filesystem-timeline",
+        "dfir-persistence-trace"
+      ],
+      "unlock_signals": "(?:\\b1102\\b|audit log (?:was )?cleared|log clearing)|(?:timestomp|setfiletime)|(?:vssadmin delete shadows|volume shadow cop)|(?:usn deletejournal|fsutil usn)|(?:detectionhistory|\\bmplog\\b|defender quarantine)|(?:\\b4719\\b|auditpol /clear|\\befstmpwp\\b)|(?:(?<![a-z0-9])(?:anti\\-forensics\\ and\\ log\\ tampering\\ trace|dfir\\ antiforensics\\ trace|antiforensics\\ trace|antiforensics\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-authentication-trace",
+      "path": "skills/dfir-authentication-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
+      ],
+      "skill_tokens": 4966,
+      "depth_files": 1,
+      "depth_tokens": 1108,
+      "use_when": [
+        "a probe or source read produced this class's signal: filter the event set to 4624 and read the LogonType and IpAddress fields of the first match",
+        "a chain card already proves this class here: htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no authentication record names a source address or an account outside the host's own service accounts, and every logon is type 5 service or type 0 system",
+        "the evidence fits one of these better: dfir-execution-trace, dfir-network-exfil-trace"
+      ],
+      "routes_to": [
+        "dfir-execution-trace",
+        "dfir-network-exfil-trace"
+      ],
+      "unlock_signals": "(?:\\b(?:4624|4625|4634|4647|4648|4672|4776)\\b)|(?:logon type\\s*\\d{1,2}|\\blogon types?\\b)|(?:\\b(?:4768|4769|4771)\\b)|(?:auth\\.log|\\bwtmp\\b|\\bbtmp\\b|\\blastlog\\b)|(?:failed logon|successful logon|logon session|logonid)|(?:terminalservices-localsessionmanager|remoteconnectionmanager|rdpcorets)|(?:(?<![a-z0-9])(?:authentication\\ and\\ logon\\ trace|dfir\\ authentication\\ trace|authentication\\ trace|authentication\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-cloud-audit-trace",
+      "path": "skills/dfir-cloud-audit-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 4098,
+      "depth_files": 1,
+      "depth_tokens": 156,
+      "use_when": [
+        "a probe or source read produced this class's signal: extract eventTime, eventName, sourceIPAddress and userIdentity.arn from every record, sort by time, and read the first action that is not a read"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: every recorded action belongs to a service principal or an automation role whose behaviour is unchanged across the whole window, and no credential or policy object was created or modified",
+        "the evidence fits one of these better: dfir-authentication-trace, dfir-network-exfil-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-authentication-trace",
+        "dfir-network-exfil-trace"
+      ],
+      "unlock_signals": "(?:\\bcloudtrail\\b)|(?:useridentity\\.(?:type|arn)|\\bsessioncontext\\b|\\bassumedrole\\b)|(?:getcalleridentity|createaccesskey|putbucketpolicy|attachuserpolicy|createloginprofile)|(?:vpc flow log|\\bguardduty\\b)|(?:unified audit log|sign-?in logs|userprincipalname|conditionalaccess)|(?:s3 (?:server )?access log|\\bconsolelogin\\b)|(?:(?<![a-z0-9])(?:dfir\\ cloud\\ audit\\ trace|cloud\\ audit\\ trace|cloud\\ audit\\ trail|cloud\\-audit\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-execution-trace",
+      "path": "skills/dfir-execution-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 5345,
+      "depth_files": 1,
+      "depth_tokens": 157,
+      "use_when": [
+        "a probe or source read produced this class's signal: filter to Sysmon event 1 or Security 4688 and read the CommandLine and ParentImage of the first match"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no event 1, 4688, 4103 or 4104 exists in the set, and every process artifact present names a signed binary under the system directory with no command line carrying a URL or an encoded run",
+        "the evidence fits one of these better: dfir-persistence-trace, dfir-authentication-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-persistence-trace",
+        "dfir-authentication-trace"
+      ],
+      "unlock_signals": "(?:\\bsysmon\\b)|(?:\\b(?:4688|4103|4104)\\b)|(?:processguid|parentimage|parentcommandline|newprocessname)|(?:\\.pf\\b|prefetch (?:file|director|hash|run))|(?:amcache|shimcache|appcompatcache|userassist)|(?:consolehost_history|psreadline|encodedcommand|script block logging)|(?:(?<![a-z0-9])(?:process\\ execution\\ trace|dfir\\ execution\\ trace|execution\\ trace|execution\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-filesystem-timeline",
+      "path": "skills/dfir-filesystem-timeline/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 4038,
+      "depth_files": 1,
+      "depth_tokens": 158,
+      "use_when": [
+        "a probe or source read produced this class's signal: build a bodyfile from the filesystem metadata and read the entries inside the intrusion window in chronological order"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no file was created, renamed or deleted inside the intrusion window outside routine operating-system paths, and the $STANDARD_INFORMATION and $FILE_NAME timestamps agree on every candidate",
+        "the evidence fits one of these better: dfir-antiforensics-trace, dfir-execution-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-antiforensics-trace",
+        "dfir-execution-trace"
+      ],
+      "unlock_signals": "(?:\\$mft\\b|\\$usnjrnl\\b|\\$extend\\b|\\$boot\\b)|(?:usn journal|usn_record|usnjrnl)|(?:standard_information|\\$file_name\\b|timestomp)|(?:\\$recycle\\.bin|jump ?list|automaticdestinations)|(?:\\bshellbags?\\b|usrclass\\.dat)|(?:\\bmactime\\b|\\bbodyfile\\b|tsk_gettimes|fls -m)|(?:(?<![a-z0-9])(?:filesystem\\ metadata\\ timeline|dfir\\ filesystem\\ timeline|filesystem\\ timeline|filesystem\\-timeline)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-network-exfil-trace",
+      "path": "skills/dfir-network-exfil-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 5099,
+      "depth_files": 1,
+      "depth_tokens": 159,
+      "use_when": [
+        "a probe or source read produced this class's signal: read the per-peer byte counts in each direction and identify the peer with the largest outbound volume, then join it to the owning process"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: every outbound conversation resolves to a vendor update or telemetry endpoint, and the largest outbound volume in the window is smaller than a routine update",
+        "the evidence fits one of these better: dfir-execution-trace, dfir-cloud-audit-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-execution-trace",
+        "dfir-cloud-audit-trace"
+      ],
+      "unlock_signals": "(?:\\bdestinationip\\b|\\bdestinationhostname\\b|dns query name)|(?:io,phs|conv,tcp|--export-objects)|(?:srudb\\.dat|qmgr\\.db|pfirewall\\.log)|(?:beacon(?:ing)? interval|\\bc2 beacon)|(?:conn\\.log|eve\\.json|\\bzeek\\b|\\bsuricata\\b)|(?:dns tunnel(?:ling|ing)?|dns exfil)|(?:(?<![a-z0-9])(?:network\\ and\\ exfiltration\\ trace|dfir\\ network\\ exfil\\ trace|network\\ exfil\\ trace|network\\-exfil\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "dfir-persistence-trace",
+      "path": "skills/dfir-persistence-trace/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "dfir"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 5166,
+      "depth_files": 1,
+      "depth_tokens": 157,
+      "use_when": [
+        "a probe or source read produced this class's signal: read the Run and RunOnce values and the Services subkeys from the SOFTWARE and SYSTEM hives, and compare each image path against the intrusion window"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: every autostart entry and service image path resolves to a signed vendor binary whose file creation time predates the intrusion window",
+        "the evidence fits one of these better: dfir-execution-trace, dfir-antiforensics-trace",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-execution-trace",
+        "dfir-antiforensics-trace"
+      ],
+      "unlock_signals": "(?:\\brunonce\\b|\\brunonceex\\b|\\brun key\\b|\\brun keys\\b)|(?:currentversion\\\\+run|currentcontrolset\\\\+services)|(?:\\b(?:7045|4697|4698|4699|4702)\\b)|(?:taskcache|schtasks|scheduled task xml)|(?:__eventfilter|commandlineeventconsumer|filtertoconsumerbinding)|(?:systemd timer|authorized_keys|ld\\.so\\.preload|/etc/cron\\.d|launchdaemons)|(?:(?<![a-z0-9])(?:dfir\\ persistence\\ trace|host\\ persistence\\ trace|persistence\\ trace|persistence\\-trace)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "file-read-primitives",
+      "path": "skills/file-read-primitives/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-red-island-ssrf-gopher-redis-lua-rce"
+      ],
+      "skill_tokens": 1534,
+      "depth_files": 4,
+      "depth_tokens": 4696,
+      "use_when": [
+        "a probe or source read produced this class's signal: an absolute path to a file the target certainly has, before trying any traversal",
+        "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-ssrf-gopher-redis-lua-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the path is resolved and confined to a fixed directory",
+        "the evidence fits one of these better: web-ssrf, web-xxe"
+      ],
+      "routes_to": [
+        "web-ssrf",
+        "web-xxe"
+      ],
+      "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:\\bfilename\\b[^\\n]{0,30}param|param\\w*[^\\n]{0,20}\\bfilename\\b)|(?:download (?:endpoint|route|handler)|serves? (?:a |the )?file)|(?:(?:error|exception|traceback|stack trace|debug|\\b50[03]\\b[^\\n]{0,12}(?:page|error|response))[^\\n]{0,45}(?:environment|config\\w*|settings|\\.env\\b|secret))|(?:environment table|unhandled exception[^\\n]{0,40}(?:print|show|reveal|leak|dump))|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
+      "bug_class": true
+    },
+    {
+      "id": "mcp-agent-security",
+      "path": "skills/mcp-agent-security/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "ai"
+      ],
+      "skill_tokens": 1645,
+      "depth_files": 4,
+      "depth_tokens": 3631,
+      "use_when": [
+        "the challenge target is an LLM, an agent, or a tool server",
+        "an external skill or MCP bundle is being reviewed before install"
+      ],
+      "do_not_use_when": [
+        "the artifact is a serialised model file: use web-deserialization",
+        "the target is a third-party server nobody here operates"
+      ],
+      "routes_to": [
+        "web-deserialization",
+        "file-read-primitives"
+      ],
+      "unlock_signals": "\\bmcp\\b|agent|llm|chatbot|system prompt|prompt injection|tool call|function calling"
+    },
+    {
+      "id": "misc-encoding-carrier",
+      "path": "skills/misc-encoding-carrier/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "misc"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 983,
+      "depth_files": 3,
+      "depth_tokens": 950,
+      "use_when": [
+        "a probe or source read produced this class's signal: IDENTIFY THE CARRIER before decoding: the alphabet, the distinct-character count and the length modulus separate base64 from base32 from base85 from hex from a custom alphabet in one command, and the index of coincidence separates a substitution from a transposition from a Vigenere"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the alphabet and length match no standard carrier and the index of coincidence is outside the natural-language range, so it is neither a standard encoding nor a classical cipher and the structure of the container is the real hiding place",
+        "the evidence fits one of these better: misc-interpreter-escape, crypto-symmetric-oracle",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "misc-interpreter-escape",
+        "crypto-symmetric-oracle"
+      ],
+      "unlock_signals": "(?:base(?:16|32|64|85|58)\\b|\\bhex\\b|\\bascii85\\b)|(?:\\bmorse\\b|\\bbinary\\b text|\\brot13\\b)|(?:brainfuck|whitespace|malbolge|esoteric)|(?:vigen[eè]re|substitution|transposition|caesar)|(?:index of coincidence|letter frequency)|(?:layered|nested|stacked encoding|peel)|(?:(?<![a-z0-9])(?:encoding\\ or\\ carrier\\ puzzle|misc\\ encoding\\ carrier|encoding\\ carrier|encoding\\-carrier)(?![a-z0-9]))|(?:base64\\.b(?:64|32|85)decode|binascii\\.(?:unhexlify|a2b))|(?:codecs\\.decode|\\.decode\\s*\\(\\s*[\\\"']rot_?13)|(?:zlib\\.decompress|gzip\\.decompress)|(?:str\\.maketrans|\\.translate\\s*\\()",
+      "bug_class": true
+    },
+    {
+      "id": "misc-interpreter-escape",
+      "path": "skills/misc-interpreter-escape/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "misc"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 963,
+      "depth_files": 3,
+      "depth_tokens": 1080,
+      "use_when": [
+        "a probe or source read produced this class's signal: MAP THE FILTER before writing an escape: send single probe characters and short tokens until the blocked bytes, names and node types are known and the layer the check runs at is named, because that mapping is the challenge and the escape is mechanical afterwards"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the check runs on the parsed AST and rejects every node type that can reach an attribute or a call, so no expression in the remaining grammar reaches a live object",
+        "the evidence fits one of these better: misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:pyjail|\\bjail\\b|sandbox)|(?:__builtins__|__import__|__class__|__subclasses__)|(?:blocked|forbidden|not allowed|rejected)|(?:\\beval\\s*\\(|\\bexec\\s*\\(|\\bcompile\\s*\\()|(?:\\brbash\\b|restricted shell|allowlist|charset)|(?:(?<![a-z0-9])(?:restricted\\ interpreter\\ escape|misc\\ interpreter\\ escape|interpreter\\ escape|interpreter\\-escape)(?![a-z0-9]))|(?:\\beval\\s*\\(\\s*(?:input|request|data))|(?:\\bexec\\s*\\(\\s*(?:input|request|data))|(?:__builtins__\\s*[:=]\\s*(?:\\{\\}|None))|(?:ast\\.parse|ast\\.walk|ast\\.NodeVisitor)|(?:(?:BLOCKED|BANNED|FORBIDDEN|blacklist)\\s*=\\s*[\\[\\(])",
+      "bug_class": true
+    },
+    {
+      "id": "osint-identity-pivot",
+      "path": "skills/osint-identity-pivot/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 963,
+      "depth_files": 3,
+      "depth_tokens": 796,
+      "use_when": [
+        "a probe or source read produced this class's signal: extract the single most UNIQUE pivot and normalise it -- compute the key fingerprint rather than eyeballing it -- then produce an ordered plan of at most six queries, each with its source and the one fact it would confirm, for ctf-writeup-scout to run"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the pivot is too generic to separate from unrelated accounts, which is a measurement about the pivot and means a different one must be extracted rather than the same one searched harder",
+        "the evidence fits one of these better: osint-media-metadata, osint-infra-records",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "osint-media-metadata",
+        "osint-infra-records"
+      ],
+      "unlock_signals": "(?:\\busername\\b|\\bhandle\\b|\\bprofile\\b)|(?:email (?:address|pattern|format))|(?:\\bgithub\\b|\\bgitlab\\b|commit author)|(?:key fingerprint|\\bpgp\\b|\\bgpg\\b|ssh-rsa)|(?:social media|pivot(?:ing)? (?:from|to))|(?:(?<![a-z0-9])(?:identity\\ and\\ handle\\ pivot|osint\\ identity\\ pivot|identity\\ pivot|identity\\-pivot)(?![a-z0-9]))|(?:Author:\\s|author_email|committer)|(?:-----BEGIN PGP|ssh-(?:rsa|ed25519)\\s)",
+      "bug_class": true
+    },
+    {
+      "id": "osint-infra-records",
+      "path": "skills/osint-infra-records/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 848,
+      "depth_files": 3,
+      "depth_tokens": 928,
+      "use_when": [
+        "a probe or source read produced this class's signal: query TXT first because that is where a flag is actually planted, then sweep the record types that can carry data, then whois, then the certificate and its subject alternative names, which routinely leak the sibling hostname that is the real next step"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: every record type returns only operational data and the certificate names no host the challenge did not already supply, so the answer is not in the live records and only an archived or transparency source could carry it",
+        "the evidence fits one of these better: osint-identity-pivot",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "osint-identity-pivot"
+      ],
+      "unlock_signals": "(?:\\bdns\\b|\\btxt record\\b|\\bcname\\b|\\bmx\\b|\\bsrv\\b)|(?:\\bwhois\\b|registrar|registration date)|(?:certificate|\\bsan\\b|subject alternative)|(?:subdomain|nameserver|\\bns\\b record)|(?:certificate transparency|passive dns)|(?:(?<![a-z0-9])(?:domain,\\ dns\\ and\\ certificate\\ records|osint\\ infra\\ records|infra\\ records|infra\\-records)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "osint-media-metadata",
+      "path": "skills/osint-media-metadata/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "osint"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 916,
+      "depth_files": 3,
+      "depth_tokens": 913,
+      "use_when": [
+        "a probe or source read produced this class's signal: run exiftool and read ALL of its output rather than grepping one tag, then binwalk and strings for appended or embedded data; steghide, zsteg and outguess are absent here, so never claim an extraction with them"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the metadata was stripped on upload and the carrier holds no appended data, so the answer is only in the visible frame and becomes a hypothesis rather than a measurement",
+        "the evidence fits one of these better: osint-identity-pivot, misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "osint-identity-pivot",
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:\\bexif\\b|exiftool|metadata)|(?:\\bgps\\b|latitude|longitude|geoloc)|(?:thumbnail|\\bmake\\b[^\\n]{0,20}\\bmodel\\b)|(?:creator tool|producer|\\bauthor\\b)|(?:photo|image|screenshot|\\bpdf\\b|\\bdocx\\b)|(?:(?<![a-z0-9])(?:media\\ and\\ document\\ metadata|osint\\ media\\ metadata|media\\ metadata|media\\-metadata)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "pwn-code-reuse",
+      "path": "skills/pwn-code-reuse/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 938,
+      "depth_files": 3,
+      "depth_tokens": 922,
+      "use_when": [
+        "a probe or source read produced this class's signal: this class presupposes control of the instruction pointer, so confirm that first; then read the protections to decide whether a leak is needed at all, and build the leak chain and verify the leaked value looks like a libc address before chaining further"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the gadgets present cannot express the call -- no controllable argument register, or no writable page to pivot into -- which tools/pwn_triage.py reports from the executable segments it actually scanned, since ROPgadget and ropper are absent here",
+        "the evidence fits one of these better: pwn-stack-overflow, pwn-format-string",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "pwn-stack-overflow",
+        "pwn-format-string"
+      ],
+      "unlock_signals": "(?:\\brop\\b|ret2libc|ret2csu|ret2plt|ret2dlresolve)|(?:\\bsrop\\b|sigreturn)|(?:\\bnx\\b|no.?execute)|(?:gadget)|(?:libc base|libc leak)|(?:pop (?:rdi|rsi|rdx)|\\bsyscall\\b)|(?:(?<![a-z0-9])(?:rop\\ and\\ code\\ reuse|pwn\\ code\\ reuse|code\\ reuse|code\\-reuse)(?![a-z0-9]))|(?:system\\s*\\(|execve\\s*\\()|(?:/bin/sh)|(?:mprotect\\s*\\()|(?:\\bplt\\b|\\bgot\\b)",
+      "bug_class": true
+    },
+    {
+      "id": "pwn-format-string",
+      "path": "skills/pwn-format-string/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 870,
+      "depth_files": 3,
+      "depth_tokens": 922,
+      "use_when": [
+        "a probe or source read produced this class's signal: send a handful of %p in one request and read the leaked words back, which is the cheapest confirmation in pwn, then locate your own buffer with %N$p before deciding read against write"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the format argument is a literal and the user value is an argument to it, so nothing is interpreted; and full RELRO reported by tools/pwn_triage.py closes the GOT-overwrite route whatever the leak is worth",
+        "the evidence fits one of these better: pwn-stack-overflow",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "pwn-stack-overflow"
+      ],
+      "unlock_signals": "(?:%p%p|%[0-9]+\\$p|\\bformat string\\b)|(?:%n\\b|%hn\\b|%hhn\\b)|(?:leaked (?:stack|address|pointer))|(?:printf[^\\n]{0,30}user|echo(?:es|ed) (?:back|input))|(?:(?<![a-z0-9])(?:format\\-string\\ read\\ or\\ write|pwn\\ format\\ string|format\\ string|format\\-string)(?![a-z0-9]))|(?:printf\\s*\\(\\s*\\w+\\s*\\)\\s*;)|(?:fprintf\\s*\\([^,]+,\\s*\\w+\\s*\\))|(?:snprintf\\s*\\([^,]+,[^,]+,\\s*\\w+\\s*\\))|(?:syslog\\s*\\([^,]+,\\s*\\w+\\s*\\))",
+      "bug_class": true
+    },
+    {
+      "id": "pwn-heap-corruption",
+      "path": "skills/pwn-heap-corruption/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 898,
+      "depth_files": 3,
+      "depth_tokens": 1089,
+      "use_when": [
+        "a probe or source read produced this class's signal: answer the glibc version question first, because tcache behaviour, double-free detection and fd mangling differ sharply across versions, then map the allocation lifecycle and name the primitive the bug gives before choosing any technique"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the pointer is cleared on free and every index is bounds-checked, so no freed object is reachable; gdb is absent here, so runtime confirmation is radare2 in debug mode or observable program behaviour",
+        "the evidence fits one of these better: pwn-stack-overflow",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "pwn-stack-overflow"
+      ],
+      "unlock_signals": "(?:use.?after.?free|\\buaf\\b)|(?:double free)|(?:\\btcache\\b|\\bfastbin\\b|unsorted bin)|(?:malloc\\(\\): |free\\(\\): invalid)|(?:corrupted (?:size|chunk|top))|(?:chunk (?:header|metadata)|overlapping chunks)|(?:(?<![a-z0-9])(?:heap\\ allocator\\ corruption|pwn\\ heap\\ corruption|heap\\ corruption|heap\\-corruption)(?![a-z0-9]))|(?:\\bfree\\s*\\(\\s*\\w+\\s*\\)\\s*;(?![^\\n]*=\\s*NULL))|(?:\\bmalloc\\s*\\(|\\bcalloc\\s*\\(|\\brealloc\\s*\\()|(?:\\[\\s*idx\\s*\\]|\\[\\s*index\\s*\\])|(?:struct\\s+\\w+\\s*\\*\\s*\\w+\\s*\\[\\s*\\d+\\s*\\])",
+      "bug_class": true
+    },
+    {
+      "id": "pwn-rop",
+      "path": "skills/pwn-rop/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "skill_tokens": 1886,
+      "depth_files": 3,
+      "depth_tokens": 1746,
+      "use_when": [
+        "control of the instruction pointer is proven and NX forces code reuse"
+      ],
+      "do_not_use_when": [
+        "the offset or the crash is not yet established"
+      ],
+      "routes_to": [
+        "ctf-pwn"
+      ],
+      "unlock_signals": "rop|ret2libc|gadget|nx enabled|pop rdi|no pie|leak libc|instruction pointer"
+    },
+    {
+      "id": "pwn-stack-overflow",
+      "path": "skills/pwn-stack-overflow/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "pwn"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 918,
+      "depth_files": 3,
+      "depth_tokens": 992,
+      "use_when": [
+        "a probe or source read produced this class's signal: run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a pattern you generate yourself -- pwntools is absent here"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the read is bounded by a length the input cannot influence, so no write reaches saved state; note that a STATIC binary carries __stack_chk_fail even when built -fno-stack-protector, so confirm a canary from the %fs:0x28 load in the disassembly rather than from the import",
+        "the evidence fits one of these better: pwn-format-string, pwn-code-reuse",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "pwn-format-string",
+        "pwn-code-reuse"
+      ],
+      "unlock_signals": "(?:segmentation fault|\\bsigsegv\\b|core dumped)|(?:stack smashing detected|\\*\\*\\* stack)|(?:\\bcanary\\b)|(?:ret2win|return address)|(?:buffer overflow|off.?by.?one)|(?:\\bgets\\s*\\(|\\bstrcpy\\s*\\()|(?:(?<![a-z0-9])(?:stack\\ memory\\ corruption|pwn\\ stack\\ overflow|stack\\ overflow|stack\\-overflow)(?![a-z0-9]))|(?:\\bgets\\s*\\()|(?:\\bstrcpy\\s*\\(|\\bstrcat\\s*\\()|(?:scanf\\s*\\(\\s*\\\"%s\\\")|(?:read\\s*\\([^,]+,[^,]+,\\s*0x[0-9a-f]{3,})|(?:char\\s+\\w+\\s*\\[\\s*(?:8|16|32|64|128)\\s*\\])|(?:memcpy\\s*\\([^,]+,[^,]+,\\s*\\w+\\s*\\))",
+      "bug_class": true
+    },
+    {
+      "id": "rev-bytecode-vm",
+      "path": "skills/rev-bytecode-vm/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 976,
+      "depth_files": 3,
+      "depth_tokens": 888,
+      "use_when": [
+        "a probe or source read produced this class's signal: for a .pyc read the header magic and name the python version before running any decompiler, falling back to the stdlib dis module on the unmarshalled code object when uncompyle6 refuses; for a custom VM recover the OPCODE TABLE before reading one instruction of its program"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the dispatch loop is data-driven from a table that is itself generated at run time, so a static table recovery is incomplete and the program must be traced instead",
+        "the evidence fits one of these better: rev-managed-code, misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "rev-managed-code",
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:\\.pyc\\b|marshal|code object|co_consts)|(?:uncompyle|pycdc|decompyle|\\bdis\\b module)|(?:opcode|dispatch (?:loop|table)|\\bvm\\b)|(?:obfuscated (?:script|javascript|python))|(?:\\bwasm\\b|webassembly|\\blua\\b|luac)|(?:(?<![a-z0-9])(?:script\\ bytecode\\ or\\ custom\\ vm|rev\\ bytecode\\ vm|bytecode\\ vm|bytecode\\-vm)(?![a-z0-9]))|(?:\\bmarshal\\.loads\\s*\\(|\\bdis\\.dis\\s*\\()|(?:while\\s+\\w+\\s*<\\s*len\\s*\\(\\s*(?:code|prog|bc))|(?:\\bopcode\\s*=\\s*|\\bops\\s*=\\s*\\{)|(?:\\beval\\s*\\(\\s*(?:base64|zlib|codecs))|(?:exec\\s*\\(\\s*(?:bytes|compile|marshal))",
+      "bug_class": true
+    },
+    {
+      "id": "rev-managed-code",
+      "path": "skills/rev-managed-code/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 881,
+      "depth_files": 3,
+      "depth_tokens": 844,
+      "use_when": [
+        "a probe or source read produced this class's signal: confirm the runtime from the header and quote the bytes -- a PE with a non-zero CLR data directory, or the 0xCAFEBABE magic -- then decompile with what exists here: ilspycmd for .NET, javap plus unzip for Java. jadx, procyon and mono are absent"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the assembly is a thin native stub and the logic is in an unmanaged module, so no managed decompiler reaches it and the work belongs to rev-native-check",
+        "the evidence fits one of these better: rev-native-check, rev-bytecode-vm",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "rev-native-check",
+        "rev-bytecode-vm"
+      ],
+      "unlock_signals": "(?:\\.net\\b|\\bclr\\b|\\bil\\b\\s|assembly)|(?:\\bjava\\b|\\.class\\b|\\.jar\\b|cafebabe)|(?:\\bc#\\b|mscorlib|System\\.)|(?:obfuscat(?:ed|or)|renamed symbols|control.?flow flattening)|(?:ilspy|dnspy|javap|jadx)|(?:(?<![a-z0-9])(?:managed\\ runtime\\ decompilation|rev\\ managed\\ code|managed\\ code|managed\\-code)(?![a-z0-9]))|(?:\\bnamespace\\s+\\w+|\\bpublic\\s+static\\s+void\\s+Main)|(?:\\bpackage\\s+[\\w.]+;|public\\s+class\\s+\\w+)|(?:System\\.Security\\.Cryptography|javax\\.crypto)|(?:Convert\\.FromBase64String|Base64\\.getDecoder)",
+      "bug_class": true
+    },
+    {
+      "id": "rev-native-check",
+      "path": "skills/rev-native-check/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "rev"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 908,
+      "depth_files": 3,
+      "depth_tokens": 992,
+      "use_when": [
+        "a probe or source read produced this class's signal: locate the input read, follow the value to the comparison, and quote the disassembly that carries it: a described check is not a measured one. r2 -A then afl then pdf @ main; gdb is absent, so r2 -d is the debugger"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the comparison is against a value computed at run time from something you cannot observe or supply, so replicating the check in python cannot produce the input",
+        "the evidence fits one of these better: rev-bytecode-vm, pwn-stack-overflow",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "rev-bytecode-vm",
+        "pwn-stack-overflow"
+      ],
+      "unlock_signals": "(?:\\belf\\b|\\bpe32\\b|\\bmach-?o\\b)|(?:wrong (?:flag|password|key)|try again|incorrect)|(?:stripped|not stripped)|(?:disassembl|decompil)|(?:\\bradare2\\b|\\br2\\b|objdump)|(?:\\bcrackme\\b|license key|serial\\b|strcmp|keygen)|(?:\\bupx\\b|packed|high entropy)|(?:(?<![a-z0-9])(?:native\\ deciding\\ check|rev\\ native\\ check|native\\ check|native\\-check)(?![a-z0-9]))|(?:\\bstrcmp\\s*\\(|\\bmemcmp\\s*\\(|\\bstrncmp\\s*\\()|(?:for\\s*\\([^)]*\\)\\s*\\{[^}]*\\^\\s*0x[0-9a-f]{2})|(?:if\\s*\\(\\s*\\w+\\s*!=\\s*0x[0-9a-f]+\\s*\\))|(?:__stack_chk|_FORTIFY_SOURCE)",
+      "bug_class": true
+    },
+    {
+      "id": "web-auth-session",
+      "path": "skills/web-auth-session/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "skill_tokens": 1740,
+      "depth_files": 5,
+      "depth_tokens": 11455,
+      "use_when": [
+        "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
+        "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the signature is verified with a key that is neither leaked nor guessable",
+        "the evidence fits one of these better: web-oauth-sso, web-idor"
+      ],
+      "routes_to": [
+        "web-oauth-sso",
+        "web-idor"
+      ],
+      "unlock_signals": "(?:\\bjwt\\b|bearer |eyJ[A-Za-z0-9_-]{6,})|(?:session|jsessionid|connect\\.sid|phpsessid|laravel_session)|(?:cookie_secret|app_key|secret_key|signed cookie)|(?:\\balg\\b|\\bhs256\\b|\\brs256\\b|alg\\w*\\s*['\"]?\\s*[:=]\\s*['\"]?\\s*none)|(?:\\botp\\b|one.?time (?:code|password)|verification code|confirmation code|activation code)|(?:password reset|forgot password|magic link)|(?:passwordless|no password (?:field|input|required)|no credential)|(?:(?:log ?in|sign ?in|authenticat\\w+)[^\\n]{0,40}\\b(?:only|just)\\b[^\\n]{0,30}(?:username|user name|email|account name))|(?:(?:signature|\\bmacs?\\b|hmac|hash|integrity check)[^\\n]{0,45}(?:does not cover|only covers?|covers? only|computed over only|applied to a prefix|prefix of))|(?:reuse the (?:original |old )?(?:signature|mac|hmac))|(?:\\bbcrypt\\b[^\\n]{0,40}(?:72|truncat))|(?:(?<![a-z0-9])(?:authentication\\ and\\ session|web\\ auth\\ session|auth\\ session|auth\\-session)(?![a-z0-9]))|(?:jwt\\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value)|(?:(?:ReadJwtToken|ReadToken)\\s*\\([^\\n)]*\\)\\s*as\\s+JwtSecurityToken)|(?:Response\\.Redirect\\s*\\([^\\n]*\\)\\s*;[\\s\\S]{0,500}await\\s+_next\\s*\\(\\s*context\\s*\\))|(?:APP_KEY|SECRET_KEY|cookie_secret|secure_cookie)|(?:verify\\s*=\\s*False|algorithms\\s*=\\s*\\[[^\\]]*none)",
+      "bug_class": true
+    },
+    {
+      "id": "web-cache-poisoning",
+      "path": "skills/web-cache-poisoning/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
+      ],
+      "skill_tokens": 1094,
+      "depth_files": 4,
+      "depth_tokens": 4077,
+      "use_when": [
+        "a probe or source read produced this class's signal: send an unkeyed header with a unique marker, then request the same URL cleanly and look for the marker",
+        "a chain card already proves this class here: htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the header is part of the cache key, so the poisoned copy is never served to anyone else",
+        "the evidence fits one of these better: web-parser-differential"
+      ],
+      "routes_to": [
+        "web-parser-differential"
+      ],
+      "unlock_signals": "(?:x-cache|cf-cache-status|\\bage:\\s*\\d|\\bvary:)|(?:cache)|(?:cdn|varnish|cloudfront)|(?:(?<![a-z0-9])(?:web\\ cache\\ poisoning|cache\\ poisoning|cache\\-poisoning|deception)(?![a-z0-9]))|(?:Cache-Control|s-maxage)|(?:cache\\.(?:set|get)\\s*\\(\\s*(?:req|request))",
+      "bug_class": true
+    },
+    {
+      "id": "web-chromedriver",
+      "path": "skills/web-chromedriver/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 1023,
+      "depth_files": 1,
+      "depth_tokens": 651,
+      "use_when": [
+        "a challenge has an admin bot and a client-side payload needs debugging",
+        "the challenge itself exposes a WebDriver or Selenium endpoint"
+      ],
+      "do_not_use_when": [
+        "the payload is already confirmed: fire it, do not rebuild the bot",
+        "there is no viewer at all, so no client-side path to the flag"
+      ],
+      "routes_to": [
+        "web-xss",
+        "web-csrf",
+        "file-read-primitives"
+      ],
+      "unlock_signals": "chromedriver|webdriver|selenium|headless|puppeteer|playwright|admin bot|bot visits|9515|4444"
+    },
+    {
+      "id": "web-command-injection",
+      "path": "skills/web-command-injection/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
+      ],
+      "skill_tokens": 1122,
+      "depth_files": 2,
+      "depth_tokens": 5813,
+      "use_when": [
+        "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
+        "a chain card already proves this class here: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the value is passed as a single argv element, never through a shell",
+        "the evidence fits one of these better: web-ssti"
+      ],
+      "routes_to": [
+        "web-ssti"
+      ],
+      "unlock_signals": "(?:command injection)|(?:(?:calculator|expression|formula|math|template)[^\\n]{0,60}(?:evaluat\\w+|\\beval\\b|comput\\w+ (?:the )?(?:result|value)))|(?:\\beval\\b[^\\n]{0,60}(?:user|request|input|param\\w*|\\bget\\b|\\bpost\\b|formula|expression|supplied))|(?:(?:user|request|input|param\\w*|formula|expression|supplied)[^\\n]{0,60}(?:reaches|passed to|handed to|goes into|lands in)[^\\n]{0,30}\\beval\\b)|(?:(?:filter|denylist|blocklist|blocks?|rejects?|strips?)[^\\n]{0,70}(?:letters|alphabetic|\\ba-z\\b|quote\\w*)[^\\n]{0,70}(?:eval\\w*|expression|formula|sandbox|evaluator))|(?:\\bping\\b.{0,20}(?:host|ip|target))|(?:uid=\\d+\\(|gid=\\d+\\()|(?:sh: \\d+:|/bin/sh)|(?:(?<![a-z0-9])(?:web\\ command\\ injection|os\\ command\\ injection|command\\ injection|command\\-injection)(?![a-z0-9]))|(?:os\\.system\\s*\\(|subprocess\\.(?:run|call|Popen)[^\\n]*shell\\s*=\\s*True)|(?:\\beval\\s*\\(\\s*['\\\"][^'\\\"\\n]{0,40}['\\\"]\\s*\\.\\s*\\$)|(?:\\beval\\s*\\([^\\n]{0,60}(?:\\$_(?:GET|POST|REQUEST)|request\\.(?:args|form|GET|POST)|params\\[))|(?:new\\s+Function\\s*\\(|vm\\.run(?:InNewContext|InThisContext|InContext)?\\s*\\()|(?:preg_match(?:_all)?\\s*\\(\\s*['\\\"]/\\[[^\\]\\n]{0,20}a-z[^\\]\\n]{0,20}\\])|(?:shell_exec\\s*\\(|passthru\\s*\\(|proc_open\\s*\\(|\\bsystem\\s*\\(\\s*\\$)|(?:require\\s*\\(\\s*[\\\"']child_process|from subprocess import)|(?:(?:execSync|spawnSync|execFileSync)\\s*\\()|(?:child_process[^\\n]{0,40}exec\\s*\\()",
+      "bug_class": true
+    },
+    {
+      "id": "web-cors",
+      "path": "skills/web-cors/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 948,
+      "depth_files": 2,
+      "depth_tokens": 1433,
+      "use_when": [
+        "a probe or source read produced this class's signal: repeat an authenticated request with a foreign Origin and read whether the origin is reflected alongside credentials"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the allowed origin is a fixed allowlist, or credentials are not permitted",
+        "the evidence fits one of these better: web-csrf",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-csrf"
+      ],
+      "unlock_signals": "(?:access-control-allow-origin|access-control-allow-credentials)|(?:\\bcors\\b)|(?:origin:)|(?:\\borigin header\\b|cross.?origin)|(?:allows? credentials|with credentials)|(?:(?<![a-z0-9])(?:cors\\ misconfiguration|web\\ cors|cors)(?![a-z0-9]))|(?:Access-Control-Allow-Origin[\\\"']?\\s*[,:]\\s*[\\\"']?\\*)|(?:origin.{0,30}(?:reflect|echo))|(?:cors\\s*\\(\\s*\\{[^}]*origin\\s*:\\s*true)",
+      "bug_class": true
+    },
+    {
+      "id": "web-csrf",
+      "path": "skills/web-csrf/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "skill_tokens": 1022,
+      "depth_files": 3,
+      "depth_tokens": 1557,
+      "use_when": [
+        "a probe or source read produced this class's signal: a cross-origin form whose content type the endpoint still accepts, submitted by the viewer you control",
+        "a chain card already proves this class here: htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the endpoint requires a token the attacker page cannot read or a content type a form cannot produce",
+        "the evidence fits one of these better: web-xss, web-cors"
+      ],
+      "routes_to": [
+        "web-xss",
+        "web-cors"
+      ],
+      "unlock_signals": "(?:\\bcsrf\\b|xsrf)|(?:samesite|sameorigin)|(?:admin bot|bot visits)|(?:text/plain|enctype)|(?:(?<![a-z0-9])(?:cross\\-site\\ request\\ forgery|web\\ csrf|csrf)(?![a-z0-9]))|(?:csrf.{0,20}(?:disable|exempt|false))|(?:@csrf_exempt)|(?:samesite\\s*[=:]\\s*[\\\"']?none)",
+      "bug_class": true
+    },
+    {
+      "id": "web-deserialization",
+      "path": "skills/web-deserialization/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
+        "htb-py2-pickle-cookie-reduce-rce-rendered-output"
+      ],
+      "skill_tokens": 1307,
+      "depth_files": 7,
+      "depth_tokens": 5186,
+      "use_when": [
+        "a probe or source read produced this class's signal: identify the format from the blob's own magic before touching any gadget",
+        "a chain card already proves this class here: htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput, htb-py2-pickle-cookie-reduce-rce-rendered-output"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the blob is signed with a key that is not leaked and not reachable",
+        "the evidence fits one of these better: web-prototype-pollution"
+      ],
+      "routes_to": [
+        "web-prototype-pollution"
+      ],
+      "unlock_signals": "(?:\\brO0AB|\\baced0005|\\bgAN|O:\\d+:\\\"|\\bBAhJ|\\bAAEAAAD)|(?:deserial|unserial|pickle|marshal|viewstate)|(?:(?<![a-z0-9])(?:unsafe\\ deserialization|web\\ deserialization|deserialization)(?![a-z0-9]))|(?:pickle\\.loads|yaml\\.load\\s*\\(|unserialize|ObjectInputStream|readObject)|(?:TypeNameHandling\\s*(?:=|\\.)\\s*(?:TypeNameHandling\\.)?(?:All|Objects|Auto|Arrays))|(?:JavaScriptSerializer|SimpleTypeResolver|LosFormatter|NetDataContractSerializer|ObjectStateFormatter|EnableUnsafeBinaryFormatterSerialization)|(?:Marshal\\.load|BinaryFormatter|torch\\.load|joblib\\.load)|(?:Unpickler\\b|find_class\\s*\\(|restricted_loads|\\.load\\s*\\(\\s*\\)\\s*$)",
+      "bug_class": true
+    },
+    {
+      "id": "web-file-upload",
+      "path": "skills/web-file-upload/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+      ],
+      "skill_tokens": 1434,
+      "depth_files": 7,
+      "depth_tokens": 6282,
+      "use_when": [
+        "a probe or source read produced this class's signal: a benign marker file first; the question is where it is stored and what later reads or executes it",
+        "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the stored file is renamed, served with a fixed type, and never parsed again",
+        "the evidence fits one of these better: file-read-primitives"
+      ],
+      "routes_to": [
+        "file-read-primitives"
+      ],
+      "unlock_signals": "(?:upload|multipart/form-data|filename=)|(?:\\bavatars?\\b|\\battachments?\\b|\\bimports?\\b|\\bplugins?\\b|\\.tar\\b|\\.zip\\b)|(?:image/|mime|magic byte)|(?:(?<![a-z0-9])(?:unrestricted\\ file\\ upload|web\\ file\\ upload|file\\ upload|file\\-upload)(?![a-z0-9]))|(?:multer|move_uploaded_file|request\\.files|\\.save\\s*\\(\\s*(?:os\\.path\\.join|path))|(?:os\\.path\\.join\\s*\\([^,]+,\\s*(?:file|filename))",
+      "bug_class": true
+    },
+    {
+      "id": "web-graphql",
+      "path": "skills/web-graphql/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 965,
+      "depth_files": 2,
+      "depth_tokens": 3954,
+      "use_when": [
+        "a probe or source read produced this class's signal: one introspection query; if it is disabled, one field-suggestion error to recover names"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: introspection is off and errors reveal no field names",
+        "the evidence fits one of these better: web-idor, web-logic-flaw",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-idor",
+        "web-logic-flaw"
+      ],
+      "unlock_signals": "(?:graphql|/gql\\b)|(?:__schema|__typename|introspection)|(?:\\bquery\\s*\\{|\\bmutation\\s*\\{)|(?:(?<![a-z0-9])(?:graphql\\ abuse|web\\ graphql|graphql)(?![a-z0-9]))|(?:graphql|apollo|graphene|strawberry)|(?:introspection\\s*[=:]\\s*True)",
+      "bug_class": true
+    },
+    {
+      "id": "web-host-header",
+      "path": "skills/web-host-header/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 992,
+      "depth_files": 3,
+      "depth_tokens": 738,
+      "use_when": [
+        "a probe or source read produced this class's signal: send the request twice, once with a controlled X-Forwarded-Host and once with a swapped Host — a reset-link or redirect reflecting your host is the signal"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no response element (Location, link, cookie domain, generated URL) is built from any attacker-controlled host header on either request",
+        "the evidence fits one of these better: web-parser-differential, web-cache-poisoning",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-parser-differential",
+        "web-cache-poisoning"
+      ],
+      "unlock_signals": "(?:x-forwarded-(?:host|server)|x-original-url|x-rewrite-url|x-host|forwarded: host|x-http-host)|(?:password reset link|reset link|reset token|magic link|activation link|host header|host-header|header injection)|(?:(?<![a-z0-9])(?:forwarded\\-header\\ attacks|web\\ host\\ header|host\\ header|host\\-header|host)(?![a-z0-9]))|(?:request\\.(?:host|headers?)|X-Forwarded|X-Original-URL|X-Rewrite-URL|SERVER_NAME|HTTP_HOST|get_host|url_for|reset_url|absolute_uri|build_absolute)",
+      "bug_class": true
+    },
+    {
+      "id": "web-idor",
+      "path": "skills/web-idor/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 1068,
+      "depth_files": 7,
+      "depth_tokens": 3485,
+      "use_when": [
+        "a probe or source read produced this class's signal: create an object as one identity, then request its identifier as a second identity"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the handler scopes the lookup by the authenticated owner",
+        "the evidence fits one of these better: web-logic-flaw, web-auth-session",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-logic-flaw",
+        "web-auth-session"
+      ],
+      "unlock_signals": "(?:\\bidor\\b)|(?:/(?:users?|orders?|files?|notes?|invoices?)/\\d+)|(?:user_?id|account_?id|object_?id)|(?:[0-9a-f]{8}-[0-9a-f]{4}-)|(?:(?:chang|increment|modif|tamper)\\w*[^\\n]{0,30}\\bid\\b)|(?:another (?:user|account|customer|person)'?s?\\b)|(?:(?<![a-z0-9])(?:broken\\ object\\-level\\ authorization|web\\ idor|idor)(?![a-z0-9]))|(?:findById\\s*\\(\\s*req\\.params|WHERE id\\s*=\\s*\\$?\\{?(?:req|params))|(?:get_object_or_404\\s*\\([^,]+,\\s*(?:pk|id)\\s*=)",
+      "bug_class": true
+    },
+    {
+      "id": "web-info-disclosure",
+      "path": "skills/web-info-disclosure/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 764,
+      "depth_files": 3,
+      "depth_tokens": 1013,
+      "use_when": [
+        "the flag or the next step may sit in an exposed file or debug endpoint",
+        "a 403, verbose error, debug header, or a shipped .git or archive is observed"
+      ],
+      "do_not_use_when": [
+        "the finding is a real sink: use the matching injection class",
+        "the target is a shared host and only a wide scan is available"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-auth-session",
+        "web-source-map"
+      ],
+      "unlock_signals": "\\.git/|\\.env|\\.ds_store|backup\\.zip|actuator|swagger|debug|stack trace|server-status|source leak"
+    },
+    {
+      "id": "web-logic-flaw",
+      "path": "skills/web-logic-flaw/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
+      ],
+      "skill_tokens": 959,
+      "depth_files": 3,
+      "depth_tokens": 1240,
+      "use_when": [
+        "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped",
+        "a chain card already proves this class here: pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the handler reads an explicit allowlist of fields and ignores everything else",
+        "the evidence fits one of these better: web-idor, web-race-condition"
+      ],
+      "routes_to": [
+        "web-idor",
+        "web-race-condition"
+      ],
+      "unlock_signals": "(?:registration|signup|checkout|coupon|workflow|approval)|(?:role|is_?admin|privilege|status)|(?:(?<![a-z0-9])(?:mass\\ assignment|web\\ logic\\ flaw|business\\ logic|logic\\ flaw|logic\\-flaw)(?![a-z0-9]))|(?:(?:update|create)\\s*\\(\\s*(?:req\\.body|request\\.(?:json|form))\\s*\\))|(?:\\*\\*(?:request|data)\\b)|(?:setattr\\s*\\(\\s*\\w+\\s*,\\s*k)",
+      "bug_class": true
+    },
+    {
+      "id": "web-mass-assignment",
+      "path": "skills/web-mass-assignment/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 954,
+      "depth_files": 3,
+      "depth_tokens": 717,
+      "use_when": [
+        "a probe or source read produced this class's signal: repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the server ignores or rejects every undocumented field: the stored object is byte-identical to the control submission",
+        "the evidence fits one of these better: web-logic-flaw, web-idor",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-logic-flaw",
+        "web-idor"
+      ],
+      "unlock_signals": "(?:mass.?assign|over.?post|parameter bind|hidden field)|(?:role|admin|is_staff|privileged|permission|balance|credits?|price)|(?:register|sign.?up|profile|update|settings|checkout|order|apply)|(?:(?<![a-z0-9])(?:web\\ mass\\ assignment|parameter\\ binding|mass\\ assignment|mass\\-assignment)(?![a-z0-9]))|(?:request\\.(?:body|json|args|form|data)|params\\.permit|bind_param|model_bind|setattr|update_attributes|ObjectMapper|@RequestBody)|(?:(?:role|admin|is_staff|balance|price|credits?)\\s*[=:]{1,2}[^\\n]{0,40}(?:request|params|body|data)\\b)",
+      "bug_class": true
+    },
+    {
+      "id": "web-nosqli",
+      "path": "skills/web-nosqli/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
+      ],
+      "skill_tokens": 990,
+      "depth_files": 3,
+      "depth_tokens": 1428,
+      "use_when": [
+        "a probe or source read produced this class's signal: send the filter pinned to an object you created, with every write field omitted, and read what comes back",
+        "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the value is coerced to a string, so no object reaches the query",
+        "the evidence fits one of these better: web-sqli, web-prototype-pollution"
+      ],
+      "routes_to": [
+        "web-sqli",
+        "web-prototype-pollution"
+      ],
+      "unlock_signals": "(?:mongo|mongoose|couch|elasticsearch|redis\\b)|(?:\\$ne\\b|\\$gt\\b|\\$where\\b|\\$regex\\b|\\$rename\\b)|(?:[0-9a-f]{24}\\b)|(?:__v\\b)|(?:object datastore|object-shaped filter|24-hex id)|(?:aggregation (?:pipeline|stage)|\\$(?:match|lookup|group|unwind)\\b)|(?:body (?:becomes|is) the (?:query|filter)|whole query structure)|(?:reaches (?:the )?(?:driver|query) (?:whole|unchanged|as-is))|(?:(?<![a-z0-9])(?:operator\\ injection|web\\ nosqli|nosqli|nosql)(?![a-z0-9]))|(?:mongoose\\.model|findOne\\s*\\(\\s*req\\.|find\\s*\\(\\s*req\\.(?:body|query))|(?:updateMany|updateOne\\s*\\(\\s*req\\.)|(?:\\$where)",
+      "bug_class": true
+    },
+    {
+      "id": "web-oauth-sso",
+      "path": "skills/web-oauth-sso/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "skill_tokens": 936,
+      "depth_files": 3,
+      "depth_tokens": 2205,
+      "use_when": [
+        "a probe or source read produced this class's signal: walk the whole flow once and record every redirect, parameter and cookie set, before changing any of them",
+        "a chain card already proves this class here: htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the state parameter is bound to the session and the redirect target is a strict allowlist",
+        "the evidence fits one of these better: web-auth-session, web-open-redirect"
+      ],
+      "routes_to": [
+        "web-auth-session",
+        "web-open-redirect"
+      ],
+      "unlock_signals": "(?:oauth|openid|oidc|saml|single sign|sso\\b)|(?:redirect_uri|client_id|response_type|authorization_code)|(?:state=|nonce=)|(?:/authorize|/token|/callback)|(?:(?<![a-z0-9])(?:web\\ oauth\\ sso|oauth\\ sso|oauth\\-sso|sso\\ flow|oauth)(?![a-z0-9]))|(?:client_secret|redirect_uri)|(?:state\\s*(?:!=|==)\\s*)|(?:\\.well-known/openid)",
+      "bug_class": true
+    },
+    {
+      "id": "web-open-redirect",
+      "path": "skills/web-open-redirect/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 914,
+      "depth_files": 3,
+      "depth_tokens": 1058,
+      "use_when": [
+        "a probe or source read produced this class's signal: one external destination in the redirect parameter, following the response Location header exactly"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the destination is validated against an allowlist or forced to a relative path",
+        "the evidence fits one of these better: web-ssrf, web-oauth-sso",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-ssrf",
+        "web-oauth-sso"
+      ],
+      "unlock_signals": "(?:redirect|next=|returnurl|callback=|continue=)|(?:\\b30[1237]\\b)|(?:(?<![a-z0-9])(?:web\\ open\\ redirect|open\\ redirect|open\\-redirect)(?![a-z0-9]))|(?:redirect\\s*\\(\\s*(?:req|request|params|\\$_))|(?:Location:\\s*[\\\"']?\\s*\\+)",
+      "bug_class": true
+    },
+    {
+      "id": "web-parser-differential",
+      "path": "skills/web-parser-differential/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "skill_tokens": 1057,
+      "depth_files": 6,
+      "depth_tokens": 9498,
+      "use_when": [
+        "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
+        "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: both forms are rejected, so the trust check does not depend on that header",
+        "the evidence fits one of these better: web-request-smuggling, web-auth-session"
+      ],
+      "routes_to": [
+        "web-request-smuggling",
+        "web-auth-session"
+      ],
+      "unlock_signals": "(?:traefik|envoy|nginx|haproxy|cloudfront|gateway|reverse proxy)|(?:(?:(?<![:/])//(?=[A-Za-z0-9_%.-])|/\\./|%2e|%2f|dot.?segment|doubled? slash|trailing slash)[^\\n]{0,70}(?:bypass\\w*|reach\\w*|allowed|accepted|\\b200\\b|differ\\w*|through|throttl\\w*|\\blimit\\w*|denied|\\b40[13]\\b|\\b429\\b))|(?:(?:normali[sz]\\w+|decod\\w+|resolv\\w+|collaps\\w+|merg\\w+)[^\\n]{0,60}\\b(?:path|url|uri|slash|segment)\\b[^\\n]{0,70}(?:differ\\w*|before|but|while|backend|upstream|app\\b|framework|proxy))|(?:(?:proxy|gateway|front|edge|waf|acl|rule|filter)[^\\n]{0,70}(?:exact|literal|string|verbatim)[^\\n]{0,40}(?:path|match|compar\\w+))|(?:(?:403|401|denied|blocked|forbidden|rate.?limit\\w*|429)[^\\n]{0,70}\\bexact\\b[^\\n]{0,30}path)|(?:(?:(?<![:/])//[A-Za-z0-9_]|/\\./|%2f|%2e)[^\\n]{0,70}(?:(?<![:/])//[A-Za-z0-9_]|/\\./|%2f|%2e))|(?:(?:same|identical)\\s+(?:path|route|endpoint|url)[^\\n]{0,70}(?:differ\\w*|never|not |no longer|bypass\\w*|allowed|throttl\\w*|\\blimit\\w*|denied|\\b429\\b))|(?:inspects the raw body|raw body before a decoder|before a decoder runs)|(?:x-real-ip|x-forwarded-for|x-forwarded-host|connection:)|(?:hop-by-hop)|(?:403.{0,40}(?:only|internal|local))|(?:middleware|x-middleware|edge (?:function|runtime))|(?:(?:one|only|single|front) (?:front )?layer.{0,40}authori)|(?:header the client can (?:set|supply|control|choose))|(?:internal[- ]subrequest|x-middleware-subrequest)|(?:(?:cookie|session)[^\\n]{0,60}(?:as the (?:store |session )?key|key of (?:a |the )?[a-z ]{0,25}store|store key))|(?:(?<![a-z0-9])(?:web\\ parser\\ differential|parser\\ differential|parser\\-differential|proxy\\ trust)(?![a-z0-9]))|(?:headers\\.get\\s*\\(\\s*[\\\"']x-(?:real-ip|forwarded))|(?:request\\.headers\\[[\\\"']x-)|(?:if not .*header.*:\\s*\\n\\s*.*local)|(?:acl\\s+\\S+\\s+(?:path|url|req\\.hdr|hdr|method|base)\\b)|(?:http-request\\s+(?:deny|set-header|replace-path)\\b)|(?:use_backend\\s+\\S+\\s+if\\b|acl\\s+\\S+\\s+src\\s+\\d)|(?:-m\\s+(?:beg|sub|dir|reg|end)\\b)|(?:location\\s+[~^=]|^\\s*internal\\s*;|proxy_set_header\\s)",
+      "bug_class": true
+    },
+    {
+      "id": "web-prototype-pollution",
+      "path": "skills/web-prototype-pollution/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-secnotes-mongoose-rename-prototype-pollution-local-gate",
+        "htb-tornadoservice-bot-csrf-class-pollution",
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "skill_tokens": 1264,
+      "depth_files": 5,
+      "depth_tokens": 4306,
+      "use_when": [
+        "a probe or source read produced this class's signal: pollute one harmless property, then read it back through a path that should not have it",
+        "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate, htb-tornadoservice-bot-csrf-class-pollution, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the merge rejects reserved keys, or nothing reads the polluted property with a fallback",
+        "the evidence fits one of these better: web-nosqli, web-deserialization"
+      ],
+      "routes_to": [
+        "web-nosqli",
+        "web-deserialization"
+      ],
+      "unlock_signals": "(?:__proto__|prototype pollution|class pollution)|(?:connection-derived|derived from the connection)|(?:constructor|__class__|__globals__|__init__)|(?:merge|deep.?(?:assign|copy|merge))|(?:(?<![a-z0-9])(?:web\\ prototype\\ pollution|prototype\\ pollution|prototype\\-pollution|class\\ pollution|prototype)(?![a-z0-9]))|(?:__proto__)|(?:Object\\.assign\\s*\\(\\s*\\{\\}?\\s*,\\s*(?:req|body))|(?:(?:_\\.)?merge\\s*\\(|extend\\s*\\(\\s*true)|(?:setattr\\s*\\()|(?:\\$rename)",
+      "bug_class": true
+    },
+    {
+      "id": "web-race-condition",
+      "path": "skills/web-race-condition/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "skill_tokens": 980,
+      "depth_files": 3,
+      "depth_tokens": 2426,
+      "use_when": [
+        "a probe or source read produced this class's signal: two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
+        "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the read and the write happen inside one transaction or behind one lock",
+        "the evidence fits one of these better: web-logic-flaw"
+      ],
+      "routes_to": [
+        "web-logic-flaw"
+      ],
+      "unlock_signals": "(?:race condition|toctou)|(?:balance|coupon|voucher|one.?time|redeem)|(?:verification token|confirmation (?:code|email|link))|(?:rate.?limit|per.?user limit|quota)|(?:(?<![a-z0-9])(?:web\\ race\\ condition|race\\ condition|race\\-condition|toctou)(?![a-z0-9]))|(?:(?:get|select|find)[^\\n]{0,80}\\n[^\\n]{0,80}(?:update|save|commit))|(?:await [^\\n]*\\n[^\\n]*await [^\\n]*(?:token|balance|count))",
+      "bug_class": true
+    },
+    {
+      "id": "web-request-smuggling",
+      "path": "skills/web-request-smuggling/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "skill_tokens": 1158,
+      "depth_files": 5,
+      "depth_tokens": 4489,
+      "use_when": [
+        "a probe or source read produced this class's signal: one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
+        "a chain card already proves this class here: htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the value is percent-encoded or validated, so no control character survives into the outbound request",
+        "the evidence fits one of these better: web-ssrf, web-parser-differential"
+      ],
+      "routes_to": [
+        "web-ssrf",
+        "web-parser-differential"
+      ],
+      "unlock_signals": "(?:smuggl|desync|crlf)|(?:content-length|transfer-encoding)|(?:%0d%0a|\\\\r\\\\n|\\\\u010d|\\\\u010a)|(?:proxy|gateway|load balancer|nginx|haproxy|traefik)|(?:(?<![a-z0-9])(?:web\\ request\\ smuggling|request\\ smuggling|request\\-smuggling|crlf\\ injection)(?![a-z0-9]))|(?:http://\\$\\{[^}]*\\}|https://\\$\\{[^}]*\\})|(?:(?:url|endpoint|host)\\s*[+]\\s*(?:req|request|params))|(?:setHeader\\s*\\([^)]*(?:req|request|params))",
+      "bug_class": true
+    },
+    {
+      "id": "web-source-map",
+      "path": "skills/web-source-map/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 690,
+      "depth_files": 3,
+      "depth_tokens": 936,
+      "use_when": [
+        "the front-end is a bundled SPA and the only available source",
+        "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"
+      ],
+      "do_not_use_when": [
+        "source is already supplied: read it directly",
+        "the bundle is a single inline script with no build step"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-auth-session"
+      ],
+      "unlock_signals": "sourceMappingURL|\\.js\\.map|_next/static|/static/js/|webpack|vite|/_buildManifest|/_ssgManifest"
+    },
+    {
+      "id": "web-sqli",
+      "path": "skills/web-sqli/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
+        "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
+      ],
+      "skill_tokens": 1686,
+      "depth_files": 13,
+      "depth_tokens": 17590,
+      "use_when": [
+        "a probe or source read produced this class's signal: one syntax marker, then a matched true/false pair against the same input",
+        "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: for an immediate sink, identical validated response for the true and false forms; for a stored or deferred sink, the same result after the consumer is triggered",
+        "the evidence fits one of these better: web-nosqli"
+      ],
+      "routes_to": [
+        "web-nosqli"
+      ],
+      "unlock_signals": "(?:\\bsql\\b)|(?:sqlite|mysql|mariadb|postgres|mssql|(?<!encrypt )(?<!decrypt )(?<!padding )(?<!padding-)(?<!chosen )(?<!cbc )(?<!ecb )(?<!aes )(?<!rsa )(?<!bleichenbacher )\\boracle\\b(?!\\s+(?:attack|loop|distinguish|encryption|decryption)))|(?:\\bselect\\b[^\\n]{0,80}\\bfrom\\b[^\\n]{0,60}\\bwhere\\b)|(?:vsprintf|sprintf[^\\n]{0,40}(?:select|insert|update))|(?:syntax error|sqlstate|you have an error in your sql)|(?:order\\s*by|union\\s+select)|(?:boolean.{0,12}(?:delta|difference))|(?:time.?based|sleep\\(|pg_sleep|waitfor delay)|(?:\\bsingle quote\\b|\\bapostrophe\\b)|(?:database error|db error|query (?:error|failed))|(?:(?<![a-z0-9])(?:sql\\ injection|web\\ sqli|sqli)(?![a-z0-9]))|(?:SELECT[\\s\\S]{0,160}(?:\\+|%|\\.format|\\$\\{|f[\\\"']))|(?:(?:FromSqlRaw|ExecuteSqlRaw|ExecuteSqlInterpolated|CommandText\\s*=|new\\s+SqlCommand)[^\\n]{0,80}\\$\\\")|(?:\\$\\\"[^\\\"\\n]{0,100}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{)|(?:f\\\"[^\\\"\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^\\\"\\n]{0,200}\\{|f'[^'\\n]{0,60}\\b(?:SELECT|INSERT\\s+INTO|UPDATE|DELETE\\s+FROM)\\b[^'\\n]{0,200}\\{)|(?:(?:execute|query|run)\\s*\\([^\\n]*(?:%|format|\\+|\\$\\{))|(?:(?:INSERT|UPDATE|DELETE)[^\\n]*\\$\\{)|(?:cursor\\.execute)",
+      "bug_class": true
+    },
+    {
+      "id": "web-ssrf",
+      "path": "skills/web-ssrf/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-red-island-ssrf-gopher-redis-lua-rce",
+        "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "skill_tokens": 1263,
+      "depth_files": 6,
+      "depth_tokens": 6983,
+      "use_when": [
+        "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
+        "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the fetch target is fixed in source and the request never influences it",
+        "the evidence fits one of these better: file-read-primitives, web-request-smuggling"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-request-smuggling"
+      ],
+      "unlock_signals": "(?:\\bssrf\\b)|(?:loopback-only|reachable by the backend itself)|(?:url\\s*[=:]|endpoint\\s*[=:]|webhook|url (?:field|param\\w*|input))|(?:server.?side (?:fetch|request)|fetches? (?:the |a )?url)|(?:pdf|screenshot|thumbnail|preview|import from url)|(?:render\\w*[^\\n]{0,30}(?:url|link|page)|(?:url|link)[^\\n]{0,30}render\\w*)|(?:127\\.0\\.0\\.1|localhost|169\\.254|metadata)|(?:admin bot|headless)|(?:outbound (?:http|https|network) request)|(?:\\burl\\b[^\\n]{0,30}(?:supplied|provided|controlled|given|submitted))|(?:\\bcurl\\b|file_get_contents|http client|requests\\.get)|(?:(?<![a-z0-9])(?:server\\-side\\ request\\ forgery|web\\ ssrf|ssrf)(?![a-z0-9]))|(?:requests\\.(?:get|post)\\s*\\(\\s*(?:req|request|params|url))|(?:urlopen\\s*\\(|\\bhttp\\.(?:get|request)\\s*\\(|\\bfetch\\s*\\(\\s*(?:req|url|`))|(?:curl_setopt|file_get_contents\\s*\\(\\s*\\$)|(?:http://\\$\\{|https://\\$\\{)",
+      "bug_class": true
+    },
+    {
+      "id": "web-ssti",
+      "path": "skills/web-ssti/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-neonify-erb-ssti-newline-filter-bypass",
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
+      ],
+      "skill_tokens": 985,
+      "depth_files": 7,
+      "depth_tokens": 4886,
+      "use_when": [
+        "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
+        "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the marker is reflected literally, which is an XSS shape rather than template evaluation",
+        "the evidence fits one of these better: web-xss, web-command-injection"
+      ],
+      "routes_to": [
+        "web-xss",
+        "web-command-injection"
+      ],
+      "unlock_signals": "(?:\\{\\{|\\$\\{|#\\{|<%=)|(?:jinja|twig|freemarker|velocity|thymeleaf|mako|erb\\b)|(?:template)|(?:\\b49\\b)|(?:(?<![a-z0-9])(?:server\\-side\\ template\\ injection|web\\ ssti|ssti)(?![a-z0-9]))|(?:render_template_string|Template\\s*\\(|ERB\\.new|\\.render\\s*\\(\\s*(?:req|params))|(?:eval\\s*\\(\\s*(?:template|tpl))",
+      "bug_class": true
+    },
+    {
+      "id": "web-user-enum",
+      "path": "skills/web-user-enum/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 986,
+      "depth_files": 3,
+      "depth_tokens": 761,
+      "use_when": [
+        "a probe or source read produced this class's signal: one known-good username and one obviously-bad username against the same form, then the same bad username twice — compare message, status, and timing across the three"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: identical response text, status, and timing distribution for known-good, known-bad, and repeated-bad attempts, including the timing of the password-verification path",
+        "the evidence fits one of these better: web-auth-session, web-logic-flaw",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "web-auth-session",
+        "web-logic-flaw"
+      ],
+      "unlock_signals": "(?:username|user\\s*(?:name|id|exists|taken|found)|account exists)|(?:invalid (?:user|username|password|credentials)|no such user|user (?:not found|does not exist))|(?:rate.?limit|too many (?:attempts|requests|tries)|locked out|lockout|captcha|throttl)|(?:login|sign.?in|password reset|forgot password|registration)|(?:timing.{0,30}(?:attack|oracle|differential))|(?:(?<![a-z0-9])(?:user\\ enumeration|auth\\ throttling|web\\ user\\ enum|user\\ enum|user\\-enum)(?![a-z0-9]))|(?:user(?:name)?s?\\.get|find_one|get_user|user_exists|check_password|verify_password)|(?:(?:rate.?limit|throttle|lockout|attempts?)\\s*[<>=:]|time\\.sleep|bcrypt|pbkdf2|scrypt|argon2)",
+      "bug_class": true
+    },
+    {
+      "id": "web-web3",
+      "path": "skills/web-web3/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 937,
+      "depth_files": 2,
+      "depth_tokens": 4265,
+      "use_when": [
+        "a probe or source read produced this class's signal: read the setup contract and the solved condition first; that names the exact state you must reach"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the solved condition depends on state no external caller can change",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [],
+      "unlock_signals": "(?:solidity|\\.sol\\b|ethereum|web3|rpc endpoint|foundry|hardhat)|(?:0x[0-9a-f]{40}\\b)|(?:setup\\(\\)|isSolved\\(\\))|(?:(?<![a-z0-9])(?:smart\\ contract|web\\ web3|web3)(?![a-z0-9]))|(?:pragma solidity|contract \\w+\\s*\\{)|(?:delegatecall|selfdestruct|tx\\.origin)",
+      "bug_class": true
+    },
+    {
+      "id": "web-websocket",
+      "path": "skills/web-websocket/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 804,
+      "depth_files": 3,
+      "depth_tokens": 861,
+      "use_when": [
+        "the target opens a ws:// or wss:// channel, or uses Socket.IO or SockJS",
+        "a live feature carries the flag path and the cookie is HttpOnly"
+      ],
+      "do_not_use_when": [
+        "there is no realtime channel: use the matching HTTP class",
+        "the channel is already confirmed hijackable: fire one probe, do not rebuild"
+      ],
+      "routes_to": [
+        "web-csrf",
+        "web-auth-session",
+        "web-xss"
+      ],
+      "unlock_signals": "websocket|ws://|wss://|socket\\.io|sockjs|upgrade:\\s*websocket|101 switching|realtime|live update"
+    },
+    {
+      "id": "web-xs-leaks",
+      "path": "skills/web-xs-leaks/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
+      ],
+      "skill_tokens": 1888,
+      "depth_files": 2,
+      "depth_tokens": 2837,
+      "use_when": [
+        "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
+        "a chain card already proves this class here: htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the bot can reach no attacker-influenced state at all, and no observable on the target changes as a function of what the victim's browser loaded",
+        "the evidence fits one of these better: web-xss, web-cache-poisoning, web-csrf"
+      ],
+      "routes_to": [
+        "web-xss",
+        "web-cache-poisoning",
+        "web-csrf"
+      ],
+      "unlock_signals": "(?:admin bot|report to admin|visit.{0,20}url|headless)|(?:xs-?leak|side.?channel)|(?:window\\.length|frame count|cache probe)|(?:script-src\\s+'none')|(?:@font-face|unicode-range)|(?:font-src[^\\n;]*\\*)|(?:(?<![a-z0-9])(?:browser\\ side\\ channel|cross\\-site\\ leak|web\\ xs\\ leaks|xs\\ leaks|xs\\-leaks)(?![a-z0-9]))|(?:puppeteer|playwright|selenium|chromedriver|google-chrome)|(?:script-src\\s+'none')|(?:font-src[^\\n;\\\"']*\\*)|(?:URLBlocklist|URLAllowlist|policies/managed)|(?:setCookie[\\s\\S]{0,120}sameSite)|(?:maxmemory-policy\\s+(?:allkeys|volatile)-lru)",
+      "bug_class": true
+    },
+    {
+      "id": "web-xss",
+      "path": "skills/web-xss/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
+        "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "skill_tokens": 1223,
+      "depth_files": 7,
+      "depth_tokens": 7166,
+      "use_when": [
+        "a probe or source read produced this class's signal: one unique harmless marker; find which context it lands in before choosing any payload",
+        "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: nothing renders the injected markup, so there is no viewer and no flag path",
+        "the evidence fits one of these better: web-ssti, web-csrf"
+      ],
+      "routes_to": [
+        "web-ssti",
+        "web-csrf"
+      ],
+      "unlock_signals": "(?:\\bxss\\b)|(?:admin bot|bot visits|report (?:url|link))|(?:(?:echo\\w*|reflect\\w*|render\\w*|repopulat\\w*|appears?|shown|displayed|comes? back|put back)[^\\n]{0,70}(?:unescaped|unencoded|\\braw\\b|verbatim|without (?:being )?escap\\w+|not escaped|as.is|into the (?:form|field|input|page|attribute)))|(?:(?:refus\\w+|reject\\w+|error message|invalid|blocked|denied)[^\\n]{0,70}\\b(?:still|but|yet|anyway)\\b[^\\n]{0,50}(?:echo\\w*|reflect\\w*|shown|displayed|appears?|comes? back))|(?:content-security-policy|nonce-)|(?:dompurify|sanitiz)|(?:(?<![a-z0-9])(?:cross\\-site\\ scripting|web\\ xss|xss)(?![a-z0-9]))|(?:innerHTML|outerHTML|document\\.write|insertAdjacentHTML)|(?:<\\?=\\s*(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^?\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE))|(?:\\becho\\s+(?:(?!htmlspecialchars|htmlentities|esc_|strip_tags)[^;\\n]){0,70}\\$_(?:GET|POST|REQUEST|COOKIE))|(?:dangerouslySetInnerHTML|mark_safe|\\|\\s*safe\\b|\\{\\{\\{)|(?:!\\{\\s*[A-Za-z_$][\\w$.\\[\\]'\\\"]{0,40}\\s*\\})|(?:<%-\\s*[A-Za-z_$]|\\{%\\s*autoescape\\s+(?:off|false))|(?:res\\.(?:send|write|end)\\s*\\(\\s*`[^`\\n]*\\$\\{)|(?:(?:render|reply)\\s*\\([^)\\n]*\\bhtml\\b[^)\\n]*\\$\\{)|(?:v-html|\\bunescape\\b|autoescape\\s*=\\s*False)",
+      "bug_class": true
+    },
+    {
+      "id": "web-xxe",
+      "path": "skills/web-xxe/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "evidence_level": "verified",
+      "verified_by": [
+        "htb-xxe-content-type-branch-simplexml-noent-file-read"
+      ],
+      "skill_tokens": 1034,
+      "depth_files": 3,
+      "depth_tokens": 1252,
+      "use_when": [
+        "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed",
+        "a chain card already proves this class here: htb-xxe-content-type-branch-simplexml-noent-file-read"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: the parser is configured with entity resolution disabled",
+        "the evidence fits one of these better: file-read-primitives, web-ssrf"
+      ],
+      "routes_to": [
+        "file-read-primitives",
+        "web-ssrf"
+      ],
+      "unlock_signals": "(?:<\\?xml|application/xml|text/xml|soap|wsdl)|(?:\\.docx|\\.xlsx|\\.svg\\b)|(?:doctype|entity)|(?:(?<![a-z0-9])(?:xml\\ external\\ entity|web\\ xxe|xxe)(?![a-z0-9]))|(?:etree\\.(?:parse|fromstring)|lxml|xml\\.dom|SAXParser|DocumentBuilder)|(?:simplexml_load|libxml_disable_entity_loader)|(?:resolve_entities\\s*=\\s*True)",
+      "bug_class": true
+    },
+    {
+      "id": "white-box-dependency-measurement",
+      "path": "skills/white-box-dependency-measurement/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 3317,
+      "depth_files": 1,
+      "depth_tokens": 165,
+      "use_when": [
+        "a chain turns on what a pinned, vendored or containerised dependency actually does",
+        "a negative result has to be recordable as a measured boundary, not an opinion"
+      ],
+      "do_not_use_when": [
+        "no source or container is available: there is nothing to measure",
+        "published documentation already settles it and nothing is pinned"
+      ],
+      "routes_to": [
+        "white-box-intended-path",
+        "file-read-primitives"
+      ],
+      "unlock_signals": "package-lock|yarn\\.lock|requirements\\.txt|poetry\\.lock|go\\.sum|Gemfile\\.lock|Dockerfile|docker-compose|node_modules|vendor/|haproxy|gunicorn|uwsgi|nginx\\.conf|varnish|alpine|==\\d+\\.\\d+|@\\d+\\.\\d+\\.\\d+"
+    },
+    {
+      "id": "white-box-intended-path",
+      "path": "skills/white-box-intended-path/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2626,
+      "depth_files": 1,
+      "depth_tokens": 162,
+      "use_when": [
+        "a high-value, low-solve white-box challenge whose author-deliberate oddities are unexplained",
+        "one mechanism budget is spent with no impact and no anomaly newly explained"
+      ],
+      "do_not_use_when": [
+        "a chain already reaches impact: finish it",
+        "the challenge is black-box, so there is no handout to diff against stock"
+      ],
+      "routes_to": [
+        "white-box-dependency-measurement"
+      ],
+      "unlock_signals": "handout|stock app|upstream diff|anomaly|unused (route|field|parameter)|dead code|custom fork|patched vendor|why is this here"
+    },
+    {
+      "id": "ctf-writeup",
+      "path": "skills/ctf-writeup/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1232,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "a flag has been verified and the chain must be written down as a reusable card"
+      ],
+      "do_not_use_when": [
+        "the flag is still a hypothesis"
+      ],
+      "routes_to": []
+    },
+    {
+      "id": "dfir-parallel-sweep",
+      "path": "skills/dfir-parallel-sweep/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "dfir"
+      ],
+      "skill_tokens": 3107,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "an artifact bundle with many questions over one collection, so several artifact families each need their own bounded measurement",
+        "a Sherlock is being worked one artifact family at a time and the clock is the blocker"
+      ],
+      "do_not_use_when": [
+        "one question answerable from one artifact: open the router and read the one depth file",
+        "nothing is extracted yet: --dfir wants the extracted directory",
+        "chain_recall reports cards_exist: run that card's probe first"
+      ],
+      "routes_to": [
+        "dfir-sherlock-triage",
+        "parallel-layer-sweep",
+        "ir-live-estate-triage"
+      ],
+      "unlock_signals": "ctf-dfir-|fan.?out|parallel (?:dfir )?sweep|subagent_fanout|seven families|artifact family"
+    },
+    {
+      "id": "parallel-layer-sweep",
+      "path": "skills/parallel-layer-sweep/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1257,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "a multi-layer white-box handout and no strong chain match, so several independent mechanism layers each need their own falsifier",
+        "a session is walking layers one at a time and the clock is the blocker"
+      ],
+      "do_not_use_when": [
+        "chain_match.py returns a candidate: run that card's probe first",
+        "one endpoint and one sink, so there is nothing to fan out",
+        "the only way to measure the layer is a write-shaped probe"
+      ],
+      "routes_to": [
+        "white-box-intended-path",
+        "white-box-dependency-measurement",
+        "ctf-playbook"
+      ],
+      "unlock_signals": "subagent|fan.?out|parallel layer|layer sweep|novel_plan|several layers"
+    },
+    {
+      "id": "security-skill-evaluation",
+      "path": "skills/security-skill-evaluation/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1032,
+      "depth_files": 2,
+      "depth_tokens": 2104,
+      "use_when": [
+        "a skill is being added, promoted, or considered for deletion",
+        "a field note is being reviewed, or a class raised from catalogue"
+      ],
+      "do_not_use_when": [
+        "a challenge is in progress: this skill solves nothing"
+      ],
+      "routes_to": []
+    },
+    {
+      "id": "web-parallel-sweep",
+      "path": "skills/web-parallel-sweep/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "web"
+      ],
+      "skill_tokens": 2070,
+      "depth_files": 0,
+      "depth_tokens": 0,
+      "use_when": [
+        "a web target with recon done and no strong chain match, so several bug-class families each need their own bounded measurement",
+        "a web challenge is being worked one hypothesis at a time and the clock is the blocker"
+      ],
+      "do_not_use_when": [
+        "chain_match.py returns a candidate: run that card's probe first",
+        "no recon exists yet: run ctf-web-recon and ctf-web-bundle first",
+        "one endpoint and one sink, so there is nothing to fan out"
+      ],
+      "routes_to": [
+        "web-triage",
+        "parallel-layer-sweep",
+        "white-box-intended-path"
+      ],
+      "unlock_signals": "ctf-web-|fan.?out|parallel (?:web )?sweep|subagent_fanout|ten families"
+    }
+  ]
+}
