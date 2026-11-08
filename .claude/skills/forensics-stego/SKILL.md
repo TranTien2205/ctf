@@ -69,7 +69,18 @@ zsteg -a challenge.png 2>/dev/null | head -20
 
 `carve_scan` is the absent-binwalk fallback: it finds embedded magics and
 data trailing a container's real end — the common CTF hide — plus a
-flag-format pass over printable runs. LSB bit-plane work still needs the
+flag-format pass over printable runs.
+
+For the LSB half there is now a stdlib option too:
+
+```bash
+python3 tools/forensics/lsb_scan.py challenge.png            # PNG/BMP, planes 1-3
+python3 tools/forensics/lsb_scan.py challenge.png --planes 1 # the common one
+```
+
+It walks the same matrix `zsteg -a` reports (b1-3, r/g/b/a/rgb/bgr,
+xy/yx, lsb/msb) and prints every stream that decodes printable, with the
+flag-format pass on top. JPEG/wav stego and deeper planes still need the
 external tools below; nothing here pretends otherwise.
 
 ## Routing
