@@ -48,6 +48,9 @@ Design choices and why:
 - The **model** can only act through tools; it cannot widen scope, spend
   past budgets, or write findings without verbatim evidence.
 - The **transcript** is append-only JSONL; findings reference it by id.
+  Each entry carries a hash-chain link and `summary.json` anchors the
+  final link, so post-run edits, insertions and deletions are detectable
+  with `argus verify`.
 - **Web content is untrusted data.** The system prompt teaches the model
   to treat in-page instructions as prompt-injection attempts and keep
   working the assessment. MCP server output gets the same treatment —
@@ -68,6 +71,8 @@ prompt wording can widen it.
 | loopback/private pivot to infra | private-address refusal (`--allow-private` opts in; auto-allowed only when the declared target is itself private) | `ScopeGuard` |
 | flood the target | shared token bucket; redirect hops count too | `RateLimiter`, `GuardedClient` |
 | invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
+| finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |
+| post-run transcript tampering | sha256 hash chain per entry + chain head anchored in `summary.json` | `verify_transcript`, `argus verify` |
 | scanner output treated as proof | `run_external`/`mcp_call` output is a lead until an `http_request` re-verifies or a `proof_marker` matches | tool notes + evidence gate |
 | exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to `resources/wordlists`+cwd; bundled shorts parsed | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
