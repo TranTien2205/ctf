@@ -97,12 +97,13 @@ def read_notes(ctx: Context) -> dict:
 def record_finding(ctx: Context, title: str, severity: str, category: str,
                    url: str, evidence_excerpt: str,
                    description: str, remediation: str,
-                   evidence_ids: list[str] | None = None) -> dict:
+                   evidence_ids: list[str] | None = None,
+                   cvss: str = "") -> dict:
     finding = ctx.session.add_finding(
         title=title, severity=severity, category=category, url=url,
         evidence_ids=list(evidence_ids or []),
         evidence_excerpt=evidence_excerpt, description=description,
-        remediation=remediation, agent=ctx.agent_name,
+        remediation=remediation, agent=ctx.agent_name, cvss=cvss,
     )
     return {"recorded": finding["id"], "title": finding["title"],
             "severity": finding["severity"]}

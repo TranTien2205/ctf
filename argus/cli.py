@@ -251,7 +251,8 @@ def _demo(args) -> int:
                          description="The quote probe produces a raw sqlite "
                                      "error - unsanitized input reaches the "
                                      "query.",
-                         remediation="Use parameterized queries.")],
+                         remediation="Use parameterized queries.",
+                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
          "text": "Error channel confirms SQLi - recording with verbatim "
                  "evidence."},
         {"tool_calls": [_t(3, "probe_reflection",
@@ -265,7 +266,8 @@ def _demo(args) -> int:
                          evidence_excerpt="<>'\"&=/",
                          description="Canary chars < > \" ' reflect "
                                      "unescaped in html context.",
-                         remediation="Output-encode by context; add CSP.")],
+                         remediation="Output-encode by context; add CSP.",
+                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")],
          "text": "Reflected with unescaped special chars - XSS lead."},
         {"tool_calls": [_t(5, "probe_idor", url=base + "/api/user/2")],
          "text": "Object-level authorization next."},
@@ -277,7 +279,8 @@ def _demo(args) -> int:
                          evidence_excerpt="\"username\"",
                          description="Neighboring ids return other users' "
                                      "objects with no authorization check.",
-                         remediation="Enforce per-object ownership checks.")],
+                         remediation="Enforce per-object ownership checks.",
+                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
          "text": "Neighbor id returns a different principal - IDOR."},
         {"tool_calls": [_t(7, "probe_xfh", url=base + "/reset")]},
         {"tool_calls": [_t(8, "finish",

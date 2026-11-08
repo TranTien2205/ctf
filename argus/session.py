@@ -15,6 +15,9 @@ import urllib.parse
 from pathlib import Path
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
+_CVSS_RE = re.compile(
+    r"^CVSS:3\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]"
+    r"/C:[NLH]/I:[NLH]/A:[NLH]$")
 
 
 def _slug(host: str) -> str:
@@ -192,10 +195,16 @@ class Session:
         description: str,
         remediation: str,
         agent: str = "",
+        cvss: str = "",
     ) -> dict:
         severity = severity.lower()
         if severity not in SEVERITIES:
             raise ValueError(f"severity must be one of {SEVERITIES}")
+        cvss = (cvss or "").strip()
+        if cvss and not _CVSS_RE.match(cvss):
+            raise ValueError(
+                "cvss must be a base vector like "
+                "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
         excerpt = (evidence_excerpt or "").strip()
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
@@ -238,6 +247,8 @@ class Session:
             }
             if agent:
                 finding["agent"] = agent
+            if cvss:
+                finding["cvss"] = cvss
             self.findings.append(finding)
             self.findings_path.write_text(
                 json.dumps(self.findings, indent=2, ensure_ascii=False)

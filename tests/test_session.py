@@ -66,6 +66,18 @@ def test_finding_dedup_same_class_endpoint(tmp_path):
     assert f["id"] == "F02"
 
 
+def test_finding_cvss_vector_validated(tmp_path):
+    s = _sess(tmp_path)
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
+    f = s.add_finding("sqli", "high", "sqli", "http://t/x", [rid], "proof",
+                      "d", "r",
+                      cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
+    assert f["cvss"].startswith("CVSS:3.1")
+    with pytest.raises(ValueError):
+        s.add_finding("bad", "high", "x", "u", [rid], "proof", "d", "r",
+                      cvss="9.8 critical")
+
+
 def test_finding_records_agent(tmp_path):
     s = _sess(tmp_path)
     rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})

@@ -419,6 +419,7 @@ TOOL_SCHEMAS: list[dict] = [
             "evidence_excerpt": {**_STR, "description": "Verbatim quote from a cited response that proves the bug"},
             "description": {**_STR, "description": "What it is, how to reproduce, impact"},
             "remediation": {**_STR, "description": "How to fix it"},
+            "cvss": {**_STR, "description": "Optional CVSS 3.x base vector, e.g. CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"},
         },
         ["title", "severity", "category", "url",
          "evidence_excerpt", "description", "remediation"],
