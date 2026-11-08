@@ -331,6 +331,9 @@ def _demo(args) -> int:
             print(f"  [{f['severity'].upper()}] {f['title']}")
     print(f"  findings={result['findings']}  requests={result['requests']}")
     print(f"  report: {result['report']}")
+    html_path = Path(result['report']).with_suffix('.html')
+    if html_path.exists():
+        print(f"  html:   {html_path}")
     return 0
 
 

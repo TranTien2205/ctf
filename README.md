@@ -105,7 +105,7 @@ python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
         ┌───────────────────────────▼───────────────────────────┐
         │   SESSION OUTPUT  (sessions/<ts>-<host>/)             │
         │   transcript.jsonl · findings.json · notes.md ·       │
-        │   report.md · summary.json · agent.log                │
+        │   report.md/.html · summary.json · agent.log          │
         └───────────────────────────────────────────────────────┘
 
         ┌───────────────────────────────────────────────────────┐
