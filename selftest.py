@@ -73,6 +73,14 @@ def main() -> int:
           verify_transcript(s.dir)["bad_lines"] == [1])
     tpath.write_text(orig, encoding="utf-8")  # restore for the suite
 
+    s2 = Session(Path(tempfile.mkdtemp()), base, meta={},
+                 secrets=["sup3rsecr3t"])
+    s2.record_exchange("t", {"body": "u=a&p=sup3rsecr3t"},
+                       {"status": 200, "body": "ok"})
+    raw = (s2.dir / "transcript.jsonl").read_text(encoding="utf-8")
+    check("declared secret scrubbed from persisted bodies",
+          "sup3rsecr3t" not in raw and "redacted" in raw)
+
     # --- probe checks against live lab -----------------------------------
     from argus.config import Config
     from argus.httpclient import GuardedClient

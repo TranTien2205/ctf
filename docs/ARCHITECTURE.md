@@ -95,7 +95,7 @@ prompt wording can widen it.
 | foreign hosts inside arg files | `-iL`/`-r`/`-l`/`-m`/`--bulk-file`/nuclei `-l` contents scanned per host | `_file_target_check` |
 | local code execution via tool | `sqlmap --eval`, `nmap --script <path>`, `nuclei -t <file>`, `-code` refused | arg guards |
 | credential leak to subprocesses | `KEY/TOKEN/SECRET/PASSWORD/CREDENTIAL` env vars scrubbed for MCP servers and exploit PoCs | `MCPClient`, `run_exploit` |
-| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `render_report` |
+| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); credentials used outside headers (form bodies, tokens) are declared via `--secret VALUE`/`ARGUS_SECRETS` (>=4 chars) and scrubbed from every persisted object at write time - model sees real bytes, artifacts get `REDACTED:` markers; reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `Session._redact_obj`, `render_report` |
 | exploit PoC escapes its dir / hits foreign host | relative manifest commands confined to the manifest dir under `resources/exploits/<id>` (cwd or bundled); `{args}` scope-scanned | `run_exploit` |
 | worker exceeds its role | card `tools` set enforced at `dispatch`; only lead holds `spawn_worker`/`finish_engagement` | `cards.py`, `dispatch` |
 | resume mixes two engagements | `--resume` refuses a session whose `meta.json` target differs | `Session._resume` |
