@@ -129,6 +129,8 @@ def main() -> int:
     check("sqli probe sees candidate", "candidate" in out["verdict"])
     out = probes.probe_sqli(ctx, base + "/product?id=1", "id")
     check("sqli probe sees numeric-context", "numeric context" in out["verdict"])
+    out = probes.probe_sqli(ctx, base + "/stock?sku=x", "sku")
+    check("sqli probe sees or-pair", "OR pair" in out["verdict"])
     out = probes.probe_time(ctx, base + "/ping?host=1", "host", delay_s=2)
     check("time probe sees cmd delay", "cmd" in out["verdict"])
     out = probes.probe_ssti(ctx, base + "/hello?name=x", "name")

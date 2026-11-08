@@ -7,6 +7,8 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /                     index with links + a search form
     GET  /search?q=            reflected XSS (unescaped reflection)
     GET  /item?id=             SQLi (error-based + boolean-blind, sqlite)
+    GET  /stock?sku=           SQLi detectable only via an OR true/false pair
+                               (AND arms all return the empty page)
     POST /login                SQLi auth bypass (' OR '1'='1)
     GET  /ping?host=           command injection (sleep separators)
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
@@ -61,8 +63,11 @@ def _init_db() -> sqlite3.Connection:
     db.execute("CREATE TABLE items (id INTEGER, name TEXT, price REAL)")
     db.execute("CREATE TABLE users (id INTEGER, username TEXT, password TEXT, role TEXT)")
     db.execute("CREATE TABLE secrets (flag TEXT)")
+    db.execute("CREATE TABLE stock (sku TEXT, name TEXT, visible INTEGER)")
     db.executemany("INSERT INTO items VALUES (?,?,?)",
                    [(1, "widget", 9.99), (2, "gadget", 19.99), (3, "sprocket", 4.50)])
+    db.executemany("INSERT INTO stock VALUES (?,?,?)",
+                   [("A-2", "widget xl", 1), ("A-3", "gadget pro", 1)])
     db.executemany("INSERT INTO users VALUES (?,?,?,?)",
                    [(1, "admin", "s3cr3t-admin-pw", "admin"),
                     (2, "alice", "alice-pw", "user"),
@@ -216,6 +221,23 @@ class Handler(BaseHTTPRequestHandler):
                 self._send(body=f"<html><body><ul>{out}</ul></body></html>")
             else:
                 self._send(body="<html><body>No product.</body></html>")
+
+        elif path == "/stock":
+            # OR-pair sqli: an AND-tail filter means baseline AND true/false
+            # all return empty; only the OR '1'='1 arm returns rows.
+            # Errors are swallowed so the error channel stays dark.
+            i = p.get("sku", "1")
+            try:
+                rows = self.db.execute(
+                    f"SELECT name FROM stock WHERE sku = '{i}' "
+                    "AND visible = 1").fetchall()
+            except sqlite3.Error:
+                rows = []
+            if rows:
+                out = "".join(f"<li>{n}</li>" for n, in rows)
+                self._send(body=f"<html><body><ul>{out}</ul></body></html>")
+            else:
+                self._send(body="<html><body>No stock.</body></html>")
 
         elif path == "/ping":
             host = p.get("host", "")

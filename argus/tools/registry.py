@@ -181,8 +181,9 @@ TOOL_SCHEMAS: list[dict] = [
     _schema(
         "probe_sqli",
         "SQL-injection differential check on one parameter: baseline, a syntax "
-        "probe (quote), and a matched true/false pair. Reports whether an SQL "
-        "error appears or the true/false responses meaningfully differ.",
+        "probe (quote), and matched AND/OR true/false pairs in quoted and "
+        "numeric context. Reports whether an SQL error appears or a "
+        "true/false pair meaningfully differs.",
         {
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter to test"},

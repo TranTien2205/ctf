@@ -45,6 +45,13 @@ def test_sqli_probe_error_based(lab_url, ctx):
     assert out["error_markers"] or out["true_false_similarity"] < 0.9
 
 
+def test_sqli_probe_or_pair(lab_url, ctx):
+    # /stock filters with AND visible=1 so both AND arms return the same
+    # empty page - only the OR '1'='1 / '1'='2 pair can differentiate
+    out = probes.probe_sqli(ctx, lab_url + "/stock?sku=x", "sku")
+    assert "OR pair" in out["verdict"], out
+
+
 def test_time_probe_cmd(lab_url, ctx):
     out = probes.probe_time(ctx, lab_url + "/ping?host=1", "host", delay_s=2)
     assert "cmd" in out["verdict"]
