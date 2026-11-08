@@ -135,7 +135,7 @@ FOREIGN_SCRIPT = re.compile(_charclass((0x0400, 0x04FF), (0x3040, 0x30FF),
 EXEMPTIONS = ROOT / "test" / "gate-exemptions.json"
 # Tools and skills that were referenced in documentation but never existed.
 PHANTOM = re.compile(r"solver/recognize\.py|credential-hygiene|external-recon/")
-TOOL_PATH = re.compile(r"\btools/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*\.py\b")
+TOOL_PATH = re.compile(r"\b(?:tools|test)/[A-Za-z0-9_]+(?:/[A-Za-z0-9_]+)*\.py\b")
 PROMPT_SECTIONS = ["## Context", "## Role", "## Goal", "## Instructions",
                    "## Constraints", "## Output Format", "## Examples"]
 

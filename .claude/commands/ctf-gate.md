@@ -24,4 +24,4 @@ bash scripts/save_version.sh "$ARGUMENTS"
 ```
 
 Never lower `test/baseline.json` to make the gate pass. It is a capability floor,
-and `capability_report.py --write` refuses to lower it for the same reason.
+and `test/capability_report.py --write` refuses to lower it for the same reason.

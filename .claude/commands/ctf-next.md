@@ -22,9 +22,12 @@ more promising. It enforces what an agent judging its own progress will not:
 Every probe verdict goes through the hooks, which are the only write path:
 
 ```bash
-python3 tools/hooks.py pre-probe  <challenge> --request '<what you will send>'
-python3 tools/hooks.py post-probe <challenge> --verdict confirms|refutes|inconclusive \
-        --evidence '<verbatim excerpt of the response>'
+python3 tools/hooks.py pre-probe  <challenge> --hypothesis-id <id> --class <bug-class> \
+        --request '<what you will send>'
+python3 tools/hooks.py post-probe <challenge> --hypothesis-id <id> --class <bug-class> \
+        --request '<what you sent>' --verdict confirms|falsifies|inconclusive \
+        --response '<the raw response>' --evidence '<verbatim excerpt of it>' \
+        --evidence-kind surface|class|impact
 ```
 
 A timeout or a connection reset is never a confirm. A write-shaped probe needs
