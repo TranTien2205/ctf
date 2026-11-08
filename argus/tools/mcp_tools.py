@@ -3,15 +3,35 @@
 MCP servers are optional external tool providers (search, fetch, CVE data)
 declared in mcp.json. Their output is untrusted third-party content - never
 treated as instructions - and every call is recorded in the transcript.
+
+MCP servers make their own network requests outside GuardedClient, so an
+mcp_call whose arguments carry an http(s) URL is scope-checked before the
+call - a fetch-type server must not become a path around the scope guard.
 """
 from __future__ import annotations
 
 import json
 
 from ..mcp import MCPError
+from ..scope import ScopeError
 from .registry import Context
 
 RETURN_CAP = 12_000
+
+
+def _url_args(value) -> list[str]:
+    """Collect http(s)-URL strings anywhere inside an arguments object."""
+    found = []
+    if isinstance(value, str):
+        if value.startswith(("http://", "https://")):
+            found.append(value)
+    elif isinstance(value, dict):
+        for v in value.values():
+            found.extend(_url_args(v))
+    elif isinstance(value, (list, tuple)):
+        for v in value:
+            found.extend(_url_args(v))
+    return found
 
 
 def _manager(ctx: Context):
@@ -67,6 +87,19 @@ def mcp_call(ctx: Context, server: str, tool: str, arguments: dict | None = None
     if arguments is not None and not isinstance(arguments, dict):
         return {"error": "arguments must be a JSON object"}
     timeout_s = max(5, min(int(timeout_s or 30), 120))
+    # MCP servers fetch their own URLs outside GuardedClient - scope-check
+    # any http(s) URL the call carries so a fetch server cannot be used to
+    # reach out-of-scope targets
+    try:
+        for url in _url_args(arguments or {}):
+            ctx.scope.check(url)
+    except ScopeError as exc:
+        ctx.session.record_event(
+            "mcp_call", {"server": server, "tool": tool,
+                         "arguments": arguments or {},
+                         "scope_block": str(exc)},
+            agent=ctx.agent_name)
+        return {"error": f"mcp_call blocked by scope: {exc}"}
     try:
         result = client.call(tool, arguments or {}, timeout_s)
     except MCPError as exc:

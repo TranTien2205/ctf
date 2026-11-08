@@ -268,7 +268,10 @@ data) declared in `mcp.json`, `--mcp-config`, or `ARGUS_MCP_CONFIG`:
 ```
 
 Servers spawn lazily, one subprocess each, shared across workers. Output is
-flagged untrusted and logged as `mcp_call` transcript events.
+flagged untrusted and logged as `mcp_call` transcript events. Because MCP
+servers make their own network requests outside `GuardedClient`, any
+http(s) URL found in `mcp_call` arguments is scope-checked first — a
+fetch-type server cannot be used to reach out-of-scope targets.
 
 ## The lab
 

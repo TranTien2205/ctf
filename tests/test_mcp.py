@@ -91,3 +91,28 @@ def test_discover_config_path(tmp_path, monkeypatch):
     assert discover_config_path(str(cfg)) == cfg
     monkeypatch.setenv("ARGUS_MCP_CONFIG", str(cfg))
     assert discover_config_path("") == cfg
+
+
+def test_mcp_call_scope_blocks_foreign_url(ctx, tmp_path):
+    """A fetch-type MCP server runs its own network path - URL args must
+    still be scope-checked, else mcp_call is a way around GuardedClient."""
+    ctx.mcp = MCPManager(_config(tmp_path))
+    try:
+        out = mcp_tools.mcp_call(
+            ctx, "fake", "echo", {"url": "https://evil.example/fetch"})
+        assert "error" in out and "scope" in out["error"]
+        # the block is recorded so the transcript shows what was attempted
+        kinds = [e for e in ctx.session._transcript.values()
+                 if e.get("scope_block")]
+        assert kinds and "evil.example" in kinds[0]["scope_block"]
+        # nested arguments are walked too
+        out2 = mcp_tools.mcp_call(
+            ctx, "fake", "echo",
+            {"opts": {"url": "https://evil.example/"}})
+        assert "error" in out2 and "scope" in out2["error"]
+        # in-scope URL args pass the gate (the fake server doesn't fetch)
+        out3 = mcp_tools.mcp_call(
+            ctx, "fake", "echo", {"url": "http://127.0.0.1/x"})
+        assert "scope" not in str(out3.get("error", ""))
+    finally:
+        ctx.mcp.close()
