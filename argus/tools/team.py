@@ -281,23 +281,22 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
         from ..mcp import MCPClient
         env = {k: v for k, v in os.environ.items()
                if not any(s in k.upper() for s in MCPClient._SECRET_RE)}
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout_s, errors="replace",
-                              cwd=str(edir), env=env)
-        output = (proc.stdout or "") + \
-            ("\n[stderr]\n" + proc.stderr if proc.stderr else "")
+        from ._subproc import run_capped
+        marker = manifest.get("proof_marker") or ""
+        rc, head, tail, proof = run_capped(
+            cmd, timeout_s, cwd=str(edir), env=env,
+            needle=marker or None)
+        proof = proof and bool(marker)
     except subprocess.TimeoutExpired:
         rid = ctx.session.record_event("exploit_run", {
             "exploit": exploit_id, "cmd": cmd, "timeout": timeout_s},
             agent=ctx.agent_name)
         return {"run_id": rid, "error": f"timed out after {timeout_s}s"}
-    marker = manifest.get("proof_marker") or ""
-    proof = bool(marker) and re.search(marker, output or "") is not None
     rid = ctx.session.record_event("exploit_run", {
-        "exploit": exploit_id, "cmd": cmd, "returncode": proc.returncode,
-        "proof": proof, "output": output[:50_000]}, agent=ctx.agent_name)
-    return {"run_id": rid, "returncode": proc.returncode, "proof": proof,
-            "output": output[-15_000:],
+        "exploit": exploit_id, "cmd": cmd, "returncode": rc,
+        "proof": proof, "output": head[:50_000]}, agent=ctx.agent_name)
+    return {"run_id": rid, "returncode": rc, "proof": proof,
+            "output": tail[-15_000:],
             "note": "proof=True verifies the exploit; cite run_id as evidence "
                     "for record_finding" if proof else
                     "no proof_marker match - treat as a lead, not a finding"}

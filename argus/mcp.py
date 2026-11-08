@@ -98,8 +98,11 @@ class MCPClient:
 
     def _reader_loop(self) -> None:
         proc = self._proc
+        # bound each readline: a hostile server writing a newline-free
+        # stream would otherwise exhaust memory - the cap splits oversized
+        # output into pieces that fail json.loads and are dropped
         while proc and proc.poll() is None:
-            line = proc.stdout.readline()
+            line = proc.stdout.readline(4 * 1024 * 1024)
             if not line:
                 break
             try:

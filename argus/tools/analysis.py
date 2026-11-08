@@ -254,14 +254,13 @@ def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> di
     rid = ctx.session.record_event("external_cmd", {"cmd": cmd},
                                    agent=ctx.agent_name)
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True,
-                              timeout=timeout_s, errors="replace")
-        output = (proc.stdout or "") + ("\n[stderr]\n" + proc.stderr if proc.stderr else "")
+        from ._subproc import run_capped
+        rc, head, tail = run_capped(cmd, timeout_s)
         ctx.session.record_event("external_result", {
-            "cmd_id": rid, "returncode": proc.returncode,
-            "output": output[:50_000]}, agent=ctx.agent_name)
-        return {"cmd_id": rid, "returncode": proc.returncode,
-                "output": output[-20_000:],
+            "cmd_id": rid, "returncode": rc,
+            "output": head[:50_000]}, agent=ctx.agent_name)
+        return {"cmd_id": rid, "returncode": rc,
+                "output": tail[-20_000:],
                 "note": "scanner output is a lead; verify with http_request before record_finding"}
     except subprocess.TimeoutExpired:
         ctx.session.record_event("external_result",
