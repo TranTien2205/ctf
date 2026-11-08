@@ -79,8 +79,11 @@ def _redact_url(url):
     if parts.username is None and parts.password is None:
         return url
     host = parts.hostname or ""
-    if parts.port:
-        host += f":{parts.port}"
+    try:
+        if parts.port:
+            host += f":{parts.port}"
+    except ValueError:
+        pass  # 'host:abc' - still strip the userinfo, just drop the port
     return urllib.parse.urlunsplit(
         (parts.scheme, f"{_REDACTED}@{host}" if host else _REDACTED,
          parts.path, parts.query, parts.fragment))

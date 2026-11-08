@@ -79,7 +79,10 @@ def _coverage(session: Session) -> dict:
         req = e.get("request")
         if not isinstance(req, dict) or not req.get("url"):
             continue
-        p = urllib.parse.urlparse(str(req["url"]))
+        try:
+            p = urllib.parse.urlparse(str(req["url"]))
+        except ValueError:
+            continue  # tampered transcript line with an unparseable url
         names = sorted(k for k, _ in urllib.parse.parse_qsl(p.query))
         endpoints.add(f"{req.get('method', 'GET')} {p.path or '/'}"
                       + ("?" + "&".join(names) if names else ""))
