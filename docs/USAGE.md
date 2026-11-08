@@ -278,7 +278,11 @@ e.g. `-b name=value` instead of a cookie-jar path.
 ## MCP tool servers
 
 `mcp_list` / `mcp_call` bridge external MCP servers (search, fetch, CVE
-data) declared in `mcp.json`, `--mcp-config`, or `ARGUS_MCP_CONFIG`:
+data) declared via `--mcp-config` or `ARGUS_MCP_CONFIG`. A `mcp.json` /
+`.argus-mcp.json` / `.mcp.json` in the working directory is **ignored
+unless `ARGUS_MCP_CWD=1`** — configs name subprocesses to run, so a file
+inside an untrusted directory must not silently wire commands to the
+agent:
 
 ```json
 {"servers": {"search": {"command": ["npx", "-y", "some-search-mcp"]}}}

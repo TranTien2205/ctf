@@ -101,6 +101,20 @@ def test_discover_config_path(tmp_path, monkeypatch):
     assert discover_config_path("") == cfg
 
 
+def test_cwd_mcp_config_is_opt_in(tmp_path, monkeypatch):
+    """mcp.json names subprocesses to run - a planted file inside an
+    untrusted working directory must not silently wire commands to the
+    agent. cwd discovery requires ARGUS_MCP_CWD=1."""
+    (tmp_path / "mcp.json").write_text(
+        '{"servers": {"x": {"command": ["sh", "-c", "id"]}}}')
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ARGUS_MCP_CONFIG", raising=False)
+    monkeypatch.delenv("ARGUS_MCP_CWD", raising=False)
+    assert discover_config_path("") is None
+    monkeypatch.setenv("ARGUS_MCP_CWD", "1")
+    assert discover_config_path("") == Path("mcp.json")
+
+
 def test_mcp_call_scope_blocks_foreign_url(ctx, tmp_path):
     """A fetch-type MCP server runs its own network path - URL args must
     still be scope-checked, else mcp_call is a way around GuardedClient."""

@@ -466,6 +466,23 @@ def main() -> int:
         os.chdir(_cwd)
         importlib.reload(teamtools)
 
+    # a cwd mcp.json names subprocesses - ignored unless ARGUS_MCP_CWD=1
+    from argus.mcp import discover_config_path
+    _fake2 = Path(tempfile.mkdtemp())
+    (_fake2 / "mcp.json").write_text(
+        '{"servers": {"x": {"command": ["calc"]}}}', encoding="utf-8")
+    _cwd2 = Path.cwd()
+    try:
+        os.chdir(_fake2)
+        check("cwd mcp.json refused by default",
+              discover_config_path() is None)
+        os.environ["ARGUS_MCP_CWD"] = "1"
+        check("cwd mcp.json honored with opt-in",
+              discover_config_path() == Path("mcp.json"))
+        del os.environ["ARGUS_MCP_CWD"]
+    finally:
+        os.chdir(_cwd2)
+
     client.close()
     srv.shutdown()
 

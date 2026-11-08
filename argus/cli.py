@@ -60,7 +60,8 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--llm-max-tokens", type=int, default=4096)
     p.add_argument("--mcp-config",
                    help="Path to mcp.json declaring MCP tool servers "
-                        "(else ARGUS_MCP_CONFIG or ./mcp.json)")
+                        "(else ARGUS_MCP_CONFIG; a ./mcp.json in cwd is "
+                        "ignored unless ARGUS_MCP_CWD=1)")
     p.add_argument("--tools",
                    help="Comma-separated tool allowlist (run mode only), "
                         "e.g. 'http_request,probe_sqli,record_finding'. "

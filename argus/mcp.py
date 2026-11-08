@@ -23,6 +23,7 @@ import json
 import os
 import queue
 import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -43,10 +44,20 @@ def discover_config_path(explicit: str = "") -> Path | None:
         if not Path(env).exists():
             raise SystemExit(f"ARGUS_MCP_CONFIG not found: {env}")
         return Path(env)
-    for name in ("mcp.json", ".argus-mcp.json", ".mcp.json"):
-        p = Path(name)
-        if p.exists():
-            return p
+    # cwd auto-discovery is opt-in: mcp.json names subprocesses to run,
+    # so a planted file inside an untrusted working directory would hand
+    # the model commands to execute. Operators declare it explicitly with
+    # --mcp-config, ARGUS_MCP_CONFIG, or ARGUS_MCP_CWD=1.
+    cwd_found = next(
+        (Path(name) for name in
+         ("mcp.json", ".argus-mcp.json", ".mcp.json")
+         if Path(name).exists()), None)
+    if cwd_found is not None:
+        if os.environ.get("ARGUS_MCP_CWD") == "1":
+            return cwd_found
+        print(f"[argus] ignoring {cwd_found} in cwd - MCP configs name "
+              "subprocesses; use --mcp-config or set ARGUS_MCP_CWD=1 to "
+              "opt in", file=sys.stderr)
     return None
 
 
