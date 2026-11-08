@@ -614,7 +614,9 @@ def probe_idor(ctx: Context, url: str, method: str = "GET",
 
 _SSRF_MARKERS = re.compile(
     r"ami-id|instance-id|local-hostname|local-ipv4|security-credentials|"
-    r"computeMetadata|Metadata-Flavor|XAwsEc2|iam/info",
+    r"computeMetadata|Metadata-Flavor|XAwsEc2|iam/info|"
+    # file:// fetch results: /etc/passwd line shape, win.ini signature
+    r"root:[x*]?:\d+:\d+:|for 16-bit app support",
     re.I,
 )
 
@@ -640,6 +642,8 @@ def probe_ssrf(ctx: Context, url: str, param: str,
         ("hex-ip", f"http://0x7f000001:{port}/"),
         ("octal-ip", f"http://0177.0.0.1:{port}/"),
         ("ipv6-loopback", f"http://[::1]:{port}/"),
+        ("file-scheme", "file:///etc/passwd"),
+        ("file-scheme-win", "file:///c:/windows/win.ini"),
         ("cloud-metadata", "http://169.254.169.254/latest/meta-data/"),
     ]
     hits = []
