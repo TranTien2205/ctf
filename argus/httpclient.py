@@ -219,6 +219,12 @@ class GuardedClient:
     ) -> dict:
         """Send one scoped request, record it, return a compact result."""
         self.scope.check(url)  # raises ScopeError before any byte is sent
+        if body is not None and not isinstance(body, (str, bytes)):
+            raise TypeError(
+                f"body must be str or bytes, got {type(body).__name__}")
+        if headers is not None and not isinstance(headers, dict):
+            raise TypeError(
+                f"headers must be a dict, got {type(headers).__name__}")
         self.rate.wait()
         with self._sent_lock:
             if self.sent >= self.max_requests:
