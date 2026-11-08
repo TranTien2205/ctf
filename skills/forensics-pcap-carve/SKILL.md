@@ -76,6 +76,12 @@ tunnel — reassemble with `tools/forensics/dns_exfil.py --pcap cap.pcap`
 (strips the suffix, joins labels in packet or index order, tries
 hex/base32/base64). Also accepts `--names queries.txt`.
 
+A USB capture (linktype 189/220, the `usb.capdata` staple) is not a
+network flow at all — decode interrupt-in reports with
+`python3 tools/forensics/usb_hid.py cap.pcap keys` for typed keystrokes
+or `mouse` for pen-stroke points; `--raw hexlines.txt` works on
+exported report hex too.
+
 ## Routing
 
 Shares signals with: `../dfir-network-exfil-trace/`, `../misc-encoding-carrier/`. Check those before committing to this one.
