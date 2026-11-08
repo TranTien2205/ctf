@@ -128,6 +128,22 @@ def main() -> int:
     check("read_response rejects unknown id",
           "error" in read_response(ctx, "r99999"))
 
+    from argus.tools.analysis import jwt_decode, jwt_forge
+    import json as _json
+    tok = _json.loads(ctx.client.send(
+        "GET", base + "/token?user=alice", tool="selftest")["body"])["token"]
+    dec = jwt_decode(ctx, tok)
+    check("jwt_decode recovers weak secret",
+          dec.get("recovered_secret") == "secret123")
+    forged = jwt_forge(ctx, tok, '{"user":"admin","role":"admin"}',
+                       secret=dec["recovered_secret"])
+    me = ctx.client.send(
+        "GET", base + "/api/me",
+        headers={"Authorization": "Bearer " + forged["resigned"]},
+        tool="selftest")
+    check("jwt_forge mints accepted admin token",
+          '"role": "admin"' in (me.get("body") or ""))
+
     out = web.fingerprint(ctx, base)
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))
     out = web.fingerprint(ctx, base + "/login")

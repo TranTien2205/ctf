@@ -51,7 +51,7 @@ EXPLOIT = RoleCard(
         "probe_upload", "probe_race", "probe_deserialize", "probe_cache",
         "probe_ppoll", "probe_smuggle", "probe_disclosure", "probe_websocket",
         "probe_crlf", "probe_enum",
-        "graphql_introspect", "jwt_decode", "run_external",
+        "graphql_introspect", "jwt_decode", "jwt_forge", "run_external",
         "run_exploit", "list_exploits", "emit_lead", "record_finding", "finish",
     }),
     prompt_file="exploit.md",

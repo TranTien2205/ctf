@@ -60,6 +60,7 @@ def _impl(name: str) -> Callable:
         "probe_crlf": probes.probe_crlf,
         "probe_enum": probes.probe_enum,
         "jwt_decode": analysis.jwt_decode,
+        "jwt_forge": analysis.jwt_forge,
         "load_skill": analysis.load_skill,
         "read_response": analysis.read_response,
         "note": analysis.note,
@@ -474,6 +475,19 @@ TOOL_SCHEMAS: list[dict] = [
         "weakness assessment (alg=none acceptance hints, HMAC weak-secret "
         "offline crack against a builtin wordlist). Analysis only - never forges.",
         {"token": {**_STR, "description": "The JWT string"}},
+        ["token"],
+    ),
+    _schema(
+        "jwt_forge",
+        "Forge a JWT after jwt_decode recovers a weak HMAC secret: re-sign "
+        "the payload (with optional claim overrides) and produce an "
+        "alg=none variant. Send the result as a Bearer token - a 200 "
+        "echoing your claims is the verbatim finding.",
+        {"token": {**_STR, "description": "The original JWT string"},
+         "claims": {**_STR, "description": "JSON object merged over the "
+                                          "payload, e.g. {\"role\":\"admin\"}"},
+         "secret": {**_STR, "description": "Recovered HMAC secret; omit to "
+                                         "only get the alg=none variant"}},
         ["token"],
     ),
     _schema(

@@ -7,10 +7,11 @@ sessions, OAuth flows. The highest-value surface on most real apps.
 
 Feed any JWT/opaque token to `jwt_decode`:
 
-- `alg=none` -> resend the token with signature dropped / alg=none
-- HS256 + weak secret recovered offline -> forge any claim (`sub`, `role`,
-  `admin`). `jwt_decode` tries a builtin wordlist; a recovered secret is
-  itself a finding with the forged request as proof.
+- `alg=none` -> `jwt_forge` emits a signature-free variant to resend
+- HS256 + weak secret recovered offline -> `jwt_forge` re-signs with claim
+  overrides (`sub`, `role`, `admin`) - you cannot compute HMAC yourself.
+  A recovered secret is itself a finding; the forged request returning a
+  200 echoing your claims is the verbatim proof.
 - RS256 -> alg confusion: re-sign with the public key as HS256 secret
 - `kid`/`jku` header -> traversal to a known file, or attacker-controlled
   JWKS URL when in scope
