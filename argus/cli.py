@@ -294,8 +294,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "skills":
         sdir = Path(__file__).parent / "skills"
         if args.name:
-            f = sdir / (args.name if args.name.endswith(".md")
-                        else args.name + ".md")
+            import re as _re
+            safe = _re.sub(r"[^a-z0-9_-]", "", args.name.lower())
+            f = sdir / f"{safe}.md"
             if f.exists():
                 print(f.read_text(encoding="utf-8"), end="")
                 return 0
