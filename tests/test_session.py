@@ -139,3 +139,12 @@ def test_transcript_hash_chain_detects_tamper(tmp_path):
     tpath.write_text("\n".join(lines) + "\n")
     res = verify_transcript(s.dir)
     assert res["bad_lines"] == [1]
+
+
+def test_record_finding_rejects_out_of_scope(ctx):
+    from argus.tools.analysis import record_finding
+    out = record_finding(ctx, title="t", severity="low", category="x",
+                         url="https://evil.example/x",
+                         evidence_excerpt="x", description="d",
+                         remediation="r")
+    assert "scope guard" in out.get("error", "")

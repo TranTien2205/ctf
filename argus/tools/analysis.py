@@ -84,7 +84,7 @@ def load_skill(ctx: Context, name: str) -> dict:
 # ---------------------------------------------------------------- notes
 
 def note(ctx: Context, text: str) -> dict:
-    ctx.session.note(text)
+    ctx.session.note(text, agent=ctx.agent_name)
     return {"ok": True}
 
 
@@ -99,6 +99,10 @@ def record_finding(ctx: Context, title: str, severity: str, category: str,
                    description: str, remediation: str,
                    evidence_ids: list[str] | None = None,
                    cvss: str = "") -> dict:
+    try:
+        ctx.scope.check(url)
+    except Exception as exc:
+        return {"error": f"finding url rejected by scope guard: {exc}"}
     finding = ctx.session.add_finding(
         title=title, severity=severity, category=category, url=url,
         evidence_ids=list(evidence_ids or []),
@@ -459,5 +463,5 @@ def _is_windows() -> bool:
 def finish(ctx: Context, summary: str) -> dict:
     ctx.finished = True
     ctx.finish_summary = summary
-    ctx.session.note(f"## Agent summary\n\n{summary}")
+    ctx.session.note(f"## Agent summary ({ctx.agent_name})\n\n{summary}")
     return {"finished": True, "stats": ctx.session.stats()}

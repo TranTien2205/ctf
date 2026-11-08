@@ -693,14 +693,15 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
     if len(ok) > 1:
         serial = [_fire("serial baseline"), _fire("serial baseline")]
     s_ok = [r for r in serial if _ok(r)]
-    if len(ok) > 1 and not overlapped:
-        verdict = ("inconclusive: burst requests were serialized "
-                   f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
-                   "raise --rate or increase n and retry")
-    elif len(ok) > 1 and len(s_ok) == len(serial):
+    if len(ok) > 1 and len(s_ok) == len(serial):
+        # repeatable is provable without overlap - check it first
         verdict = (f"{len(ok)}/{n} burst successes but {len(s_ok)}/"
                    f"{len(serial)} serial probes also succeeded - the "
                    "action is repeatable, not a one-time race")
+    elif len(ok) > 1 and not overlapped:
+        verdict = ("inconclusive: burst requests were serialized "
+                   f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
+                   "raise --rate or increase n and retry")
     elif len(ok) > 1:
         verdict = (f"race candidate: {len(ok)}/{n} concurrent requests "
                    f"succeeded but serial probes now return "

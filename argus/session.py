@@ -304,10 +304,14 @@ class Session:
             )
         return finding
 
-    def note(self, text: str) -> None:
+    def note(self, text: str, agent: str = "") -> None:
+        stamp = time.strftime("%H:%M:%S")
+        prefix = f"- **[{stamp} {agent}]** " if agent else \
+            f"- **[{stamp}]** " if not text.startswith(
+                ("#", ">", "-", "*")) else ""
         with self._lock:
             with self.notes_path.open("a", encoding="utf-8") as fh:
-                fh.write(text.rstrip() + "\n\n")
+                fh.write(prefix + text.rstrip() + "\n\n")
 
     def stats(self) -> dict:
         return {

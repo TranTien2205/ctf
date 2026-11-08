@@ -142,7 +142,12 @@ def main(argv: list[str] | None = None) -> int:
             max_time=0, rate=0,
             session_dir="sessions", allow_private=True, tls_verify=False,
             no_external=True, goal="", llm_max_tokens=0))
-        cfg.model = session.dir.name
+        try:
+            meta = json.loads((sdir / "meta.json").read_text(
+                encoding="utf-8"))
+            cfg.model = meta.get("model") or cfg.model
+        except Exception:
+            pass
         path = render_report(session, cfg)
         print(path)
         return 0
