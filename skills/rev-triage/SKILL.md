@@ -55,6 +55,13 @@ it names which class skill and which tool opens the artifact.
 Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
 with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
 
+For the deciding-check hunt without `nm`/`readelf`/`objdump`:
+`python3 tools/elf_info.py ./bin` lists sections, dynamic + static
+symbols, DT_NEEDED libs, and flags the imports that name the check
+(`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). Stripped binaries report
+`no symtab` honestly — dynamic symbols still answer "what does it
+call". Static read only; disassembly still needs a real tool.
+
 ## Dynamic before static
 
 `ltrace ./bin` often exposes the comparison directly; `strace` shows the syscall
