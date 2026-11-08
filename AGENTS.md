@@ -57,4 +57,10 @@ family — if you change a probe, update the lab and its test together.
   `verify_transcript` / `argus verify`. Any code path that appends to
   `transcript.jsonl` must go through `Session.record_*` — never write the
   file directly.
+- Secret header values never persist to artifacts: auth/cookie/token
+  request headers and `Set-Cookie` are recorded redacted (names +
+  scheme/attrs kept), and reports re-redact old transcripts at render.
+  Any new record path must apply `httpclient._redact_headers`. Operator
+  secrets are also opaque to the model — tool results never echo request
+  headers back.
 - No new runtime dependencies without strong cause — `httpx` is enough.
