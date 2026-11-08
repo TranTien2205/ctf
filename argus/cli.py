@@ -238,9 +238,16 @@ def main(argv: list[str] | None = None) -> int:
                   "recorded in summary.json - tail entries were removed, "
                   "or the session continued after its last report")
             return 1
+        if res.get("findings_bad"):
+            print(f"TAMPERED: findings {res['findings_bad']} no longer "
+                  "verify - evidence ids missing from the transcript or "
+                  "excerpt not verbatim")
+            return 1
         anchored = " anchored to summary.json" if res.get("head_anchor") \
             else ""
-        print(f"OK: {res['entries']} chained entries verified{anchored}")
+        fchk = (f", {res['findings_checked']} findings re-validated"
+                if res.get("findings_checked") else "")
+        print(f"OK: {res['entries']} chained entries verified{anchored}{fchk}")
         return 0
 
     if args.cmd == "check":

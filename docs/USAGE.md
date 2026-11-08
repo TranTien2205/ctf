@@ -197,6 +197,9 @@ mid-file deletions are detectable after the fact. `python -m argus verify
 <session_dir>` recomputes the chain and reports any mismatch; `summary.json`
 anchors the last link, so even tail truncation is caught once a report has
 been rendered (a mismatch there means truncation OR post-report appends).
+`findings.json` is not chained itself, so verify also re-validates every
+recorded finding against the immutable transcript: edited excerpts or
+invented evidence ids surface as `TAMPERED: findings [...]`.
 
 ## Resuming a run
 

@@ -200,7 +200,8 @@ not just in the prompt.
 - **Full transcript** — every request lands in `transcript.jsonl` with an
   id; reports embed the proving exchange under each finding. Each entry
   carries a hash-chain link, so `argus verify <session>` can prove nothing
-  was edited or deleted after the run.
+  was edited or deleted after the run — it also re-validates every finding
+  against the chained transcript, catching edited findings.json too.
 - **Scope-checked findings** — `record_finding` runs the finding URL
   through the scope guard, so the report cannot claim a bug on a host the
   engagement never authorized.

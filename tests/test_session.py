@@ -150,6 +150,33 @@ def test_record_finding_rejects_out_of_scope(ctx):
     assert "scope guard" in out.get("error", "")
 
 
+def test_verify_revalidates_findings(tmp_path):
+    """findings.json is not chained, so verify re-checks every claim
+    against the (immutable) transcript: edited excerpts or invented
+    evidence ids must surface as tamper."""
+    import json
+    from argus.session import Session, verify_transcript
+    s = Session(tmp_path, "http://t", {})
+    s.record_exchange("t", {"method": "GET", "url": "http://t/"},
+                      {"status": 200, "body": "proof bytes here"})
+    s.add_finding(title="x", severity="low", category="x",
+                  url="http://t/", evidence_ids=["r1"],
+                  evidence_excerpt="proof bytes",
+                  description="d", remediation="r")
+    res = verify_transcript(s.dir)
+    assert res["findings_checked"] == 1 and not res.get("findings_bad")
+    # tamper: rewrite the excerpt - the transcript is untouched yet the
+    # finding no longer verifies
+    fp = s.dir / "findings.json"
+    fs = json.loads(fp.read_text())
+    fs[0]["evidence_excerpt"] = "invented"
+    fs.append({"id": "F99", "evidence_ids": ["r999"],
+               "evidence_excerpt": "x", "title": "t"})
+    fp.write_text(json.dumps(fs))
+    res = verify_transcript(s.dir)
+    assert res["findings_bad"] == ["F01", "F99"]
+
+
 def test_chain_head_anchor_catches_tail_truncation(tmp_path):
     import json
     from argus.session import Session, verify_transcript

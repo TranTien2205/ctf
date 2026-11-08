@@ -42,6 +42,7 @@ def verify_transcript(sdir: Path) -> dict:
         out["error"] = "no transcript.jsonl"
         return out
     prev = ""
+    entries: dict[str, dict] = {}
     for i, line in enumerate(
             tpath.read_text(encoding="utf-8").splitlines(), 1):
         if not line.strip():
@@ -63,6 +64,7 @@ def verify_transcript(sdir: Path) -> dict:
             out["bad_lines"].append(i)
         prev = stored
         out["entries"] += 1
+        entries[entry.get("id", "")] = entry
     # summary.json anchors the last link - if present, a tail-truncated
     # transcript no longer reaches the recorded head
     spath = Path(sdir) / "summary.json"
@@ -75,7 +77,35 @@ def verify_transcript(sdir: Path) -> dict:
         out["head_anchor"] = head
         if head and prev != head:
             out["tail_truncated"] = True
+    # findings.json itself is not chained - but every claim in it must cite
+    # chained transcript evidence verbatim. Re-validating here makes an
+    # edited findings.json (fake finding, inflated severity) detectable.
+    fpath = Path(sdir) / "findings.json"
+    if fpath.exists() and out["chained"]:
+        try:
+            stored_findings = json.loads(fpath.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            stored_findings = []
+        out["findings_checked"] = len(stored_findings)
+        bad = []
+        for f in stored_findings:
+            excerpt = (f.get("evidence_excerpt") or "").strip()
+            ids = f.get("evidence_ids") or []
+            cited = [entries.get(r) for r in ids]
+            if not excerpt or not cited or None in cited or \
+                    not any(excerpt in _evidence_text_of_entry(e)
+                            for e in cited):
+                bad.append(f.get("id", "?"))
+        if bad:
+            out["findings_bad"] = bad
     return out
+
+
+def _evidence_text_of_entry(entry: dict | None) -> str:
+    if not entry:
+        return ""
+    resp = entry.get("response") or {}
+    return (resp.get("body") or "") or (entry.get("output") or "")
 
 
 def _finding_key(category: str, url: str) -> tuple:
