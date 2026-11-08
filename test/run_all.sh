@@ -86,7 +86,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/web/oob_listener.py tools/web/ssti_probe.py tools/web/sqli_probe.py \
          tools/web/sqli_extract.py tools/web/xss_context.py \
          tools/pwn_cyclic.py tools/net_dialog.py tools/enc_detect.py tools/hash_id.py \
-         tools/pickle_gen.py \
+         tools/pickle_gen.py tools/web/upload_probe.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"

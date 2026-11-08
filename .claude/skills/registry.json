@@ -1736,7 +1736,7 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
       ],
-      "skill_tokens": 1434,
+      "skill_tokens": 1540,
       "depth_files": 7,
       "depth_tokens": 6282,
       "use_when": [

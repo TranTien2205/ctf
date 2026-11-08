@@ -62,6 +62,13 @@ echo "UNIQUE_MARKER_TEST" > test.txt
 curl -s https://target.com/uploads/test.txt
 ```
 
+`tools/web/upload_probe.py` does this loop end to end: `gen --dir up/`
+writes a deterministic canary set (marker text, PHP-in-GIF/PNG polyglot,
+.phtml/.PhP, SVG-with-script, .htaccess), and `verify --url <served-url>
+--expect-source '<?php'` classifies the fetch-back as served-raw,
+executed-or-transformed, blocked, or gone — the same question the
+rejected-extension probe answers, graded instead of eyeballed.
+
 ### Identify Validation
 1. Upload with no modifications → note response
 2. Try different extension → `.php`, `.php5`, `.phtml`, `.pht`
