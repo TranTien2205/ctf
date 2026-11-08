@@ -258,6 +258,18 @@ class StructureTests(unittest.TestCase):
             self.assertIn(resolved, routers,
                           "ctf.py routes category %r but no router declares it" % category)
 
+    def test_every_routed_category_has_a_planner_rule(self):
+        """tools/plan.py must not fall back to category-discovery for a routed
+        category. The ir category shipped without a rule and every ransom-note
+        brief got the generic 'inspect the interface' hypothesis instead of the
+        estate intake."""
+        sys.path.insert(0, str(ROOT / "tools"))
+        import plan
+        missing = sorted(set(ctf.SKILLS) - set(plan.RULES))
+        self.assertEqual(missing, [],
+                         "ctf.py routes these categories but plan.py has no rule "
+                         "for them: %s" % missing)
+
     def test_every_router_is_reachable_from_ctf_py(self):
         """The reverse direction: a router no ctf.py category resolves to is dead.
 

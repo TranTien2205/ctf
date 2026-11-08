@@ -10,6 +10,28 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 from ctf import observation_route
 
+# One entry per ctf.SKILLS category: the cheapest technique hypothesis when a
+# routed observation carries that category's vocabulary. Module level so the
+# regression suite can assert no routed category falls back to
+# "category-discovery" -- the ir category shipped in exactly that state.
+RULES = {
+    "web": [("ssrf-pdf-fetch", r"url|fetch|webhook|pdf|internal"), ("ssti", r"template|jinja|twig|\{\{"),
+            ("sqli", r"sql|sqli|query|database|login"), ("xss-admin-bot", r"xss|reflection|admin bot"), ("jwt", r"jwt"),
+            ("idor", r"idor|object|user id|authorization")],
+    "web-ssrf": [("ssrf-pdf-fetch", r"url|fetch|webhook|pdf|internal")],
+    "pwn": [("buffer-overflow", r"elf|buffer|heap|rop|format|checksec")],
+    "crypto": [("rsa", r"rsa|modulus"), ("parameter-weakness", r"aes|nonce|key|cipher|ciphertext|hash")],
+    "rev": [("validation-path", r"rev|binary|reverse|decompil\w*|disassembl\w*|packed|firmware|bytecode")],
+    "forensics": [("artifact-analysis", r"pcap|memory|disk|stego|forensic")],
+    "misc": [("encoding-constraint", r"jail|sandbox|encoding|vm|programming")],
+    "dfir": [("artifact-inventory", r"evtx|sysmon|registry|hive|\$?mft|prefetch|amcache|cloudtrail|sherlock|bundle")],
+    "osint": [("pivot-extraction", r"username|handle|domain|photo|image|geolocat\w*|whois|certificate")],
+    "ai": [("model-surface-map", r"llm|prompt|model|pickle|firmware|mqtt|coap|iot")],
+    "ad": [("service-intake", r"flag store|tick|vulnbox|checker|sla|patch|defen[cs]e|availability")],
+    "ir": [("estate-intake", r"ransom|services? (?:are |were )?down|handed root|live estate|"
+                             r"recovery|availability|post.?incident|encrypted files?")],
+}
+
 
 def main():
     ap = argparse.ArgumentParser(description="Plan first probes for an unknown CTF")
@@ -26,22 +48,7 @@ def main():
     except (OSError, ValueError):
         policies = {}
     candidates = []
-    rules = {
-        "web": [("ssrf-pdf-fetch", r"url|fetch|webhook|pdf|internal"), ("ssti", r"template|jinja|twig|\{\{"),
-                ("sqli", r"sql|sqli|query|database|login"), ("xss-admin-bot", r"xss|reflection|admin bot"), ("jwt", r"jwt"),
-                ("idor", r"idor|object|user id|authorization")],
-        "web-ssrf": [("ssrf-pdf-fetch", r"url|fetch|webhook|pdf|internal")],
-        "pwn": [("buffer-overflow", r"elf|buffer|heap|rop|format|checksec")],
-        "crypto": [("rsa", r"rsa|modulus"), ("parameter-weakness", r"aes|nonce|key|cipher|ciphertext|hash")],
-        "rev": [("validation-path", r"rev|binary|reverse|decompil\w*|disassembl\w*|packed|firmware|bytecode")],
-        "forensics": [("artifact-analysis", r"pcap|memory|disk|stego|forensic")],
-        "misc": [("encoding-constraint", r"jail|sandbox|encoding|vm|programming")],
-        "dfir": [("artifact-inventory", r"evtx|sysmon|registry|hive|\$?mft|prefetch|amcache|cloudtrail|sherlock|bundle")],
-        "osint": [("pivot-extraction", r"username|handle|domain|photo|image|geolocat\w*|whois|certificate")],
-        "ai": [("model-surface-map", r"llm|prompt|model|pickle|firmware|mqtt|coap|iot")],
-        "ad": [("service-intake", r"flag store|tick|vulnbox|checker|sla|patch|defen[cs]e|availability")],
-    }
-    for technique, pattern in rules.get(route["category"], []):
+    for technique, pattern in RULES.get(route["category"], []):
         hits = re.findall(r"(?<!\w)(?:" + pattern + r")(?!\w)", text, re.I)
         if hits:
             candidates.append({"technique": technique, "score": len(hits), "evidence": sorted(set(hits))})
