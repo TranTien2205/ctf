@@ -371,7 +371,7 @@ if (brief.strong_chain_match && brief.strong_chain_match.id) {
       '# read blast_radius before any write-shaped probe: '
         + (card.blast_radius || '(none recorded on the card)'),
       '# then run the card probe through the gate, from THIS thread:',
-      'python3 tools/web/http_probe.py --url <url> --emit-hook-cmd',
+      'python3 tools/web/http_probe.py --url <url> --challenge ' + CHALLENGE + ' --emit',
     ],
     known_traps: card.known_traps || [],
   }
