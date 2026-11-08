@@ -121,6 +121,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "run":
         cfg = load_config(args)
+        _preflight_target(cfg)
         loop = AgentLoop(cfg, quiet=args.quiet)
         result = loop.run()
         print(json.dumps(result, indent=2))
@@ -129,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "team":
         from .team.coordinator import TeamRun
         cfg = load_config(args)
+        _preflight_target(cfg)
         team = TeamRun(cfg, quiet=args.quiet,
                        n_recon=args.recon, n_exploit=args.exploit,
                        n_report=args.report_workers,
@@ -305,6 +307,25 @@ def main(argv: list[str] | None = None) -> int:
         return _demo(args)
 
     return 2
+
+
+def _preflight_target(cfg) -> None:
+    """Fail fast on a target the scope guard would reject anyway —
+    before a session dir is created or an API call is burned."""
+    from urllib.parse import urlparse
+    from .scope import ScopeGuard
+    u = urlparse(cfg.target or "")
+    if u.scheme not in ("http", "https") or not u.hostname:
+        raise SystemExit(
+            f"invalid target {cfg.target!r}: expected http(s)://host[/path] "
+            f"(you typed {cfg.target!r})")
+    try:
+        ScopeGuard(
+            cfg.target, extra_hosts=cfg.scope_hosts,
+            exclude_paths=cfg.exclude_paths,
+            allow_private=cfg.allow_private).check(cfg.target)
+    except Exception as exc:
+        raise SystemExit(f"target rejected by scope guard: {exc}")
 
 
 def _demo(args) -> int:
