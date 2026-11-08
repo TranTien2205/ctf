@@ -232,7 +232,18 @@ class AgentLoop:
                 # API marks the tool_result as an error for the model
                 is_error = "error" in out or \
                     "error" in (out.get("result") or {})
-                self._log(f"  -> {'ERROR ' if is_error else ''}{_truncate_result(out)[:300]}")
+                # the model sees real response headers (it needs them); the
+                # persisted log gets the redacted copy, same as transcript
+                logged = dict(out)
+                if isinstance(out.get("result"), dict) and \
+                        isinstance(out["result"].get("headers"), dict):
+                    from .httpclient import _redact_headers
+                    secrets = getattr(self.ctx.client, "_secret_values",
+                                      set())
+                    logged = {**out, "result": {
+                        **out["result"], "headers": _redact_headers(
+                            out["result"]["headers"], secrets)}}
+                self._log(f"  -> {'ERROR ' if is_error else ''}{_truncate_result(logged)[:300]}")
                 results.append({
                     "type": "tool_result",
                     "tool_use_id": call.get("id"),
