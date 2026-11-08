@@ -51,6 +51,10 @@ Design choices and why:
   billed input drops ~90% on cache hits. A 400 mentioning cache disables
   it transparently. The full 54-tool schema is ~30KB/call, so constrained
   auth paths can pass `--tools` (run) or rely on role-card subsets (team).
+- **Bounded context.** Tool results older than the last 8 result-messages
+  compact to a stub naming their request_ids (re-inspect via
+  `read_response`), so an 80-turn run cannot silently overrun the context
+  window.
 
 ## Trust boundaries
 

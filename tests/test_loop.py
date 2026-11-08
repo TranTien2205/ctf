@@ -1,4 +1,5 @@
 """End-to-end: ScriptedClient drives the loop on the live lab."""
+import json
 import sys
 from pathlib import Path
 
@@ -11,6 +12,35 @@ from argus.loop import AgentLoop
 def _call(name, inp, n=0):
     return {"id": f"call_{name}_{n}", "name": name, "input": inp,
             "type": "tool_use"}
+
+
+def test_compact_history_bounds_context():
+    """Old tool_results compact to stubs naming their request_ids, so a long
+    run stays under the context window; recent results stay verbatim."""
+    from argus.loop import _compact_history, _KEEP_FULL_RESULTS
+    big = json.dumps({"result": {"request_id": "r7", "data": "x" * 600}})
+    msgs = [{"role": "user", "content": "seed"}]
+    n = _KEEP_FULL_RESULTS + 3
+    for i in range(n):
+        msgs.append({"role": "assistant", "content": [
+            {"type": "tool_use", "id": f"c{i}", "name": "crawl",
+             "input": {}}]})
+        msgs.append({"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": f"c{i}",
+             "content": big.replace("r7", f"r{i}")}]})
+    _compact_history(msgs)
+    result_msgs = [m for m in msgs if isinstance(m["content"], list)
+                   and any(b.get("type") == "tool_result"
+                           for b in m["content"])]
+    compacted = result_msgs[:-_KEEP_FULL_RESULTS]
+    kept = result_msgs[-_KEEP_FULL_RESULTS:]
+    assert len(compacted) == 3
+    for m in compacted:
+        stub = m["content"][0]["content"]
+        assert "cleared" in stub and "rids:" in stub
+    for m in kept:
+        assert "xxxx" in m["content"][0]["content"]  # still verbatim
+    assert "r0" in compacted[0]["content"][0]["content"]
 
 
 def test_loop_records_finding_and_reports(lab_url, tmp_path):

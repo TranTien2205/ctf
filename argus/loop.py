@@ -6,6 +6,7 @@ exhaustion, or when the model stops calling tools after a nudge.
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -18,6 +19,11 @@ from .system import build_seed, build_system
 from .tools import TOOL_SCHEMAS, Context, dispatch
 
 _MAX_RESULT_CHARS = 16_000
+# Older tool_results are compacted to stubs once this many newer result
+# messages exist - 80 turns x 16KB otherwise overruns the context window
+# mid-run and the API error kills the engagement. read_response(rid)
+# always re-fetches the full exchange, so nothing is lost.
+_KEEP_FULL_RESULTS = 8
 
 
 def _truncate_result(result: dict) -> str:
@@ -25,6 +31,29 @@ def _truncate_result(result: dict) -> str:
     if len(text) > _MAX_RESULT_CHARS:
         text = text[:_MAX_RESULT_CHARS] + "...[truncated]"
     return text
+
+
+def _compact_history(messages: list) -> None:
+    """Shrink tool_result payloads older than the last _KEEP_FULL_RESULTS
+    result-messages, keeping the cited request ids visible so the model
+    can re-inspect via read_response."""
+    result_msgs = [i for i, m in enumerate(messages)
+                   if m.get("role") == "user"
+                   and isinstance(m.get("content"), list)
+                   and any(b.get("type") == "tool_result"
+                           for b in m["content"])]
+    for i in result_msgs[:-_KEEP_FULL_RESULTS] if len(
+            result_msgs) > _KEEP_FULL_RESULTS else []:
+        for b in messages[i]["content"]:
+            if b.get("type") != "tool_result":
+                continue
+            c = b.get("content")
+            if not isinstance(c, str) or len(c) < 400:
+                continue
+            rids = re.findall(r'"request_id"\s*:\s*"(r\d+)"', c)
+            b["content"] = (f"[prior tool result cleared "
+                            f"({len(c)} chars; rids: {', '.join(rids[:8]) or 'none'})"
+                            " - call read_response(rid) to re-inspect]")
 
 
 class AgentLoop:
@@ -153,6 +182,7 @@ class AgentLoop:
                     "tests, then call finish()."})
                 nudges += 1
 
+            _compact_history(messages)
             try:
                 response = self.llm.chat(messages, self.tools, self.system)
             except KeyboardInterrupt:
