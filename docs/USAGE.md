@@ -165,6 +165,8 @@ so the same mechanism works from a pip-installed `argus`.
 ```
 sessions/20261106-101500-app.example/
   report.md        ← start here
+  report.html      ← same report for browsers/slides
+  report.sarif     ← SARIF 2.1.0: upload to GitHub code scanning / CI
   findings.json    ← same data, machine-readable
   transcript.jsonl ← every request/response, cited by request_id
   notes.md         ← the agent's working reasoning

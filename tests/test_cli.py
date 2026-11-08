@@ -14,6 +14,11 @@ def test_demo_single(tmp_path):
     assert (sdir / "report.md").exists()
     html = (sdir / "report.html").read_text(encoding="utf-8")
     assert "F01" in html and "sqlite3" in html
+    sarif = json.loads((sdir / "report.sarif").read_text())
+    run = sarif["runs"][0]
+    assert sarif["version"] == "2.1.0"
+    assert len(run["results"]) == len(findings)
+    assert {r["ruleId"] for r in run["results"]} >= {"CWE-89", "CWE-347"}
 
 
 def test_demo_team(tmp_path):

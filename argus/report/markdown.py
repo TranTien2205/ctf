@@ -276,4 +276,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         render_html(session, cfg, summary, extra)
     except Exception:
         pass  # html is a convenience; the markdown report is canonical
+    try:
+        from .sarif import render_sarif
+        render_sarif(session)
+    except Exception:
+        pass  # sarif is CI-integrations glue; never block the report
     return path
