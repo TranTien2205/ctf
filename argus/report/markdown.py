@@ -300,7 +300,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             ]
 
     path = session.dir / "report.md"
-    path.write_text("\n".join(lines), encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write("\n".join(lines))
     summary_json = {
         "session": session.id,
         "findings": findings,

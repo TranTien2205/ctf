@@ -74,6 +74,6 @@ def render_sarif(session: Session) -> Path:
         }],
     }
     path = session.dir / "report.sarif"
-    path.write_text(json.dumps(doc, indent=2, ensure_ascii=False),
-                    encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(json.dumps(doc, indent=2, ensure_ascii=False))
     return path

@@ -29,7 +29,10 @@ def _atomic_write(path: Path, text: str) -> None:
     """Write-rename so a crash mid-write cannot leave a truncated artifact
     (findings.json / summary.json are the deliverable, not scratch data)."""
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
+    # newline="": artifact bytes must be platform-stable - a digest
+    # computed on Windows must verify on Linux, so writes pin LF
+    with tmp.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
     tmp.replace(path)  # os.replace: atomic on POSIX and Windows alike
 
 
@@ -251,7 +254,9 @@ class Session:
             json.dumps({"id": self.id, "target": target,
                         "started": self.started, **meta},
                        indent=2, ensure_ascii=False))
-        (self.dir / "notes.md").write_text(f"# Working notes - {target}\n\n")
+        with (self.dir / "notes.md").open("w", encoding="utf-8",
+                                          newline="") as fh:
+            fh.write(f"# Working notes - {target}\n\n")
 
     def _resume(self, sdir: Path, target: str, meta: dict) -> None:
         """Continue an existing session dir: transcript, findings and request
@@ -303,7 +308,9 @@ class Session:
             except (ValueError, OSError):
                 self.findings = []
         if not (sdir / "notes.md").exists():
-            (sdir / "notes.md").write_text(f"# Working notes - {target}\n\n")
+            with (sdir / "notes.md").open("w", encoding="utf-8",
+                                          newline="") as fh:
+                fh.write(f"# Working notes - {target}\n\n")
         # the resumed run may carry different budgets/flags - meta.json must
         # reflect the CURRENT engagement constraints, marked as resumed
         try:
@@ -359,7 +366,7 @@ class Session:
             entry["chain"] = _chain(self._last_chain, entry)
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
-            with self.transcript_path.open("a", encoding="utf-8") as fh:
+            with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             return rid
 
@@ -374,7 +381,7 @@ class Session:
             entry["chain"] = _chain(self._last_chain, entry)
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
-            with self.transcript_path.open("a", encoding="utf-8") as fh:
+            with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             return rid
 
@@ -422,7 +429,7 @@ class Session:
             entry["chain"] = _chain(self._last_chain, entry)
             self._last_chain = entry["chain"]
             self._transcript["seal"] = entry
-            with self.transcript_path.open("a", encoding="utf-8") as fh:
+            with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
         rid = "seal"
         if sp.exists():
@@ -550,7 +557,7 @@ class Session:
             f"- **[{stamp}]** " if not text.startswith(
                 ("#", ">", "-", "*")) else ""
         with self._lock:
-            with self.notes_path.open("a", encoding="utf-8") as fh:
+            with self.notes_path.open("a", encoding="utf-8", newline="") as fh:
                 fh.write(prefix + text.rstrip() + "\n\n")
 
     def stats(self) -> dict:

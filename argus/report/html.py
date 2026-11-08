@@ -138,5 +138,6 @@ bytes verified against the recorded transcript.</p>
 </body></html>"""
 
     path = session.dir / "report.html"
-    path.write_text(doc, encoding="utf-8")
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        fh.write(doc)
     return path

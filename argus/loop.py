@@ -145,7 +145,7 @@ class AgentLoop:
         fname = "agent.log" if self.agent_name == "agent" else \
             f"agent-{self.agent_name}.log"
         try:
-            with (self.session.dir / fname).open("a", encoding="utf-8") as fh:
+            with (self.session.dir / fname).open("a", encoding="utf-8", newline="") as fh:
                 fh.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
         except OSError:
             pass

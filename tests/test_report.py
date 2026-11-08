@@ -40,15 +40,15 @@ def test_sealed_artifacts_detect_edits(tmp_path):
     # re-render is legitimate - digests skip the mutable head/duration
     assert main(["report", str(sdir)]) == 0
     assert not verify_transcript(sdir).get("artifact_mismatch")
-    # editing findings.json is not
+    # editing findings.json is not (byte-exact restore: artifacts are
+    # LF-pinned so a digest holds across platforms)
     fp = sdir / "findings.json"
-    orig = fp.read_text(encoding="utf-8")
+    orig = fp.read_bytes()
     d = json.loads(orig)
     d[0]["severity"] = "low" if d[0]["severity"] != "low" else "high"
-    fp.write_text(json.dumps(d, indent=2, ensure_ascii=False),
-                  encoding="utf-8")
+    fp.write_bytes(json.dumps(d, indent=2, ensure_ascii=False).encode())
     assert verify_transcript(sdir)["artifact_mismatch"] == ["findings.json"]
-    fp.write_text(orig, encoding="utf-8")
+    fp.write_bytes(orig)
     assert not verify_transcript(sdir).get("artifact_mismatch")
 
 

@@ -50,3 +50,5 @@ jobs:
           pip install dist/*.whl
           argus skills | grep -q sqli   # bundled data resolvable post-install
           argus sessions --session-dir /tmp/none --json | grep -q '\[\]'
+      - name: checked-in sample session still verifies (LF-stable digests)
+        run: python -m argus verify docs/sample-session
