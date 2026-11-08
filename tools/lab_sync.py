@@ -45,7 +45,10 @@ def safe_name(key):
 def load_targets(source):
     if re.match(r"^https?://", source):
         with urllib.request.urlopen(source, timeout=15) as handle:
-            return json.loads(handle.read().decode("utf-8"))
+            body = handle.read(8 * 1024 * 1024 + 1)
+            if len(body) > 8 * 1024 * 1024:
+                raise SystemExit(json.dumps({"error": "targets listing exceeds 8 MiB"}))
+            return json.loads(body.decode("utf-8"))
     with open(source, encoding="utf-8") as handle:
         return json.load(handle)
 
@@ -85,9 +88,16 @@ def cmd_challenge(payload, key, fetch_source):
     if fetch_source and item.get("source_url"):
         os.makedirs(source_dir, exist_ok=True)
         archive = os.path.join(ROOT, "challenges", name, "source.zip")
+        max_bytes = 200 * 1024 * 1024
         with urllib.request.urlopen(item["source_url"], timeout=60) as handle, \
                 open(archive, "wb") as out:
-            out.write(handle.read())
+            body = handle.read(max_bytes + 1)
+            if len(body) > max_bytes:
+                os.remove(archive)
+                raise SystemExit(json.dumps({
+                    "error": "source archive exceeds %d bytes" % max_bytes,
+                    "challenge": key}))
+            out.write(body)
         with zipfile.ZipFile(archive) as zf:
             zf.extractall(source_dir)
         fetched = os.path.relpath(source_dir, ROOT)

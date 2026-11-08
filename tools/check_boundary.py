@@ -84,7 +84,8 @@ def violations(root=ROOT):
             if rel in DECLARES_BOUNDARY:
                 continue
             try:
-                text = open(path, encoding="utf-8", errors="replace").read().lower()
+                with open(path, encoding="utf-8", errors="replace") as handle:
+                    text = handle.read().lower()
             except OSError:
                 continue
             for token in BLOCKED:
