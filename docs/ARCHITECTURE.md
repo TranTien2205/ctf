@@ -39,7 +39,7 @@ Design choices and why:
 - **Baseline-diffed probes.** Each `probe_*` returns `verdict` +
   `request_ids`, never "you are vulnerable". The agent confirms and
   rates severity itself.
-- **Skills as retrievable knowledge.** 24 methodology modules (~2KB each)
+- **Skills as retrievable knowledge.** 27 methodology modules (~2KB each)
   load on demand via `load_skill`. Detection signals, first probes,
   confirmation criteria, bypasses, honest severity guidance.
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real
@@ -86,6 +86,7 @@ prompt wording can widen it.
 | invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
 | finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |
 | post-run transcript tampering | sha256 hash chain per entry + chain head anchored in `summary.json` | `verify_transcript`, `argus verify` |
+| post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript (the file itself is not hashed) | `verify_transcript` findings pass |
 | scanner output treated as proof | `run_external`/`mcp_call` output is a lead until an `http_request` re-verifies or a `proof_marker` matches | tool notes + evidence gate |
 | exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to bundled/cwd `resources/wordlists`; bundled shorts parsed | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
