@@ -1707,7 +1707,7 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1359,
+      "skill_tokens": 1393,
       "depth_files": 7,
       "depth_tokens": 5186,
       "use_when": [
@@ -1736,7 +1736,7 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce",
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce"
       ],
-      "skill_tokens": 1540,
+      "skill_tokens": 1568,
       "depth_files": 7,
       "depth_tokens": 6282,
       "use_when": [

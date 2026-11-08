@@ -95,6 +95,8 @@ echo -n 'COOKIE_VALUE' | base64 -d
 
 ## Decision Tree
 - PHP serialized data → `references/php-deser.md`
+  (`tools/web/archive_gen.py phar --metadata '<serialized>'` mints a signed
+  phar for the phar:// wrapper path without PHP on the box)
 - Java serialized data → `references/java-deser.md`
 - Python pickle → `references/python-deser.md`
 - .NET BinaryFormatter → `references/dotnet-deser.md`

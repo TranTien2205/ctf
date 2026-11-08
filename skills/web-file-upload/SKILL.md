@@ -82,6 +82,8 @@ rejected-extension probe answers, graded instead of eyeballed.
 - **Content/magic bytes** → prepend valid headers, exiftool, SVG, polyglots → `references/content-bypass.md`
 - **Path traversal** → filename traversal, Zip Slip → `references/path-traversal.md`
 - **Archive upload** → Zip Slip, XXE-in-DOCX, SVG XXE, CSV injection → `references/archive-attacks.md`
+  (`tools/web/archive_gen.py` mints the zip-slip / tar-symlink / phar files
+  without tar, zip or PHP on the box)
 - **Webshell needed** → per-language templates → `references/webshell-templates.md`
 
 ## Common Upload Paths

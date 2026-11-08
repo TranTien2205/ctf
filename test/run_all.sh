@@ -97,6 +97,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/pcap_parse.py tools/file_type.py tools/fmt_probe.py \
          tools/forensics/dns_exfil.py tools/web/git_dumper.py \
          tools/forensics/lsb_scan.py tools/web/gopher_gen.py \
+         tools/web/archive_gen.py \
          tools/log_summary.py tools/web/ssrf_probe.py tools/xor_solve.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
