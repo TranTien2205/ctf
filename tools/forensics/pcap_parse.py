@@ -22,6 +22,7 @@ import argparse
 import ipaddress
 import json
 import os
+import re
 import struct
 import sys
 
@@ -212,6 +213,100 @@ def cmd_follow(args):
     return 0
 
 
+def _http_objects(data, limit=200, max_obj=8 << 20):
+    """Parse HTTP/1.x responses out of a reassembled stream. Returns
+    (url_hint, status, headers, body) tuples; bounded by count and size."""
+    out, pos = [], 0
+    while len(out) < limit:
+        m = re.search(rb"HTTP/1\.[01] \d{3}", data[pos:])
+        if not m:
+            break
+        start = pos + m.start()
+        hend = data.find(b"\r\n\r\n", start)
+        if hend < 0:
+            break
+        heads = data[start:hend].split(b"\r\n")
+        status = int(heads[0].split()[1])
+        hdr = {}
+        for h in heads[1:]:
+            k, _, v = h.partition(b":")
+            hdr[k.strip().lower().decode("ascii", "replace")] = v.strip()
+        bstart = hend + 4
+        if "chunked" in hdr.get("transfer-encoding", ""):
+            body, p2 = bytearray(), bstart
+            while True:
+                eol = data.find(b"\r\n", p2)
+                if eol < 0:
+                    break
+                try:
+                    n = int(data[p2:eol].split(b";")[0], 16)
+                except ValueError:
+                    break
+                p2 = eol + 2
+                if n == 0:
+                    p2 = data.find(b"\r\n\r\n", p2)
+                    p2 = (p2 + 4) if p2 >= 0 else len(data)
+                    break
+                body += data[p2:p2 + n]
+                p2 += n + 2
+            body = bytes(body[:max_obj])
+            pos = p2
+        else:
+            try:
+                n = int(hdr.get("content-length", b"0"))
+            except (ValueError, TypeError):
+                n = 0
+            n = min(n, max_obj)
+            body = data[bstart:bstart + n]
+            pos = bstart + n
+        ctype = hdr.get("content-type", "")
+        ctype = ctype.decode("utf-8", "replace") if isinstance(ctype, bytes) \
+            else ctype
+        out.append({"status": status, "body": body, "content_type": ctype})
+        if pos <= start:
+            pos = start + 8
+    return out
+
+
+def cmd_http(args):
+    """--export-objects equivalent: reassemble TCP flows, carve every
+    HTTP response body out to --out. The most common pcap flag carrier."""
+    _lt, pkts, err = parse_pcap(args.pcap)
+    if err:
+        print(json.dumps({"error": err}))
+        return 1
+    os.makedirs(args.out, exist_ok=True)
+    written, flows = [], _flows(pkts)
+    for key, f in sorted(flows.items(), key=lambda kv: -kv[1]["bytes"]):
+        if f["proto"] != "tcp":
+            continue
+        for di in (0, 1):
+            data = b"".join(c[1] for c in sorted(f["dirs"][di],
+                                               key=lambda c: c[0]))
+            if b"HTTP/1." not in data:
+                continue
+            for i, obj in enumerate(_http_objects(data)):
+                if not obj["body"]:
+                    continue
+                ext = {b"text/html": ".html", b"image/png": ".png",
+                       b"image/jpeg": ".jpg", b"application/zip": ".zip",
+                       b"text/plain": ".txt"}.get(
+                           obj["content_type"].encode().split(b";")[0].strip(),
+                           ".bin")
+                name = "obj-%s-%d-%d%s" % (f["bport"], di, i, ext)
+                path = os.path.join(args.out, name)
+                with open(path, "wb") as fh:
+                    fh.write(obj["body"])
+                written.append({"file": name, "status": obj["status"],
+                                "content_type": obj["content_type"],
+                                "bytes": len(obj["body"]),
+                                "flow": "%s:%d <-> %s:%d" % (
+                                    f["a"], f["aport"], f["b"], f["bport"])})
+    print(json.dumps({"objects": len(written), "written": written[:200],
+                      "out": os.path.abspath(args.out)}, indent=1))
+    return 0
+
+
 def _selftest() -> int:
     """Build a tiny pcap in memory: one DNS query + one TCP exchange."""
     import tempfile
@@ -234,10 +329,15 @@ def _selftest() -> int:
                     10, 0, 0, 2, 10, 0, 0, 1])
         return b"\x00" * 12 + b"\x08\x00" + ip + tcp
 
+    body = b"flag{http_carve}"
+    http_resp = (b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                 b"Content-Length: " + str(len(body)).encode()
+                 + b"\r\n\r\n" + body)
     with tempfile.NamedTemporaryFile(suffix=".pcap", delete=False) as fh:
         fh.write(struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
         for i, p in enumerate([eth_ip_udp(dnsq("flag.example.com")),
-                               eth_ip_tcp(b"GET /secret HTTP/1.0\r\n\r\n")]):
+                               eth_ip_tcp(b"GET /secret HTTP/1.0\r\n\r\n"),
+                               eth_ip_tcp(http_resp, seq=200)]):
             fh.write(struct.pack("<IIII", i, 0, len(p), len(p)))
             fh.write(p)
         path = fh.name
@@ -258,6 +358,18 @@ def _selftest() -> int:
         ns.min, ns.max, ns.find = 6, 50, "secret"
         cmd_ascii(ns)
     assert any("secret" in r for r in json.loads(buf.getvalue())["runs"])
+    import tempfile as _tf, shutil
+    odir = _tf.mkdtemp()
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        ns.out = odir
+        cmd_http(ns)
+    got = json.loads(buf.getvalue())
+    assert got["objects"] >= 1, got
+    carved = b"".join(open(os.path.join(odir, w["file"]), "rb").read()
+                      for w in got["written"])
+    assert b"flag{http_carve}" in carved, got
+    shutil.rmtree(odir, ignore_errors=True)
     os.unlink(path)
     print("pcap_parse selftest: ok")
     return 0
@@ -277,6 +389,9 @@ def main(argv=None) -> int:
     f.add_argument("--flow", type=int, default=0)
     f.add_argument("--dir", type=int, default=0, choices=[0, 1])
     f.set_defaults(fn=cmd_follow)
+    h = sub.add_parser("http", help="carve HTTP response objects to --out")
+    h.add_argument("pcap"); h.add_argument("--out", default="objects")
+    h.set_defaults(fn=cmd_http)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
