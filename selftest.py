@@ -114,6 +114,12 @@ def main() -> int:
     check("nuclei guard blocks template files+code",
           bool(_nuclei_arg_check(ctx, ["-t", str(tf), "-u", base])) and
           bool(_nuclei_arg_check(ctx, ["-code", "-u", base])))
+    from argus.tools.analysis import run_external
+    check("external rejects non-allowlisted tool",
+          "not allowed" in (run_external(ctx, "hydra", base).get("error") or ""))
+    check("external scope-checks target host",
+          "scope" in (run_external(ctx, "curl", "http://foreign.example")
+                      .get("error") or "").lower())
 
     out = web.fingerprint(ctx, base)
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))

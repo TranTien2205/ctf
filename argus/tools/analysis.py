@@ -131,19 +131,22 @@ def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> di
     binary = shutil.which(tool)
     if not binary:
         return {"error": f"{tool} is not installed on this host"}
-    for u in _URL_RE.findall(args):
-        ctx.scope.check(u)  # raises ScopeError -> returned as error
-    # bare hostnames/IPs as arguments (e.g. `nmap evil.com`) must also be
-    # in scope; flags and existing filenames are skipped
-    for tok in _split_args(args):
-        if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
-            continue
-        host_part = tok.split(":")[0]
-        if re.search(r"\.(?:txt|xml|json|html?|list|lst|md|csv|out|log|yaml|yml|py|sh|gz|zip)$",
-                     host_part, re.I):
-            continue  # file-like, not a hostname
-        if _HOST_RE.fullmatch(host_part):
-            ctx.scope.check("http://" + host_part)
+    try:
+        for u in _URL_RE.findall(args):
+            ctx.scope.check(u)
+        # bare hostnames/IPs as arguments (e.g. `nmap evil.com`) must also be
+        # in scope; flags and existing filenames are skipped
+        for tok in _split_args(args):
+            if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
+                continue
+            host_part = tok.split(":")[0]
+            if re.search(r"\.(?:txt|xml|json|html?|list|lst|md|csv|out|log|yaml|yml|py|sh|gz|zip)$",
+                         host_part, re.I):
+                continue  # file-like, not a hostname
+            if _HOST_RE.fullmatch(host_part):
+                ctx.scope.check("http://" + host_part)
+    except Exception as exc:
+        return {"error": f"args rejected by scope guard: {exc}"}
     toks = _split_args(args)
     check = _ARG_CHECKS.get(tool)
     if check:
