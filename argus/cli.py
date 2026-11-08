@@ -93,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
                         "(e.g. run vs team for the experiment chapter)")
     p_cmp.add_argument("dir_a")
     p_cmp.add_argument("dir_b")
+    p_cmp.add_argument("--csv", action="store_true",
+                       help="print metrics as CSV rows for spreadsheets")
 
     p_demo = sub.add_parser(
         "demo", help="offline scripted run against the bundled lab - "
@@ -147,7 +149,9 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
             for f in data:
-                print(f"[{f['severity'].upper():8}] {f['id']} {f['title']} ({f['url']})")
+                cvss = f" [{f['cvss']}]" if f.get("cvss") else ""
+                print(f"[{f['severity'].upper():8}] {f['id']} {f['title']}"
+                      f" ({f['url']}){cvss}")
         return 0
 
     if args.cmd == "skills":
@@ -224,6 +228,16 @@ def main(argv: list[str] | None = None) -> int:
                 "workers": len(agents),
             }
         a, b = _summ(args.dir_a), _summ(args.dir_b)
+        if args.csv:
+            hdr = "session,mode,findings,requests,ttf_s,endpoints,llm_calls,workers,tokens_in,tokens_out"
+            print(hdr)
+            for s in (a, b):
+                t = s.get("tokens") or {}
+                print(f"{s['dir']},{s.get('mode','?')},{s.get('findings','?')},"
+                      f"{s.get('requests','?')},{s.get('ttf') or ''},"
+                      f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
+                      f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)}")
+            return 0
         keys = [("mode", "mode"), ("findings", "findings"),
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
