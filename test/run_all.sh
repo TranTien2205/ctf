@@ -91,6 +91,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/web/cors_probe.py tools/web/redirect_probe.py \
          tools/web/nosqli_probe.py tools/web/csrf_probe.py \
          tools/web/cache_probe.py tools/web/host_probe.py \
+         tools/web/enum_probe.py tools/web/binding_probe.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"

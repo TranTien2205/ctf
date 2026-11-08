@@ -70,6 +70,11 @@ curl -i -X POST -d 'user=zzz-no-such&pass=x' "$BASE/login" > /tmp/bad
 diff /tmp/good /tmp/bad
 ```
 
+`tools/web/enum_probe.py` does the diff for you: one `--known-user`
+against four random usernames, measuring status / body signature+length /
+elapsed against the random spread. It reports which channel separates
+them (verbatim excerpts attached); a uniform result is a real negative.
+
 ## Routing
 
 Shares signals with: `../web-auth-session/`, `../web-logic-flaw/`. Check those before committing to this one.

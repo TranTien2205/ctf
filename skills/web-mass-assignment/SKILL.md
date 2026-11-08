@@ -68,6 +68,13 @@ curl -i -X POST -H 'Content-Type: application/json'   -d '{"username":"me","pass
 curl -i "$BASE/api/me"   # read back: is role honoured?
 ```
 
+`tools/web/binding_probe.py` runs the field matrix: one extra field at a
+time (`role`, `admin`, `is_admin`, `isAdmin`, `debug`, `permissions`,
+`group`, `verified`, `is_staff`, or `--fields`) with a canary value,
+then grades whether it echoed in the response or landed on `--readback`.
+A landed field is a candidate; whether it changes authorization is the
+confirm above.
+
 ## Routing
 
 Shares signals with: `../web-logic-flaw/`, `../web-idor/`. Check those before committing to this one.
