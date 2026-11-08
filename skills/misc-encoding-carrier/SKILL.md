@@ -58,9 +58,12 @@ polyalphabetic or layered.
 ## Operational probe
 
 ```bash
-python3 -c "import base64,binascii; d=open('blob.txt','rb').read().strip(); [print(n, getattr(base64,n)(d)[:60]) for n in ('b64decode','b32decode','b85decode','a85decode')  if __import__('contextlib').suppress(Exception) or False]"
+python3 tools/enc_detect.py --file blob.txt   # peels hex/base64/base32/url/gzip/zip layers, reports the chain
 strings blob.txt | grep -i "flag{"
 ```
+
+`enc_detect` reports only layers that decode cleanly — a "no layer recognised"
+result is the signal to stop decoding and open `../ctf-crypto/classic-ciphers.md`.
 
 ## Routing
 
