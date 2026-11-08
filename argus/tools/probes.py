@@ -370,9 +370,19 @@ def probe_redirect(ctx: Context, url: str, param: str,
             break  # first working variant is enough
     open_h = next((h for h in hits if h["open"]), None)
     cs_h = next((h for h in hits if h["client_side"]), None)
+    # a redirector that echoes ANY scheme into Location also passes
+    # javascript: - DOM XSS, strictly worse than open redirect
+    if open_h:
+        jr = _send(ctx, url, param, "javascript:alert(1)",
+                   method, data, "probe_redirect", "javascript scheme")
+        jloc = (jr.get("headers") or {}).get("location", "")
+        if "javascript:" in jloc:
+            open_h["javascript_scheme"] = jr["request_id"]
     if open_h:
         verdict = "open redirect" + (f" ({open_h['variant']} variant)"
                                      if open_h["variant"] != "canonical" else "")
+        if "javascript_scheme" in open_h:
+            verdict += "; javascript: scheme echoed into Location - DOM XSS"
     elif cs_h:
         verdict = "open redirect (client-side, via meta-refresh/JS)"
     else:

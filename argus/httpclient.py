@@ -77,12 +77,23 @@ class GuardedClient:
         # intercepting proxy such as Burp/ZAP for live inspection. This is
         # NOT reachable by the model - external-tool proxy flags stay
         # refused in the arg guards.
+        def _capture(resp):
+            # httpx materialises response.next_request even when we do not
+            # follow redirects - a 30x to javascript:/data:/malformed
+            # Location crashes inside client.request() and the response is
+            # lost. Response hooks run BEFORE that step, so the box carried
+            # in request extensions still gets the verbatim 30x.
+            box = resp.request.extensions.get("_argus_box")
+            if box is not None:
+                box["resp"] = resp
+
         self._client = httpx.Client(
             verify=tls_verify,
             follow_redirects=False,
             timeout=httpx.Timeout(15.0, connect=8.0),
             headers=default_headers or {},
             proxy=proxy or None,
+            event_hooks={"response": [_capture]},
         )
 
     def send(
@@ -116,6 +127,7 @@ class GuardedClient:
         # passing timeout=None to httpx builds Timeout(None) - an INFINITE
         # wait that overrides the client default; only pass it when set.
         tkw = {} if timeout is None else {"timeout": timeout}
+        box: dict = {}
         try:
             resp = self._client.request(
                 method.upper(),
@@ -123,6 +135,7 @@ class GuardedClient:
                 headers=req_headers,
                 content=body,
                 follow_redirects=False,
+                extensions={"_argus_box": box},
                 **tkw,
             )
             # Manual redirect following: letting httpx follow automatically
@@ -150,7 +163,8 @@ class GuardedClient:
                     self.sent += 1
                 resp = self._client.request(
                     m2, nxt, headers=req_headers, content=b2,
-                    follow_redirects=False, **tkw)
+                    follow_redirects=False, extensions={"_argus_box": box},
+                    **tkw)
                 hops += 1
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             raw = resp.content[:BODY_CAP]
@@ -168,6 +182,24 @@ class GuardedClient:
             }
             if chain:
                 response_data["redirects"] = chain
+        except httpx.InvalidURL as exc:
+            # Not an HTTPError: httpx refuses to parse the redirect target
+            # (javascript:/data:/malformed Location). The event hook held on
+            # to the verbatim 30x, so evidence survives the exception.
+            elapsed_ms = round((time.monotonic() - started) * 1000, 1)
+            error = f"{type(exc).__name__}: {exc}"
+            resp = resp or box.get("resp")
+            try:
+                rbody = resp.text[:BODY_CAP] if resp is not None else ""
+            except Exception:
+                rbody = ""  # stream was closed - headers still materialised
+            response_data = {
+                "status": resp.status_code if resp is not None else 0,
+                "headers": _headers_dict(resp) if resp is not None else {},
+                "body": rbody,
+                "elapsed_ms": elapsed_ms,
+                "error": error,
+            }
         except httpx.HTTPError as exc:
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             error = f"{type(exc).__name__}: {exc}"

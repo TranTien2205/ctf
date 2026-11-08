@@ -162,7 +162,10 @@ def main() -> int:
     out = probes.probe_lfi(ctx, base + "/download?file=x", "file")
     check("lfi probe sees file bytes", "confirmed marker" in out["verdict"])
     out = probes.probe_redirect(ctx, base + "/redirect?next=/", "next")
-    check("redirect probe sees open redirect", out["verdict"] == "open redirect")
+    check("redirect probe sees open redirect",
+          "open redirect" in out["verdict"])
+    check("redirect probe flags javascript: scheme Location",
+          "javascript:" in out["verdict"])
     out = probes.probe_redirect(ctx, base + "/jsredirect?next=/", "next")
     check("redirect probe sees client-side", "client-side" in out["verdict"])
     out = probes.probe_redirect(ctx, base + "/safedirect?next=/", "next")

@@ -82,7 +82,10 @@ def test_redirect_probe(lab_url, ctx):
     # client-side redirect via meta-refresh (no Location header)
     out2 = probes.probe_redirect(ctx, lab_url + "/jsredirect?next=/", "next")
     assert "client-side" in out2["verdict"], out2
-    assert out["verdict"] == "open redirect"
+    assert "open redirect" in out["verdict"]
+    # raw-echo redirector also lands javascript: in Location -> DOM XSS
+    assert "javascript:" in out["verdict"], out
+    assert out["variants"][0].get("javascript_scheme"), out
     out3 = probes.probe_redirect(ctx, lab_url + "/safedirect?next=/", "next")
     assert "protocol-relative" in out3["verdict"], out3
 
