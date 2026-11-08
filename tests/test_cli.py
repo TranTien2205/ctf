@@ -37,6 +37,28 @@ def test_sessions_listing(tmp_path, capsys):
     assert "findings=5" in out
 
 
+def test_compare_two_sessions(tmp_path, capsys):
+    """The thesis comparison table must print metrics for both runs."""
+    rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
+    assert rc == 0
+    (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
+    other = tmp_path / "b"
+    rc = main(["demo", "--session-dir", str(other), "--quiet", "--team"])
+    assert rc == 0
+    (tdir,) = [d for d in other.iterdir() if d.is_dir()]
+    capsys.readouterr()
+    rc = main(["compare", str(sdir), str(tdir)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "findings" in out and "llm_calls" in out
+    assert "single" in out and "team" in out
+    rc = main(["compare", str(sdir), str(tdir), "--csv"])
+    assert rc == 0
+    csv_out = capsys.readouterr().out
+    assert csv_out.splitlines()[0].startswith("session,mode,findings")
+    assert len([l for l in csv_out.splitlines() if l.strip()]) == 3
+
+
 def test_reopen_report_findings_verify(tmp_path, capsys):
     """Regression: _reopen must restore lock/chain/started so the offline
     commands work on an existing session dir."""
