@@ -310,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "sessions":
         root = Path(args.session_dir)
         rows = []
-        for d in sorted(root.iterdir()) if root.exists() else []:
+        for d in sorted(root.iterdir()) if root.is_dir() else []:
             if not d.is_dir():
                 continue
             row = {"dir": d.name}
