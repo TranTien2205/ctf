@@ -243,5 +243,6 @@ bounties where automation is allowed, engagements with written scope.
 Declare scope precisely (`--scope`, `--exclude`) — the guard enforces it
 technically, but the legal obligation is yours.
 
-See `docs/ARCHITECTURE.md` for the design and `docs/USAGE.md` for flags,
-auth, external tools, and reading a report.
+See `docs/ARCHITECTURE.md` for the design, `docs/USAGE.md` for flags,
+auth, external tools, and reading a report, and `docs/EXPERIMENTS.md` for
+the run-vs-team evaluation protocol.
