@@ -71,6 +71,8 @@ Depth, one named file at a time:
 - `skills/ctf-reverse/tools.md`
 - `skills/rev-triage/references/packer-analysis.md`
 
+| Any native binary check question | `references/static-and-dynamic.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

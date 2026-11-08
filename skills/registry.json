@@ -483,9 +483,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 952,
-      "depth_files": 1,
-      "depth_tokens": 160,
+      "skill_tokens": 970,
+      "depth_files": 3,
+      "depth_tokens": 968,
       "use_when": [
         "a probe or source read produced this class's signal: name the generator from source, count how many consecutive outputs you hold, then run the matching attack id (lcg-recover, lcg-unknown-modulus, lcg-truncated, berlekamp-massey, lfsr-recover, lfsr-predict, mt19937-clone)"
       ],
@@ -973,9 +973,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 964,
-      "depth_files": 1,
-      "depth_tokens": 158,
+      "skill_tokens": 983,
+      "depth_files": 3,
+      "depth_tokens": 950,
       "use_when": [
         "a probe or source read produced this class's signal: IDENTIFY THE CARRIER before decoding: the alphabet, the distinct-character count and the length modulus separate base64 from base32 from base85 from hex from a custom alphabet in one command, and the index of coincidence separates a substitution from a transposition from a Vigenere"
       ],
@@ -1159,9 +1159,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 882,
-      "depth_files": 1,
-      "depth_tokens": 158,
+      "skill_tokens": 898,
+      "depth_files": 3,
+      "depth_tokens": 1089,
       "use_when": [
         "a probe or source read produced this class's signal: answer the glibc version question first, because tcache behaviour, double-free detection and fd mangling differ sharply across versions, then map the allocation lifecycle and name the primitive the bug gives before choosing any technique"
       ],
@@ -1287,9 +1287,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 889,
-      "depth_files": 1,
-      "depth_tokens": 157,
+      "skill_tokens": 908,
+      "depth_files": 3,
+      "depth_tokens": 992,
       "use_when": [
         "a probe or source read produced this class's signal: locate the input read, follow the value to the comparison, and quote the disassembly that carries it: a described check is not a measured one. r2 -A then afl then pdf @ main; gdb is absent, so r2 -d is the debugger"
       ],

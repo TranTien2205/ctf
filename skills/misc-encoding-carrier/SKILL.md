@@ -72,6 +72,8 @@ Depth, one named file at a time:
 - `skills/ctf-misc/encodings.md`
 - `skills/ctf-crypto/classic-ciphers.md`
 
+| Any encoding/carrier question | `references/layer-identification.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

@@ -78,6 +78,8 @@ Depth, one named file at a time:
 - `skills/ctf-crypto/prng-attacks.md`
 - `skills/ctf-crypto/prng.md`
 
+| Any predictable-random question | `references/state-recovery.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

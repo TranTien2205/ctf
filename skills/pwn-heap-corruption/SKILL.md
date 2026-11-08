@@ -72,6 +72,8 @@ Depth, one named file at a time:
 - `skills/ctf-pwn/heap-techniques.md`
 - `skills/ctf-pwn/heap-fsop.md`
 
+| Any heap-corruption question | `references/chunk-abuse.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
