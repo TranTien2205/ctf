@@ -293,6 +293,36 @@
    "observation": "nc host 31337 serves timed math puzzles over a socket; automate solving the rounds fast enough",
    "expect_top": "misc-constraint-puzzle",
    "origin": "coverage: misc-constraint-puzzle observation"
+  },
+  {
+   "observation": "the search parameter gives a sql syntax error on a single quote and a boolean true/false pair changes the page - mysql database query",
+   "expect_top": "web-sqli",
+   "origin": "coverage: web-sqli observation"
+  },
+  {
+   "observation": "the json login body accepts an object value and a $ne operator on the password field flips the nosql query result",
+   "expect_top": "web-nosqli",
+   "origin": "coverage: web-nosqli observation"
+  },
+  {
+   "observation": "a proxy sits in front of the app and the desync candidate: a request with both content-length and transfer-encoding splits framing",
+   "expect_top": "web-request-smuggling",
+   "origin": "coverage: web-request-smuggling observation"
+  },
+  {
+   "observation": "the coupon redeem endpoint is check-then-act on a balance; two interleaved race requests oversell the single-use token",
+   "expect_top": "web-race-condition",
+   "origin": "coverage: web-race-condition observation"
+  },
+  {
+   "observation": "the checkout flow lets you skip a step or tamper the price field - a business logic boundary violation",
+   "expect_top": "web-logic-flaw",
+   "origin": "coverage: web-logic-flaw observation"
+  },
+  {
+   "observation": "the download endpoint takes a file parameter and path traversal ../../../../etc/passwd reads a local file",
+   "expect_top": "file-read-primitives",
+   "origin": "coverage: file-read-primitives observation"
   }
  ],
  "source_cases": [
