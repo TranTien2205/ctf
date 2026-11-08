@@ -443,7 +443,10 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             self._send(403, "<html><body>Forbidden</body></html>")
 
         elif path == "/login":
-            self._send(body="""<html><body><form method="POST" action="/login">
+            # session cookie without SameSite/HttpOnly - weak-cookie CSRF
+            # surface plus a passive PHP framework hint for fingerprint()
+            self._send(headers={"Set-Cookie": "PHPSESSID=lab5ess10n; Path=/"},
+                       body="""<html><body><form method="POST" action="/login">
 <input name="username"><input name="password" type="password">
 <button>login</button></form></body></html>""")
 

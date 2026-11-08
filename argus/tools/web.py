@@ -276,6 +276,21 @@ _WAF_TOKENS = {
 }
 
 
+# session-cookie name -> framework hint: the most reliable passive stack
+# signal short of an error page
+_COOKIE_FRAMEWORKS = {
+    "phpsessid": "php", "jsessionid": "java (tomcat/servlet)",
+    "laravel_session": "laravel", "csrftoken": "django",
+    "django": "django", "connect.sid": "express/node",
+    ".aspxauth": "asp.net", "asp.net_sessionid": "asp.net",
+    ".aspnetcore": "asp.net core", "_session": "rails/django-style",
+    "rack.session": "rack/rails", "cf_clearance": "cloudflare (challenge)",
+    "remember_web_": "rails/devise", "wpsession": "wordpress",
+    "wordpress_logged_in": "wordpress", "phpbb3_": "phpbb",
+    "sessionid": "django/flask-style", "sid": "generic session",
+}
+
+
 def fingerprint(ctx: Context, url: str) -> dict:
     res = ctx.client.send("GET", url, tool="fingerprint", note="baseline GET")
     headers = {k.lower(): v for k, v in (res.get("headers") or {}).items()}
@@ -318,6 +333,13 @@ def fingerprint(ctx: Context, url: str) -> dict:
             stack_hints.append(f"{h}: {headers[h]}")
     if "x-nextjs-cache" in headers or "_next/" in res.get("body", ""):
         stack_hints.append("framework: next.js (hint)")
+    for c in cookies:
+        name = c["name"].lower()
+        hint = next((fw for tok, fw in _COOKIE_FRAMEWORKS.items()
+                     if name == tok or name.startswith(tok.rstrip("_"))),
+                    None)
+        if hint:
+            stack_hints.append(f"framework: {hint} (cookie '{c['name']}')")
     # passive WAF/CDN read from the SAME response - no extra requests
     hblock = "\n".join(f"{k}: {v}" for k, v in headers.items()).lower()
     waf_hints = sorted({name for tok, name in _WAF_TOKENS.items()

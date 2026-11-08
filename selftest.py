@@ -130,6 +130,11 @@ def main() -> int:
 
     out = web.fingerprint(ctx, base)
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))
+    out = web.fingerprint(ctx, base + "/login")
+    check("fingerprint reads cookie framework hint",
+          any("php" in h and "PHPSESSID" in h for h in out["stack_hints"])
+          and any(c["name"] == "PHPSESSID" and not c["samesite"]
+                  for c in out["cookies"]))
     out = web.crawl(ctx, base, depth=1)
     check("crawl finds forms/endpoints", len(out["endpoints"]) >= 4)
     out = web.js_recon(ctx, base)
