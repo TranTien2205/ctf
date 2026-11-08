@@ -110,10 +110,13 @@ def list_workers(ctx: Context) -> dict:
 def read_findings(ctx: Context) -> dict:
     """Slim view for dedup decisions - workers only need class+endpoint+id
     to skip already-proven work; full bodies live in findings.json."""
+    rows = ctx.session.findings
     slim = [{k: f.get(k) for k in
              ("id", "title", "severity", "category", "url")}
-            for f in ctx.session.findings]
-    return {"findings": slim, "count": len(slim)}
+            for f in rows[-200:] if isinstance(f, dict)]
+    return {"findings": slim, "count": len(rows),
+            "returned": len(slim),
+            "note": "last 200 shown; dedup by category+url anyway"}
 
 
 def finish_engagement(ctx: Context, summary: str) -> dict:

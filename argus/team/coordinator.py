@@ -88,9 +88,10 @@ class TeamRun:
         if not (getattr(self.session, "resumed", False)
                 and self.session.findings):
             return ""
+        from ..session import sanitized_findings
         prior = "\n".join(
             f"- {f['id']} [{f['severity']}] {f['title']} ({f['url']})"
-            for f in self.session.findings[:15])
+            for f in sanitized_findings(self.session.findings)[:15])
         return (f"\n\nThis run RESUMES session {self.session.id}. "
                 f"Prior findings are already recorded - build on them, "
                 f"do not re-verify:\n{prior}")
