@@ -460,8 +460,8 @@ def main(argv: list[str] | None = None) -> int:
             # host + path + params + class, ignoring the port
             cat, _netloc, path, params = _finding_key(
                 f.get("category"), f.get("url"))
-            host = _up.urlparse(f.get("url") if "://" in f.get("url", "")
-                                else "http://" + f.get("url", "")).hostname
+            u = str(f.get("url") or "")
+            host = _up.urlparse(u if "://" in u else "http://" + u).hostname
             return (cat, (host or "").lower(), path, params)
 
         def _load(d):

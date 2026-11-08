@@ -66,6 +66,14 @@ def test_finding_dedup_same_class_endpoint(tmp_path):
     assert f["id"] == "F02"
 
 
+def test_finding_key_tolerates_nonstr():
+    # findings.json is operator-editable - a null/odd url must not crash
+    # dedup or `argus diff`
+    from argus.session import _finding_key
+    assert _finding_key("xss", None) == ("xss", "", "/", ())
+    assert _finding_key(None, 123) == ("", "123", "/", ())
+
+
 def test_finding_cvss_vector_validated(tmp_path):
     s = _sess(tmp_path)
     rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
