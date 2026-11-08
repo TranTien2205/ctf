@@ -120,6 +120,14 @@ def main(argv: list[str] | None = None) -> int:
     p_ver.add_argument("--json", action="store_true",
                        help="print the raw verification result as JSON")
 
+    p_diff = sub.add_parser(
+        "diff", help="findings-level retest diff between two sessions: "
+                     "FIXED / STILL PRESENT / NEW (match = bug class + "
+                     "endpoint + params)")
+    p_diff.add_argument("before")
+    p_diff.add_argument("after")
+    p_diff.add_argument("--json", action="store_true")
+
     p_cmp = sub.add_parser(
         "compare", help="compare sessions' metrics side by side "
                         "(e.g. run vs team for the experiment chapter)")
@@ -387,6 +395,49 @@ def main(argv: list[str] | None = None) -> int:
                   f"extra-usage). Use 'argus run --tools <list>' or "
                   f"'argus team' (role-card subsets are smaller).")
             return 2  # degraded: auth works, but a default run would die
+
+    if args.cmd == "diff":
+        from .session import _finding_key
+        import urllib.parse as _up
+
+        def _dkey(f):
+            # retests usually run on a fresh instance (new port) - match on
+            # host + path + params + class, ignoring the port
+            cat, _netloc, path, params = _finding_key(
+                f.get("category"), f.get("url"))
+            host = _up.urlparse(f.get("url") if "://" in f.get("url", "")
+                                else "http://" + f.get("url", "")).hostname
+            return (cat, (host or "").lower(), path, params)
+
+        def _load(d):
+            fp = Path(d) / "findings.json"
+            if not fp.exists():
+                raise SystemExit(f"no findings.json in {d}")
+            return {_dkey(f): f
+                    for f in json.loads(fp.read_text(encoding="utf-8"))}
+        before, after = _load(args.before), _load(args.after)
+        fixed = [before[k] for k in sorted(set(before) - set(after))]
+        still = [(before[k], after[k])
+                 for k in sorted(set(before) & set(after))]
+        new = [after[k] for k in sorted(set(after) - set(before))]
+        if args.json:
+            print(json.dumps({"fixed": fixed, "new": new,
+                              "still_present": [b for b, _ in still]},
+                             indent=2, ensure_ascii=False))
+            return 0
+        print(f"--- {Path(args.before).name} -> {Path(args.after).name} ---")
+        for f in fixed:
+            print(f"[FIXED ] {f['id']} {f['title']} ({f['severity']})")
+        for b, a in still:
+            drift = (f" severity {b['severity']}->{a['severity']}"
+                     if b.get("severity") != a.get("severity") else "")
+            print(f"[STILL ] {b['id']}->{a['id']} {a['title']}"
+                  f" ({a['severity']}){drift}")
+        for f in new:
+            print(f"[NEW   ] {f['id']} {f['title']} ({f['severity']})")
+        print(f"{len(fixed)} fixed, {len(still)} still present, "
+              f"{len(new)} new")
+        return 0
 
     if args.cmd == "compare":
         def _summ(d):

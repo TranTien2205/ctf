@@ -197,6 +197,11 @@ request counts (`--json` for scripts); `python -m argus compare <dirA> <dirB>`
 prints a side-by-side metrics table (mode, findings, requests,
 time-to-first-finding, endpoints touched, llm calls, workers, tokens
 incl. cache read/write) for run-vs-team experiments.
+`python -m argus diff <before> <after>` is the retest view: findings are
+matched across the two sessions by bug class + host + path + params
+(ports ignored, so a fresh lab instance still lines up) and printed as
+`FIXED`, `STILL PRESENT` (with severity drift), or `NEW`; `--json` for
+scripts.
 `python -m argus skills` lists the bundled methodology modules;
 `python -m argus skills <name>` prints one, which is useful when auditing
 exactly what guidance the model loads.

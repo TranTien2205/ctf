@@ -73,3 +73,26 @@ def test_verify_json_output(tmp_path, capsys):
     assert main(["verify", str(sdir), "--json"]) == 1
     res = json.loads(capsys.readouterr().out)
     assert not res["ok"] and res["artifact_mismatch"] == ["findings.json"]
+
+
+def test_diff_retest(tmp_path, capsys):
+    """`argus diff` matches findings across fresh instances (different
+    ports) by class+host+path+params and reports fixed/still/new."""
+    import json
+    from argus.cli import main
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    s1 = next(p for p in tmp_path.iterdir() if p.is_dir())
+    other = tmp_path / "retest"
+    assert main(["demo", "--session-dir", str(other), "--quiet"]) == 0
+    s2 = next(p for p in other.iterdir() if p.is_dir())
+    capsys.readouterr()
+    assert main(["diff", str(s1), str(s2)]) == 0
+    out = capsys.readouterr().out
+    assert "0 fixed, 5 still present, 0 new" in out
+    # drop one finding from the "after" session -> shows FIXED
+    fp = s2 / "findings.json"
+    d = json.loads(fp.read_text(encoding="utf-8"))
+    fp.write_text(json.dumps(d[1:], indent=2), encoding="utf-8")
+    assert main(["diff", str(s1), str(s2), "--json"]) == 0
+    res = json.loads(capsys.readouterr().out)
+    assert len(res["fixed"]) == 1 and len(res["still_present"]) == 4
