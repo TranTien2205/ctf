@@ -20,8 +20,8 @@ Other enumeration channels worth one request each:
 - Password reset: "reset link sent" vs "no account for that address" -
   a uniform message is the defense
 - Timing: real users get a bcrypt verify (~100-300ms), unknown users
-  return early - measurable with `probe_time` when the error text is
-  uniform
+  return early - `probe_enum` measures this channel automatically
+  (~2.5x+ slower = timing lead when error text is uniform)
 
 ## Weak credentials
 

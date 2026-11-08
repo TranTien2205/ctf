@@ -9,7 +9,8 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /item?id=             SQLi (error-based + boolean-blind, sqlite)
     GET  /stock?sku=           SQLi detectable only via an OR true/false pair
                                (AND arms all return the empty page)
-    POST /login                SQLi auth bypass (' OR '1'='1)
+    POST /login                SQLi auth bypass (' OR '1'='1), user-enum errors
+    POST /login2               user-enum via timing (uniform error text)
     GET  /ping?host=           command injection (sleep separators)
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
     GET  /download?file=       path traversal / file read
@@ -603,6 +604,21 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 else:
                     self._send(body="<html><body>Unknown user."
                                     "</body></html>")
+            return
+        if path == "/login2":
+            # uniform error text but a real account runs the (expensive)
+            # password verify - timing-only enumeration channel
+            b = self._body()
+            u, pw = b.get("username", ""), b.get("password", "")
+            exists = self.db.execute(
+                "SELECT 1 FROM users WHERE username = ?",
+                (u,)).fetchone()
+            if exists:
+                time.sleep(0.4)   # simulated bcrypt verify
+                if pw == "hunter2":
+                    self._send(body="<html><body>Welcome!</body></html>")
+                    return
+            self._send(body="<html><body>Invalid credentials.</body></html>")
             return
         if path == "/xml":
             # simulated XXE-prone parser: external entities get "resolved"

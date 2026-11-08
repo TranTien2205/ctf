@@ -757,15 +757,37 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
         results.append({
             "user": u, "status": r["status"],
             "request_id": r["request_id"],
+            "elapsed_ms": r["elapsed_ms"],
             "similarity_to_bogus": _similarity(r.get("body") or "",
                                                base_body)})
     hits = [t for t in results
             if t["similarity_to_bogus"] < 0.9 or t["status"] != base["status"]]
-    verdict = ("user-enumeration candidate: response differs between an "
-               "unknown user and likely-real usernames ("
-               + ", ".join(t["user"] for t in hits)
-               + ") - confirm a hit is really a valid user before citing"
-               if hits else "uniform error response - no enumeration signal")
+    # timing channel: a real account runs a password-hash verify the
+    # bogus path skips - ~2.5x+ and 100ms slower is a live oracle when
+    # error text is uniform
+    base_ms = base["elapsed_ms"]
+    slow = [t for t in results
+            if t["elapsed_ms"] > base_ms * 2.5 + 100 and t not in hits]
+    hits = hits + slow
+    if hits and not slow:
+        verdict = ("user-enumeration candidate: response differs between an "
+                   "unknown user and likely-real usernames ("
+                   + ", ".join(t["user"] for t in hits)
+                   + ") - confirm a hit is really a valid user before citing")
+    elif hits and slow and not any(h["similarity_to_bogus"] < 0.9
+                                   or h["status"] != base["status"]
+                                   for h in hits):
+        verdict = ("user-enumeration lead (timing): uniform error text but "
+                   + ", ".join(t["user"] for t in slow)
+                   + " answered ~2.5x+ slower - consistent with a real "
+                     "password verify; repeat to rule out noise")
+    elif hits:
+        verdict = ("user-enumeration candidate: response and/or timing "
+                   "differs for "
+                   + ", ".join(t["user"] for t in hits)
+                   + " - confirm a hit is really a valid user")
+    else:
+        verdict = "uniform error response - no enumeration signal"
     return {"verdict": verdict, "bogus_id": base["request_id"],
             "results": results,
             "note": "a differing error only proves enumeration when the "

@@ -189,6 +189,11 @@ def main() -> int:
                             "username=x&password=x", "username")
     check("enum probe sees user differential",
           "enumeration candidate" in out["verdict"])
+    out = probes.probe_enum(ctx, base + "/login2",
+                            "username=x&password=x", "username",
+                            users="admin,bob")
+    check("enum probe sees timing differential",
+          "timing" in out["verdict"] or "candidate" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/reset")
     check("xfh probe sees reflected host", "candidate" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/", restricted="/admin")
