@@ -1,5 +1,5 @@
 {
- "comment": "Golden cases for tools/classify.py. Each observation is the evidence that was available BEFORE the solve, not a summary written afterwards — that is what makes this a measurement rather than a tautology. expect_top must be the first candidate; expect_within must appear in the first N. Add a case after every solve. Never delete one to make a change pass.",
+ "comment": "Golden cases for tools/classify.py. Each observation is the evidence that was available BEFORE the solve, not a summary written afterwards \u2014 that is what makes this a measurement rather than a tautology. expect_top must be the first candidate; expect_within must appear in the first N. Add a case after every solve. Never delete one to make a change pass.",
  "cases": [
   {
    "observation": "Ruby WEBrick app renders the neon parameter with ERB, filter rejects Malicious Input Detected",
@@ -243,6 +243,56 @@
    "observation": "the search term is echoed back into the page unescaped and the admin bot visits the reported url",
    "expect_top": "web-xss",
    "origin": "coverage: web-xss observation"
+  },
+  {
+   "observation": "the login form says 'user not found' for a bad username but 'wrong password' for a real account, and there is no lockout or rate limit after repeated attempts",
+   "expect_top": "web-user-enum",
+   "origin": "coverage: web-user-enum observation"
+  },
+  {
+   "observation": "the password reset link is built from the x-forwarded-host header and the middleware honours x-original-url for a path that 403s directly",
+   "expect_top": "web-host-header",
+   "origin": "coverage: web-host-header observation"
+  },
+  {
+   "observation": "the handout is a png image and the challenge says data is hidden inside the carrier - lsb pixel and embedded payload stego",
+   "expect_top": "forensics-stego",
+   "origin": "coverage: forensics-stego observation"
+  },
+  {
+   "observation": "a pcap capture is the handout; follow the dominant stream and export objects to reassemble the flag from packets",
+   "expect_top": "forensics-pcap-carve",
+   "origin": "coverage: forensics-pcap-carve observation"
+  },
+  {
+   "observation": "a memory dump mem.raw is the handout; use volatility to identify the image profile then run pslist and cmdline",
+   "expect_top": "forensics-memory-analysis",
+   "origin": "coverage: forensics-memory-analysis observation"
+  },
+  {
+   "observation": "a disk image dd is the handout; a deleted file must be recovered by carving unallocated space with photorec",
+   "expect_top": "forensics-disk-image",
+   "origin": "coverage: forensics-disk-image observation"
+  },
+  {
+   "observation": "access.log and auth.log are the handout; find which ip attacked and when, by counting request fields",
+   "expect_top": "forensics-log-analysis",
+   "origin": "coverage: forensics-log-analysis observation"
+  },
+  {
+   "observation": "a vigenere ciphertext with no key; letter frequency and index of coincidence identify the classical cipher",
+   "expect_top": "crypto-classical",
+   "origin": "coverage: crypto-classical observation"
+  },
+  {
+   "observation": "find the location where the photo was taken using reverse image search, signage and street view matching",
+   "expect_top": "osint-geolocation",
+   "origin": "coverage: osint-geolocation observation"
+  },
+  {
+   "observation": "nc host 31337 serves timed math puzzles over a socket; automate solving the rounds fast enough",
+   "expect_top": "misc-constraint-puzzle",
+   "origin": "coverage: misc-constraint-puzzle observation"
   }
  ],
  "source_cases": [
@@ -262,7 +312,7 @@
      "n": 4
     }
    ],
-   "origin": "solved/weather_app.md — the three classes the real chain used"
+   "origin": "solved/weather_app.md \u2014 the three classes the real chain used"
   },
   {
    "source": "test/fixtures/benign-express",
