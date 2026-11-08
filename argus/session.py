@@ -392,6 +392,10 @@ class Session:
             p = self.dir / name
             if p.exists():
                 files[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+        # agent.log / agent-<role>.log are diagnostic, but they are still
+        # session artifacts an auditor may read - seal them too
+        for p in sorted(self.dir.glob("agent*.log")):
+            files[p.name] = hashlib.sha256(p.read_bytes()).hexdigest()
         sp = self.dir / "summary.json"
         if sp.exists():
             try:
