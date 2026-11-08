@@ -58,7 +58,10 @@ with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
 For the deciding-check hunt without `nm`/`readelf`/`objdump`:
 `python3 tools/elf_info.py ./bin` lists sections, dynamic + static
 symbols, DT_NEEDED libs, and flags the imports that name the check
-(`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). Stripped binaries report
+(`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). PE binary instead?
+`python3 tools/pe_info.py ./bin.exe` does the same read: import table
+per DLL, exports, per-section flags, and packer-named sections
+(UPX/VMP/Themida) in `packed_suspects`. Stripped binaries report
 `no symtab` honestly — dynamic symbols still answer "what does it
 call". Static read only; disassembly still needs a real tool.
 
