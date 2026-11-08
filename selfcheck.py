@@ -20,9 +20,12 @@ check("ctf.py exists", os.path.isfile(os.path.join(ROOT, "ctf.py")))
 check("PROMPT.md exists", os.path.isfile(os.path.join(ROOT, "PROMPT.md")))
 check("knowledge schema exists", os.path.isfile(os.path.join(ROOT, "knowledge", "schema.json")))
 check("first probes registry exists", os.path.isfile(os.path.join(ROOT, "knowledge", "first-probes.json")))
+# agent/probe-policy.json was a stale pre-taxonomy duplicate of first-probes.json
+# (category "reverse" instead of rev, no dfir/osint/ai/ad/ir rows). Removed:
+# knowledge/first-probes.json is the only probe policy.
 check("writeup schema exists", os.path.isfile(os.path.join(ROOT, "knowledge", "schema.json")))
 check("operator workflow notes exist", os.path.isfile(os.path.join(ROOT, "agent", "autonomous-loop.md")))
-check("probe policy exists", os.path.isfile(os.path.join(ROOT, "agent", "probe-policy.json")))
+check("no legacy probe-policy.json duplicate", not os.path.isfile(os.path.join(ROOT, "agent", "probe-policy.json")))
 check("skill registry exists", os.path.isfile(os.path.join(ROOT, "skills", "registry.json")))
 check("skill index exists", os.path.isfile(os.path.join(ROOT, "skills", "INDEX.md")))
 check("chain schema exists", os.path.isfile(os.path.join(ROOT, "knowledge", "chain-schema.json")))
