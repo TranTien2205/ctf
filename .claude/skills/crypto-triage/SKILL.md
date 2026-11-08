@@ -85,7 +85,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | A reused CTR counter or IV with one plaintext known | Keystream recovery by XOR | no offset where both ciphertexts are defined | `crib-drag --in file.json` |
 | **Unauthenticated** CBC ciphertext you can resubmit | IV / previous-block bit flipping | a MAC or tag is verified before decryption | — → `../ctf-crypto/modern-ciphers-2.md` |
 | The service distinguishes bad padding from bad content | CBC padding oracle (Bleichenbacher/Manger for RSA) | error text **and** timing identical for both cases | `python3 tools/pad_oracle.py --ct HEX --url 'http://t/dec?ct={CT}' --ok-status 200` |
-| Repeating 16-byte ciphertext blocks | ECB pattern leak, cut-and-paste, byte-at-a-time | no two blocks repeat and the length is not a clean multiple | — → `../ctf-crypto/modern-ciphers-2.md` |
+| Repeating 16-byte ciphertext blocks | ECB pattern leak, cut-and-paste, byte-at-a-time | no two blocks repeat and the length is not a clean multiple | `python3 tools/ecb_oracle.py --url 'http://t/e?d={PT}' shape` then `crack` for an appended secret |
 | A modulus with no other handle — always try first | factordb and small-factor sweep | `n` is a clean two-prime product absent from factordb | `fermat --n N`, then `../ctf-crypto/triage-toolbox.md` |
 | Letter-only ciphertext, no key material, a named classical cipher or none | Classical cipher (Caesar/Vigenere/substitution/transposition) | statistics show encoding, not cipher — route to misc-encoding-carrier | — → class `crypto-classical` (`../crypto-classical/`) |
 | A bare hash string to crack ("find the password/preimage") | format identification first — salted formats change everything | `tools/hash_id.py` names family + hashcat mode + first move; an unrecognised result routes to enc_detect | `python3 tools/hash_id.py <hash>` |
@@ -106,7 +106,7 @@ index: `references/attack-to-reference.md`.
 | `berlekamp-massey`, `lfsr-recover`, `lfsr-predict` | `../ctf-crypto/stream-ciphers.md` | `LFSR Stream Cipher Attacks` (both BM and Galois tap recovery live in it) |
 | `length-extension` | `../ctf-crypto/modern-ciphers-2.md` | `Hash Length Extension Attack` |
 | `ecdsa-nonce-reuse`, `mt19937-clone`, `crib-drag`, `lcg-*`, `smoothness`, `crt`, `factor-from-d`, `rsa-decrypt` | file named in the command column above | full index: `references/attack-to-reference.md` |
-| No tool yet (GCM nonce reuse, ECB cut-and-paste) | `../ctf-crypto/modern-ciphers.md`, `../ctf-crypto/modern-ciphers-2.md` | hand-roll from the depth file |
+| No tool yet (GCM nonce reuse) | `../ctf-crypto/modern-ciphers.md`, `../ctf-crypto/modern-ciphers-2.md` | hand-roll from the depth file |
 
 ## Multi-stage ladder
 
