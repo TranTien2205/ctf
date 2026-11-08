@@ -34,6 +34,7 @@ class Config:
     extra_headers: dict[str, str] = field(default_factory=dict)
     external_tools: bool = True
     goal: str = ""
+    operator: str = ""
     max_response_bytes: int = 200_000
     llm_max_tokens: int = 4096
     mcp_config: str = ""
@@ -184,6 +185,7 @@ def load_config(args) -> Config:
         extra_headers=headers,
         external_tools=not args.no_external,
         goal=getattr(args, "goal", "") or "",
+        operator=getattr(args, "operator", "") or "",
         llm_max_tokens=args.llm_max_tokens,
         mcp_config=getattr(args, "mcp_config", "") or "",
         resume=getattr(args, "resume", "") or "",

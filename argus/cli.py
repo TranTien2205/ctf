@@ -23,6 +23,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--header", action="append",
                    help="'Name: value' applied to every request (e.g. auth cookie)")
     p.add_argument("--goal", help="Operator goal, e.g. 'focus on the /api surface'")
+    p.add_argument("--operator",
+                   help="Tester/org attribution recorded in meta.json and "
+                        "rendered in the report header")
     p.add_argument("--model", help="Claude model id (default claude-sonnet-4-5)")
     p.add_argument("--api-key", help="Anthropic API key (else ANTHROPIC_API_KEY)")
     p.add_argument("--auth-token",

@@ -114,7 +114,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 <h1>Penetration Test Report</h1>
 <p class="meta"><b>Session:</b> {_esc(session.id)}<br>
 <b>Date:</b> {_esc(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started)))}<br>
-<b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session._seq}</p>
+<b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session._seq}{('<br><b>Operator:</b> ' + _esc(meta['operator'])) if meta.get('operator') else ''}</p>
 <h2>Executive summary</h2>
 <p>{_esc(summary) or '<i>No agent summary recorded.</i>'}</p>
 <table><tr><th>Severity</th><th>Count</th></tr>{sev_rows}</table>

@@ -58,7 +58,7 @@ class AgentLoop:
             exclude_paths=cfg.exclude_paths, allow_private=cfg.allow_private,
         )
         self.session = session or Session(cfg.session_dir, cfg.target, meta={
-            "model": cfg.model, "goal": cfg.goal,
+            "model": cfg.model, "goal": cfg.goal, "operator": cfg.operator,
             "scope": cfg.scope_hosts, "max_turns": cfg.max_turns,
             "max_requests": cfg.max_requests, "rate_rps": cfg.rate_rps,
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),

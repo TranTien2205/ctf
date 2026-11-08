@@ -81,6 +81,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             meta = json.loads(mp.read_text(encoding="utf-8"))
         except Exception:
             meta = {}
+    if meta.get("operator"):
+        lines.insert(6, f"- **Operator:** {meta['operator']}")
     lines += [
         "| Severity | Count |",
         "|---|---|",
