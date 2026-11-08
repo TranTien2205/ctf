@@ -99,7 +99,9 @@ class Board:
             "agents": self.agents(),
             "requests": requests,
             "notes": self.notes()[-15:],
-            "findings": [{"id": f["id"], "severity": f["severity"],
-                          "title": f["title"]} for f in self.session.findings],
+            "findings": [{"id": f.get("id"), "severity": f.get("severity"),
+                          "title": f.get("title")}
+                         for f in self.session.findings
+                         if isinstance(f, dict)],
             "stop": self.stop.is_set(),
         }
