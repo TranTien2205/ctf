@@ -107,6 +107,8 @@ def main(argv: list[str] | None = None) -> int:
         "check", help="preflight: verify auth/credentials work before a run")
     p_check.add_argument("--api-key"); p_check.add_argument("--auth-token")
     p_check.add_argument("--model")
+    p_check.add_argument("--json", action="store_true",
+                         help="machine-readable verdict (ok/degraded/error)")
 
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
@@ -186,6 +188,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"no transcript.jsonl in {sdir} - not a session dir")
             return 1
         session = _reopen(sdir)
+        if not session._transcript:
+            # a transcript with zero entries means the run died at init -
+            # rendering + sealing a zero-evidence report fabricates an
+            # engagement that never happened
+            print(f"{sdir} has an empty transcript - nothing to report")
+            return 1
         # bare Config suffices - the renderer only reads cfg.model, and
         # resolving auth here could refresh OAuth creds as a side effect of
         # a read-only command
@@ -371,7 +379,18 @@ def main(argv: list[str] | None = None) -> int:
         key, tok = resolve_auth(args)
         src = ("api-key" if key else "oauth (Claude Code/OpenCode)"
                if tok else None)
+        _js = getattr(args, "json", False)
+
+        def _emit(rc: int, **kw) -> int:
+            if _js:
+                print(json.dumps({"ok": rc == 0, "degraded": rc == 2,
+                                  "source": src, **kw},
+                                 indent=2, ensure_ascii=False))
+            return rc
+
         if not src:
+            if _js:
+                return _emit(1, error="no credentials")
             print("no credentials found - set ANTHROPIC_API_KEY or sign in "
                   "to Claude Code")
             return 1
@@ -382,6 +401,8 @@ def main(argv: list[str] | None = None) -> int:
             c.chat(messages=[{"role": "user", "content": "say OK"}],
                    tools=[], system="one word")
         except Exception as exc:
+            if _js:
+                return _emit(1, error=str(exc))
             print(f"auth failed via {src}: {exc}")
             return 1
         # a bare ping is not the real failure mode - metered OAuth tiers
@@ -391,10 +412,15 @@ def main(argv: list[str] | None = None) -> int:
         try:
             c.chat(messages=[{"role": "user", "content": "say OK"}],
                    tools=surface, system="one word")
+            if _js:
+                return _emit(0, model=model, tools=len(surface))
             print(f"auth ok via {src}, model={model}, "
                   f"full tool surface ({len(surface)} tools) accepted")
             return 0
         except Exception as exc:
+            if _js:
+                return _emit(2, model=model, tools=len(surface),
+                             error=str(exc))
             print(f"auth ok via {src}, model={model} - but the full tool "
                   f"surface ({len(surface)} tools) was REJECTED:\n  {exc}\n"
                   f"  -> this credential caps request size (metered OAuth "
