@@ -509,9 +509,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1074,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 1090,
+      "depth_files": 3,
+      "depth_tokens": 912,
       "use_when": [
         "a probe or source read produced this class's signal: answer the six discriminators in order with python3 tools/crypto_attack.py list, then run the ONE attack they select: how many moduli, is e small, is d small, are the primes close, is part of a factor known, is phi shared"
       ],
@@ -1133,9 +1133,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 853,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 870,
+      "depth_files": 3,
+      "depth_tokens": 922,
       "use_when": [
         "a probe or source read produced this class's signal: send a handful of %p in one request and read the leaked words back, which is the cheapest confirmation in pwn, then locate your own buffer with %N$p before deciding read against write"
       ],
@@ -1206,9 +1206,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 901,
-      "depth_files": 1,
-      "depth_tokens": 158,
+      "skill_tokens": 918,
+      "depth_files": 3,
+      "depth_tokens": 992,
       "use_when": [
         "a probe or source read produced this class's signal: run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a pattern you generate yourself -- pwntools is absent here"
       ],
