@@ -2420,6 +2420,74 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(tuple(hooks_mod.FLAG_SOURCES),
                          tuple(decide_mod.FLAG_SOURCES))
 
+    def test_the_evidence_kind_vocabulary_is_one_word_spoken_five_ways(self):
+        """EVIDENCE_KINDS is restated in three tools and two workflow schemas.
+
+        hooks.py owns the tuple; tools/web/http_probe.py, tools/subagent_fanout.py
+        (as KINDS), dfir-sweep.js and web-sweep.js each carry a copy. A kind added
+        or renamed in the gate and not in a workflow schema is a report that
+        validates in the fleet and is then refused at the ledger. proven equal.
+        """
+        sys.path.insert(0, str(ROOT / "tools" / "web"))
+        try:
+            import http_probe
+            import subagent_fanout as fanout
+        finally:
+            sys.path.remove(str(ROOT / "tools" / "web"))
+        canonical = tuple(hooks_mod.EVIDENCE_KINDS)
+        self.assertEqual(tuple(http_probe.EVIDENCE_KINDS), canonical,
+                         "http_probe restates the vocabulary")
+        self.assertEqual(tuple(fanout.KINDS), canonical,
+                         "subagent_fanout restates it under another name")
+        enum = re.compile(r"enum:\s*\[([^\]]*)\]")
+        for wf in ("dfir-sweep.js", "web-sweep.js"):
+            text = (ROOT / ".claude" / "workflows" / wf).read_text(encoding="utf-8")
+            kinds = next(
+                tuple(s.strip().strip("'\"") for s in m.group(1).split(","))
+                for m in enum.finditer(text)
+                if "surface" in m.group(1))
+            self.assertEqual(kinds, canonical, "%s restates it in the schema" % wf)
+
+    def test_the_verdict_vocabulary_is_one_word_spoken_three_ways(self):
+        """hooks.py owns the verdicts; fkit and http_probe restate them.
+
+        A verdict renamed in the gate and not in an emitter is a report whose
+        post-probe command is refused at the ledger. subagent_fanout is
+        deliberately liberal on INPUT (it accepts refutes) — the invariant
+        there is that every canonical verdict its HOOKS_VERDICT map emits is
+        one hooks.py accepts.
+        """
+        sys.path.insert(0, str(ROOT / "tools" / "web"))
+        try:
+            import http_probe
+            import subagent_fanout as fanout
+            sys.path.insert(0, str(ROOT / "tools" / "forensics"))
+            import fkit
+        finally:
+            for p in (str(ROOT / "tools" / "web"), str(ROOT / "tools" / "forensics")):
+                if p in sys.path:
+                    sys.path.remove(p)
+        canonical = tuple(hooks_mod.VERDICTS)
+        self.assertEqual(tuple(http_probe.VERDICTS), canonical)
+        self.assertEqual(tuple(fkit.VERDICTS), canonical)
+        emitted = set(fanout.HOOKS_VERDICT.values())
+        self.assertTrue(emitted.issubset(set(canonical)),
+                        "fanout emits verdicts hooks.py refuses: %s" % (emitted - set(canonical)))
+
+    def test_the_layer_ceiling_is_the_class_budget(self):
+        """subagent_fanout's PROBE_CEILING is decide.py's class budget restated.
+
+        The per-layer ceiling a fleet report must respect is the same five
+        probes decide.py enforces per class. Bumping one without the other
+        lets a layer burn past the budget the ledger will enforce.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        try:
+            import subagent_fanout as fanout
+        finally:
+            sys.path.remove(str(ROOT / "tools"))
+        self.assertEqual(fanout.PROBE_CEILING, decide_mod.PROBE_BUDGET)
+
     def test_every_solver_the_ladder_names_exists_on_disk(self):
         """solver_handoff prints agent names; a renamed file leaves it dead.
 
