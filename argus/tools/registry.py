@@ -289,9 +289,12 @@ TOOL_SCHEMAS: list[dict] = [
         "probe_csrf",
         "CSRF surface check: inventories forms on the page, flags POST "
         "forms without anti-CSRF hidden tokens, and checks session cookies "
-        "for missing SameSite=Lax/Strict.",
+        "for missing SameSite=Lax/Strict. Pass data to replay the action "
+        "with a CORS-simple content type and test enforcement.",
         {"url": {**_STR, "description": URL_DESC +
-                 " Point it at a page containing the state-changing form."}},
+                 " Point it at a page containing the state-changing form."},
+         "method": {**_STR, "description": "POST|PUT|DELETE|PATCH for the replay (default: POST when data given)"},
+         "data": {**_STR, "description": "Body to replay with Content-Type: text/plain"}},
         ["url"],
     ),
     _schema(

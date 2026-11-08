@@ -210,6 +210,12 @@ class Handler(BaseHTTPRequestHandler):
             self._send(302, "<html><body>redirecting</body></html>",
                        headers={"Location": nxt})
 
+        elif path == "/jsredirect":
+            # client-side open redirect: no Location header at all
+            nxt = p.get("next", "/")
+            self._send(body=f"<html><head><meta http-equiv='refresh' "
+                       f"content='0;url={nxt}'></head><body>go</body></html>")
+
         elif path == "/fetch":
             u = p.get("url", "")
             try:
@@ -502,6 +508,9 @@ def make_server(port: int = 0):
     Handler._usercfg = {"theme": "dark", "lang": "en"}
     os.makedirs(WWW, exist_ok=True)
     os.makedirs(os.path.join(FAKEFS, "etc"), exist_ok=True)
+    os.makedirs(os.path.join(FAKEFS, "windows"), exist_ok=True)
+    with open(os.path.join(FAKEFS, "windows", "win.ini"), "w") as fh:
+        fh.write("; for 16-bit app support\n[fonts]\n[extensions]\n")
     with open(os.path.join(WWW, "welcome.txt"), "w") as fh:
         fh.write("welcome to labshop\n")
     with open(os.path.join(WWW, "app.py.bak"), "w") as fh:

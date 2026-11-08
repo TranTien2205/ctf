@@ -20,6 +20,10 @@ SQL_ERRORS = re.compile(
     r"syntax error.*sql|warning.*mysql|division by zero.*sql",
     re.I,
 )
+_CLIENT_REDIRECT = re.compile(
+    r"meta[^>]+http-equiv=['\"]?refresh|location\.(?:href|assign|replace)|"
+    r"window\.location", re.I)
+
 LFI_MARKERS = re.compile(
     r"root:x:0:0|daemon:|\[fonts\]|\[extensions\]|for 16-bit app support|"
     r"<\?php|BEGIN RSA PRIVATE KEY",
@@ -222,6 +226,7 @@ def probe_lfi(ctx: Context, url: str, param: str) -> dict:
         ("etc-passwd-abs", "/etc/passwd"),
         ("etc-passwd-enc", "....//....//....//etc/passwd"),
         ("win-ini", "..\\..\\..\\..\\windows\\win.ini"),
+        ("win-ini-abs", "/windows/win.ini"),
         ("nullbyte", "../../../../../../etc/passwd%00"),
     ]
     hits, results = [], []
@@ -246,8 +251,15 @@ def probe_redirect(ctx: Context, url: str, param: str) -> dict:
     r = _send(ctx, url, param, dest, "GET", None, "probe_redirect", "external dest")
     loc = (r.get("headers") or {}).get("location", "")
     open_r = r["status"] in (301, 302, 303, 307, 308) and "example.org" in loc
+    # client-side redirects never set Location: meta refresh, window.location
+    body = r.get("body", "")
+    client_side = (not open_r) and "example.org" in body and _CLIENT_REDIRECT.search(body)
+    verdict = ("open redirect" if open_r
+               else "open redirect (client-side, via meta-refresh/JS)"
+               if client_side
+               else "not redirected to external host")
     return {
-        "verdict": "open redirect" if open_r else "not redirected to external host",
+        "verdict": verdict,
         "request_id": r["request_id"],
         "status": r["status"],
         "location": loc,
@@ -468,9 +480,13 @@ def _forms(html: str) -> list[dict]:
     return forms
 
 
-def probe_csrf(ctx: Context, url: str) -> dict:
+def probe_csrf(ctx: Context, url: str, method: str = "GET",
+               data: str | None = None) -> dict:
     """CSRF surface check: POST forms without anti-CSRF tokens plus
-    session cookies missing SameSite=Lax/Strict."""
+    session cookies missing SameSite=Lax/Strict. When `data` is given,
+    also replays the action with Content-Type: text/plain - a "simple"
+    content type browsers may send cross-origin without a preflight;
+    an endpoint that still processes it is CSRFable."""
     r = ctx.client.send("GET", url, tool="probe_csrf", note="form inventory")
     body = r.get("body") or ""
     forms = _forms(body)
@@ -482,7 +498,19 @@ def probe_csrf(ctx: Context, url: str) -> dict:
         sc = [sc]
     weak_cookies = [c.split("=", 1)[0] for c in sc
                     if "samesite" not in c.lower()]
-    if not post_forms:
+    ct_bypass = None
+    if data is not None:
+        p = ctx.client.send(
+            "POST" if method.upper() == "GET" else method.upper(), url,
+            headers={"Content-Type": "text/plain"}, body=data,
+            tool="probe_csrf", note="text/plain content-type replay")
+        ct_bypass = {"status": p["status"], "request_id": p["request_id"],
+                     "processed": p["status"] < 400}
+    if ct_bypass and ct_bypass["processed"]:
+        verdict = ("csrf candidate: endpoint processed a text/plain body "
+                   f"(HTTP {ct_bypass['status']}) - no content-type "
+                   "enforcement, submittable cross-origin without preflight")
+    elif not post_forms:
         verdict = "no state-changing forms"
     elif not unprotected:
         verdict = "post forms carry anti-csrf tokens"
@@ -495,7 +523,8 @@ def probe_csrf(ctx: Context, url: str) -> dict:
                    "session cookie seen - confirm auth is cookie-based")
     return {"verdict": verdict, "request_id": r["request_id"],
             "post_forms": post_forms, "unprotected": unprotected,
-            "weak_cookies": weak_cookies}
+            "weak_cookies": weak_cookies,
+            "content_type_replay": ct_bypass}
 
 
 def probe_xfh(ctx: Context, url: str) -> dict:
@@ -635,11 +664,19 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
     for r in rs:
         statuses[r["status"]] = statuses.get(r["status"], 0) + 1
     ok = [r for r in rs if _ok(r)]
+    # If the burst took ~as long as the requests would serially, nothing
+    # actually overlapped and a multi-success cannot evidence a race.
+    serial_est = sum(r.get("elapsed_ms", 0) for r in rs) / 1000
+    overlapped = not serial_est or burst_s < serial_est * 0.85
     serial: list[dict] = []
     if len(ok) > 1:
         serial = [_fire("serial baseline"), _fire("serial baseline")]
     s_ok = [r for r in serial if _ok(r)]
-    if len(ok) > 1 and len(s_ok) == len(serial):
+    if len(ok) > 1 and not overlapped:
+        verdict = ("inconclusive: burst requests were serialized "
+                   f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
+                   "raise --rate or increase n and retry")
+    elif len(ok) > 1 and len(s_ok) == len(serial):
         verdict = (f"{len(ok)}/{n} burst successes but {len(s_ok)}/"
                    f"{len(serial)} serial probes also succeeded - the "
                    "action is repeatable, not a one-time race")
@@ -656,7 +693,7 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
         verdict = ("no success in burst; statuses "
                    f"{statuses} - endpoint may not be one-time")
     return {"verdict": verdict, "statuses": statuses,
-            "burst_seconds": burst_s,
+            "burst_seconds": burst_s, "overlapped": overlapped,
             "serial_statuses": [r["status"] for r in serial],
             "results": [{"status": r["status"],
                          "request_id": r["request_id"]} for r in rs]}

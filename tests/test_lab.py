@@ -62,6 +62,9 @@ def test_lfi_probe(lab_url, ctx):
 
 def test_redirect_probe(lab_url, ctx):
     out = probes.probe_redirect(ctx, lab_url + "/redirect?next=/", "next")
+    # client-side redirect via meta-refresh (no Location header)
+    out2 = probes.probe_redirect(ctx, lab_url + "/jsredirect?next=/", "next")
+    assert "client-side" in out2["verdict"], out2
     assert out["verdict"] == "open redirect"
 
 
@@ -91,6 +94,11 @@ def test_csrf_probe(lab_url, ctx):
     out = probes.probe_csrf(ctx, lab_url + "/login")
     assert "csrf" in out["verdict"], out
     assert out["unprotected"], out
+    # JSON API processed via a CORS-simple content type = csrfable
+    out2 = probes.probe_csrf(ctx, lab_url + "/api/config",
+                             data="theme=light")
+    assert "text/plain" in out2["verdict"], out2
+    assert out2["content_type_replay"]["processed"]
 
 
 def test_xfh_probe(lab_url, ctx):
