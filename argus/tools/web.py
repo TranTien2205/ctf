@@ -344,12 +344,37 @@ def fingerprint(ctx: Context, url: str) -> dict:
     hblock = "\n".join(f"{k}: {v}" for k, v in headers.items()).lower()
     waf_hints = sorted({name for tok, name in _WAF_TOKENS.items()
                         if tok in hblock})
+    # version hints: only well-established version->CVE matches, phrased
+    # as leads ("matches known-vulnerable range - verify") not findings
+    version_notes = []
+    hay = " ".join(stack_hints).lower()
+    for pat, note in (
+        (r"apache/2\.4\.49", "apache 2.4.49 -> CVE-2021-41773 "
+                             "path traversal/RCE"),
+        (r"apache/2\.4\.50", "apache 2.4.50 -> CVE-2021-42013 "
+                             "incomplete fix, still exploitable"),
+        (r"php/[45]\.", "EOL PHP branch - unpatched CVEs accumulate"),
+        (r"php/7\.[0-3]\.", "PHP 7.0-7.3 is EOL"),
+        (r"openssl/1\.0", "OpenSSL 1.0.x is EOL"),
+        (r"microsoft-iis/[1-6]\.", "legacy IIS - check for "
+                                  "CVE-2017-7269 (webdav) if WebDAV on"),
+        (r"openssh[_/ ](?:[0-5]\.|6\.[0-6])", "old OpenSSH - "
+                                            "check regreSSHion-era versions"),
+    ):
+        if re.search(pat, hay):
+            version_notes.append(note + " - verify before citing")
+    m = re.search(r"jquery[-.]?([12])\.\d", (res.get("body") or "").lower())
+    if m:
+        version_notes.append(
+            f"jquery {m.group(1)}.x detected in page source - outdated, "
+            "known XSS CVEs - verify before citing")
     return {
         "request_id": res["request_id"],
         "status": res["status"],
         "headers": headers,
         "stack_hints": stack_hints,
         "waf_hints": waf_hints,
+        "version_notes": version_notes,
         "cookies": cookies,
         "missing_security_headers": missing,
         "robots": robots,
@@ -364,8 +389,9 @@ _INTROSPECTION = (
 
 def graphql_introspect(ctx: Context, url: str) -> dict:
     """POST a standard introspection query and summarize the schema -
-    types, fields, mutation/subscription roots. A disabled endpoint or an
-    error body is reported as negative evidence."""
+    types, fields, mutation/subscription roots. Falls back to a GET
+    ?query= request - many servers accept either. A disabled endpoint or
+    an error body is reported as negative evidence."""
     body = '{"query": ' + _json.dumps(_INTROSPECTION) + "}"
     r = ctx.client.send("POST", url,
                         headers={"Content-Type": "application/json"},
@@ -375,8 +401,20 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
     try:
         doc = _json.loads(raw)
     except ValueError:
-        return {"verdict": "no schema (non-JSON response)",
-                    "request_id": r["request_id"], "status": r["status"]}
+        # GET fallback: many graphql servers accept ?query= too
+        sep = "&" if urllib.parse.urlparse(url).query else "?"
+        g = ctx.client.send(
+            "GET", url + sep + "query="
+            + urllib.parse.quote(_INTROSPECTION),
+            tool="graphql_introspect", note="introspection GET")
+        try:
+            doc = _json.loads(g.get("body") or "")
+            r = g
+        except ValueError:
+            return {"verdict": "no schema (non-JSON response)",
+                    "request_id": r["request_id"],
+                    "get_request_id": g["request_id"],
+                    "status": r["status"]}
     schema = ((doc.get("data") or {}).get("__schema"))
     if not schema:
         errs = [e.get("message", "?") for e in doc.get("errors") or []][:5]

@@ -203,6 +203,20 @@ class Handler(BaseHTTPRequestHandler):
 <!-- TODO: remove /debug before production -->
 </body></html>""")
 
+        elif path == "/graphql":
+            # accepts GET ?query= too - many real graphql servers do
+            q = p.get("query", "")
+            if "__schema" in q:
+                self._send(body=json.dumps({"data": {"__schema": {
+                    "queryType": {"name": "Query"},
+                    "mutationType": None,
+                    "types": [{"name": "User", "fields": [
+                        {"name": "id"}, {"name": "username"},
+                        {"name": "password"}]}]}}}), ctype="application/json")
+            else:
+                self._send(body=json.dumps({"data": {}}),
+                           ctype="application/json")
+
         elif path == "/search":
             q = p.get("q", "")
             self._send(body=f"<html><body>Results for: {q}</body></html>")
