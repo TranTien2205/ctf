@@ -166,6 +166,13 @@ code change. Lookup order is `resources/` in your working directory first,
 then the bundled `argus/resources/` (a cwd file shadows a bundled one),
 so the same mechanism works from a pip-installed `argus`.
 
+Exploit manifests name commands to run, so the **cwd exploit tree is
+opt-in**: it is only searched when `ARGUS_EXPLOITS_CWD=1` is set in the
+real environment. Without it, a `resources/exploits/` inside the working
+directory is ignored — running argus inside an untrusted checkout can
+never turn a planted manifest into command execution. Wordlists carry
+no commands and keep cwd shadowing unconditionally.
+
 ## Reading a run
 
 ```

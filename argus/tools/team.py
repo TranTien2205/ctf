@@ -13,9 +13,13 @@ from pathlib import Path
 from ..team.leads import Lead
 from .registry import Context
 
-# Bundled defaults ship inside the package (wheels), a <cwd>/resources/
-# tree lets an operator extend wordlists/exploits without touching the
-# install — the cwd copy wins on name collisions.
+# Bundled defaults ship inside the package (wheels). A <cwd>/resources/
+# tree lets an operator extend wordlists without touching the install —
+# the cwd copy wins on name collisions. Exploits are different: their
+# manifests name commands to run, so a cwd tree only loads with
+# ARGUS_EXPLOITS_CWD=1 - otherwise running argus inside an untrusted
+# directory (e.g. extracted target source) would let a planted manifest
+# execute arbitrary commands through the model.
 RESOURCES = Path(__file__).resolve().parents[1] / "resources"
 RESOURCES_USER = Path.cwd() / "resources"
 WORDLISTS = RESOURCES / "wordlists"
@@ -198,9 +202,12 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
 # ------------------------------------------------------------- exploits
 
 def _exploit_dirs() -> list[Path]:
-    """All manifest dirs, user tree first (it shadows bundled ids)."""
+    """All manifest dirs, user tree first (it shadows bundled ids).
+    The cwd tree is only searched under ARGUS_EXPLOITS_CWD=1."""
     seen, out = set(), []
-    for root in (EXPLOITS_USER, EXPLOITS):
+    roots = (EXPLOITS_USER, EXPLOITS) \
+        if os.environ.get("ARGUS_EXPLOITS_CWD") == "1" else (EXPLOITS,)
+    for root in roots:
         if not root.exists():
             continue
         for d in sorted(root.iterdir()):
@@ -213,7 +220,9 @@ def _exploit_dirs() -> list[Path]:
 
 def _load_manifest(exploit_id: str) -> tuple[dict | None, Path | None, str | None]:
     safe = re.sub(r"[^a-z0-9_-]", "", (exploit_id or "").lower())
-    for root in (EXPLOITS_USER, EXPLOITS):
+    roots = (EXPLOITS_USER, EXPLOITS) \
+        if os.environ.get("ARGUS_EXPLOITS_CWD") == "1" else (EXPLOITS,)
+    for root in roots:
         d = root / safe
         mpath = d / "manifest.json"
         if mpath.exists():
