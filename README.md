@@ -207,7 +207,7 @@ not just in the prompt.
   was edited or deleted after the run — it also re-validates every finding
   against the chained transcript, catching edited findings.json too. At
   run end an `artifacts_digest` entry seals sha256 digests of `meta.json`,
-  `findings.json`, `notes.md` and `summary.json` into the chain, so edits
+  `findings.json`, `notes.md`, `report.*` and `summary.json` into the chain, so edits
   to any session artifact are detectable.
 - **Scope-checked findings** — `record_finding` runs the finding URL
   through the scope guard, so the report cannot claim a bug on a host the

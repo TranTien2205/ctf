@@ -387,7 +387,8 @@ class Session:
         duration_s: both are legitimately rewritten by `argus report`
         re-renders."""
         files: dict[str, str] = {}
-        for name in ("meta.json", "findings.json", "notes.md"):
+        for name in ("meta.json", "findings.json", "notes.md",
+                     "report.md", "report.html", "report.sarif"):
             p = self.dir / name
             if p.exists():
                 files[name] = hashlib.sha256(p.read_bytes()).hexdigest()

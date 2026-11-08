@@ -264,9 +264,13 @@ class TeamRun:
             "mode": "team", "agents": self.board.agents(),
             "llm_calls": calls, "llm_tokens": tokens,
         })
-        # anchor every un-chained artifact (meta/findings/summary) into the
-        # transcript so post-run edits are detectable by verify
-        self.session.seal_artifacts()
+        # anchor every un-chained artifact (meta/findings/summary/report.*)
+        # into the transcript so post-run edits are detectable by verify -
+        # best-effort: a seal failure must not kill a completed run
+        try:
+            self.session.seal_artifacts()
+        except OSError:
+            pass
         return {
             "mode": "team",
             "session_dir": str(self.session.dir),

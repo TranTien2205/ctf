@@ -210,12 +210,13 @@ been rendered (a mismatch there means truncation OR post-report appends).
 `findings.json` is not chained itself, so verify also re-validates every
 recorded finding against the immutable transcript: edited excerpts or
 invented evidence ids surface as `TAMPERED: findings [...]`. At run end an
-`artifacts_digest` entry additionally seals sha256 hashes of `meta.json`,
-`findings.json` and `summary.json` (minus the mutable head/duration
-fields) into the transcript - post-run edits to ANY of those files, even
-a byte, surface as `TAMPERED: [...] edited since the run was sealed`.
-`argus report` re-renders skip failing findings and warn when the chain
-itself is broken; `argus findings` marks failing rows `UNVERIFIED`.
+`artifacts_digest` entry seals sha256 hashes of `meta.json`,
+`findings.json`, `notes.md` and `report.*` plus `summary.json` (minus
+the mutable head/duration fields) into the transcript - post-run edits
+to ANY session artifact, even a byte, surface as `TAMPERED: [...] edited
+since the run was sealed`. `argus report` re-renders re-seal the fresh
+artifacts, skip failing findings and warn when the chain itself is
+broken; `argus findings` marks failing rows `UNVERIFIED`.
 
 Secret header **values** (`Authorization`, `Cookie`, `Set-Cookie`,
 `X-*-Token` and any header carrying a `--header`-configured secret) are

@@ -202,6 +202,13 @@ def main(argv: list[str] | None = None) -> int:
             session.findings = [f for f in session.findings
                                 if f.get("id") not in bad]
         path = render_report(session, cfg)
+        # a re-render is a new attested artifact state: seal again so the
+        # delivered report.* files are digest-anchored too
+        try:
+            session.seal_artifacts()
+        except OSError as exc:
+            print(f"warning: could not seal artifacts ({exc}) - this "
+                  "render is not digest-anchored", file=sys.stderr)
         print(path)
         return 0
 

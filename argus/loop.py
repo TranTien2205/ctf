@@ -267,9 +267,14 @@ class AgentLoop:
                 extra={"mode": "team" if self.ctx.board is not None else "single",
                        "llm_calls": self.llm.calls,
                        "llm_tokens": self._token_stats()}))
-            # anchor every un-chained artifact (meta/findings/summary) into
-            # the transcript so post-run edits are detectable by verify
-            self.session.seal_artifacts()
+            # anchor every un-chained artifact (meta/findings/summary/
+            # report.*) into the transcript so post-run edits are
+            # detectable by verify - best-effort: a seal failure must not
+            # kill a completed run
+            try:
+                self.session.seal_artifacts()
+            except OSError as exc:
+                self._log(f"warning: artifact seal failed: {exc}")
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
