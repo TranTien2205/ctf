@@ -26,6 +26,11 @@ def test_js_recon_finds_endpoints_and_secret(lab_url, ctx):
     eps = [e["endpoint"] for e in out["endpoints"]]
     assert any("/api/user" in e for e in eps)
     assert out["secret_candidates"]
+    # deployed sourcemap is recovered and its sources scanned
+    assert out["sourcemaps_found"] == 1
+    assert any("/api/admin/export" in e for e in eps), eps
+    sm_srcs = {e["source"] for e in out["endpoints"]}
+    assert any(".map#" in s for s in sm_srcs)
 
 
 def test_reflection_probe(lab_url, ctx):

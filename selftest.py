@@ -105,6 +105,10 @@ def main() -> int:
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))
     out = web.crawl(ctx, base, depth=1)
     check("crawl finds forms/endpoints", len(out["endpoints"]) >= 4)
+    out = web.js_recon(ctx, base)
+    check("js_recon recovers sourcemap", out["sourcemaps_found"] == 1
+          and any("/api/admin/export" in e["endpoint"]
+                  for e in out["endpoints"]))
     out = probes.probe_reflection(ctx, base + "/search?q=x", "q")
     check("reflection probe sees XSS", out.get("reflected") is True)
     out = probes.probe_sqli(ctx, base + "/item?id=1", "id")

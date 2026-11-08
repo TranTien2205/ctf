@@ -265,7 +265,20 @@ class Handler(BaseHTTPRequestHandler):
             self._send(body="""fetch('/api/user/1').then(r=>r.json());
 const internal = '/internal/status';  // hidden route
 const API_KEY = 'lab_key_0123456789abcdef';
+//# sourceMappingURL=app.js.map
 """, ctype="application/javascript")
+
+        elif path == "/static/app.js.map":
+            # deployed sourcemap: original sources leak - a real-world find
+            self._send(body=json.dumps({
+                "version": 3,
+                "sources": ["webpack://app/src/api.js",
+                            "webpack://app/src/config.js"],
+                "sourcesContent": [
+                    "fetch('/api/admin/export').then(r => r.json());\n",
+                    "export const client_secret = 'sm_secret_abcdef123456';\n",
+                ],
+            }), ctype="application/json")
 
         elif path == "/internal/status":
             self._send(body=json.dumps({"status": "internal-ok"}),

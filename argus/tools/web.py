@@ -159,6 +159,7 @@ _JS_SECRET = re.compile(
     r"""(?i)(api[_-]?key|api[_-]?secret|access[_-]?token|auth[_-]?token|secret|password|passwd|private[_-]?key|aws[_-]?secret|client[_-]?secret)"""
     r"""\s*[:=]\s*['"`]([^'"`\s]{8,120})['"`]"""
 )
+_SRCMAP = re.compile(r"sourceMappingURL=([^\s]+)")
 
 
 def js_recon(ctx: Context, url: str) -> dict:
@@ -187,15 +188,45 @@ def js_recon(ctx: Context, url: str) -> dict:
         endpoints.extend(e)
         secrets.extend(s)
     fetched = 0
+    maps_found = 0
     for src in scripts[:15]:
         try:
             r = ctx.client.send("GET", src, tool="js_recon", note="js bundle")
         except ScopeError:
             continue
         fetched += 1
-        e, s = scan(r.get("body", ""), src)
+        bundle = r.get("body", "")
+        e, s = scan(bundle, src)
         endpoints.extend(e)
         secrets.extend(s)
+
+        # Sourcemap recovery: a deployed .map exposes the original sources -
+        # comments, env refs, file paths - far richer than the minified bundle
+        m = _SRCMAP.search(bundle[-2000:])
+        map_url = urllib.parse.urljoin(src, m.group(1)) if m else src + ".map"
+        try:
+            mr = ctx.client.send("GET", map_url, tool="js_recon",
+                                 note="sourcemap probe")
+        except ScopeError:
+            mr = None
+        if mr is None or not (200 <= mr["status"] < 300):
+            continue
+        try:
+            smap = _json.loads(mr.get("body", ""))
+        except (ValueError, _json.JSONDecodeError):
+            continue
+        contents = smap.get("sourcesContent")
+        if not isinstance(contents, list):
+            continue
+        maps_found += 1
+        names = smap.get("sources") or []
+        for i, cont in enumerate(contents[:20]):
+            if not isinstance(cont, str):
+                continue
+            label = names[i] if i < len(names) else f"source-{i}"
+            e, s = scan(cont, f"{map_url}#{label}")
+            endpoints.extend(e)
+            secrets.extend(s)
 
     uniq_eps, seen = [], set()
     for ep in endpoints:
@@ -206,6 +237,7 @@ def js_recon(ctx: Context, url: str) -> dict:
         "page_request_id": res["request_id"],
         "scripts_found": len(scripts),
         "scripts_fetched": fetched,
+        "sourcemaps_found": maps_found,
         "endpoints": uniq_eps[:80],
         "secret_candidates": secrets[:30],
         "note": "secret_candidates are leads, not findings - verify usage before recording",
