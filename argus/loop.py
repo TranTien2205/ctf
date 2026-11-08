@@ -199,6 +199,8 @@ class AgentLoop:
                     "content": _truncate_result(out),
                     "is_error": is_error,
                 })
+            if self._last_error == "interrupted":
+                break  # Ctrl-C during a tool must end the run, not retry
             messages.append({"role": "user", "content": results})
 
         self._log(f"done in {turns} turns; findings={len(self.session.findings)}")

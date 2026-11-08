@@ -108,3 +108,33 @@ def test_loop_survives_keyboard_interrupt(lab_url, tmp_path):
                        quiet=True).run()
     assert result["error"] == "interrupted"
     assert Path(result["report"]).exists()
+
+
+def test_loop_interrupt_during_dispatch_stops(lab_url, tmp_path):
+    # Ctrl-C while a tool runs must end the loop - not fall through to
+    # another llm.chat call (which would need a second Ctrl-C).
+    import argus.loop as aloop
+    script = [
+        {"tool_calls": [_call("fingerprint", {"url": lab_url}),
+                        _call("fingerprint", {"url": lab_url})]},
+        {"tool_calls": [_call("finish", {"summary": "x"})]},
+    ]
+    llm = ScriptedClient(script)
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 max_turns=10, rate_rps=0)
+    orig = aloop.dispatch
+    calls = []
+
+    def boom(ctx, name, args):
+        calls.append(name)
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        return orig(ctx, name, args)
+
+    aloop.dispatch = boom
+    try:
+        result = AgentLoop(cfg, llm=llm, quiet=True).run()
+    finally:
+        aloop.dispatch = orig
+    assert result["error"] == "interrupted"
+    assert llm.calls == 1  # never reached a second chat turn

@@ -34,7 +34,8 @@ def _chain(prev: str, entry: dict) -> str:
 
 def verify_transcript(sdir: Path) -> dict:
     """Recompute the hash chain over transcript.jsonl. Detects edited,
-    inserted or mid-deleted entries; cannot detect tail truncation."""
+    inserted or mid-deleted entries, and tail truncation when
+    summary.json still anchors the recorded chain head."""
     tpath = Path(sdir) / "transcript.jsonl"
     out = {"entries": 0, "bad_lines": [], "chained": False}
     if not tpath.exists():
