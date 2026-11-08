@@ -219,6 +219,13 @@ class GuardedClient:
     ) -> dict:
         """Send one scoped request, record it, return a compact result."""
         self.scope.check(url)  # raises ScopeError before any byte is sent
+        if not isinstance(method, str) or not method.strip() or \
+                any(ord(c) < 0x21 or ord(c) > 0x7E for c in method):
+            # httpx does NOT reject control chars in the method - a CRLF
+            # there is written verbatim into the request line, smuggling
+            # a header past every framing check
+            raise ValueError(
+                f"invalid HTTP method {method!r}: printable token only")
         if body is not None and not isinstance(body, (str, bytes)):
             raise TypeError(
                 f"body must be str or bytes, got {type(body).__name__}")
