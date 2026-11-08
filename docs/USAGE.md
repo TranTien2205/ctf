@@ -110,7 +110,8 @@ verbatim evidence from a cited response.
 | Prototype pollution | `probe_ppoll` | `__proto__` merge then cross-object read |
 | Request smuggling | `probe_smuggle` | CL.TE + TE.CL + obfuscated-TE raw sends; 'G'/'GPOST' poison own next request only |
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
-| WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101) |
+| WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101 + accept check) |
+| CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
 | JWT/session | `jwt_decode` | decode, alg weaknesses, weak-secret crack |
 | GraphQL | `graphql_introspect` | schema introspection summary |
 | Recon | `fingerprint` `crawl` `js_recon` `wordlist_fuzz` | stack/links/forms/endpoints/secrets/sourcemaps |

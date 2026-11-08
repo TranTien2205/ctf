@@ -57,6 +57,7 @@ def _impl(name: str) -> Callable:
         "probe_smuggle": probes.probe_smuggle,
         "probe_disclosure": probes.probe_disclosure,
         "probe_websocket": probes.probe_websocket,
+        "probe_crlf": probes.probe_crlf,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -381,11 +382,12 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_smuggle",
-        "Request-smuggling detection (CL.TE): sends one ambiguous request "
-        "with both Content-Length and Transfer-Encoding, then a clean "
-        "request on the same connection. A 'G*' bogus-method error on the "
-        "second request means a front/back framing split. Detection only - "
-        "the stray byte can only poison the agent's own request.",
+        "Request-smuggling detection: sends ambiguous requests carrying "
+        "both Content-Length and Transfer-Encoding, then a clean request "
+        "on the same connection. Covers CL.TE, TE.CL and obfuscated-TE "
+        "variants. A 'G*' bogus-method error (or an extra queued response) "
+        "means a front/back framing split. Detection only - the stray "
+        "bytes can only poison the agent's own request.",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
     ),
@@ -405,6 +407,17 @@ TOOL_SCHEMAS: list[dict] = [
         "message-level testing needs a ws client.",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
+    ),
+    _schema(
+        "probe_crlf",
+        "CRLF / response-splitting: sends a CRLF canary in a parameter "
+        "that may reach a header context (redirect targets, cookie values, "
+        "reflected header params). An injected 'x-argus-crlf' response "
+        "header proves header control - session fixation, cache poisoning, "
+        "response splitting.",
+        {"url": {**_STR, "description": URL_DESC},
+         "param": {**_STR, "description": "Parameter name to inject into."}},
+        ["url", "param"],
     ),
     _schema(
         "jwt_decode",

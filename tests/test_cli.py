@@ -34,7 +34,7 @@ def test_sessions_listing(tmp_path, capsys):
     rc = main(["sessions", "--session-dir", str(tmp_path)])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "findings=3" in out
+    assert "findings=4" in out
 
 
 def test_reopen_report_findings_verify(tmp_path, capsys):

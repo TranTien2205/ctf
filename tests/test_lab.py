@@ -206,6 +206,12 @@ def test_disclosure_probe(lab_url, ctx):
     assert {"/.git/HEAD", "/.env", "/debug"} <= paths
 
 
+def test_crlf_probe(lab_url, ctx):
+    out = probes.probe_crlf(ctx, lab_url + "/redirect?next=/", "next")
+    assert "crlf injection candidate" in out["verdict"]
+    assert out["injected_header"] is True
+
+
 def test_websocket_probe(lab_url, ctx):
     out = probes.probe_websocket(ctx, lab_url + "/ws")
     assert "confirmed" in out["verdict"]

@@ -279,6 +279,42 @@ def probe_redirect(ctx: Context, url: str, param: str) -> dict:
     }
 
 
+def probe_crlf(ctx: Context, url: str, param: str) -> dict:
+    """CRLF / response-splitting: a CRLF pair inside the parameter value.
+    If the value lands in a header context (Location, Set-Cookie, custom
+    echo headers) unencoded, the injected canary header appears in the
+    response - proof of header control. A double-CRLF canary additionally
+    checks body splitting, though it is only meaningful when the param is
+    NOT reflected into the body anyway."""
+    canary = _marker("acrlf")
+    hdr_inj = _send(ctx, url, param, f"\r\nX-Argus-Crlf: {canary}",
+                    tool="probe_crlf", note="header inject canary")
+    hh = {k.lower(): v for k, v in (hdr_inj.get("headers") or {}).items()}
+    header_hit = "x-argus-crlf" in hh
+    # response splitting: %0d%0a%0d%0a<canary> - lands past the header block
+    body_inj = _send(ctx, url, param, f"\r\n\r\n{canary}",
+                     tool="probe_crlf", note="body split canary")
+    body_hit = canary in (body_inj.get("body") or "")
+    if header_hit:
+        verdict = ("crlf injection candidate: CRLF in parameter reached the "
+                   "response as a real 'x-argus-crlf' header - header "
+                   "control allows session fixation, cache poisoning and "
+                   "response splitting")
+    elif body_hit:
+        verdict = ("crlf lead: canary appears in the response body after a "
+                   "double-CRLF - could be response splitting OR plain "
+                   "reflection; confirm by checking whether the parameter "
+                   "reflects normally")
+    else:
+        verdict = "no crlf signal"
+    return {"verdict": verdict,
+            "header_inject_id": hdr_inj["request_id"],
+            "body_split_id": body_inj["request_id"],
+            "injected_header": header_hit,
+            "note": "verify with a second canary header (e.g. Set-Cookie) "
+                    "before recording; quote the injected header verbatim"}
+
+
 def probe_cors(ctx: Context, url: str) -> dict:
     evil = "https://argus-probe.invalid"
     r = ctx.client.send("GET", url, headers={"Origin": evil},

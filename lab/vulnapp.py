@@ -11,7 +11,8 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /ping?host=           command injection (sleep separators)
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
     GET  /download?file=       path traversal / file read
-    GET  /redirect?next=       open redirect
+    GET  /redirect?next=       open redirect + CRLF header injection
+                               (Location value is not sanitized)
     GET  /api/user/<id>        IDOR (any id served)
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     POST /xml                  XXE (simulated external-entity resolution)
@@ -380,7 +381,8 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             # TOCTOU: check-then-act with no lock - concurrent requests all
             # pass the guard before the first commits the decrement
             if self._coupons > 0:
-                time.sleep(0.05)      # deterministic race window
+                time.sleep(0.15)      # race window: wide enough that an
+                # 8-request burst overlaps even under test-suite load
                 type(self)._coupons -= 1
                 self._send(body=json.dumps(
                     {"ok": True, "left": type(self)._coupons}))

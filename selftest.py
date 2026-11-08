@@ -184,6 +184,9 @@ def main() -> int:
     out = probes.probe_smuggle(ctx, base + "/desync-none")
     check("smuggle probe clean on agreed framing",
           "no desync signal" in out["verdict"])
+    out = probes.probe_crlf(ctx, base + "/redirect?next=/", "next")
+    check("crlf probe injects header",
+          "crlf injection candidate" in out["verdict"])
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})

@@ -31,4 +31,5 @@ actually confirms the bug, and bypasses for common filters.
 | Cookie/param deserializes (pickle, Java, PHP) | `deserialization` |
 | Cache in front; unkeyed inputs reflected | `cache-poisoning` |
 | ws:// channel, Socket.IO | `websocket` |
+| Value lands in a response header unencoded | `crlf` |
 | First pass over an unknown target | `triage` |
