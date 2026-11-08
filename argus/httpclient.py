@@ -310,8 +310,11 @@ class GuardedClient:
                                  "headers": _redact_headers(
                                      dict(resp.request.headers),
                                      self._secret_values),
-                                 "body": body.decode("utf-8", "replace")
-                                 if isinstance(body, bytes) else body},
+                                 "body": body[:BODY_CAP].decode(
+                                     "utf-8", "replace")
+                                 if isinstance(body, bytes) else
+                                 body[:BODY_CAP]
+                                 if isinstance(body, str) else body},
                         response={"status": resp.status_code,
                                   "headers": _redact_headers(
                                       _headers_dict(resp),
@@ -337,12 +340,17 @@ class GuardedClient:
             except Exception:
                 pass
 
+        # persisted request bodies get the same cap as responses - a
+        # model-written upload payload must not bloat the transcript
+        req_body = body[:BODY_CAP] if isinstance(body, bytes) else \
+            (body[:BODY_CAP] if isinstance(body, str) else body)
         rid = self.session.record_exchange(
             tool=tool,
             request={"method": method.upper(), "url": url,
                      "headers": _redact_headers(sent_headers,
                                                 self._secret_values),
-                     "body": body.decode("utf-8", "replace") if isinstance(body, bytes) else body},
+                     "body": req_body.decode("utf-8", "replace")
+                     if isinstance(req_body, bytes) else req_body},
             response={**response_data,
                       "headers": _redact_headers(
                           response_data["headers"], self._secret_values)},
@@ -503,7 +511,8 @@ class GuardedClient:
                                  "request_text": _redact_request_text(
                                      raw_req.decode("utf-8", "replace"),
                                      self._secret_values)[:4000],
-                                 "body": body.decode("utf-8", "replace")},
+                                 "body": body[:BODY_CAP].decode(
+                                     "utf-8", "replace")},
                         response={"status": status,
                                   "headers": _redact_headers(
                                       rheaders, self._secret_values),
