@@ -14,6 +14,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_PRIORITY = 50
 # A revived branch comes back below a fresh one until new evidence raises it.
 REVIVE_PRIORITY = 40
+# HYPOTHESIS_PROTOCOL.md: "Never more than three at priority above zero."
+# Until now the rule was prose only, so a fourth branch could open at 50 and
+# nothing noticed. Enforced at the write gate: a command whose net effect
+# leaves more than this many open hypotheses above zero is refused.
+MAX_ACTIVE_HYPOTHESES = 3
 # The escalation rungs tools/decide.py can offer. Duplicated here rather than
 # imported because decide.py imports THIS module, so importing it back would be
 # circular. test/regression.py asserts the two tuples stay identical -- a rung
@@ -197,6 +202,14 @@ def main():
             selected["deprioritized_reason"] = args.deprioritize
     if args.decision:
         state.setdefault("decisions", []).append({"text": args.decision, "time": time.time()})
+    active = [h for h in state["hypotheses"]
+              if h.get("status") == "open" and (h.get("priority") or 0) > 0]
+    if len(active) > MAX_ACTIVE_HYPOTHESES:
+        ap.error(
+            "state not changed: this would leave %d open hypotheses above "
+            "priority zero (cap %d). Park one first with --hypothesis-id "
+            "<id> --deprioritize '<reason>', or close it." %
+            (len(active), MAX_ACTIVE_HYPOTHESES))
     state["updated_at"] = time.time()
     atomic_json(path, state)
     print(json.dumps({"path": path, "state": state}, ensure_ascii=False))

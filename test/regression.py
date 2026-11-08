@@ -1676,6 +1676,32 @@ class LedgerTests(unittest.TestCase):
         for flag in ("--deprioritize", "--revive", "--show"):
             self.assertIn(flag, text, "HYPOTHESIS_PROTOCOL.md must document " + flag)
 
+    def test_the_three_hypothesis_cap_is_a_write_gate(self):
+        """HYPOTHESIS_PROTOCOL.md limits the open ledger to three branches
+        above priority zero. Until state.py enforced it the rule was prose;
+        a fourth branch could open at 50 and the ledger grew without bound."""
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            (root / "challenges").mkdir()
+            for i in range(3):
+                self.ledger(root, "capped", "--hypothesis", "branch %d" % i,
+                            "--bug-class", "web-ssti")
+            with self.assertRaises(SystemExit):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.ledger(root, "capped", "--hypothesis", "a fourth")
+            data = json.loads((root / "challenges/capped/state.json").read_text())
+            self.assertEqual(len(data["hypotheses"]), 3,
+                             "a refused write must leave the ledger untouched")
+            hid = data["hypotheses"][0]["id"]
+            self.ledger(root, "capped", "--hypothesis-id", hid,
+                        "--deprioritize", "weakest branch")
+            self.ledger(root, "capped", "--hypothesis", "a fourth")
+            data = json.loads((root / "challenges/capped/state.json").read_text())
+            self.assertEqual(len(data["hypotheses"]), 4)
+            self.assertEqual(sum(1 for h in data["hypotheses"]
+                                 if h.get("status") == "open"
+                                 and (h.get("priority") or 0) > 0), 3)
+
 
 # --------------------------------------------------------------------------- H
 class TaxonomyTests(unittest.TestCase):
