@@ -8,6 +8,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import urllib.parse
 from pathlib import Path
@@ -208,6 +209,33 @@ _HOST_RE = re.compile(
     r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?")
 
 
+def _hostish_token(tok: str) -> bool:
+    """Does a bare token name a host? Full DNS/IPv4 matches, numeric
+    IP spellings tools accept even when this host's resolver does not
+    (127.1, 0x7f.0.0.1 - getaddrinfo rejects them on Windows but nmap
+    still scans them), plus single-label names (localhost, intranet
+    hosts like db01) that actually RESOLVE: flag values like '80' or
+    'vuln' don't resolve on a healthy resolver."""
+    if not tok:
+        return False
+    if tok.isdigit():
+        # pure digits are ports - but a value >65535 can't be a port and
+        # tools accept the decimal form of an IPv4 literal (2130706433)
+        return int(tok) > 65535
+    if _HOST_RE.fullmatch(tok):
+        return True
+    if not re.fullmatch(r"[a-zA-Z0-9_.-]+", tok):
+        return False
+    if re.fullmatch(r"[0-9a-fA-FxX.]+", tok) and \
+            ("." in tok or "x" in tok.lower()):
+        return True  # numeric IP spelling - let the scope guard decide
+    try:
+        socket.getaddrinfo(tok, None)
+        return True
+    except OSError:
+        return False
+
+
 def _args_scope_check(ctx: Context, args: str) -> None:
     """Scope-check every target-looking token in an args string: full URLs,
     bare hostnames/IPs (`nmap evil.com`), and IPv6 literals (`nmap ::1`).
@@ -226,7 +254,7 @@ def _args_scope_check(ctx: Context, args: str) -> None:
         if re.search(r"\.(?:txt|xml|json|html?|list|lst|md|csv|out|log|yaml|yml|py|sh|gz|zip)$",
                      host_part, re.I):
             continue  # file-like, not a hostname
-        if _HOST_RE.fullmatch(host_part):
+        if _hostish_token(host_part):
             ctx.scope.check("http://" + host_part)
 
 
@@ -327,7 +355,7 @@ def _file_target_hosts(path: Path) -> set[str]:
                       else "http://[" + tok + "]")
             continue
         host = first.split(":")[0]
-        if _HOST_RE.fullmatch(host):
+        if _hostish_token(host):
             hosts.add("http://" + host)
     return hosts
 

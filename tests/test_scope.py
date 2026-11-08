@@ -235,6 +235,24 @@ def test_external_args_scope_scan(ctx):
     ok("-sV 127.0.0.1")                  # in-scope IP
     ok("-sV 127.0.0.1:8080")             # in-scope host:port
     ok("-p 80,443")                      # port list - not a host
+    ok("--top-ports 5000")               # port arg - not a host
+
+
+def test_external_args_scope_scan_host_spellings(ctx):
+    """Single-label and non-canonical IP spellings are targets too:
+    'nmap localhost' scans the agent host, and nmap parses 127.1 /
+    2130706433 even where this machine's resolver does not. Private
+    spellings are denied against a public scope."""
+    from argus.tools.analysis import _args_scope_check
+    from argus.scope import ScopeGuard, ScopeError
+    import pytest, types
+    c = types.SimpleNamespace(scope=ScopeGuard("http://public.example"))
+    for a in ("-sV localhost", "-sV 127.1", "-sV 2130706433",
+              "-sV 0x7f000001", "-sV ::ffff:127.0.0.1"):
+        with pytest.raises(ScopeError):
+            _args_scope_check(c, a)
+    _args_scope_check(c, "-p 80,443")   # ports are not hosts
+    _args_scope_check(c, "--top-ports 5000")
 
 
 def test_nmap_arg_guards(ctx, tmp_path):
