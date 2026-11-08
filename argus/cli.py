@@ -17,6 +17,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
                    help="Extra in-scope hosts (comma-separated ok); may repeat")
     p.add_argument("--exclude", action="append",
                    help="Path prefixes to never touch (e.g. /logout); may repeat")
+    p.add_argument("--header-file",
+                   help="File with one 'Name: value' header per line "
+                        "(e.g. a Burp copy); blank lines and # comments skipped")
     p.add_argument("--header", action="append",
                    help="'Name: value' applied to every request (e.g. auth cookie)")
     p.add_argument("--goal", help="Operator goal, e.g. 'focus on the /api surface'")

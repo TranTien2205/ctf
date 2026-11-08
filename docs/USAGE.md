@@ -26,6 +26,7 @@ python -m argus run https://app.example \
 | `--scope` | target host only | extra allowed hosts; subdomains included |
 | `--exclude` | none | path prefixes never touched |
 | `--header` | none | applied to every request (auth, custom UA) |
+| `--header-file` | none | headers from a file, one `Name: value` per line (Burp copy) |
 | `--model` | `claude-sonnet-4-5` | any Anthropic model id |
 | `--max-turns` | 80 | LLM tool-call turns |
 | `--max-requests` | 400 | HTTP request budget |

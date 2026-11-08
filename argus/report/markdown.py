@@ -208,6 +208,21 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "recorded transcript at write time._",
     ]
 
+    notes_path = session.dir / "notes.md"
+    if notes_path.exists():
+        notes = notes_path.read_text(encoding="utf-8", errors="replace")
+        if notes.strip():
+            lines += [
+                "",
+                "<details><summary>Appendix: agent working notes "
+                "(audit)</summary>",
+                "",
+                "```",
+                notes[:20000],
+                "```",
+                "</details>",
+            ]
+
     path = session.dir / "report.md"
     path.write_text("\n".join(lines), encoding="utf-8")
     summary_json = {

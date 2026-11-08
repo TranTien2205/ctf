@@ -146,7 +146,17 @@ def load_config(args) -> Config:
         if os.environ.get("ANTHROPIC_BASE_URL") else API_URL
 
     headers: dict[str, str] = {}
-    for raw in getattr(args, "header", None) or []:
+    header_lines: list[str] = []
+    hf = getattr(args, "header_file", None)
+    if hf:
+        try:
+            header_lines += [l.strip() for l in Path(hf).read_text(
+                encoding="utf-8").splitlines()
+                if l.strip() and not l.strip().startswith("#")]
+        except OSError as exc:
+            raise SystemExit(f"--header-file unreadable: {exc}")
+    header_lines += list(getattr(args, "header", None) or [])
+    for raw in header_lines:
         if ":" not in raw:
             raise SystemExit(f"--header must be 'Name: value', got: {raw!r}")
         name, value = raw.split(":", 1)
