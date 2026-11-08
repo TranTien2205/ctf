@@ -29,7 +29,7 @@ NO_CREDENTIAL_MSG = (
 class ClaudeClient:
     def __init__(self, api_key: str, api_base: str, model: str,
                  max_tokens: int = 4096, timeout: float = 120.0,
-                 auth_token: str = ""):
+                 auth_token: str = "", prompt_cache: bool = True):
         self.api_key = api_key
         self.auth_token = auth_token
         self.api_base = api_base
@@ -39,6 +39,39 @@ class ClaudeClient:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.cache_read_tokens = 0
+        self.cache_write_tokens = 0
+        # prompt caching: the system+tools prefix (~30KB) is identical every
+        # turn and the conversation tail is a stable prefix for the NEXT
+        # turn - ephemeral breakpoints cut billed input by ~90% on reads.
+        # Some auth paths (metered OAuth tiers) reject cache_control, so a
+        # 400 mentioning cache disables it permanently for the client.
+        self._cache = prompt_cache
+
+    def _build(self, messages: list[dict], tools: list[dict],
+               system, with_cache: bool) -> dict:
+        sys_field = system
+        tls = tools
+        msgs = messages
+        if with_cache:
+            if sys_field and isinstance(sys_field, str):
+                sys_field = [{"type": "text", "text": sys_field}]
+            if tls:
+                tls = list(tls)
+                tls[-1] = {**tls[-1],
+                           "cache_control": {"type": "ephemeral"}}
+            if msgs:
+                msgs = list(msgs)
+                last = msgs[-1]
+                cont = last.get("content")
+                cont = ([{"type": "text", "text": cont}]
+                        if isinstance(cont, str) else list(cont or []))
+                if cont:
+                    cont[-1] = {**cont[-1],
+                                "cache_control": {"type": "ephemeral"}}
+                    msgs[-1] = {**last, "content": cont}
+        return {"model": self.model, "max_tokens": self.max_tokens,
+                "system": sys_field, "tools": tls, "messages": msgs}
 
     def chat(self, messages: list[dict], tools: list[dict], system: str) -> dict:
         if not (self.api_key or self.auth_token):
@@ -64,21 +97,18 @@ class ClaudeClient:
             headers = {
                 "x-api-key": self.api_key,
                 "anthropic-version": API_VERSION,
+                "anthropic-beta": "prompt-caching-2024-07-31",
                 "content-type": "application/json",
             }
-        payload = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "system": system,
-            "tools": tools,
-            "messages": messages,
-        }
         delay = 2.0
         last_error = ""
         for attempt in range(5):
             try:
                 with httpx.Client(timeout=self.timeout) as client:
-                    resp = client.post(self.api_base, json=payload, headers=headers)
+                    resp = client.post(
+                        self.api_base,
+                        json=self._build(messages, tools, system, self._cache),
+                        headers=headers)
             except httpx.HTTPError as exc:
                 last_error = f"{type(exc).__name__}: {exc}"
                 time.sleep(delay)
@@ -90,8 +120,18 @@ class ClaudeClient:
                 usage = data.get("usage") or {}
                 self.input_tokens += usage.get("input_tokens", 0)
                 self.output_tokens += usage.get("output_tokens", 0)
+                self.cache_read_tokens += \
+                    usage.get("cache_read_input_tokens", 0)
+                self.cache_write_tokens += \
+                    usage.get("cache_creation_input_tokens", 0)
                 return data
             body = resp.text[:500]
+            # cache_control rejected (e.g. a plan that forbids it): drop the
+            # feature once and resend the identical request without it
+            if resp.status_code == 400 and self._cache \
+                    and "cache" in body.lower():
+                self._cache = False
+                continue
             last_error = f"HTTP {resp.status_code}: {body}"
             if resp.status_code not in RETRYABLE:
                 raise LLMError(f"Anthropic API error {resp.status_code}: {body}")
@@ -108,6 +148,8 @@ class ScriptedClient:
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
+        self.cache_read_tokens = 0
+        self.cache_write_tokens = 0
         self.seen_messages: list[list[dict]] = []
 
     def chat(self, messages: list[dict], tools: list[dict], system: str) -> dict:

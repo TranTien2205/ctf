@@ -225,8 +225,7 @@ class AgentLoop:
                 self.session, self.cfg, self.ctx.finish_summary,
                 extra={"mode": "team" if self.ctx.board is not None else "single",
                        "llm_calls": self.llm.calls,
-                       "llm_tokens": {"in": self.llm.input_tokens,
-                                      "out": self.llm.output_tokens}}))
+                       "llm_tokens": self._token_stats()}))
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
@@ -234,7 +233,13 @@ class AgentLoop:
             "findings": len(self.session.findings),
             "report": report_path,
             "llm_calls": self.llm.calls,
-            "llm_tokens": {"in": self.llm.input_tokens, "out": self.llm.output_tokens},
+            "llm_tokens": self._token_stats(),
             "summary": self.ctx.finish_summary,
             "error": self._last_error or None,
         }
+
+    def _token_stats(self) -> dict:
+        return {"in": self.llm.input_tokens,
+                "out": self.llm.output_tokens,
+                "cache_read": getattr(self.llm, "cache_read_tokens", 0),
+                "cache_write": getattr(self.llm, "cache_write_tokens", 0)}
