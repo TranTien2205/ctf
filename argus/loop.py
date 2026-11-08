@@ -187,7 +187,11 @@ class AgentLoop:
                     self._last_error = "interrupted"
                     out = None
                     break
-                is_error = "error" in out
+                # tools signal soft errors as {"error": ...} inside the
+                # dispatch {"result": ...} wrapper - flag both layers so the
+                # API marks the tool_result as an error for the model
+                is_error = "error" in out or \
+                    "error" in (out.get("result") or {})
                 self._log(f"  -> {'ERROR ' if is_error else ''}{_truncate_result(out)[:300]}")
                 results.append({
                     "type": "tool_result",

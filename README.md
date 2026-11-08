@@ -190,7 +190,12 @@ not just in the prompt.
   (true/false, benign/payload, controlled/uncontrolled URL). A single
   200 OK is never treated as signal.
 - **Full transcript** — every request lands in `transcript.jsonl` with an
-  id; reports embed the proving exchange under each finding.
+  id; reports embed the proving exchange under each finding. Each entry
+  carries a hash-chain link, so `argus verify <session>` can prove nothing
+  was edited or deleted after the run.
+- **Scope-checked findings** — `record_finding` runs the finding URL
+  through the scope guard, so the report cannot claim a bug on a host the
+  engagement never authorized.
 - **Honesty under budget** — budgets (turns/requests/wall-clock) and a
   `note()` ledger keep the agent from payload-spamming one hypothesis.
 - **Knowledge on demand** — `load_skill("sqli")` pulls one focused
