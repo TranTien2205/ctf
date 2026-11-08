@@ -24,12 +24,27 @@ def _is_private_host(host: str) -> bool:
     if host in ("localhost", "localhost.localdomain"):
         return True
     try:
-        ip = ipaddress.ip_address(host)
+        return _ip_private(ipaddress.ip_address(host))
     except ValueError:
+        pass
+    # getaddrinfo over gethostbyname: it returns BOTH families and every
+    # address - a host whose only AAAA is ::1 must not read as public, and
+    # a multi-record answer must not pass on the strength of one public IP
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False  # unresolvable: nothing can connect anyway
+    for info in infos:
         try:
-            ip = ipaddress.ip_address(socket.gethostbyname(host))
-        except (OSError, ValueError):
-            return False
+            if info[4] and info[4][0] and \
+                    _ip_private(ipaddress.ip_address(info[4][0])):
+                return True
+        except ValueError:
+            continue  # non-IP sockaddr (e.g. AF_UNIX) - not a TCP target
+    return False
+
+
+def _ip_private(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
 
 

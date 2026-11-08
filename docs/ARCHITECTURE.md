@@ -81,7 +81,7 @@ prompt wording can widen it.
 |---|---|---|
 | request to an unauthorized host | scope-check before any byte is sent; redirect `Location` re-checked per hop | `ScopeGuard.check`, `GuardedClient.send` |
 | `file:`/`gopher:`/`ftp:` URL schemes | scheme allowlist `http`/`https` | `ScopeGuard.check` |
-| loopback/private pivot to infra | private-address refusal (`--allow-private` opts in; auto-allowed only when the declared target is itself private) | `ScopeGuard` |
+| loopback/private pivot to infra | private-address refusal over ALL resolved records (v4+v6 via `getaddrinfo` - one private answer denies); `--allow-private` opts in, auto-allowed only when the declared target is itself private. Known residual: a malicious DNS answer can still flip between check and connect (rebinding) - pinning the socket IP would need a custom transport | `ScopeGuard` |
 | flood the target | shared token bucket; redirect hops count too | `RateLimiter`, `GuardedClient` |
 | invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
 | finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |

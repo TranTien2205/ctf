@@ -105,6 +105,40 @@ def test_private_target_autoallows():
     g.check("http://127.0.0.1:8777/")
 
 
+def test_ipv6_only_private_host_denied(monkeypatch):
+    """A hostname resolving ONLY via AAAA to ::1 must not read as public -
+    gethostbyname raised for v6-only answers, so the old check failed open."""
+    import socket
+    def fake_gai(host, port, *a, **k):
+        return [(socket.AF_INET6, socket.SOCK_STREAM, 6, "",
+                 ("::1", 0, 0, 0))]
+    monkeypatch.setattr(socket, "getaddrinfo", fake_gai)
+    from argus.scope import _is_private_host
+    assert _is_private_host("v6loop.example")
+
+
+def test_mixed_records_denied_when_any_private(monkeypatch):
+    """A host answering public+private together must not pass on the
+    strength of the public record alone - the connector may pick either."""
+    import socket
+    def fake_gai(host, port, *a, **k):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.9", 0))]
+    monkeypatch.setattr(socket, "getaddrinfo", fake_gai)
+    from argus.scope import _is_private_host
+    assert _is_private_host("mixed.example")
+
+
+def test_all_public_records_allowed(monkeypatch):
+    import socket
+    def fake_gai(host, port, *a, **k):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 0)),
+                (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("1.1.1.1", 0))]
+    monkeypatch.setattr(socket, "getaddrinfo", fake_gai)
+    from argus.scope import _is_private_host
+    assert not _is_private_host("public.example")
+
+
 def test_redirect_follow_stays_in_scope(ctx, lab_url):
     """follow_redirects must scope-check every hop - a 302 to a foreign
     host is refused, and the blocked hop lands in the transcript."""
