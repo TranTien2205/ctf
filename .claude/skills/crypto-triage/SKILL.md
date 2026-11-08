@@ -81,7 +81,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | >=624 consecutive 32-bit outputs, or Python `random` | MT19937 state clone | fewer than 624 full words and no float or GF(2) route | `mt19937-clone --in file.json` |
 | A secret-prefix MAC, `sha256(secret + message)`, Merkle-Damgard, secret **length known** | Length extension | the MAC is HMAC, or the hash is a sponge (SHA-3, BLAKE2) | `length-extension --in file.json` |
 | Two ciphertexts under one keystream (CTR, OFB, stream, OTP) | Many-time pad / crib drag | the XOR of the two is unprintable under every crib | `crib-drag --ct1 HEX --in file.json` |
-| The **same nonce twice under AES-GCM** | Forbidden attack — recover `H`, forge tags | the nonces differ, or one ciphertext only per nonce | — → `../ctf-crypto/modern-ciphers.md` |
+| The **same nonce twice under AES-GCM** | Forbidden attack — recover `H`, forge tags | the nonces differ, or one ciphertext only per nonce | `python3 tools/gcm_nonce.py recover --ct1 HEX --tag1 HEX --ct2 HEX --tag2 HEX` then `forge --ct HEX --tag HEX --h HEX --new-ct HEX` |
 | A reused CTR counter or IV with one plaintext known | Keystream recovery by XOR | no offset where both ciphertexts are defined | `crib-drag --in file.json` |
 | **Unauthenticated** CBC ciphertext you can resubmit | IV / previous-block bit flipping | a MAC or tag is verified before decryption | — → `../ctf-crypto/modern-ciphers-2.md` |
 | The service distinguishes bad padding from bad content | CBC padding oracle (Bleichenbacher/Manger for RSA) | error text **and** timing identical for both cases | `python3 tools/pad_oracle.py --ct HEX --url 'http://t/dec?ct={CT}' --ok-status 200` |
@@ -106,7 +106,7 @@ index: `references/attack-to-reference.md`.
 | `berlekamp-massey`, `lfsr-recover`, `lfsr-predict` | `../ctf-crypto/stream-ciphers.md` | `LFSR Stream Cipher Attacks` (both BM and Galois tap recovery live in it) |
 | `length-extension` | `../ctf-crypto/modern-ciphers-2.md` | `Hash Length Extension Attack` |
 | `ecdsa-nonce-reuse`, `mt19937-clone`, `crib-drag`, `lcg-*`, `smoothness`, `crt`, `factor-from-d`, `rsa-decrypt` | file named in the command column above | full index: `references/attack-to-reference.md` |
-| No tool yet (GCM nonce reuse) | `../ctf-crypto/modern-ciphers.md`, `../ctf-crypto/modern-ciphers-2.md` | hand-roll from the depth file |
+| `gcm_nonce.py` recover/forge, `pad_oracle.py`, `ecb_oracle.py` | `../ctf-crypto/modern-ciphers.md`, `../ctf-crypto/modern-ciphers-2.md` | `Forbidden attack`, `Padding oracle`, `Byte-at-a-time` sections |
 
 ## Multi-stage ladder
 

@@ -99,7 +99,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/lsb_scan.py tools/web/gopher_gen.py \
          tools/web/archive_gen.py \
          tools/log_summary.py tools/web/ssrf_probe.py tools/xor_solve.py \
-         tools/pad_oracle.py tools/ecb_oracle.py \
+         tools/pad_oracle.py tools/ecb_oracle.py tools/gcm_nonce.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
