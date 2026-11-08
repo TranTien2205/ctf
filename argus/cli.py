@@ -40,7 +40,8 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
                    help="HTTP request budget per agent (0 = no cap)")
     p.add_argument("--max-time", type=float, default=2400,
                    help="Wall-clock budget in seconds (0 = no cap)")
-    p.add_argument("--rate", type=float, default=5.0, help="Requests/second cap")
+    p.add_argument("--rate", type=float, default=5.0,
+                   help="Requests/second cap (0 = no cap)")
     p.add_argument("--proxy",
                    help="Route target traffic through a proxy for inspection "
                         "(e.g. Burp/ZAP at http://127.0.0.1:8080)")

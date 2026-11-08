@@ -196,6 +196,10 @@ def load_config(args) -> Config:
             continue
         exclude_paths.append(p if p.startswith("/") else "/" + p)
 
+    if args.rate < 0:
+        # a negative rate silently disables the safety cap (interval 0) -
+        # a typo must fail loud, not turn the tool loose on the target
+        raise SystemExit("--rate must be >= 0 (0 = no rate cap)")
     return Config(
         target=args.target,
         model=getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", DEFAULT_MODEL),
