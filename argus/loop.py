@@ -229,6 +229,17 @@ class AgentLoop:
 
             results = []
             for call in tool_uses:
+                if self.ctx.finished:
+                    # finish() mid-batch: later calls must not fire -
+                    # the run is done, and post-finish requests would
+                    # pollute the transcript tail
+                    results.append({
+                        "type": "tool_result",
+                        "tool_use_id": call.get("id"),
+                        "content": '{"skipped": "engagement already finished"}',
+                        "is_error": False,
+                    })
+                    continue
                 name = call.get("name", "?")
                 args = call.get("input") or {}
                 self._log(f"tool {name} {json.dumps(args)[:200]}")
