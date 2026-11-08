@@ -80,6 +80,43 @@ The session dir gains `agent-<name>.log` per member plus the shared
 `transcript.jsonl` (each entry tagged with its agent), `findings.json`,
 and `report.md`.
 
+## Probe coverage
+
+Every probe baseline-diffs or uses a matched pair — the verdict is a
+signal to verify, never a declared bug. `record_finding` still requires
+verbatim evidence from a cited response.
+
+| Bug class | Tool | Detection approach |
+|---|---|---|
+| Reflected XSS | `probe_reflection` | canary reflection, context detection |
+| SQL injection | `probe_sqli` | quoted + unquoted true/false pairs, error + boolean diff |
+| NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` operator objects vs JSON baseline |
+| Command injection | `probe_time` | sleep separators vs measured baseline latency |
+| SSTI | `probe_ssti` | `{{7*7}}`-family eval per engine syntax |
+| File read / LFI | `probe_lfi` | traversal, absolute, encoded, Windows, null-byte |
+| Open redirect | `probe_redirect` | `Location` + meta/JS client-side hops |
+| CORS | `probe_cors` | evil Origin reflection + credentials flag |
+| HTTP methods | `probe_method` | OPTIONS then canary PUT/DELETE with cleanup |
+| IDOR | `probe_idor` | neighboring object ids vs own object |
+| SSRF | `probe_ssrf` | self-fetch, loopback variants, metadata markers |
+| XXE | `probe_xxe` | external entity file/http resolution |
+| CSRF | `probe_csrf` | token inspection + `text/plain` replay |
+| Host-header | `probe_xfh` | X-Forwarded-Host canary in body/Location |
+| File upload | `probe_upload` | benign + php/.phtml/double-ext/ct-spoof, served check |
+| Race condition | `probe_race` | concurrent burst + serial baseline + overlap check |
+| Deserialization | `probe_deserialize` | magic bytes vs parser-error signatures |
+| Cache poisoning | `probe_cache` | unkeyed XFH poison then clean fetch |
+| Prototype pollution | `probe_ppoll` | `__proto__` merge then cross-object read |
+| Request smuggling | `probe_smuggle` | CL.TE raw send; 'G' poisons own next request only |
+| Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
+| WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101) |
+| JWT/session | `jwt_decode` | decode, alg weaknesses, weak-secret crack |
+| GraphQL | `graphql_introspect` | schema introspection summary |
+| Recon | `fingerprint` `crawl` `js_recon` `wordlist_fuzz` | stack/links/forms/endpoints/secrets/sourcemaps |
+
+Methodology-only classes (auth-session flows, logic flaws, triage order)
+are covered by `load_skill` modules rather than a fixed probe.
+
 ## Resources
 
 `resources/wordlists/<name>.txt` — wordlists for `wordlist_fuzz`; add a
