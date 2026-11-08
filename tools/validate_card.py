@@ -20,6 +20,10 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# Handout trees that are inputs rather than authored files: a card may cite
+# provenance that legitimately is not committed. The regression suite notes
+# the same paths and skips them; a missing solved/ note still fails.
+UNCOMMITTED_DATA_ROOTS = ("challenges/", "CSCV2026/")
 SECRET = re.compile(r"(?:AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]+PRIVATE KEY-----|(?:token|password|secret)\s*[:=]\s*['\"][^'\"]{8,})", re.I)
 FLAGISH = re.compile(r"(?:HTB|csawctf|flag)\{([^}]{2,})\}", re.I)
 
@@ -155,7 +159,9 @@ def validate_chain(data):
     errors += _signal_hygiene(data)
     if not re.fullmatch(r"[a-z0-9][a-z0-9._-]{2,160}", data["id"]):
         errors.append("unsafe card ID")
-    if not (ROOT / data["source_note"]).is_file():
+    source_note = data["source_note"].replace("\\", "/")
+    if not (ROOT / data["source_note"]).is_file() and not source_note.startswith(
+            UNCOMMITTED_DATA_ROOTS):
         errors.append("source_note does not exist on disk: %s" % data["source_note"])
     if data.get("flag") is not None:
         errors.append("flag must be null; a card never carries a flag")
