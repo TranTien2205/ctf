@@ -187,9 +187,13 @@ Each finding carries `severity`, optional `cvss`, and an auto-mapped `cwe`
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
 `python -m argus sessions` lists every session dir with mode, finding and
-request counts; `python -m argus compare <dirA> <dirB>` prints a side-by-side
-metrics table (mode, findings, requests, time-to-first-finding, endpoints
-touched, llm calls, workers, tokens) for run-vs-team experiments.
+request counts (`--json` for scripts); `python -m argus compare <dirA> <dirB>`
+prints a side-by-side metrics table (mode, findings, requests,
+time-to-first-finding, endpoints touched, llm calls, workers, tokens
+incl. cache read/write) for run-vs-team experiments.
+`python -m argus skills` lists the bundled methodology modules;
+`python -m argus skills <name>` prints one, which is useful when auditing
+exactly what guidance the model loads.
 
 Every `transcript.jsonl` entry carries a `chain` field - a sha256 hash of
 the previous entry's link plus the entry itself, so edits, insertions and

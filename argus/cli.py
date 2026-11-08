@@ -93,7 +93,10 @@ def main(argv: list[str] | None = None) -> int:
     p_find.add_argument("session_dir")
     p_find.add_argument("--json", action="store_true")
 
-    p_skills = sub.add_parser("skills", help="list knowledge modules")
+    p_skills = sub.add_parser(
+        "skills", help="list knowledge modules, or print one with "
+                       "'skills <name>'")
+    p_skills.add_argument("name", nargs="?", default=None)
     p_skills.set_defaults(list_skills=True)
 
     p_check = sub.add_parser(
@@ -189,8 +192,18 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "skills":
         sdir = Path(__file__).parent / "skills"
+        if args.name:
+            f = sdir / (args.name if args.name.endswith(".md")
+                        else args.name + ".md")
+            if f.exists():
+                print(f.read_text(encoding="utf-8"), end="")
+                return 0
+            print(f"no skill '{args.name}' - "
+                  f"available: {', '.join(p.stem for p in sorted(sdir.glob('*.md')) if p.stem != 'INDEX')}")
+            return 1
         for p in sorted(sdir.glob("*.md")):
-            print(p.stem)
+            if p.stem != "INDEX":
+                print(p.stem)
         return 0
 
     if args.cmd == "sessions":
