@@ -138,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "team":
         from .team.coordinator import TeamRun
+        if getattr(args, "tools", ""):
+            raise SystemExit("--tools applies to 'run' only - team workers "
+                             "already carry role-card tool subsets")
         cfg = load_config(args)
         _preflight_target(cfg)
         team = TeamRun(cfg, quiet=args.quiet,

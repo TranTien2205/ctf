@@ -43,8 +43,14 @@ Design choices and why:
   load on demand via `load_skill`. Detection signals, first probes,
   confirmation criteria, bypasses, honest severity guidance.
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real
-  limits; near the end the loop nudges once ("record and finish"), then
-  stops. No human-in-the-loop inside scope by design.
+  limits; the loop warns once near ~80% ("record now, prioritize"), nudges
+  once at exhaustion, then stops. Measured on a real run: the early
+  warning turned a deferred-finding loss into a 5x recording rate.
+- **Cost-aware LLM calls.** `ClaudeClient` marks the static prefix
+  (system + tools + conversation tail) with ephemeral cache breakpoints —
+  billed input drops ~90% on cache hits. A 400 mentioning cache disables
+  it transparently. The full 54-tool schema is ~30KB/call, so constrained
+  auth paths can pass `--tools` (run) or rely on role-card subsets (team).
 
 ## Trust boundaries
 

@@ -12,6 +12,13 @@ export ANTHROPIC_API_KEY=...          # or rely on Claude Code OAuth
 python lab/vulnapp.py 8777            # deterministic vulnerable app
 ```
 
+Auth note: subscription OAuth bills to the account's "extra usage" pool
+and caps per-request size — the full 54-tool schema (~30KB) may be
+rejected there. For constrained auth, run `run` with
+`--tools fingerprint,crawl,http_request,probe_sqli,probe_idor,probe_reflection,probe_disclosure,record_finding,note,load_skill,read_response`
+or use `team` (role cards already subset tools per worker). Metered API
+keys are unaffected.
+
 The lab plants one bug per probe family (SQLi, NoSQLi, XSS, IDOR, SSRF,
 XXE, CSRF, XFH/ACL-bypass, upload, race, deserialization, cache
 poisoning+deception, prototype pollution, JWT weak secret, CORS,
@@ -49,7 +56,7 @@ done
 | `time_to_first_finding_s` | speed to first confirmed result |
 | `coverage.endpoints` | endpoints touched (method+path+param names) |
 | `coverage.probes` | probe families exercised |
-| `llm_calls`, `llm_tokens` | cost |
+| `llm_calls`, `llm_tokens` | cost — `in`/`out` are billed tokens; `cache_read`/`cache_write` show prompt-cached volume (~10% cost) |
 | `agents` (team only) | per-worker turns/requests/tokens/findings |
 
 ## Compare

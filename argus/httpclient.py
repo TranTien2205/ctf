@@ -70,6 +70,9 @@ class GuardedClient:
         self.agent = agent
         self.sent = 0
         self._tls_verify = tls_verify
+        # send_raw builds its wire text by hand, so it cannot inherit
+        # httpx's client-level merge - keep the operator headers for it.
+        self._default_headers = default_headers or {}
         # probe_race fires concurrent sends through one client - the budget
         # check+increment must be atomic or threads lose count
         self._sent_lock = threading.Lock()
@@ -311,8 +314,22 @@ class GuardedClient:
                 method = (spec.get("method") or "GET").upper()
                 lines = [f"{method} {path} HTTP/1.1",
                          f"Host: {host_port}",
-                         "Connection: keep-alive",
-                         f"User-Agent: argus-raw/1.0"]
+                         "Connection: keep-alive"]
+                # operator headers (--header auth cookies) ride every send,
+                # raw included - on an authenticated target an unauthenticated
+                # smuggle probe dies at the front-end before reaching the
+                # framing boundary. Framing headers stay spec-controlled.
+                emitted = {"host", "connection"}
+                for k, v in self._default_headers.items():
+                    kl = k.lower()
+                    if kl in emitted or kl in ("content-length",
+                                               "transfer-encoding"):
+                        continue
+                    emitted.add(kl)
+                    lines.append(f"{k}: {v}")
+                if "user-agent" not in emitted:
+                    emitted.add("user-agent")
+                    lines.append("User-Agent: argus-raw/1.0")
                 for k, v in spec.get("headers") or []:
                     if k.lower() in ("host",):
                         continue  # Host comes from the scoped URL only
