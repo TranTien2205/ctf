@@ -5,3 +5,7 @@
 *.json text eol=lf
 *.yml text eol=lf
 *.toml text eol=lf
+
+# checked-in demo session is digest-sealed: checkout must preserve the
+# exact LF bytes or `argus verify docs/sample-session` reports tampering
+docs/sample-session/** eol=lf
