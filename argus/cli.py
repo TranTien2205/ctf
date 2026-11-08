@@ -275,7 +275,8 @@ def main(argv: list[str] | None = None) -> int:
                     row.update(mode=s.get("mode", "single"),
                                findings=len(s.get("findings") or []),
                                requests=s.get("requests", "?"),
-                               duration=s.get("duration_s"))
+                               duration=s.get("duration_s"),
+                               sealed=bool(s.get("sealed")))
                 except Exception:
                     pass
             rows.append(row)
@@ -288,9 +289,10 @@ def main(argv: list[str] | None = None) -> int:
         for r in rows:
             dur = f"{r['duration']:.0f}s" if isinstance(
                 r.get("duration"), (int, float)) else "?"
+            seal = " sealed" if r.get("sealed") else ""
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
-                  f"requests={r.get('requests','?')} dur={dur}")
+                  f"requests={r.get('requests','?')} dur={dur}{seal}")
         return 0
 
     if args.cmd == "verify":
