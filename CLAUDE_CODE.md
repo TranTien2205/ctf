@@ -96,6 +96,15 @@ if a command file names a tool that does not exist.
    The junction resolves `../skills` identically for readers, and
    `--skip-worktree` keeps git from treating the machine-specific link type as
    a content change. A POSIX checkout is unaffected either way.
+
+   **Never run `git add -A` or `git add .` while the junction exists.** Git
+   walks INTO the junction and stages all of `skills/` a second time under
+   `.claude/skills/` — `--skip-worktree` only protects the link entry itself.
+   Always stage explicit paths (`git add ctf.py skills/... test/...`). If it
+   happens anyway: `git reset --soft HEAD~1`,
+   `git rm -r --cached .claude/skills`, then restore the link entry with
+   `git update-index --add --cacheinfo 120000,$(git ls-tree HEAD .claude/skills | awk '{print $3}'),.claude/skills`
+   and re-set `--skip-worktree`.
 2. `/skill-doctor` reports frontmatter parse errors; every skill here needs at
    least `name` and `description`.
 3. Unknown frontmatter keys are ignored, not rejected, so `budget`,
