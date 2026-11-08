@@ -10,7 +10,7 @@ def test_demo_single(tmp_path):
     (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
     findings = json.loads((sdir / "findings.json").read_text())
     cats = {f["category"] for f in findings}
-    assert {"sqli", "xss", "idor", "info-disclosure"} <= cats
+    assert {"sqli", "xss", "idor", "info-disclosure", "jwt"} <= cats
     assert (sdir / "report.md").exists()
     html = (sdir / "report.html").read_text(encoding="utf-8")
     assert "F01" in html and "sqlite3" in html
@@ -34,7 +34,7 @@ def test_sessions_listing(tmp_path, capsys):
     rc = main(["sessions", "--session-dir", str(tmp_path)])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "findings=4" in out
+    assert "findings=5" in out
 
 
 def test_reopen_report_findings_verify(tmp_path, capsys):

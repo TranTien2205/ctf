@@ -349,6 +349,17 @@ def _demo(args) -> int:
     base = f"http://127.0.0.1:{srv.server_address[1]}"
     threading.Thread(target=srv.serve_forever, daemon=True).start()
 
+    # The lab JWT embeds a live iat, so the token/forged strings must be
+    # captured at demo setup and embedded literally into the script. This
+    # setup fetch is outside the transcript on purpose - it is scripting,
+    # not assessment.
+    import urllib.request as _urlreq
+    from .tools.analysis import jwt_forge as _jwt_forge
+    _tok = json.loads(_urlreq.urlopen(
+        base + "/token?user=alice", timeout=5).read())["token"]
+    _forged = _jwt_forge(None, _tok, '{"user":"admin","role":"admin"}',
+                         secret="secret123")["resigned"]
+
     def _t(i, name, **kw):
         return {"id": f"d{i}", "name": name, "type": "tool_use", "input": kw}
 
@@ -409,16 +420,42 @@ def _demo(args) -> int:
                                      "server; rotate exposed secrets.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
          "text": "Exposed secrets on the web root - recording."},
-        {"tool_calls": [_t(9, "probe_xfh", url=base + "/reset")]},
-        {"tool_calls": [_t(10, "finish",
+        {"tool_calls": [_t(9, "jwt_decode", token=_tok)],
+         "text": "The session token itself is the next surface."},
+        {"tool_calls": [_t(10, "jwt_forge", token=_tok,
+                           claims='{"user":"admin","role":"admin"}',
+                           secret="secret123")],
+         "text": "Weak HMAC secret recovered offline - forge an admin "
+                 "token and prove acceptance."},
+        {"tool_calls": [_t(11, "http_request", method="GET",
+                           url=base + "/api/me",
+                           headers={"Authorization":
+                                    f"Bearer {_forged}"})]},
+        {"tool_calls": [_t(12, "record_finding",
+                         title="JWT weak secret: forged admin token accepted",
+                         severity="critical", category="jwt",
+                         url=base + "/api/me",
+                         evidence_excerpt='"role": "admin"',
+                         description="The lab JWT verifies against the "
+                                     "dictionary secret 'secret123'; a "
+                                     "forged admin token is accepted and "
+                                     "its claims echoed back verbatim.",
+                         remediation="Rotate to a high-entropy secret; "
+                                     "prefer asymmetric signing.",
+                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
+         "text": "Forged claims returned by the server - privilege "
+                 "escalation proven end to end."},
+        {"tool_calls": [_t(13, "probe_xfh", url=base + "/reset")]},
+        {"tool_calls": [_t(14, "finish",
                          summary="Demo run: SQLi + XSS + IDOR + info "
-                                 "disclosure verified with verbatim "
-                                 "evidence; host-header reflection left as "
-                                 "a lead for manual follow-up.")]},
+                                 "disclosure + forged-JWT admin takeover "
+                                 "verified with verbatim evidence; "
+                                 "host-header reflection left as a lead "
+                                 "for manual follow-up.")]},
     ]
     cfg = Config(target=base, allow_private=True,
                  session_dir=Path(args.session_dir),
-                 model="scripted-demo", max_turns=12, rate_rps=0)
+                 model="scripted-demo", max_turns=16, rate_rps=0)
     if args.team:
         result = _demo_team(cfg, base, _t, args, ScriptedClient)
     else:

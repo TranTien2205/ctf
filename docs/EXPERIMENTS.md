@@ -12,11 +12,13 @@ export ANTHROPIC_API_KEY=...          # or rely on Claude Code OAuth
 python lab/vulnapp.py 8777            # deterministic vulnerable app
 ```
 
-The lab plants one bug per probe family (SQLi, XSS, IDOR, SSRF, XXE, CSRF,
-XFH, NoSQLi, upload, race, deserialization, cache poisoning, prototype
-pollution, JWT weak secret, host-header, method, CORS, redirect, LFI, SSTI,
-time-based injection, GraphQL, CSRF) plus recon surface (robots, .git,
-sourcemap, hidden routes). Each run resets state at `make_server`.
+The lab plants one bug per probe family (SQLi, NoSQLi, XSS, IDOR, SSRF,
+XXE, CSRF, XFH/ACL-bypass, upload, race, deserialization, cache
+poisoning+deception, prototype pollution, JWT weak secret, CORS,
+open-redirect, CRLF, LFI, SSTI, time-based injection, request smuggling,
+user-enum, login lockout, mass-assignment, GraphQL, WebSocket, info
+disclosure) plus recon surface (robots, .git, sourcemap, hidden routes).
+Each run resets state at `make_server`.
 
 ## Procedure
 
@@ -61,7 +63,7 @@ python -m argus sessions --session-dir exp/single-1
 Report medians per configuration: findings count, requests, tokens,
 time-to-first-finding, endpoints covered. The offline check
 `python -m argus demo` / `demo --team` reproduces the pipeline shape without
-spending tokens (3 seeded findings on both paths).
+spending tokens (5 seeded findings single / 4 on the team path).
 
 ## Controls
 
