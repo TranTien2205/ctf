@@ -7,7 +7,7 @@ import json
 import time
 from pathlib import Path
 
-from ..session import Session, _cwe_of
+from ..session import Session, _cwe_of, _owasp_of
 
 _LEVEL = {"critical": "error", "high": "error", "medium": "warning",
           "low": "warning", "info": "note"}
@@ -47,6 +47,7 @@ def render_sarif(session: Session) -> Path:
                 "argus-severity": f["severity"],
                 "cvss": f.get("cvss", ""),
                 "cwe": cwe,
+                "owasp": f.get("owasp") or _owasp_of(cwe),
                 "evidence_ids": f.get("evidence_ids", []),
                 "evidence_excerpt": (f.get("evidence_excerpt") or "")[:500],
                 "remediation": f.get("remediation", ""),

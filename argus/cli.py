@@ -186,8 +186,9 @@ def main(argv: list[str] | None = None) -> int:
             for f in data:
                 cvss = f" [{f['cvss']}]" if f.get("cvss") else ""
                 cwe = f" {f['cwe']}" if f.get("cwe") else ""
+                ow = f" <{f['owasp']}>" if f.get("owasp") else ""
                 print(f"[{f['severity'].upper():8}] {f['id']} {f['title']}"
-                      f" ({f['url']}){cwe}{cvss}")
+                      f" ({f['url']}){cwe}{ow}{cvss}")
         return 0
 
     if args.cmd == "skills":

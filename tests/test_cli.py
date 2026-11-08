@@ -109,6 +109,26 @@ def test_finding_carries_cwe(tmp_path):
     assert "CWE-89" in (sdir / "report.md").read_text()
 
 
+def test_finding_carries_owasp(tmp_path):
+    """CWE -> OWASP Top 10 (2021) bucket: findings, md summary table,
+    html and sarif all carry the taxonomy audit reports speak in."""
+    from argus.session import _owasp_of
+    assert _owasp_of("CWE-89") == "A03 Injection"
+    assert _owasp_of("CWE-918") == "A10 SSRF"
+    assert _owasp_of("CWE-999") == ""
+    rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
+    assert rc == 0
+    (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
+    findings = json.loads((sdir / "findings.json").read_text())
+    ow = {f["category"]: f.get("owasp") for f in findings}
+    assert ow["sqli"] == "A03 Injection" and ow["jwt"] == \
+        "A02 Cryptographic Failures"
+    md = (sdir / "report.md").read_text()
+    assert "OWASP Top 10 (2021)" in md and "A03 Injection" in md
+    sarif = json.loads((sdir / "report.sarif").read_text())
+    assert sarif["runs"][0]["results"][0]["properties"]["owasp"]
+
+
 def test_tools_allowlist_validation(capsys):
     """--tools: bad names fail fast with the valid list; good names are
     restricted to exactly those tools (finish auto-included)."""

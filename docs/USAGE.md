@@ -186,7 +186,8 @@ compare `run` vs `team` on speed, coverage and cost.
 
 Each finding carries `severity`, optional `cvss`, and an auto-mapped `cwe`
 (the named bug class resolves to the canonical CWE identifier, e.g.
-`sqli` -> CWE-89; unknown categories simply omit it), plus verbatim
+`sqli` -> CWE-89 -> OWASP A03 Injection; unknown categories simply omit
+both), plus verbatim
 `evidence_excerpt` and cited `evidence_ids`.
 
 `python -m argus findings <session_dir>` reprints the table;

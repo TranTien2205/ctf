@@ -324,6 +324,10 @@ def main() -> int:
     check("finding carries auto-mapped CWE",
           json.loads((sdir / "findings.json").read_text())[0]
           .get("cwe") == "CWE-89")
+    check("finding carries OWASP Top10 bucket",
+          json.loads((sdir / "findings.json").read_text())[0]
+          .get("owasp") == "A03 Injection"
+          and "OWASP Top 10" in (sdir / "report.md").read_text())
     sarif = json.loads((sdir / "report.sarif").read_text())
     check("report.sarif is valid 2.1.0",
           sarif["version"] == "2.1.0"

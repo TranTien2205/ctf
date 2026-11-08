@@ -142,6 +142,42 @@ def _cwe_of(category: str) -> str:
     return _CWE.get(re.sub(r"[^a-z0-9]", "", (category or "").lower()), "")
 
 
+# CWE -> OWASP Top 10 (2021) bucket. This is the taxonomy audit reports
+# are actually summarized in; findings carry both labels.
+_OWASP = {
+    "CWE-639": "A01 Broken Access Control",
+    "CWE-22": "A01 Broken Access Control",
+    "CWE-601": "A01 Broken Access Control",
+    "CWE-352": "A01 Broken Access Control",
+    "CWE-200": "A01 Broken Access Control",
+    "CWE-1385": "A01 Broken Access Control",
+    "CWE-347": "A02 Cryptographic Failures",
+    "CWE-89": "A03 Injection",
+    "CWE-943": "A03 Injection",
+    "CWE-78": "A03 Injection",
+    "CWE-1336": "A03 Injection",
+    "CWE-79": "A03 Injection",
+    "CWE-113": "A03 Injection",
+    "CWE-915": "A04 Insecure Design",
+    "CWE-362": "A04 Insecure Design",
+    "CWE-611": "A05 Security Misconfiguration",
+    "CWE-434": "A05 Security Misconfiguration",
+    "CWE-525": "A05 Security Misconfiguration",
+    "CWE-444": "A05 Security Misconfiguration",
+    "CWE-942": "A05 Security Misconfiguration",
+    "CWE-749": "A05 Security Misconfiguration",
+    "CWE-204": "A07 AuthN Failures",
+    "CWE-307": "A07 AuthN Failures",
+    "CWE-502": "A08 Integrity Failures",
+    "CWE-918": "A10 SSRF",
+    "CWE-98": "A08 Integrity Failures",
+}
+
+
+def _owasp_of(cwe: str) -> str:
+    return _OWASP.get(cwe or "", "")
+
+
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
                  resume: Path | None = None):
@@ -377,6 +413,9 @@ class Session:
             cwe = _cwe_of(category)
             if cwe:
                 finding["cwe"] = cwe
+                owasp = _owasp_of(cwe)
+                if owasp:
+                    finding["owasp"] = owasp
             self.findings.append(finding)
             self.findings_path.write_text(
                 json.dumps(self.findings, indent=2, ensure_ascii=False)

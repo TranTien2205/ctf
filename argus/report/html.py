@@ -6,7 +6,7 @@ import html
 import time
 from pathlib import Path
 
-from ..session import Session, SEVERITIES, _cwe_of
+from ..session import Session, SEVERITIES, _cwe_of, _owasp_of
 from ..config import Config
 from .markdown import _coverage, _SEV_ORDER
 
@@ -73,6 +73,8 @@ def render_html(session: Session, cfg: Config, summary: str = "",
                if f.get("cvss") else "")
             + (f" &nbsp; <b>CWE:</b> <code>{_esc(f.get('cwe') or _cwe_of(f.get('category')))}</code>"
                if f.get("cwe") or _cwe_of(f.get("category")) else "")
+            + (f" &nbsp; <b>OWASP:</b> {_esc(f.get('owasp') or _owasp_of(f.get('cwe') or _cwe_of(f.get('category'))))}"
+               if f.get("owasp") or _owasp_of(f.get("cwe") or _cwe_of(f.get("category"))) else "")
             + f"</p><p><b>Description</b><br>{_esc(f['description'])}</p>"
             f"<p><b>Proof (verbatim excerpt)</b></p>"
             f"<pre>{_esc(f['evidence_excerpt'][:1200])}</pre>"

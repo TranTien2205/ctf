@@ -8,7 +8,7 @@ import urllib.parse
 from pathlib import Path
 
 from ..config import Config
-from ..session import SEVERITIES, Session, _cwe_of
+from ..session import SEVERITIES, Session, _cwe_of, _owasp_of
 
 _SEV_ORDER = {s: i for i, s in enumerate(SEVERITIES)}
 _SEV_LABEL = {
@@ -123,6 +123,17 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             lines.append(f"| {_SEV_LABEL[sev]} | {counts[sev]} |")
     if not findings:
         lines.append("| - | 0 |")
+    def _o(f):
+        return f.get("owasp") or _owasp_of(
+            f.get("cwe") or _cwe_of(f.get("category")))
+    owasp_counts: dict[str, list] = {}
+    for f in findings:
+        if _o(f):
+            owasp_counts.setdefault(_o(f), []).append(f["id"])
+    if owasp_counts:
+        lines += ["", "| OWASP Top 10 (2021) | Findings |", "|---|---|"]
+        for o in sorted(owasp_counts):
+            lines.append(f"| {o} | {', '.join(owasp_counts[o])} |")
     lines += [
         "",
         "## Engagement constraints",
@@ -146,6 +157,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             f"- **Category:** {f['category']}",
             *([f"- **CWE:** `{f.get('cwe') or _cwe_of(f['category'])}`"]
               if f.get("cwe") or _cwe_of(f.get("category")) else []),
+            *([f"- **OWASP:** {f.get('owasp') or _owasp_of(f.get('cwe') or _cwe_of(f['category']))}"]
+              if f.get("owasp") or _owasp_of(f.get("cwe") or _cwe_of(f.get("category"))) else []),
             f"- **Endpoint:** {_code(f['url'])}",
             f"- **Evidence:** {', '.join(f['evidence_ids'])}",
             "",
