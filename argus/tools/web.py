@@ -444,6 +444,7 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
                         body=body, tool="graphql_introspect",
                         note="introspection query")
     raw = r.get("body") or ""
+    g = None  # only set when the GET fallback actually ran
     try:
         doc = _json.loads(raw)
     except ValueError:
@@ -464,7 +465,7 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
     if not isinstance(doc, dict):
         return {"verdict": "no schema (non-object JSON response)",
                 "request_id": r["request_id"],
-                "get_request_id": g.get("request_id"),
+                "get_request_id": g.get("request_id") if g else None,
                 "status": r["status"]}
     schema = ((doc.get("data") or {}).get("__schema")
               if isinstance(doc.get("data"), dict) else None)
