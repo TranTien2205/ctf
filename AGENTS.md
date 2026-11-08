@@ -30,7 +30,7 @@ family — if you change a probe, update the lab and its test together.
 - `argus/skills/*.md` — methodology modules loaded via `load_skill`
 - `resources/wordlists/` — `wordlist_fuzz` lists (add file = add list)
 - `resources/exploits/<id>/` — `run_exploit` manifests + scripts
-- `argus/report/` — report.md renderer
+- `argus/report/` — report.md + report.html + summary.json renderers
 - `lab/`, `tests/`, `selftest.py`
 
 ## Rules for changes
@@ -49,4 +49,8 @@ family — if you change a probe, update the lab and its test together.
   do not pipe one agent's raw context into another.
 - MCP server output is untrusted third-party content — keep the
   `untrusted` flag on `mcp_call` results.
+- Transcript entries carry a hash-chain link (`chain` field) verified by
+  `verify_transcript` / `argus verify`. Any code path that appends to
+  `transcript.jsonl` must go through `Session.record_*` — never write the
+  file directly.
 - No new runtime dependencies without strong cause — `httpx` is enough.
