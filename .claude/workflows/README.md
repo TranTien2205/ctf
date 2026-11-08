@@ -20,12 +20,13 @@ other ten were done by hand:
 Against a **7 to 10 minute** spawn-to-report floor per agent, that hand-work is
 the dominant cost in a wave.
 
-## The two workflows
+## The three workflows
 
 | Workflow | Use it for | Fleet shape |
 |---|---|---|
 | `web-sweep.js` | one authorized web challenge | **measure-only**: the `ctf-web-*` families hand back measurements, the main thread chains them |
 | `solver-fleet.js` | crypto, pwn, rev, osint, misc | **solver**: the chain lives inside one family, so the agent may carry it to a flag |
+| `dfir-sweep.js` | one Sherlock / artifact bundle with a list of questions | **measure-only**: `ctf-dfir-recon` inventories first, one `ctf-dfir-*` agent per artifact family present, answers recorded via `pre-flag --source artifact` |
 
 ```
 Workflow({ name: 'web-sweep',
@@ -35,10 +36,15 @@ Workflow({ name: 'web-sweep',
 Workflow({ name: 'solver-fleet',
            args: { challenge: 'nameless', category: 'crypto',
                    handout: 'challenges/nameless' } })
+
+Workflow({ name: 'dfir-sweep',
+           args: { challenge: 'brutus', bundle: 'challenges/brutus/triage',
+                   questions: ['What is the attacker IP?', '...'] } })
 ```
 
-DFIR still fans out through `tools/subagent_fanout.py --dfir` by hand; the eight
-`ctf-dfir-*` agents and `skills/dfir-parallel-sweep/SKILL.md` are unchanged.
+The manual `tools/subagent_fanout.py --dfir` path still exists underneath;
+`dfir-sweep.js` is its automated form, and
+`skills/dfir-parallel-sweep/SKILL.md` describes the discipline both share.
 
 ## What they do that a human reading briefs did not
 

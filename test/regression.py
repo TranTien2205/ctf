@@ -1238,6 +1238,24 @@ class ContractTests(unittest.TestCase):
                          "a workflow script appears to delegate tools/hooks.py "
                          "or tools/state.py to a subagent: %s" % offenders)
 
+    def test_every_workflow_script_is_named_in_the_readme(self):
+        """The README is the discovery surface; an unlisted workflow is invisible.
+
+        It listed exactly two workflows while a third, dfir-sweep.js, already
+        sat in the directory. Nothing broke — the fleet just went unused. The
+        check is deliberately literal: the file name must appear in the text.
+        """
+        workflows = ROOT / ".claude" / "workflows"
+        readme = workflows / "README.md"
+        if not workflows.is_dir() or not readme.is_file():
+            self.skipTest("no .claude/workflows/ in this tree")
+        text = readme.read_text(encoding="utf-8")
+        missing = [p.name for p in sorted(workflows.glob("*.js"))
+                   if p.name not in text]
+        self.assertEqual(missing, [],
+                         "workflow scripts exist that the README never names: %s"
+                         % missing)
+
     def test_every_tool_flag_named_in_prose_exists(self):
         """The path test's sibling, one level down: the FLAGS have to be real too.
 
