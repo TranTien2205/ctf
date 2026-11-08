@@ -1141,7 +1141,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 906,
+      "skill_tokens": 939,
       "depth_files": 3,
       "depth_tokens": 631,
       "use_when": [
@@ -1428,7 +1428,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 918,
+      "skill_tokens": 953,
       "depth_files": 3,
       "depth_tokens": 992,
       "use_when": [

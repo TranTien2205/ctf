@@ -21,7 +21,7 @@ point and record what actually happens in `field-notes.md`.
 
 ## First probe
 
-run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a pattern you generate yourself -- pwntools is absent here
+run python3 tools/pwn_triage.py on the binary FIRST for the protections with the evidence that decided each, then measure the exact offset to the saved return address empirically with a cyclic pattern -- pwntools is absent here, so `python3 tools/pwn_cyclic.py <len>` generates the De Bruijn pattern and `python3 tools/pwn_cyclic.py --find <faulting-register>` reads the offset back
 
 **Falsifier** — the observation that closes this class: the read is bounded by a length the input cannot influence, so no write reaches saved state; note that a STATIC binary carries __stack_chk_fail even when built -fno-stack-protector, so confirm a canary from the %fs:0x28 load in the disassembly rather than from the import
 ## Recognise

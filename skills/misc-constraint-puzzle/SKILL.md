@@ -64,7 +64,9 @@ format edges that break solvers.
 ## Operational probe
 
 ```bash
-nc host 31337 | head -20   # capture banner + first prompt verbatim
+python3 tools/net_dialog.py host 31337          # banner grab, like nc | head
+# scripted rounds once the protocol is captured:
+python3 tools/net_dialog.py host 31337 --steps 'wait:> ; send:1\n ; dump'
 ```
 
 ## Routing
