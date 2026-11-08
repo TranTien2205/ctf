@@ -70,6 +70,11 @@ tshark -r cap.pcap --export-objects http,./objs
 tshark -r cap.pcap -Y dns -T fields -e dns.qry.name | sort -u | head
 ```
 
+Queries that look like chunked data under one suffix domain are a DNS
+tunnel — reassemble with `tools/forensics/dns_exfil.py --pcap cap.pcap`
+(strips the suffix, joins labels in packet or index order, tries
+hex/base32/base64). Also accepts `--names queries.txt`.
+
 ## Routing
 
 Shares signals with: `../dfir-network-exfil-trace/`, `../misc-encoding-carrier/`. Check those before committing to this one.
