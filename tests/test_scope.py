@@ -73,6 +73,24 @@ def test_excluded_path_denied():
     g.check("https://target.example/administer")  # prefix boundary
 
 
+def test_excluded_path_bypass_attempts_denied():
+    """httpx decodes %XX and resolves .. before the wire, so exclusions
+    must be checked on the normalized path too."""
+    g = ScopeGuard("https://target.example", exclude_paths=["/admin"],
+                   allow_private=False)
+    for u in ("https://target.example/%61dmin",
+              "https://target.example/%2561dmin",   # double-encoded
+              "https://target.example/x/../admin",
+              "https://target.example/x/./../admin",
+              "https://target.example/ADMIN/../admin",
+              "https://target.example/x/%2e%2e/admin"):
+        with pytest.raises(ScopeError, match="excluded"):
+            g.check(u)
+    # normalization must not over-block siblings
+    g.check("https://target.example/x/../administer")
+    g.check("https://target.example/%61dminister")
+
+
 def test_private_refused_by_default():
     g = ScopeGuard("https://target.example", extra_hosts=["internal.example"],
                    allow_private=False)

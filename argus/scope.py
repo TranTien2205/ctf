@@ -11,6 +11,7 @@ initial target itself was private (a lab). Resolution is cached per host.
 from __future__ import annotations
 
 import ipaddress
+import posixpath
 import socket
 import urllib.parse
 
@@ -81,8 +82,22 @@ class ScopeGuard:
                 f"{host} resolves to a private/loopback address; pass --allow-private to permit"
             )
         path = parsed.path or "/"
+        # httpx normalizes dot-segments AND percent-decodes before the wire,
+        # so exclusion must match what is actually sent - a raw-path check
+        # alone is bypassed by /%61dmin or /x/../admin reaching /admin.
+        norm = path
+        for _ in range(3):  # unquote until stable: defeats double-encoding
+            dec = urllib.parse.unquote(norm)
+            if dec == norm:
+                break
+            norm = dec
+        norm = posixpath.normpath(norm)
+        if not norm.startswith("/"):
+            norm = "/" + norm
         for prefix in self.exclude_paths:
-            if prefix and (path == prefix or path.startswith(prefix + "/")):
+            if prefix and (
+                    path == prefix or path.startswith(prefix + "/")
+                    or norm == prefix or norm.startswith(prefix + "/")):
                 raise ScopeError(f"path excluded by scope rules: {path}")
         return parsed
 
