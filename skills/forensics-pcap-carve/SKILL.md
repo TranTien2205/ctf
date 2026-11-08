@@ -43,8 +43,11 @@ interesting is a lead.
    save format): `convs` for the protocol-hierarchy answer, `dns`
    for the query-name carve, `ascii` for the strings pass, `follow N`
    for one stream per direction, `http --out objs/` for the
-   export-objects equivalent — the most common flag carrier. Its own
-   output says where it is weaker than tshark (seq-overlap not verified).
+   export-objects equivalent — the most common flag carrier — and
+   `fields cap.pcap --field ttl|ipid|dport|tcpflags|icmp|len` for the
+   one-value-per-packet split-flag carriers (the `-T fields -e` trick).
+   Its own output says where it is weaker than tshark (seq-overlap not
+   verified).
 1. `tshark -r cap -q -z io,phs` — the protocol hierarchy tells you which
    channel dominates; start there, not with a global strings run.
 2. `--export-objects` for HTTP/SMB/TFTP — reassembled files are the most

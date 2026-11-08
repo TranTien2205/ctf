@@ -15,6 +15,7 @@ undecoded, honestly.
     python3 tools/forensics/pcap_parse.py dns cap.pcap
     python3 tools/forensics/pcap_parse.py ascii cap.pcap --min 8
     python3 tools/forensics/pcap_parse.py follow cap.pcap --flow 0 --dir 0
+    python3 tools/forensics/pcap_parse.py fields cap.pcap --field ttl
     python3 tools/forensics/pcap_parse.py --selftest
 """
 from __future__ import annotations
@@ -435,7 +436,94 @@ def _selftest() -> int:
         cmd_dns(ns2)
     assert "flag.example.com" in json.loads(buf.getvalue())["queries"]
     os.unlink(ngpath)
+    # fields: a TTL-per-packet carrier spelling flag{ttl}
+    def udp_ttl(ttl):
+        udp = struct.pack(">HHHH", 53000, 53, 8, 0)
+        ip = bytes([0x45, 0, 0, 20 + len(udp), 0, 0, 0, 0, ttl, 17,
+                    0, 0, 10, 0, 0, 1, 8, 8, 8, 8])
+        return b"\x00" * 12 + b"\x08\x00" + ip + udp
+    with tempfile.NamedTemporaryFile(suffix=".pcap", delete=False) as fh:
+        fh.write(struct.pack("<IHHIIII", 0xA1B2C3D4, 2, 4, 0, 0, 65535, 1))
+        for i, c in enumerate(b"flag{ttl}"):
+            p = udp_ttl(c)
+            fh.write(struct.pack("<IIII", i, 0, len(p), len(p)) + p)
+        tpath = fh.name
+    ns3 = argparse.Namespace(pcap=tpath, field="ttl")
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cmd_fields(ns3)
+    fres = json.loads(buf.getvalue())
+    assert fres["flag_patterns"] == ["flag{ttl}"], fres
+    os.unlink(tpath)
     print("pcap_parse selftest: ok")
+    return 0
+
+
+def _field(pkt, name):
+    """Pull one header field from a raw Ethernet/IPv4 frame — the carriers
+    authors use for one-value-per-packet exfil."""
+    if len(pkt) < 14:
+        return None
+    eth = struct.unpack(">H", pkt[12:14])[0]
+    if eth == 0x8100 and len(pkt) > 18:
+        pkt = pkt[:12] + pkt[16:]
+    elif eth != 0x0800:
+        return None
+    if len(pkt) < 34:
+        return None
+    ihl = (pkt[14] & 0x0F) * 4
+    ip = pkt[14:14 + ihl]
+    proto = ip[9]
+    l4 = pkt[14 + ihl:]
+    if name == "len":
+        return len(pkt)
+    if name == "ttl":
+        return ip[8]
+    if name == "ipid":
+        return struct.unpack(">H", ip[4:6])[0]
+    if name == "sport" and proto in (6, 17) and len(l4) >= 4:
+        return struct.unpack(">H", l4[:2])[0]
+    if name == "dport" and proto in (6, 17) and len(l4) >= 4:
+        return struct.unpack(">H", l4[2:4])[0]
+    if name == "tcpflags" and proto == 6 and len(l4) >= 14:
+        return l4[13]
+    if name == "icmp" and proto == 1 and len(l4) > 8:
+        return l4[8:]
+    return None
+
+
+def cmd_fields(args):
+    """`tshark -T fields -e <f>` equivalent for the split-flag carriers:
+    ordered values per packet, plus a joined-bytes guess at what they
+    spell. Low bytes become chars; icmp already returns payload."""
+    linktype, pkts, err = parse_pcap(args.pcap)
+    if err:
+        print(json.dumps({"error": err}))
+        return 1
+    vals = []
+    for _ts, raw in pkts:
+        v = _field(raw, args.field)
+        if v is not None:
+            vals.append(v)
+    if vals and isinstance(vals[0], bytes):
+        joined = b"".join(vals)
+        byteview = joined
+    else:
+        lo = bytes(v & 0xFF for v in vals)
+        joined = lo
+        byteview = lo
+    printable = sum(1 for b in byteview if 32 <= b < 127 or b in (9, 10))
+    flags = re.findall(rb"[a-zA-Z0-9_]+\{[^}]{1,80}\}", byteview)
+    print(json.dumps({
+        "field": args.field, "packets": len(vals),
+        "values": [v.hex() if isinstance(v, bytes) else v
+                   for v in vals[:64]],
+        "joined_hex": byteview[:256].hex(),
+        "joined_printable_ratio": round(printable / max(1, len(byteview)), 2),
+        "flag_patterns": [f.decode("utf-8", "replace") for f in flags],
+        "note": "values are in packet order; if joined bytes read as "
+                "ASCII the field was the carrier — try adjacent fields "
+                "when the byte view is noise"}))
     return 0
 
 
@@ -456,6 +544,13 @@ def main(argv=None) -> int:
     h = sub.add_parser("http", help="carve HTTP response objects to --out")
     h.add_argument("pcap"); h.add_argument("--out", default="objects")
     h.set_defaults(fn=cmd_http)
+    fd = sub.add_parser("fields", help="per-packet field carve "
+                        "(one-byte-per-packet hides)")
+    fd.add_argument("pcap")
+    fd.add_argument("--field", required=True,
+                    choices=["len", "ttl", "ipid", "sport", "dport",
+                             "tcpflags", "icmp"])
+    fd.set_defaults(fn=cmd_fields)
     ap.add_argument("--selftest", action="store_true")
     args = ap.parse_args(argv)
     if args.selftest:
