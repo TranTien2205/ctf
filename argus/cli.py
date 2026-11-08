@@ -116,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
         "verify", help="verify a session's transcript hash chain "
                        "(tamper-evidence check)")
     p_ver.add_argument("session_dir")
+    p_ver.add_argument("--json", action="store_true",
+                       help="print the raw verification result as JSON")
 
     p_cmp = sub.add_parser(
         "compare", help="compare sessions' metrics side by side "
@@ -294,6 +296,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "verify":
         from .session import verify_transcript
         res = verify_transcript(Path(args.session_dir))
+        if args.json:
+            # machine-readable verdict for CI: ok mirrors the exit code
+            res["ok"] = not (res.get("error") or not res.get("chained")
+                             or res.get("bad_lines")
+                             or res.get("tail_truncated")
+                             or res.get("anchor_missing")
+                             or res.get("findings_bad")
+                             or res.get("artifact_mismatch"))
+            print(json.dumps(res, indent=2, ensure_ascii=False))
+            return 0 if res["ok"] else 1
         if res.get("error"):
             print(res["error"])
             return 1

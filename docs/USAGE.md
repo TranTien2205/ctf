@@ -216,7 +216,8 @@ the mutable head/duration fields) into the transcript - post-run edits
 to ANY session artifact, even a byte, surface as `TAMPERED: [...] edited
 since the run was sealed`. `argus report` re-renders re-seal the fresh
 artifacts, skip failing findings and warn when the chain itself is
-broken; `argus findings` marks failing rows `UNVERIFIED`.
+broken; `argus findings` marks failing rows `UNVERIFIED`. `verify --json`
+emits the raw result (`ok` mirrors the exit code) for CI pipelines.
 
 Secret header **values** (`Authorization`, `Cookie`, `Set-Cookie`,
 `X-*-Token` and any header carrying a `--header`-configured secret) are

@@ -50,3 +50,26 @@ def test_sealed_artifacts_detect_edits(tmp_path):
     assert verify_transcript(sdir)["artifact_mismatch"] == ["findings.json"]
     fp.write_text(orig, encoding="utf-8")
     assert not verify_transcript(sdir).get("artifact_mismatch")
+
+
+def test_verify_json_output(tmp_path, capsys):
+    """`argus verify --json` prints the machine-readable verdict and maps
+    the same failures to the exit code."""
+    import json
+    from argus.cli import main
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    capsys.readouterr()  # flush demo output before reading --json stdout
+    assert main(["verify", str(sdir), "--json"]) == 0
+    res = json.loads(capsys.readouterr().out)
+    assert res["ok"] and res["chained"] and res["findings_checked"] == 5
+    assert "findings.json" in res["sealed"]
+    # tamper -> ok flips false and rc goes 1
+    fp = sdir / "findings.json"
+    orig = fp.read_bytes()
+    d = json.loads(orig)
+    d[0]["severity"] = "low"
+    fp.write_text(json.dumps(d, indent=2), encoding="utf-8")
+    assert main(["verify", str(sdir), "--json"]) == 1
+    res = json.loads(capsys.readouterr().out)
+    assert not res["ok"] and res["artifact_mismatch"] == ["findings.json"]
