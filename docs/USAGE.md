@@ -20,10 +20,14 @@ Checked in this order - first hit wins:
    `%LOCALAPPDATA%\opencode\auth.json`)
 
 `python -m argus check` performs a real tiny API call and tells you which
-source resolved. Note: OAuth (subscription) auth bills calls to your
-account's "extra usage" budget, not plan limits - on a constrained
-account the full 54-tool schema may be rejected (`--tools` shrinks it;
-team mode splits tools across role cards and fits under the cap).
+source resolved, then retries with the full tool schema. Exit codes:
+0 = auth works and the full surface is accepted; 1 = no credentials or
+auth rejected; 2 = auth works but the tool surface was rejected
+(degraded - constrain it). Note: OAuth (subscription) auth bills calls
+to your account's "extra usage" budget, not plan limits - on a
+constrained account the full ~46-tool schema may be rejected
+(`--tools` shrinks it; team mode splits tools across role cards and
+fits under the cap).
 
 ## Run
 
@@ -59,6 +63,7 @@ python -m argus run https://app.example \
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
+| `--session-dir` | `sessions` | where run artifacts land |
 | `--quiet` | off | suppress console trace |
 
 ## Offline demo
@@ -70,8 +75,8 @@ python -m argus demo --team   # same, through the lead/worker pipeline
 ```
 
 Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
-agent loop, and lands four evidence-gated findings (SQLi, XSS, IDOR,
-info-disclosure) in a
+agent loop, and lands five evidence-gated findings (SQLi, XSS, IDOR,
+info-disclosure, weak-JWT forge) in a
 normal session dir - use it to demo the pipeline at a defense without
 spending tokens. `--team` runs the same assessment through TeamRun: a lead
 seeds the lead queue, a recon worker maps the surface, and an exploit worker
