@@ -154,6 +154,9 @@ def main() -> int:
           out["union"]["columns"] == 2)
     out = probes.probe_time(ctx, base + "/ping?host=1", "host", delay_s=2)
     check("time probe sees cmd delay", "cmd" in out["verdict"])
+    slow = {r["family"] for r in out["results"] if r["slow"]}
+    check("time probe sees sql delays",
+          {"mysql", "postgres", "mssql", "mysql-benchmark"} <= slow)
     out = probes.probe_ssti(ctx, base + "/hello?name=x", "name")
     check("ssti probe sees eval", "ssti candidate" in out["verdict"])
     out = probes.probe_lfi(ctx, base + "/download?file=x", "file")
@@ -202,6 +205,9 @@ def main() -> int:
           "deserialization surface" in out["verdict"])
     out = probes.probe_cache(ctx, base + "/cached")
     check("cache probe sees unkeyed xfh", "candidate" in out["verdict"])
+    out = probes.probe_cache(ctx, base + "/profile")
+    check("cache probe flags path confusion",
+          "path confusion" in out["verdict"] and out["deception"])
     out = probes.probe_ppoll(ctx, base + "/api/config",
                              base + "/api/config")
     check("ppoll probe sees merged key",

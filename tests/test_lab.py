@@ -185,6 +185,9 @@ def test_deserialize_probe(lab_url, ctx):
 def test_cache_probe(lab_url, ctx):
     out = probes.probe_cache(ctx, lab_url + "/cached")
     assert "cache-poisoning candidate" in out["verdict"], out
+    out = probes.probe_cache(ctx, lab_url + "/profile")
+    assert "path confusion" in out["verdict"], out
+    assert out["deception"]["similarity"] > 0.9, out
 
 
 def test_ppoll_probe(lab_url, ctx):

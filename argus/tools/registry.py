@@ -381,9 +381,11 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_cache",
-        "Cache-poisoning check: poisons via unkeyed X-Forwarded-Host, then "
-        "fetches clean - poisoned bytes served to the clean request mean "
-        "the header is unkeyed input into a shared cache.",
+        "Cache check: poisons via unkeyed X-Forwarded-Host then fetches "
+        "clean (poisoned bytes served to a clean request = unkeyed input "
+        "into a shared cache), then tests cache deception - the same page "
+        "resolving under a .css suffix is path confusion exploitable "
+        "behind extension-keyed caches.",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
     ),

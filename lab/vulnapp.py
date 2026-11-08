@@ -24,6 +24,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /redeem               race condition (unlocked check-then-act)
     GET  /import?data=         deserialization (magic bytes -> parser error)
     GET  /cached               cache poisoning (X-Forwarded-Host unkeyed)
+    GET  /profile[/x.css]      cache deception (path confusion)
     GET+POST /api/config       prototype pollution (__proto__ merge)
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
@@ -243,14 +244,32 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/ping":
             host = p.get("host", "")
             m = re.search(r"sleep\s+(\d+)", host)
+            sql = (re.search(r"SLEEP\((\d+)\)", host) or
+                   re.search(r"pg_sleep\((\d+)\)", host) or
+                   re.search(r"WAITFOR DELAY '0:0:(\d+)'", host))
+            bench = re.search(r"BENCHMARK\((\d+)", host)
             if re.search(r"[;&|`$(]", host) and m:
                 time.sleep(min(int(m.group(1)), 8))
+                self._send(body="<html><body>PING ok</body></html>")
+            elif sql:
+                time.sleep(min(int(sql.group(1)), 8))
+                self._send(body="<html><body>PING ok</body></html>")
+            elif bench:
+                # heavy query: iterations, not seconds - ~1s per million
+                time.sleep(min(int(bench.group(1)) // 1_000_000, 8))
                 self._send(body="<html><body>PING ok</body></html>")
             elif re.search(r"[;&|`$(]", host):
                 self._send(500, "<html><body>sh: syntax error</body></html>")
             else:
                 self._send(body=f"<html><body>PING {host}: 4 packets, 0% loss"
                                 f"</body></html>")
+
+        elif path == "/profile" or path.startswith("/profile/"):
+            # path confusion: the same private page resolves under any
+            # suffix - a static-extension URL is cacheable by a CDN
+            body = ("<html><body>Profile: bob &lt;bob@lab.local&gt; "
+                    "ssn=123-45-6789</body></html>")
+            self._send(body=body)
 
         elif path == "/hello":
             name = p.get("name", "guest")
