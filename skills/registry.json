@@ -1540,7 +1540,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1798,
+      "skill_tokens": 1924,
       "depth_files": 5,
       "depth_tokens": 11455,
       "use_when": [

