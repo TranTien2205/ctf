@@ -7,7 +7,8 @@ zlib -> unfilter (all five filter types), BMP header + pixel array. It
 then walks the zsteg-equivalent matrix — bit planes 1-3, channel sets
 r/g/b/rgb/bgr/alpha, row and column order, lsb- and msb-first packing —
 and reports any extraction whose bytes decode to printable text, with
-the flag-format pass on top.
+the flag-format pass on top. WAV input takes the same matrix over PCM
+sample bytes (8-bit raw, 16-bit little-endian split lo/hi).
 
 Bounded: images capped at 8M pixels, output capped at 1 MiB per stream,
 8-bit channels only (16-bit and interlaced PNG reported as unsupported
@@ -165,12 +166,54 @@ def printable_ratio(bs):
     return good / min(len(bs), 4096)
 
 
+def wav_samples(path):
+    """PCM samples out of a RIFF WAV. Returns a pseudo-image: every
+    sample's channel bytes become pixel channels so the same bit-plane
+    matrix applies. 8/16-bit PCM only; >2-channel audio folded flat."""
+    raw = open(path, "rb").read()
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WAVE":
+        return None, "not a WAV"
+    off, fmt, data = 12, None, None
+    while off + 8 <= len(raw):
+        cid, ln = raw[off:off + 4], struct.unpack("<I", raw[off + 4:off + 8])[0]
+        body = raw[off + 8:off + 8 + ln]
+        off += 8 + ln + (ln & 1)
+        if cid == b"fmt ":
+            fmt = struct.unpack("<HHIIHH", body[:16])
+        elif cid == b"data":
+            data = body
+            break
+    if not fmt or data is None:
+        return None, "no fmt/data chunk"
+    audio, nch, _rate, _br, _align, bits = fmt
+    if audio != 1 or bits not in (8, 16):
+        return None, "unsupported WAV (audio=%s bits=%s)" % (audio, bits)
+    bps = bits // 8
+    px = []
+    if bits == 8:
+        for i in range(0, len(data) - bps + 1, bps):
+            px.append(tuple(data[i:i + bps]) + (255,) * (4 - bps))
+    else:
+        for i in range(0, len(data) - bps * nch + 1, bps * nch):
+            for c in range(nch):
+                s = struct.unpack_from("<h", data, i + c * bps)[0]
+                px.append((s & 0xFF, (s >> 8) & 0xFF, 0, 255))
+    if len(px) > _MAXPX:
+        px = px[:_MAXPX]
+    w = 1024
+    h = (len(px) + w - 1) // w
+    px += [(0, 0, 0, 255)] * (w * h - len(px))
+    return (w, h, px), None
+
+
 def scan(path, planes=(1, 2, 3)):
     ext = os.path.splitext(path)[1].lower()
     if ext == ".png":
         got, err = png_pixels(path)
     elif ext == ".bmp":
         got, err = bmp_pixels(path)
+    elif ext == ".wav":
+        got, err = wav_samples(path)
     else:
         return None, "unsupported extension %s" % ext
     if err:
@@ -235,6 +278,26 @@ def _selftest() -> int:
         assert any(h_["flag"] and "lsb_w0rks" in h_["flag"]
                    for h_ in out["hits"]), out
         assert "b1,r,xy,lsb" in streams, streams
+        # WAV: flag in the LSB of 8-bit PCM samples
+        samples = bytearray(b"\x80" * 4096)
+        wbits = []
+        for byte in pt:
+            wbits += [(byte >> j) & 1 for j in range(8)]
+        for i, b in enumerate(wbits):
+            samples[i] = (samples[i] & ~1) | b
+        wav = (b"RIFF" + struct.pack("<I", 36 + len(samples)) + b"WAVE"
+               + b"fmt " + struct.pack("<IHHIIHH", 16, 1, 1, 8000,
+                                       8000, 1, 8)
+               + b"data" + struct.pack("<I", len(samples)) + samples)
+        wpath = path + ".wav"
+        open(wpath, "wb").write(wav)
+        try:
+            wo, we = scan(wpath, planes=(1,))
+            assert we is None, we
+            assert any("lsb_w0rks" in (h_["flag"] or "")
+                       for h_ in wo["hits"]), wo
+        finally:
+            os.unlink(wpath)
     finally:
         os.unlink(path)
     print("lsb_scan selftest: ok")
