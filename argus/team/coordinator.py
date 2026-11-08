@@ -222,8 +222,13 @@ class TeamRun:
                     self.board.leads.close()
                     break
                 if self.board.engagement_done.is_set():
-                    # lead finished: wait for workers to drain + exit
-                    if all(not t.is_alive() for t in self._threads.values()):
+                    # lead finished: wait for workers to drain + exit.
+                    # _threads is mutated by _start_worker on the lead's
+                    # thread - snapshot under the same lock the spawner
+                    # holds or the iteration can RuntimeError mid-run
+                    with self._lock:
+                        threads = list(self._threads.values())
+                    if all(not t.is_alive() for t in threads):
                         break
                 if self.board.stop.is_set():
                     break
@@ -233,14 +238,18 @@ class TeamRun:
 
         # bounded join; workers are daemon threads so a straggler can't hang
         join_deadline = time.monotonic() + 30
-        for t in self._threads.values():
+        with self._lock:
+            join_set = list(self._threads.values())
+        for t in join_set:
             remaining = join_deadline - time.monotonic()
             if remaining <= 0:
                 break
             t.join(timeout=max(0.1, remaining))
         self.board.stop.set()
 
-        for name, t in self._threads.items():
+        with self._lock:
+            threads = list(self._threads.items())
+        for name, t in threads:
             if t.is_alive():
                 self.board.update_agent(name, status="killed")
         self.mcp.close()
