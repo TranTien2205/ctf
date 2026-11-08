@@ -11,6 +11,7 @@ Shared between every member (code-enforced, not prompt-level):
 """
 from __future__ import annotations
 
+import sys
 import threading
 import time
 from pathlib import Path
@@ -69,6 +70,9 @@ class TeamRun:
         self.rate = RateLimiter(cfg.rate_rps)
         from ..mcp import MCPManager, discover_config_path
         self.mcp = MCPManager(discover_config_path(cfg.mcp_config))
+        for name, err in self.mcp.errors().items():
+            print(f"[argus] mcp config error {name}: {err}",
+                  file=sys.stderr)
         self.board = Board(self.session)
         self.board.set_spawner(self._spawn_guarded)
         self._llm_factory = llm_factory or self._default_llm

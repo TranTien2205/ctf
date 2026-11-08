@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import time
 from pathlib import Path
 
@@ -160,6 +161,13 @@ class AgentLoop:
         turns = 0
         nudges = 0
         self._log(f"session {self.session.id} -> {self.cfg.target}")
+        # a malformed MCP config or a server spec without 'command' must
+        # be operator-visible, not silently absent for the whole run
+        if self._owns_mcp and self.ctx.mcp is not None:
+            for name, err in self.ctx.mcp.errors().items():
+                self._log(f"mcp config error {name}: {err}")
+                print(f"[argus] mcp config error {name}: {err}",
+                      file=sys.stderr)
 
         while True:
             if self.ctx.finished:
