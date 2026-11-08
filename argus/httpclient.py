@@ -441,7 +441,13 @@ class GuardedClient:
                 if "user-agent" not in emitted:
                     emitted.add("user-agent")
                     lines.append("User-Agent: argus-raw/1.0")
-                for k, v in spec.get("headers") or []:
+                spec_headers = spec.get("headers") or []
+                if isinstance(spec_headers, dict):
+                    # models naturally emit {"A":"b"}; iterating a dict
+                    # would unpack 2-char KEYS into (k,v) and silently
+                    # write a wrong header onto the wire
+                    spec_headers = list(spec_headers.items())
+                for k, v in spec_headers:
                     if k.lower() in ("host",):
                         continue  # Host comes from the scoped URL only
                     lines.append(f"{k}: {v}")
