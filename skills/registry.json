@@ -2183,7 +2183,7 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce",
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1446,
+      "skill_tokens": 1535,
       "depth_files": 6,
       "depth_tokens": 6983,
       "use_when": [

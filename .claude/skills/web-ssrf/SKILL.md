@@ -120,6 +120,12 @@ so hits correlate by token, and `hits` replays the log. A curl smoke test at the
 canary proves the listener works; silence after the real payload is then a
 measurement, not a guess.
 
+Once a port is open, `tools/web/gopher_gen.py` builds the escalation URL:
+`redis` mode appends the QUIT that keeps the fetcher from timing out
+(blank failure without it), `resp` computes the $-length prefix you do
+not want to hand-count for EVAL/SET, `http` wraps a raw request for an
+internal web service, `--double` for filters that decode once.
+
 **Falsifier:** the fetch target is fixed in source and the request never
 influences it. Reaching your own host proves egress, not SSRF — the class signal
 is that *the server* chose an address you supplied.
