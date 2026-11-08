@@ -2409,6 +2409,17 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(tuple(decide_mod.ESCALATION_LADDER),
                          tuple(state.ESCALATION_LADDER))
 
+    def test_the_two_flag_source_definitions_cannot_drift(self):
+        """hooks.py writes flag.source; decide.py reads it to return record_solve.
+
+        A source spelled differently in one file is a flag that pre-flag
+        records and the controller then routes to verify_flag for ever —
+        the solve can never be recognised. One tuple in each file, proven
+        equal rather than trusted.
+        """
+        self.assertEqual(tuple(hooks_mod.FLAG_SOURCES),
+                         tuple(decide_mod.FLAG_SOURCES))
+
     def test_every_solver_the_ladder_names_exists_on_disk(self):
         """solver_handoff prints agent names; a renamed file leaves it dead.
 
