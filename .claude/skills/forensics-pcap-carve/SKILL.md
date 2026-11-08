@@ -39,7 +39,8 @@ interesting is a lead.
 ## Extraction order
 
 0. No tshark on the box? `tools/forensics/pcap_parse.py` covers the same
-   order with stdlib: `convs` for the protocol-hierarchy answer, `dns`
+   order with stdlib — classic pcap **and** pcapng (Wireshark's default
+   save format): `convs` for the protocol-hierarchy answer, `dns`
    for the query-name carve, `ascii` for the strings pass, `follow N`
    for one stream per direction, `http --out objs/` for the
    export-objects equivalent — the most common flag carrier. Its own

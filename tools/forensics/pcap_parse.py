@@ -7,8 +7,9 @@ gives the protocol-hierarchy answer (which flow is worth opening),
 `dns` extracts query names (the split-flag field carve), `ascii` runs
 printable-scan over payloads (strings equivalent), and `follow N`
 reassembles one TCP flow per direction by sequence order — overlap is
-dropped, gaps are marked. It parses Ethernet/IPv4/TCP/UDP only; anything
-else is reported as undecoded, honestly.
+dropped, gaps are marked. Classic pcap and pcapng (Wireshark's default)
+both read; Ethernet/IPv4/TCP/UDP decode — anything else is reported as
+undecoded, honestly.
 
     python3 tools/forensics/pcap_parse.py convs cap.pcap
     python3 tools/forensics/pcap_parse.py dns cap.pcap
@@ -33,12 +34,53 @@ _PORTS = {20: "ftp-data", 21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp",
           143: "imap", 443: "https", 445: "smb", 3389: "rdp", 8080: "http-alt"}
 
 
+def _parse_pcapng(fh, gh, max_packets):
+    """pcapng walk: section header -> interface linktypes -> enhanced
+    and simple packet blocks. Wireshark's default save format; a CTF
+    handout is at least as likely to be this as classic pcap."""
+    le = gh[8:12] in (b"\x4d\x3c\x2b\x1a",)  # byte-order magic LE
+    e = "<" if le else ">"
+    linktypes = {}
+    pkts = []
+    # gh[24:] is unconsumed; re-read from start for simplicity
+    fh.seek(0)
+    data = fh.read()
+    off = 0
+    first_link = None
+    while off + 12 <= len(data) and len(pkts) < max_packets:
+        btype, blen = struct.unpack(e + "II", data[off:off + 8])
+        if blen < 12 or off + blen > len(data):
+            break
+        body = data[off + 8:off + blen - 4]
+        if btype == 0x0A0D0D0A:            # section header
+            pass
+        elif btype == 0x00000001:          # interface description
+            lt = struct.unpack(e + "H", body[:2])[0]
+            linktypes[len(linktypes)] = lt
+            if first_link is None:
+                first_link = lt
+        elif btype == 0x00000006:          # enhanced packet
+            iid, thi, tlo, caplen = struct.unpack(e + "IIII", body[:16])
+            ts = ((thi << 32) | tlo) / 1e6
+            pkts.append((ts, body[20:20 + caplen]))
+            _ = iid
+        elif btype == 0x00000003:          # simple packet
+            plen = struct.unpack(e + "I", body[:4])[0]
+            pkts.append((0.0, body[4:4 + plen]))
+        off += blen
+    if first_link is None:
+        return None, [], "pcapng with no interface description block"
+    return first_link, pkts, None
+
+
 def parse_pcap(path, max_packets=2_000_000):
     with open(path, "rb") as fh:
         gh = fh.read(24)
+        if len(gh) >= 12 and gh[:4] == b"\x0a\x0d\x0d\x0a":
+            return _parse_pcapng(fh, gh, max_packets)
         if len(gh) < 24 or gh[:4] not in (b"\xd4\xc3\xb2\xa1", b"\xa1\xb2\xc3\xd4",
                                         b"\x4d\x3c\xb2\xa1", b"\xa1\xb2\x3c\x4d"):
-            return None, [], "not a classic pcap (pcapng needs tshark)"
+            return None, [], "not a pcap or pcapng file"
         le = gh[:4] in (b"\xd4\xc3\xb2\xa1", b"\x4d\x3c\xb2\xa1")
         e = "<" if le else ">"
         linktype = struct.unpack(e + "I", gh[20:24])[0]
@@ -371,6 +413,28 @@ def _selftest() -> int:
     assert b"flag{http_carve}" in carved, got
     shutil.rmtree(odir, ignore_errors=True)
     os.unlink(path)
+    # same capture in pcapng (Wireshark's default): SHB + IDB + EPB
+    pkts = [eth_ip_udp(dnsq("flag.example.com")),
+            eth_ip_tcp(b"GET /x HTTP/1.0\r\n\r\n")]
+    ng = struct.pack("<II I HH q I", 0x0A0D0D0A, 28, 0x1A2B3C4D, 1, 0,
+                     -1, 28)
+    ng += struct.pack("<II HH I I", 1, 20, 1, 0, 65535, 20)
+    for i, p in enumerate(pkts):
+        pad = b"\x00" * (-len(p) % 4)
+        blen = 8 + 20 + len(p) + len(pad) + 4
+        ng += struct.pack("<IIIIIII", 6, blen, 0, 0, i, len(p), len(p))
+        ng += p + pad
+        ng += struct.pack("<I", blen)
+    with tempfile.NamedTemporaryFile(suffix=".pcapng",
+                                     delete=False) as fh:
+        fh.write(ng)
+        ngpath = fh.name
+    ns2 = argparse.Namespace(pcap=ngpath)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        cmd_dns(ns2)
+    assert "flag.example.com" in json.loads(buf.getvalue())["queries"]
+    os.unlink(ngpath)
     print("pcap_parse selftest: ok")
     return 0
 
