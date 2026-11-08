@@ -128,9 +128,10 @@ class AgentLoop:
         self.seed = seed or build_seed(cfg)
         if getattr(self.session, "resumed", False) and seed is None \
                 and self.session.findings:
+            from .session import sanitized_findings
             prior = "\n".join(
                 f"- {f['id']} [{f['severity']}] {f['title']} ({f['url']})"
-                for f in self.session.findings[:20])
+                for f in sanitized_findings(self.session.findings)[:20])
             self.seed += (f"\n\nThis run RESUMES session {self.session.id}. "
                           f"Prior findings already recorded - do not re-verify "
                           f"them, build on them:\n{prior}")
@@ -207,7 +208,13 @@ class AgentLoop:
                 break
             turns += 1
 
-            content = response.get("content") or []
+            # a non-Anthropic gateway can answer 200 with a shape that is
+            # not {content: [blocks]} - coerce or an AttributeError would
+            # kill the run outside the LLM try/except, artifacts unsealed
+            content = [b for b in
+                       (response.get("content") or [])
+                       if isinstance(b, dict)] \
+                if isinstance(response, dict) else []
             messages.append({"role": "assistant", "content": content})
 
             tool_uses = [b for b in content if b.get("type") == "tool_use"]
@@ -216,7 +223,8 @@ class AgentLoop:
                     self._log(f"agent: {b['text'].strip()[:400]}")
 
             if not tool_uses:
-                if response.get("stop_reason") == "end_turn":
+                if isinstance(response, dict) and \
+                        response.get("stop_reason") == "end_turn":
                     if nudges >= 2:
                         break
                     messages.append({"role": "user", "content":
