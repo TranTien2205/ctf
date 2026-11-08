@@ -81,7 +81,7 @@ hr "REQUIRED: web primitive selftests (--selftest on the tool itself -- all offl
 # than in tools/web/selftest.py. 255 checks between them; each one exits non-zero
 # when an assertion fails, and each was built by breaking the tool on purpose and
 # confirming the check caught it.
-for t in variant_matrix race_probe bundle_miner session_dissect ws_probe; do
+for t in variant_matrix race_probe bundle_miner session_dissect ws_probe jwt_forge; do
   f="tools/web/$t.py"
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"

