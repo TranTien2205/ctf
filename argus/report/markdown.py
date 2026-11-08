@@ -49,6 +49,19 @@ def _coverage(session: Session) -> dict:
             "probes": sorted(probes)}
 
 
+def _duration(session: Session) -> float:
+    """Run duration: reuse the value stored in summary.json on first render
+    so a re-rendered report shows the run's real length, not time-since."""
+    try:
+        prev = json.loads((session.dir / "summary.json").read_text(
+            encoding="utf-8"))
+        if prev.get("duration_s") is not None:
+            return float(prev["duration_s"])
+    except Exception:
+        pass
+    return round(time.time() - session.started, 1)
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
@@ -67,7 +80,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "",
         f"- **Target:** `{session.dir.name.split('-', 2)[-1]}` ({session.dir.name})",
         f"- **Date:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started))}",
-        f"- **Duration:** {round(time.time() - session.started, 1)}s",
+        f"- **Duration:** {_duration(session)}s",
         f"- **Agent model:** {cfg.model}",
         f"- **Requests sent:** {session._seq}",
         "",
@@ -234,6 +247,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "findings": findings,
         "counts": counts,
         "requests": session._seq,
+        "duration_s": _duration(session),
         "time_to_first_finding_s": ttf,
         "coverage": coverage,
         # anchoring the last chain link makes tail truncation detectable:

@@ -489,12 +489,23 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
 
 def _reopen(sdir: Path) -> Session:
     """Rebuild a Session view over an existing session directory."""
+    import threading
     sess = Session.__new__(Session)
     sess.dir = sdir
     sess.id = sdir.name
     sess.started = 0.0
     sess._seq = 0
     sess._transcript = {}
+    sess._lock = threading.Lock()
+    sess._last_chain = ""
+    sess.resumed = False
+    mpath = sdir / "meta.json"
+    if mpath.exists():
+        try:
+            sess.started = float(json.loads(
+                mpath.read_text(encoding="utf-8")).get("started") or 0.0)
+        except (ValueError, OSError):
+            pass
     tpath = sdir / "transcript.jsonl"
     if tpath.exists():
         for line in tpath.read_text(encoding="utf-8").splitlines():
@@ -502,6 +513,8 @@ def _reopen(sdir: Path) -> Session:
                 continue
             entry = json.loads(line)
             sess._transcript[entry["id"]] = entry
+            if entry.get("chain"):
+                sess._last_chain = entry["chain"]
             sess._seq = max(sess._seq, int(entry["id"][1:]) if entry["id"][1:].isdigit() else 0)
     fpath = sdir / "findings.json"
     sess.findings = json.loads(fpath.read_text(encoding="utf-8")) if fpath.exists() else []
