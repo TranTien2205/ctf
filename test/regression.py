@@ -270,6 +270,38 @@ class StructureTests(unittest.TestCase):
                          "ctf.py routes these categories but plan.py has no rule "
                          "for them: %s" % missing)
 
+    def test_fts_index_covers_every_chain_card(self):
+        """related_cards searches the FTS index; a stale index silently empties it.
+
+        The index was built over knowledge/cards alone -- one external card --
+        while 73 verified chain cards sat unindexed, so ctf.py --json returned
+        related_cards: [] on every observation. Assert the row count covers
+        every chain card plus every reviewed external card, so the next card
+        added without a rebuild fails loudly.
+        """
+        import glob as globmod
+        import sqlite3
+        chains = globmod.glob(str(ROOT / "knowledge" / "chains" / "*.json"))
+        reviewed = 0
+        for path in globmod.glob(str(ROOT / "knowledge" / "cards" / "**" / "*.json"),
+                                 recursive=True):
+            try:
+                if json.loads(Path(path).read_text(encoding="utf-8")).get(
+                        "quality", {}).get("review_status") == "reviewed":
+                    reviewed += 1
+            except (OSError, ValueError):
+                continue
+        db = sqlite3.connect("file:%s?mode=ro" %
+                             (ROOT / "knowledge" / "ctf.sqlite3").as_posix(), uri=True)
+        try:
+            rows = db.execute("SELECT COUNT(*) FROM cards").fetchone()[0]
+        finally:
+            db.close()
+        expected = reviewed + len(chains)
+        self.assertEqual(rows, expected,
+                         "ctf.sqlite3 indexes %d cards but %d are on disk; "
+                         "re-run python tools/build_index.py" % (rows, expected))
+
     def test_every_router_is_reachable_from_ctf_py(self):
         """The reverse direction: a router no ctf.py category resolves to is dead.
 
