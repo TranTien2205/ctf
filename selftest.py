@@ -363,6 +363,8 @@ def main() -> int:
           out["tested"] == 10 and len(out["interesting"]) >= 1)
     out = teamtools.run_exploit(ctx, "lab-auth-bypass", base)
     check("exploit runner proves manifest", out.get("proof") is True)
+    out = teamtools.run_exploit(ctx, "lab-jwt-forge", base)
+    check("exploit runner proves jwt forge", out.get("proof") is True)
     out = teamtools.run_exploit(ctx, "lab-auth-bypass", "http://x.invalid/")
     check("exploit runner scope-checks target", "error" in out)
 

@@ -250,14 +250,16 @@ class TeamRun:
         from ..report.markdown import render_report
         lead_res = self._results.get("lead", {})
         summary = lead_res.get("summary") or ""
-        tok_in = sum((r.get("llm_tokens") or {}).get("in", 0)
-                     for r in self._results.values())
-        tok_out = sum((r.get("llm_tokens") or {}).get("out", 0)
-                      for r in self._results.values())
+        def _sum_tokens(key: str) -> int:
+            return sum((r.get("llm_tokens") or {}).get(key, 0)
+                       for r in self._results.values())
+        tokens = {"in": _sum_tokens("in"), "out": _sum_tokens("out"),
+                  "cache_read": _sum_tokens("cache_read"),
+                  "cache_write": _sum_tokens("cache_write")}
         calls = sum(r.get("llm_calls", 0) or 0 for r in self._results.values())
         report_path = render_report(self.session, cfg, summary, extra={
             "mode": "team", "agents": self.board.agents(),
-            "llm_calls": calls, "llm_tokens": {"in": tok_in, "out": tok_out},
+            "llm_calls": calls, "llm_tokens": tokens,
         })
         return {
             "mode": "team",
@@ -267,7 +269,7 @@ class TeamRun:
             "findings": len(self.session.findings),
             "report": str(report_path),
             "llm_calls": calls,
-            "llm_tokens": {"in": tok_in, "out": tok_out},
+            "llm_tokens": tokens,
             "lead_summary": summary,
             "lead_error": lead_res.get("error"),
             "elapsed_s": round(time.monotonic() - started, 1),
