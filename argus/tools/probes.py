@@ -1019,9 +1019,20 @@ def probe_websocket(ctx: Context, url: str) -> dict:
     upgrade = str(hdrs.get("upgrade", "")).lower()
     accept = hdrs.get("sec-websocket-accept", "")
     if r["status"] == 101 and "websocket" in upgrade:
-        verdict = ("websocket endpoint confirmed (101 + Upgrade: websocket) "
-                   "- channel is open; test per-message authorization and "
-                   "input handling with a ws client")
+        # verify the accept token: a broken server may 101 without
+        # completing the RFC 6455 challenge - worth noting either way
+        import hashlib
+        want = base64.b64encode(hashlib.sha1(
+            (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
+        ).digest()).decode()
+        if accept and accept != want:
+            verdict = ("websocket 101 received but Sec-WebSocket-Accept is "
+                       "WRONG - handshake not RFC-compliant; the endpoint "
+                       "may be a mock or middleware, probe manually")
+        else:
+            verdict = ("websocket endpoint confirmed (101 + valid accept) "
+                       "- channel is open; test per-message authorization "
+                       "and input handling with a ws client")
     elif r["status"] in (400, 426):
         verdict = f"upgrade refused (HTTP {r['status']}) - endpoint may not be ws"
     elif r["status"] == 200:

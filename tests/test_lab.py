@@ -217,3 +217,39 @@ def test_js_recon_finds_websocket(lab_url, ctx):
     from argus.tools.web import js_recon
     out = js_recon(ctx, lab_url + "/")
     assert any("ws://" in e["endpoint"] for e in out["websocket_endpoints"])
+
+
+def test_send_raw_preserves_wire_text(lab_url, ctx):
+    out = ctx.client.send_raw(
+        lab_url + "/desync-none",
+        requests=[{"method": "POST",
+                   "headers": [["Content-Length", "6"],
+                               ["Transfer-Encoding", "chunked"]],
+                   "body": b"0\r\n\r\nG"}],
+        tool="dbg")
+    assert out["sends"][0]["status"] == 200
+    entry = ctx.session._transcript[out["sends"][0]["request_id"]]
+    text = entry["request"]["request_text"]
+    assert "Content-Length: 6" in text
+    assert "Transfer-Encoding: chunked" in text  # both headers survive
+
+
+def test_send_raw_reads_unsolicited(lab_url, ctx):
+    out = ctx.client.send_raw(
+        lab_url + "/desync-cl",
+        requests=[{"method": "POST", "reads": 2,
+                   "headers": [["Content-Length", "4"],
+                               ["Transfer-Encoding", "chunked"]],
+                   "body": b"14\r\nGPOST / HTTP/1.1\r\n\r\n\r\n0\r\n\r\n"}],
+        tool="dbg")
+    assert [s["status"] for s in out["sends"]] == [200, 501]
+    assert out["sends"][1]["solicited"] is False
+
+
+def test_send_raw_scope_checked(lab_url, ctx):
+    import pytest
+    with pytest.raises(Exception):
+        ctx.client.send_raw(
+            "http://169.254.169.254/",
+            requests=[{"method": "GET", "headers": [], "body": b""}],
+            tool="dbg")
