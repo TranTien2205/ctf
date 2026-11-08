@@ -88,6 +88,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | Repeating 16-byte ciphertext blocks | ECB pattern leak, cut-and-paste, byte-at-a-time | no two blocks repeat and the length is not a clean multiple | — → `../ctf-crypto/modern-ciphers-2.md` |
 | A modulus with no other handle — always try first | factordb and small-factor sweep | `n` is a clean two-prime product absent from factordb | `fermat --n N`, then `../ctf-crypto/triage-toolbox.md` |
 | Letter-only ciphertext, no key material, a named classical cipher or none | Classical cipher (Caesar/Vigenere/substitution/transposition) | statistics show encoding, not cipher — route to misc-encoding-carrier | — → class `crypto-classical` (`../crypto-classical/`) |
+| A bare hash string to crack ("find the password/preimage") | format identification first — salted formats change everything | `tools/hash_id.py` names family + hashcat mode + first move; an unrecognised result routes to enc_detect | `python3 tools/hash_id.py <hash>` |
 
 ## Route to depth — attack family to the one file
 
