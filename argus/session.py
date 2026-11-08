@@ -33,9 +33,12 @@ def _atomic_write(path: Path, text: str) -> None:
     tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}")
     # newline="": artifact bytes must be platform-stable - a digest
     # computed on Windows must verify on Linux, so writes pin LF
-    with tmp.open("w", encoding="utf-8", newline="") as fh:
-        fh.write(text)
-    tmp.replace(path)  # os.replace: atomic on POSIX and Windows alike
+    try:
+        with tmp.open("w", encoding="utf-8", newline="") as fh:
+            fh.write(text)
+        tmp.replace(path)  # os.replace: atomic on POSIX and Windows alike
+    finally:
+        tmp.unlink(missing_ok=True)   # a failed write leaves no litter
 
 
 def _chain(prev: str, entry: dict) -> str:
