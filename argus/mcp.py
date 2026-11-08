@@ -126,6 +126,8 @@ class MCPClient:
                 msg = json.loads(line.decode("utf-8", "replace"))
             except ValueError:
                 continue
+            if not isinstance(msg, dict):
+                continue    # a list/str frame would kill the reader on .get
             rid = msg.get("id")
             q = self._pending.get(rid)
             if q is not None:
@@ -154,7 +156,8 @@ class MCPClient:
             self._pending.pop(rid, None)
         if "error" in resp:
             raise MCPError(f"{method}: {resp['error']}")
-        return resp.get("result") or {}
+        result = resp.get("result")
+        return result if isinstance(result, dict) else {}
 
     def _initialize(self) -> None:
         self._rpc("initialize", {
@@ -171,7 +174,9 @@ class MCPClient:
                 return self._tools
             self._start()
             result = self._rpc("tools/list", {}, timeout=self.timeout_s)
-            self._tools = result.get("tools") or []
+            tools = result.get("tools")
+            self._tools = [t for t in tools if isinstance(t, dict)] \
+                if isinstance(tools, list) else []
             return self._tools
 
     def call(self, tool: str, arguments: dict, timeout_s: float) -> dict:
