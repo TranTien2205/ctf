@@ -179,6 +179,17 @@ def main(argv: list[str] | None = None) -> int:
             cfg.model = meta.get("model") or cfg.model
         except Exception:
             pass
+        # a re-render must not silently carry tampered claims: findings.json
+        # is not chained, so re-validate every finding's evidence against
+        # the transcript before trusting it
+        from .session import findings_bad
+        bad = findings_bad(session._transcript, session.findings)
+        if bad:
+            print(f"warning: findings {bad} fail evidence re-validation - "
+                  "excluded from this report (run 'argus verify' for detail)",
+                  file=sys.stderr)
+            session.findings = [f for f in session.findings
+                                if f.get("id") not in bad]
         path = render_report(session, cfg)
         print(path)
         return 0

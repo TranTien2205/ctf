@@ -95,18 +95,27 @@ def verify_transcript(sdir: Path) -> dict:
         except (ValueError, OSError):
             stored_findings = []
         out["findings_checked"] = len(stored_findings)
-        bad = []
-        for f in stored_findings:
-            excerpt = (f.get("evidence_excerpt") or "").strip()
-            ids = f.get("evidence_ids") or []
-            cited = [entries.get(r) for r in ids]
-            if not excerpt or not cited or None in cited or \
-                    not any(excerpt in _evidence_text_of_entry(e)
-                            for e in cited):
-                bad.append(f.get("id", "?"))
+        bad = findings_bad(entries, stored_findings)
         if bad:
             out["findings_bad"] = bad
     return out
+
+
+def findings_bad(entries: dict, findings: list) -> list[str]:
+    """Finding ids whose evidence no longer verifies against the transcript:
+    invented request ids, empty excerpts, or a quote that is not a verbatim
+    substring of any cited response/event. Used by `argus verify` and by
+    `argus report` (a re-render must not silently carry tampered claims)."""
+    bad = []
+    for f in findings:
+        excerpt = (f.get("evidence_excerpt") or "").strip()
+        ids = f.get("evidence_ids") or []
+        cited = [entries.get(r) for r in ids]
+        if not excerpt or not cited or None in cited or \
+                not any(excerpt in _evidence_text_of_entry(e)
+                        for e in cited):
+            bad.append(f.get("id", "?"))
+    return bad
 
 
 def _evidence_text_of_entry(entry: dict | None) -> str:
