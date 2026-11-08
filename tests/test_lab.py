@@ -151,6 +151,8 @@ def test_nosqli_probe(lab_url, ctx):
                               '{"username":"admin","password":"x"}',
                               "password")
     assert "nosqli candidate" in out["verdict"], out
+    form = next(h for h in out["results"] if h["op"] == "urlencoded[$ne]")
+    assert form["differs"] and form["status"] == 200, out
 
 
 def test_upload_probe(lab_url, ctx):

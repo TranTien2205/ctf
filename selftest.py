@@ -188,6 +188,9 @@ def main() -> int:
     out = probes.probe_nosqli(ctx, base + "/api/login",
                               '{"username":"admin","password":"x"}', "password")
     check("nosqli probe flips auth", "nosqli candidate" in out["verdict"])
+    check("nosqli urlencoded operator flips",
+          any(h["op"] == "urlencoded[$ne]" and h["differs"]
+              for h in out["results"]))
     out = probes.probe_upload(ctx, base + "/upload")
     check("upload probe serves active file", "upload candidate" in out["verdict"])
     out = probes.probe_race(ctx, base + "/redeem", n=8)

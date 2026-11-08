@@ -649,6 +649,12 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             b = self._body()
             u = b.get("username", "") if isinstance(b, dict) else ""
             pw = b.get("password", "") if isinstance(b, dict) else ""
+            # urlencoded PHP-array syntax: password[$ne]=x parses to the
+            # same operator document on a lenient backend
+            form_ops = [k for k in b
+                        if re.match(r"^\w+\[\$\w+\]$", str(k))]
+            if form_ops and not isinstance(pw, dict):
+                pw = {re.sub(r"^\w+\[|\]$", "", form_ops[0]): b[form_ops[0]]}
             if isinstance(pw, dict) and any(str(k).startswith("$")
                                             for k in pw):
                 row = self.db.execute(

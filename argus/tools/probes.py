@@ -754,6 +754,24 @@ def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
                      "similarity_to_base": sim,
                      "differs": r["status"] != base["status"] or sim < 0.7})
     flip = next((h for h in hits if h["differs"]), None)
+    # urlencoded PHP-array syntax is the other classic carrier:
+    # password[$ne]=x parses to {"$ne":"x"} on lenient backends, no JSON
+    # content-type needed
+    form = {k: str(v) for k, v in template.items()
+            if isinstance(v, (str, int))}
+    form.pop(param, None)
+    form[param + "[$ne]"] = "argus"
+    fr = ctx.client.send(
+        "POST", url,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        body=urllib.parse.urlencode(form),
+        tool="probe_nosqli", note="urlencoded operator")
+    fsim = _similarity(fr.get("body") or "", base.get("body") or "")
+    hits.append({"op": "urlencoded[$ne]", "status": fr["status"],
+                 "request_id": fr["request_id"],
+                 "similarity_to_base": fsim,
+                 "differs": fr["status"] != base["status"] or fsim < 0.7})
+    flip = flip or next((h for h in hits if h["differs"]), None)
     verdict = ("nosqli candidate: operator payload flipped the response "
                f"({flip['op']} status {flip['status']} vs baseline "
                f"{base['status']})" if flip else "no nosqli signal")

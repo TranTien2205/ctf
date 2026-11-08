@@ -329,8 +329,9 @@ TOOL_SCHEMAS: list[dict] = [
     _schema(
         "probe_nosqli",
         "NoSQL operator injection check: POSTs a JSON baseline then swaps "
-        "the parameter for $ne/$gt/$regex operator objects; a flipped "
-        "status or body means the server evaluated the operator.",
+        "the parameter for $ne/$gt/$regex operator objects, plus a "
+        "urlencoded param[$ne] carrier; a flipped status or body means "
+        "the server evaluated the operator.",
         {
             "url": {**_STR, "description": URL_DESC},
             "data": {**_STR, "description": "JSON body template, e.g. "
