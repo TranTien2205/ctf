@@ -35,3 +35,22 @@ def test_sessions_listing(tmp_path, capsys):
     assert rc == 0
     out = capsys.readouterr().out
     assert "findings=3" in out
+
+
+def test_reopen_report_findings_verify(tmp_path, capsys):
+    """Regression: _reopen must restore lock/chain/started so the offline
+    commands work on an existing session dir."""
+    rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
+    assert rc == 0
+    (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
+    (sdir / "report.md").unlink()
+    rc = main(["report", str(sdir)])
+    assert rc == 0
+    text = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "Duration" in text and "1970" not in text
+    rc = main(["verify", str(sdir)])
+    assert rc == 0
+    rc = main(["findings", str(sdir)])
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "SQL injection" in out
