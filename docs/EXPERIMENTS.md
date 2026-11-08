@@ -81,4 +81,5 @@ spending tokens (5 seeded findings on both paths).
   are the recall denominator.
 - Keep transcripts: they are the audit trail for every claimed finding.
   `python -m argus verify <dir>` proves the transcript was not altered
-  before the thesis is written.
+  and re-validates every finding's evidence against it - a tampered
+  `findings.json` fails the check even when the chain itself is intact.

@@ -103,6 +103,8 @@ def main(argv: list[str] | None = None) -> int:
 
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
+    p_sess.add_argument("--json", action="store_true",
+                        help="machine-readable listing for experiment scripts")
 
     p_ver = sub.add_parser(
         "verify", help="verify a session's transcript hash chain "
@@ -209,6 +211,9 @@ def main(argv: list[str] | None = None) -> int:
                 except Exception:
                     pass
             rows.append(row)
+        if args.json:
+            print(json.dumps(rows, indent=2, ensure_ascii=False))
+            return 0
         if not rows:
             print("no sessions yet")
             return 0
