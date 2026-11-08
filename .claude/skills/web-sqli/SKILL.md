@@ -23,7 +23,14 @@ evidence_level: verified
 
 ## Confirm the primitive before extracting anything
 
-Take a baseline, then compare: `id=1`, `id=1'`, `id=1 AND 1=1`, `id=1 AND 1=2`.
+`tools/web/sqli_probe.py --url URL --param P` fires the baseline/quote/true/false/
+sleep matrix below and reports which channels showed signal (error,
+boolean-blind, time-blind) with verbatim excerpts; `--order-by N` runs the
+column-count ramp. Its channel list is a candidate — the confirming probe in
+this file still has to produce the recorded evidence.
+
+The manual form of the same matrix: take a baseline, then compare `id=1`,
+`id=1'`, `id=1 AND 1=1`, `id=1 AND 1=2` — each differential maps to a channel:
 
 | Observation | Channel |
 |---|---|

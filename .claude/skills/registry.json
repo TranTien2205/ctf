@@ -1090,7 +1090,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 871,
+      "skill_tokens": 994,
       "depth_files": 3,
       "depth_tokens": 701,
       "use_when": [
@@ -2154,7 +2154,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1686,
+      "skill_tokens": 1796,
       "depth_files": 13,
       "depth_tokens": 17590,
       "use_when": [

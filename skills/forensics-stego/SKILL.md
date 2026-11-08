@@ -60,10 +60,17 @@ channel yielded.
 ## Operational probe
 
 ```bash
+python3 tools/forensics/carve_scan.py challenge.png     # stdlib: magic offsets + trailing data + flag-format runs
+python3 tools/forensics/carve_scan.py challenge.png --extract out/   # carve each hit to a file
 file challenge.png && binwalk challenge.png && strings -n 8 challenge.png | head
 exiftool challenge.png
 zsteg -a challenge.png 2>/dev/null | head -20
 ```
+
+`carve_scan` is the absent-binwalk fallback: it finds embedded magics and
+data trailing a container's real end — the common CTF hide — plus a
+flag-format pass over printable runs. LSB bit-plane work still needs the
+external tools below; nothing here pretends otherwise.
 
 ## Routing
 
