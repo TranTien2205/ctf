@@ -260,7 +260,12 @@ def _finding_key(category: str, url: str) -> tuple:
     """Dedup key: same bug class on the same endpoint+params is one finding."""
     cat = re.sub(r"[^a-z0-9]", "", str(category or "").lower())
     url = str(url or "")
-    p = urllib.parse.urlparse(url if "://" in url else "http://" + url)
+    try:
+        p = urllib.parse.urlparse(url if "://" in url else "http://" + url)
+    except ValueError:
+        # unparseable (e.g. 'http://[bad') - keep a stable key rather
+        # than crashing dedup/diff on a tampered or mangled url
+        return (cat, "", url, ())
     params = tuple(sorted(k for k, _ in urllib.parse.parse_qsl(p.query)))
     return (cat, p.netloc.lower(), p.path or "/", params)
 

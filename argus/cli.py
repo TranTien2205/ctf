@@ -461,7 +461,11 @@ def main(argv: list[str] | None = None) -> int:
             cat, _netloc, path, params = _finding_key(
                 f.get("category"), f.get("url"))
             u = str(f.get("url") or "")
-            host = _up.urlparse(u if "://" in u else "http://" + u).hostname
+            try:
+                host = _up.urlparse(
+                    u if "://" in u else "http://" + u).hostname
+            except ValueError:
+                host = None  # tampered url like http://[bad
             return (cat, (host or "").lower(), path, params)
 
         def _load(d):
