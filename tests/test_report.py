@@ -98,6 +98,26 @@ def test_diff_retest(tmp_path, capsys):
     assert len(res["fixed"]) == 1 and len(res["still_present"]) == 4
 
 
+def test_report_flags_bogus_severity(tmp_path, capsys):
+    """A finding whose evidence still verifies but whose severity was
+    inflated is corrupt metadata - findings_bad must flag it so report/
+    findings/diff all warn instead of trusting the row."""
+    import json
+    from argus.cli import main
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    fp = sdir / "findings.json"
+    data = json.loads(fp.read_text(encoding="utf-8"))
+    data[0]["severity"] = "apocalyptic"   # valid evidence, bogus severity
+    fp.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["findings", str(sdir)]) == 0
+    out = capsys.readouterr()
+    assert "UNVERIFIED" in out.out
+    # and report excludes the row rather than rendering it
+    assert main(["report", str(sdir)]) == 0
+    assert "apocalyptic" not in (sdir / "report.md").read_text()
+
+
 def test_report_refuses_non_session_dir(tmp_path, capsys):
     """`argus report` must not fabricate a sealed session out of an empty
     directory - refuse before render/seal."""
