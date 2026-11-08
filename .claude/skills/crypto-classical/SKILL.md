@@ -67,15 +67,20 @@ readable text or the flag format, and you can state WHICH transform did it.
 
 ## Operational probe
 
+`tools/classical_solve.py` carries the mechanical half — every family
+cipher_id can name:
+
 ```bash
-python3 - <<'PY'
-t=open('cipher.txt').read().strip()
-import collections
-f=collections.Counter(c for c in t.lower() if c.isalpha())
-ic=sum(v*(v-1) for v in f.values())/(len(f)*(len(f)-1) or 1)
-print(len(t), sorted(f.items(),key=lambda x:-x[1])[:6], 'IC=%.4f'%ic)
-PY
+python3 tools/classical_solve.py caesar --text 'CT'       # 25 shifts ranked
+python3 tools/classical_solve.py vigenere --text 'CT'     # IC/Kasiski -> key
+python3 tools/classical_solve.py subst --text 'CT'        # annealing + polish
+python3 tools/classical_solve.py railfence --text 'CT'    # rail depths ranked
 ```
+
+`caesar` runs inside `vigenere`/`subst` anyway — if IC is ~0.066 start
+with `subst`, if ~0.038 start with `vigenere`, and if the "cipher" fails
+to read as language under every family, route to `tools/enc_detect.py`
+because it was an encoding, not a cipher.
 
 ## Routing
 
