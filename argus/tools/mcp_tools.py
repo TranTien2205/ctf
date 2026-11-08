@@ -47,7 +47,7 @@ def _flatten(result: dict) -> str:
     parts = []
     for block in (result.get("content") or []):
         if isinstance(block, dict) and block.get("type") == "text":
-            parts.append(block.get("text", ""))
+            parts.append(str(block.get("text", "")))
         elif isinstance(block, dict):
             parts.append(json.dumps(block, ensure_ascii=False)[:2000])
     if parts:
