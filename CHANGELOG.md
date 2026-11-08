@@ -141,9 +141,13 @@ system. All notable milestones on `agent-v2`.
   stderr at run start instead of silently dropping servers.
 
 ### Verification & packaging
-- `python selftest.py`: 108 offline checks.
-- `python -m pytest tests/ -q`: 140 tests (unit + live-lab + loop +
-  team + MCP + CLI).
+- `python selftest.py`: 109 offline checks.
+- `python -m pytest tests/ -q`: 150 tests (unit + live-lab + loop +
+  team + MCP + CLI + external-tool subprocess path).
+- Fault-tolerance pass: every forensic reader (`verify`, `findings`,
+  `diff`, `sessions`, `_reopen`, renderers) degrades malformed session
+  artifacts to flags/warnings instead of tracebacks — fuzzed across
+  dir-swaps, non-dict JSON, null fields and truncated files.
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
   no API key (5 evidence-gated findings each).
 - Wheel ships skills + role prompts + wordlists + exploit manifests;
