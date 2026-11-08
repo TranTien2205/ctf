@@ -7,8 +7,8 @@
     "field_notes_confirmed": 18,
     "routers": 11,
     "chain_cards": 73,
-    "routing_cases": 13,
-    "routing_correct": 13,
+    "routing_cases": 15,
+    "routing_correct": 15,
     "solved_notes": 60
   },
   "note": "Floor for test/regression.py CapabilityTests. Raise it only after run_all.sh passes."

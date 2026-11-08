@@ -1445,6 +1445,19 @@ class DispatchTests(unittest.TestCase):
                     self.assertNotIn(forbidden, opened,
                                      "%s must not be opened for this input" % forbidden)
 
+    def test_depth_candidate_when_expected(self):
+        # A router that does not name the class card leaves depth_candidate
+        # null -- this is the regression the category routes_to fill fixed.
+        for case in load_cases("dispatch.json")["skill_select"]:
+            want = case.get("expect_depth")
+            if not want:
+                continue
+            with self.subTest(case=case.get("observation") or case.get("source")):
+                result = self.run_select(case)
+                got = (result.get("depth_candidate") or {}).get("id")
+                self.assertEqual(got, want,
+                                 "origin: " + case.get("origin", "unknown"))
+
     def test_entry_skill_is_always_offered(self):
         result = self.run_select({"observation": "something entirely unclassifiable"})
         self.assertEqual(result["open_now"][0]["id"], "ctf-playbook")

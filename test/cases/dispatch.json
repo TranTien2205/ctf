@@ -4,38 +4,149 @@
     {
       "observation": "Express mongoose POST /update noteId extra keys GET /flag 403 access denied",
       "expect_router": "web-triage",
-      "forbid_open": ["ctf-web", "ctf-pwn", "crypto-triage"],
+      "forbid_open": [
+        "ctf-web",
+        "ctf-pwn",
+        "crypto-triage"
+      ],
       "origin": "solved/secnotes.md"
     },
     {
       "observation": "ELF 64-bit dynamically linked NX enabled checksec buffer overflow",
       "expect_router": "pwn-binary-triage",
-      "forbid_open": ["web-triage", "ctf-pwn"],
+      "forbid_open": [
+        "web-triage",
+        "ctf-pwn"
+      ],
       "origin": "pwn category"
     },
     {
       "observation": "RSA public key modulus n small exponent e ciphertext c",
       "expect_router": "crypto-triage",
-      "forbid_open": ["web-triage", "ctf-crypto"],
+      "forbid_open": [
+        "web-triage",
+        "ctf-crypto"
+      ],
       "origin": "crypto category"
     },
     {
       "observation": "pcap capture with http objects and an exiftool artifact",
       "expect_router": "forensics-triage",
-      "forbid_open": ["web-triage", "ctf-forensics"],
+      "forbid_open": [
+        "web-triage",
+        "ctf-forensics"
+      ],
       "origin": "forensics category"
     },
     {
       "observation": "packed binary UPX ghidra decompile crackme validation routine",
       "expect_router": "rev-triage",
-      "forbid_open": ["pwn-binary-triage", "ctf-reverse"],
+      "forbid_open": [
+        "pwn-binary-triage",
+        "ctf-reverse"
+      ],
       "origin": "rev category"
     },
     {
       "source": "challenges/Weather App/web_weather_app/challenge",
       "expect_router": "web-triage",
-      "forbid_open": ["ctf-web", "pwn-binary-triage"],
+      "forbid_open": [
+        "ctf-web",
+        "pwn-binary-triage"
+      ],
       "origin": "white-box path"
+    },
+    {
+      "observation": "ELF binary asks for key, prints wrong password, stripped, decompile in ghidra",
+      "expect_router": "rev-triage",
+      "expect_depth": "rev-native-check",
+      "forbid_open": [
+        "ctf-pwn",
+        "pwn-binary-triage"
+      ],
+      "origin": "coverage: rev class depth"
+    },
+    {
+      "observation": "RSA public key modulus n small exponent e ciphertext c",
+      "expect_router": "crypto-triage",
+      "expect_depth": "crypto-rsa",
+      "forbid_open": [
+        "web-triage"
+      ],
+      "origin": "coverage: crypto class depth"
+    },
+    {
+      "observation": "AES ECB encrypt oracle chosen plaintext append secret",
+      "expect_router": "crypto-triage",
+      "expect_depth": "crypto-symmetric-oracle",
+      "forbid_open": [
+        "web-triage",
+        "web-sqli"
+      ],
+      "origin": "coverage: crypto oracle not sqli"
+    },
+    {
+      "observation": "ECDSA signatures reused nonce same r curve",
+      "expect_router": "crypto-triage",
+      "expect_depth": "crypto-ecc-dlog",
+      "forbid_open": [
+        "crypto-rsa"
+      ],
+      "origin": "coverage: ecc class depth"
+    },
+    {
+      "observation": "ELF checksec no canary gets buffer overflow rip",
+      "expect_router": "pwn-binary-triage",
+      "expect_depth": "pwn-stack-overflow",
+      "forbid_open": [
+        "web-triage"
+      ],
+      "origin": "coverage: pwn class depth"
+    },
+    {
+      "observation": "printf user format string %p %n leak write",
+      "expect_router": "pwn-binary-triage",
+      "expect_depth": "pwn-format-string",
+      "forbid_open": [
+        "pwn-stack-overflow"
+      ],
+      "origin": "coverage: pwn fmtstr depth"
+    },
+    {
+      "observation": "photo jpg exif gps geolocation",
+      "expect_router": "osint-triage",
+      "expect_depth": "osint-media-metadata",
+      "forbid_open": [
+        "web-triage"
+      ],
+      "origin": "coverage: osint class depth"
+    },
+    {
+      "observation": "custom vm bytecode python pyc dis",
+      "expect_router": "rev-triage",
+      "expect_depth": "rev-bytecode-vm",
+      "forbid_open": [
+        "rev-native-check"
+      ],
+      "origin": "coverage: rev bytecode depth"
+    },
+    {
+      "observation": "evtx security 4624 4625 logon auth.log wtmp",
+      "expect_router": "dfir-sherlock-triage",
+      "expect_depth": "dfir-authentication-trace",
+      "forbid_open": [
+        "forensics-triage"
+      ],
+      "origin": "coverage: dfir auth depth"
+    },
+    {
+      "observation": "attack defense contest vulnbox flag store tick service checker sla",
+      "expect_router": "ad-service-triage",
+      "forbid_open": [
+        "web-triage",
+        "ctf-playbook-depth"
+      ],
+      "origin": "coverage: ad router"
     }
   ],
   "chain_match": [
