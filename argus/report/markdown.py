@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.parse
 from pathlib import Path
@@ -22,6 +23,21 @@ def _excerpt(text: str, needle: str, span: int = 300) -> str:
         return text[:span]
     start = max(0, idx - span // 3)
     return text[start: idx + len(needle) + span]
+
+
+def _fence(text: str) -> str:
+    """A ```-run inside untrusted bytes breaks a fixed-length fence and can
+    inject fake report sections. Always fence one longer than the longest
+    backtick run in the content."""
+    longest = max((len(m.group()) for m in re.finditer(r"`+", text)),
+                  default=0)
+    return "`" * max(3, longest + 1)
+
+
+def _code(text: str) -> str:
+    """Inline-code for untrusted strings (URLs, ids) - a backtick inside the
+    value would break the span, so fence wider when needed."""
+    return f"`{text}`" if "`" not in str(text) else f"`` {text} ``"
 
 
 def _coverage(session: Session) -> dict:
@@ -128,16 +144,16 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             f"- **Severity:** {_SEV_LABEL.get(f['severity'], f['severity'])}",
             *([f"- **CVSS:** `{f['cvss']}`"] if f.get("cvss") else []),
             f"- **Category:** {f['category']}",
-            f"- **Endpoint:** `{f['url']}`",
+            f"- **Endpoint:** {_code(f['url'])}",
             f"- **Evidence:** {', '.join(f['evidence_ids'])}",
             "",
             f"**Description**  ",
             f"{f['description']}",
             "",
             "**Proof (verbatim excerpt)**  ",
-            "```",
+            _fence(f["evidence_excerpt"]),
             f["evidence_excerpt"][:1200],
-            "```",
+            _fence(f["evidence_excerpt"]),
             "",
             "**Remediation**  ",
             f"{f['remediation']}",
@@ -148,27 +164,22 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             if not entry or "request" not in entry:
                 continue
             req, resp = entry["request"], entry.get("response") or {}
+            block = "\n".join(
+                [f"{req.get('method')} {req.get('url')}"]
+                + [f"{k}: {v}" for k, v in (req.get("headers") or {}).items()]
+                + (["", str(req["body"])[:800]] if req.get("body") else [])
+                + ["", f"HTTP/{resp.get('status')}"]
+                + [f"{k}: {v}" for k, v
+                   in list((resp.get("headers") or {}).items())[:15]]
+                + ["", _excerpt(resp.get("body", ""),
+                                f["evidence_excerpt"])[:1500]])
             lines += [
                 f"<details><summary>Transcript {rid}: {req.get('method')} "
                 f"{req.get('url')} -> {resp.get('status')}</summary>",
                 "",
-                "```http",
-                f"{req.get('method')} {req.get('url')}",
-            ]
-            for k, v in (req.get("headers") or {}).items():
-                lines.append(f"{k}: {v}")
-            if req.get("body"):
-                lines += ["", str(req["body"])[:800]]
-            lines += [
-                "",
-                f"HTTP/{resp.get('status')}",
-            ]
-            for k, v in list((resp.get("headers") or {}).items())[:15]:
-                lines.append(f"{k}: {v}")
-            lines += [
-                "",
-                _excerpt(resp.get("body", ""), f["evidence_excerpt"])[:1500],
-                "```",
+                _fence(block) + "http",
+                block,
+                _fence(block),
                 "</details>",
                 "",
             ]
@@ -206,7 +217,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
               "",
               f"**Endpoints exercised ({len(coverage['endpoints'])}):**", ""]
     for ep in coverage["endpoints"][:80]:
-        lines.append(f"- `{ep}`")
+        lines.append(f"- {_code(ep)}")
     if len(coverage["endpoints"]) > 80:
         lines.append(f"- _...and {len(coverage['endpoints']) - 80} more "
                      "(see summary.json)_")
@@ -229,14 +240,15 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     if notes_path.exists():
         notes = notes_path.read_text(encoding="utf-8", errors="replace")
         if notes.strip():
+            f_ = _fence(notes)
             lines += [
                 "",
                 "<details><summary>Appendix: agent working notes "
                 "(audit)</summary>",
                 "",
-                "```",
+                f_,
                 notes[:20000],
-                "```",
+                f_,
                 "</details>",
             ]
 

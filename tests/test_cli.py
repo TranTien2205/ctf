@@ -59,6 +59,21 @@ def test_compare_two_sessions(tmp_path, capsys):
     assert len([l for l in csv_out.splitlines() if l.strip()]) == 3
 
 
+def test_report_fence_cant_be_broken(tmp_path):
+    """Evidence containing ``` must not break out of its code fence - a
+    target could otherwise inject fake report sections (finding spoof)."""
+    from argus.report.markdown import _fence, _code
+    evil = "before\n```\n# FAKE CRITICAL FINDING\n```\nafter"
+    f = _fence(evil)
+    assert f == "````"  # one longer than the longest ```-run
+    block = f"{f}\n{evil}\n{f}"
+    # every fence in the block is the long one - the inner ``` can't close it
+    assert block.count("````") == 2
+    assert "```\n# FAKE" in block  # payload stays literal inside the fence
+    assert _code("http://x/?a=1") == "`http://x/?a=1`"
+    assert _code("has`tick").startswith("`` ")
+
+
 def test_tools_allowlist_validation(capsys):
     """--tools: bad names fail fast with the valid list; good names are
     restricted to exactly those tools (finish auto-included)."""
