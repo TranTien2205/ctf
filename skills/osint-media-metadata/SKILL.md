@@ -33,9 +33,12 @@ it — where, when, on what device, or what was inside before it was shared.
 
 Read **all** of the metadata, not one guessed tag: `exiftool` prints every
 group, and the answer is often in an odd corner (`ThumbnailImage`,
-`HistoryParameters`, a software string). Then the container itself — `binwalk`
-and `strings` find appended archives and embedded payloads that metadata never
-shows.
+`HistoryParameters`, a software string). No exiftool on the box?
+`python3 tools/meta_read.py <file>` reads JPEG EXIF (incl. GPS
+rationals), PNG text chunks, PDF /Info + XMP, Office docProps, WAV
+LIST/INFO and ID3v2 with stdlib. Then the container itself — `binwalk`
+and `strings` (or `tools/forensics/carve_scan.py`) find appended
+archives and embedded payloads that metadata never shows.
 
 | Evidence surface | What it answers |
 |---|---|
@@ -59,8 +62,9 @@ coordinate names is a hypothesis until a map source confirms it.
 ## Operational probe
 
 ```bash
-exiftool -a -u -g1 <file>
-binwalk -e <file>
+python3 tools/meta_read.py <file>          # stdlib fallback for exiftool
+exiftool -a -u -g1 <file>                  # when installed
+python3 tools/forensics/carve_scan.py <file>   # appended/embedded data
 strings -n 6 <file> | grep -iE "flag|gps|key"
 ```
 
