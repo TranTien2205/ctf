@@ -235,6 +235,51 @@ class StructureTests(unittest.TestCase):
             "produces. Port the change into the generator and re-run it; a "
             "hand-edited output is reverted by the next regeneration.")
 
+    def test_registry_json_and_index_match_their_generators(self):
+        """The other two generated artifacts get the same drift treatment.
+
+        skills/registry.json is rewritten by build/make_registry.py and
+        skills/INDEX.md by build/make_index.py. A hand edit to either is
+        silently reverted the next time someone regenerates — the same failure
+        bug-classes.json already proved, with the same fix: compare, and make
+        the generator the place edits land.
+        """
+        import importlib.util
+        committed_registry = read("skills/registry.json")
+        with tempfile.TemporaryDirectory() as tmp:
+            reg_copy = os.path.join(tmp, "registry.json")
+            Path(reg_copy).write_text(committed_registry, encoding="utf-8")
+            spec = importlib.util.spec_from_file_location(
+                "_mreg", ROOT / "build" / "make_registry.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            module.REGISTRY = reg_copy
+            with contextlib.redirect_stdout(io.StringIO()):
+                module.main()
+            produced_registry = Path(reg_copy).read_text(encoding="utf-8")
+        self.assertEqual(
+            produced_registry, committed_registry,
+            "skills/registry.json is not what build/make_registry.py produces. "
+            "Port the change into the generator and re-run it; a hand-edited "
+            "output is reverted by the next regeneration.")
+
+        spec = importlib.util.spec_from_file_location(
+            "_midx", ROOT / "build" / "make_index.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        # tempfile's default lives on another mount on Windows; relpath()
+        # inside the generator cannot cross it.
+        with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
+            module.OUT = os.path.join(tmp, "INDEX.md")
+            with contextlib.redirect_stdout(io.StringIO()):
+                module.main()
+            produced_index = Path(module.OUT).read_text(encoding="utf-8")
+        self.assertEqual(
+            produced_index, read("skills/INDEX.md"),
+            "skills/INDEX.md is not what build/make_index.py produces. Re-run "
+            "the generator; a hand-edited index is reverted by the next "
+            "regeneration.")
+
     def test_every_skill_on_disk_is_registered(self):
         on_disk = {p.parent.name for p in (ROOT / "skills").glob("*/SKILL.md")}
         registered = {s["id"] for s in registry()["skills"]}
