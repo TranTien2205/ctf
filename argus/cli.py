@@ -6,7 +6,7 @@ import json
 import sys
 from pathlib import Path
 
-from .config import load_config
+from .config import Config, load_config
 from .loop import AgentLoop
 from .session import Session
 
@@ -155,12 +155,10 @@ def main(argv: list[str] | None = None) -> int:
         from .report.markdown import render_report
         sdir = Path(args.session_dir)
         session = _reopen(sdir)
-        cfg = load_config(argparse.Namespace(
-            target="http://x", header=[], scope=[], exclude=[], model=None,
-            api_key=None, auth_token=None, max_turns=0, max_requests=0,
-            max_time=0, rate=0,
-            session_dir="sessions", allow_private=True, tls_verify=False,
-            no_external=True, goal="", llm_max_tokens=0))
+        # bare Config suffices - the renderer only reads cfg.model, and
+        # resolving auth here could refresh OAuth creds as a side effect of
+        # a read-only command
+        cfg = Config(target="http://x")
         try:
             meta = json.loads((sdir / "meta.json").read_text(
                 encoding="utf-8"))
