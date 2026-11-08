@@ -179,6 +179,10 @@ def main() -> int:
     check("csrf probe flags get-form state change",
           "get form" in out["verdict"].lower()
           and "state-changing" in out["verdict"])
+    out = probes.probe_enum(ctx, base + "/login",
+                            "username=x&password=x", "username")
+    check("enum probe sees user differential",
+          "enumeration candidate" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/reset")
     check("xfh probe sees reflected host", "candidate" in out["verdict"])
     out = probes.probe_nosqli(ctx, base + "/api/login",

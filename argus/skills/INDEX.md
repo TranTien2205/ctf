@@ -19,6 +19,7 @@ actually confirms the bug, and bypasses for common filters.
 | XML parser, external entities | `xxe` |
 | Object id in path/body, no ownership check | `idor` |
 | Token/cookie signed, key in token or leaked | `auth-session` |
+| Login/reset reveals which accounts exist | `auth-enum` |
 | Deep merge over request JSON; `__proto__` | `prototype-pollution` |
 | Check-then-act on balance/coupon/one-time | `race-condition` |
 | ACAO reflects origin; credentials allowed | `cors` |

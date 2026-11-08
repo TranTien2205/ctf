@@ -58,6 +58,7 @@ def _impl(name: str) -> Callable:
         "probe_disclosure": probes.probe_disclosure,
         "probe_websocket": probes.probe_websocket,
         "probe_crlf": probes.probe_crlf,
+        "probe_enum": probes.probe_enum,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "read_response": analysis.read_response,
@@ -438,6 +439,21 @@ TOOL_SCHEMAS: list[dict] = [
          "method": {**_STR, "description": "GET or POST (default GET)"},
          "data": {**_STR, "description": "POST body template; param value is replaced"}},
         ["url", "param"],
+    ),
+    _schema(
+        "probe_enum",
+        "User-enumeration differential on a login/registration/recovery "
+        "form: submits a guaranteed-bogus identifier, then likely-real "
+        "usernames. A differing error/status means the endpoint reveals "
+        "which accounts exist.",
+        {"url": {**_STR, "description": URL_DESC},
+         "data": {**_STR, "description": "POST body template; param value "
+                                         "is replaced"},
+         "param": {**_STR, "description": "Body field carrying the username "
+                                        "(default 'username')"},
+         "users": {**_STR, "description": "Comma-separated candidate "
+                                        "usernames (default common names)"}},
+        ["url", "data"],
     ),
     _schema(
         "jwt_decode",

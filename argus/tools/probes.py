@@ -672,6 +672,41 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
             "content_type_replay": ct_bypass}
 
 
+def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
+               users: str = "admin,administrator,root,test,user") -> dict:
+    """User-enumeration differential: submit the form with a guaranteed-
+    bogus identifier, then with likely-real usernames. A response that
+    differs between 'unknown user' and 'known user, wrong password'
+    (error text, status, length) lets an attacker build a valid-user
+    list before any password guessing."""
+    bogus = _marker("nouser")
+    base = _send(ctx, url, param, bogus, "POST", data,
+                 "probe_enum", "bogus user")
+    base_body = base.get("body") or ""
+    tests = [u.strip() for u in (users or "").split(",") if u.strip()][:8]
+    results = []
+    for u in tests:
+        r = _send(ctx, url, param, u, "POST", data, "probe_enum",
+                  f"user {u}")
+        results.append({
+            "user": u, "status": r["status"],
+            "request_id": r["request_id"],
+            "similarity_to_bogus": _similarity(r.get("body") or "",
+                                               base_body)})
+    hits = [t for t in results
+            if t["similarity_to_bogus"] < 0.9 or t["status"] != base["status"]]
+    verdict = ("user-enumeration candidate: response differs between an "
+               "unknown user and likely-real usernames ("
+               + ", ".join(t["user"] for t in hits)
+               + ") - confirm a hit is really a valid user before citing"
+               if hits else "uniform error response - no enumeration signal")
+    return {"verdict": verdict, "bogus_id": base["request_id"],
+            "results": results,
+            "note": "a differing error only proves enumeration when the "
+                    "endpoint really checks credentials - verify one hit "
+                    "is a real account (e.g. via password-reset)"}
+
+
 def probe_xfh(ctx: Context, url: str) -> dict:
     """Host-header poisoning: X-Forwarded-Host canary reflected into the
     body or Location means generated absolute links can be attacker-aimed

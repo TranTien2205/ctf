@@ -551,7 +551,17 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 self._send(body=f"<html><body>Welcome {u}! role={row[1]}"
                                 f"</body></html>")
             else:
-                self._send(body="<html><body>Login failed.</body></html>")
+                # user-enumeration vuln: the error reveals whether the
+                # username exists before the password is even checked
+                exists = self.db.execute(
+                    "SELECT 1 FROM users WHERE username = ?",
+                    (u,)).fetchone()
+                if exists:
+                    self._send(body="<html><body>Wrong password for "
+                                    f"{u}.</body></html>")
+                else:
+                    self._send(body="<html><body>Unknown user."
+                                    "</body></html>")
             return
         if path == "/xml":
             # simulated XXE-prone parser: external entities get "resolved"

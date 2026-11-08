@@ -117,6 +117,7 @@ verbatim evidence from a cited response.
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
 | WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101 + accept check) |
 | CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
+| User enumeration | `probe_enum` | bogus vs likely-real usernames, error differential |
 | JWT/session | `jwt_decode` | decode, alg weaknesses, weak-secret crack |
 | GraphQL | `graphql_introspect` | schema introspection summary |
 | Recon | `fingerprint` `crawl` `js_recon` `wordlist_fuzz` | stack/links/forms/endpoints/secrets/sourcemaps |

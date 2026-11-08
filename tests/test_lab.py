@@ -132,6 +132,15 @@ def test_csrf_probe(lab_url, ctx):
     assert out3["stateful_get_forms"], out3
 
 
+def test_enum_probe(lab_url, ctx):
+    # /login answers "Unknown user" for a bogus name but "Wrong password
+    # for admin" for a real one - the differential IS the enumeration
+    out = probes.probe_enum(ctx, lab_url + "/login",
+                            "username=x&password=x", "username")
+    assert "enumeration candidate" in out["verdict"], out
+    assert any(t["user"] == "admin" for t in out["results"]), out
+
+
 def test_xfh_probe(lab_url, ctx):
     out = probes.probe_xfh(ctx, lab_url + "/reset")
     assert "host-header candidate" in out["verdict"], out
