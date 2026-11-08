@@ -3614,6 +3614,11 @@ class EveryChainCardValidatesTests(unittest.TestCase):
         self.assertGreater(len(cards), 60, "chain library unexpectedly small")
         # In-process: 73 subprocesses took 72 seconds, and this runs on the
         # gate for every change.
+        try:
+            import jsonschema  # noqa: F401 -- gate the optional dep, not the suite
+        except ImportError:
+            self.skipTest("jsonschema is not installed; schema validation is "
+                          "optional in this tree (see run_all.sh)")
         sys.path.insert(0, str(ROOT / "tools"))
         import validate_card
         failures = []
