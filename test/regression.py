@@ -2092,6 +2092,48 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIn("challenge budget exhausted", decision["rationale"])
         self.assertIn("no further probe is permitted", decision["rationale"])
 
+    def test_a_fresh_challenge_starts_with_recon(self):
+        """No state file is the very first decision the controller makes."""
+        decision = decide_mod.decide("brand-new")
+        self.assertEqual(decision["action"], "start_recon")
+        self.assertEqual(len(decision["recon_rules"]), 3)
+        self.assertTrue(any("classify" in c for c in decision["commands"]))
+
+    def test_an_unclassified_hypothesis_blocks_probing(self):
+        """An open hypothesis with no bug_class cannot be probed: the
+        controller demands it be classified or rejected first, or an
+        unscoped guess would burn the per-class budget invisibly."""
+        self.write_state("unclassed", {"hypotheses": [
+            {"id": "h1", "name": "something odd", "status": "open",
+             "priority": 50, "time": 1}],
+            "probes": []})
+        decision = decide_mod.decide("unclassed")
+        self.assertEqual(decision["action"], "classify_first")
+        self.assertIn("--hypothesis-id h1", " ".join(decision["commands"]))
+
+    def test_a_named_challenge_with_nothing_open_searches_writeups(self):
+        """search_writeup is the last resort before stopping: it fires only
+        when every hypothesis is closed and the challenge has a name to
+        look up. Without it the controller would stop while a public
+        solve path still existed."""
+        self.write_state("named", {
+            "hypotheses": [{"id": "h1", "status": "rejected", "priority": 50,
+                            "time": 1, "bug_class": "web-ssti"}],
+            "probes": [{"request": "GET /x", "verdict": "falsifies",
+                        "result": "no", "time": 1, "class": "web-ssti"}],
+            "challenge_name": "Weather App", "event_name": "HTB"})
+        self.assertEqual(decide_mod.decide("named")["action"], "search_writeup")
+
+    def test_an_unnamed_challenge_with_nothing_open_stops(self):
+        """The same dead end without a name has nothing to search; the honest
+        answer is the stop report."""
+        self.write_state("unnamed", {
+            "hypotheses": [{"id": "h1", "status": "rejected", "priority": 50,
+                            "time": 1, "bug_class": "web-ssti"}],
+            "probes": [{"request": "GET /x", "verdict": "falsifies",
+                        "result": "no", "time": 1, "class": "web-ssti"}]})
+        self.assertEqual(decide_mod.decide("unnamed")["action"], "stop_report")
+
     def test_the_escalation_ladder_ends_in_a_stop_and_not_a_loop(self):
         """Removing the stop would make the controller loop for ever.
 
