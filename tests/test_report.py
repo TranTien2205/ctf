@@ -20,3 +20,8 @@ def test_report_excludes_tampered_findings(tmp_path, capsys):
     assert "F99" in err and "re-validation" in err
     rep = (sdir / "report.md").read_text(encoding="utf-8")
     assert "F99" not in rep and "F01" in rep
+    # `argus findings` keeps the forensic listing but flags the bad row
+    assert main(["findings", str(sdir)]) == 0
+    out = capsys.readouterr()
+    assert "F99" in out.err
+    assert "UNVERIFIED" in out.out

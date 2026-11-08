@@ -200,6 +200,15 @@ def main(argv: list[str] | None = None) -> int:
             print("[]" if args.json else "no findings.json in that session dir")
             return 1
         data = json.loads(fpath.read_text(encoding="utf-8"))
+        # findings.json is not chained - flag any claim whose evidence
+        # fails re-validation instead of presenting it as trustworthy
+        from .session import findings_bad
+        bad = set(findings_bad(_reopen(Path(args.session_dir))._transcript,
+                               data))
+        if bad:
+            print(f"warning: findings {sorted(bad)} fail evidence "
+                  "re-validation - do not trust (run 'argus verify')",
+                  file=sys.stderr)
         if args.json:
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
@@ -207,8 +216,9 @@ def main(argv: list[str] | None = None) -> int:
                 cvss = f" [{f['cvss']}]" if f.get("cvss") else ""
                 cwe = f" {f['cwe']}" if f.get("cwe") else ""
                 ow = f" <{f['owasp']}>" if f.get("owasp") else ""
+                flag = " UNVERIFIED" if f.get("id") in bad else ""
                 print(f"[{f['severity'].upper():8}] {f['id']} {f['title']}"
-                      f" ({f['url']}){cwe}{ow}{cvss}")
+                      f" ({f['url']}){cwe}{ow}{cvss}{flag}")
         return 0
 
     if args.cmd == "skills":
