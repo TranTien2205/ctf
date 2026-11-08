@@ -203,7 +203,8 @@ def main(argv: list[str] | None = None) -> int:
                     s = json.loads(summ.read_text(encoding="utf-8"))
                     row.update(mode=s.get("mode", "single"),
                                findings=len(s.get("findings") or []),
-                               requests=s.get("requests", "?"))
+                               requests=s.get("requests", "?"),
+                               duration=s.get("duration_s"))
                 except Exception:
                     pass
             rows.append(row)
@@ -211,9 +212,11 @@ def main(argv: list[str] | None = None) -> int:
             print("no sessions yet")
             return 0
         for r in rows:
+            dur = f"{r['duration']:.0f}s" if isinstance(
+                r.get("duration"), (int, float)) else "?"
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
-                  f"requests={r.get('requests','?')}")
+                  f"requests={r.get('requests','?')} dur={dur}")
         return 0
 
     if args.cmd == "verify":
@@ -303,7 +306,7 @@ def main(argv: list[str] | None = None) -> int:
                 ("coverage", "endpoints_touched"),
                 ("llm_calls", "llm_calls"), ("workers", "workers"),
                 ("tokens", "tokens_in_out")]
-        labels = [chr(ord('A') + i) for i in range(len(sums))]
+        labels = [f"S{i + 1}" for i in range(len(sums))]
         w = max(24, max(len(s['dir']) for s in sums) + 2)
         print(f"{'metric':<24}" + "".join(f"{l:<{w}}" for l in labels))
         print(f"{'':24}" + "".join(f"{s['dir']:<{w}}" for s in sums))

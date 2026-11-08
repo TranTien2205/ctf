@@ -63,6 +63,9 @@ Work in phases, but let evidence drive the order:
   the API allows it.
 - Respect rate: the client already limits requests/second; do not
   parallelize floods by hand.
+- Older tool results compact to stubs as the run grows - the transcript
+  keeps every exchange, so read_response(request_id) re-inspects any
+  earlier request/response verbatim whenever you need it again.
 
 ## Scope
 
