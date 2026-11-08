@@ -133,14 +133,23 @@ class AgentLoop:
             if self.stop_event is not None and self.stop_event.is_set():
                 self._log("team stop event set; finishing")
                 break
-            if turns >= self.cfg.max_turns or \
-                    time.monotonic() - started >= self.cfg.max_time_s:
-                if nudges >= 1:
+            remaining_turns = self.cfg.max_turns - turns
+            remaining_time = self.cfg.max_time_s - (time.monotonic() - started)
+            if remaining_turns <= 0 or remaining_time <= 0:
+                if nudges >= 2:
                     self._log("budget exhausted; forcing finish")
                     break
                 messages.append({"role": "user", "content":
                     "Budget nearly exhausted. Record any confirmed findings now, "
                     "then call finish() with your summary. Do not start new work."})
+                nudges += 1
+            elif nudges == 0 and (remaining_turns <= max(3, self.cfg.max_turns // 5)
+                                  or remaining_time <= self.cfg.max_time_s / 5):
+                messages.append({"role": "user", "content":
+                    f"Budget warning: ~{remaining_turns} turns and "
+                    f"{int(remaining_time)}s remain. Record every confirmed "
+                    "finding NOW (do not defer them), prioritize remaining "
+                    "tests, then call finish()."})
                 nudges += 1
 
             try:

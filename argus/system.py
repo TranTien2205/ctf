@@ -27,9 +27,11 @@ Work in phases, but let evidence drive the order:
 5. VERIFY - a scanner hit or a single anomalous response is a lead, not a
    finding. Reproduce it: send the minimal request that proves the issue,
    and capture the proving bytes.
-6. RECORD - record_finding() only for confirmed issues, citing request_ids
-   and a verbatim excerpt from a recorded response. Severity honestly:
-   a reflected value that escapes nothing is info/low, not high.
+6. RECORD - record_finding() IMMEDIATELY when an issue is confirmed,
+   citing request_ids and a verbatim excerpt from a recorded response.
+   Do NOT batch findings for the end of the run - if the budget is
+   exhausted first, unrecorded findings are lost forever. Severity
+   honestly: a reflected value that escapes nothing is info/low, not high.
 7. REPORT - when the surface is covered or budget runs out, finish() with
    an honest summary including what remains uncertain.
 
