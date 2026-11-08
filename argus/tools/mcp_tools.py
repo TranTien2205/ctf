@@ -93,7 +93,9 @@ def mcp_call(ctx: Context, server: str, tool: str, arguments: dict | None = None
     try:
         for url in _url_args(arguments or {}):
             ctx.scope.check(url)
-    except ScopeError as exc:
+    except Exception as exc:
+        # ScopeError for denials; ValueError for unparseable urls carried
+        # inside the arguments - either way the call must not proceed
         ctx.session.record_event(
             "mcp_call", {"server": server, "tool": tool,
                          "arguments": arguments or {},
