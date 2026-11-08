@@ -42,12 +42,22 @@ def _code(text: str) -> str:
     return f"`{text}`" if "`" not in str(text) else f"`` {text} ``"
 
 
+def _join_list(v, empty: str) -> str:
+    """', '.join over operator-editable meta.json values - a non-list
+    must not crash or spew per-character output."""
+    if not isinstance(v, list):
+        return str(v) if v else empty
+    return ", ".join(str(x) for x in v if x) or empty
+
+
 def _tool_surface(meta: dict) -> str:
     """`--tools` restricted runs have different coverage - the report must
     say so. meta carries "all" or the sorted allowlist."""
     t = meta.get("tools")
     if isinstance(t, list):
-        return f"restricted to {len(t)} tools ({', '.join(t[:8])}{', …' if len(t) > 8 else ''})"
+        return (f"restricted to {len(t)} tools "
+                f"({', '.join(str(x) for x in t[:8])}"
+                f"{', …' if len(t) > 8 else ''})")
     return "all"
 
 
@@ -60,16 +70,16 @@ def _coverage(session: Session) -> dict:
     with session._lock:  # straggler workers may still append mid-render
         entries = list(session._transcript.values())
     for e in entries:
-        if e.get("kind") == "artifacts_digest":
+        if not isinstance(e, dict) or e.get("kind") == "artifacts_digest":
             continue  # the seal is bookkeeping, not exercised surface
-        tool = e.get("tool") or e.get("kind") or "?"
+        tool = str(e.get("tool") or e.get("kind") or "?")
         tools[tool] = tools.get(tool, 0) + 1
         if tool.startswith("probe_"):
             probes.add(tool)
         req = e.get("request")
-        if not req or not req.get("url"):
+        if not isinstance(req, dict) or not req.get("url"):
             continue
-        p = urllib.parse.urlparse(req["url"])
+        p = urllib.parse.urlparse(str(req["url"]))
         names = sorted(k for k, _ in urllib.parse.parse_qsl(p.query))
         endpoints.add(f"{req.get('method', 'GET')} {p.path or '/'}"
                       + ("?" + "&".join(names) if names else ""))
@@ -139,6 +149,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             meta = json.loads(mp.read_text(encoding="utf-8"))
         except Exception:
             meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
     if meta.get("operator"):
         lines.insert(6, f"- **Operator:** {meta['operator']}")
     lines += [
@@ -165,8 +177,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "",
         "## Engagement constraints",
         "",
-        f"- **Scope hosts:** {', '.join(meta.get('scope') or []) or '(target only)'}",
-        f"- **Excluded paths:** {', '.join(meta.get('exclude_paths') or []) or 'none'}",
+        f"- **Scope hosts:** {_join_list(meta.get('scope'), '(target only)')}",
+        f"- **Excluded paths:** {_join_list(meta.get('exclude_paths'), 'none')}",
         f"- **Budgets:** {meta.get('max_turns', '?')} turns, "
         f"{meta.get('max_requests', '?')} requests, {meta.get('rate_rps', '?')} rps",
         f"- **Proxy:** {'yes' if meta.get('proxy') else 'no'} · "

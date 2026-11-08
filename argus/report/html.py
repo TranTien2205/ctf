@@ -84,15 +84,18 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 
     meta = {}
     mp = session.dir / "meta.json"
-    if mp.exists():
+    if mp.is_file():
         try:
             import json as _j
             meta = _j.loads(mp.read_text(encoding="utf-8"))
         except Exception:
             meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+    from .markdown import _join_list
     constraints = (
-        f"<p><b>Scope hosts:</b> {_esc(', '.join(meta.get('scope') or []) or '(target only)')}<br>"
-        f"<b>Excluded paths:</b> {_esc(', '.join(meta.get('exclude_paths') or []) or 'none')}<br>"
+        f"<p><b>Scope hosts:</b> {_esc(_join_list(meta.get('scope'), '(target only)'))}<br>"
+        f"<b>Excluded paths:</b> {_esc(_join_list(meta.get('exclude_paths'), 'none'))}<br>"
         f"<b>Budgets:</b> {_esc(meta.get('max_turns','?'))} turns, "
         f"{_esc(meta.get('max_requests','?'))} requests, {_esc(meta.get('rate_rps','?'))} rps<br>"
         f"<b>Proxy:</b> {'yes' if meta.get('proxy') else 'no'} · "
