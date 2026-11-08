@@ -264,6 +264,9 @@ class TeamRun:
             "mode": "team", "agents": self.board.agents(),
             "llm_calls": calls, "llm_tokens": tokens,
         })
+        # anchor every un-chained artifact (meta/findings/summary) into the
+        # transcript so post-run edits are detectable by verify
+        self.session.seal_artifacts()
         return {
             "mode": "team",
             "session_dir": str(self.session.dir),

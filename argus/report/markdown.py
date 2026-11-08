@@ -59,6 +59,8 @@ def _coverage(session: Session) -> dict:
     with session._lock:  # straggler workers may still append mid-render
         entries = list(session._transcript.values())
     for e in entries:
+        if e.get("kind") == "artifacts_digest":
+            continue  # the seal is bookkeeping, not exercised surface
         tool = e.get("tool") or e.get("kind") or "?"
         tools[tool] = tools.get(tool, 0) + 1
         if tool.startswith("probe_"):
@@ -91,6 +93,20 @@ def _duration(session: Session) -> float:
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
+    # a re-render (`argus report`) must not drop run metrics the original
+    # render recorded (mode, llm_calls, llm_tokens, agents) - they land as
+    # top-level summary keys, so carry forward every key the canonical
+    # schema does not own, under any freshly supplied ones
+    _BASE = {"session", "findings", "counts", "requests", "duration_s",
+             "time_to_first_finding_s", "coverage", "transcript_chain_head"}
+    _prev = session.dir / "summary.json"
+    if _prev.exists():
+        try:
+            _old = json.loads(_prev.read_text(encoding="utf-8"))
+            extra = {**{k: v for k, v in _old.items() if k not in _BASE},
+                     **extra}
+        except (ValueError, OSError):
+            pass
     coverage = _coverage(session)
     findings = sorted(session.findings,
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))

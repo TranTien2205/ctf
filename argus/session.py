@@ -85,6 +85,10 @@ def verify_transcript(sdir: Path) -> dict:
         out["head_anchor"] = head
         if head and prev != head:
             out["tail_truncated"] = True
+        elif not head:
+            # a summary without its anchor is itself a tamper signal: with
+            # nothing to compare, a truncated tail would verify clean
+            out["anchor_missing"] = True
     # findings.json itself is not chained - but every claim in it must cite
     # chained transcript evidence verbatim. Re-validating here makes an
     # edited findings.json (fake finding, inflated severity) detectable.
@@ -98,6 +102,35 @@ def verify_transcript(sdir: Path) -> dict:
         bad = findings_bad(entries, stored_findings)
         if bad:
             out["findings_bad"] = bad
+    # a run sealed with artifacts_digest anchors every un-chained file:
+    # meta.json, findings.json and summary.json (minus the mutable head/
+    # duration fields). Any post-run edit surfaces as a digest mismatch.
+    dig = next((e for e in reversed(list(entries.values()))
+                if e.get("kind") == "artifacts_digest"), None)
+    if dig and out["chained"]:
+        mismatched = []
+        for name, want in (dig.get("files") or {}).items():
+            p = Path(sdir) / name
+            if not p.exists():
+                mismatched.append(name)
+                continue
+            if name == "summary.json":
+                try:
+                    data = json.loads(p.read_text(encoding="utf-8"))
+                    for k in ("transcript_chain_head", "duration_s"):
+                        data.pop(k, None)
+                    got = hashlib.sha256(json.dumps(
+                        data, sort_keys=True, ensure_ascii=False
+                    ).encode()).hexdigest()
+                except (ValueError, OSError):
+                    mismatched.append(name)
+                    continue
+            else:
+                got = hashlib.sha256(p.read_bytes()).hexdigest()
+            if got != want:
+                mismatched.append(name)
+        if mismatched:
+            out["artifact_mismatch"] = mismatched
     return out
 
 
@@ -343,6 +376,54 @@ class Session:
             with self.transcript_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
             return rid
+
+    def seal_artifacts(self) -> str | None:
+        """Record sha256 digests of the un-chained artifacts (meta.json,
+        findings.json, summary.json) as a transcript event, then re-anchor
+        summary.json to the new chain head. Called once at run end after
+        render - afterwards ANY edit to those files is detectable by
+        `argus verify`. The summary digest skips transcript_chain_head and
+        duration_s: both are legitimately rewritten by `argus report`
+        re-renders."""
+        files: dict[str, str] = {}
+        for name in ("meta.json", "findings.json"):
+            p = self.dir / name
+            if p.exists():
+                files[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+        sp = self.dir / "summary.json"
+        if sp.exists():
+            try:
+                data = json.loads(sp.read_text(encoding="utf-8"))
+                for k in ("transcript_chain_head", "duration_s"):
+                    data.pop(k, None)
+                files["summary.json"] = hashlib.sha256(json.dumps(
+                    data, sort_keys=True, ensure_ascii=False).encode()
+                ).hexdigest()
+            except (ValueError, OSError):
+                pass
+        if not files:
+            return None
+        # fixed id, not an r<n>: the seal must not consume a sequence number
+        # or `requests` in summary.json changes on every re-render and the
+        # digest would flag its own bookkeeping
+        with self._lock:
+            entry = {"id": "seal", "ts": round(time.time(), 3),
+                     "kind": "artifacts_digest", "files": files}
+            entry["chain"] = _chain(self._last_chain, entry)
+            self._last_chain = entry["chain"]
+            self._transcript["seal"] = entry
+            with self.transcript_path.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        rid = "seal"
+        if sp.exists():
+            try:
+                data = json.loads(sp.read_text(encoding="utf-8"))
+                data["transcript_chain_head"] = self._last_chain
+                _atomic_write(sp, json.dumps(data, indent=2,
+                                             ensure_ascii=False))
+            except (ValueError, OSError):
+                pass
+        return rid
 
     def get_exchange(self, rid: str) -> dict | None:
         return self._transcript.get(rid)

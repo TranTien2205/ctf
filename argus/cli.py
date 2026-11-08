@@ -294,10 +294,21 @@ def main(argv: list[str] | None = None) -> int:
                   "recorded in summary.json - tail entries were removed, "
                   "or the session continued after its last report")
             return 1
+        if res.get("anchor_missing"):
+            print("UNVERIFIABLE: summary.json carries no "
+                  "transcript_chain_head - either this session predates "
+                  "anchoring, or the anchor was deleted (which defeats "
+                  "tail-truncation detection)")
+            return 1
         if res.get("findings_bad"):
             print(f"TAMPERED: findings {res['findings_bad']} no longer "
                   "verify - evidence ids missing from the transcript or "
                   "excerpt not verbatim")
+            return 1
+        if res.get("artifact_mismatch"):
+            print(f"TAMPERED: {res['artifact_mismatch']} edited since the "
+                  "run was sealed - sha256 differs from the digest "
+                  "recorded in the transcript")
             return 1
         anchored = " anchored to summary.json" if res.get("head_anchor") \
             else ""

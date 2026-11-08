@@ -25,3 +25,28 @@ def test_report_excludes_tampered_findings(tmp_path, capsys):
     out = capsys.readouterr()
     assert "F99" in out.err
     assert "UNVERIFIED" in out.out
+
+
+def test_sealed_artifacts_detect_edits(tmp_path):
+    """After a run seals, editing findings/meta/summary must fail verify;
+    a legitimate `argus report` re-render must not."""
+    import json
+    from argus.cli import main
+    from argus.session import verify_transcript
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    res = verify_transcript(sdir)
+    assert res["chained"] and not res.get("artifact_mismatch")
+    # re-render is legitimate - digests skip the mutable head/duration
+    assert main(["report", str(sdir)]) == 0
+    assert not verify_transcript(sdir).get("artifact_mismatch")
+    # editing findings.json is not
+    fp = sdir / "findings.json"
+    orig = fp.read_text(encoding="utf-8")
+    d = json.loads(orig)
+    d[0]["severity"] = "low" if d[0]["severity"] != "low" else "high"
+    fp.write_text(json.dumps(d, indent=2, ensure_ascii=False),
+                  encoding="utf-8")
+    assert verify_transcript(sdir)["artifact_mismatch"] == ["findings.json"]
+    fp.write_text(orig, encoding="utf-8")
+    assert not verify_transcript(sdir).get("artifact_mismatch")

@@ -341,13 +341,30 @@ def main() -> int:
     check("verify re-validates findings ok", res["findings_checked"] == 1
           and not res.get("findings_bad"))
     fp = sdir / "findings.json"
-    fs = json.loads(fp.read_text())
+    orig_bytes = fp.read_bytes()
+    fs = json.loads(orig_bytes)
     fs[0]["evidence_excerpt"] = "tampered-bytes"
     fp.write_text(json.dumps(fs))
     res = verify_transcript(sdir)
     check("verify flags tampered finding", res.get("findings_bad") == ["F01"])
+    check("seal flags findings.json edit",
+          res.get("artifact_mismatch") == ["findings.json"])
     fs[0]["evidence_excerpt"] = "sqlite3.OperationalError"
     fp.write_text(json.dumps(fs))
+    res = verify_transcript(sdir)
+    check("content-identical rewrite still flagged by seal",
+          res.get("artifact_mismatch") == ["findings.json"])
+    fp.write_bytes(orig_bytes)  # byte-exact restore
+    res = verify_transcript(sdir)
+    check("seal clean after byte-exact restore",
+          not res.get("artifact_mismatch"))
+    mp = sdir / "meta.json"
+    m_orig = mp.read_bytes()
+    mp.write_bytes(m_orig + b" ")
+    res = verify_transcript(sdir)
+    check("seal flags meta.json whitespace edit",
+          res.get("artifact_mismatch") == ["meta.json"])
+    mp.write_bytes(m_orig)
     from argus.loop import _compact_history, _KEEP_FULL_RESULTS
     msgs = [{"role": "user", "content": [
         {"type": "tool_result", "tool_use_id": "c",

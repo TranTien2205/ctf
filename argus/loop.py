@@ -267,6 +267,9 @@ class AgentLoop:
                 extra={"mode": "team" if self.ctx.board is not None else "single",
                        "llm_calls": self.llm.calls,
                        "llm_tokens": self._token_stats()}))
+            # anchor every un-chained artifact (meta/findings/summary) into
+            # the transcript so post-run edits are detectable by verify
+            self.session.seal_artifacts()
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
