@@ -263,11 +263,16 @@ TOOL_SCHEMAS: list[dict] = [
     _schema(
         "probe_idor",
         "IDOR / broken object-level authorization check: fetches the object "
-        "at the numeric id in the URL, then id+1 and id-1. A different "
-        "object returned at the same access level is an IDOR lead - verify "
-        "the second object belongs to a different principal.",
+        "at the numeric id - in the URL path/query, or inside a POST body "
+        "template - then id+1 and id-1. A different object returned at the "
+        "same access level is an IDOR lead - verify the second object "
+        "belongs to a different principal.",
         {"url": {**_STR, "description": URL_DESC +
-                 " Must contain a numeric object id (path or query)."}},
+                 " For GET, it must contain a numeric object id (path or query)."},
+         "method": {**_STR, "description": "GET or POST (default GET)"},
+         "data": {**_STR, "description": "POST body template; the first "
+                                         "numeric value is treated as the "
+                                         "object id"}},
         ["url"],
     ),
     _schema(
@@ -280,6 +285,8 @@ TOOL_SCHEMAS: list[dict] = [
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter that accepts a URL "
                                              "(e.g. url, callback, image, dest)"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
         },
         ["url", "param"],
     ),

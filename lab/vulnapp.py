@@ -16,6 +16,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /redirect?next=       open redirect + CRLF header injection
                                (Location value is not sanitized)
     GET  /api/user/<id>        IDOR (any id served)
+    POST /api/order            IDOR in a JSON body ({"order": N} served)
     GET  /fetch?url=           SSRF (real server-side fetch, 3s timeout)
     POST /xml                  XXE (simulated external-entity resolution)
     POST /api/login            NoSQLi ($ne/$gt operator password bypass)
@@ -635,6 +636,18 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             else:
                 self._send(401, json.dumps({"ok": False}),
                            ctype="application/json")
+            return
+        if path == "/api/order":
+            # POST-body IDOR: any order id is served regardless of caller
+            b = self._body()
+            oid = b.get("order", 0) if isinstance(b, dict) else 0
+            try:
+                oid = int(oid)
+            except (TypeError, ValueError):
+                oid = 0
+            self._send(body=json.dumps(
+                {"order": oid, "owner": f"user-{oid}",
+                 "total": 10 + oid}), ctype="application/json")
             return
         if path == "/graphql":
             b = self._body()

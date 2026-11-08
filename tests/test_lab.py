@@ -80,6 +80,13 @@ def test_idor_probe(lab_url, ctx):
     assert "idor candidate" in out["verdict"], out
 
 
+def test_idor_probe_post_body(lab_url, ctx):
+    # object id lives inside the JSON body, not the URL
+    out = probes.probe_idor(ctx, lab_url + "/api/order", method="POST",
+                            data='{"order": 5}')
+    assert "idor candidate" in out["verdict"], out
+
+
 def test_idor_probe_query_id(lab_url, ctx):
     out = probes.probe_idor(ctx, lab_url + "/api/user/2?x=1")
     assert "idor candidate" in out["verdict"] or "neighbors" in out["verdict"], out

@@ -390,27 +390,45 @@ def probe_method(ctx: Context, url: str) -> dict:
 _ID_RE = re.compile(r"(?<![\w.-])(\d{1,12})(?![\w.-])")
 
 
-def probe_idor(ctx: Context, url: str) -> dict:
-    """IDOR matched-pair: fetch the object, then the same URL with the
-    numeric id +/-1. A different object at the same access level means
+def probe_idor(ctx: Context, url: str, method: str = "GET",
+               data: str | None = None) -> dict:
+    """IDOR matched-pair: fetch the object, then the same request with the
+    numeric id +/-1 - in the URL path/query, or inside a POST body template
+    when `data` is given. A different object at the same access level means
     access control is per-object (or missing)."""
+    method = (method or "GET").upper()
+    headers = None
     p = urllib.parse.urlparse(url)
+    if method != "GET" and data is not None:
+        headers = ({"Content-Type": "application/json"}
+                   if data.strip().startswith("{")
+                   else {"Content-Type": "application/x-www-form-urlencoded"})
     where, target = "path", p.path
-    m = _ID_RE.search(target)
+    m = _ID_RE.search(target) if where == "path" else None
     if not m:
         where, target = "query", p.query
         m = _ID_RE.search(target)
+    if not m and data is not None:
+        where, target = "body", data
+        m = _ID_RE.search(target)
     if not m:
-        return {"error": "no numeric id found in url; pass e.g. "
-                         "/item?id=7 or /user/42/profile"}
-    base = ctx.client.send("GET", url, tool="probe_idor", note="own object")
+        return {"error": "no numeric id found in url/body; pass e.g. "
+                         "/item?id=7, /user/42/profile or a POST body "
+                         "like {\"order\": 5}"}
+    base = ctx.client.send(method, url, headers=headers, body=data,
+                           tool="probe_idor", note="own object")
 
     def _shift(delta: int) -> dict:
         new_id = str(int(m.group(1)) + delta)
         comp = target[:m.start(1)] + new_id + target[m.end(1):]
+        if where == "body":
+            return ctx.client.send(method, url, headers=headers, body=comp,
+                                   tool="probe_idor",
+                                   note=f"id {new_id} (id{delta:+d})")
         u2 = urllib.parse.urlunparse(
             p._replace(**{where: comp}))
-        return ctx.client.send("GET", u2, tool="probe_idor",
+        return ctx.client.send(method, u2, headers=headers, body=data,
+                               tool="probe_idor",
                                note=f"id {new_id} (id{delta:+d})")
 
     neighbors = [_shift(d) for d in (1, -1)]
@@ -442,7 +460,8 @@ _SSRF_MARKERS = re.compile(
 )
 
 
-def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
+def probe_ssrf(ctx: Context, url: str, param: str,
+               method: str = "GET", data: str | None = None) -> dict:
     """SSRF matched-pair: baseline is an unresolvable canary host, then
     internal URLs (self-fetch on the target's own port, loopback name,
     cloud metadata). A 200 whose body differs from the canary error - with
@@ -450,7 +469,7 @@ def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
     p = urllib.parse.urlparse(url)
     port = p.port or (443 if p.scheme == "https" else 80)
     canary = f"http://{_marker('nrf')}.invalid/"
-    base = _send(ctx, url, param, canary, tool="probe_ssrf",
+    base = _send(ctx, url, param, canary, method, data, tool="probe_ssrf",
                  note="unresolvable canary")
     base_body = (base.get("body") or "").replace(canary, "")
 
@@ -463,7 +482,8 @@ def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
     ]
     hits = []
     for name, target in payloads:
-        r = _send(ctx, url, param, target, tool="probe_ssrf", note=name)
+        r = _send(ctx, url, param, target, method, data,
+                  tool="probe_ssrf", note=name)
         body = r.get("body") or ""
         marker = _SSRF_MARKERS.search(body)
         sim = _similarity(body.replace(target, ""), base_body)
