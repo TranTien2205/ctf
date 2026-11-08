@@ -82,6 +82,12 @@ If the endpoint accepts it, request only the observed schema surface. If
 introspection is disabled, use one unknown field and preserve the exact error.
 Do not invent field names after a silent response.
 
+`tools/web/graphql_probe.py` automates both branches: `introspect` sends
+the bounded __schema query and summarizes types/queries/mutations;
+`suggest --field X` parses every 'did you mean' hint; `map --seed a,b`
+loops the suggestion oracle to a bounded field count — the
+introspection-off enumeration, without inventing names.
+
 The first useful signal is schema/type disclosure.
 Schema disclosure is not an exploit; the vulnerability signal is separate.
 Use two identities or roles to request one observed object field or mutation,
