@@ -152,7 +152,8 @@ def _load_dotenv(path: Path = Path(".env")) -> None:
     if not path.exists():
         return
     try:
-        for line in path.read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(
+                encoding="utf-8", errors="replace").splitlines():
             line = line.strip()
             if not line or line.startswith("#") or "=" not in line:
                 continue
@@ -177,7 +178,7 @@ def load_config(args) -> Config:
     if hf:
         try:
             header_lines += [l.strip() for l in Path(hf).read_text(
-                encoding="utf-8").splitlines()
+                encoding="utf-8", errors="replace").splitlines()
                 if l.strip() and not l.strip().startswith("#")]
         except OSError as exc:
             raise SystemExit(f"--header-file unreadable: {exc}")
