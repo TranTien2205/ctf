@@ -303,7 +303,7 @@ def main(argv: list[str] | None = None) -> int:
                   f"  -> this credential caps request size (metered OAuth "
                   f"extra-usage). Use 'argus run --tools <list>' or "
                   f"'argus team' (role-card subsets are smaller).")
-            return 0
+            return 2  # degraded: auth works, but a default run would die
 
     if args.cmd == "compare":
         def _summ(d):
