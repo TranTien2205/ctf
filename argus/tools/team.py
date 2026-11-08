@@ -128,7 +128,7 @@ def finish_engagement(ctx: Context, summary: str) -> dict:
 
 # ------------------------------------------------------------- wordlists
 
-def _load_wordlist(name: str) -> tuple[list[str], str | None]:
+def _load_wordlist(name: str, limit: int = 50_000) -> tuple[list[str], str | None]:
     safe = re.sub(r"[^a-z0-9_-]", "", (name or "").lower())
     if not safe:
         return [], f"bad wordlist name {name!r}; use a file stem from resources/wordlists/"
@@ -139,8 +139,19 @@ def _load_wordlist(name: str) -> tuple[list[str], str | None]:
         avail = sorted({p.stem for d in (WORDLISTS, WORDLISTS_USER)
                         if d.exists() for p in d.glob("*.txt")})
         return [], f"no wordlist {safe!r}; available: {avail}"
-    words = [w.strip() for w in path.read_text(encoding="utf-8").splitlines()
-             if w.strip() and not w.startswith("#")]
+    # stream only what callers can use - the cwd tree is operator-extendable,
+    # and a multi-GB planted list must not be buffered whole
+    words: list[str] = []
+    try:
+        with path.open(encoding="utf-8") as fh:
+            for line in fh:
+                w = line.strip()
+                if w and not w.startswith("#"):
+                    words.append(w)
+                if len(words) >= limit:
+                    break
+    except OSError as exc:
+        return [], f"wordlist {safe!r} unreadable: {exc}"
     return words, None
 
 
@@ -154,11 +165,10 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
     request still passes the scope guard, rate limiter and budget."""
     from .probes import _inject_body
     ctx.scope.check(base_url)  # fail fast before burning the budget
-    words, err = _load_wordlist(wordlist)
+    max_words = max(1, min(int(max_words or 80), 400))
+    words, err = _load_wordlist(wordlist, limit=max_words)
     if err:
         return {"error": err}
-    max_words = max(1, min(int(max_words or 80), 400))
-    words = words[:max_words]
     keep = None
     if statuses.strip():
         keep = {int(s) for s in re.split(r"[^0-9]+", statuses) if s}
