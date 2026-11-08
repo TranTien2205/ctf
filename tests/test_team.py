@@ -250,3 +250,12 @@ def test_team_e2e(tmp_path, lab_url):
     assert "time_to_first_finding_s" in sj
     assert sj["llm_tokens"]["in"] >= 0
     assert "agents" in sj
+
+
+def test_role_cards_reference_real_tools():
+    from argus.team.cards import RECON, EXPLOIT, REPORT, LEAD
+    from argus.tools.registry import TOOL_SCHEMAS
+    names = {s["name"] for s in TOOL_SCHEMAS}
+    for card in (RECON, EXPLOIT, REPORT, LEAD):
+        assert card.tools <= names, \
+            f"{card.name} card references tools without schemas"

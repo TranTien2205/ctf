@@ -83,6 +83,7 @@ python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
         │              idor · ssrf · xxe · csrf · xfh ·         │
         │              upload · race · deserialize · cache ·    │
         │              ppoll · smuggle · disclosure · websocket │
+        │              crlf                                     │
         │  analysis.py jwt_decode · load_skill · notes ·        │
         │              record_finding · run_external · finish   │
         │  mcp_tools.py  mcp_list · mcp_call (external servers) │
