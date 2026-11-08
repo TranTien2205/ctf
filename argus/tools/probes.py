@@ -820,3 +820,139 @@ def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
         verdict = "no prototype-pollution signal"
     return {"verdict": verdict, "before_id": before["request_id"],
             "pollute_id": poll["request_id"], "after_id": after["request_id"]}
+
+
+_SMUGGLE_G = re.compile(r"G(GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)|"
+                        r"'G[A-Z]+'|unrecognized method|bad request|"
+                        r"unsupported method", re.I)
+
+
+def probe_smuggle(ctx: Context, url: str) -> dict:
+    """HTTP request-smuggling detection - CL.TE variant.
+
+    Sends ONE ambiguous request (both Content-Length and Transfer-Encoding:
+    chunked) whose body ends with a stray 'G', then a clean request on the
+    SAME connection. If a front/back pair disagrees on framing, the 'G' is
+    left in the stream and poisons the SECOND request's method line -
+    observed as a 4xx/5xx naming a bogus 'G*' method. This only corrupts
+    our own follow-up request, never a stranger's queue (the standard
+    safe detection from the PortSwigger methodology)."""
+    r = ctx.client.send_raw(
+        url,
+        requests=[
+            {"method": "POST",
+             "headers": [["Content-Length", "6"],
+                         ["Transfer-Encoding", "chunked"]],
+             "body": b"0\r\n\r\nG"},
+            {"method": "GET", "headers": [], "body": b""},
+        ],
+        tool="probe_smuggle",
+        note="CL.TE detect - 'G' may only poison our own next request")
+    sends = r.get("sends") or []
+    if len(sends) < 2:
+        return {"verdict": "inconclusive: connection did not survive the "
+                           "ambiguous request", "sends": sends}
+    s1, s2 = sends[0], sends[1]
+    if s2.get("error"):
+        verdict = ("inconclusive: second request failed after the ambiguous "
+                   "one - could be a desync or just a dropped connection; "
+                   "retry manually")
+    elif s2["status"] >= 400 and _SMUGGLE_G.search(s2.get("body") or ""):
+        verdict = ("cl.te desync candidate: the stray 'G' poisoned the next "
+                   "request's method line - back-end parsed chunked framing "
+                   "while the front-end forwarded Content-Length bytes")
+    elif s2["status"] < 400 and s1["status"] < 400:
+        verdict = ("no cl.te signal: second request clean - back-end likely "
+                   "honored Content-Length (or no front/back parse split)")
+    else:
+        verdict = ("inconclusive: second request rejected but without a "
+                   "'G*' method signature - manual review needed")
+    return {"verdict": verdict,
+            "ambiguous_id": s1["request_id"], "check_id": s2["request_id"],
+            "statuses": [s1["status"], s2["status"]],
+            "note": "TE.CL and HTTP/2-downgrade variants are separate - "
+                    "load_skill('request-smuggling') for those"}
+
+
+_DISCLOSE_PATHS: list[tuple[str, re.Pattern]] = [
+    ("/.git/HEAD", re.compile(r"^ref:\s|^[0-9a-f]{40}", re.M)),
+    ("/.git/config", re.compile(r"\[core\]|\[remote", re.I)),
+    ("/.env", re.compile(r"^[A-Z_]+=|DB_|SECRET|TOKEN|KEY=", re.M)),
+    ("/.svn/entries", re.compile(r"dir|svn:entry", re.I)),
+    ("/.DS_Store", re.compile(r"Bud1|\.localized", re.I)),
+    ("/server-status", re.compile(r"Apache Status|Server uptime|scoreboard", re.I)),
+    ("/actuator/env", re.compile(r'"propertySources"|"systemProperties"', re.I)),
+    ("/actuator/heapdump", re.compile(r"JAVA PROFILE|HPROF", re.I)),
+    ("/phpinfo.php", re.compile(r"phpinfo\(\)|PHP Version|php\.net", re.I)),
+    ("/debug", re.compile(r"debug|traceback|environment|locals", re.I)),
+    ("/elmah.axd", re.compile(r"Error Log for|ELMAH", re.I)),
+    ("/WEB-INF/web.xml", re.compile(r"<web-app|servlet-class", re.I)),
+    ("/trace", re.compile(r"TRACE /|HTTP/1\.1", re.I)),
+    ("/backup.zip", re.compile(r"PK\x03\x04")),
+    ("/wp-config.php~", re.compile(r"DB_PASSWORD|DB_NAME", re.I)),
+]
+
+
+def probe_disclosure(ctx: Context, url: str) -> dict:
+    """Information-disclosure sweep: GET a curated list of commonly-
+    exposed sensitive paths against the target's origin. A 200 whose body
+    matches the artifact's own signature is a real exposure lead; a plain
+    200 without the signature is usually a soft-404 and is not reported."""
+    p = urllib.parse.urlparse(url)
+    root = f"{p.scheme}://{p.netloc}"
+    # baseline: a definitely-missing path shows the site's soft-404 shape
+    base = ctx.client.send("GET", root + "/" + _marker("arg404"),
+                           tool="probe_disclosure", note="soft-404 baseline")
+    hits, checked = [], 0
+    for rel, sig in _DISCLOSE_PATHS:
+        r = ctx.client.send("GET", root + rel, tool="probe_disclosure",
+                            note=f"sensitive path {rel}")
+        checked += 1
+        if r["status"] != 200:
+            continue
+        body = r.get("body") or ""
+        if body == (base.get("body") or "") and body:
+            continue  # identical to soft-404 - not a real artifact
+        if sig.search(body):
+            hits.append({"path": rel, "request_id": r["request_id"],
+                         "bytes": len(body), "signature": sig.pattern[:40]})
+    verdict = (f"{len(hits)} exposed sensitive path(s): "
+               + ", ".join(h["path"] for h in hits) if hits
+               else "no sensitive artifacts found")
+    return {"verdict": verdict, "checked": checked, "exposed": hits,
+            "note": "each hit already matched its artifact signature - "
+                    "quote it verbatim when recording"}
+
+
+def probe_websocket(ctx: Context, url: str) -> dict:
+    """WebSocket discovery: RFC 6455 upgrade handshake. A 101 with
+    Upgrade: websocket confirms a live ws channel - then test authz and
+    message-level controls manually (raw ws framing is out of httpx's
+    scope, so this probe stops at the handshake)."""
+    import base64
+    import os
+    key = base64.b64encode(os.urandom(16)).decode()
+    r = ctx.client.send(
+        "GET", url,
+        headers={"Upgrade": "websocket", "Connection": "Upgrade",
+                 "Sec-WebSocket-Key": key, "Sec-WebSocket-Version": "13"},
+        tool="probe_websocket", note="ws upgrade handshake")
+    hdrs = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
+    upgrade = str(hdrs.get("upgrade", "")).lower()
+    accept = hdrs.get("sec-websocket-accept", "")
+    if r["status"] == 101 and "websocket" in upgrade:
+        verdict = ("websocket endpoint confirmed (101 + Upgrade: websocket) "
+                   "- channel is open; test per-message authorization and "
+                   "input handling with a ws client")
+    elif r["status"] in (400, 426):
+        verdict = f"upgrade refused (HTTP {r['status']}) - endpoint may not be ws"
+    elif r["status"] == 200:
+        verdict = ("no ws upgrade: plain 200 - endpoint ignores the "
+                   "handshake headers")
+    else:
+        verdict = f"no ws signal (HTTP {r['status']})"
+    out = {"verdict": verdict, "request_id": r["request_id"],
+           "status": r["status"]}
+    if accept:
+        out["accept_token"] = accept
+    return out

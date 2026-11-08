@@ -54,6 +54,9 @@ def _impl(name: str) -> Callable:
         "probe_deserialize": probes.probe_deserialize,
         "probe_cache": probes.probe_cache,
         "probe_ppoll": probes.probe_ppoll,
+        "probe_smuggle": probes.probe_smuggle,
+        "probe_disclosure": probes.probe_disclosure,
+        "probe_websocket": probes.probe_websocket,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
         "note": analysis.note,
@@ -375,6 +378,33 @@ TOOL_SCHEMAS: list[dict] = [
                           " A GET endpoint that renders config/objects."},
         },
         ["pollute_url", "check_url"],
+    ),
+    _schema(
+        "probe_smuggle",
+        "Request-smuggling detection (CL.TE): sends one ambiguous request "
+        "with both Content-Length and Transfer-Encoding, then a clean "
+        "request on the same connection. A 'G*' bogus-method error on the "
+        "second request means a front/back framing split. Detection only - "
+        "the stray byte can only poison the agent's own request.",
+        {"url": {**_STR, "description": URL_DESC}},
+        ["url"],
+    ),
+    _schema(
+        "probe_disclosure",
+        "Information-disclosure sweep: GETs commonly-exposed sensitive "
+        "paths (.git/HEAD, .env, /debug, actuator, phpinfo, backups). A "
+        "200 matching the artifact's signature is an exposure lead; a "
+        "soft-404-shaped 200 is not reported.",
+        {"url": {**_STR, "description": URL_DESC}},
+        ["url"],
+    ),
+    _schema(
+        "probe_websocket",
+        "WebSocket discovery: RFC 6455 upgrade handshake. A 101 with "
+        "Upgrade: websocket confirms a live ws channel; further "
+        "message-level testing needs a ws client.",
+        {"url": {**_STR, "description": URL_DESC}},
+        ["url"],
     ),
     _schema(
         "jwt_decode",

@@ -176,3 +176,28 @@ def test_scope_blocks_outside(ctx):
     from argus.scope import ScopeError
     with pytest.raises(ScopeError):
         ctx.client.send("GET", "https://example.org/")
+
+
+def test_smuggle_probe_desync(lab_url, ctx):
+    out = probes.probe_smuggle(ctx, lab_url + "/desync")
+    assert "desync candidate" in out["verdict"]
+    assert out["statuses"] == [200, 501]
+
+
+def test_disclosure_probe(lab_url, ctx):
+    out = probes.probe_disclosure(ctx, lab_url)
+    paths = {h["path"] for h in out["exposed"]}
+    assert {"/.git/HEAD", "/.env", "/debug"} <= paths
+
+
+def test_websocket_probe(lab_url, ctx):
+    out = probes.probe_websocket(ctx, lab_url + "/ws")
+    assert "confirmed" in out["verdict"]
+    out2 = probes.probe_websocket(ctx, lab_url + "/")
+    assert "no ws" in out2["verdict"]
+
+
+def test_js_recon_finds_websocket(lab_url, ctx):
+    from argus.tools.web import js_recon
+    out = js_recon(ctx, lab_url + "/")
+    assert any("ws://" in e["endpoint"] for e in out["websocket_endpoints"])

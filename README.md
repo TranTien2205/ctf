@@ -82,7 +82,7 @@ python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
         │              redirect · cors · method · reflection ·  │
         │              idor · ssrf · xxe · csrf · xfh ·         │
         │              upload · race · deserialize · cache ·    │
-        │              ppoll                                    │
+        │              ppoll · smuggle · disclosure · websocket │
         │  analysis.py jwt_decode · load_skill · notes ·        │
         │              record_finding · run_external · finish   │
         │  mcp_tools.py  mcp_list · mcp_call (external servers) │
@@ -155,7 +155,8 @@ CLI (argus run | argus team)
   │   │   ├── probes.py      matched-pair checks: sqli, nosqli, time, ssti,
   │   │   │                  lfi, redirect, cors, methods, reflection, idor,
   │   │   │                  ssrf, xxe, csrf, xfh, upload, race, deserialize,
-  │   │   │                  cache, prototype-pollution
+  │   │   │                  cache, prototype-pollution, request-smuggling
+  │   │   │                  (CL.TE raw send), info-disclosure, websocket
   │   │   ├── analysis.py    jwt_decode, load_skill, notes, record_finding,
   │   │   │                  run_external (sqlmap/nuclei/nmap/ffuf), finish
   │   │   ├── mcp_tools.py   mcp_list, mcp_call -> external MCP servers

@@ -16,7 +16,7 @@ ClaudeClient.chat(messages, TOOL_SCHEMAS, system)   ← Anthropic tool_use API
                         │
                         ├─ ScopeGuard.check(url)     ← hard boundary
                         ├─ RateLimiter.wait()
-                        ├─ GuardedClient.send()      ← the ONLY socket
+                        ├─ GuardedClient.send/raw()  ← the ONLY socket
                         └─ Session.record_exchange() ← evidence, r<n> id
                      result → tool_result → next turn
    │
@@ -29,14 +29,17 @@ Design choices and why:
   schema-validated calls; the loop never regexes commands out of prose.
 - **One guarded client.** Every tool — `http_request`, `crawl`, probes,
   even `run_external` arg checking — funnels through `ScopeGuard` +
-  `RateLimiter` + transcript recording. No tool opens its own socket.
+  `RateLimiter` + transcript recording. No tool opens its own socket;
+  desync probes that httpx cannot express go through
+  `GuardedClient.send_raw`, which keeps the same scope/budget/transcript
+  guarantees on a controlled raw channel.
 - **Evidence gating at write time.** `Session.add_finding` asserts the
   excerpt is a substring of a cited response. Same idea as a flag gate,
   generalized: the machine validates the *truth* of a claim, not its shape.
 - **Baseline-diffed probes.** Each `probe_*` returns `verdict` +
   `request_ids`, never "you are vulnerable". The agent confirms and
   rates severity itself.
-- **Skills as retrievable knowledge.** 23 methodology modules (~2KB each)
+- **Skills as retrievable knowledge.** 24 methodology modules (~2KB each)
   load on demand via `load_skill`. Detection signals, first probes,
   confirmation criteria, bypasses, honest severity guidance.
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real

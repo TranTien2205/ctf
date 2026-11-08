@@ -52,6 +52,7 @@ class GuardedClient:
         self.max_requests = max_requests
         self.agent = agent
         self.sent = 0
+        self._tls_verify = tls_verify
         # probe_race fires concurrent sends through one client - the budget
         # check+increment must be atomic or threads lose count
         self._sent_lock = threading.Lock()
@@ -213,6 +214,104 @@ class GuardedClient:
         if error:
             out["error"] = error
         return out
+
+    def send_raw(
+        self,
+        url: str,
+        requests: list[dict],
+        tool: str = "http_request",
+        note: str = "",
+    ) -> dict:
+        """Raw HTTP/1.1 sends on ONE connection - for probes httpx cannot
+        express (duplicate/conflicting headers like CL+TE). The socket,
+        request budget, rate limiter and transcript all go through the same
+        guards as send(); the URL's own Host is always emitted so headers
+        cannot retarget the wire.
+
+        requests: [{"method","headers":[[k,v],...],"body":bytes}, ...]"""
+        import http.client
+        parsed = self.scope.check(url)
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+        host_port = f"{parsed.hostname}:{parsed.port}" if parsed.port \
+            else parsed.hostname
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        if parsed.scheme == "https":
+            import ssl
+            sctx = ssl.create_default_context()
+            if not self._tls_verify:
+                sctx.check_hostname = False
+                sctx.verify_mode = ssl.CERT_NONE
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+                parsed.hostname, port, timeout=15, context=sctx)
+        else:
+            conn = http.client.HTTPConnection(parsed.hostname, port,
+                                              timeout=15)
+        sends_out: list[dict] = []
+        try:
+            conn.connect()
+            for spec in requests:
+                method = (spec.get("method") or "GET").upper()
+                lines = [f"{method} {path} HTTP/1.1",
+                         f"Host: {host_port}",
+                         f"User-Agent: argus-raw/1.0"]
+                for k, v in spec.get("headers") or []:
+                    if k.lower() in ("host",):
+                        continue  # Host comes from the scoped URL only
+                    lines.append(f"{k}: {v}")
+                body = spec.get("body") or b""
+                if isinstance(body, str):
+                    body = body.encode()
+                raw_req = ("\r\n".join(lines) + "\r\n\r\n").encode() + body
+                self.rate.wait()
+                with self._sent_lock:
+                    if self.sent >= self.max_requests:
+                        raise RequestBudgetExhausted(
+                            f"request budget exhausted ({self.max_requests}); "
+                            "call finish")
+                    self.sent += 1
+                started = time.monotonic()
+                status, rheaders, rbody, error = 0, {}, "", None
+                try:
+                    # sock-level send + HTTPResponse: the connection's own
+                    # state machine only understands well-formed requests
+                    conn.sock.sendall(raw_req)
+                    resp = http.client.HTTPResponse(
+                        conn.sock, method=method)
+                    resp.begin()
+                    # the full body MUST be drained or its bytes corrupt
+                    # the next response's parse on this reused connection
+                    rbody = resp.read().decode("utf-8", "replace")[:BODY_CAP]
+                    status = resp.status
+                    rheaders = dict(resp.getheaders())
+                except (http.client.HTTPException, OSError) as exc:
+                    error = f"{type(exc).__name__}: {exc}"
+                elapsed = round((time.monotonic() - started) * 1000, 1)
+                rid = self.session.record_exchange(
+                    tool=tool,
+                    request={"method": method, "url": url,
+                             "headers": {l.split(": ", 1)[0]: l.split(": ", 1)[1]
+                                         for l in lines[1:]},
+                             "raw": True,
+                             "body": body.decode("utf-8", "replace")},
+                    response={"status": status, "headers": rheaders,
+                              "body": rbody, "elapsed_ms": elapsed},
+                    note=note or "raw send", agent=self.agent)
+                entry = {"request_id": rid, "status": status,
+                         "elapsed_ms": elapsed, "body": rbody[:RETURN_CAP]}
+                if error:
+                    entry["error"] = error
+                sends_out.append(entry)
+                if error:
+                    break
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        return {"sends": sends_out,
+                "note": "raw sends share one connection - order matters" if len(sends_out) > 1 else ""}
 
     def close(self) -> None:
         self._client.close()

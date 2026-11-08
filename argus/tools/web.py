@@ -160,6 +160,7 @@ _JS_SECRET = re.compile(
     r"""\s*[:=]\s*['"`]([^'"`\s]{8,120})['"`]"""
 )
 _SRCMAP = re.compile(r"sourceMappingURL=([^\s]+)")
+_JS_WS = re.compile(r"""['"`](wss?://[^'"`\s]{4,200})['"`]""", re.I)
 
 
 def js_recon(ctx: Context, url: str) -> dict:
@@ -168,6 +169,8 @@ def js_recon(ctx: Context, url: str) -> dict:
     surf = _parse_surface(body)
     scripts = [urllib.parse.urljoin(url, s) for s in surf.scripts]
     inline = [s for s in surf.inline_js if s.strip()]
+
+    ws_endpoints: list[dict] = []
 
     def scan(text: str, src: str) -> tuple[list[dict], list[dict]]:
         eps, secrets = [], []
@@ -179,6 +182,10 @@ def js_recon(ctx: Context, url: str) -> dict:
             line = text.count("\n", 0, m.start()) + 1
             secrets.append({"kind": m.group(1), "value": m.group(2),
                             "source": src, "line": line})
+        for m in _JS_WS.finditer(text):
+            line = text.count("\n", 0, m.start()) + 1
+            ws_endpoints.append({"endpoint": m.group(1), "source": src,
+                                 "line": line})
         return eps, secrets
 
     endpoints: list[dict] = []
@@ -239,6 +246,7 @@ def js_recon(ctx: Context, url: str) -> dict:
         "scripts_fetched": fetched,
         "sourcemaps_found": maps_found,
         "endpoints": uniq_eps[:80],
+        "websocket_endpoints": ws_endpoints[:20],
         "secret_candidates": secrets[:30],
         "note": "secret_candidates are leads, not findings - verify usage before recording",
     }

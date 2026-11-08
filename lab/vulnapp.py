@@ -24,7 +24,9 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
-    GET  /.git/HEAD, /debug    info disclosure
+    GET  /.git/HEAD, /.env, /debug  info disclosure
+    POST /desync               request smuggling (TE-parsing back-end sim)
+    GET  /ws                   websocket handshake (101)
 
 Run:  python lab/vulnapp.py [port]
 """
@@ -94,6 +96,7 @@ def _jwt_verify(token: str):
 class Handler(BaseHTTPRequestHandler):
     db = None
     server_version = "LabVuln/1.0"
+    protocol_version = "HTTP/1.1"  # keep-alive: needed for desync exercise
 
     # -- helpers ---------------------------------------------------------
     def _send(self, status=200, body="", ctype="text/html; charset=utf-8",
@@ -282,10 +285,27 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/.git/HEAD":
             self._send(body="ref: refs/heads/main", ctype="text/plain")
 
+        elif path == "/.env":
+            self._send(body="DB_HOST=db.internal\nDB_PASSWORD=hunter2\n"
+                            "SECRET_KEY=lab-secret-0123\n", ctype="text/plain")
+
+        elif path == "/ws":
+            # RFC 6455 handshake: a live ws endpoint answers 101 + Accept
+            key = self.headers.get("Sec-WebSocket-Key", "")
+            accept = base64.b64encode(hashlib.sha1(
+                (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
+            ).digest()).decode()
+            self.send_response(101, "Switching Protocols")
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", accept)
+            self.end_headers()
+
         elif path == "/static/app.js":
             self._send(body="""fetch('/api/user/1').then(r=>r.json());
 const internal = '/internal/status';  // hidden route
 const API_KEY = 'lab_key_0123456789abcdef';
+const ws = new WebSocket('ws://127.0.0.1:9999/feed');
 //# sourceMappingURL=app.js.map
 """, ctype="application/javascript")
 
@@ -382,6 +402,30 @@ const API_KEY = 'lab_key_0123456789abcdef';
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
+        if path == "/desync":
+            # Simulate a TE-honoring back-end behind a CL-honoring proxy:
+            # when Transfer-Encoding: chunked is present, parse chunked
+            # framing and leave whatever follows in the stream - a stray
+            # byte then poisons the NEXT request line on this connection.
+            te = "chunked" in (self.headers.get("Transfer-Encoding") or "")
+            if te:
+                while True:
+                    line = self.rfile.readline()
+                    try:
+                        size = int(line.strip() or b"0", 16)
+                    except ValueError:
+                        size = 0
+                    if size == 0:
+                        while self.rfile.readline() not in (b"\r\n", b"\n", b""):
+                            pass  # consume trailer until the blank line
+                        break
+                    self.rfile.read(size)
+                    self.rfile.readline()  # CRLF after chunk data
+                self._send(200, "chunked ok", ctype="text/plain")
+            else:
+                self._body()  # CL path consumes the whole body
+                self._send(200, "cl ok", ctype="text/plain")
+            return
         if path == "/login":
             b = self._body()
             u, pw = b.get("username", ""), b.get("password", "")

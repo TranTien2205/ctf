@@ -172,6 +172,13 @@ def main() -> int:
                              base + "/api/config")
     check("ppoll probe sees merged key",
           "prototype-pollution candidate" in out["verdict"])
+    out = probes.probe_smuggle(ctx, base + "/desync")
+    check("smuggle probe sees cl.te desync", "desync candidate" in out["verdict"])
+    out = probes.probe_disclosure(ctx, base)
+    check("disclosure probe finds exposed paths",
+          {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
+    out = probes.probe_websocket(ctx, base + "/ws")
+    check("websocket probe confirms upgrade", "confirmed" in out["verdict"])
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient
