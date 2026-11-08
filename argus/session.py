@@ -25,6 +25,14 @@ def _slug(host: str) -> str:
     return re.sub(r"[^a-zA-Z0-9.-]+", "_", host)[:60]
 
 
+def _atomic_write(path: Path, text: str) -> None:
+    """Write-rename so a crash mid-write cannot leave a truncated artifact
+    (findings.json / summary.json are the deliverable, not scratch data)."""
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    tmp.replace(path)  # os.replace: atomic on POSIX and Windows alike
+
+
 def _chain(prev: str, entry: dict) -> str:
     """Hash-chain link: sha256(prev_link + canonical entry). Makes silent
     edits, insertions and mid-deletions in transcript.jsonl detectable."""
@@ -195,10 +203,11 @@ class Session:
         self.findings: list[dict] = []
         self.resumed = False
         self._last_chain = ""
-        (self.dir / "meta.json").write_text(
-            json.dumps({"id": self.id, "target": target, "started": self.started, **meta},
-                       indent=2, ensure_ascii=False)
-        )
+        _atomic_write(
+            self.dir / "meta.json",
+            json.dumps({"id": self.id, "target": target,
+                        "started": self.started, **meta},
+                       indent=2, ensure_ascii=False))
         (self.dir / "notes.md").write_text(f"# Working notes - {target}\n\n")
 
     def _resume(self, sdir: Path, target: str, meta: dict) -> None:
@@ -258,7 +267,7 @@ class Session:
             merged = dict(old)
             merged.update(meta)
             merged["resumed"] = True
-            mpath.write_text(json.dumps(
+            _atomic_write(mpath, json.dumps(
                 {"id": self.id, "target": target, "started": self.started,
                  **merged}, indent=2, ensure_ascii=False))
         except OSError:
@@ -429,9 +438,9 @@ class Session:
                 if owasp:
                     finding["owasp"] = owasp
             self.findings.append(finding)
-            self.findings_path.write_text(
-                json.dumps(self.findings, indent=2, ensure_ascii=False)
-            )
+            _atomic_write(
+                self.findings_path,
+                json.dumps(self.findings, indent=2, ensure_ascii=False))
         return finding
 
     def note(self, text: str, agent: str = "") -> None:

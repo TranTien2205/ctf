@@ -298,8 +298,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "transcript_chain_head": getattr(session, "_last_chain", ""),
         **extra,
     }
-    (session.dir / "summary.json").write_text(
-        json.dumps(summary_json, indent=2, ensure_ascii=False))
+    from ..session import _atomic_write
+    _atomic_write(session.dir / "summary.json",
+                  json.dumps(summary_json, indent=2, ensure_ascii=False))
     try:
         from .html import render_html
         render_html(session, cfg, summary, extra)
