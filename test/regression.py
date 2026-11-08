@@ -642,6 +642,30 @@ class ContractTests(unittest.TestCase):
                                 cwd=str(ROOT), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout[-800:])
 
+    def test_the_boundary_scan_reaches_authored_claude_files(self):
+        """A marker in .claude/agents must trip the guard; one in a worktree must not.
+
+        The scan used to skip all of .claude/ because transient git worktrees
+        live there — which also shielded 42 authored agent prompts and commands
+        from the scope guard entirely.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        try:
+            import check_boundary
+        finally:
+            sys.path.remove(str(ROOT / "tools"))
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / ".claude" / "agents").mkdir(parents=True)
+            (tmp / ".claude" / "worktrees" / "wt1").mkdir(parents=True)
+            (tmp / ".claude" / "agents" / "bad.md").write_text(
+                "use bloodhound for enumeration", encoding="utf-8")
+            (tmp / ".claude" / "worktrees" / "wt1" / "also-bad.md").write_text(
+                "use bloodhound for enumeration", encoding="utf-8")
+            hits = check_boundary.violations(root=str(tmp))
+        self.assertEqual(hits, [(".claude/agents/bad.md", "bloodhound")],
+                         "authored .claude files must be scanned; worktree copies must not")
+
     def test_no_phantom_tool_references(self):
         for path in list((ROOT / "skills").rglob("*.md")) + [ROOT / rel for rel in CONTROL_PLANE]:
             hits = PHANTOM.findall(path.read_text(encoding="utf-8"))

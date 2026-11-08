@@ -55,22 +55,32 @@ DECLARES_BOUNDARY = {
     "skills/ctf-misc/jails-and-shells.md",
 }
 
-# ".claude" holds git worktrees that agents run in. Each is a full copy of the
-# tree, including THIS file, so scanning them reports this file's own marker
-# list as a violation. A worktree is a transient checkout, not authored
-# content, and the real copy is scanned anyway.
-SKIP_DIRS = {".git", ".claude", "__pycache__", "cache", "raw", "challenges"}
+# "worktrees" holds git worktrees that agents run in (conventionally under
+# .claude/worktrees, but the name is skipped at any depth). Each is a full copy
+# of the tree, including THIS file, so scanning them reports this file's own
+# marker list as a violation. A worktree is a transient checkout, not authored
+# content, and the real copy is scanned anyway. The rest of .claude/ (agents,
+# commands, workflows) IS authored content and must stay inside the scan;
+# only .claude/skills is left out below because it is a link to the skills/
+# tree that is already walked at its real path.
+SKIP_DIRS = {".git", "__pycache__", "cache", "raw", "challenges", "worktrees"}
+
+# Pruned only when the walk is directly inside .claude/: "skills" is a symlink
+# or junction to ../skills whose content the real tree already scans.
+CLAUDE_LINK_DIRS = {"skills"}
 
 
-def violations():
+def violations(root=ROOT):
     hits = []
-    for base, dirs, names in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+    for base, dirs, names in os.walk(root):
+        rel_dir = os.path.relpath(base, root).replace(os.sep, "/")
+        dirs[:] = [d for d in dirs if d not in SKIP_DIRS
+                   and not (rel_dir == ".claude" and d in CLAUDE_LINK_DIRS)]
         for name in names:
             if not name.endswith((".py", ".md", ".yaml", ".json", ".sh")):
                 continue
             path = os.path.join(base, name)
-            rel = os.path.relpath(path, ROOT).replace(os.sep, "/")
+            rel = os.path.relpath(path, root).replace(os.sep, "/")
             if rel in DECLARES_BOUNDARY:
                 continue
             try:
