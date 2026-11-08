@@ -344,13 +344,20 @@ class Session:
                     f"cannot resume {sdir.name}: session target "
                     f"{old_target!r} != current target {target!r}")
         tpath = sdir / "transcript.jsonl"
-        if tpath.exists():
-            for line in tpath.read_text(encoding="utf-8").splitlines():
+        if tpath.is_file():
+            try:
+                tlines = tpath.read_text(encoding="utf-8").splitlines()
+            except OSError:
+                tlines = []
+            for line in tlines:
                 if not line.strip():
                     continue
                 try:
                     entry = json.loads(line)
                 except ValueError:
+                    continue
+                if not isinstance(entry, dict) \
+                        or not isinstance(entry.get("id"), str):
                     continue
                 self._transcript[entry["id"]] = entry
                 if entry.get("chain"):
@@ -359,9 +366,10 @@ class Session:
                 if suffix.isdigit():
                     self._seq = max(self._seq, int(suffix))
         fpath = sdir / "findings.json"
-        if fpath.exists():
+        if fpath.is_file():
             try:
-                self.findings = json.loads(fpath.read_text(encoding="utf-8"))
+                rows = json.loads(fpath.read_text(encoding="utf-8"))
+                self.findings = rows if isinstance(rows, list) else []
             except (ValueError, OSError):
                 self.findings = []
         if not (sdir / "notes.md").exists():
