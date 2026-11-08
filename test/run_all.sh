@@ -95,7 +95,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/web/crlf_probe.py tools/pyjail_gen.py tools/web/pp_probe.py \
          tools/cipher_id.py tools/web/graphql_probe.py \
          tools/forensics/pcap_parse.py tools/file_type.py tools/fmt_probe.py \
-         tools/log_summary.py \
+         tools/log_summary.py tools/web/ssrf_probe.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"

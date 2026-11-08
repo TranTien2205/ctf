@@ -107,6 +107,12 @@ python3 tools/web/http_probe.py --challenge "$C" --class web-ssrf \
 A refused loopback port is a better first probe than a callback host: it needs no
 egress, and the error text names the address the server actually dialled.
 
+`tools/web/ssrf_probe.py` extends that to the port oracle: refused-port
+baseline then a bounded `--ports` sweep through the same parameter,
+grading each by status / length / elapsed delta against the baseline.
+Differing ports are open-port candidates — what they serve is the next
+probe's question.
+
 When the reachability question does need egress, `tools/web/oob_listener.py` is
 the callback half: `serve` records every hit as a JSONL line (method, path,
 headers incl. Referer/User-Agent, body), `canary` mints a unique URL per payload
