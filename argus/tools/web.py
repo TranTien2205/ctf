@@ -222,6 +222,8 @@ def js_recon(ctx: Context, url: str) -> dict:
             smap = _json.loads(mr.get("body", ""))
         except (ValueError, _json.JSONDecodeError):
             continue
+        if not isinstance(smap, dict):
+            continue    # a JSON array/scalar map is not a sourcemap
         contents = smap.get("sourcesContent")
         if not isinstance(contents, list):
             continue
@@ -431,16 +433,26 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
                     "request_id": r["request_id"],
                     "get_request_id": g["request_id"],
                     "status": r["status"]}
-    schema = ((doc.get("data") or {}).get("__schema"))
-    if not schema:
-        errs = [e.get("message", "?") for e in doc.get("errors") or []][:5]
+    if not isinstance(doc, dict):
+        return {"verdict": "no schema (non-object JSON response)",
+                "request_id": r["request_id"],
+                "get_request_id": g.get("request_id"),
+                "status": r["status"]}
+    schema = ((doc.get("data") or {}).get("__schema")
+              if isinstance(doc.get("data"), dict) else None)
+    if not isinstance(schema, dict):
+        raw_errs = doc.get("errors")
+        errs = [str(e.get("message", "?")) if isinstance(e, dict)
+                else str(e) for e in raw_errs[:5]] \
+            if isinstance(raw_errs, list) else []
         return {"verdict": "introspection refused or empty",
                 "request_id": r["request_id"], "errors": errs}
     types = [t for t in (schema.get("types") or [])
-             if t.get("name") and not t["name"].startswith("__")]
+             if isinstance(t, dict) and t.get("name")
+             and not str(t["name"]).startswith("__")]
     out_types = [{"name": t["name"], "kind": t.get("kind"),
                   "fields": [f["name"] for f in (t.get("fields") or [])
-                             if f.get("name")][:40]}
+                             if isinstance(f, dict) and f.get("name")][:40]}
                  for t in types][:40]
     return {"verdict": "schema introspected",
             "request_id": r["request_id"],
