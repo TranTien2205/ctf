@@ -271,11 +271,26 @@ def main(argv: list[str] | None = None) -> int:
         try:
             c.chat(messages=[{"role": "user", "content": "say OK"}],
                    tools=[], system="one word")
-            print(f"auth ok via {src}, model={model}")
-            return 0
         except Exception as exc:
             print(f"auth failed via {src}: {exc}")
             return 1
+        # a bare ping is not the real failure mode - metered OAuth tiers
+        # accept it yet reject the ~30KB tool schema a run actually sends
+        from .tools.registry import TOOL_SCHEMAS, BOARD_TOOLS
+        surface = [s for s in TOOL_SCHEMAS if s["name"] not in BOARD_TOOLS]
+        try:
+            c.chat(messages=[{"role": "user", "content": "say OK"}],
+                   tools=surface, system="one word")
+            print(f"auth ok via {src}, model={model}, "
+                  f"full tool surface ({len(surface)} tools) accepted")
+            return 0
+        except Exception as exc:
+            print(f"auth ok via {src}, model={model} - but the full tool "
+                  f"surface ({len(surface)} tools) was REJECTED:\n  {exc}\n"
+                  f"  -> this credential caps request size (metered OAuth "
+                  f"extra-usage). Use 'argus run --tools <list>' or "
+                  f"'argus team' (role-card subsets are smaller).")
+            return 0
 
     if args.cmd == "compare":
         def _summ(d):
@@ -520,6 +535,9 @@ def _demo(args) -> int:
     html_path = Path(result['report']).with_suffix('.html')
     if html_path.exists():
         print(f"  html:   {html_path}")
+    sarif_path = Path(result['report']).with_suffix('.sarif')
+    if sarif_path.exists():
+        print(f"  sarif:  {sarif_path}")
     return 0
 
 
