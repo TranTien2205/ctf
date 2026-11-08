@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import time
+import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -165,7 +166,22 @@ def load_config(args) -> Config:
 
     scope_hosts = []
     for raw in getattr(args, "scope", None) or []:
-        scope_hosts.extend(h.strip() for h in raw.split(",") if h.strip())
+        for h in raw.split(","):
+            h = h.strip().rstrip("/")
+            if not h:
+                continue
+            # tolerate URLs and bare hosts alike: --scope api.example.com
+            # and --scope https://api.example.com mean the same host
+            if "://" in h:
+                h = urllib.parse.urlparse(h).hostname or h
+            scope_hosts.append(h)
+
+    exclude_paths = []
+    for p in (getattr(args, "exclude", None) or []):
+        p = p.strip()
+        if not p:
+            continue
+        exclude_paths.append(p if p.startswith("/") else "/" + p)
 
     return Config(
         target=args.target,
@@ -179,7 +195,7 @@ def load_config(args) -> Config:
         rate_rps=args.rate,
         session_dir=Path(args.session_dir),
         scope_hosts=scope_hosts,
-        exclude_paths=[p for p in (getattr(args, "exclude", None) or [])],
+        exclude_paths=exclude_paths,
         allow_private=args.allow_private,
         tls_verify=args.tls_verify,
         extra_headers=headers,
