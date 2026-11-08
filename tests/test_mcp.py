@@ -85,7 +85,15 @@ def test_mcp_call_rejects_non_object_args(ctx, tmp_path):
 
 
 def test_discover_config_path(tmp_path, monkeypatch):
-    assert discover_config_path("/nonexistent/x.json") is None
+    # a declared-but-missing config must fail loud, not silently drop the
+    # servers the operator wired
+    import pytest as _pt
+    with _pt.raises(SystemExit):
+        discover_config_path("/nonexistent/x.json")
+    monkeypatch.setenv("ARGUS_MCP_CONFIG", "/nonexistent/y.json")
+    with _pt.raises(SystemExit):
+        discover_config_path("")
+    monkeypatch.delenv("ARGUS_MCP_CONFIG")
     cfg = tmp_path / "mcp.json"
     cfg.write_text("{}")
     assert discover_config_path(str(cfg)) == cfg

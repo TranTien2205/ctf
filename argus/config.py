@@ -221,6 +221,10 @@ def load_config(args) -> Config:
             raise SystemExit(f"{flag} must be >= 0 (0 = no cap)")
     if getattr(args, "llm_max_tokens", 1) <= 0:
         raise SystemExit("--llm-max-tokens must be > 0")
+    mc = getattr(args, "mcp_config", "") or os.environ.get(
+        "ARGUS_MCP_CONFIG", "")
+    if mc and not Path(mc).exists():
+        raise SystemExit(f"MCP config not found: {mc}")
     return Config(
         target=args.target,
         model=getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", DEFAULT_MODEL),

@@ -33,9 +33,15 @@ CLIENT_INFO = {"name": "argus", "version": "1.0"}
 def discover_config_path(explicit: str = "") -> Path | None:
     if explicit:
         p = Path(explicit)
-        return p if p.exists() else None
+        if not p.exists():
+            # a declared-but-missing config must fail loud: silently
+            # running without the servers the operator wired is worse
+            raise SystemExit(f"--mcp-config not found: {explicit}")
+        return p
     env = os.environ.get("ARGUS_MCP_CONFIG", "")
-    if env and Path(env).exists():
+    if env:
+        if not Path(env).exists():
+            raise SystemExit(f"ARGUS_MCP_CONFIG not found: {env}")
         return Path(env)
     for name in ("mcp.json", ".argus-mcp.json", ".mcp.json"):
         p = Path(name)
