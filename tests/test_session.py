@@ -74,6 +74,14 @@ def test_finding_key_tolerates_nonstr():
     assert _finding_key(None, 123) == ("", "123", "/", ())
 
 
+def test_findings_bad_tolerates_nonstr(tmp_path):
+    from argus.session import findings_bad
+    entries = {"r1": {"response": {"body": 42}}}
+    rows = [{"id": "F01", "severity": "high", "evidence_excerpt": 5,
+             "evidence_ids": ["r1"]}]
+    assert findings_bad(entries, rows) == ["F01"]   # flagged, not crash
+
+
 def test_finding_cvss_vector_validated(tmp_path):
     s = _sess(tmp_path)
     rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})

@@ -207,7 +207,7 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
         if not isinstance(f, dict):
             bad.append("?")
             continue
-        excerpt = (f.get("evidence_excerpt") or "").strip()
+        excerpt = str(f.get("evidence_excerpt") or "").strip()
         ids = f.get("evidence_ids") or []
         cited = [entries.get(r) for r in ids]
         if f.get("severity") not in SEVERITIES or \
@@ -222,7 +222,7 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
     if not entry:
         return ""
     resp = entry.get("response") or {}
-    return (resp.get("body") or "") or (entry.get("output") or "")
+    return str(resp.get("body") or "") or str(entry.get("output") or "")
 
 
 def _finding_key(category: str, url: str) -> tuple:
