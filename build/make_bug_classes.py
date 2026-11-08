@@ -667,6 +667,35 @@ CLASSES = [
         "confusable_with": ["dfir-network-exfil-trace", "misc-encoding-carrier"],
     },
     {
+        "id": "forensics-memory-analysis", "name": "Memory image analysis",
+        "skill_dir": "forensics-memory-analysis", "category": "forensics",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"memory (?:dump|image|capture)|\.(?:raw|vmem|mem|dmp|lime)\b|"
+            r"volatility|hiberfil|crash dump|ram dump"],
+        "source_signals": [],
+        "first_probe": "identify the image profile before any plugin — volatility3 imageinfo/pslist against an unidentified image lies silently",
+        "falsifier": "process list, command lines, network connections and file scans all account for the image's normal workload",
+        "depth_refs": ["skills/forensics-memory-analysis/references/README.md",
+                       "skills/forensics-memory-analysis/references/plugin-order.md"],
+        "confusable_with": ["dfir-execution-trace", "forensics-pcap-carve"],
+    },
+    {
+        "id": "forensics-disk-image", "name": "Disk image / filesystem carving",
+        "skill_dir": "forensics-disk-image", "category": "forensics",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"disk image|\.(?:dd|img|e01|aff4?|vmdk|vhdx?|iso)\b|filesystem|"
+            r"deleted (?:file|photo|document)|carve|recover.{0,20}(?:file|data|flag)|"
+            r"partition|mount|fsstat|fls|icat"],
+        "source_signals": [],
+        "first_probe": "mount or list the filesystem first (fls/icat or mmls) — the flag is usually a deleted file or an unallocated-space carve, not live content",
+        "falsifier": "live files, deleted entries, and unallocated-space carving all yield only expected OS content",
+        "depth_refs": ["skills/forensics-disk-image/references/README.md",
+                       "skills/forensics-disk-image/references/deleted-and-unallocated.md"],
+        "confusable_with": ["forensics-stego", "dfir-filesystem-timeline"],
+    },
+    {
         "id": "dfir-authentication-trace", "name": "Authentication and logon trace",
         "skill_dir": "dfir-authentication-trace", "category": "dfir",
         # The first DFIR class with local evidence, raised 2026-10-01 by the Brutus
@@ -818,6 +847,22 @@ CLASSES = [
     # its 32 attacks), prng and prng-lattice (7), ecdsa/ecdsa-lattice/dlog/
     # lattice (6), xor and hash (3) -- rather than a textbook division, so a
     # class names a probe the tree can run today.
+    {
+        "id": "crypto-classical", "name": "Classical cipher",
+        "skill_dir": "crypto-classical", "category": "crypto",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"caesar|vigenere|substitution|transposition|atbash|playfair|"
+            r"rail ?fence|beaufort|rot13|affine cipher|classical cipher",
+            r"monoalphabetic|polyalphabetic|letter frequenc|"
+            r"index of coincidence|kasiski|cipher\s+(?:text|message)\b"],
+        "source_signals": [],
+        "first_probe": "frequency analysis before any key guess — monoalphabetic spikes vs flattened vigenere polygraphs separate the families in seconds",
+        "falsifier": "no classical transform (shift, substitution, transposition, polyalphabetic key) produces language from the ciphertext on standard tooling",
+        "depth_refs": ["skills/crypto-classical/references/README.md",
+                       "skills/crypto-classical/references/cipher-identification.md"],
+        "confusable_with": ["misc-encoding-carrier", "crypto-symmetric-oracle"],
+    },
     {
         "id": "crypto-rsa", "name": "RSA key or plaintext recovery",
         "skill_dir": "crypto-rsa", "category": "crypto",

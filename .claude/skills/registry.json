@@ -122,7 +122,7 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 3170,
+      "skill_tokens": 3239,
       "depth_files": 8,
       "depth_tokens": 5368,
       "use_when": [
@@ -134,6 +134,7 @@
         "the data is an encoding rather than encryption: use ctf-misc"
       ],
       "routes_to": [
+        "crypto-classical",
         "crypto-ecc-dlog",
         "crypto-prng",
         "crypto-rsa",
@@ -199,7 +200,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 690,
+      "skill_tokens": 708,
       "depth_files": 7,
       "depth_tokens": 4971,
       "use_when": [
@@ -450,6 +451,33 @@
         "web-triage"
       ],
       "unlock_signals": "capture|pcap|dumpcap|tcpdump|tshark|replay|their exploit|inbound (request|traffic)|steal (the )?exploit"
+    },
+    {
+      "id": "crypto-classical",
+      "path": "skills/crypto-classical/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "crypto"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 970,
+      "depth_files": 3,
+      "depth_tokens": 639,
+      "use_when": [
+        "a probe or source read produced this class's signal: frequency analysis before any key guess — monoalphabetic spikes vs flattened vigenere polygraphs separate the families in seconds"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no classical transform (shift, substitution, transposition, polyalphabetic key) produces language from the ciphertext on standard tooling",
+        "the evidence fits one of these better: misc-encoding-carrier, crypto-symmetric-oracle",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "misc-encoding-carrier",
+        "crypto-symmetric-oracle"
+      ],
+      "unlock_signals": "(?:caesar|vigenere|substitution|transposition|atbash|playfair|rail ?fence|beaufort|rot13|affine cipher|classical cipher)|(?:monoalphabetic|polyalphabetic|letter frequenc|index of coincidence|kasiski|cipher\\s+(?:text|message)\\b)|(?:(?<![a-z0-9])(?:classical\\ cipher|crypto\\ classical|classical)(?![a-z0-9]))",
+      "bug_class": true
     },
     {
       "id": "crypto-ecc-dlog",
@@ -941,6 +969,60 @@
         "web-xxe"
       ],
       "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:\\bfilename\\b[^\\n]{0,30}param|param\\w*[^\\n]{0,20}\\bfilename\\b)|(?:download (?:endpoint|route|handler)|serves? (?:a |the )?file)|(?:(?:error|exception|traceback|stack trace|debug|\\b50[03]\\b[^\\n]{0,12}(?:page|error|response))[^\\n]{0,45}(?:environment|config\\w*|settings|\\.env\\b|secret))|(?:environment table|unhandled exception[^\\n]{0,40}(?:print|show|reveal|leak|dump))|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
+      "bug_class": true
+    },
+    {
+      "id": "forensics-disk-image",
+      "path": "skills/forensics-disk-image/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 884,
+      "depth_files": 3,
+      "depth_tokens": 617,
+      "use_when": [
+        "a probe or source read produced this class's signal: mount or list the filesystem first (fls/icat or mmls) — the flag is usually a deleted file or an unallocated-space carve, not live content"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: live files, deleted entries, and unallocated-space carving all yield only expected OS content",
+        "the evidence fits one of these better: forensics-stego, dfir-filesystem-timeline",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "forensics-stego",
+        "dfir-filesystem-timeline"
+      ],
+      "unlock_signals": "(?:disk image|\\.(?:dd|img|e01|aff4?|vmdk|vhdx?|iso)\\b|filesystem|deleted (?:file|photo|document)|carve|recover.{0,20}(?:file|data|flag)|partition|mount|fsstat|fls|icat)|(?:(?<![a-z0-9])(?:forensics\\ disk\\ image|filesystem\\ carving|disk\\ image|disk\\-image)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "forensics-memory-analysis",
+      "path": "skills/forensics-memory-analysis/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 901,
+      "depth_files": 3,
+      "depth_tokens": 716,
+      "use_when": [
+        "a probe or source read produced this class's signal: identify the image profile before any plugin — volatility3 imageinfo/pslist against an unidentified image lies silently"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: process list, command lines, network connections and file scans all account for the image's normal workload",
+        "the evidence fits one of these better: dfir-execution-trace, forensics-pcap-carve",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-execution-trace",
+        "forensics-pcap-carve"
+      ],
+      "unlock_signals": "(?:memory (?:dump|image|capture)|\\.(?:raw|vmem|mem|dmp|lime)\\b|volatility|hiberfil|crash dump|ram dump)|(?:(?<![a-z0-9])(?:forensics\\ memory\\ analysis|memory\\ image\\ analysis|memory\\ analysis|memory\\-analysis)(?![a-z0-9]))",
       "bug_class": true
     },
     {

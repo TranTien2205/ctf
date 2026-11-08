@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 961,000 tokens across 470 files. Opening
+The depth corpus is roughly 965,000 tokens across 482 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -58,7 +58,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 |---|---|---|---|
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
-| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `crypto-ecc-dlog`, `crypto-prng`, `crypto-rsa` … |
+| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.2k | `crypto-classical`, `crypto-ecc-dlog`, `crypto-prng` … |
 | jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | `misc-encoding-carrier`, `misc-interpreter-escape` |
 | artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `dfir-antiforensics-trace`, `dfir-authentication-trace`, `dfir-cloud-audit-trace` … |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.7k | `ctf-forensics`, `ctf-malware` |
@@ -114,6 +114,8 @@ Open one only after its signal fired.
 |---|---|---|---|
 | Steganography / hidden data | catalogue | no appended data | `skills/forensics-stego/SKILL.md` |
 | Capture carving / protocol extraction | catalogue | every exported object and followed stream is accounted for as normal tra | `skills/forensics-pcap-carve/SKILL.md` |
+| Memory image analysis | catalogue | process list | `skills/forensics-memory-analysis/SKILL.md` |
+| Disk image / filesystem carving | catalogue | live files | `skills/forensics-disk-image/SKILL.md` |
 
 ## DFIR evidence families
 
@@ -135,6 +137,7 @@ Open one only after its signal fired.
 
 | Class | Evidence | Closed when (falsifier) | Skill |
 |---|---|---|---|
+| Classical cipher | catalogue | no classical transform (shift | `skills/crypto-classical/SKILL.md` |
 | RSA key or plaintext recovery | catalogue | the attack's own stated applicability bound is exceeded -- for example d | `skills/crypto-rsa/SKILL.md` |
 | Predictable pseudorandom generator | catalogue | predict one held-back output and compare: a generator whose next value y | `skills/crypto-prng/SKILL.md` |
 | Curve, nonce or discrete-log recovery | catalogue | re-derive the public point from the recovered private scalar and compare | `skills/crypto-ecc-dlog/SKILL.md` |

@@ -1107,6 +1107,139 @@ tshark -r cap.pcap --export-objects http,./objs
 tshark -r cap.pcap -Y dns -T fields -e dns.qry.name | sort -u | head
 ```
 """,
+    "forensics-memory-analysis": """## Recognise
+
+A memory image is the handout (`*.raw`, `*.vmem`, `*.mem`, `*.dmp`, hiberfil)
+and the answer is what the machine was doing: a running process, a typed
+command, an open file, a password or key in memory, injected code.
+
+## Confirm safely
+
+All reads are local. The evidence is the plugin output itself — a `pslist`
+row, a `cmdline` hit, a `filescan` path, dumped bytes containing the flag —
+quote it verbatim.
+
+## Extraction order
+
+1. Identify the image: volatility3 `windows.info` (or `banners` on Linux
+   images). A wrong-profile `pslist` produces garbage that LOOKS like a
+   process list — the profile step is the falsifier of the whole session.
+2. `pslist`/`pstree` — the odd process names the suspect.
+3. `cmdline`, `netscan`, `filescan` — what it ran, talked to, and opened.
+4. `memmap`/`dumpfiles`/`procdump` on the suspect — the flag is usually in
+   the process's own memory or the file it had open.
+5. `malfind`/`hivescan` only after a process lead exists.
+
+`references/plugin-order.md` maps the goal to the plugin and the one-liner.
+
+## Traps
+
+- `volatility2` vs `volatility3` flag syntax differs completely — check which
+  is installed before copying a writeup command.
+- Windows Defender often deleted the suspicious binary from disk but the
+  evidence survives in memory — `filescan` the path, `memmap` the process.
+- A `pslist` full of svchosts is normal; sort by start-time and look at the
+  tail — challenge processes run late and alone.
+
+## Operational probe
+
+```bash
+vol -f mem.raw windows.info
+vol -f mem.raw windows.pslist
+vol -f mem.raw windows.cmdline | grep -v svchost
+```
+""",
+    "forensics-disk-image": """## Recognise
+
+A disk or filesystem image is the handout (`*.dd`, `*.img`, `*.e01`,
+partition dumps, ISO) and the flag was deleted, hidden in unallocated space,
+or sits in a file the OS pretends is gone.
+
+## Confirm safely
+
+All reads are local. Mount read-only (`-o ro,loop`) or stay in sleuthkit —
+never fsck or repair a forensic image. Evidence is the recovered bytes.
+
+## Extraction order
+
+1. `mmls`/`fdisk -l` — the partition table says where data lives and whether
+   unallocated space is hiding something.
+2. `fls -r <img>` — live files, including deleted-but-listed entries
+   (sleuthkit marks them `*`).
+3. `icat <img> <inode>` — pull the deleted entry's bytes before carving.
+4. `photorec`/`foremost` on unallocated space when `fls` shows nothing —
+   carved files keep their magic bytes.
+5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
+   `$Extend/$UsnJrnl`, swap.
+
+`references/deleted-and-unallocated.md` carries the per-tool commands.
+
+## Traps
+
+- Mounting read-write — even by accident — updates access times and can write
+  journal entries. `ro` is not optional.
+- A `fls` entry marked `*` is deleted-but-allocated: `icat` it before
+  assuming carving is needed.
+- ext4 zeroes inode block pointers on delete — `fls` shows the name but icat
+  gives nothing; carve by signature instead. Record which filesystem you hit.
+
+## Operational probe
+
+```bash
+mmls image.dd && fls -r -o <offset> image.dd | grep '\*'
+icat -o <offset> image.dd <inode> > recovered
+foremost -i image.dd -o carved/
+```
+""",
+    "crypto-classical": """## Recognise
+
+A ciphertext blob, no key material, and either a named cipher in the
+description or none. Caesar, Vigenere, substitution, transposition, Atbash,
+Playfair, rail-fence — the classical family is identified by statistics, not
+guessed.
+
+## Confirm safely
+
+All work is offline text. The confirmation is language: the decode produces
+readable text or the flag format, and you can state WHICH transform did it.
+
+## Identification order
+
+1. Frequency analysis first — a monoalphabetic cipher keeps the natural
+   spike pattern (ETAOIN); Vigenere and transposition flatten or preserve
+   letters differently.
+2. Index of coincidence — ~0.066 says monoalphabetic (shift/substitution),
+   ~0.038 says polyalphabetic (Vigenere). IC also estimates the key period.
+3. Named in the challenge? Go straight to the decoder — `dcode.fr`, CyberChef,
+   or a five-line script. Do not re-derive a named cipher by hand.
+4. Nothing matches? Try transposition shapes (rail-fence depths, columnar)
+   and check whether the "ciphertext" is actually an encoding
+   (misc-encoding-carrier) — b64-looking or hex-looking text is not a cipher.
+
+`references/cipher-identification.md` carries the decision table.
+
+## Traps
+
+- Caesar is a special case of substitution — try all 25 shifts before writing
+  substitution code.
+- Vigenere keys are usually a word from the challenge text — try the
+  obvious ones before Kasiski.
+- A substitution solve that produces near-English but wrong flag format is
+  often the right cipher with a partially-wrong key — check the flag-shaped
+  positions first.
+
+## Operational probe
+
+```bash
+python3 - <<'PY'
+t=open('cipher.txt').read().strip()
+import collections
+f=collections.Counter(c for c in t.lower() if c.isalpha())
+ic=sum(v*(v-1) for v in f.values())/(len(f)*(len(f)-1) or 1)
+print(len(t), sorted(f.items(),key=lambda x:-x[1])[:6], 'IC=%.4f'%ic)
+PY
+```
+""",
     "osint-media-metadata": """## Recognise
 
 A media or document file is the handout and the question asks for a fact about

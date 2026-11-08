@@ -44,8 +44,8 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 
 ## Decision Tree
 - PCAP file → class `forensics-pcap-carve` (`../forensics-pcap-carve/`), depth `references/network-forensics.md`
-- Memory dump → `references/memory-analysis.md`
-- Disk image → `references/disk-forensics.md`
+- Memory dump → class `forensics-memory-analysis` (`../forensics-memory-analysis/`), depth `references/memory-analysis.md`
+- Disk image → class `forensics-disk-image` (`../forensics-disk-image/`), depth `references/disk-forensics.md`
 - Steganography → class `forensics-stego` (`../forensics-stego/`), depth `references/steganography.md`
 - Log files → `references/log-analysis.md`
 - Suspicious binary → `references/malware-analysis.md`

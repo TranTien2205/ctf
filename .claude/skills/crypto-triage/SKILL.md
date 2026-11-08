@@ -87,6 +87,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | The service distinguishes bad padding from bad content | CBC padding oracle (Bleichenbacher/Manger for RSA) | error text **and** timing identical for both cases | — → `../ctf-crypto/modern-ciphers.md` |
 | Repeating 16-byte ciphertext blocks | ECB pattern leak, cut-and-paste, byte-at-a-time | no two blocks repeat and the length is not a clean multiple | — → `../ctf-crypto/modern-ciphers-2.md` |
 | A modulus with no other handle — always try first | factordb and small-factor sweep | `n` is a clean two-prime product absent from factordb | `fermat --n N`, then `../ctf-crypto/triage-toolbox.md` |
+| Letter-only ciphertext, no key material, a named classical cipher or none | Classical cipher (Caesar/Vigenere/substitution/transposition) | statistics show encoding, not cipher — route to misc-encoding-carrier | — → class `crypto-classical` (`../crypto-classical/`) |
 
 ## Route to depth — attack family to the one file
 

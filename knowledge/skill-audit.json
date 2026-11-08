@@ -1,22 +1,24 @@
 {
-  "generated_at": "2026-11-09T00:17:42",
+  "generated_at": "2026-11-09T00:21:10",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 89,
+    "skills": 92,
     "review": 0,
-    "warn": 0,
+    "warn": 1,
     "local_evidence_present": 22,
-    "local_evidence_stub": 31,
+    "local_evidence_stub": 34,
     "local_evidence_missing": 0,
-    "actionable_skills": 53,
+    "actionable_skills": 56,
     "basic_skills": 0
   },
   "review": [],
-  "warn": [],
+  "warn": [
+    "crypto-triage"
+  ],
   "skills": [
     {
       "id": "ctf-playbook",
@@ -52,11 +54,13 @@
       "id": "crypto-triage",
       "layer": "router",
       "path": "skills/crypto-triage/SKILL.md",
-      "flags": [],
+      "flags": [
+        "router/entry bloated: 161 lines"
+      ],
       "score": null,
-      "verdict": "thin-by-design",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 160
+      "lines": 161
     },
     {
       "id": "ctf-misc",
@@ -167,6 +171,22 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 125
+    },
+    {
+      "id": "crypto-classical",
+      "layer": "depth",
+      "path": "skills/crypto-classical/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 93,
+      "actionability": "operational",
+      "nearest_neighbour": "forensics-stego",
+      "overlap": 0.194,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "crypto-ecc-dlog",
@@ -338,8 +358,8 @@
       "local_evidence": "present",
       "lines": 235,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-pcap-carve",
-      "overlap": 0.017,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.018,
       "trust": "local-confirmed"
     },
     {
@@ -354,7 +374,7 @@
       "local_evidence": "stub",
       "lines": 213,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-pcap-carve",
+      "nearest_neighbour": "forensics-memory-analysis",
       "overlap": 0.025,
       "trust": "catalogue-or-unreviewed"
     },
@@ -386,7 +406,7 @@
       "local_evidence": "stub",
       "lines": 214,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-pcap-carve",
+      "nearest_neighbour": "forensics-disk-image",
       "overlap": 0.03,
       "trust": "catalogue-or-unreviewed"
     },
@@ -402,8 +422,8 @@
       "local_evidence": "stub",
       "lines": 229,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-pcap-carve",
-      "overlap": 0.033,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.034,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -418,8 +438,8 @@
       "local_evidence": "stub",
       "lines": 214,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-pcap-carve",
-      "overlap": 0.02,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.021,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -437,6 +457,38 @@
       "trust": "local-confirmed"
     },
     {
+      "id": "forensics-disk-image",
+      "layer": "depth",
+      "path": "skills/forensics-disk-image/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 86,
+      "actionability": "operational",
+      "nearest_neighbour": "forensics-stego",
+      "overlap": 0.201,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "forensics-memory-analysis",
+      "layer": "depth",
+      "path": "skills/forensics-memory-analysis/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 86,
+      "actionability": "operational",
+      "nearest_neighbour": "forensics-stego",
+      "overlap": 0.207,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
       "id": "forensics-pcap-carve",
       "layer": "depth",
       "path": "skills/forensics-pcap-carve/SKILL.md",
@@ -448,8 +500,8 @@
       "local_evidence": "stub",
       "lines": 85,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.2,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.201,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -464,8 +516,8 @@
       "local_evidence": "stub",
       "lines": 85,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.201,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.207,
       "trust": "catalogue-or-unreviewed"
     },
     {
