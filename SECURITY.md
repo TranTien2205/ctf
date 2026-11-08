@@ -8,7 +8,8 @@ work. Pointing it at a system you do not own or have not been engaged to test
 is prohibited and may be unlawful.
 
 The tool enforces a hard target scope (`--target` plus optional
-`--scope-host`), request budgets, and rate limits in code — not in prompts.
+`--scope`/`--exclude`), request budgets, and rate limits in code — not in
+prompts.
 These guardrails exist to keep an authorized engagement inside its letter of
 authorization; they are not a license to point at anything.
 
@@ -30,3 +31,7 @@ with audit artifacts.
   localhost only; never expose it on a network interface.
 - LLM credentials resolved from `~/.claude/.credentials.json` or OpenCode are
   used in memory only and never written to transcripts or reports.
+- The private-address check resolves every record via `getaddrinfo` before
+  each request, but a hostile DNS server could still answer differently at
+  connect time (rebinding). Do not point Argus at targets whose DNS you
+  believe is attacker-controlled.
