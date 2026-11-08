@@ -210,19 +210,23 @@ class TeamRun:
 
         deadline = started + cfg.max_time_s
         total_req_cap = cfg.max_requests * max(2, self.max_workers)
-        while True:
-            time.sleep(0.5)
-            if self.session._seq >= total_req_cap or \
-                    time.monotonic() >= deadline:
-                self.board.stop.set()
-                self.board.leads.close()
-                break
-            if self.board.engagement_done.is_set():
-                # lead finished: wait for workers to drain + exit
-                if all(not t.is_alive() for t in self._threads.values()):
+        try:
+            while True:
+                time.sleep(0.5)
+                if self.session._seq >= total_req_cap or \
+                        time.monotonic() >= deadline:
+                    self.board.stop.set()
+                    self.board.leads.close()
                     break
-            if self.board.stop.is_set():
-                break
+                if self.board.engagement_done.is_set():
+                    # lead finished: wait for workers to drain + exit
+                    if all(not t.is_alive() for t in self._threads.values()):
+                        break
+                if self.board.stop.is_set():
+                    break
+        except KeyboardInterrupt:
+            self.board.stop.set()
+            self.board.leads.close()
 
         # bounded join; workers are daemon threads so a straggler can't hang
         join_deadline = time.monotonic() + 30

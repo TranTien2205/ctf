@@ -167,6 +167,21 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(body="<html><body>No item found.</body></html>")
 
+        elif path == "/product":
+            # numeric-context sqli: id is NOT quoted, errors are swallowed,
+            # so only an unquoted boolean pair differentiates
+            i = p.get("id", "1")
+            try:
+                rows = self.db.execute(
+                    f"SELECT name, price FROM items WHERE id = {i}").fetchall()
+            except sqlite3.Error:
+                rows = []
+            if rows:
+                out = "".join(f"<li>{n} - ${pr}</li>" for n, pr in rows)
+                self._send(body=f"<html><body><ul>{out}</ul></body></html>")
+            else:
+                self._send(body="<html><body>No product.</body></html>")
+
         elif path == "/ping":
             host = p.get("host", "")
             m = re.search(r"sleep\s+(\d+)", host)

@@ -145,6 +145,10 @@ class AgentLoop:
 
             try:
                 response = self.llm.chat(messages, self.tools, self.system)
+            except KeyboardInterrupt:
+                self._log("interrupted by operator")
+                self._last_error = "interrupted"
+                break
             except Exception as exc:
                 self._log(f"LLM error: {exc}")
                 self._last_error = str(exc)
@@ -176,7 +180,13 @@ class AgentLoop:
                 name = call.get("name", "?")
                 args = call.get("input") or {}
                 self._log(f"tool {name} {json.dumps(args)[:200]}")
-                out = dispatch(self.ctx, name, args)
+                try:
+                    out = dispatch(self.ctx, name, args)
+                except KeyboardInterrupt:
+                    self._log("interrupted by operator")
+                    self._last_error = "interrupted"
+                    out = None
+                    break
                 is_error = "error" in out
                 self._log(f"  -> {'ERROR ' if is_error else ''}{_truncate_result(out)[:300]}")
                 results.append({

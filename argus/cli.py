@@ -290,8 +290,7 @@ def _demo(args) -> int:
                          title="SQL injection in /item id parameter",
                          severity="high", category="sqli",
                          url=base + "/item?id=1",
-                         evidence_ids=["r2"],
-                         evidence_excerpt="sqlite3.OperationalError",
+                                                  evidence_excerpt="sqlite3.OperationalError",
                          description="The quote probe produces a raw sqlite "
                                      "error - unsanitized input reaches the "
                                      "query.",
@@ -306,8 +305,7 @@ def _demo(args) -> int:
                          title="Reflected XSS in /search q parameter",
                          severity="medium", category="xss",
                          url=base + "/search?q=x",
-                         evidence_ids=["r5"],
-                         evidence_excerpt="<>'\"&=/",
+                                                  evidence_excerpt="<>'\"&=/",
                          description="Canary chars < > \" ' reflect "
                                      "unescaped in html context.",
                          remediation="Output-encode by context; add CSP.",
@@ -319,8 +317,7 @@ def _demo(args) -> int:
                          title="IDOR: /api/user/<id> serves any user object",
                          severity="high", category="idor",
                          url=base + "/api/user/2",
-                         evidence_ids=["r7"],
-                         evidence_excerpt="\"username\"",
+                                                  evidence_excerpt="\"username\"",
                          description="Neighboring ids return other users' "
                                      "objects with no authorization check.",
                          remediation="Enforce per-object ownership checks.",

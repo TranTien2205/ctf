@@ -91,3 +91,20 @@ def test_loop_resume_seed_carries_findings(lab_url, tmp_path):
     seed = llm.seen_messages[0][0]["content"]
     assert "RESUMES" in seed and "Old bug" in seed
     assert result["findings"] == 1  # prior finding still counted
+
+
+def test_loop_survives_keyboard_interrupt(lab_url, tmp_path):
+    # Ctrl-C mid-run must still render report + return cleanly.
+    class InterruptingClient(ScriptedClient):
+        def chat(self, messages, tools, system):
+            if self.calls == 1:
+                raise KeyboardInterrupt
+            return super().chat(messages, tools, system)
+
+    script = [{"tool_calls": [_call("fingerprint", {"url": lab_url})]}]
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 max_turns=10, rate_rps=0)
+    result = AgentLoop(cfg, llm=InterruptingClient(script),
+                       quiet=True).run()
+    assert result["error"] == "interrupted"
+    assert Path(result["report"]).exists()

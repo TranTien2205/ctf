@@ -126,28 +126,41 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
     quote = _send(ctx, url, param, "1'", method, data, tool, "syntax probe")
     true_r = _send(ctx, url, param, "1' AND '1'='1", method, data, tool, "true")
     false_r = _send(ctx, url, param, "1' AND '1'='2", method, data, tool, "false")
+    # unquoted numeric context: quote-based pairs are syntax errors there,
+    # so they cannot reveal boolean-blind injection on bare int params
+    ntrue_r = _send(ctx, url, param, "1 AND 1=1", method, data, tool, "ntrue")
+    nfalse_r = _send(ctx, url, param, "1 AND 1=2", method, data, tool, "nfalse")
 
     bodies = {k: r.get("body", "") for k, r in
-              (("base", base), ("quote", quote), ("true", true_r), ("false", false_r))}
+              (("base", base), ("quote", quote), ("true", true_r),
+               ("false", false_r), ("ntrue", ntrue_r), ("nfalse", nfalse_r))}
     error_hits = {k: m.group(0) for k, b in bodies.items()
                   if (m := SQL_ERRORS.search(b))}
     sim = _similarity(bodies["true"], bodies["false"])
+    nsim = _similarity(bodies["ntrue"], bodies["nfalse"])
     status_diff = true_r["status"] != false_r["status"]
+    nstatus_diff = ntrue_r["status"] != nfalse_r["status"]
 
     verdict, signal = "no signal", None
     if error_hits and "quote" in error_hits:
         verdict, signal = "error-based candidate", error_hits.get("quote")
     elif sim < 0.85 or status_diff:
         verdict = "boolean-blind candidate"
-        signal = f"true/false similarity={sim}, statuses {true_r['status']}/{false_r['status']}"
+        signal = f"quoted true/false similarity={sim}, statuses {true_r['status']}/{false_r['status']}"
+    elif nsim < 0.85 or nstatus_diff:
+        verdict = "boolean-blind candidate (numeric context)"
+        signal = (f"unquoted true/false similarity={nsim}, statuses "
+                  f"{ntrue_r['status']}/{nfalse_r['status']}")
     return {
         "verdict": verdict,
         "signal": signal,
         "request_ids": {k: r["request_id"] for k, r in
                         (("base", base), ("quote", quote),
-                         ("true", true_r), ("false", false_r))},
+                         ("true", true_r), ("false", false_r),
+                         ("ntrue", ntrue_r), ("nfalse", nfalse_r))},
         "error_markers": error_hits,
         "true_false_similarity": sim,
+        "numeric_true_false_similarity": nsim,
         "note": "confirm before record_finding: reproduce the difference and quote the differing bytes",
     }
 
