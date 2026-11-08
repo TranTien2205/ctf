@@ -69,6 +69,8 @@ path is a falsifier; check the content, not the status.
 
 Shares signals with: `../file-read-primitives/`, `../web-auth-session/`,
 `../web-source-map/`. Depth, one named file at a time:
+
+| Exposed-artifact sweep | `references/exposed-artifacts.md` |
 `../ctf-web/server-side-advanced.md`.
 
 ## Field notes

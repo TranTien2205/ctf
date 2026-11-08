@@ -1592,9 +1592,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 747,
-      "depth_files": 1,
-      "depth_tokens": 157,
+      "skill_tokens": 764,
+      "depth_files": 3,
+      "depth_tokens": 1013,
       "use_when": [
         "the flag or the next step may sit in an exposed file or debug endpoint",
         "a 403, verbose error, debug header, or a shipped .git or archive is observed"
@@ -1849,9 +1849,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 670,
-      "depth_files": 1,
-      "depth_tokens": 156,
+      "skill_tokens": 690,
+      "depth_files": 3,
+      "depth_tokens": 936,
       "use_when": [
         "the front-end is a bundled SPA and the only available source",
         "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"
@@ -1986,9 +1986,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 788,
-      "depth_files": 1,
-      "depth_tokens": 155,
+      "skill_tokens": 804,
+      "depth_files": 3,
+      "depth_tokens": 861,
       "use_when": [
         "the target opens a ws:// or wss:// channel, or uses Socket.IO or SockJS",
         "a live feature carries the flag path and the cookie is HttpOnly"

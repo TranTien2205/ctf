@@ -59,6 +59,8 @@ a 404 map is a falsifier for this route.
 ## Routing
 
 Shares signals with: `../web-triage/`, `../file-read-primitives/`. Depth, one
+
+| Bundle/map extraction or endpoint mining | `references/bundle-mining.md` |
 named file at a time: `../ctf-web/client-side.md`.
 
 ## Field notes

@@ -67,6 +67,8 @@ message. After the channel is open, test:
 Shares signals with: `../web-csrf/`, `../web-auth-session/`, `../web-xss/`.
 Depth, one named file at a time: `../ctf-web/client-side.md`.
 
+| Any channel-abuse question | `references/channel-abuse.md` |
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a challenge of this class is
