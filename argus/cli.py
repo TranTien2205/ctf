@@ -421,9 +421,16 @@ def main(argv: list[str] | None = None) -> int:
                  for k in sorted(set(before) & set(after))]
         new = [after[k] for k in sorted(set(after) - set(before))]
         if args.json:
-            print(json.dumps({"fixed": fixed, "new": new,
-                              "still_present": [b for b, _ in still]},
-                             indent=2, ensure_ascii=False))
+            print(json.dumps({
+                "fixed": fixed, "new": new,
+                "still_present": [
+                    {"id_before": b["id"], "id_after": a["id"],
+                     "title": a["title"], "category": a.get("category"),
+                     "url": a.get("url"),
+                     "severity_before": b.get("severity"),
+                     "severity_after": a.get("severity")}
+                    for b, a in still],
+            }, indent=2, ensure_ascii=False))
             return 0
         print(f"--- {Path(args.before).name} -> {Path(args.after).name} ---")
         for f in fixed:
