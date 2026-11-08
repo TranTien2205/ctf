@@ -231,9 +231,8 @@ class Session:
         resp = entry.get("response") or {}
         return resp.get("body", "") or ""
 
-    def evidence_text(self, rid: str) -> str:
-        """Verbatim bytes a finding may quote: response body or event output."""
-        entry = self._transcript.get(rid)
+    @staticmethod
+    def _evidence_text_of(entry: dict | None) -> str:
         if not entry:
             return ""
         resp = entry.get("response") or {}
@@ -241,6 +240,10 @@ class Session:
         if body:
             return body
         return entry.get("output", "") or ""
+
+    def evidence_text(self, rid: str) -> str:
+        """Verbatim bytes a finding may quote: response body or event output."""
+        return self._evidence_text_of(self._transcript.get(rid))
 
     # ------------------------------------------------------------------
     # Findings
@@ -269,20 +272,24 @@ class Session:
         excerpt = (evidence_excerpt or "").strip()
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
+        with self._lock:  # snapshot: other workers keep appending mid-check
+            transcript_snapshot = dict(self._transcript)
         if not evidence_ids:
             # Resolve the proving exchange from the excerpt itself - the
             # verbatim gate is unchanged: the quote must exist in a recorded
             # response/event. Cite the first entry that contains it.
-            evidence_ids = [r for r in self._transcript
-                            if excerpt in self.evidence_text(r)][:1]
+            evidence_ids = [r for r in transcript_snapshot
+                            if excerpt in self._evidence_text_of(
+                                transcript_snapshot.get(r))][:1]
             if not evidence_ids:
                 raise ValueError(
                     "evidence_excerpt is not a verbatim substring of any "
                     "recorded response or event")
-        unknown = [r for r in evidence_ids if r not in self._transcript]
+        unknown = [r for r in evidence_ids if r not in transcript_snapshot]
         if unknown:
             raise ValueError(f"unknown evidence request ids: {unknown}")
-        if not any(excerpt in self.evidence_text(r) for r in evidence_ids):
+        if not any(excerpt in self._evidence_text_of(
+                transcript_snapshot.get(r)) for r in evidence_ids):
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )

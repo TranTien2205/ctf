@@ -30,7 +30,9 @@ def _coverage(session: Session) -> dict:
     tools: dict[str, int] = {}
     endpoints: set[str] = set()
     probes: set[str] = set()
-    for e in session._transcript.values():
+    with session._lock:  # straggler workers may still append mid-render
+        entries = list(session._transcript.values())
+    for e in entries:
         tool = e.get("tool") or e.get("kind") or "?"
         tools[tool] = tools.get(tool, 0) + 1
         if tool.startswith("probe_"):

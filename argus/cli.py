@@ -445,7 +445,8 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                               description="Quote probe yields a raw sqlite "
                                           "error - unsanitized input reaches "
                                           "the query.",
-                              remediation="Use parameterized queries.")]},
+                              remediation="Use parameterized queries.",
+                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
             {"tool_calls": [_t("e4", "probe_reflection",
                               url=base + "/search?q=x", param="q")]},
             {"tool_calls": [_t("e5", "record_finding",
@@ -456,7 +457,8 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                               description="Canary chars reflect unescaped "
                                           "in html context.",
                               remediation="Output-encode by context; "
-                                          "add CSP.")]},
+                                          "add CSP.",
+                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")]},
             {"tool_calls": [_t("e6", "probe_idor",
                               url=base + "/api/user/2")]},
             {"tool_calls": [_t("e7", "record_finding",
@@ -467,7 +469,8 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                               description="Neighboring ids return other "
                                           "users' objects, no authz check.",
                               remediation="Enforce per-object ownership "
-                                          "checks.")]},
+                                          "checks.",
+                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
             {"tool_calls": [_t("e8", "finish",
                               summary="3/3 leads verified with verbatim "
                                       "evidence.")]},
