@@ -267,6 +267,7 @@ def main(argv: list[str] | None = None) -> int:
                 "findings": len(s.get("findings") or []),
                 "requests": s.get("requests", 0),
                 "ttf": s.get("time_to_first_finding_s"),
+                "duration_s": s.get("duration_s"),
                 "coverage": len((s.get("coverage") or {}).get("endpoints") or []),
                 "llm_calls": s.get("llm_calls", 0),
                 "tokens": (s.get("llm_tokens") or {}),
@@ -277,18 +278,20 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         sums = [_summ(d) for d in args.dirs]
         if args.csv:
-            hdr = "session,mode,findings,requests,ttf_s,endpoints,llm_calls,workers,tokens_in,tokens_out"
+            hdr = "session,mode,findings,requests,ttf_s,duration_s,endpoints,llm_calls,workers,tokens_in,tokens_out"
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
                 print(f"{s['dir']},{s.get('mode','?')},{s.get('findings','?')},"
                       f"{s.get('requests','?')},{s.get('ttf') or ''},"
+                      f"{s.get('duration_s') or ''},"
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
                       f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)}")
             return 0
         keys = [("mode", "mode"), ("findings", "findings"),
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
+                ("duration_s", "duration_s"),
                 ("coverage", "endpoints_touched"),
                 ("llm_calls", "llm_calls"), ("workers", "workers"),
                 ("tokens", "tokens_in_out")]
