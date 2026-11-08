@@ -129,10 +129,13 @@ def _load_wordlist(name: str) -> tuple[list[str], str | None]:
 
 def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
                   mode: str = "path", param: str = "", max_words: int = 80,
-                  statuses: str = "") -> dict:
+                  statuses: str = "", method: str = "GET",
+                  data: str | None = None) -> dict:
     """Probe one wordlist-driven surface. mode=path appends each word to
-    base_url; mode=param sets ?param=word. Every request still passes the
-    scope guard, rate limiter and request budget."""
+    base_url; mode=param sets ?param=word (GET) or injects the word into
+    a POST body template (method=POST, data='u=x&p={{param}}'). Every
+    request still passes the scope guard, rate limiter and budget."""
+    from .probes import _inject_body
     ctx.scope.check(base_url)  # fail fast before burning the budget
     words, err = _load_wordlist(wordlist)
     if err:
@@ -143,15 +146,31 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
     if statuses.strip():
         keep = {int(s) for s in re.split(r"[^0-9]+", statuses) if s}
     sep = "&" if "?" in base_url else "?"
+    method = (method or "GET").upper()
+    post = method != "GET" and data is not None
+    headers = None
+    if post:
+        headers = ({"Content-Type": "application/json"}
+                   if data.strip().startswith("{")
+                   else {"Content-Type": "application/x-www-form-urlencoded"})
     hits, tested = [], 0
     for w in words:
+        body = None
         if mode == "param":
             if not param:
                 return {"error": "mode=param requires a param name"}
-            url = base_url + sep + urllib.parse.urlencode({param: w})
+            if post:
+                url = base_url
+                body = (data.replace("{{param}}", w)
+                        if "{{param}}" in data
+                        else _inject_body(data, param, w))
+            else:
+                url = base_url + sep + urllib.parse.urlencode({param: w})
         else:
             url = base_url.rstrip("/") + "/" + w.lstrip("/")
-        r = ctx.client.send("GET", url, tool="wordlist_fuzz",
+        r = ctx.client.send(method if post else "GET", url,
+                            headers=headers, body=body,
+                            tool="wordlist_fuzz",
                             note=f"wl:{wordlist}:{w}")
         tested += 1
         st = r.get("status", 0)

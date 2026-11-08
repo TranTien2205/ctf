@@ -663,8 +663,9 @@ TOOL_SCHEMAS: list[dict] = [
     _schema(
         "wordlist_fuzz",
         "Wordlist-driven discovery: mode=path tries base_url/<word>, "
-        "mode=param tries base_url?param=<word>. Every request is scoped, "
-        "rated and budgeted. Returns statuses that are not 404.",
+        "mode=param tries base_url?param=<word> - or, with method=POST "
+        "and a body template, injects each word into the body. Every "
+        "request is scoped, rated and budgeted. Returns non-404s.",
         {
             "base_url": {**_STR, "description": URL_DESC},
             "wordlist": {**_STR, "description": "Stem of a file in resources/wordlists/ (e.g. dirs-small, params)"},
@@ -672,6 +673,10 @@ TOOL_SCHEMAS: list[dict] = [
             "param": {**_STR, "description": "Parameter name for mode=param"},
             "max_words": {**_INT, "description": "Words to try (default 80, cap 400)"},
             "statuses": {**_STR, "description": "Optional '200,301,403' to keep only these statuses"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; the named "
+                     "param is replaced per word ({{param}} placeholder "
+                     "also honoured)"},
         },
         ["base_url"],
     ),

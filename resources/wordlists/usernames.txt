@@ -1,0 +1,17 @@
+# common usernames - login/registration enumeration and POST-body fuzzing
+admin
+administrator
+root
+test
+user
+guest
+demo
+operator
+alice
+bob
+support
+backup
+sysadmin
+webmaster
+info
+nobody

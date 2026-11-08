@@ -121,6 +121,20 @@ def test_wordlist_fuzz(ctx, lab_url):
     assert "api/me" in paths or "api/data" in paths
 
 
+def test_wordlist_fuzz_post_body(ctx, lab_url):
+    ctx.board = Board(ctx.session)
+    out = teamtools.wordlist_fuzz(
+        ctx, base_url=lab_url + "/login", wordlist="usernames",
+        mode="param", param="username", method="POST",
+        data="username={{param}}&password=x", max_words=10)
+    assert out["tested"] == 10
+    sizes = {h["word"]: h["bytes"] for h in out["interesting"]}
+    # lab /login answers 'Wrong password for admin' for real users and
+    # 'Unknown user' otherwise - differing body sizes prove the word
+    # really reached the POST body
+    assert sizes["admin"] != sizes["root"], sizes
+
+
 def test_run_exploit_lab(ctx, lab_url):
     ctx.board = Board(ctx.session)
     ctx.agent_name = "exploit-1"
