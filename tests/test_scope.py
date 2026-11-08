@@ -217,7 +217,8 @@ def test_send_timeout_never_infinite(ctx):
 
 def test_transcript_records_wire_headers(lab_url, tmp_path):
     """Recorded request headers must reflect the wire - client default
-    headers (e.g. --header Authorization) and jar cookies included."""
+    headers (e.g. --header Authorization) and jar cookies included. Secret
+    VALUES are redacted (the audit shows auth was sent, not the token)."""
     cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path)
     scope = ScopeGuard(cfg.target, allow_private=True)
     session = Session(tmp_path, cfg.target, meta={})
@@ -227,7 +228,7 @@ def test_transcript_records_wire_headers(lab_url, tmp_path):
     out = client.send("GET", lab_url + "/")
     entry = session.get_exchange(out["request_id"])
     hdrs = {k.lower(): v for k, v in entry["request"]["headers"].items()}
-    assert hdrs.get("authorization") == "Bearer t3st"
+    assert hdrs.get("authorization") == "Bearer •••redacted•••"
     assert hdrs.get("host", "").startswith("127.0.0.1")
 
 

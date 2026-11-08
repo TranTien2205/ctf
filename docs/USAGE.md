@@ -211,6 +211,15 @@ been rendered (a mismatch there means truncation OR post-report appends).
 recorded finding against the immutable transcript: edited excerpts or
 invented evidence ids surface as `TAMPERED: findings [...]`.
 
+Secret header **values** (`Authorization`, `Cookie`, `Set-Cookie`,
+`X-*-Token` and any header carrying a `--header`-configured secret) are
+recorded redacted - the audit shows the request was authenticated without
+persisting live credentials into `transcript.jsonl` or the report. Header
+names, the `Bearer` scheme, cookie names and `Set-Cookie` attributes stay
+visible. Findings cite response bodies, so redaction can never break a
+verbatim check. When full wire fidelity is needed, run with `--proxy`
+through Burp/ZAP - the interceptor sees everything Argus sends.
+
 ## Resuming a run
 
 `--resume <session_dir>` continues an earlier session: transcript,

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from ..config import Config
 from ..session import SEVERITIES, Session, _cwe_of, _owasp_of
+from ..httpclient import _redact_headers
 
 _SEV_ORDER = {s: i for i, s in enumerate(SEVERITIES)}
 _SEV_LABEL = {
@@ -179,13 +180,18 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             if not entry or "request" not in entry:
                 continue
             req, resp = entry["request"], entry.get("response") or {}
+            # transcripts written before header redaction still hold live
+            # operator secrets - re-redact at render so the shareable
+            # report never carries them
+            req_headers = _redact_headers(req.get("headers") or {}, set())
             block = "\n".join(
                 [f"{req.get('method')} {req.get('url')}"]
-                + [f"{k}: {v}" for k, v in (req.get("headers") or {}).items()]
+                + [f"{k}: {v}" for k, v in req_headers.items()]
                 + (["", str(req["body"])[:800]] if req.get("body") else [])
                 + ["", f"HTTP/{resp.get('status')}"]
                 + [f"{k}: {v}" for k, v
-                   in list((resp.get("headers") or {}).items())[:15]]
+                   in list(_redact_headers(
+                       resp.get("headers") or {}, set()).items())[:15]]
                 + ["", _excerpt(resp.get("body", ""),
                                 f["evidence_excerpt"])[:1500]])
             lines += [

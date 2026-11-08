@@ -51,6 +51,62 @@ class _NoCloseFile:
         pass
 
 
+# Headers whose VALUES are operator secrets, not assessment evidence.
+# They ride every request silently (--header/--header-file), so persisting
+# them verbatim would leak live credentials into transcript.jsonl and the
+# shareable report. Evidence only cites response bodies/event output, so
+# redaction cannot break a finding. Names stay visible - the audit still
+# shows the request was authenticated.
+_SENSITIVE_REQ_HEADERS = {
+    "authorization", "proxy-authorization", "cookie", "x-api-key",
+    "x-auth-token", "x-access-token", "x-csrf-token", "x-xsrf-token",
+    "x-session-token", "x-amz-security-token",
+}
+_SENSITIVE_RESP_HEADERS = {"set-cookie"}
+_REDACTED = "•••redacted•••"
+
+
+def _redact_header_value(name: str, value: str) -> str:
+    """Keep structure, drop secrets: Bearer scheme, cookie pair names and
+    set-cookie attributes survive - the credential does not."""
+    ln = name.lower()
+    if ln == "authorization" or ln == "proxy-authorization":
+        scheme = value.split(" ", 1)[0]
+        return f"{scheme} {_REDACTED}" if " " in value else _REDACTED
+    if ln in ("cookie", "set-cookie"):
+        return "; ".join(
+            p if "=" not in p else p.split("=", 1)[0] + "=" + _REDACTED
+            for p in value.split("; "))
+    return _REDACTED
+
+
+def _redact_headers(headers: dict, secret_values: set[str]) -> dict:
+    out = {}
+    for k, v in (headers or {}).items():
+        if k.lower() in _SENSITIVE_REQ_HEADERS \
+                or k.lower() in _SENSITIVE_RESP_HEADERS \
+                or v in secret_values:
+            out[k] = _redact_header_value(k, v)
+        else:
+            out[k] = v
+    return out
+
+
+def _redact_request_text(text: str, secret_values: set[str]) -> str:
+    """Raw wire text (send_raw) carries secrets inline - redact sensitive
+    header lines while preserving the line structure that IS the smuggle
+    evidence (e.g. duplicated/conflicting headers)."""
+    out = []
+    for line in text.split("\r\n"):
+        if ": " in line:
+            name, _, val = line.partition(": ")
+            if name.lower() in _SENSITIVE_REQ_HEADERS \
+                    or val in secret_values:
+                line = name + ": " + _REDACTED
+        out.append(line)
+    return "\r\n".join(out)
+
+
 class GuardedClient:
     def __init__(
         self,
@@ -73,6 +129,10 @@ class GuardedClient:
         # send_raw builds its wire text by hand, so it cannot inherit
         # httpx's client-level merge - keep the operator headers for it.
         self._default_headers = default_headers or {}
+        # values >=8 chars are treated as operator secrets wherever they
+        # appear in recorded headers, even under a custom header name
+        self._secret_values = {v for v in self._default_headers.values()
+                               if len(v) >= 8}
         # probe_race fires concurrent sends through one client - the budget
         # check+increment must be atomic or threads lose count
         self._sent_lock = threading.Lock()
@@ -217,11 +277,15 @@ class GuardedClient:
                     self.session.record_exchange(
                         tool=tool,
                         request={"method": method.upper(), "url": url,
-                                 "headers": dict(resp.request.headers),
+                                 "headers": _redact_headers(
+                                     dict(resp.request.headers),
+                                     self._secret_values),
                                  "body": body.decode("utf-8", "replace")
                                  if isinstance(body, bytes) else body},
                         response={"status": resp.status_code,
-                                  "headers": _headers_dict(resp),
+                                  "headers": _redact_headers(
+                                      _headers_dict(resp),
+                                      self._secret_values),
                                   "body": resp.text[:BODY_CAP],
                                   "redirects": chain,
                                   "blocked_redirect": True,
@@ -245,9 +309,12 @@ class GuardedClient:
         rid = self.session.record_exchange(
             tool=tool,
             request={"method": method.upper(), "url": url,
-                     "headers": sent_headers,
+                     "headers": _redact_headers(sent_headers,
+                                                self._secret_values),
                      "body": body.decode("utf-8", "replace") if isinstance(body, bytes) else body},
-            response=response_data,
+            response={**response_data,
+                      "headers": _redact_headers(
+                          response_data["headers"], self._secret_values)},
             note=note,
             agent=self.agent,
         )
@@ -387,14 +454,19 @@ class GuardedClient:
                                  # a dict collapses duplicate headers - and
                                  # a duplicated/conflicting header pair IS
                                  # the evidence - so keep the wire text too
-                                 "headers": {
-                                     l.split(": ", 1)[0]: l.split(": ", 1)[1]
-                                     for l in lines[1:]},
+                                 "headers": _redact_headers(
+                                     {l.split(": ", 1)[0]:
+                                          l.split(": ", 1)[1]
+                                      for l in lines[1:]},
+                                     self._secret_values),
                                  "raw": True,
-                                 "request_text": raw_req.decode(
-                                     "utf-8", "replace")[:4000],
+                                 "request_text": _redact_request_text(
+                                     raw_req.decode("utf-8", "replace"),
+                                     self._secret_values)[:4000],
                                  "body": body.decode("utf-8", "replace")},
-                        response={"status": status, "headers": rheaders,
+                        response={"status": status,
+                                  "headers": _redact_headers(
+                                      rheaders, self._secret_values),
                                   "body": rbody, "elapsed_ms": elapsed},
                         note=(note or "raw send")
                              + ("" if ri == 0 else f" (unsolicited #{ri})"),

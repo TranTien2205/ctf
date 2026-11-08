@@ -332,3 +332,56 @@ def test_send_raw_scope_checked(lab_url, ctx):
             "http://169.254.169.254/",
             requests=[{"method": "GET", "headers": [], "body": b""}],
             tool="dbg")
+
+
+def test_transcript_redacts_operator_secrets(lab_url, tmp_path):
+    """A recorded exchange must not persist the operator's live credential
+    values - transcripts and rendered reports are shared artifacts. Header
+    names stay (audit shows auth was sent); values are redacted."""
+    from argus.config import Config
+    from argus.scope import ScopeGuard
+    from argus.ratelimit import RateLimiter
+    from argus.session import Session
+    from argus.httpclient import GuardedClient
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path)
+    session = Session(tmp_path, lab_url, meta={})
+    client = GuardedClient(
+        ScopeGuard(lab_url, allow_private=True), session, RateLimiter(0),
+        default_headers={"Authorization": "Bearer live-session-tok3n",
+                         "Cookie": "sid=sekrit-value"},
+        agent="t")
+    out = client.send("GET", lab_url + "/", tool="t")
+    client.close()
+    entry = session._transcript[out["request_id"]]
+    wire = entry["request"]["headers"]
+    assert wire["authorization"] == "Bearer •••redacted•••"
+    assert "sekrit-value" not in str(entry)
+    assert "live-session-tok3n" not in str(entry)
+    assert wire["cookie"].startswith("sid=")
+
+
+def test_send_raw_redacts_secrets_keeps_structure(lab_url, tmp_path):
+    """send_raw merges operator headers onto the wire; the recorded wire
+    text must redact their values while keeping framing evidence intact."""
+    from argus.config import Config
+    from argus.scope import ScopeGuard
+    from argus.ratelimit import RateLimiter
+    from argus.session import Session
+    from argus.httpclient import GuardedClient
+    session = Session(tmp_path, lab_url, meta={})
+    client = GuardedClient(
+        ScopeGuard(lab_url, allow_private=True), session, RateLimiter(0),
+        default_headers={"Authorization": "Bearer live-session-tok3n"})
+    out = client.send_raw(
+        lab_url + "/desync-none",
+        requests=[{"method": "POST",
+                   "headers": [["Content-Length", "6"],
+                               ["Transfer-Encoding", "chunked"]],
+                   "body": b"0\r\n\r\nG"}],
+        tool="dbg")
+    client.close()
+    entry = session._transcript[out["sends"][0]["request_id"]]
+    text = entry["request"]["request_text"]
+    assert "live-session-tok3n" not in text
+    assert "Authorization: •••redacted•••" in text
+    assert "Transfer-Encoding: chunked" in text  # evidence untouched
