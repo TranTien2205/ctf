@@ -542,9 +542,11 @@ def _ffuf_arg_check(ctx: Context, toks: list[str]) -> str | None:
 
 # sqlmap -------------------------------------------------------------------
 def _sqlmap_arg_check(ctx: Context, toks: list[str]) -> str | None:
-    """--eval runs Python on THIS machine; -d connects to an arbitrary
-    DBMS host outside scope; -r/-l/-m read targets from files; --tamper
-    loads scripts by path; -c injects options like curl -K."""
+    """--eval runs Python on THIS machine; --alert runs a host command;
+    -z shortcut strings smuggle eval via 'eva='; -d connects to an
+    arbitrary DBMS host outside scope; -r/-l/-m read targets from
+    files; --tamper loads scripts by path; -c injects options like
+    curl -K."""
     bad = _file_target_check(
         ctx, toks, {"-r", "-l", "-m", "-x", "--bulk-file"})
     if bad:
@@ -553,7 +555,11 @@ def _sqlmap_arg_check(ctx: Context, toks: list[str]) -> str | None:
         flag = tok.partition("=")[0]
         if flag in {"--eval", "-c", "--config-file", "--dependencies",
                     "--update", "--purge", "--sqlmap-shell", "--msf-path",
-                    "-d", "--direct", "--proxy", "--tor", "--check-tor"}:
+                    "-d", "--direct", "--proxy", "--tor", "--check-tor",
+                    # --alert runs a host command on each finding; -z packs
+                    # shortcut flags whose 'eva=' form smuggles --eval past
+                    # the flag-level check above
+                    "--alert", "-z"}:
             return f"sqlmap {flag} is disabled"
         if flag == "--tamper":
             val = _flag_value(toks, i)

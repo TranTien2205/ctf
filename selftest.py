@@ -113,8 +113,16 @@ def main() -> int:
           bool(_sqlmap_arg_check(ctx, ["-u", base, "--eval", "x"])) and
           bool(_sqlmap_arg_check(ctx, ["-u", base, "-d", "mysql://a@b/"])) and
           bool(_sqlmap_arg_check(ctx, ["-u", base, "--tamper", "../x.py"])))
+    check("sqlmap guard blocks -z/--alert local exec",
+          bool(_sqlmap_arg_check(ctx, ["-u", base, "-z", "eva=print(1)"])) and
+          bool(_sqlmap_arg_check(ctx, ["-u", base, "--alert", "beep"])))
     check("ffuf guard confines wordlists",
           bool(_ffuf_arg_check(ctx, ["-w", "/etc/passwd:FUZZ", "-u", base])))
+    check("ffuf guard blocks -input-cmd local exec",
+          bool(_ffuf_arg_check(ctx, ["-input-cmd", "id", "-u", base])))
+    check("nuclei guard blocks lfa/custom-oob",
+          bool(_nuclei_arg_check(ctx, ["-lfa", "-u", base])) and
+          bool(_nuclei_arg_check(ctx, ["-iserver", "http://oob.example"])))
     check("nmap guard blocks -iR and script paths",
           bool(_nmap_arg_check(ctx, ["-iR", "100"])) and
           bool(_nmap_arg_check(ctx, ["--script", "./x.nse", "127.0.0.1"])))
