@@ -120,6 +120,13 @@ def main() -> int:
     check("external scope-checks target host",
           "scope" in (run_external(ctx, "curl", "http://foreign.example")
                       .get("error") or "").lower())
+    from argus.tools.analysis import read_response
+    rr = ctx.client.send("GET", base + "/", tool="selftest")
+    page = read_response(ctx, rr["request_id"], offset=0, length=4000)
+    check("read_response pages a recorded body",
+          "LabShop" in page["body"] and page["status"] == 200)
+    check("read_response rejects unknown id",
+          "error" in read_response(ctx, "r99999"))
 
     out = web.fingerprint(ctx, base)
     check("fingerprint reads stack", any("LabVuln" in h for h in out["stack_hints"]))

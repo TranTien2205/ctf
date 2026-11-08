@@ -124,6 +124,11 @@ verbatim evidence from a cited response.
 Methodology-only classes (auth-session flows, logic flaws, triage order)
 are covered by `load_skill` modules rather than a fixed probe.
 
+Utility tools: `read_response` re-reads any recorded response (or external
+tool output) from the transcript — bodies are stored at 200k chars while
+tool results truncate at 12k, so long pages are paged through here instead
+of re-requested. `note`/`read_notes` keep the working narrative.
+
 ## Resources
 
 `resources/wordlists/<name>.txt` — wordlists for `wordlist_fuzz`; add a

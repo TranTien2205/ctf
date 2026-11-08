@@ -81,6 +81,38 @@ def load_skill(ctx: Context, name: str) -> dict:
     return {"skill": safe, "content": path.read_text(encoding="utf-8")}
 
 
+# ---------------------------------------------------------------- transcript
+
+def read_response(ctx: Context, request_id: str,
+                  offset: int = 0, length: int = 12000) -> dict:
+    """Re-read a recorded response body without spending a request.
+
+    Tool output truncates bodies at 12k chars while the transcript keeps
+    200k - page through a long response here instead of refetching."""
+    entry = ctx.session.get_exchange((request_id or "").strip())
+    if not entry:
+        return {"error": f"no exchange {request_id!r} in transcript"}
+    resp = entry.get("response") or {}
+    body = resp.get("body", "") or ""
+    offset = max(0, int(offset or 0))
+    length = max(1, min(int(length or 12000), 50000))
+    out = {"request_id": entry["id"], "status": resp.get("status"),
+           "tool": entry.get("tool"), "note": entry.get("note", ""),
+           "headers": resp.get("headers") or {},
+           "total_chars": len(body), "offset": offset,
+           "returned": min(length, max(0, len(body) - offset)),
+           "body": body[offset:offset + length],
+           "truncated_at_store": resp.get("truncated", False)}
+    if "response" not in entry:
+        # an event entry (external_cmd/external_result/exploit_run) - the
+        # recorded stdout is the interesting part, page it the same way
+        raw = entry.get("output", "") or ""
+        out.update({"kind": entry.get("kind"), "total_chars": len(raw),
+                    "returned": min(length, max(0, len(raw) - offset)),
+                    "body": raw[offset:offset + length]})
+    return out
+
+
 # ---------------------------------------------------------------- notes
 
 def note(ctx: Context, text: str) -> dict:

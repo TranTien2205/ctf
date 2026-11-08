@@ -60,6 +60,7 @@ def _impl(name: str) -> Callable:
         "probe_crlf": probes.probe_crlf,
         "jwt_decode": analysis.jwt_decode,
         "load_skill": analysis.load_skill,
+        "read_response": analysis.read_response,
         "note": analysis.note,
         "read_notes": analysis.read_notes,
         "record_finding": analysis.record_finding,
@@ -449,6 +450,20 @@ TOOL_SCHEMAS: list[dict] = [
         "list of available skills.",
         {"name": {**_STR, "description": "Skill name, e.g. sqli, xss, ssrf, idor, auth-session"}},
         ["name"],
+    ),
+    _schema(
+        "read_response",
+        "Re-read a recorded response (or external-tool output) from the "
+        "transcript without spending a request. Tool results truncate "
+        "bodies at 12k chars; the transcript keeps 200k - page through "
+        "with offset/length.",
+        {"request_id": {**_STR, "description": "Exchange id like r12, or an "
+                                             "event id like r34 from "
+                                             "run_external/run_exploit"},
+         "offset": {**_INT, "description": "Char offset to start at (default 0)"},
+         "length": {**_INT, "description": "Chars to return (default 12000, "
+                                          "max 50000)"}},
+        ["request_id"],
     ),
     _schema(
         "note",
