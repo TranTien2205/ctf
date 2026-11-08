@@ -249,6 +249,11 @@ def _args_scope_check(ctx: Context, args: str) -> None:
     for u in _URL_RE.findall(args):
         ctx.scope.check(u)
     for tok in _split_args(args):
+        # full URLs were already scope-checked via _URL_RE above - a
+        # 'http://host:8080/' token also trips the >=2-colon IPv6 branch
+        # and gets falsely rejected as an invalid literal
+        if "://" in tok:
+            continue
         if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
             continue
         host_part = tok.split(":")[0]
@@ -289,7 +294,14 @@ def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> di
                                    agent=ctx.agent_name)
     try:
         from ._subproc import run_capped
-        rc, head, tail = run_capped(cmd, timeout_s)
+        # scrub credential env vars from the scanner's environment - the
+        # exploit runner already does this; a scanner binary is the same
+        # semi-trusted child and must not inherit ANTHROPIC_API_KEY etc.
+        from ..mcp import MCPClient
+        env = {k: v for k, v in os.environ.items()
+               if not any(s in k.upper() for s in MCPClient._SECRET_RE)
+               and v not in ctx.session.secret_values}
+        rc, head, tail, _found = run_capped(cmd, timeout_s, env=env)
         ctx.session.record_event("external_result", {
             "cmd_id": rid, "returncode": rc,
             "output": head[:50_000]}, agent=ctx.agent_name)
