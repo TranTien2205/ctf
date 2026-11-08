@@ -72,6 +72,8 @@ Depth, one named file at a time:
 - `skills/pwn-rop/references/ret2libc.md`
 - `skills/ctf-pwn/rop-and-shellcode.md`
 
+| Any ROP/code-reuse question | `references/gadget-selection.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

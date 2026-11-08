@@ -71,6 +71,8 @@ Depth, one named file at a time:
 - `skills/rev-triage/references/managed-code.md`
 - `skills/ctf-reverse/languages-platforms.md`
 
+| Any managed-runtime question | `references/decompile-and-inspect.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

@@ -457,9 +457,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 957,
-      "depth_files": 1,
-      "depth_tokens": 161,
+      "skill_tokens": 974,
+      "depth_files": 3,
+      "depth_tokens": 898,
       "use_when": [
         "a probe or source read produced this class's signal: decide the discriminator first: a nonce REUSED across two signatures recovers the key in closed form with ecdsa-nonce-reuse and needs no lattice, a merely BIASED nonce is hnp or hnp-ecdsa, and a plain discrete log needs the smoothness check before bsgs or pohlig-hellman"
       ],
@@ -535,9 +535,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 926,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 944,
+      "depth_files": 3,
+      "depth_tokens": 965,
       "use_when": [
         "a probe or source read produced this class's signal: detect ECB in ONE request wherever you control plaintext -- identical plaintext blocks give identical ciphertext blocks -- then separate an invalid-pad answer from an invalid-MAC answer before writing any oracle loop"
       ],
@@ -1000,9 +1000,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 946,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 963,
+      "depth_files": 3,
+      "depth_tokens": 1080,
       "use_when": [
         "a probe or source read produced this class's signal: MAP THE FILTER before writing an escape: send single probe characters and short tokens until the blocked bytes, names and node types are known and the layer the check runs at is named, because that mapping is the challenge and the escape is mechanical afterwards"
       ],
@@ -1106,9 +1106,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 920,
-      "depth_files": 1,
-      "depth_tokens": 156,
+      "skill_tokens": 938,
+      "depth_files": 3,
+      "depth_tokens": 922,
       "use_when": [
         "a probe or source read produced this class's signal: this class presupposes control of the instruction pointer, so confirm that first; then read the protections to decide whether a leak is needed at all, and build the leak chain and verify the leaked value looks like a libc address before chaining further"
       ],
@@ -1233,9 +1233,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 957,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 976,
+      "depth_files": 3,
+      "depth_tokens": 888,
       "use_when": [
         "a probe or source read produced this class's signal: for a .pyc read the header magic and name the python version before running any decompiler, falling back to the stdlib dis module on the unmarshalled code object when uncompyle6 refuses; for a custom VM recover the OPCODE TABLE before reading one instruction of its program"
       ],
@@ -1260,9 +1260,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 862,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 881,
+      "depth_files": 3,
+      "depth_tokens": 844,
       "use_when": [
         "a probe or source read produced this class's signal: confirm the runtime from the header and quote the bytes -- a PE with a non-zero CLR data directory, or the 0xCAFEBABE magic -- then decompile with what exists here: ilspycmd for .NET, javap plus unzip for Java. jadx, procyon and mono are absent"
       ],

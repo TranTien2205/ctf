@@ -73,6 +73,8 @@ Depth, one named file at a time:
 - `skills/crypto-triage/references/hash-attacks.md`
 - `skills/ctf-crypto/modern-ciphers.md`
 
+| Any block/stream/MAC-oracle question | `references/oracle-shapes.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

@@ -75,6 +75,8 @@ Depth, one named file at a time:
 - `skills/rev-triage/references/vm-analysis.md`
 - `skills/ctf-reverse/patterns-runtime.md`
 
+| Any bytecode/custom-VM question | `references/instruction-decoding.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
