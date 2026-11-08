@@ -23,6 +23,12 @@ point and record what actually happens in `field-notes.md`.
 
 wc -l and head/tail first — bracket the timeframe and count the volume before greping, so a count claim has a baseline
 
+`tools/log_summary.py` does that opening without awk on the box:
+`summary FILE` gives line count, first/last lines, detected timestamp
+range, per-hour histogram, and top-N counts of IPs / users / paths /
+status codes plus any flag-like lines; `field --regex` runs a custom
+distribution, `window --around N` prints the context lines.
+
 **Falsifier** — the observation that closes this class: the log is syntactically uniform — every line the same shape, no outlier entry, no anomaly against its own baseline
 ## Recognise
 

@@ -61,6 +61,12 @@ offset every `%n` write depends on.
 AAAA.%N$p              # N where 0x41414141 returns = buffer offset
 ```
 
+`tools/fmt_probe.py` runs both: `detect --host h --port p` sends the %p
+run and counts 0x-words (two or more leaks = format-string candidate,
+zero = the literal-format falsifier); `offset --max N` sweeps AAAA%N$p
+until 0x41414141 returns — that N is the buffer offset every %n write
+depends on.
+
 ## Routing
 
 Shares signals with: `../pwn-stack-overflow/`. Check those before committing to this one.
