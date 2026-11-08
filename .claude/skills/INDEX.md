@@ -208,7 +208,7 @@ that file and this table would drift.
 | `skills/mcp-agent-security/SKILL.md` | depth | ~1.6k | the target is an LLM, an agent, or a tool server |
 | `skills/pwn-rop/SKILL.md` | depth | ~1.9k | instruction-pointer control is proven and NX forces code reuse |
 | `skills/web-chromedriver/SKILL.md` | depth | ~1.0k | an admin bot exists and a client-side payload needs debugging |
-| `skills/web-info-disclosure/SKILL.md` | depth | ~0.8k | an exposed file, debug route, or verbose error is observed |
+| `skills/web-info-disclosure/SKILL.md` | depth | ~0.9k | an exposed file, debug route, or verbose error is observed |
 | `skills/web-source-map/SKILL.md` | depth | ~0.7k | the front-end bundle is the only available source |
 | `skills/web-websocket/SKILL.md` | depth | ~0.9k | a ws:// channel or realtime feature carries the flag path |
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |

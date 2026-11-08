@@ -42,6 +42,17 @@ file:
 git clone --no-checkout "$BASE/.git" repo 2>/dev/null && cd repo && git checkout -- .
 ```
 
+If the clone fails — no git on the box, or the server does not speak the
+smart protocol — walk the loose objects over plain HTTP instead:
+
+```bash
+python3 tools/web/git_dumper.py --base "$BASE/.git/" --out repo
+```
+
+It resolves `HEAD`, walks commit -> tree -> blob, inflates each loose
+object and writes the working tree out. A pack-only repository is
+reported honestly rather than half-parsed.
+
 Expected confirmation is a real artifact — source, config, key, commit history,
 or the flag — not a catch-all 200. A generic 200 with the app's HTML for every
 path is a falsifier; check the content, not the status.
