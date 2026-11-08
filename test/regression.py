@@ -501,10 +501,12 @@ class ContractTests(unittest.TestCase):
         link = re.compile(r"`([A-Za-z0-9_./-]+\.md)`")
         broken = []
         uncommitted = []
+        used = set()
         for skill in sorted((ROOT / "skills").rglob("*.md")):
             rel = skill.relative_to(ROOT).as_posix()
             for target in link.findall(skill.read_text(encoding="utf-8")):
                 if (rel, target) in exempt:
+                    used.add((rel, target))
                     continue
                 candidates = [skill.parent / target, ROOT / target]
                 if any(c.is_file() for c in candidates):
@@ -518,6 +520,9 @@ class ContractTests(unittest.TestCase):
                 broken.append("%s -> %s" % (rel, target))
         self.assertEqual(broken, [],
                          "a skill names a reference file that does not exist: %s" % broken)
+        self.assertEqual(sorted(exempt - used), [],
+                         "test/gate-exemptions.json reference_links exempts links "
+                         "that no longer need it: %s" % sorted(exempt - used))
         if uncommitted:
             print("\n  note: %d skill reference(s) point into a gitignored data "
                   "tree and were not checked: %s" % (len(uncommitted), uncommitted))
@@ -618,16 +623,22 @@ class ContractTests(unittest.TestCase):
                             "%s is exempted with no reason given" % entry["path"])
             allowed[entry["path"]] = entry
         offenders = []
+        used = set()
         for path in authored_files():
             rel = path.relative_to(ROOT).as_posix()
-            if rel in allowed:
-                continue
             hits = rooted.findall(path.read_text(encoding="utf-8"))
+            if rel in allowed:
+                if hits:
+                    used.add(rel)
+                continue
             if hits:
                 offenders.append("%s %s" % (rel, sorted(set(hits))[:4]))
         self.assertEqual(offenders, [],
                          "a hardcoded tree root would break this tree anywhere else: %s"
                          % offenders)
+        self.assertEqual(sorted(set(allowed) - used), [],
+                         "test/gate-exemptions.json tree_root_mentions exempts files "
+                         "that no longer need it: %s" % sorted(set(allowed) - used))
 
     def test_scope_boundary_holds(self):
         """No machine, Active Directory or cross-toolkit methodology in this tree.
@@ -1180,17 +1191,24 @@ class ContractTests(unittest.TestCase):
                    + sorted((ROOT / ".claude" / "agents").glob("*.md")))
         exempt = {e["path"] for e in exemptions().get("tool_path_mentions", [])}
         dangling = []
+        used = set()
         for path in sources:
+            rel = path.relative_to(ROOT).as_posix()
             if not path.is_file():
                 continue
-            rel = path.relative_to(ROOT).as_posix()
+            hits = [ref for ref in sorted(set(TOOL_PATH.findall(
+                        path.read_text(encoding="utf-8"))))
+                    if not (ROOT / ref).is_file()]
             if rel in exempt:
+                if hits:
+                    used.add(rel)
                 continue
-            for ref in sorted(set(TOOL_PATH.findall(path.read_text(encoding="utf-8")))):
-                if not (ROOT / ref).is_file():
-                    dangling.append("%s -> %s" % (rel, ref))
+            dangling.extend("%s -> %s" % (rel, ref) for ref in hits)
         self.assertEqual(dangling, [],
                          "a document names a tool that does not exist: %s" % dangling[:6])
+        self.assertEqual(sorted(exempt - used), [],
+                         "test/gate-exemptions.json tool_path_mentions exempts files "
+                         "that no longer need it: %s" % sorted(exempt - used))
 
     def test_every_workflow_script_spawns_an_agent_that_exists(self):
         """A workflow that names an absent subagent cannot run at all.
