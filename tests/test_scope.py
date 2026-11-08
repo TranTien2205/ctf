@@ -12,6 +12,28 @@ from argus.scope import ScopeError, ScopeGuard
 from argus.session import Session
 
 
+def test_framing_headers_dropped_from_config(tmp_path):
+    """A Burp-copied header file always carries Host:/Content-Length: -
+    honoring them would desync the wire from the scoped URL (scope check
+    says host A, wire says host B) and break request framing."""
+    import argparse
+    from argus.config import load_config
+    args = argparse.Namespace(
+        api_key="k", auth_token=None, header_file=None,
+        header=["Host: evil.example", "Cookie: s=1",
+                "Content-Length: 9", "X-Custom: v"],
+        scope=[], exclude=[], target="http://127.0.0.1:1", model=None,
+        max_turns=1, max_requests=1, max_time=1, rate=0, goal="",
+        operator="", proxy="", llm_max_tokens=1, mcp_config=None,
+        resume=None, allow_private=True, tls_verify=False,
+        no_external=False, quiet=True, session_dir=str(tmp_path),
+        tools="")
+    cfg = load_config(args)
+    hdrs = cfg.resolved_headers()
+    assert "Host" not in hdrs and "Content-Length" not in hdrs
+    assert hdrs["Cookie"] == "s=1" and hdrs["X-Custom"] == "v"
+
+
 def test_in_scope_host_ok():
     g = ScopeGuard("https://target.example/app", allow_private=False)
     g.check("https://target.example/login?next=/x")

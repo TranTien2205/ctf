@@ -19,7 +19,10 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
                    help="Path prefixes to never touch (e.g. /logout); may repeat")
     p.add_argument("--header-file",
                    help="File with one 'Name: value' header per line "
-                        "(e.g. a Burp copy); blank lines and # comments skipped")
+                        "(e.g. a Burp copy); blank lines and # comments "
+                        "skipped; framing headers (Host, Content-Length, "
+                        "Transfer-Encoding, Connection) dropped - the wire "
+                        "computes them from the scoped URL")
     p.add_argument("--header", action="append",
                    help="'Name: value' applied to every request (e.g. auth cookie)")
     p.add_argument("--goal", help="Operator goal, e.g. 'focus on the /api surface'")

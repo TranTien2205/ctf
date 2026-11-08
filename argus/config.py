@@ -158,11 +158,24 @@ def load_config(args) -> Config:
         except OSError as exc:
             raise SystemExit(f"--header-file unreadable: {exc}")
     header_lines += list(getattr(args, "header", None) or [])
+    # framing headers must stay wire-computed: a Burp-copied file always
+    # carries Host:/Content-Length:, and honoring them would desync the wire
+    # from what ScopeGuard checked (and break every request's framing)
+    framing = {"host", "content-length", "transfer-encoding", "connection"}
+    dropped = []
     for raw in header_lines:
         if ":" not in raw:
             raise SystemExit(f"--header must be 'Name: value', got: {raw!r}")
         name, value = raw.split(":", 1)
-        headers[name.strip()] = value.strip()
+        name = name.strip()
+        if name.lower() in framing:
+            dropped.append(name)
+            continue
+        headers[name] = value.strip()
+    if dropped:
+        import sys as _sys
+        print(f"note: dropped framing header(s) {sorted(set(dropped))} - "
+              "the wire computes them from the scoped URL", file=_sys.stderr)
 
     scope_hosts = []
     for raw in getattr(args, "scope", None) or []:
