@@ -88,7 +88,10 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
     errors: list[str] = []
 
     def canon(u: str) -> str:
-        p = urllib.parse.urlparse(u)
+        try:
+            p = urllib.parse.urlparse(u)
+        except ValueError:
+            return u  # unparseable - dedup on the raw string instead
         clean_q = urllib.parse.urlencode(
             sorted(urllib.parse.parse_qsl(p.query)))
         return urllib.parse.urlunparse((p.scheme, p.netloc, p.path or "/",
@@ -102,13 +105,20 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
         seen.add(key)
         try:
             res = ctx.client.send("GET", cur, tool="crawl", note=f"crawl depth {d}")
-        except ScopeError as exc:
+        except Exception as exc:
+            # ScopeError AND unparseable target-controlled links alike -
+            # neither should kill a crawl that already collected pages
             errors.append(str(exc))
             continue
         status = res["status"]
         body = res.get("body", "")
         ctype = (res.get("headers") or {}).get("content-type", "")
-        parsed = urllib.parse.urlparse(cur)
+        try:
+            parsed = urllib.parse.urlparse(cur)
+        except ValueError:
+            pages.append({"url": cur, "status": status, "depth": d,
+                          "request_id": res["request_id"], "params": []})
+            continue
         params = sorted({n for n, _ in urllib.parse.parse_qsl(parsed.query)})
         page = {"url": cur, "status": status, "depth": d,
                 "request_id": res["request_id"], "params": params}
@@ -120,16 +130,25 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
         page["title"] = surf.title[:120]
         pages.append(page)
         for form in surf.forms:
-            action = urllib.parse.urljoin(cur, form["action"] or cur)
+            try:
+                action = urllib.parse.urljoin(cur, form["action"] or cur)
+            except ValueError:
+                continue  # target-controlled href that even urljoin rejects
             forms.append({"page": cur, "action": action,
                           "method": form["method"], "inputs": form["inputs"]})
-            endpoints.add(urllib.parse.urlparse(action).path or "/")
+            try:
+                endpoints.add(urllib.parse.urlparse(action).path or "/")
+            except ValueError:
+                pass
         if d < depth:
             for link in surf.links + surf.scripts:
                 if link.startswith(("javascript:", "mailto:", "tel:", "#")):
                     continue
-                absu = urllib.parse.urljoin(cur, link)
-                pu = urllib.parse.urlparse(absu)
+                try:
+                    absu = urllib.parse.urljoin(cur, link)
+                    pu = urllib.parse.urlparse(absu)
+                except ValueError:
+                    continue
                 # follow in-scope hosts (incl. declared subdomains), not just
                 # the start origin - scope.check still vets scheme/private
                 if not ctx.scope.host_allowed(pu.hostname or ""):
