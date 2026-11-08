@@ -46,6 +46,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
    `$Extend/$UsnJrnl`, swap.
+6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
+   survive in freeblocks and freelist pages until VACUUM.
+   `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
+   (`source=freeblock|unallocated|freelist`); add `--live` to diff against
+   live cells.
 
 `references/deleted-and-unallocated.md` carries the per-tool commands.
 
