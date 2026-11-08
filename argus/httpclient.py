@@ -12,7 +12,8 @@ import urllib.parse
 import httpx
 
 from .ratelimit import RateLimiter
-from .scope import ScopeGuard
+from .scope import ScopeGuard, ScopeError, _ip_private
+import ipaddress as _ipaddress
 from .session import Session
 
 BODY_CAP = 200_000  # bytes stored in transcript
@@ -191,6 +192,24 @@ class GuardedClient:
                 method, url, headers=req_headers, content=body,
                 follow_redirects=False, extensions={"_argus_box": box},
                 **tkw) as resp:
+            # DNS-rebinding guard: the scope check resolved the host once,
+            # but this connection resolved it again - a changed answer now
+            # points at a private address while passing the earlier check.
+            # The connected peer's real address is authoritative.
+            if not self.scope.allow_private:
+                ns = resp.extensions.get("network_stream")
+                peer = None
+                try:
+                    addr = ns.get_extra_info("server_addr") if ns else None
+                    if addr:
+                        peer = _ipaddress.ip_address(addr[0])
+                except (ValueError, TypeError, OSError, AttributeError):
+                    peer = None
+                if peer is not None and _ip_private(peer):
+                    raise ScopeError(
+                        f"connection to {resp.request.url.host} resolved to "
+                        f"private address {peer} at connect time "
+                        f"(DNS rebinding protection)")
             buf = bytearray()
             for chunk in resp.iter_bytes(65536):
                 buf += chunk
@@ -428,6 +447,20 @@ class GuardedClient:
         rbfile = None
         try:
             conn.connect()
+            # same rebinding guard as _fetch_capped: the scope check's
+            # resolution and this socket's are two separate answers
+            if not self.scope.allow_private and conn.sock is not None:
+                try:
+                    peer_ip = _ipaddress.ip_address(
+                        conn.sock.getpeername()[0])
+                except (ValueError, TypeError, OSError):
+                    peer_ip = None
+                if peer_ip is not None and _ip_private(peer_ip):
+                    conn.close()
+                    raise ScopeError(
+                        f"connection to {parsed.hostname} resolved to "
+                        f"private address {peer_ip} at connect time "
+                        f"(DNS rebinding protection)")
             # ONE buffered reader shared by every response on this
             # connection: each HTTPResponse would otherwise wrap the socket
             # in its own BufferedReader, and the first response's read-ahead

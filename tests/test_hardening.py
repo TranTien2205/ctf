@@ -70,6 +70,23 @@ def test_record_event_preserves_small_values(tmp_path):
     assert e["n"] == 5 and e["ok"] is True
 
 
+def test_dns_rebinding_blocked_at_connect(tmp_path, lab_url, monkeypatch):
+    # the scope check resolved 'localhost' as public (rebound answer);
+    # the real connection still lands on 127.0.0.1 and must be refused
+    import argus.scope as scope_mod
+    from argus.scope import ScopeError
+    monkeypatch.setattr(scope_mod, "_is_private_host", lambda h: False)
+    host = lab_url.split("://")[1].split(":")[0]
+    scope = ScopeGuard(lab_url, allow_private=False)
+    session = Session(tmp_path, lab_url, meta={"t": 1})
+    c = GuardedClient(scope, session, RateLimiter(0))
+    try:
+        with pytest.raises(ScopeError, match="rebinding"):
+            c.send("GET", lab_url)
+    finally:
+        c.close()
+
+
 def test_bound_value_handles_unserializable():
     class Weird:
         def __str__(self):
