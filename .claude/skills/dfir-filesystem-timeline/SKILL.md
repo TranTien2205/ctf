@@ -192,6 +192,13 @@ fls -o <part_offset> -m C: -r image.dd > body.txt
 mactime -y -d -b body.txt | grep -i '<name_from_the_question>'
 ```
 
+Handed a bare `$MFT` file with no image? `python3 tools/forensics/mft_parse.py
+MFT` decodes each record to JSON: `si` + `names` timestamp sets (the 4+4
+divergence a timestomp question asks about), `in_use`/`is_dir` flags, resident
+`$DATA` previews. `--deleted` keeps only records whose in-use bit is clear;
+`--dump N` writes a record's resident `$DATA` bytes (a small deleted file's
+whole body) to stdout as hex.
+
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
 which is the answer to a timestomp question. Confirmed = a timeline row quoted
