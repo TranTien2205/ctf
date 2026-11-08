@@ -92,6 +92,12 @@ variant:  one observed folded control character -> parser error or a second
           attributable status line
 ```
 
+`tools/web/crlf_probe.py` fires the fold matrix — %0d%0a header, %0d%0a%0d%0a
+body, lone %0d, lone %0a, double-encoded %250d — into the value slot and
+grades each against the ordinary baseline: upstream-error text, folded
+marker echo, or status delta, verbatim excerpts attached. A 302, generic
+400, or timeout still does not count.
+
 Use only routes observed in source or responses. A class confirmation requires
 the control character to survive into the outbound request, shown by a parser
 differential or a second response. A 302, generic 400, timeout, or reset is not

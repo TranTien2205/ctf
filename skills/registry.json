@@ -1195,7 +1195,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 963,
+      "skill_tokens": 1060,
       "depth_files": 3,
       "depth_tokens": 1080,
       "use_when": [
@@ -2100,7 +2100,7 @@
       "verified_by": [
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1158,
+      "skill_tokens": 1244,
       "depth_files": 5,
       "depth_tokens": 4489,
       "use_when": [

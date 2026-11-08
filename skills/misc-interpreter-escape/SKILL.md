@@ -56,6 +56,13 @@ output the jail claims to forbid.
 - A jail that echoes errors is free recon — quote the rejection in your notes;
   it names the exact layer.
 
+Once the filter layer is mapped to banned words or characters,
+`tools/pyjail_gen.py --banned w1 w2 --banchars "()'"` filters the escape
+corpus down to the shapes that survive it — and emits a chr()-join form
+for any banned attribute name, which a word blacklist cannot see. It
+still tells you which `__subclasses__` index must be enumerated at run
+time; it does not guess one.
+
 ## Operational probe
 
 ```text
