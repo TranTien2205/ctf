@@ -107,6 +107,13 @@ python3 tools/web/http_probe.py --challenge "$C" --class web-ssrf \
 A refused loopback port is a better first probe than a callback host: it needs no
 egress, and the error text names the address the server actually dialled.
 
+When the reachability question does need egress, `tools/web/oob_listener.py` is
+the callback half: `serve` records every hit as a JSONL line (method, path,
+headers incl. Referer/User-Agent, body), `canary` mints a unique URL per payload
+so hits correlate by token, and `hits` replays the log. A curl smoke test at the
+canary proves the listener works; silence after the real payload is then a
+measurement, not a guess.
+
 **Falsifier:** the fetch target is fixed in source and the request never
 influences it. Reaching your own host proves egress, not SSRF — the class signal
 is that *the server* chose an address you supplied.

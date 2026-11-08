@@ -89,9 +89,10 @@ known file or marker:
 If the endpoint echoes the field, replace only the internal entity with a local
 file reference that the supplied challenge definitely contains. If there is no
 echo channel, use an out-of-band URL only when the challenge provides a
-controlled callback. Record status, body length, parser error, and callback
-evidence separately. A malformed XML error does not prove external entity
-resolution.
+controlled callback — `tools/web/oob_listener.py serve` records each hit with
+headers and body to a JSONL log, and `canary` mints a unique URL per payload.
+Record status, body length, parser error, and callback evidence separately. A
+malformed XML error does not prove external entity resolution.
 
 For uploads, keep the first file a valid document of the observed type. Do not
 combine XXE with archive traversal, polyglot content, or an external callback in
