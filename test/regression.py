@@ -91,12 +91,16 @@ CONTROL_PLANE = [
 TAXONOMY = ROOT / "knowledge" / "bug-classes.json"
 ENTRY_STATUS = re.compile(r"^- status: (?P<status>\w[\w-]*)\s*$", re.M)
 ENTRY_HEAD = re.compile(r"^## (?P<anchor>\S+) · (?P<name>.+?) · (?P<status>\w[\w-]*)\s*$", re.M)
-ROUTER_SKILLS = [
-    "skills/ctf-playbook/SKILL.md", "skills/web-triage/SKILL.md",
-    "skills/pwn-binary-triage/SKILL.md", "skills/rev-triage/SKILL.md",
-    "skills/crypto-triage/SKILL.md", "skills/forensics-triage/SKILL.md",
-    "skills/osint-triage/SKILL.md", "skills/ai-iot-triage/SKILL.md",
-]
+def _router_skill_paths():
+    """Every router the registry knows about, entry skill included. The list
+    used to be hand-maintained and silently dropped ad/dfir/ir when those
+    routers were added; deriving it keeps the language checks honest."""
+    registry = json.loads((ROOT / "skills" / "registry.json").read_text(encoding="utf-8"))
+    return sorted(s["path"] for s in registry["skills"]
+                  if s.get("layer") in ("entry", "router"))
+
+
+ROUTER_SKILLS = _router_skill_paths()
 # Language detectors. The character classes are built from integer codepoints on
 # purpose: this file is itself scanned by the whole-tree language check below, so
 # it must stay pure ASCII. A literal character class here would make the detector
