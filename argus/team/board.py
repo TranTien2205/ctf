@@ -56,8 +56,10 @@ class Board:
                        reason: str) -> None:
         """Worker asks the lead for help; lead decides on read_board."""
         with self._lock:
-            self._requests.append({"agent": agent, "role": role, "task": task,
-                                   "reason": reason, "ts": round(time.time(), 1)})
+            self._requests.append({"agent": agent, "role": role,
+                                   "task": task[:2000],
+                                   "reason": reason[:1000],
+                                   "ts": round(time.time(), 1)})
 
     def take_requests(self) -> list[dict]:
         with self._lock:

@@ -114,7 +114,10 @@ class TeamRun:
                 return {"error": f"max_workers ({self.max_workers}) reached"}
             self._counts[role] += 1
             name = f"{role}-{self._counts[role]}"
-            self._start_worker(name, card, task or _DEFAULT_TASKS[role])
+            # a huge lead-written task lands verbatim in the worker seed -
+            # bound it like board notes
+            self._start_worker(name, card,
+                               (task or _DEFAULT_TASKS[role])[:4000])
             return {"spawned": name, "role": role}
 
     def _mk_client(self, name: str, max_requests: int = 0) -> GuardedClient:

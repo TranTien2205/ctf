@@ -72,6 +72,29 @@ def test_board_requests_consumed_only_by_lead(ctx):
     assert board.snapshot()["requests"] == []
 
 
+def test_board_text_fields_bounded(ctx):
+    """Huge worker-written strings must not bloat the lead snapshot."""
+    board = Board(ctx.session)
+    board.request_worker("recon-1", "exploit", "T" * 9999, "R" * 9999)
+    req = board.snapshot(consume_requests=True)["requests"][0]
+    assert len(req["task"]) == 2000 and len(req["reason"]) == 1000
+    board.post_note("recon-1", "N" * 9999)
+    assert len(board.snapshot()["notes"][-1]["text"]) == 2000
+
+
+def test_emit_lead_fields_bounded(ctx):
+    ctx.board = Board(ctx.session)
+    ctx.agent_name = "recon-1"
+    r = teamtools.emit_lead(ctx, kind="endpoint",
+                            url=ctx.cfg.target + "/" + "u" * 5000,
+                            params=[f"p{i}" for i in range(100)],
+                            tech="t" * 2000, note="n" * 9999)
+    assert r["queued"] is True
+    leads, _ = ctx.board.leads.pull(max_n=1, wait_s=0)
+    assert len(leads[0].url) <= 2000 and len(leads[0].note) <= 2000
+    assert len(leads[0].tech) <= 500 and len(leads[0].params) <= 50
+
+
 # ------------------------------------------------------------ role gating
 
 def test_role_tool_gate(ctx):

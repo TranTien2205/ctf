@@ -48,9 +48,10 @@ def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
             ctx.scope.check(url)
         except Exception as exc:
             return {"error": f"lead url rejected by scope guard: {exc}"}
-    lead = Lead(kind=kind, url=url.strip(),
-                params=tuple(sorted(params or [])),
-                method=(method or "GET").upper(), tech=tech, note=note,
+    lead = Lead(kind=kind, url=url.strip()[:2000],
+                params=tuple(sorted(params or []))[:50],
+                method=(method or "GET").upper(),
+                tech=(tech or "")[:500], note=(note or "")[:2000],
                 source=source or ctx.agent_name,
                 priority=max(0, min(int(priority or 5), 9)))
     if not board.leads.push(lead):
