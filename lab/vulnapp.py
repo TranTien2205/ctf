@@ -205,6 +205,17 @@ class Handler(BaseHTTPRequestHandler):
 <!-- TODO: remove /debug before production -->
 </body></html>""")
 
+        elif path == "/weird-links":
+            # hostile target-controlled URLs: crawl/js_recon must skip
+            # rather than die on hrefs urljoin itself rejects
+            self._send(body="""<html><body>
+<a href="http://[bad">bad ipv6</a>
+<a href="/item?id=2">item 2</a>
+<form action="http://[bad"><input name="x"></form>
+<script src="//[bad/x.js"></script>
+<script src="/static/app.js"></script>
+</body></html>""")
+
         elif path == "/graphql":
             # accepts GET ?query= too - many real graphql servers do
             q = p.get("query", "")

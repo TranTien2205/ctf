@@ -87,6 +87,20 @@ def test_dns_rebinding_blocked_at_connect(tmp_path, lab_url, monkeypatch):
         c.close()
 
 
+def test_crawl_survives_hostile_hrefs(ctx, lab_url):
+    from argus.tools import web
+    out = web.crawl(ctx, lab_url + "/weird-links", depth=1)
+    # malformed links are skipped; the good /item?id=2 one is followed
+    assert "error" not in out
+    assert any("/item" in p["url"] for p in out["pages"])
+
+
+def test_js_recon_survives_hostile_srcs(ctx, lab_url):
+    from argus.tools import web
+    out = web.js_recon(ctx, lab_url + "/weird-links")
+    assert "error" not in out  # '//[bad/x.js' src skipped, good src fetched
+
+
 def test_bound_value_handles_unserializable():
     class Weird:
         def __str__(self):
