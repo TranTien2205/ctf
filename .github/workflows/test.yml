@@ -45,3 +45,8 @@ jobs:
               assert need in names, f"wheel missing {need}"
           print("wheel contents ok:", len(names), "files")
           EOF
+      - name: wheel installs and the console script works
+        run: |
+          pip install dist/*.whl
+          argus skills | grep -q sqli   # bundled data resolvable post-install
+          argus sessions --session-dir /tmp/none --json | grep -q '\[\]'
