@@ -125,14 +125,22 @@ class ClaudeClient:
                     time.sleep(delay)
                     delay = min(delay * 2, 30)
                     continue
+                if not isinstance(data, dict):
+                    # valid JSON, wrong shape - same transient-gateway class
+                    last_error = f"HTTP 200 with non-object JSON body"
+                    time.sleep(delay)
+                    delay = min(delay * 2, 30)
+                    continue
                 self.calls += 1
-                usage = data.get("usage") or {}
-                self.input_tokens += usage.get("input_tokens", 0)
-                self.output_tokens += usage.get("output_tokens", 0)
-                self.cache_read_tokens += \
-                    usage.get("cache_read_input_tokens", 0)
-                self.cache_write_tokens += \
-                    usage.get("cache_creation_input_tokens", 0)
+                usage = data.get("usage")
+                usage = usage if isinstance(usage, dict) else {}
+                def _tok(key):
+                    v = usage.get(key, 0)
+                    return v if isinstance(v, int) and not isinstance(v, bool) else 0
+                self.input_tokens += _tok("input_tokens")
+                self.output_tokens += _tok("output_tokens")
+                self.cache_read_tokens += _tok("cache_read_input_tokens")
+                self.cache_write_tokens += _tok("cache_creation_input_tokens")
                 return data
             body = resp.text[:500]
             # cache_control rejected (e.g. a plan that forbids it): drop the
