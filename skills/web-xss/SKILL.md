@@ -32,7 +32,11 @@ If nothing renders the injected markup, there is no flag path here. Return to
 
 ## Identify the context — the step that decides the payload
 
-Send one unique harmless marker and find where it lands.
+Send one unique harmless marker and find where it lands —
+`tools/web/xss_context.py --url U --param P` sends the metachar canary, classifies
+the landing context, and reports per-character verbatim/encoded/gone survival.
+`context-breakable` is a candidate verdict: the class still owes a
+rendered-execution excerpt, measured by the confirming probe.
 
 | Context | First payload shape | Depth |
 |---|---|---|

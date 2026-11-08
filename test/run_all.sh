@@ -84,8 +84,9 @@ hr "REQUIRED: web primitive selftests (--selftest on the tool itself -- all offl
 for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_miner.py \
          tools/web/session_dissect.py tools/web/ws_probe.py tools/web/jwt_forge.py \
          tools/web/oob_listener.py tools/web/ssti_probe.py tools/web/sqli_probe.py \
-         tools/web/sqli_extract.py \
+         tools/web/sqli_extract.py tools/web/xss_context.py \
          tools/pwn_cyclic.py tools/net_dialog.py tools/enc_detect.py tools/hash_id.py \
+         tools/pickle_gen.py \
          tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"

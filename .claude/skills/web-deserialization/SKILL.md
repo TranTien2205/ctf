@@ -35,7 +35,10 @@ the tail — and compare the response with a well-formed one. An application
 that unserialises untrusted input almost always answers malformed input with
 a parser stack trace, a distinct error, or a timing difference. That single
 non-destructive probe confirms the object is actually being deserialised
-before any gadget chain is attempted.
+before any gadget chain is attempted. For the Python path,
+`tools/pickle_gen.py --marker TAG` builds the benign object whose
+`PWNED-<tag>` appearance in the response is the confirm; `--cmd`/`--eval`
+forms are for the already-confirmed sink.
 
 **Falsifier** — the observation that closes this class: malformed objects are
 rejected with the same response and the same timing as well-formed ones, and
