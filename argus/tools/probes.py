@@ -453,9 +453,23 @@ def probe_method(ctx: Context, url: str) -> dict:
             if out["put_verified"]:
                 ctx.client.send("DELETE", url.rstrip("/") + f"/{canary}.txt",
                                 tool="probe_method", note="cleanup canary")
+    if "TRACE" in allow.upper():
+        # TRACE that echoes request headers back is cross-site tracing -
+        # it leaks HttpOnly cookies/auth headers to a reading XSS
+        canary = _marker("tr")
+        t = ctx.client.send("TRACE", url, headers={"X-Argus-Trace": canary},
+                            tool="probe_method", note="TRACE echo")
+        out["trace_attempt"] = {"status": t["status"],
+                                "request_id": t["request_id"],
+                                "echoes": canary in (t.get("body") or "")}
     out["dangerous_methods"] = dangerous
-    out["verdict"] = ("writable method confirmed" if out.get("put_verified")
-                      else f"methods: {allow or 'none advertised'}")
+    if out.get("put_verified"):
+        verdict = "writable method confirmed"
+    elif out.get("trace_attempt", {}).get("echoes"):
+        verdict = "TRACE echoes request (cross-site tracing candidate)"
+    else:
+        verdict = f"methods: {allow or 'none advertised'}"
+    out["verdict"] = verdict
     return out
 
 
@@ -503,7 +517,12 @@ def probe_idor(ctx: Context, url: str, method: str = "GET",
                                tool="probe_idor",
                                note=f"id {new_id} (id{delta:+d})")
 
-    neighbors = [_shift(d) for d in (1, -1)]
+    shifts = [1, -1]
+    # id=0 is a real edge: seed/admin objects often live at zero, and
+    # "WHERE id=0" bugs differ from a simple neighbor read
+    if int(m.group(1)) not in (0, 1):
+        shifts.append(-int(m.group(1)))
+    neighbors = [_shift(d) for d in shifts]
     results = []
     for r in neighbors:
         other = r.get("body", "")
@@ -754,10 +773,12 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                     "is a real account (e.g. via password-reset)"}
 
 
-def probe_xfh(ctx: Context, url: str) -> dict:
+def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
     """Host-header poisoning: X-Forwarded-Host canary reflected into the
     body or Location means generated absolute links can be attacker-aimed
-    (password-reset poisoning, cache poisoning)."""
+    (password-reset poisoning, cache poisoning). With `restricted` (a path
+    that 403s directly, e.g. /admin) also tests X-Original-URL and
+    X-Rewrite-URL - middleware honouring either is an ACL bypass."""
     canary = f"{_marker('xfh')}.argus.invalid"
     r = ctx.client.send("GET", url, headers={"X-Forwarded-Host": canary},
                         tool="probe_xfh", note="xfh canary")
@@ -767,10 +788,38 @@ def probe_xfh(ctx: Context, url: str) -> dict:
         loc = " ".join(loc)
     where = ("Location" if canary in loc
              else "body" if canary in body else "")
-    verdict = (f"host-header candidate: X-Forwarded-Host reflected in {where}"
-               if where else "no host-header reflection")
-    return {"verdict": verdict, "request_id": r["request_id"],
-            "canary": canary, "reflected_in": where}
+    signals = ([f"host-header candidate: X-Forwarded-Host reflected in {where}"]
+               if where else [])
+
+    out = {"request_id": r["request_id"], "canary": canary,
+           "reflected_in": where}
+    if restricted:
+        p = urllib.parse.urlparse(url)
+        direct = ctx.client.send(
+            "GET", urllib.parse.urlunparse(p._replace(
+                path=restricted, query="")),
+            tool="probe_xfh", note="restricted direct")
+        bypasses = []
+        for hdr in ("X-Original-URL", "X-Rewrite-URL"):
+            b = ctx.client.send("GET", url, headers={hdr: restricted},
+                                tool="probe_xfh", note=f"{hdr} bypass")
+            differs = (_similarity(b.get("body") or "", body) < 0.8
+                       or b["status"] != r["status"])
+            bypasses.append({"header": hdr, "status": b["status"],
+                             "request_id": b["request_id"],
+                             "differs": differs})
+        out["restricted_direct"] = {"status": direct["status"],
+                                    "request_id": direct["request_id"]}
+        out["bypasses"] = bypasses
+        hit = next((b for b in bypasses
+                    if b["differs"] and b["status"] == 200), None)
+        if hit and direct["status"] in (401, 403):
+            signals.append(
+                f"acl-bypass candidate: {hit['header']} served "
+                f"{restricted} content (200) that direct access "
+                f"denies ({direct['status']})")
+    out["verdict"] = "; ".join(signals) if signals else "no host-header signal"
+    return out
 
 
 def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:

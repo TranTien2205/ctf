@@ -191,6 +191,9 @@ def main() -> int:
           "enumeration candidate" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/reset")
     check("xfh probe sees reflected host", "candidate" in out["verdict"])
+    out = probes.probe_xfh(ctx, base + "/", restricted="/admin")
+    check("xfh probe sees x-original-url bypass",
+          "acl-bypass candidate" in out["verdict"])
     out = probes.probe_nosqli(ctx, base + "/api/login",
                               '{"username":"admin","password":"x"}', "password")
     check("nosqli probe flips auth", "nosqli candidate" in out["verdict"])

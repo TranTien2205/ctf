@@ -325,8 +325,15 @@ TOOL_SCHEMAS: list[dict] = [
         "probe_xfh",
         "Host-header poisoning check: sends an X-Forwarded-Host canary and "
         "reports whether it is reflected into the response body or the "
-        "Location header (password-reset poisoning, cache poisoning).",
-        {"url": {**_STR, "description": URL_DESC}},
+        "Location header (password-reset poisoning, cache poisoning). "
+        "Pass `restricted` (a path that 403s directly) to also test "
+        "X-Original-URL / X-Rewrite-URL middleware ACL bypass.",
+        {
+            "url": {**_STR, "description": URL_DESC},
+            "restricted": {**_STR, "description": "Optional path that 403s "
+                           "directly, e.g. /admin - enables the header "
+                           "ACL-bypass check"},
+        },
         ["url"],
     ),
     _schema(

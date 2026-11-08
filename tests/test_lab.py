@@ -146,6 +146,8 @@ def test_enum_probe(lab_url, ctx):
 def test_xfh_probe(lab_url, ctx):
     out = probes.probe_xfh(ctx, lab_url + "/reset")
     assert "host-header candidate" in out["verdict"], out
+    out = probes.probe_xfh(ctx, lab_url + "/", restricted="/admin")
+    assert "acl-bypass candidate" in out["verdict"], out
 
 
 def test_nosqli_probe(lab_url, ctx):

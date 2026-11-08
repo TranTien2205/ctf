@@ -15,6 +15,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /download?file=       path traversal / file read
     GET  /redirect?next=       open redirect + CRLF header injection
     GET  /safedirect?next=     filtered redirect (//host bypass)
+    hdr  X-Original-URL: /admin  middleware ACL bypass
                                (Location value is not sanitized)
     GET  /api/user/<id>        IDOR (any id served)
     POST /api/order            IDOR in a JSON body ({"order": N} served)
@@ -176,6 +177,15 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = urllib.parse.urlparse(self.path).path
         p = self._params()
+
+        # middleware honours X-Original-URL/X-Rewrite-URL while the edge
+        # 403s /admin directly - the classic header-based ACL bypass
+        xou = (self.headers.get("X-Original-URL")
+               or self.headers.get("X-Rewrite-URL"))
+        if xou == "/admin":
+            self._send(body="<html><body>admin panel: users=3 "
+                            "cfg=release-1</body></html>")
+            return
 
         if path == "/":
             self._send(body="""<html><head><title>LabShop</title></head><body>

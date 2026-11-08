@@ -33,4 +33,5 @@ actually confirms the bug, and bypasses for common filters.
 | Cache in front; unkeyed inputs reflected | `cache-poisoning` |
 | ws:// channel, Socket.IO | `websocket` |
 | Value lands in a response header unencoded | `crlf` |
+| XFH reflected; 403 path under X-Original-URL | `host-header` |
 | First pass over an unknown target | `triage` |
