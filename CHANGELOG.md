@@ -60,10 +60,15 @@ system. All notable milestones on `agent-v2`.
 - `mcp_call` scope-checks every http(s) URL inside its arguments — an
   MCP fetch server cannot become a path around the scope guard, and the
   block is recorded in the transcript.
-- External-tool args are scanned for URLs, bare hosts AND IPv6 literals
-  (`nmap ::1` no longer slips past `split(':')`), with per-tool flag
-  guards for local-file exfil, target-list files, redirect flags, and
-  local code exec.
+- External-tool args are scanned for URLs, bare hosts, IPv6 literals
+  (`nmap ::1` no longer slips past `split(':')`), single-label names
+  (`localhost`, `db01`) and non-canonical IP spellings (`127.1`,
+  `2130706433`, `0x7f000001`) — tools parse all of them even where the
+  host resolver does not. Per-tool flag guards cover local-file exfil,
+  target-list files (incl. IPv6 lines), redirect flags, and local code
+  exec (ffuf `-input-cmd`, sqlmap `--eval`/`--alert`/`-z eva=`,
+  nuclei `-code`/`-lfa`/custom interactsh, nuclei template dirs
+  confined to cwd, ffuf `-request` files host-checked).
 
 ### LLM layer
 - Auth chain: `--api-key`/`ANTHROPIC_API_KEY` → `ANTHROPIC_AUTH_TOKEN`/
@@ -96,9 +101,6 @@ system. All notable milestones on `agent-v2`.
   excerpts, coverage, constraints, agent metrics, notes appendix.
   Dynamic code fences mean target bytes
   cannot break out and inject fake report sections.
-  verbatim proof, embedded transcript excerpts, coverage, constraints,
-  agent metrics, notes appendix. Dynamic code fences mean target bytes
-  cannot break out and inject fake report sections.
 - `report.sarif`: SARIF 2.1.0 — findings ingestible by GitHub code
   scanning / Azure DevOps dashboards.
 - `findings.json`, `notes.md`, `meta.json`, `summary.json`,
@@ -109,13 +111,38 @@ system. All notable milestones on `agent-v2`.
   (path/param/POST-body modes).
 - `argus/resources/exploits/<id>/manifest.json` → `run_exploit`
   (scope-checked, timeout-bounded, env-scrubbed, `proof_marker` verdict).
-- `<cwd>/resources/` shadows bundled entries on any install.
+- `<cwd>/resources/wordlists/` shadows bundled lists on any install;
+  `<cwd>/resources/exploits/` requires `ARGUS_EXPLOITS_CWD=1`.
 - Two bundled exploits demonstrate the manifest path:
   `lab-auth-bypass`, `lab-jwt-forge`.
 
+### Ambient-trust hardening (cwd/env are untrusted input)
+- `.env` whitelists credential keys only — `ANTHROPIC_BASE_URL` and
+  `ARGUS_MCP_CONFIG` from a stray .env can no longer redirect the API
+  endpoint (key exfil) or name subprocesses.
+- Target client runs `trust_env=False`: env proxies and `~/.netrc`
+  cannot silently re-route scoped traffic or attach Basic credentials;
+  `--proxy` is the only proxy path.
+- cwd `resources/exploits/` and cwd `mcp.json`/`.argus-mcp.json` are
+  opt-in (`ARGUS_EXPLOITS_CWD=1`, `ARGUS_MCP_CWD=1`) — a planted
+  manifest/config inside an untrusted checkout cannot execute commands
+  through the model; wordlists keep unconditional shadowing.
+- `--header`/`--header-file` reject control characters — a pasted CRLF
+  cannot smuggle header lines onto the raw-send wire.
+- Reads are memory-bounded everywhere: response bodies stream at
+  BODY_CAP, subprocess stdout/stderr go through tempfiles with
+  stream-searched proof markers, MCP frames cap at 4MB, wordlists and
+  target files read only what is needed, persisted request bodies cap.
+- Corrupt-input forensic tolerance: `verify`, `report`, `findings`,
+  `diff`, `compare`, `sessions` and `--resume` degrade safely on
+  malformed JSON, non-list findings, directory-swapped artifacts and
+  broken meta.json — flagged as integrity signals, never tracebacks.
+- MCP config errors (unreadable file, missing `command`) warn on
+  stderr at run start instead of silently dropping servers.
+
 ### Verification & packaging
-- `python selftest.py`: 99 offline checks.
-- `python -m pytest tests/ -q`: 129 tests (unit + live-lab + loop +
+- `python selftest.py`: 108 offline checks.
+- `python -m pytest tests/ -q`: 140 tests (unit + live-lab + loop +
   team + MCP + CLI).
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
   no API key (5 evidence-gated findings each).
