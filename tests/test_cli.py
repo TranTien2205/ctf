@@ -74,6 +74,23 @@ def test_report_fence_cant_be_broken(tmp_path):
     assert _code("has`tick").startswith("`` ")
 
 
+def test_finding_carries_cwe(tmp_path):
+    """Category -> canonical CWE auto-mapped for audit-grade reports;
+    unknown categories just omit the field."""
+    from argus.session import _cwe_of
+    assert _cwe_of("sqli") == "CWE-89"
+    assert _cwe_of("info-disclosure") == "CWE-200"
+    assert _cwe_of("open redirect") == "CWE-601"
+    assert _cwe_of("something-else") == ""
+    rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
+    assert rc == 0
+    (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
+    findings = json.loads((sdir / "findings.json").read_text())
+    cwes = {f["category"]: f.get("cwe") for f in findings}
+    assert cwes["sqli"] == "CWE-89" and cwes["jwt"] == "CWE-347"
+    assert "CWE-89" in (sdir / "report.md").read_text()
+
+
 def test_tools_allowlist_validation(capsys):
     """--tools: bad names fail fast with the valid list; good names are
     restricted to exactly those tools (finish auto-included)."""

@@ -177,6 +177,11 @@ In team mode `summary.json` also carries `agents` — each worker's turns,
 requests, LLM calls, token usage and credited findings — the data needed to
 compare `run` vs `team` on speed, coverage and cost.
 
+Each finding carries `severity`, optional `cvss`, and an auto-mapped `cwe`
+(the named bug class resolves to the canonical CWE identifier, e.g.
+`sqli` -> CWE-89; unknown categories simply omit it), plus verbatim
+`evidence_excerpt` and cited `evidence_ids`.
+
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
 `python -m argus sessions` lists every session dir with mode, finding and

@@ -8,7 +8,7 @@ import urllib.parse
 from pathlib import Path
 
 from ..config import Config
-from ..session import SEVERITIES, Session
+from ..session import SEVERITIES, Session, _cwe_of
 
 _SEV_ORDER = {s: i for i, s in enumerate(SEVERITIES)}
 _SEV_LABEL = {
@@ -144,6 +144,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             f"- **Severity:** {_SEV_LABEL.get(f['severity'], f['severity'])}",
             *([f"- **CVSS:** `{f['cvss']}`"] if f.get("cvss") else []),
             f"- **Category:** {f['category']}",
+            *([f"- **CWE:** `{f.get('cwe') or _cwe_of(f['category'])}`"]
+              if f.get("cwe") or _cwe_of(f.get("category")) else []),
             f"- **Endpoint:** {_code(f['url'])}",
             f"- **Evidence:** {', '.join(f['evidence_ids'])}",
             "",

@@ -86,6 +86,32 @@ def _finding_key(category: str, url: str) -> tuple:
     return (cat, p.netloc.lower(), p.path or "/", params)
 
 
+# Audit-grade reports carry standard identifiers; the category the model
+# names maps to the canonical CWE automatically (normalized: strip
+# non-alphanumerics, so "info-disclosure" == "infodisclosure").
+_CWE = {
+    "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
+    "time": "CWE-78", "cmdinjection": "CWE-78", "lfi": "CWE-22",
+    "rfi": "CWE-98", "xss": "CWE-79", "reflection": "CWE-79",
+    "idor": "CWE-639", "enum": "CWE-204", "enumeration": "CWE-204",
+    "lockout": "CWE-307", "massassign": "CWE-915",
+    "massassignment": "CWE-915", "ssrf": "CWE-918", "xxe": "CWE-611",
+    "csrf": "CWE-352", "xfh": "CWE-444", "upload": "CWE-434",
+    "race": "CWE-362", "deserialize": "CWE-502",
+    "deserialization": "CWE-502", "cache": "CWE-525",
+    "cachepoisoning": "CWE-525", "ppoll": "CWE-1321",
+    "prototypepollution": "CWE-1321", "smuggle": "CWE-444",
+    "requestsmuggling": "CWE-444", "disclosure": "CWE-200",
+    "infodisclosure": "CWE-200", "websocket": "CWE-1385",
+    "crlf": "CWE-113", "redirect": "CWE-601", "openredirect": "CWE-601",
+    "cors": "CWE-942", "jwt": "CWE-347", "method": "CWE-749",
+}
+
+
+def _cwe_of(category: str) -> str:
+    return _CWE.get(re.sub(r"[^a-z0-9]", "", (category or "").lower()), "")
+
+
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
                  resume: Path | None = None):
@@ -318,6 +344,9 @@ class Session:
                 finding["agent"] = agent
             if cvss:
                 finding["cvss"] = cvss
+            cwe = _cwe_of(category)
+            if cwe:
+                finding["cwe"] = cwe
             self.findings.append(finding)
             self.findings_path.write_text(
                 json.dumps(self.findings, indent=2, ensure_ascii=False)
