@@ -1,0 +1,72 @@
+# Experiment protocol — single-agent vs team mode
+
+Protocol for the evaluation chapter: run the same target under `run` and
+`team`, collect the metrics `summary.json` already records, and compare with
+`argus compare`. Repeatable and automatable.
+
+## Setup
+
+```bash
+pip install -e .
+export ANTHROPIC_API_KEY=...          # or rely on Claude Code OAuth
+python lab/vulnapp.py 8777            # deterministic vulnerable app
+```
+
+The lab plants one bug per probe family (SQLi, XSS, IDOR, SSRF, XXE, CSRF,
+XFH, NoSQLi, upload, race, deserialization, cache poisoning, prototype
+pollution, JWT weak secret, host-header, method, CORS, redirect, LFI, SSTI,
+time-based injection, GraphQL, CSRF) plus recon surface (robots, .git,
+sourcemap, hidden routes). Each run resets state at `make_server`.
+
+## Procedure
+
+For each configuration, run N identical trials (suggest N=5; LLM output is
+non-deterministic, so report median):
+
+```bash
+# A: single agent
+for i in 1 2 3 4 5; do
+  python -m argus run http://127.0.0.1:8777 --allow-private \
+      --goal "map the surface and confirm real vulnerabilities" \
+      --max-turns 40 --session-dir "exp/single-$i" --quiet
+done
+
+# B: team (1 lead + 1 recon + 2 exploit)
+for i in 1 2 3 4 5; do
+  python -m argus team http://127.0.0.1:8777 --allow-private \
+      --recon 1 --exploit 2 --session-dir "exp/team-$i" --quiet
+done
+```
+
+## Metrics (all in `sessions/<run>/summary.json`)
+
+| metric | meaning |
+|---|---|
+| `findings` (count) | evidence-gated findings recorded |
+| `requests` | real wire requests spent (budget discipline) |
+| `time_to_first_finding_s` | speed to first confirmed result |
+| `coverage.endpoints` | endpoints touched (method+path+param names) |
+| `coverage.probes` | probe families exercised |
+| `llm_calls`, `llm_tokens` | cost |
+| `agents` (team only) | per-worker turns/requests/tokens/findings |
+
+## Compare
+
+```bash
+python -m argus compare exp/single-1/<dir> exp/team-1/<dir>
+python -m argus sessions --session-dir exp/single-1
+```
+
+Report medians per configuration: findings count, requests, tokens,
+time-to-first-finding, endpoints covered. The offline check
+`python -m argus demo` / `demo --team` reproduces the pipeline shape without
+spending tokens (3 seeded findings on both paths).
+
+## Controls
+
+- Same lab instance lifecycle per trial (fresh `vulnapp.py` port or a fresh
+  `make_server`; counters/caches reset).
+- Same `--goal`, `--max-turns`, `--rate`, `--max-requests` across A/B.
+- Report findings as count AND categories found — the lab's planted classes
+  are the recall denominator.
+- Keep transcripts: they are the audit trail for every claimed finding.
