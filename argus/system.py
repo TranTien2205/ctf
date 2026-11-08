@@ -79,11 +79,15 @@ Budget: ~{max_turns} tool turns, {max_requests} HTTP requests total,
 
 
 def build_system(cfg: Config, scope: ScopeGuard) -> str:
+    # 10**n sentinels mean "no cap" (operator passed 0) - print 'unlimited'
+    # rather than leaking the internal sentinel into the prompt
+    def _fmt(v: float) -> str:
+        return "unlimited" if v >= 10**9 else str(int(v))
     return SYSTEM.format(
         scope_block=scope.describe(),
-        max_turns=cfg.max_turns,
-        max_requests=cfg.max_requests,
-        max_time=int(cfg.max_time_s),
+        max_turns=_fmt(cfg.max_turns),
+        max_requests=_fmt(cfg.max_requests),
+        max_time=_fmt(cfg.max_time_s),
     )
 
 

@@ -115,7 +115,16 @@ class ClaudeClient:
                 delay = min(delay * 2, 30)
                 continue
             if resp.status_code == 200:
-                data = resp.json()
+                try:
+                    data = resp.json()
+                except ValueError:
+                    # a proxy/gateway answered 200 with a non-JSON body -
+                    # retry like any transient upstream failure rather
+                    # than killing the whole run on a parse error
+                    last_error = f"HTTP 200 with non-JSON body: {resp.text[:200]}"
+                    time.sleep(delay)
+                    delay = min(delay * 2, 30)
+                    continue
                 self.calls += 1
                 usage = data.get("usage") or {}
                 self.input_tokens += usage.get("input_tokens", 0)
