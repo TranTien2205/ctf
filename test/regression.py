@@ -2248,6 +2248,29 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(tuple(decide_mod.ESCALATION_LADDER),
                          tuple(state.ESCALATION_LADDER))
 
+    def test_every_solver_the_ladder_names_exists_on_disk(self):
+        """solver_handoff prints agent names; a renamed file leaves it dead.
+
+        SOLVERS_FOR_CATEGORY is hand-maintained, like the router list was —
+        and for the same reason it needs a resolver check rather than trust.
+        The ladder's last rung would tell the main thread to spawn an agent
+        that does not exist, discovered only mid-wave after the cheaper rungs
+        have been spent.
+        """
+        missing = ["%s -> %s" % (cat, agent)
+                   for cat, agents in decide_mod.SOLVERS_FOR_CATEGORY.items()
+                   for agent in agents
+                   if not (ROOT / ".claude" / "agents" / (agent + ".md")).is_file()]
+        self.assertEqual(missing, [],
+                         "decide.py names solver agents that are not on disk: %s"
+                         % missing)
+        dead = ["%s -> %s" % (cat, skill)
+                for cat, (flag, skill) in decide_mod.FLEET_FOR_CATEGORY.items()
+                if not (ROOT / skill).is_file()]
+        self.assertEqual(dead, [],
+                         "fanout_sweep names sweep skills that are not on disk: %s"
+                         % dead)
+
     def test_the_probe_brake_still_refuses_past_the_ceiling(self):
         """Escalation is additive: it must not have loosened the brake.
 
