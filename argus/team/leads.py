@@ -65,7 +65,10 @@ class LeadQueue:
     def push(self, lead: Lead) -> bool:
         """Add a lead. Returns False when it duplicates an existing one."""
         with self._cond:
-            if self._closed or lead.key() in self._seen:
+            # bound total unique leads - a runaway producer must not grow
+            # the heap/seen-set without limit
+            if self._closed or lead.key() in self._seen \
+                    or len(self._seen) >= 10_000:
                 return False
             self._seen.add(lead.key())
             heapq.heappush(self._heap,

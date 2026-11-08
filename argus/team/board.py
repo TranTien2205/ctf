@@ -28,6 +28,11 @@ class Board:
     # ------------------------------------------------------------- agents
     def register(self, name: str, role: str, task: str) -> None:
         with self._lock:
+            # bound the roster: sequential spawns would grow it forever -
+            # drop finished entries past a generous history
+            if len(self._agents) >= 200:
+                self._agents = {n: a for n, a in self._agents.items()
+                                if a.get("status") == "running"}
             self._agents[name] = {"role": role, "task": task,
                                   "status": "running",
                                   "started": round(time.time(), 1),
@@ -46,6 +51,7 @@ class Board:
         with self._lock:
             self._notes.append({"agent": agent, "ts": round(time.time(), 1),
                                 "text": text[:2000]})
+            del self._notes[:-500]             # bound memory, keep a tail
 
     def notes(self) -> list[dict]:
         with self._lock:
@@ -60,6 +66,7 @@ class Board:
                                    "task": task[:2000],
                                    "reason": reason[:1000],
                                    "ts": round(time.time(), 1)})
+            del self._requests[:-200]          # a lead 200 behind is dead
 
     def take_requests(self) -> list[dict]:
         with self._lock:

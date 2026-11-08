@@ -95,6 +95,31 @@ def test_emit_lead_fields_bounded(ctx):
     assert len(leads[0].tech) <= 500 and len(leads[0].params) <= 50
 
 
+def test_board_counts_bounded(ctx):
+    """A runaway worker cannot grow board state without limit."""
+    board = Board(ctx.session)
+    for i in range(600):
+        board.post_note("w", f"n{i}")
+    assert len(board.notes()) == 500
+    for i in range(300):
+        board.request_worker("w", "exploit", f"t{i}", "r")
+    assert len(board.pending_requests()) == 200
+    for i in range(210):
+        board.register(f"w{i}", "recon", "t")
+        board.update_agent(f"w{i}", status="done")
+    board.register("fresh", "recon", "t")
+    assert len(board.agents()) < 210          # finished entries pruned
+
+
+def test_lead_queue_saturates(ctx):
+    from argus.team.leads import Lead, LeadQueue
+    q = LeadQueue()
+    for i in range(10_000):
+        assert q.push(Lead(kind="endpoint", url=ctx.cfg.target + f"/{i}"))
+    assert not q.push(Lead(kind="endpoint", url=ctx.cfg.target + "/overflow"))
+    assert q.pending == 10_000
+
+
 # ------------------------------------------------------------ role gating
 
 def test_role_tool_gate(ctx):
