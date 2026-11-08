@@ -34,6 +34,23 @@ class RequestBudgetExhausted(RuntimeError):
     pass
 
 
+class _NoCloseFile:
+    """fp proxy that swallows close() - several HTTPResponse objects share
+    one buffered reader on a kept-alive connection, but every response
+    calls fp.close() once its body is fully read (_close_conn). Without
+    this shim the FIRST response's read would kill the reader for the
+    rest of the reads."""
+
+    def __init__(self, real):
+        self._real = real
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def close(self):
+        pass
+
+
 class GuardedClient:
     def __init__(
         self,
@@ -249,8 +266,15 @@ class GuardedClient:
             conn = http.client.HTTPConnection(parsed.hostname, port,
                                               timeout=15)
         sends_out: list[dict] = []
+        rbfile = None
         try:
             conn.connect()
+            # ONE buffered reader shared by every response on this
+            # connection: each HTTPResponse would otherwise wrap the socket
+            # in its own BufferedReader, and the first response's read-ahead
+            # would swallow the NEXT response's bytes - seen downstream as
+            # RemoteDisconnected or a mid-body BadStatusLine on extra reads.
+            rbfile = conn.sock.makefile("rb")
             for spec in requests:
                 method = (spec.get("method") or "GET").upper()
                 lines = [f"{method} {path} HTTP/1.1",
@@ -291,6 +315,8 @@ class GuardedClient:
                             conn.sock.settimeout(3.0)  # extra reads are opportunistic
                         resp = http.client.HTTPResponse(
                             conn.sock, method=method)
+                        resp.fp.close()  # private reader never read - swap
+                        resp.fp = _NoCloseFile(rbfile)  # share the real one
                         resp.begin()
                         # the full body MUST be drained or its bytes corrupt
                         # the next response's parse on this reused connection
@@ -341,6 +367,11 @@ class GuardedClient:
                 conn.close()
             except Exception:
                 pass
+            if rbfile is not None:
+                try:
+                    rbfile.close()
+                except Exception:
+                    pass
         return {"sends": sends_out,
                 "note": "raw sends share one connection - order matters" if len(sends_out) > 1 else ""}
 

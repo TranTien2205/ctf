@@ -178,8 +178,8 @@ def main() -> int:
     out = probes.probe_smuggle(ctx, base + "/desync-cl")
     check("smuggle probe sees te.cl desync",
           "te.cl desync candidate" in out["verdict"])
-    out = probes.probe_smuggle(ctx, base + "/login")
-    check("smuggle probe rejects cl-only endpoint",
+    out = probes.probe_smuggle(ctx, base + "/desync-none")
+    check("smuggle probe clean on agreed framing",
           "no desync signal" in out["verdict"])
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",

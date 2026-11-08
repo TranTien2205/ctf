@@ -98,6 +98,20 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "LabVuln/1.0"
     protocol_version = "HTTP/1.1"  # keep-alive: needed for desync exercise
 
+    def finish(self):
+        # A socket closed with unread inbound data makes Windows send RST
+        # instead of FIN, which can race away a just-written reply - the
+        # desync lab's poisoned-response signal is exactly that case.
+        # Drain the kernel buffer first so teardown is a clean FIN.
+        try:
+            self.connection.setblocking(0)
+            while self.connection.recv(65536):
+                pass
+        except (BlockingIOError, OSError):
+            pass
+        finally:
+            super().finish()
+
     # -- helpers ---------------------------------------------------------
     def _send(self, status=200, body="", ctype="text/html; charset=utf-8",
               headers=None):
@@ -321,6 +335,9 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 ],
             }), ctype="application/json")
 
+        elif path in ("/desync", "/desync-cl", "/desync-none"):
+            self._send(200, "clean follow-up", ctype="text/plain")
+
         elif path == "/internal/status":
             self._send(body=json.dumps({"status": "internal-ok"}),
                        ctype="application/json")
@@ -402,10 +419,12 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path in ("/desync", "/desync-cl"):
+        if path in ("/desync", "/desync-cl", "/desync-none"):
             # Simulate a desync back-end:
-            #   /desync    - TE-honoring behind a CL-honoring front (CL.TE)
-            #   /desync-cl - CL-honoring behind a TE-honoring front (TE.CL)
+            #   /desync      - TE-honoring behind a CL-honoring front (CL.TE)
+            #   /desync-cl   - CL-honoring behind a TE-honoring front (TE.CL)
+            #   /desync-none - agreed framing: reads its body fully, then
+            #                  drains leftovers - a clean control endpoint
             # Whatever framing is NOT consumed stays in the stream and
             # poisons the next request line on this connection.
             te = "chunked" in (self.headers.get("Transfer-Encoding") or "")
@@ -413,6 +432,39 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 n = int(self.headers.get("Content-Length") or 0)
                 self.rfile.read(n)  # CL honored, TE ignored -> leftover stays
                 self._send(200, "cl ok", ctype="text/plain")
+                return
+            if te and path == "/desync-none":
+                n = int(self.headers.get("Content-Length") or 0)
+                if n:
+                    self.rfile.read(n)          # honor CL
+                else:
+                    while True:                  # or honor chunked
+                        line = self.rfile.readline()
+                        try:
+                            size = int(line.strip() or b"0", 16)
+                        except ValueError:
+                            size = 0
+                        if size == 0:
+                            while self.rfile.readline() not in \
+                                    (b"\r\n", b"\n", b""):
+                                pass
+                            break
+                        self.rfile.read(size)
+                        self.rfile.readline()
+                # then drain whatever the OTHER framing left behind, so the
+                # next request line starts clean - front and back agree here.
+                # read1() serves buffered bytes without a raw read; on the
+                # non-blocking socket an empty read raises instead of
+                # hanging - deterministic on every platform.
+                self.connection.setblocking(0)
+                try:
+                    while self.rfile.read1(65536):
+                        pass
+                except (BlockingIOError, OSError):
+                    pass
+                finally:
+                    self.connection.setblocking(1)
+                self._send(200, "clean", ctype="text/plain")
                 return
             if te:
                 while True:
