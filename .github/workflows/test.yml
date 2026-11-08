@@ -23,3 +23,25 @@ jobs:
         run: python -m pytest tests/ -q
       - name: selftest
         run: python selftest.py
+
+  wheel:
+    # packaging regressions are invisible to tests run from the repo tree -
+    # verify the built wheel actually ships the data the tools resolve
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip wheel . -w dist --no-deps -q
+      - name: wheel ships skills, role prompts, wordlists and exploit manifests
+        run: |
+          python - <<'EOF'
+          import glob, zipfile
+          names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
+          for need in ("argus/skills/sqli.md", "argus/team/roles/lead.md",
+                       "argus/resources/wordlists/dirs-small.txt",
+                       "argus/resources/exploits/lab-jwt-forge/manifest.json"):
+              assert need in names, f"wheel missing {need}"
+          print("wheel contents ok:", len(names), "files")
+          EOF
