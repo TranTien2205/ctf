@@ -25,7 +25,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
     GET  /.git/HEAD, /.env, /debug  info disclosure
-    POST /desync               request smuggling (TE-parsing back-end sim)
+    POST /desync, /desync-cl   request smuggling (CL.TE + TE.CL sims)
     GET  /ws                   websocket handshake (101)
 
 Run:  python lab/vulnapp.py [port]
@@ -402,12 +402,18 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path == "/desync":
-            # Simulate a TE-honoring back-end behind a CL-honoring proxy:
-            # when Transfer-Encoding: chunked is present, parse chunked
-            # framing and leave whatever follows in the stream - a stray
-            # byte then poisons the NEXT request line on this connection.
+        if path in ("/desync", "/desync-cl"):
+            # Simulate a desync back-end:
+            #   /desync    - TE-honoring behind a CL-honoring front (CL.TE)
+            #   /desync-cl - CL-honoring behind a TE-honoring front (TE.CL)
+            # Whatever framing is NOT consumed stays in the stream and
+            # poisons the next request line on this connection.
             te = "chunked" in (self.headers.get("Transfer-Encoding") or "")
+            if te and path == "/desync-cl":
+                n = int(self.headers.get("Content-Length") or 0)
+                self.rfile.read(n)  # CL honored, TE ignored -> leftover stays
+                self._send(200, "cl ok", ctype="text/plain")
+                return
             if te:
                 while True:
                     line = self.rfile.readline()

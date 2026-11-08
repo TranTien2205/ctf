@@ -180,8 +180,14 @@ def test_scope_blocks_outside(ctx):
 
 def test_smuggle_probe_desync(lab_url, ctx):
     out = probes.probe_smuggle(ctx, lab_url + "/desync")
-    assert "desync candidate" in out["verdict"]
+    assert "cl.te desync candidate" in out["verdict"]
     assert out["statuses"] == [200, 501]
+
+
+def test_smuggle_probe_tecl(lab_url, ctx):
+    out = probes.probe_smuggle(ctx, lab_url + "/desync-cl")
+    assert "te.cl desync candidate" in out["verdict"]
+    assert out["statuses"][-1] == 501
 
 
 def test_disclosure_probe(lab_url, ctx):

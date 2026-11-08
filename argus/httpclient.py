@@ -273,43 +273,68 @@ class GuardedClient:
                             "call finish")
                     self.sent += 1
                 started = time.monotonic()
-                status, rheaders, rbody, error = 0, {}, "", None
                 try:
                     # sock-level send + HTTPResponse: the connection's own
                     # state machine only understands well-formed requests
                     conn.sock.sendall(raw_req)
-                    resp = http.client.HTTPResponse(
-                        conn.sock, method=method)
-                    resp.begin()
-                    # the full body MUST be drained or its bytes corrupt
-                    # the next response's parse on this reused connection
-                    rbody = resp.read().decode("utf-8", "replace")[:BODY_CAP]
-                    status = resp.status
-                    rheaders = dict(resp.getheaders())
+                    send_error = None
                 except (http.client.HTTPException, OSError) as exc:
-                    error = f"{type(exc).__name__}: {exc}"
-                elapsed = round((time.monotonic() - started) * 1000, 1)
-                rid = self.session.record_exchange(
-                    tool=tool,
-                    request={"method": method, "url": url,
-                             # a dict collapses duplicate headers - and a
-                             # duplicated/conflicting header pair IS the
-                             # evidence here - so keep the wire text too
-                             "headers": {l.split(": ", 1)[0]: l.split(": ", 1)[1]
-                                         for l in lines[1:]},
-                             "raw": True,
-                             "request_text": raw_req.decode(
-                                 "utf-8", "replace")[:4000],
-                             "body": body.decode("utf-8", "replace")},
-                    response={"status": status, "headers": rheaders,
-                              "body": rbody, "elapsed_ms": elapsed},
-                    note=note or "raw send", agent=self.agent)
-                entry = {"request_id": rid, "status": status,
-                         "elapsed_ms": elapsed, "body": rbody[:RETURN_CAP]}
-                if error:
-                    entry["error"] = error
-                sends_out.append(entry)
-                if error:
+                    send_error = f"{type(exc).__name__}: {exc}"
+                # reads>1 collects pipelined/unsolicited responses: a
+                # desynced back-end answers a poisoned queued request
+                # without us sending anything more
+                n_reads = max(1, int(spec.get("reads") or 1))
+                for ri in range(n_reads):
+                    status, rheaders, rbody, error = 0, {}, "", send_error
+                    try:
+                        if ri > 0:
+                            conn.sock.settimeout(3.0)  # extra reads are opportunistic
+                        resp = http.client.HTTPResponse(
+                            conn.sock, method=method)
+                        resp.begin()
+                        # the full body MUST be drained or its bytes corrupt
+                        # the next response's parse on this reused connection
+                        rbody = resp.read().decode(
+                            "utf-8", "replace")[:BODY_CAP]
+                        status = resp.status
+                        rheaders = dict(resp.getheaders())
+                    except (http.client.HTTPException, OSError,
+                            TimeoutError) as exc:
+                        if error is None:
+                            error = f"{type(exc).__name__}: {exc}"
+                    finally:
+                        conn.sock.settimeout(15.0)
+                    elapsed = round((time.monotonic() - started) * 1000, 1)
+                    rid = self.session.record_exchange(
+                        tool=tool,
+                        request={"method": method if ri == 0 else "-",
+                                 "url": url,
+                                 # a dict collapses duplicate headers - and
+                                 # a duplicated/conflicting header pair IS
+                                 # the evidence - so keep the wire text too
+                                 "headers": {
+                                     l.split(": ", 1)[0]: l.split(": ", 1)[1]
+                                     for l in lines[1:]},
+                                 "raw": True,
+                                 "request_text": raw_req.decode(
+                                     "utf-8", "replace")[:4000],
+                                 "body": body.decode("utf-8", "replace")},
+                        response={"status": status, "headers": rheaders,
+                                  "body": rbody, "elapsed_ms": elapsed},
+                        note=(note or "raw send")
+                             + ("" if ri == 0 else f" (unsolicited #{ri})"),
+                        agent=self.agent)
+                    entry = {"request_id": rid, "status": status,
+                             "elapsed_ms": elapsed,
+                             "solicited": ri == 0,
+                             "body": rbody[:RETURN_CAP]}
+                    if error:
+                        entry["error"] = error
+                    sends_out.append(entry)
+                    if error:
+                        break
+                if send_error or (sends_out and sends_out[-1].get("error")
+                                  and spec.get("stop_on_error", True)):
                     break
         finally:
             try:
