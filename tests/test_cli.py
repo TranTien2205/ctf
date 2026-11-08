@@ -10,7 +10,7 @@ def test_demo_single(tmp_path):
     (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
     findings = json.loads((sdir / "findings.json").read_text())
     cats = {f["category"] for f in findings}
-    assert {"sqli", "xss", "idor"} <= cats
+    assert {"sqli", "xss", "idor", "info-disclosure"} <= cats
     assert (sdir / "report.md").exists()
     html = (sdir / "report.html").read_text(encoding="utf-8")
     assert "F01" in html and "sqlite3" in html
@@ -22,7 +22,7 @@ def test_demo_team(tmp_path):
     (sdir,) = [d for d in tmp_path.iterdir() if d.is_dir()]
     findings = json.loads((sdir / "findings.json").read_text())
     cats = {f["category"] for f in findings}
-    assert {"sqli", "xss", "idor"} <= cats
+    assert {"sqli", "xss", "idor", "info-disclosure"} <= cats
     assert all(f.get("agent") for f in findings)  # credited to a worker
     agents = json.loads((sdir / "summary.json").read_text())["agents"]
     assert "lead" in agents and "exploit-1" in agents

@@ -448,7 +448,7 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
 
     scripts = {
         "lead": [
-            {"text": "Seeding the pipeline with the three most promising "
+            {"text": "Seeding the pipeline with the most promising "
                      "surfaces.",
              "tool_calls": [
                  _t("l1", "emit_lead", kind="param", url=base + "/item?id=1",
@@ -456,12 +456,15 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                  _t("l2", "emit_lead", kind="param", url=base + "/search?q=x",
                     params=["q"], note="reflected parameter"),
                  _t("l3", "emit_lead", kind="endpoint",
-                    url=base + "/api/user/2", note="enumerable object ids")]},
+                    url=base + "/api/user/2", note="enumerable object ids"),
+                 _t("l4", "emit_lead", kind="endpoint", url=base,
+                    note="web root may serve sensitive artifacts")]},
             {"text": "Leads queued; workers drain while I close out.",
-             "tool_calls": [_t("l4", "finish_engagement",
+             "tool_calls": [_t("l5", "finish_engagement",
                               summary="Team demo: recon mapped the surface, "
-                                      "exploit verified SQLi, XSS and IDOR "
-                                      "with verbatim evidence.")]},
+                                      "exploit verified SQLi, XSS, IDOR and "
+                                      "info disclosure with verbatim "
+                                      "evidence.")]},
         ],
         "recon": [
             {"text": "Mapping stack and surface for the exploit workers.",
@@ -514,8 +517,21 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                               remediation="Enforce per-object ownership "
                                           "checks.",
                               cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
-            {"tool_calls": [_t("e8", "finish",
-                              summary="3/3 leads verified with verbatim "
+            {"tool_calls": [_t("e8", "probe_disclosure", url=base)]},
+            {"tool_calls": [_t("e9", "record_finding",
+                              title="Exposed /.env and /.git/HEAD at web "
+                                    "root",
+                              severity="medium", category="info-disclosure",
+                              url=base + "/.env",
+                              evidence_excerpt="SECRET_KEY=lab-secret-0123",
+                              description="Sensitive paths served publicly - "
+                                          "credentials and VCS metadata "
+                                          "leak.",
+                              remediation="Deny dotfile/VCS paths; rotate "
+                                          "exposed secrets.",
+                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
+            {"tool_calls": [_t("e10", "finish",
+                              summary="4/4 leads verified with verbatim "
                                       "evidence.")]},
         ],
     }
