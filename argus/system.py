@@ -66,6 +66,8 @@ Work in phases, but let evidence drive the order:
 - Older tool results compact to stubs as the run grows - the transcript
   keeps every exchange, so read_response(request_id) re-inspects any
   earlier request/response verbatim whenever you need it again.
+- read_findings() lists what you already recorded - check it before
+  re-testing a class you may have closed (duplicates are rejected anyway).
 
 ## Scope
 
