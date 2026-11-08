@@ -900,12 +900,40 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
                 "check_id": t2["request_id"],
                 "statuses": [s1["status"], s2["status"],
                              t1["status"], t2["status"]]}
+    # TE-obfuscation variants of CL.TE: a strict front-end normalizes or
+    # rejects a non-canonical TE and falls back to CL, while a lenient
+    # back-end still parses chunked - a differential plain CL.TE cannot
+    # expose. Same 'G' self-poison signal.
+    obf_sends: list[dict] = []
+    for obf in ("xchunked", "chunked "):
+        sends3 = _smuggle_pair(ctx, url, {
+            "method": "POST",
+            "headers": [["Content-Length", "6"],
+                        ["Transfer-Encoding", obf]],
+            "body": b"0\r\n\r\nG"},
+            note=f"CL.TE detect - obfuscated TE {obf!r}")
+        obf_sends += sends3
+        if len(sends3) < 2 or sends3[1].get("error"):
+            continue
+        o1, o2 = sends3
+        if o2["status"] >= 400 and _SMUGGLE_G.search(o2.get("body") or ""):
+            return {"verdict": "cl.te desync candidate (obfuscated TE "
+                               f"{obf!r}): the stray 'G' poisoned the next "
+                               "request's method line - front-end did not "
+                               "honor the non-canonical TE while the "
+                               "back-end still parsed chunked framing",
+                    "ambiguous_id": o1["request_id"],
+                    "check_id": o2["request_id"],
+                    "statuses": [s1["status"], s2["status"],
+                                 t1["status"], t2["status"],
+                                 o1["status"], o2["status"]]}
     # the poisoned request is self-contained, so desync => an extra
     # response; nothing extra arriving means the framing agreed
     nothing_queued = bool(t2.get("error")) or t2["status"] == 0
     if (nothing_queued or t2["status"] < 400) and s2["status"] < 400:
-        verdict = ("no desync signal: clean follow-up on both variants - "
-                   "back-end and front-end likely agree on framing")
+        verdict = ("no desync signal: clean follow-up on all variants "
+                   "(canonical and obfuscated TE) - back-end and front-end "
+                   "likely agree on framing")
     else:
         verdict = ("inconclusive: follow-up rejected but without a 'G*' "
                    "method signature - manual review needed")

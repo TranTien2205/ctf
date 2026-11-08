@@ -46,6 +46,10 @@ request (queue-poison your own connection). Never aim a smuggled prefix at
 a shared queue blindly - other users' requests get captured; that is both
 a finding and collateral. One poisoned self-request proves the primitive.
 
+`probe_smuggle` tries canonical CL.TE and TE.CL first, then obfuscated-TE
+variants (`xchunked`, trailing-space `chunked `) of CL.TE - the last set
+catches a strict front/lenient back pair that a canonical probe misses.
+
 ## Transfer-Encoding obfuscations (when plain TE fails)
 
 `Transfer-Encoding: xchunked` · `Transfer-Encoding : chunked` ·

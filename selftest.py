@@ -178,6 +178,9 @@ def main() -> int:
     out = probes.probe_smuggle(ctx, base + "/desync-cl")
     check("smuggle probe sees te.cl desync",
           "te.cl desync candidate" in out["verdict"])
+    out = probes.probe_smuggle(ctx, base + "/desync-obf")
+    check("smuggle probe sees obfuscated-te desync",
+          "obfuscated TE" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync-none")
     check("smuggle probe clean on agreed framing",
           "no desync signal" in out["verdict"])

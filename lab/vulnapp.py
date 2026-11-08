@@ -25,7 +25,9 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
     GET  /.git/HEAD, /.env, /debug  info disclosure
-    POST /desync, /desync-cl   request smuggling (CL.TE + TE.CL sims)
+    POST /desync, /desync-cl, /desync-obf, /desync-none
+                               request smuggling sims: CL.TE, TE.CL,
+                               obfuscated-TE differential, agreed framing
     GET  /ws                   websocket handshake (101)
 
 Run:  python lab/vulnapp.py [port]
@@ -133,6 +135,20 @@ class Handler(BaseHTTPRequestHandler):
     def _params(self):
         q = urllib.parse.urlparse(self.path).query
         return dict(urllib.parse.parse_qsl(q))
+
+    def _drain_leftover(self):
+        """Consume any bytes the other framing left in the stream, so the
+        next request line starts clean. read1() serves buffered bytes
+        without a raw read; on a non-blocking socket an empty read raises
+        instead of hanging - deterministic on every platform."""
+        self.connection.setblocking(0)
+        try:
+            while self.rfile.read1(65536):
+                pass
+        except (BlockingIOError, OSError):
+            pass
+        finally:
+            self.connection.setblocking(1)
 
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
@@ -335,7 +351,8 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 ],
             }), ctype="application/json")
 
-        elif path in ("/desync", "/desync-cl", "/desync-none"):
+        elif path in ("/desync", "/desync-cl", "/desync-none",
+                      "/desync-obf"):
             self._send(200, "clean follow-up", ctype="text/plain")
 
         elif path == "/internal/status":
@@ -419,15 +436,31 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
 
     def do_POST(self):
         path = urllib.parse.urlparse(self.path).path
-        if path in ("/desync", "/desync-cl", "/desync-none"):
+        if path in ("/desync", "/desync-cl", "/desync-none", "/desync-obf"):
             # Simulate a desync back-end:
             #   /desync      - TE-honoring behind a CL-honoring front (CL.TE)
             #   /desync-cl   - CL-honoring behind a TE-honoring front (TE.CL)
             #   /desync-none - agreed framing: reads its body fully, then
             #                  drains leftovers - a clean control endpoint
+            #   /desync-obf  - front-end normalizes CANONICAL TE away (reads
+            #                  CL + drains), but an OBFUSCATED TE slips
+            #                  through to a chunked parser - the real-world
+            #                  obfuscation differential
             # Whatever framing is NOT consumed stays in the stream and
             # poisons the next request line on this connection.
             te = "chunked" in (self.headers.get("Transfer-Encoding") or "")
+            if path == "/desync-obf":
+                te_raw = (self.headers.get("Transfer-Encoding") or "").strip()
+                canonical = te_raw.lower() == "chunked"
+                n = int(self.headers.get("Content-Length") or 0)
+                if canonical or not te:
+                    if n:
+                        self.rfile.read(n)   # front normalized to CL
+                    self._drain_leftover()
+                    self._send(200, "clean", ctype="text/plain")
+                    return
+                # obfuscated TE (xchunked, 'chunked ', ...) reaches a lenient
+                # chunked parser -> falls through to the chunked reader
             if te and path == "/desync-cl":
                 n = int(self.headers.get("Content-Length") or 0)
                 self.rfile.read(n)  # CL honored, TE ignored -> leftover stays
@@ -452,18 +485,8 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                         self.rfile.read(size)
                         self.rfile.readline()
                 # then drain whatever the OTHER framing left behind, so the
-                # next request line starts clean - front and back agree here.
-                # read1() serves buffered bytes without a raw read; on the
-                # non-blocking socket an empty read raises instead of
-                # hanging - deterministic on every platform.
-                self.connection.setblocking(0)
-                try:
-                    while self.rfile.read1(65536):
-                        pass
-                except (BlockingIOError, OSError):
-                    pass
-                finally:
-                    self.connection.setblocking(1)
+                # next request line starts clean - front and back agree here
+                self._drain_leftover()
                 self._send(200, "clean", ctype="text/plain")
                 return
             if te:
