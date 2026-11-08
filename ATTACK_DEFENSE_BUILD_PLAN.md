@@ -1,7 +1,12 @@
 # ATTACK_DEFENSE_BUILD_PLAN.md
 
 This is the build plan for one evening (2026-09-29) plus one morning, ahead of an
-attack-defense contest with a post-ransomware phase 1 on 2026-09-30. It ranks
+attack-defense contest with a post-ransomware phase 1 on 2026-09-30. It is kept
+as the record of *what was planned and why* — some tool names below are the
+planned names and shipped under different ones (`sla_check.py`, `tick.py`,
+`host_diff.py`, `flag_farm.py`, `cap_split.py`, `traffic_mine.py`,
+`secret_inventory.py` are what actually exist), so run `ls tools/ad/` before
+quoting a command from this file. It ranks
 every candidate change to `tools/ad/`, `tools/forensics/` and the documents around
 them by what it costs to lose if the change is not made, and it names the exact
 edit, the verification command and the minutes for each. The scenario below is a

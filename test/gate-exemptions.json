@@ -33,6 +33,16 @@
       "reason": "the homoglyph table is the technique: it pairs ASCII letters with the Cyrillic codepoints that render identically (U+0430, U+043E, U+0435, U+0455, U+0440). Replacing them with ASCII would make every row of the table state something false."
     }
   ],
+  "tool_path_mentions": [
+    {
+      "path": "ATTACK_DEFENSE_BUILD_PLAN.md",
+      "reason": "the build plan names the tools it set out to write; several shipped under different names and the header now says so. Rewriting the plan would falsify the record of what was planned."
+    },
+    {
+      "path": "V2_CHANGES.md",
+      "reason": "a migration note describing the previous tree; tools/doxpit_relay.py lived there and naming it is the point of the note."
+    }
+  ],
   "reference_links": [
     {
       "path": "skills/ctf-writeup/SKILL.md",

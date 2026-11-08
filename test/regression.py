@@ -1075,20 +1075,21 @@ class ContractTests(unittest.TestCase):
         so. This resolves every tools/<name>.py written anywhere an agent reads,
         which is the check that would have caught it.
         """
-        sources = (list((ROOT / "skills").rglob("*.md"))
-                   + list((ROOT / "tools").rglob("*.md"))
-                   + [ROOT / rel for rel in CONTROL_PLANE]
-                   + [ROOT / "AGENTS.md"]
+        sources = ([p for p in authored_files() if p.suffix == ".md"]
                    + sorted((ROOT / ".claude" / "commands").glob("*.md"))
                    + sorted((ROOT / ".claude" / "workflows").glob("*.md"))
                    + sorted((ROOT / ".claude" / "agents").glob("*.md")))
+        exempt = {e["path"] for e in exemptions().get("tool_path_mentions", [])}
         dangling = []
         for path in sources:
             if not path.is_file():
                 continue
+            rel = path.relative_to(ROOT).as_posix()
+            if rel in exempt:
+                continue
             for ref in sorted(set(TOOL_PATH.findall(path.read_text(encoding="utf-8")))):
                 if not (ROOT / ref).is_file():
-                    dangling.append("%s -> %s" % (path.relative_to(ROOT), ref))
+                    dangling.append("%s -> %s" % (rel, ref))
         self.assertEqual(dangling, [],
                          "a document names a tool that does not exist: %s" % dangling[:6])
 
@@ -1276,10 +1277,7 @@ class ContractTests(unittest.TestCase):
         under `post-probe`, so checking only top-level help reported fifteen real
         flags as missing.
         """
-        sources = (list((ROOT / "skills").rglob("*.md"))
-                   + list((ROOT / "tools").rglob("*.md"))
-                   + [ROOT / rel for rel in CONTROL_PLANE]
-                   + [ROOT / "AGENTS.md"]
+        sources = ([p for p in authored_files() if p.suffix == ".md"]
                    + sorted((ROOT / ".claude" / "commands").glob("*.md"))
                    + sorted((ROOT / ".claude" / "agents").glob("*.md"))
                    + sorted((ROOT / ".claude" / "workflows").glob("*.md"))
