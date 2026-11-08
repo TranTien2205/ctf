@@ -80,6 +80,8 @@ spending tokens (5 seeded findings on both paths).
 - Report findings as count AND categories found — the lab's planted classes
   are the recall denominator.
 - Keep transcripts: they are the audit trail for every claimed finding.
-  `python -m argus verify <dir>` proves the transcript was not altered
-  and re-validates every finding's evidence against it - a tampered
-  `findings.json` fails the check even when the chain itself is intact.
+  `python -m argus verify <dir>` proves the transcript was not altered,
+  re-validates every finding's evidence against it, and recomputes the
+  run-end `artifacts_digest` seal - a tampered `findings.json`,
+  `meta.json`, `notes.md` or `summary.json` fails the check even when
+  the chain itself is intact.

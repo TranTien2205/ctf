@@ -19,6 +19,17 @@ system. All notable milestones on `agent-v2`.
   head anchored in `summary.json`; `argus verify` detects edits,
   insertions, deletions, tail truncation — and re-validates every finding
   against the immutable transcript so an edited `findings.json` fails too.
+  Run end seals `meta.json`/`findings.json`/`notes.md`/`summary.json`
+  sha256 digests into the chain (`artifacts_digest`), so post-run edits
+  to ANY session artifact are caught; `argus report`/`argus findings`
+  warn on broken chains, failing findings and seal mismatches.
+- ScopeGuard exclusions match the normalized wire path: percent-encoding
+  and dot-segments cannot bypass `--exclude` (httpx decodes/resolves
+  before sending, so the raw-path check was fail-open).
+- Operator secrets never persist: `Authorization`/`Cookie`/`Set-Cookie`/
+  `X-*-Token` and any `--header`-configured value are redacted at record
+  time (transcript + logs) and re-redacted at render time (old sessions);
+  `--proxy` remains the wire-fidelity path.
 
 ### Probe coverage (26 matched-pair probes)
 - Injection: sqli (quoted/numeric/OR-pair/xpath/UNION), nosqli, ssti,
@@ -80,8 +91,8 @@ system. All notable milestones on `agent-v2`.
   `lab-auth-bypass`, `lab-jwt-forge`.
 
 ### Verification & packaging
-- `python selftest.py`: 88 offline checks.
-- `python -m pytest tests/ -q`: 114 tests (unit + live-lab + loop +
+- `python selftest.py`: 99 offline checks.
+- `python -m pytest tests/ -q`: 122 tests (unit + live-lab + loop +
   team + MCP + CLI).
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
   no API key (5 evidence-gated findings each).
