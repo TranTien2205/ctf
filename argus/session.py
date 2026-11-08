@@ -344,6 +344,14 @@ class Session:
         ids all carry over, so the evidence chain and dedup stay intact."""
         if not sdir.is_dir():
             raise FileNotFoundError(f"cannot resume: {sdir} is not a session dir")
+        if not (sdir / "meta.json").exists() and \
+                not (sdir / "transcript.jsonl").exists():
+            # an arbitrary dir (e.g. the sessions/ parent) "resumed"
+            # would get artifacts written into it - refuse: a session
+            # dir carries meta.json and/or transcript.jsonl
+            raise FileNotFoundError(
+                f"cannot resume: {sdir} has no meta.json/transcript.jsonl "
+                "- not a session dir")
         self.dir = sdir
         self.id = sdir.name
         self.resumed = True
@@ -392,6 +400,27 @@ class Session:
                 suffix = entry["id"][1:]
                 if suffix.isdigit():
                     self._seq = max(self._seq, int(suffix))
+        # meta.json gone means old_target is unknown - fall back to the
+        # evidence itself: the first recorded request's host must match
+        # the current target or this is the wrong session dir
+        if not old.get("target"):
+            first_url = next(
+                (e.get("request", {}).get("url", "")
+                 for e in self._transcript.values()
+                 if isinstance(e.get("request"), dict)
+                 and e["request"].get("url")), "")
+            if first_url:
+                try:
+                    old_host = urllib.parse.urlparse(first_url).hostname
+                    new_host = urllib.parse.urlparse(target).hostname
+                except ValueError:
+                    old_host = new_host = None
+                if old_host and new_host and \
+                        old_host.lower() != new_host.lower():
+                    raise ValueError(
+                        f"cannot resume {sdir.name}: transcript "
+                        f"evidence targets {old_host!r} != current "
+                        f"target host {new_host!r}")
         fpath = sdir / "findings.json"
         if fpath.is_file():
             try:
