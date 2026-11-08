@@ -41,25 +41,31 @@ def jwt_decode(ctx: Context, token: str) -> dict:
     except (ValueError, json.JSONDecodeError) as exc:
         return {"error": f"decode failed: {exc}"}
     out: dict = {"header": header, "payload": payload}
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        out["issues"] = ["decoded segments are not JSON objects"]
+        return out
     alg = (header.get("alg") or "").lower()
     issues = []
     if alg == "none":
         issues.append("alg=none token presented - try dropping the signature")
     if alg.startswith("hs") and len(parts) == 3:
         signing_input = f"{parts[0]}.{parts[1]}".encode()
-        sig = _b64url(parts[2])
+        try:
+            sig = _b64url(parts[2])
+        except ValueError:
+            sig = None
         algo = {"hs256": hashlib.sha256, "hs384": hashlib.sha384,
                 "hs512": hashlib.sha512}[alg]
         for secret in _COMMON_SECRETS:
             cand = _hmac.new(secret.encode(), signing_input, algo).digest()
-            if _hmac.compare_digest(cand, sig):
+            if sig is not None and _hmac.compare_digest(cand, sig):
                 issues.append(f"weak HMAC secret recovered offline: {secret!r}")
                 out["recovered_secret"] = secret
                 break
     if alg.startswith("rs") or alg.startswith("es"):
         issues.append(f"{alg}: check for alg-confusion (RS256->HS256 with public key) and jku/kid injection")
     exp = payload.get("exp")
-    if exp:
+    if isinstance(exp, (int, float)):
         import time
         out["expired"] = exp < time.time()
     out["issues"] = issues or ["no obvious weakness; need the signing key or a confused verifier"]
@@ -85,6 +91,8 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
         payload = json.loads(_b64url(parts[1]))
     except (ValueError, json.JSONDecodeError) as exc:
         return {"error": f"decode failed: {exc}"}
+    if not isinstance(header, dict) or not isinstance(payload, dict):
+        return {"error": "decoded segments are not JSON objects"}
     try:
         overrides = json.loads(claims or "{}")
         if not isinstance(overrides, dict):
