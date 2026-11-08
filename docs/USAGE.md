@@ -95,31 +95,31 @@ verbatim evidence from a cited response.
 | Bug class | Tool | Detection approach |
 |---|---|---|
 | Reflected XSS | `probe_reflection` | canary reflection, context detection |
-| SQL injection | `probe_sqli` | quoted + unquoted true/false pairs, error + boolean diff |
-| NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` operator objects vs JSON baseline |
+| SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count |
+| NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` JSON + urlencoded `param[$op]` carrier |
 | Command injection | `probe_time` | sleep separators vs measured baseline latency |
 | SSTI | `probe_ssti` | `{{7*7}}`-family eval per engine syntax |
-| File read / LFI | `probe_lfi` | traversal, absolute, encoded, Windows, null-byte |
-| Open redirect | `probe_redirect` | `Location` + meta/JS client-side hops |
-| CORS | `probe_cors` | evil Origin reflection + credentials flag |
-| HTTP methods | `probe_method` | OPTIONS then canary PUT/DELETE with cleanup |
-| IDOR | `probe_idor` | neighboring object ids vs own object |
-| SSRF | `probe_ssrf` | self-fetch, loopback variants, metadata markers |
+| File read / LFI | `probe_lfi` | traversal/absolute/encoded/null-byte + `file://`, `php://filter` decode |
+| Open redirect | `probe_redirect` | canonical + //host, backslash, userinfo, suffix-confuse; meta/JS hops |
+| CORS | `probe_cors` | foreign/null/subdomain/prefix origins x credentials flag |
+| HTTP methods | `probe_method` | OPTIONS + PUT canary/cleanup + TRACE echo check |
+| IDOR | `probe_idor` | id +/-1 and id=0 in path/query/JSON body |
+| SSRF | `probe_ssrf` | self-fetch + short/decimal/hex/octal/ipv6 encodings + metadata |
 | XXE | `probe_xxe` | external entity file/http resolution |
-| CSRF | `probe_csrf` | token inspection + `text/plain` replay |
-| Host-header | `probe_xfh` | X-Forwarded-Host canary in body/Location |
-| File upload | `probe_upload` | benign + php/.phtml/double-ext/ct-spoof, served check |
+| CSRF | `probe_csrf` | token/SameSite audit + `text/plain` replay + GET state-change leads |
+| Host-header | `probe_xfh` | XFH canary + X-Original-URL/X-Rewrite-URL ACL bypass |
+| File upload | `probe_upload` | php/phtml/jsp/aspx/svg/htaccess/double-ext/spoof/traversal, served check |
 | Race condition | `probe_race` | concurrent burst + serial baseline + overlap check |
-| Deserialization | `probe_deserialize` | magic bytes vs parser-error signatures |
-| Cache poisoning | `probe_cache` | unkeyed XFH poison then clean fetch |
-| Prototype pollution | `probe_ppoll` | `__proto__` merge then cross-object read |
+| Deserialization | `probe_deserialize` | java/php/pickle/node/yaml/dotnet/ruby magic bytes vs parser errors |
+| Cache poisoning | `probe_cache` | unkeyed XFH poison + .css-suffix deception path confusion |
+| Prototype pollution | `probe_ppoll` | `__proto__` + `constructor.prototype` carriers, cross-object read |
 | Request smuggling | `probe_smuggle` | CL.TE + TE.CL + obfuscated-TE raw sends; 'G'/'GPOST' poison own next request only |
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
 | WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101 + accept check) |
 | CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
-| User enumeration | `probe_enum` | bogus vs likely-real usernames, error differential |
+| User enumeration | `probe_enum` | bogus vs real usernames - error text/status + timing differential |
 | JWT/session | `jwt_decode` | decode, alg weaknesses, weak-secret crack |
-| GraphQL | `graphql_introspect` | schema introspection summary |
+| GraphQL | `graphql_introspect` | POST introspection + GET ?query= fallback |
 | Recon | `fingerprint` `crawl` `js_recon` `wordlist_fuzz` | stack/links/forms/endpoints/secrets/sourcemaps |
 
 Methodology-only classes (auth-session flows, logic flaws, triage order)
@@ -132,7 +132,7 @@ of re-requested. `note`/`read_notes` keep the working narrative.
 
 ## Resources
 
-`resources/wordlists/<name>.txt` — wordlists for `wordlist_fuzz`; add a
+`resources/wordlists/<name>.txt` — wordlists for `wordlist_fuzz` (path/param/POST-body modes); add a
 file to add a list. `resources/exploits/<id>/` — PoC manifests
 (`command`, `affects`, `proof_marker`) for `run_exploit`; add a directory
 to add an exploit. Both are data, not code — extending coverage needs no
