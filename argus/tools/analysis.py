@@ -571,8 +571,10 @@ def _sqlmap_arg_check(ctx: Context, toks: list[str]) -> str | None:
 # nuclei -------------------------------------------------------------------
 def _nuclei_arg_check(ctx: Context, toks: list[str]) -> str | None:
     """-l reads target lists from files; -t pointing at a local FILE runs
-    a hand-made template (arbitrary requests/code) - built-in template
-    names and directories stay allowed; -code enables code templates."""
+    a hand-made template (arbitrary requests/code); -t pointing at a
+    DIRECTORY outside cwd does the same at scale - nuclei fetches
+    template-defined URLs through its own stack outside GuardedClient,
+    so only cwd-confined custom dirs are accepted."""
     bad = _file_target_check(ctx, toks, {"-l", "-list", "--list", "-resume"})
     if bad:
         return bad
@@ -589,9 +591,16 @@ def _nuclei_arg_check(ctx: Context, toks: list[str]) -> str | None:
             val = _flag_value(toks, i)
             for piece in val.split(","):
                 piece = piece.strip()
-                if piece and Path(piece).is_file():
+                if not piece:
+                    continue
+                p = Path(piece)
+                if p.is_file():
                     return "nuclei templates must come from template " \
                            "names or directories, not local files"
+                if p.is_dir() and not p.resolve().is_relative_to(
+                        Path.cwd().resolve()):
+                    return "nuclei template directories must stay " \
+                           "inside the working directory"
         if flag in {"-o", "-se", "-je", "-jle", "-me", "-rd", "-srd"} \
                 and not _rel_path_ok(_flag_value(toks, i)):
             return f"nuclei {flag} must stay inside the working directory"
