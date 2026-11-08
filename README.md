@@ -233,6 +233,7 @@ Each run writes `sessions/<ts>-<host>/`:
 | `findings.json` | confirmed findings (evidence-gated, deduped) |
 | `notes.md` | the agent's working reasoning |
 | `report.md` | final human report, generated on finish |
+| `report.html` | the same report styled for browsers/slides |
 | `summary.json` | machine-readable result |
 | `agent.log` | tool calls + agent text, for audit |
 

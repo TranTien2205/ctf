@@ -12,6 +12,8 @@ def test_demo_single(tmp_path):
     cats = {f["category"] for f in findings}
     assert {"sqli", "xss", "idor"} <= cats
     assert (sdir / "report.md").exists()
+    html = (sdir / "report.html").read_text(encoding="utf-8")
+    assert "F01" in html and "sqlite3" in html
 
 
 def test_demo_team(tmp_path):

@@ -200,4 +200,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     }
     (session.dir / "summary.json").write_text(
         json.dumps(summary_json, indent=2, ensure_ascii=False))
+    try:
+        from .html import render_html
+        render_html(session, cfg, summary, extra)
+    except Exception:
+        pass  # html is a convenience; the markdown report is canonical
     return path
