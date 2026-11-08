@@ -97,10 +97,10 @@ def main(argv: list[str] | None = None) -> int:
     p_ver.add_argument("session_dir")
 
     p_cmp = sub.add_parser(
-        "compare", help="compare two sessions' metrics side by side "
+        "compare", help="compare sessions' metrics side by side "
                         "(e.g. run vs team for the experiment chapter)")
-    p_cmp.add_argument("dir_a")
-    p_cmp.add_argument("dir_b")
+    p_cmp.add_argument("dirs", nargs="+",
+                       help="two or more session dirs")
     p_cmp.add_argument("--csv", action="store_true",
                        help="print metrics as CSV rows for spreadsheets")
 
@@ -252,11 +252,14 @@ def main(argv: list[str] | None = None) -> int:
                 "tokens": (s.get("llm_tokens") or {}),
                 "workers": len(agents),
             }
-        a, b = _summ(args.dir_a), _summ(args.dir_b)
+        if len(args.dirs) < 2:
+            print("compare needs at least two session dirs")
+            return 2
+        sums = [_summ(d) for d in args.dirs]
         if args.csv:
             hdr = "session,mode,findings,requests,ttf_s,endpoints,llm_calls,workers,tokens_in,tokens_out"
             print(hdr)
-            for s in (a, b):
+            for s in sums:
                 t = s.get("tokens") or {}
                 print(f"{s['dir']},{s.get('mode','?')},{s.get('findings','?')},"
                       f"{s.get('requests','?')},{s.get('ttf') or ''},"
@@ -267,14 +270,19 @@ def main(argv: list[str] | None = None) -> int:
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
                 ("coverage", "endpoints_touched"),
-                ("llm_calls", "llm_calls"), ("workers", "workers")]
-        print(f"{'metric':<24} {'A':<32} {'B':<32}")
-        print(f"{'':24} {a['dir']:<32} {b['dir']:<32}")
+                ("llm_calls", "llm_calls"), ("workers", "workers"),
+                ("tokens", "tokens_in_out")]
+        labels = [chr(ord('A') + i) for i in range(len(sums))]
+        w = max(24, max(len(s['dir']) for s in sums) + 2)
+        print(f"{'metric':<24}" + "".join(f"{l:<{w}}" for l in labels))
+        print(f"{'':24}" + "".join(f"{s['dir']:<{w}}" for s in sums))
         for k, label in keys:
-            print(f"{label:<24} {str(a.get(k)):<32} {str(b.get(k)):<32}")
-        for who, s in (("A", a), ("B", b)):
-            t = s.get("tokens") or {}
-            print(f"tokens({who}){'':18} in={t.get('in',0)} out={t.get('out',0)}")
+            def _v(s, k=k):
+                if k == "tokens":
+                    t = s.get("tokens") or {}
+                    return f"{t.get('in',0)}/{t.get('out',0)}"
+                return str(s.get(k))
+            print(f"{label:<24}" + "".join(f"{_v(s):<{w}}" for s in sums))
         return 0
 
     if args.cmd == "demo":

@@ -616,6 +616,12 @@ def probe_upload(ctx: Context, url: str) -> dict:
          f"<script>/*{canary}*/alert(1)</script></svg>"),
         ("php-rce", f"{canary}.php", "application/x-php",
          f"<?php /*{canary}*/ echo 'x'; ?>"),
+        ("double-ext", f"{canary}.php.jpg", "image/jpeg",
+         f"<?php /*{canary}*/ echo 'x'; ?>"),
+        ("phtml", f"{canary}.phtml", "application/x-php",
+         f"<?php /*{canary}*/ echo 'x'; ?>"),
+        ("ctype-spoof", f"{canary}.php", "image/jpeg",
+         f"<?php /*{canary}*/ echo 'x'; ?>"),
     ]
     results = []
     for name, fname, ctype, content in payloads:
