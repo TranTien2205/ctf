@@ -855,8 +855,20 @@ def make_server(port: int = 0):
     with open(os.path.join(FAKEFS, "etc", "passwd"), "w") as fh:
         fh.write("root:x:0:0:root:/root:/bin/bash\n"
                  "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n")
-    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    srv = _LabServer(("127.0.0.1", port), Handler)
     return srv
+
+
+class _LabServer(ThreadingHTTPServer):
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        # probes legitimately drop keep-alive sockets mid-read (redirect
+        # scheme recovery, smuggle raw sends); that reset is test signal,
+        # not a server bug - keep stderr for real handler crashes only
+        if isinstance(sys.exc_info()[1], (ConnectionError, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
 
 
 if __name__ == "__main__":
