@@ -83,6 +83,8 @@ def test_redirect_probe(lab_url, ctx):
     out2 = probes.probe_redirect(ctx, lab_url + "/jsredirect?next=/", "next")
     assert "client-side" in out2["verdict"], out2
     assert out["verdict"] == "open redirect"
+    out3 = probes.probe_redirect(ctx, lab_url + "/safedirect?next=/", "next")
+    assert "protocol-relative" in out3["verdict"], out3
 
 
 def test_idor_probe(lab_url, ctx):

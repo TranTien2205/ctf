@@ -241,8 +241,11 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_redirect",
-        "Open redirect check: sets the parameter to an external URL and reads "
-        "the Location header of the response.",
+        "Open redirect check: sets the parameter to an external URL and "
+        "reads Location, then retries with filter-bypass shapes - "
+        "protocol-relative //host, backslash, host@ userinfo, and "
+        "host.example.org suffix confusion - plus client-side "
+        "(meta-refresh/JS) detection.",
         {
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter that names the destination"},

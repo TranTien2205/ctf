@@ -165,6 +165,9 @@ def main() -> int:
     check("redirect probe sees open redirect", out["verdict"] == "open redirect")
     out = probes.probe_redirect(ctx, base + "/jsredirect?next=/", "next")
     check("redirect probe sees client-side", "client-side" in out["verdict"])
+    out = probes.probe_redirect(ctx, base + "/safedirect?next=/", "next")
+    check("redirect probe bypasses path filter",
+          "protocol-relative" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/api/config", data="theme=x")
     check("csrf probe sees text/plain replay", "text/plain" in out["verdict"])
     out = probes.probe_cors(ctx, base + "/api/data")

@@ -14,6 +14,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
     GET  /download?file=       path traversal / file read
     GET  /redirect?next=       open redirect + CRLF header injection
+    GET  /safedirect?next=     filtered redirect (//host bypass)
                                (Location value is not sanitized)
     GET  /api/user/<id>        IDOR (any id served)
     POST /api/order            IDOR in a JSON body ({"order": N} served)
@@ -301,6 +302,17 @@ class Handler(BaseHTTPRequestHandler):
             nxt = p.get("next", "/")
             self._send(302, "<html><body>redirecting</body></html>",
                        headers={"Location": nxt})
+
+        elif path == "/safedirect":
+            # naive filter: only "local" paths allowed - but //host is a
+            # protocol-relative EXTERNAL url that still starts with /
+            nxt = p.get("next", "/")
+            if nxt.startswith("/"):
+                self._send(302, "<html><body>redirecting</body></html>",
+                           headers={"Location": nxt})
+            else:
+                self._send(400, "<html><body>external urls not allowed"
+                                "</body></html>")
 
         elif path == "/jsredirect":
             # client-side open redirect: no Location header at all
