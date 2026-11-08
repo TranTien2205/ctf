@@ -58,6 +58,13 @@ def _try_layer(b: bytes) -> tuple:
             except Exception:
                 return None, None
     t = b.strip()
+    # pure-01 strings match the hex alphabet too — try binary first, its
+    # output is downstream-scored while hex-of-01s yields valid garbage
+    if len(t) >= 16 and re.fullmatch(rb"[01\s]+", t):
+        bits = re.sub(rb"\s", b"", t)
+        if len(bits) % 8 == 0:
+            return bytes(int(bits[i:i + 8], 2)
+                       for i in range(0, len(bits), 8)), "binary"
     if len(t) > 4 and re.fullmatch(rb"[0-9a-fA-F\s]+", t):
         try:
             out = binascii.unhexlify(re.sub(rb"\s", b"", t))
@@ -84,7 +91,55 @@ def _try_layer(b: bytes) -> tuple:
         out = urllib.parse.unquote_to_bytes(t.decode("ascii", "replace"))
         if out and out != t:
             return out, "url-quoted"
+    if len(t) > 8 and re.fullmatch(rb"[\d,;\s]+", t) and b"," in t:
+        try:
+            vals = [int(x) for x in re.split(rb"[,\s;]+", t.strip()) if x]
+            if vals and all(0 <= v <= 255 for v in vals):
+                return bytes(vals), "decimal-array"
+        except ValueError:
+            pass
+    if len(t) > 8 and re.fullmatch(rb"([0-3][0-7]{2}|[0-7]{1,2})([,\s]+[0-3]?[0-7]{1,2})*", t):
+        try:
+            vals = [int(x, 8) for x in re.split(rb"[,\s]+", t.strip()) if x]
+            if vals and all(0 <= v <= 255 for v in vals):
+                return bytes(vals), "octal-array"
+        except ValueError:
+            pass
+    if len(t) > 4 and re.fullmatch(rb"[!-u]+", t):
+        try:
+            out = base64.b85decode(t)
+            if out:
+                return out, "base85"
+        except (binascii.Error, ValueError):
+            pass
+    if len(t) > 8 and re.fullmatch(rb"[.\- /|]+", t) and b"." in t and b"-" in t:
+        decoded = _morse(t)
+        if decoded:
+            return decoded, "morse"
     return None, None
+
+
+_MORSE = {
+    ".-": b"a", "-...": b"b", "-.-.": b"c", "-..": b"d", ".": b"e",
+    "..-.": b"f", "--.": b"g", "....": b"h", "..": b"i", ".---": b"j",
+    "-.-": b"k", ".-..": b"l", "--": b"m", "-.": b"n", "---": b"o",
+    ".--.": b"p", "--.-": b"q", ".-.": b"r", "...": b"s", "-": b"t",
+    "..-": b"u", "...-": b"v", ".--": b"w", "-..-": b"x", "-.--": b"y",
+    "--..": b"z", ".----": b"1", "..---": b"2", "...--": b"3",
+    "....-": b"4", ".....": b"5", "-....": b"6", "--...": b"7",
+    "---..": b"8", "----.": b"9", "-----": b"0",
+}
+
+
+def _morse(t: bytes) -> bytes:
+    s = t.decode("ascii", "replace").replace("|", " / ")
+    out = bytearray()
+    for word in s.split(" / "):
+        chars = [_MORSE.get(c) for c in word.split()]
+        if not chars or any(c is None for c in chars):
+            return b""
+        out += b"".join(chars) + b" "
+    return bytes(out).strip()
 
 
 def peel(data: bytes) -> dict:
@@ -124,6 +179,13 @@ def _selftest() -> int:
     assert r2["layers"] == ["gzip"] and "flag{zipped}" in r2["decoded"]
     r3 = peel(urllib.parse.quote_plus("flag{url}").encode())
     assert r3["layers"] == ["url-quoted"]
+    bits = b"".join(format(b_, "08b").encode() for b_ in b"flag{bin}")
+    r4 = peel(bits)
+    assert r4["layers"] == ["binary"] and "flag{bin}" in r4["decoded"], r4
+    r5b = peel(b"102,108,97,103,123,100,101,99,125")
+    assert r5b["layers"] == ["decimal-array"] and "flag{dec}" in r5b["decoded"]
+    r5c = peel(b".... . .-.. .-.. --- / .-- --- .-. .-.. -..")
+    assert r5c["layers"] == ["morse"] and "hello world" in r5c["decoded"], r5c
     r4 = peel(b"just plain text")
     assert r4["layers"] == [] and r4["final"] == "text"      # already readable
     r5 = peel(b"\x00\x01\x02\x03")

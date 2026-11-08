@@ -58,7 +58,7 @@ polyalphabetic or layered.
 ## Operational probe
 
 ```bash
-python3 tools/enc_detect.py --file blob.txt   # peels hex/base64/base32/url/gzip/zip layers, reports the chain
+python3 tools/enc_detect.py --file blob.txt   # peels hex/base64/base32/url/gzip/zip/binary/decimal/octal/base85/morse layers, reports the chain
 strings blob.txt | grep -i "flag{"
 ```
 
