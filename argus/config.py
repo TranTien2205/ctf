@@ -62,7 +62,10 @@ def _claude_code_token() -> str:
         data = json.loads(path.read_text(encoding="utf-8"))
         oauth = data.get("claudeAiOauth") or {}
         token = oauth.get("accessToken") or ""
-        expires = int(oauth.get("expiresAt") or 0)
+        try:
+            expires = int(oauth.get("expiresAt") or 0)
+        except (TypeError, ValueError):
+            expires = 0
         if token and expires > time.time() * 1000:
             return token
         refresh = oauth.get("refreshToken") or ""
@@ -80,8 +83,12 @@ def _claude_code_token() -> str:
         fresh = json.loads(resp.read())
         oauth["accessToken"] = fresh.get("access_token", token)
         oauth["refreshToken"] = fresh.get("refresh_token", refresh)
-        if fresh.get("expires_in"):
-            oauth["expiresAt"] = int(time.time() * 1000) + fresh["expires_in"] * 1000
+        try:
+            expires_in = int(fresh.get("expires_in") or 0)
+        except (TypeError, ValueError):
+            expires_in = 0
+        if expires_in:
+            oauth["expiresAt"] = int(time.time() * 1000) + expires_in * 1000
         # atomic write: a crash mid-write would corrupt the user's
         # Claude Code credentials file; keep the original file mode so a
         # 0600 credentials file does not silently widen
