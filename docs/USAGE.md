@@ -56,7 +56,7 @@ python -m argus run https://app.example \
 | `--rate` | 5 | requests/second cap |
 | `--goal` | full assessment | operator goal, injected into the system contract |
 | `--operator` | none | tester/org attribution written into meta + reports |
-| `--proxy` | none | route via Burp/ZAP for inspection |
+| `--proxy` | none | route via Burp/ZAP for inspection — the only proxy path; env `HTTP(S)_PROXY` and `~/.netrc` are ignored for target traffic (LLM API calls still honor env proxies) |
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
 | `--tools` | all | `run` only: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests |

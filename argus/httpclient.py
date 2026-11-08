@@ -166,6 +166,11 @@ class GuardedClient:
             headers=default_headers or {},
             proxy=proxy or None,
             event_hooks={"response": [_capture]},
+            # target traffic must come only from declared inputs:
+            # trust_env would let HTTP_PROXY silently re-route scoped
+            # requests and let ~/.netrc auto-attach Basic credentials to
+            # a matching target host. --proxy covers corp egress.
+            trust_env=False,
         )
 
     def _fetch_capped(self, method: str, url: str,
