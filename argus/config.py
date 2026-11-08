@@ -192,10 +192,17 @@ def load_config(args) -> Config:
             raise SystemExit(f"--header must be 'Name: value', got: {raw!r}")
         name, value = raw.split(":", 1)
         name = name.strip()
+        value = value.strip()
+        # control chars would smuggle header lines onto the wire: httpx
+        # validates at send time but send_raw concatenates its wire text
+        # by hand, so a pasted 'X: a\r\nInjected: y' becomes real framing
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in name + value):
+            raise SystemExit(
+                f"--header contains control characters: {raw!r}")
         if name.lower() in framing:
             dropped.append(name)
             continue
-        headers[name] = value.strip()
+        headers[name] = value
     if dropped:
         import sys as _sys
         print(f"note: dropped framing header(s) {sorted(set(dropped))} - "
