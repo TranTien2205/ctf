@@ -607,28 +607,48 @@ def probe_upload(ctx: Context, url: str) -> dict:
 def probe_race(ctx: Context, url: str, method: str = "GET",
                data: str | None = None, n: int = 8) -> dict:
     """TOCTOU / limit-exceeded check: fire n concurrent identical
-    requests. If a presumed one-time action (redeem, vote, transfer)
-    reports success more than once, the guard window raced.
+    requests, then disambiguate with a serial baseline.
+
+    A signature that also appears serially is not a race: if two
+    sequential probes succeed as well, the action is simply repeatable.
+    Race evidence is when the burst succeeds N times while the serial
+    probes now fail - the limited action was crossed under concurrency.
 
     Sends still respect the shared rate limiter - for true wire
     concurrency run with a high --rate or no cap."""
     import concurrent.futures
+    import time as _time
 
-    def _fire() -> dict:
+    def _fire(note="concurrent burst") -> dict:
         return ctx.client.send(method, url, body=data,
-                               tool="probe_race", note="concurrent burst")
+                               tool="probe_race", note=note)
+
+    def _ok(r):
+        return 200 <= r["status"] < 300
 
     n = max(2, min(int(n or 8), 16))
+    t0 = _time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
         rs = list(ex.map(lambda _: _fire(), range(n)))
+    burst_s = round(_time.monotonic() - t0, 2)
     statuses: dict[int, int] = {}
     for r in rs:
         statuses[r["status"]] = statuses.get(r["status"], 0) + 1
-    ok = [r for r in rs if 200 <= r["status"] < 300]
+    ok = [r for r in rs if _ok(r)]
+    serial: list[dict] = []
     if len(ok) > 1:
+        serial = [_fire("serial baseline"), _fire("serial baseline")]
+    s_ok = [r for r in serial if _ok(r)]
+    if len(ok) > 1 and len(s_ok) == len(serial):
+        verdict = (f"{len(ok)}/{n} burst successes but {len(s_ok)}/"
+                   f"{len(serial)} serial probes also succeeded - the "
+                   "action is repeatable, not a one-time race")
+    elif len(ok) > 1:
         verdict = (f"race candidate: {len(ok)}/{n} concurrent requests "
-                   "succeeded - if the action is one-time it executed "
-                   f"{len(ok)}x; confirm by checking server-side state")
+                   f"succeeded but serial probes now return "
+                   f"{[r['status'] for r in serial]} - a limited action "
+                   "was crossed under concurrency; confirm by checking "
+                   "server-side state")
     elif len(ok) == 1:
         verdict = ("single success in burst - no race window observed "
                    "(or the action was already consumed)")
@@ -636,6 +656,8 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
         verdict = ("no success in burst; statuses "
                    f"{statuses} - endpoint may not be one-time")
     return {"verdict": verdict, "statuses": statuses,
+            "burst_seconds": burst_s,
+            "serial_statuses": [r["status"] for r in serial],
             "results": [{"status": r["status"],
                          "request_id": r["request_id"]} for r in rs]}
 

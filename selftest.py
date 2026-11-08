@@ -137,6 +137,8 @@ def main() -> int:
     check("upload probe serves active file", "upload candidate" in out["verdict"])
     out = probes.probe_race(ctx, base + "/redeem", n=8)
     check("race probe multi-redeems", "race candidate" in out["verdict"])
+    out = probes.probe_race(ctx, base + "/hello", n=6)
+    check("race probe rejects repeatable", "repeatable" in out["verdict"])
     out = probes.probe_deserialize(ctx, base + "/import?data=x", "data")
     check("deserialize probe sees parser error",
           "deserialization surface" in out["verdict"])

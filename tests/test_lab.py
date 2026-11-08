@@ -117,6 +117,9 @@ def test_race_probe(lab_url, ctx):
     out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
     assert "race candidate" in out["verdict"], out
     assert out["statuses"].get(200, 0) > 1, out
+    # serial baseline disambiguates: a repeatable endpoint is not a race
+    out2 = probes.probe_race(ctx, lab_url + "/hello", n=6)
+    assert "repeatable" in out2["verdict"], out2
 
 
 def test_deserialize_probe(lab_url, ctx):
