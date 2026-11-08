@@ -181,8 +181,15 @@ def main(argv: list[str] | None = None) -> int:
             pass
         # a re-render must not silently carry tampered claims: findings.json
         # is not chained, so re-validate every finding's evidence against
-        # the transcript before trusting it
-        from .session import findings_bad
+        # the transcript before trusting it - and warn when the transcript
+        # itself fails the chain check
+        from .session import findings_bad, verify_transcript
+        v = verify_transcript(sdir)
+        if not v.get("chained") or v.get("tail_truncated") \
+                or v.get("bad_lines"):
+            print("warning: transcript chain check failed - report may "
+                  "reflect an edited/truncated transcript "
+                  "(run 'argus verify' for detail)", file=sys.stderr)
         bad = findings_bad(session._transcript, session.findings)
         if bad:
             print(f"warning: findings {bad} fail evidence re-validation - "
