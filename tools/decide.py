@@ -305,6 +305,12 @@ def decide(name, taxonomy_path=None, now=None):
     try:
         with open(path, encoding="utf-8") as handle:
             current = json.load(handle)
+    except json.JSONDecodeError as exc:
+        return {"mode": "decide",
+                "error": "state file is corrupt: %s" % exc,
+                "commands": [
+                    "python3 tools/state.py %s --show" % name,
+                    "# inspect %s, repair or remove it, then re-run decide" % path]}
     except FileNotFoundError:
         result["action"] = "start_recon"
         result["rationale"] = "no state file: begin with minimal recon"

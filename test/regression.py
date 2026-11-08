@@ -2254,6 +2254,15 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(decision["action"], "reopen_confirm")
         self.assertIn("--hypothesis-id h1", " ".join(decision["commands"]))
 
+    def test_decide_reports_a_corrupt_state_file_instead_of_crashing(self):
+        """A half-written state file used to surface as a raw traceback mid-run."""
+        path = self.root / "challenges" / "t2b" / "state.json"
+        path.parent.mkdir(parents=True)
+        path.write_text('{"corrupt": ', encoding="utf-8")
+        decision = decide_mod.decide("t2b")
+        self.assertIn("corrupt", decision["error"])
+        self.assertTrue(any("--show" in c for c in decision["commands"]))
+
     def test_decide_switches_class_when_budget_is_exhausted(self):
         probes = [{"request": "GET /?p=%d" % i, "result": "inconclusive",
                    "time": 1000.0 + i, "verdict": "inconclusive",
