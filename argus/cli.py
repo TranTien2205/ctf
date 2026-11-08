@@ -349,8 +349,8 @@ def _demo(args) -> int:
     def _t(i, name, **kw):
         return {"id": f"d{i}", "name": name, "type": "tool_use", "input": kw}
 
-    # Request numbering is deterministic: sqli=4 (r1-r4), reflection=1 (r5),
-    # idor=3 (r6-r8), xfh=1 (r9).
+    # Request numbering is deterministic: sqli=4, reflection=1, idor=3,
+    # disclosure=1+paths, xfh=1 - evidence cites excerpts, not request ids.
     script = [
         {"text": "Baseline-diffed probes first: /item looks injectable.",
          "tool_calls": [_t(1, "probe_sqli", url=base + "/item?id=1",
@@ -392,11 +392,26 @@ def _demo(args) -> int:
                          remediation="Enforce per-object ownership checks.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
          "text": "Neighbor id returns a different principal - IDOR."},
-        {"tool_calls": [_t(7, "probe_xfh", url=base + "/reset")]},
-        {"tool_calls": [_t(8, "finish",
-                         summary="Demo run: SQLi + XSS + IDOR verified with "
-                                 "verbatim evidence; host-header reflection "
-                                 "left as a lead for manual follow-up.")]},
+        {"tool_calls": [_t(7, "probe_disclosure", url=base)],
+         "text": "Sensitive-artifact sweep before finishing."},
+        {"tool_calls": [_t(8, "record_finding",
+                         title="Exposed /.env and /.git/HEAD at web root",
+                         severity="medium", category="info-disclosure",
+                         url=base + "/.env",
+                         evidence_excerpt="SECRET_KEY=lab-secret-0123",
+                         description="Sensitive paths are served publicly - "
+                                     "credentials and source-control "
+                                     "metadata leak to anyone.",
+                         remediation="Deny dotfile/VCS paths at the web "
+                                     "server; rotate exposed secrets.",
+                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
+         "text": "Exposed secrets on the web root - recording."},
+        {"tool_calls": [_t(9, "probe_xfh", url=base + "/reset")]},
+        {"tool_calls": [_t(10, "finish",
+                         summary="Demo run: SQLi + XSS + IDOR + info "
+                                 "disclosure verified with verbatim "
+                                 "evidence; host-header reflection left as "
+                                 "a lead for manual follow-up.")]},
     ]
     cfg = Config(target=base, allow_private=True,
                  session_dir=Path(args.session_dir),

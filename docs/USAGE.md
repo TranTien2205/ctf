@@ -47,7 +47,8 @@ python -m argus demo --team   # same, through the lead/worker pipeline
 ```
 
 Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
-agent loop, and lands three evidence-gated findings (SQLi, XSS, IDOR) in a
+agent loop, and lands four evidence-gated findings (SQLi, XSS, IDOR,
+info-disclosure) in a
 normal session dir - use it to demo the pipeline at a defense without
 spending tokens. `--team` runs the same assessment through TeamRun: a lead
 seeds the lead queue, a recon worker maps the surface, and an exploit worker
