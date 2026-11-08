@@ -16,6 +16,7 @@ from .registry import Context
 
 SQL_ERRORS = re.compile(
     r"sql syntax|mysql|mariadb|sqlite3?|postgresql|pg_query|ORA-\d{4}|"
+    r"microsoft sql|incorrect syntax|db2 |sql server|pl/sql|"
     r"odbc|jdbc|sqlstate|unclosed quotation|unterminated string|"
     r"syntax error.*sql|warning.*mysql|division by zero.*sql",
     re.I,
