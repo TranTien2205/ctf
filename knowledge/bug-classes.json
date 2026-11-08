@@ -1090,7 +1090,7 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "observation_signals": [
-        "disk image|\\.(?:dd|img|e01|aff4?|vmdk|vhdx?|iso)\\b|filesystem|deleted (?:file|photo|document)|carve|recover.{0,20}(?:file|data|flag)|partition|mount|fsstat|fls|icat",
+        "disk image|\\.(?:dd|img|e01|aff4?|vmdk|vhdx?|iso)\\b|filesystem|deleted (?:file|photo|document)|\\bcarv(?:e|ed|ing)\\b|\\brecover\\b.{0,20}(?:file|data|flag)|\\bpartition|\\bmount|\\bfsstat\\b|\\bfls\\b|\\bicat\\b",
         "(?<![a-z0-9])(?:forensics\\ disk\\ image|filesystem\\ carving|disk\\ image|disk\\-image)(?![a-z0-9])"
       ],
       "source_signals": [],

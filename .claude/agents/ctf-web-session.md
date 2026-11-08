@@ -531,7 +531,7 @@ knowledge: every line was produced by a solve or a measurement in this
 repository, and each is attributed so you can open the source and check it.
 Prefer it over anything you recall.
 
-**Your classes:** `web-auth-session` **verified** (3 cards) · `web-oauth-sso` **verified** (1 card) · `web-idor` **catalogue**.
+**Your classes:** `web-auth-session` **verified** (3 cards) · `web-oauth-sso` **verified** (1 card) · `web-idor` **catalogue** · `web-user-enum` **catalogue**.
 A **catalogue** class has never been solved here — say so rather than
 presenting its technique as local experience.
 

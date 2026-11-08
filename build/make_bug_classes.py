@@ -686,8 +686,8 @@ CLASSES = [
         "evidence_level": "catalogue", "verified_by": [],
         "observation_signals": [
             r"disk image|\.(?:dd|img|e01|aff4?|vmdk|vhdx?|iso)\b|filesystem|"
-            r"deleted (?:file|photo|document)|carve|recover.{0,20}(?:file|data|flag)|"
-            r"partition|mount|fsstat|fls|icat"],
+            r"deleted (?:file|photo|document)|\bcarv(?:e|ed|ing)\b|\brecover\b.{0,20}(?:file|data|flag)|"
+            r"\bpartition|\bmount|\bfsstat\b|\bfls\b|\bicat\b"],
         "source_signals": [],
         "first_probe": "mount or list the filesystem first (fls/icat or mmls) — the flag is usually a deleted file or an unallocated-space carve, not live content",
         "falsifier": "live files, deleted entries, and unallocated-space carving all yield only expected OS content",

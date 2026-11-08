@@ -508,7 +508,7 @@ knowledge: every line was produced by a solve or a measurement in this
 repository, and each is attributed so you can open the source and check it.
 Prefer it over anything you recall.
 
-**Your classes:** `web-prototype-pollution` **verified** (3 cards) · `web-deserialization` **verified** (2 cards) · `web-logic-flaw` **verified** (1 card).
+**Your classes:** `web-prototype-pollution` **verified** (3 cards) · `web-deserialization` **verified** (2 cards) · `web-logic-flaw` **verified** (1 card) · `web-mass-assignment` **catalogue**.
 A **catalogue** class has never been solved here — say so rather than
 presenting its technique as local experience.
 
