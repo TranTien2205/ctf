@@ -1,228 +1,288 @@
 {
-  "comment": "Golden cases for tools/classify.py. Each observation is the evidence that was available BEFORE the solve, not a summary written afterwards — that is what makes this a measurement rather than a tautology. expect_top must be the first candidate; expect_within must appear in the first N. Add a case after every solve. Never delete one to make a change pass.",
-  "cases": [
+ "comment": "Golden cases for tools/classify.py. Each observation is the evidence that was available BEFORE the solve, not a summary written afterwards — that is what makes this a measurement rather than a tautology. expect_top must be the first candidate; expect_within must appear in the first N. Add a case after every solve. Never delete one to make a change pass.",
+ "cases": [
+  {
+   "observation": "Ruby WEBrick app renders the neon parameter with ERB, filter rejects Malicious Input Detected",
+   "expect_top": "web-ssti",
+   "origin": "solved/neonify.md"
+  },
+  {
+   "observation": "Traefik reverse proxy, app trusts X-Real-Ip, 403 only internal, Connection header",
+   "expect_top": "web-parser-differential",
+   "origin": "solved/novacore.md"
+  },
+  {
+   "observation": "OAuth2 SSO provider, redirect_uri and state, jsessionid and connect.sid cookies, /authorize and /token",
+   "expect_top": "web-oauth-sso",
+   "origin": "solved/ssos.md"
+  },
+  {
+   "observation": "Express mongoose update takes extra keys, __proto__ merge, GET /flag 403 access denied",
+   "expect_top": "web-prototype-pollution",
+   "expect_within": {
+    "class": "web-nosqli",
+    "n": 3
+   },
+   "origin": "solved/secnotes.md"
+  },
+  {
+   "observation": "nginx serving /assets with an alias, Laravel error page, .env leak, session cookie",
+   "expect_within": {
+    "class": "file-read-primitives",
+    "n": 3
+   },
+   "origin": "solved/nginxatsu.md"
+  },
+  {
+   "observation": "picture url field is converted server side, Express X-Powered-By, error body echoes content",
+   "expect_top": "web-ssrf",
+   "origin": "solved/red-island.md"
+  },
+  {
+   "observation": "index page prints the php source: waf() on the raw body then json_decode, vsprintf into SELECT note FROM notes WHERE assignee, response always 200 empty",
+   "expect_within": {
+    "class": "web-sqli",
+    "n": 3
+   },
+   "origin": "solved/red-island-2.md"
+  },
+  {
+   "observation": "profile update then a verification token is re-read in another function, admin bot renders stored notes",
+   "expect_within": {
+    "class": "web-race-condition",
+    "n": 3
+   },
+   "origin": "solved/apexsurvive.md"
+  },
+  {
+   "observation": "SOAP endpoint accepts application/xml with a DOCTYPE and an ENTITY",
+   "expect_top": "web-xxe",
+   "origin": "catalogue class must still route"
+  },
+  {
+   "observation": "multipart/form-data avatar upload, filename kept, image/png mime check",
+   "expect_top": "web-file-upload",
+   "origin": "catalogue-adjacent shape"
+  },
+  {
+   "observation": "nginx proxy_cache with a location regex for css js html json, X-Cache-Status header, authenticated pages cached by uri and args",
+   "expect_top": "web-cache-poisoning",
+   "origin": "EncoDecept: web cache deception confirmed live; an unauthenticated request received a cached authenticated page (X-Cache-Status: HIT)"
+  },
+  {
+   "observation": "RSA public key modulus n small exponent e ciphertext c",
+   "expect_top": "crypto-rsa",
+   "origin": "coverage: crypto depth class"
+  },
+  {
+   "observation": "seeded PRNG token mt19937 rand predictable outputs",
+   "expect_top": "crypto-prng",
+   "origin": "coverage: crypto depth class"
+  },
+  {
+   "observation": "ECDSA signatures reused nonce same r curve",
+   "expect_top": "crypto-ecc-dlog",
+   "origin": "coverage: crypto depth class"
+  },
+  {
+   "observation": "AES ECB encrypt oracle chosen plaintext append secret",
+   "expect_top": "crypto-symmetric-oracle",
+   "origin": "coverage: crypto depth class"
+  },
+  {
+   "observation": "pyjail prompt filters input by blacklist, __builtins__ emptied, need sandbox escape via __subclasses__",
+   "expect_top": "misc-interpreter-escape",
+   "origin": "coverage: misc depth class"
+  },
+  {
+   "observation": "encoded blob base64 hex rot13 layered carrier",
+   "expect_top": "misc-encoding-carrier",
+   "origin": "coverage: misc depth class"
+  },
+  {
+   "observation": "photo jpg exif gps geolocation",
+   "expect_top": "osint-media-metadata",
+   "origin": "coverage: osint depth class"
+  },
+  {
+   "observation": "username handle twitter github pivot person",
+   "expect_top": "osint-identity-pivot",
+   "origin": "coverage: osint depth class"
+  },
+  {
+   "observation": "domain dns whois certificate subdomain",
+   "expect_top": "osint-infra-records",
+   "origin": "coverage: osint depth class"
+  },
+  {
+   "observation": "ELF checksec no canary gets buffer overflow rip",
+   "expect_top": "pwn-stack-overflow",
+   "origin": "coverage: pwn depth class"
+  },
+  {
+   "observation": "printf user format string %p %n leak write",
+   "expect_top": "pwn-format-string",
+   "origin": "coverage: pwn depth class"
+  },
+  {
+   "observation": "glibc malloc free use-after-free tcache chunks",
+   "expect_top": "pwn-heap-corruption",
+   "origin": "coverage: pwn depth class"
+  },
+  {
+   "observation": "NX enabled ret2libc rop gadgets pop rdi",
+   "expect_top": "pwn-code-reuse",
+   "origin": "coverage: pwn depth class"
+  },
+  {
+   "observation": "ELF binary asks for key, prints wrong password, stripped, decompile in ghidra",
+   "expect_top": "rev-native-check",
+   "origin": "coverage: rev depth class"
+  },
+  {
+   "observation": "dotnet assembly dnspy decompile flag check",
+   "expect_top": "rev-managed-code",
+   "origin": "coverage: rev depth class"
+  },
+  {
+   "observation": "custom vm bytecode python pyc dis",
+   "expect_top": "rev-bytecode-vm",
+   "origin": "coverage: rev depth class"
+  },
+  {
+   "observation": "evtx security 4624 4625 logon auth.log wtmp",
+   "expect_top": "dfir-authentication-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "sysmon event id 1 process creation commandline",
+   "expect_top": "dfir-execution-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "7045 service installed persistence registry run key",
+   "expect_top": "dfir-persistence-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "mft usn journal filesystem timeline timestomp",
+   "expect_top": "dfir-filesystem-timeline",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "conn.log zeek output shows dns tunnelling beacon interval to one destinationip",
+   "expect_top": "dfir-network-exfil-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "cloudtrail consolelogin iam accesskey",
+   "expect_top": "dfir-cloud-audit-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "evtx 1102 log cleared timestomp",
+   "expect_top": "dfir-antiforensics-trace",
+   "origin": "coverage: dfir depth class"
+  },
+  {
+   "observation": "the login issues a JWT bearer token with alg hs256 and the session cookie phpsessid is not rotated",
+   "expect_top": "web-auth-session",
+   "origin": "coverage: web-auth-session observation"
+  },
+  {
+   "observation": "the ping form passes the host parameter into a shell command; input with a semicolon runs a second command",
+   "expect_top": "web-command-injection",
+   "origin": "coverage: web-command-injection observation"
+  },
+  {
+   "observation": "the api reflects the origin: header into access-control-allow-origin and allows credentials",
+   "expect_top": "web-cors",
+   "origin": "coverage: web-cors observation"
+  },
+  {
+   "observation": "the admin bot visits any reported link and the password-change form has no csrf token or samesite cookie",
+   "expect_top": "web-csrf",
+   "origin": "coverage: web-csrf observation"
+  },
+  {
+   "observation": "the remember-me cookie is a base64 blob starting rO0AB, a java serialized object passed to readObject",
+   "expect_top": "web-deserialization",
+   "origin": "coverage: web-deserialization observation"
+  },
+  {
+   "observation": "a graphql endpoint at /gql answers __schema introspection and the mutation accepts any object id",
+   "expect_top": "web-graphql",
+   "origin": "coverage: web-graphql observation"
+  },
+  {
+   "observation": "GET /users/1042/orders returns another users invoice just by changing the numeric object_id",
+   "expect_top": "web-idor",
+   "origin": "coverage: web-idor observation"
+  },
+  {
+   "observation": "the signup body accepts an is_admin=true field and mass assignment grants the role",
+   "expect_top": "web-logic-flaw",
+   "origin": "coverage: web-logic-flaw observation"
+  },
+  {
+   "observation": "the login page honors ?next= and 302 redirects to an external callback= url",
+   "expect_top": "web-open-redirect",
+   "origin": "coverage: web-open-redirect observation"
+  },
+  {
+   "observation": "a solidity contract setup with isSolved() on an ethereum rpc endpoint; foundry scripts in the handout",
+   "expect_top": "web-web3",
+   "origin": "coverage: web-web3 observation"
+  },
+  {
+   "observation": "an admin bot visits the url you supply; window.length frame count leaks whether the search matched - an xs-leak side channel",
+   "expect_top": "web-xs-leaks",
+   "origin": "coverage: web-xs-leaks observation"
+  },
+  {
+   "observation": "the search term is echoed back into the page unescaped and the admin bot visits the reported url",
+   "expect_top": "web-xss",
+   "origin": "coverage: web-xss observation"
+  }
+ ],
+ "source_cases": [
+  {
+   "source": "challenges/Weather App/web_weather_app/challenge",
+   "expect_within": {
+    "class": "web-ssrf",
+    "n": 3
+   },
+   "also_within": [
     {
-      "observation": "Ruby WEBrick app renders the neon parameter with ERB, filter rejects Malicious Input Detected",
-      "expect_top": "web-ssti",
-      "origin": "solved/neonify.md"
+     "class": "web-request-smuggling",
+     "n": 4
     },
     {
-      "observation": "Traefik reverse proxy, app trusts X-Real-Ip, 403 only internal, Connection header",
-      "expect_top": "web-parser-differential",
-      "origin": "solved/novacore.md"
-    },
-    {
-      "observation": "OAuth2 SSO provider, redirect_uri and state, jsessionid and connect.sid cookies, /authorize and /token",
-      "expect_top": "web-oauth-sso",
-      "origin": "solved/ssos.md"
-    },
-    {
-      "observation": "Express mongoose update takes extra keys, __proto__ merge, GET /flag 403 access denied",
-      "expect_top": "web-prototype-pollution",
-      "expect_within": {
-        "class": "web-nosqli",
-        "n": 3
-      },
-      "origin": "solved/secnotes.md"
-    },
-    {
-      "observation": "nginx serving /assets with an alias, Laravel error page, .env leak, session cookie",
-      "expect_within": {
-        "class": "file-read-primitives",
-        "n": 3
-      },
-      "origin": "solved/nginxatsu.md"
-    },
-    {
-      "observation": "picture url field is converted server side, Express X-Powered-By, error body echoes content",
-      "expect_top": "web-ssrf",
-      "origin": "solved/red-island.md"
-    },
-    {
-      "observation": "index page prints the php source: waf() on the raw body then json_decode, vsprintf into SELECT note FROM notes WHERE assignee, response always 200 empty",
-      "expect_within": {
-        "class": "web-sqli",
-        "n": 3
-      },
-      "origin": "solved/red-island-2.md"
-    },
-    {
-      "observation": "profile update then a verification token is re-read in another function, admin bot renders stored notes",
-      "expect_within": {
-        "class": "web-race-condition",
-        "n": 3
-      },
-      "origin": "solved/apexsurvive.md"
-    },
-    {
-      "observation": "SOAP endpoint accepts application/xml with a DOCTYPE and an ENTITY",
-      "expect_top": "web-xxe",
-      "origin": "catalogue class must still route"
-    },
-    {
-      "observation": "multipart/form-data avatar upload, filename kept, image/png mime check",
-      "expect_top": "web-file-upload",
-      "origin": "catalogue-adjacent shape"
-    },
-    {
-      "observation": "nginx proxy_cache with a location regex for css js html json, X-Cache-Status header, authenticated pages cached by uri and args",
-      "expect_top": "web-cache-poisoning",
-      "origin": "EncoDecept: web cache deception confirmed live; an unauthenticated request received a cached authenticated page (X-Cache-Status: HIT)"
-    },
-    {
-      "observation": "RSA public key modulus n small exponent e ciphertext c",
-      "expect_top": "crypto-rsa",
-      "origin": "coverage: crypto depth class"
-    },
-    {
-      "observation": "seeded PRNG token mt19937 rand predictable outputs",
-      "expect_top": "crypto-prng",
-      "origin": "coverage: crypto depth class"
-    },
-    {
-      "observation": "ECDSA signatures reused nonce same r curve",
-      "expect_top": "crypto-ecc-dlog",
-      "origin": "coverage: crypto depth class"
-    },
-    {
-      "observation": "AES ECB encrypt oracle chosen plaintext append secret",
-      "expect_top": "crypto-symmetric-oracle",
-      "origin": "coverage: crypto depth class"
-    },
-    {
-      "observation": "pyjail prompt filters input by blacklist, __builtins__ emptied, need sandbox escape via __subclasses__",
-      "expect_top": "misc-interpreter-escape",
-      "origin": "coverage: misc depth class"
-    },
-    {
-      "observation": "encoded blob base64 hex rot13 layered carrier",
-      "expect_top": "misc-encoding-carrier",
-      "origin": "coverage: misc depth class"
-    },
-    {
-      "observation": "photo jpg exif gps geolocation",
-      "expect_top": "osint-media-metadata",
-      "origin": "coverage: osint depth class"
-    },
-    {
-      "observation": "username handle twitter github pivot person",
-      "expect_top": "osint-identity-pivot",
-      "origin": "coverage: osint depth class"
-    },
-    {
-      "observation": "domain dns whois certificate subdomain",
-      "expect_top": "osint-infra-records",
-      "origin": "coverage: osint depth class"
-    },
-    {
-      "observation": "ELF checksec no canary gets buffer overflow rip",
-      "expect_top": "pwn-stack-overflow",
-      "origin": "coverage: pwn depth class"
-    },
-    {
-      "observation": "printf user format string %p %n leak write",
-      "expect_top": "pwn-format-string",
-      "origin": "coverage: pwn depth class"
-    },
-    {
-      "observation": "glibc malloc free use-after-free tcache chunks",
-      "expect_top": "pwn-heap-corruption",
-      "origin": "coverage: pwn depth class"
-    },
-    {
-      "observation": "NX enabled ret2libc rop gadgets pop rdi",
-      "expect_top": "pwn-code-reuse",
-      "origin": "coverage: pwn depth class"
-    },
-    {
-      "observation": "ELF binary asks for key, prints wrong password, stripped, decompile in ghidra",
-      "expect_top": "rev-native-check",
-      "origin": "coverage: rev depth class"
-    },
-    {
-      "observation": "dotnet assembly dnspy decompile flag check",
-      "expect_top": "rev-managed-code",
-      "origin": "coverage: rev depth class"
-    },
-    {
-      "observation": "custom vm bytecode python pyc dis",
-      "expect_top": "rev-bytecode-vm",
-      "origin": "coverage: rev depth class"
-    },
-    {
-      "observation": "evtx security 4624 4625 logon auth.log wtmp",
-      "expect_top": "dfir-authentication-trace",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "sysmon event id 1 process creation commandline",
-      "expect_top": "dfir-execution-trace",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "7045 service installed persistence registry run key",
-      "expect_top": "dfir-persistence-trace",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "mft usn journal filesystem timeline timestomp",
-      "expect_top": "dfir-filesystem-timeline",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "conn.log zeek output shows dns tunnelling beacon interval to one destinationip",
-      "expect_top": "dfir-network-exfil-trace",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "cloudtrail consolelogin iam accesskey",
-      "expect_top": "dfir-cloud-audit-trace",
-      "origin": "coverage: dfir depth class"
-    },
-    {
-      "observation": "evtx 1102 log cleared timestomp",
-      "expect_top": "dfir-antiforensics-trace",
-      "origin": "coverage: dfir depth class"
+     "class": "web-sqli",
+     "n": 4
     }
-  ],
-  "source_cases": [
-    {
-      "source": "challenges/Weather App/web_weather_app/challenge",
-      "expect_within": {
-        "class": "web-ssrf",
-        "n": 3
-      },
-      "also_within": [
-        {
-          "class": "web-request-smuggling",
-          "n": 4
-        },
-        {
-          "class": "web-sqli",
-          "n": 4
-        }
-      ],
-      "origin": "solved/weather_app.md — the three classes the real chain used"
-    },
-    {
-      "source": "test/fixtures/benign-express",
-      "expect_none": true,
-      "origin": "precision guard: an ordinary app must match nothing. If this fails, a signal in knowledge/bug-classes.json is too broad. Tighten the signal, never the test."
-    },
-    {
-      "source": "test/fixtures/crypto-rsa-handout",
-      "expect_top": "crypto-rsa",
-      "origin": "coverage: crypto source classification"
-    },
-    {
-      "source": "test/fixtures/pwn-stack-handout",
-      "expect_top": "pwn-stack-overflow",
-      "origin": "coverage: pwn source classification"
-    },
-    {
-      "source": "test/fixtures/rev-crackme-handout",
-      "expect_top": "rev-native-check",
-      "origin": "coverage: rev source classification"
-    }
-  ]
+   ],
+   "origin": "solved/weather_app.md — the three classes the real chain used"
+  },
+  {
+   "source": "test/fixtures/benign-express",
+   "expect_none": true,
+   "origin": "precision guard: an ordinary app must match nothing. If this fails, a signal in knowledge/bug-classes.json is too broad. Tighten the signal, never the test."
+  },
+  {
+   "source": "test/fixtures/crypto-rsa-handout",
+   "expect_top": "crypto-rsa",
+   "origin": "coverage: crypto source classification"
+  },
+  {
+   "source": "test/fixtures/pwn-stack-handout",
+   "expect_top": "pwn-stack-overflow",
+   "origin": "coverage: pwn source classification"
+  },
+  {
+   "source": "test/fixtures/rev-crackme-handout",
+   "expect_top": "rev-native-check",
+   "origin": "coverage: rev source classification"
+  }
+ ]
 }
