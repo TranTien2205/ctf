@@ -83,12 +83,17 @@ def _redact_header_value(name: str, value: str) -> str:
 def _redact_headers(headers: dict, secret_values: set[str]) -> dict:
     out = {}
     for k, v in (headers or {}).items():
-        if k.lower() in _SENSITIVE_REQ_HEADERS \
-                or k.lower() in _SENSITIVE_RESP_HEADERS \
-                or v in secret_values:
-            out[k] = _redact_header_value(k, v)
+        # model-built header dicts can carry non-str values (JSON arrays
+        # are legal tool input) - coerce so redaction cannot crash the
+        # record path and mask the real httpx error
+        ks = k if isinstance(k, str) else str(k)
+        vs = v if isinstance(v, str) else str(v)
+        if ks.lower() in _SENSITIVE_REQ_HEADERS \
+                or ks.lower() in _SENSITIVE_RESP_HEADERS \
+                or vs in secret_values:
+            out[ks] = _redact_header_value(ks, vs)
         else:
-            out[k] = v
+            out[ks] = vs
     return out
 
 

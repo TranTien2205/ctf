@@ -193,6 +193,8 @@ def load_config(args) -> Config:
         name, value = raw.split(":", 1)
         name = name.strip()
         value = value.strip()
+        if not name:
+            raise SystemExit(f"--header has an empty name: {raw!r}")
         # control chars would smuggle header lines onto the wire: httpx
         # validates at send time but send_raw concatenates its wire text
         # by hand, so a pasted 'X: a\r\nInjected: y' becomes real framing
