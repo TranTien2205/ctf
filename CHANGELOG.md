@@ -139,11 +139,24 @@ system. All notable milestones on `agent-v2`.
   broken meta.json — flagged as integrity signals, never tracebacks.
 - MCP config errors (unreadable file, missing `command`) warn on
   stderr at run start instead of silently dropping servers.
+- DNS-rebinding defense: `send()`/`send_raw()` verify the connected
+  peer's real address (`network_stream.server_addr` / `getpeername`)
+  and refuse private IPs when `--allow-private` was not given —
+  the scope check's resolution and the socket's are separate answers.
+- Boundary validation before budget: non-str/bytes bodies, non-dict
+  headers and control-char methods are rejected before `sent += 1`.
+- `record_event` detail values bound at 60k serialized chars each;
+  LLM/gateway shapes (non-object JSON, non-str text/input/name/id,
+  non-int usage counters) degrade to retries/zeros, never crashes.
+- Target-controlled URLs are fuzz-safe: `crawl`, `js_recon`, `diff`,
+  renderers, `_redact_url` and `_finding_key` all skip/degrade on
+  `http://[bad`-class input instead of tracebacking.
 
 ### Verification & packaging
-- `python selftest.py`: 109 offline checks.
-- `python -m pytest tests/ -q`: 150 tests (unit + live-lab + loop +
-  team + MCP + CLI + external-tool subprocess path).
+- `python selftest.py`: 110 offline checks.
+- `python -m pytest tests/ -q`: 160 tests (unit + live-lab + loop +
+  team + MCP + CLI + external-tool subprocess path + hardening
+  regressions).
 - Fault-tolerance pass: every forensic reader (`verify`, `findings`,
   `diff`, `sessions`, `_reopen`, renderers) degrades malformed session
   artifacts to flags/warnings instead of tracebacks — fuzzed across
