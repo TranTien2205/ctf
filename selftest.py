@@ -319,6 +319,44 @@ def main() -> int:
     check("summary carries run metrics",
           "time_to_first_finding_s" in sj and sj.get("llm_calls") == 3)
 
+    # --- audit guarantees added after the original selftest ---------------
+    sdir = Path(result["report"]).parent
+    check("finding carries auto-mapped CWE",
+          json.loads((sdir / "findings.json").read_text())[0]
+          .get("cwe") == "CWE-89")
+    sarif = json.loads((sdir / "report.sarif").read_text())
+    check("report.sarif is valid 2.1.0",
+          sarif["version"] == "2.1.0"
+          and sarif["runs"][0]["results"][0]["ruleId"] == "CWE-89")
+    from argus.report.markdown import _fence
+    evil = "x\n```\n# FAKE\n```\ny"
+    check("report fence survives backtick injection",
+          _fence(evil) == "````" and _fence("clean") == "```")
+    from argus.session import verify_transcript
+    res = verify_transcript(sdir)
+    check("verify re-validates findings ok", res["findings_checked"] == 1
+          and not res.get("findings_bad"))
+    fp = sdir / "findings.json"
+    fs = json.loads(fp.read_text())
+    fs[0]["evidence_excerpt"] = "tampered-bytes"
+    fp.write_text(json.dumps(fs))
+    res = verify_transcript(sdir)
+    check("verify flags tampered finding", res.get("findings_bad") == ["F01"])
+    fs[0]["evidence_excerpt"] = "sqlite3.OperationalError"
+    fp.write_text(json.dumps(fs))
+    from argus.loop import _compact_history, _KEEP_FULL_RESULTS
+    msgs = [{"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": "c",
+         "content": json.dumps({"request_id": "r1", "x": "y" * 500})}]}]
+    for i in range(_KEEP_FULL_RESULTS):
+        msgs.append({"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": f"k{i}",
+             "content": "z" * 500}]})
+    _compact_history(msgs)
+    check("history compacts old results keeping rids",
+          "rids: r1" in msgs[0]["content"][0]["content"]
+          and msgs[-1]["content"][0]["content"] == "z" * 500)
+
     # --- MCP bridge (fake stdio server) -----------------------------------
     from argus.mcp import MCPManager
     from argus.tools import mcp_tools
