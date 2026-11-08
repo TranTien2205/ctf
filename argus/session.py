@@ -28,7 +28,8 @@ def _slug(host: str) -> str:
 def _atomic_write(path: Path, text: str) -> None:
     """Write-rename so a crash mid-write cannot leave a truncated artifact
     (findings.json / summary.json are the deliverable, not scratch data)."""
-    tmp = path.with_name(path.name + ".tmp")
+    import os
+    tmp = path.with_name(f"{path.name}.tmp-{os.getpid()}")
     # newline="": artifact bytes must be platform-stable - a digest
     # computed on Windows must verify on Linux, so writes pin LF
     with tmp.open("w", encoding="utf-8", newline="") as fh:
