@@ -178,6 +178,8 @@ def main() -> int:
           "credentials" in out["verdict"])
     check("cors probe sees null-origin trust",
           "null origin" in out["verdict"])
+    check("cors probe sees preflight reflection",
+          "preflight" in out["verdict"])
     out = probes.probe_idor(ctx, base + "/api/user/2")
     check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
     out = probes.probe_ssrf(ctx, base + "/fetch?url=x", "url")

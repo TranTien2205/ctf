@@ -449,6 +449,20 @@ def probe_cors(ctx: Context, url: str) -> dict:
     ]
     results = []
     signals = []
+    # preflight channel: some apps answer ACAO only on OPTIONS (the GET
+    # variants below then miss it entirely); one cheap request covers it
+    pre = ctx.client.send(
+        "OPTIONS", url,
+        headers={"Origin": "https://argus-probe.invalid",
+                 "Access-Control-Request-Method": "GET"},
+        tool="probe_cors", note="preflight foreign origin")
+    ph = {k.lower(): v for k, v in (pre.get("headers") or {}).items()}
+    pre_acao = ph.get("access-control-allow-origin", "")
+    pre_acac = (ph.get("access-control-allow-credentials", "")
+                .lower() == "true")
+    if "argus-probe.invalid" in pre_acao or pre_acao == "*":
+        signals.append("preflight reflects foreign origin"
+                       + (" WITH credentials" if pre_acac else ""))
     for name, origin in variants:
         r = ctx.client.send("GET", url, headers={"Origin": origin},
                             tool="probe_cors", note=f"origin {name}")
@@ -481,6 +495,8 @@ def probe_cors(ctx: Context, url: str) -> dict:
     first = results[0]
     return {"verdict": verdict, "request_id": first["request_id"],
             "acao": first["acao"], "acac": "true" if first["acac"] else "",
+            "preflight_id": pre["request_id"],
+            "preflight_acao": pre_acao,
             "origins": results}
 
 

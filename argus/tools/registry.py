@@ -256,9 +256,9 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_cors",
-        "CORS misconfiguration check: sends a foreign Origin and reports "
-        "whether it is reflected in Access-Control-Allow-Origin, and whether "
-        "credentials are allowed.",
+        "CORS misconfiguration check: preflight OPTIONS plus an origin "
+        "variant sweep (foreign, null, subdomain, prefix-confuse); reports "
+        "reflected ACAO and whether credentials are allowed.",
         {"url": {**_STR, "description": URL_DESC}},
         ["url"],
     ),
