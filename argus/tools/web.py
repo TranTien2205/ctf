@@ -258,6 +258,23 @@ _SEC_HEADERS = [
     "permissions-policy",
 ]
 
+# passive WAF/CDN fingerprint: token substring -> product hint, matched
+# against the whole "name: value" header block in lowercase
+_WAF_TOKENS = {
+    "cf-ray": "cloudflare", "__cf_bm": "cloudflare",
+    "cf-cache-status": "cloudflare", "cloudflare": "cloudflare",
+    "x-sucuri": "sucuri", "incap_ses": "imperva/incapsula",
+    "visid_incap": "imperva/incapsula", "x-iinfo": "imperva/incapsula",
+    "akamai": "akamai", "x-akamai": "akamai",
+    "x-amz-cf": "aws cloudfront", "x-amzn-": "aws",
+    "awselb": "aws elb", "x-azure": "azure", "x-fd-": "azure front door",
+    "x-vercel": "vercel", "x-fastly": "fastly", "fastly-": "fastly",
+    "x-waf": "generic waf", "x-firewall": "generic waf",
+    "x-denied-reason": "generic waf", "x-mod-security": "mod_security",
+    "mod_security": "mod_security", "x-backside-transport": "ibm datapower",
+    "f5bigip": "f5 big-ip", "bigip": "f5 big-ip",
+}
+
 
 def fingerprint(ctx: Context, url: str) -> dict:
     res = ctx.client.send("GET", url, tool="fingerprint", note="baseline GET")
@@ -301,11 +318,16 @@ def fingerprint(ctx: Context, url: str) -> dict:
             stack_hints.append(f"{h}: {headers[h]}")
     if "x-nextjs-cache" in headers or "_next/" in res.get("body", ""):
         stack_hints.append("framework: next.js (hint)")
+    # passive WAF/CDN read from the SAME response - no extra requests
+    hblock = "\n".join(f"{k}: {v}" for k, v in headers.items()).lower()
+    waf_hints = sorted({name for tok, name in _WAF_TOKENS.items()
+                        if tok in hblock})
     return {
         "request_id": res["request_id"],
         "status": res["status"],
         "headers": headers,
         "stack_hints": stack_hints,
+        "waf_hints": waf_hints,
         "cookies": cookies,
         "missing_security_headers": missing,
         "robots": robots,
