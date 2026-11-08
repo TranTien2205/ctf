@@ -891,6 +891,14 @@ _DISCLOSE_PATHS: list[tuple[str, re.Pattern]] = [
     ("/trace", re.compile(r"TRACE /|HTTP/1\.1", re.I)),
     ("/backup.zip", re.compile(r"PK\x03\x04")),
     ("/wp-config.php~", re.compile(r"DB_PASSWORD|DB_NAME", re.I)),
+    ("/swagger.json", re.compile(r'"swagger"\s*:\s*"|"openapi"\s*:', re.I)),
+    ("/api-docs", re.compile(r'"swagger"|"openapi"|"paths"\s*:', re.I)),
+    ("/metrics", re.compile(r"^# (HELP|TYPE)|_total \d|_seconds ", re.M)),
+    ("/console", re.compile(r"Werkzeug|Interactive Console|TRACE", re.I)),
+    ("/docker-compose.yml", re.compile(r"version:\s*['\"]|services:", re.I)),
+    ("/.npmrc", re.compile(r"_auth|_authToken|registry=", re.I)),
+    ("/.aws/credentials", re.compile(r"aws_access_key_id|aws_secret", re.I)),
+    ("/health", re.compile(r'"status"\s*:\s*"(UP|ok|healthy|pass)"', re.I)),
 ]
 
 

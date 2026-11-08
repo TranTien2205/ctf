@@ -255,6 +255,7 @@ class GuardedClient:
                 method = (spec.get("method") or "GET").upper()
                 lines = [f"{method} {path} HTTP/1.1",
                          f"Host: {host_port}",
+                         "Connection: keep-alive",
                          f"User-Agent: argus-raw/1.0"]
                 for k, v in spec.get("headers") or []:
                     if k.lower() in ("host",):
