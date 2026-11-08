@@ -69,6 +69,8 @@ Depth, one named file at a time:
 - `skills/ctf-osint/web-and-dns.md`
 - `skills/ctf-misc/dns.md`
 
+| Any domain/DNS/cert question | `references/dns-cert-whois.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

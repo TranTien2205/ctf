@@ -72,6 +72,8 @@ Depth, one named file at a time:
 - `skills/osint-triage/references/email-pattern-detection.md`
 - `skills/osint-triage/references/legal-considerations.md`
 
+| Any handle/identity pivot question | `references/handle-pivot.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

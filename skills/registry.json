@@ -1026,9 +1026,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 945,
-      "depth_files": 1,
-      "depth_tokens": 158,
+      "skill_tokens": 963,
+      "depth_files": 3,
+      "depth_tokens": 796,
       "use_when": [
         "a probe or source read produced this class's signal: extract the single most UNIQUE pivot and normalise it -- compute the key fingerprint rather than eyeballing it -- then produce an ordered plan of at most six queries, each with its source and the one fact it would confirm, for ctf-writeup-scout to run"
       ],
@@ -1053,9 +1053,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 830,
-      "depth_files": 1,
-      "depth_tokens": 161,
+      "skill_tokens": 848,
+      "depth_files": 3,
+      "depth_tokens": 928,
       "use_when": [
         "a probe or source read produced this class's signal: query TXT first because that is where a flag is actually planted, then sweep the record types that can carry data, then whois, then the certificate and its subject alternative names, which routinely leak the sibling hostname that is the real next step"
       ],
@@ -1079,9 +1079,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 898,
-      "depth_files": 1,
-      "depth_tokens": 159,
+      "skill_tokens": 916,
+      "depth_files": 3,
+      "depth_tokens": 913,
       "use_when": [
         "a probe or source read produced this class's signal: run exiftool and read ALL of its output rather than grepping one tag, then binwalk and strings for appended or embedded data; steghide, zsteg and outguess are absent here, so never claim an extraction with them"
       ],

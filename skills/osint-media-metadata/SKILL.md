@@ -73,6 +73,8 @@ Depth, one named file at a time:
 - `skills/ctf-osint/geolocation-and-media.md`
 - `skills/osint-triage/references/tool-commands.md`
 
+| Any media metadata question | `references/exif-and-document.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
