@@ -89,5 +89,14 @@
     "a string replace applied after formatting cannot match the placeholder it was meant to replace"
   ],
   "flag": null,
-  "schema_version": 1
+  "schema_version": 1,
+  "classification": {
+    "primary": "web-sqli",
+    "confidence": 0.47,
+    "secondary": [
+      "file-read-primitives",
+      "web-auth-session"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

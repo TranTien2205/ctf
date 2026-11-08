@@ -113,7 +113,6 @@
   "classification": {
     "primary": "web-auth-session",
     "secondary": [
-      "web-info-disclosure",
       "web-idor"
     ],
     "confidence": 0.9

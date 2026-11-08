@@ -471,16 +471,17 @@ presenting its technique as local experience.
 
 - **htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce** — `send two interleaved profile updates and observe which address receives which token`
   expected: a token belonging to one address arrives at the other
+- **htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti** — `submit a tautology in the field that is interpolated into the filter and count the rows rendered by the view`
+  expected: every row of the table comes back instead of one, exposing whichever columns the template prints
 - **htb-const-flask-jinja2-lipsum-rce** — `GET /{{7*7}}`
   expected: the custom 404 template renders <str>49</str>
 - **htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape** — `GET /?location={{7*7}} and then GET /?location={{_self}}`
   expected: the page renders 49 in place of the value, and _self renders __string_template__ followed by a hash: the parameter is compiled as template source
-- **htb-neonify-erb-ssti-newline-filter-bypass** — `POST / with neon=abc\n<%= 7*7 %>`
-  expected: the glow output renders 49
 
 ### Traps this tree has already paid for
 
 - A partial configuration overwrite loses the socket and bricks the instance permanently — and the re-solve proved this step is not needed at all.  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- a character blacklist is not a sandbox: chr() concatenation rebuilds any string once quotes and dots are stripped, and an iterating directive avoids the method call the blacklist was aimed at  *(htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti)*
 - a slash in the payload breaks the route pattern (<str> does not match slashes); slash-free shell commands are the easy route  *(htb-const-flask-jinja2-lipsum-rce)*
 - measure the jail, do not read it off the Dockerfile. This image sets LD_PRELOAD to a GNU libiconv build, which is the precondition for the well-known iconv memory-corruption bypass, but at runtime getenv('LD_PRELOAD') is EMPTY. Believing the Dockerfile would have sent the solve into a heap-grooming   *(htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape)*
 - puts inside eval goes to server stdout, not into the template output  *(htb-neonify-erb-ssti-newline-filter-bypass)*
@@ -491,21 +492,20 @@ presenting its technique as local experience.
 - a broad filter fired before the update semantics are understood mass-updates the collection and can cost the instance  *(htb-secnotes-mongoose-rename-prototype-pollution-local-gate)*
 - The bundle sends the raw token as the Authorization header with NO 'Bearer ' prefix; using Bearer gets 'Not authenticated' and reads like an authorization bug rather than a client mistake.  *(htb-speednet-graphql-dev-mutation-idor-alias-2fa-bypass)*
 - Testing the input only at submission time proves nothing about a second-order bug. Every direct probe of the username here returned a normal page while the injection already worked in the deferred job.  *(pico-crystal-peak-second-order-sqli-async-report)*
-- the insert is parameterised and accepts the payload silently, so testing the request that stores the value shows nothing and the flow looks safe  *(picoctf-expense-tracker-second-order-sqli-async-report-union)*
 
-*46 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 46 of 58 are NOT in this prompt and the cards are the complete record.*
+*52 more in the cards above; open the card before working its chain. One trap per card is shown before any card's second, so every card here is represented -- but 52 of 64 are NOT in this prompt and the cards are the complete record.*
 
 ### Blast radius recorded for this family
 
 - overwriting server configuration or an imported module can permanently break the instance  *(htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce)*
+- mostly additive and reversible, but read this before firing. The injection is SELECT-only. The key set gains one extra key: APPEND, never replace, or every other player's session breaks, and restore the original afterwards. The uploaded probe file and the rendered announcement ro  *(htb-bobbys-bistro-sqli-jwks-write-chameleon-ssti)*
 - arbitrary python execution as root inside the single-container app  *(htb-const-flask-jinja2-lipsum-rce)*
-- Steps 4 and 5 WRITE into the document root, and the .htaccess changes how Apache treats that directory for everyone until it is removed. Keep the dropped files to a private extension, and remove every one of them afterwards through the same Filesystem::remove gadget; this solve v  *(htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape)*
 
 ### Confirmed field notes
 
 - **2026-09-27 · pcalc · confirmed** (`web-command-injection`) — **Confirming probe that worked** > GET /?formula=_   (a single underscore, nothing else) Expected: the page renders _ . An undefined constant became its own name, so the runtime is PHP 7.x and the hig
 - **2026-09-27 · Jerryboree · confirmed** (`web-ssti`) — **Confirming probe that worked** > GET /?location={{7*7}} and then GET /?location={{_self}} Expected: the page renders 49 in place of the value, and _self renders __string_template__ followed by a has
 
-*12 cards, 58 traps, 2 confirmed notes.*
+*13 cards, 64 traps, 2 confirmed notes.*
 
 <!-- FORGED:END -->

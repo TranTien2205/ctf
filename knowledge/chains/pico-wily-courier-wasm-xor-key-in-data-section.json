@@ -108,5 +108,13 @@
     "A NUL byte inside the stored comparison value truncates strcmp, so the verdict function stops checking there and accepts many wrong answers. Verify by comparing the full transform output against the full stored value, not by trusting the verdict.",
     "When comparing memory against a result, slice exactly the same length. A 65-byte slice compared with a 41-byte result reports a mismatch that does not exist."
   ],
-  "flag": null
+  "flag": null,
+  "classification": {
+    "primary": "rev-native-check",
+    "confidence": 0.48,
+    "secondary": [
+      "rev-managed-code"
+    ],
+    "derived_by": "backfill_classification.py"
+  }
 }

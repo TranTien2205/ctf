@@ -1586,6 +1586,19 @@ class ChainReuseTests(unittest.TestCase):
             self.assertIn(card["verification"]["status"],
                           ("verified_live", "writeup-claimed", "unverified"))
 
+    def test_chain_card_classifications_name_real_classes(self):
+        classes = {c["id"] for c in json.loads(read("knowledge/bug-classes.json"))["classes"]}
+        for card in chain_match.load_chains():
+            classification = card.get("classification")
+            if not classification:
+                continue  # a primary is optional; an ambiguous chain stays unlabelled
+            primary = classification.get("primary")
+            self.assertIn(primary, classes,
+                          "%s names unknown class %r" % (card["id"], primary))
+            for secondary in classification.get("secondary", []):
+                self.assertIn(secondary, classes,
+                              "%s names unknown secondary class %r" % (card["id"], secondary))
+
     def test_chain_cards_carry_no_flags(self):
         for card in chain_match.load_chains():
             blob = json.dumps(card, ensure_ascii=False)

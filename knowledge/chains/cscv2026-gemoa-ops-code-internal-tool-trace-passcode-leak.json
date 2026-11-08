@@ -94,8 +94,7 @@
   "classification": {
     "primary": "web-logic-flaw",
     "secondary": [
-      "web-auth-session",
-      "web-info-disclosure"
+      "web-auth-session"
     ],
     "confidence": 0.4
   },
