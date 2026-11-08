@@ -142,6 +142,25 @@ def test_cli_tolerates_corrupt_session_files(tmp_path, capsys):
     assert "UNVERIFIED" in capsys.readouterr().out
 
 
+def test_verify_tolerates_nonregular_artifact(tmp_path):
+    """A directory swapped in for a sealed file is tamper, not a traceback:
+    verify must flag it in artifact_mismatch and carry on."""
+    import shutil
+    from argus.cli import main
+    from argus.session import verify_transcript
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    (sdir / "findings.json").unlink()
+    (sdir / "findings.json").mkdir()
+    res = verify_transcript(sdir)
+    assert "findings.json" in res.get("artifact_mismatch", [])
+    # transcript.jsonl itself swapped for a directory -> clean error, no crash
+    sdir2 = tmp_path / "weird"
+    (sdir2 / "transcript.jsonl").mkdir(parents=True)
+    res2 = verify_transcript(sdir2)
+    assert "not a regular file" in res2.get("error", "")
+
+
 def test_report_refuses_non_session_dir(tmp_path, capsys):
     """`argus report` must not fabricate a sealed session out of an empty
     directory - refuse before render/seal."""

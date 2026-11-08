@@ -74,10 +74,17 @@ def verify_transcript(sdir: Path) -> dict:
     if not tpath.exists():
         out["error"] = "no transcript.jsonl"
         return out
+    if not tpath.is_file():
+        out["error"] = "transcript.jsonl is not a regular file"
+        return out
+    try:
+        lines = tpath.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        out["error"] = f"transcript unreadable: {exc}"
+        return out
     prev = ""
     entries: dict[str, dict] = {}
-    for i, line in enumerate(
-            tpath.read_text(encoding="utf-8").splitlines(), 1):
+    for i, line in enumerate(lines, 1):
         if not line.strip():
             continue
         try:
@@ -137,7 +144,9 @@ def verify_transcript(sdir: Path) -> dict:
         mismatched = []
         for name, want in (dig.get("files") or {}).items():
             p = Path(sdir) / name
-            if not p.exists():
+            if not p.is_file():
+                # missing - or swapped for a directory: either way the
+                # sealed bytes are gone, which is itself a tamper signal
                 mismatched.append(name)
                 continue
             if name == "summary.json":
@@ -152,7 +161,11 @@ def verify_transcript(sdir: Path) -> dict:
                     mismatched.append(name)
                     continue
             else:
-                got = hashlib.sha256(p.read_bytes()).hexdigest()
+                try:
+                    got = hashlib.sha256(p.read_bytes()).hexdigest()
+                except OSError:
+                    mismatched.append(name)
+                    continue
             if got != want:
                 mismatched.append(name)
         if mismatched:
