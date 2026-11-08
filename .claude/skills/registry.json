@@ -2214,7 +2214,7 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
-      "skill_tokens": 1054,
+      "skill_tokens": 1136,
       "depth_files": 7,
       "depth_tokens": 4897,
       "use_when": [

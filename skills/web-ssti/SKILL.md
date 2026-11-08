@@ -62,6 +62,12 @@ injection — go back to `../web-triage/` and consider XSS instead.
 Use one harmless command first, such as printing the current user, and read the
 exact output before building anything larger.
 
+`python3 tools/web/ssti_gen.py --engine ENG --cmd 'id'` emits every
+reference shape for a named engine with your command substituted —
+`--marker 7` for the render probe, `--read PATH` for file-read forms,
+`--ban CHARS` to drop shapes a filter blocks. The payloads are
+candidates: fire them only after the marker evaluates.
+
 ## Filter and sandbox bypass
 
 Attribute names split and concatenated; indexes supplied through a request
