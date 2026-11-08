@@ -293,20 +293,68 @@ def test_send_timeout_never_infinite(ctx):
         encoding = "utf-8"
         url = "http://127.0.0.1/"
 
-    orig = ctx.client._client.request
+        def iter_bytes(self, n):
+            return iter(())
+
+    orig = ctx.client._client.stream
+
+    class _StreamCtx:
+        def __enter__(self):
+            return _Resp()
+
+        def __exit__(self, *a):
+            return False
 
     def spy(method, url, **kw):
         calls.append(kw)
-        return _Resp()
+        return _StreamCtx()
 
-    ctx.client._client.request = spy
+    ctx.client._client.stream = spy
     try:
         ctx.client.send("GET", "http://127.0.0.1/")
         ctx.client.send("GET", "http://127.0.0.1/", timeout=3.0)
     finally:
-        ctx.client._client.request = orig
+        ctx.client._client.stream = orig
     assert "timeout" not in calls[0]
     assert calls[1]["timeout"] == 3.0
+
+
+def test_response_body_read_is_bounded(ctx):
+    """A response larger than BODY_CAP must cap the stored body AND flag
+    truncated - the stream is abandoned instead of buffering it whole."""
+    import httpx
+    from argus.httpclient import BODY_CAP
+
+    class _BigResp:
+        status_code = 200
+        headers = httpx.Headers({"content-type": "text/plain"})
+        encoding = "utf-8"
+        url = "http://127.0.0.1/"
+
+        def iter_bytes(self, n):
+            # three 128KB chunks = 384KB > 200KB cap
+            for _ in range(3):
+                yield b"A" * 131072
+
+    class _Ctx:
+        def __enter__(self):
+            return _BigResp()
+
+        def __exit__(self, *a):
+            return False
+
+    orig = ctx.client._client.stream
+    ctx.client._client.stream = lambda *a, **k: _Ctx()
+    try:
+        out = ctx.client.send("GET", "http://127.0.0.1/")
+    finally:
+        ctx.client._client.stream = orig
+    assert out["body_truncated_at"] == BODY_CAP
+    assert len(out["body"]) <= BODY_CAP
+    # persisted transcript body is bounded too
+    entry = ctx.session._transcript[out["request_id"]]
+    assert entry["response"]["truncated"] is True
+    assert len(entry["response"]["body"]) <= BODY_CAP
 
 
 def test_transcript_records_wire_headers(lab_url, tmp_path):

@@ -168,6 +168,34 @@ class GuardedClient:
             event_hooks={"response": [_capture]},
         )
 
+    def _fetch_capped(self, method: str, url: str,
+                      req_headers: dict, body, tkw: dict,
+                      box: dict) -> tuple:
+        """One request via client.stream(): the body is read bounded at
+        BODY_CAP, so a hostile or misconfigured target cannot exhaust
+        memory by streaming an unbounded response - the old path pulled
+        resp.content (full buffering) before slicing.
+        Returns (resp, raw_bytes, truncated): resp is closed, but status/
+        headers/url/request stay readable; reading its body raises."""
+        with self._client.stream(
+                method, url, headers=req_headers, content=body,
+                follow_redirects=False, extensions={"_argus_box": box},
+                **tkw) as resp:
+            buf = bytearray()
+            for chunk in resp.iter_bytes(65536):
+                buf += chunk
+                if len(buf) > BODY_CAP:
+                    break
+            truncated = len(buf) > BODY_CAP
+            return resp, bytes(buf[:BODY_CAP]), truncated
+
+    @staticmethod
+    def _decode_body(raw: bytes, encoding: str | None) -> str:
+        try:
+            return raw.decode(encoding or "utf-8", errors="replace")
+        except (LookupError, TypeError):
+            return raw.decode("utf-8", errors="replace")
+
     def send(
         self,
         method: str,
@@ -200,16 +228,11 @@ class GuardedClient:
         # wait that overrides the client default; only pass it when set.
         tkw = {} if timeout is None else {"timeout": timeout}
         box: dict = {}
+        raw = b""
+        truncated = False
         try:
-            resp = self._client.request(
-                method.upper(),
-                url,
-                headers=req_headers,
-                content=body,
-                follow_redirects=False,
-                extensions={"_argus_box": box},
-                **tkw,
-            )
+            resp, raw, truncated = self._fetch_capped(
+                method.upper(), url, req_headers, body, tkw, box)
             # Manual redirect following: letting httpx follow automatically
             # would skip the scope check on each Location - a 302 to a
             # foreign host must be refused like any other out-of-scope URL.
@@ -233,24 +256,17 @@ class GuardedClient:
                         chain[-1]["budget_exhausted"] = True
                         break
                     self.sent += 1
-                resp = self._client.request(
-                    m2, nxt, headers=req_headers, content=b2,
-                    follow_redirects=False, extensions={"_argus_box": box},
-                    **tkw)
+                resp, raw, truncated = self._fetch_capped(
+                    m2, nxt, req_headers, b2, tkw, box)
                 hops += 1
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
-            raw = resp.content[:BODY_CAP]
-            try:
-                text = raw.decode(resp.encoding or "utf-8", errors="replace")
-            except (LookupError, TypeError):
-                text = raw.decode("utf-8", errors="replace")
             response_data = {
                 "status": resp.status_code,
                 "headers": _headers_dict(resp),
-                "body": text,
+                "body": self._decode_body(raw, resp.encoding),
                 "elapsed_ms": elapsed_ms,
                 "final_url": str(resp.url),
-                "truncated": len(resp.content) > BODY_CAP,
+                "truncated": truncated,
             }
             if chain:
                 response_data["redirects"] = chain
@@ -261,10 +277,10 @@ class GuardedClient:
             elapsed_ms = round((time.monotonic() - started) * 1000, 1)
             error = f"{type(exc).__name__}: {exc}"
             resp = resp or box.get("resp")
-            try:
-                rbody = resp.text[:BODY_CAP] if resp is not None else ""
-            except Exception:
-                rbody = ""  # stream was closed - headers still materialised
+            # raw was already read bounded inside the stream context; the
+            # closed Response's .text would raise ResponseNotRead here
+            rbody = self._decode_body(
+                raw, getattr(resp, "encoding", None)) if raw else ""
             response_data = {
                 "status": resp.status_code if resp is not None else 0,
                 "headers": _headers_dict(resp) if resp is not None else {},
@@ -295,7 +311,8 @@ class GuardedClient:
                                   "headers": _redact_headers(
                                       _headers_dict(resp),
                                       self._secret_values),
-                                  "body": resp.text[:BODY_CAP],
+                                  "body": self._decode_body(
+                                      raw, resp.encoding),
                                   "redirects": chain,
                                   "blocked_redirect": True,
                                   "blocked_to": blocked_to},
@@ -444,9 +461,18 @@ class GuardedClient:
                         resp.fp = _NoCloseFile(rbfile)  # share the real one
                         resp.begin()
                         # the full body MUST be drained or its bytes corrupt
-                        # the next response's parse on this reused connection
-                        rbody = resp.read().decode(
-                            "utf-8", "replace")[:BODY_CAP]
+                        # the next response's parse on this reused connection -
+                        # but only the first BODY_CAP is kept: a hostile server
+                        # cannot exhaust memory with an unbounded body
+                        buf = bytearray()
+                        while True:
+                            chunk = resp.read(65536)
+                            if not chunk:
+                                break
+                            if len(buf) <= BODY_CAP:
+                                buf += chunk
+                        rbody = bytes(buf[:BODY_CAP]).decode(
+                            "utf-8", "replace")
                         status = resp.status
                         rheaders = dict(resp.getheaders())
                     except (http.client.HTTPException, OSError,
