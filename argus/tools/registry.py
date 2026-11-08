@@ -59,6 +59,7 @@ def _impl(name: str) -> Callable:
         "probe_websocket": probes.probe_websocket,
         "probe_crlf": probes.probe_crlf,
         "probe_enum": probes.probe_enum,
+        "probe_lockout": probes.probe_lockout,
         "jwt_decode": analysis.jwt_decode,
         "jwt_forge": analysis.jwt_forge,
         "load_skill": analysis.load_skill,
@@ -467,6 +468,21 @@ TOOL_SCHEMAS: list[dict] = [
                                         "(default 'username')"},
          "users": {**_STR, "description": "Comma-separated candidate "
                                         "usernames (default common names)"}},
+        ["url", "data"],
+    ),
+    _schema(
+        "probe_lockout",
+        "Login rate-limit/lockout check: a small bounded burst of bad-"
+        "credential attempts with one bogus user. 429, lockout text, or "
+        "growing latency = throttled; identical failures throughout = "
+        "unthrottled guessing (standard report line).",
+        {"url": {**_STR, "description": URL_DESC},
+         "data": {**_STR, "description": "POST body template; param value "
+                                         "is replaced"},
+         "param": {**_STR, "description": "Body field carrying the username "
+                                        "(default 'username')"},
+         "tries": {**_STR, "description": "Attempts to send, 3-15 "
+                                        "(default 10)"}},
         ["url", "data"],
     ),
     _schema(

@@ -867,6 +867,52 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                     "is a real account (e.g. via password-reset)"}
 
 
+_LOCK_RE = re.compile(
+    r"lock(ed|out)|throttl|rate.?limit|too many|try again|captcha|"
+    r"temporar(ily|y) (block|disabl)|attempt(s)? (exceeded|remaining)",
+    re.I)
+
+
+def probe_lockout(ctx: Context, url: str, data: str,
+                  param: str = "username", tries: int = 10) -> dict:
+    """Login rate-limit/lockout check: N consecutive bad-credential attempts
+    with the SAME bogus user. A 429, a lockout message, or a growing delay
+    means throttling exists; N identical failures means password guessing
+    is unthrottled - a standard report line. Kept deliberately small so it
+    cannot itself be a brute-force run."""
+    tries = max(3, min(int(tries or 10), 15))
+    bogus_u = _marker("lk")
+    results = []
+    for i in range(tries):
+        r = _send(ctx, url, param, bogus_u, "POST", data,
+                  "probe_lockout", f"attempt {i + 1}")
+        body = r.get("body") or ""
+        results.append({"n": i + 1, "status": r["status"],
+                        "elapsed_ms": r["elapsed_ms"],
+                        "request_id": r["request_id"],
+                        "lock_marker": bool(_LOCK_RE.search(body))})
+        if r["status"] == 429 or _LOCK_RE.search(body):
+            break
+    last = results[-1]
+    throttled = last["status"] == 429 or last["lock_marker"] or \
+        any(t["lock_marker"] for t in results)
+    # slow-down channel: a linearly growing elapsed_ms is soft throttling
+    if not throttled and len(results) >= 4:
+        first_half = sum(t["elapsed_ms"] for t in results[:3]) / 3
+        last_half = sum(t["elapsed_ms"] for t in results[-3:]) / 3
+        throttled = last_half > first_half * 3 + 150
+    verdict = (
+        "throttling observed: " +
+        ("429 / lockout message" if any(
+            t["status"] == 429 or t["lock_marker"] for t in results)
+         else "responses grow slower (soft throttle)")
+        if throttled else
+        f"no lockout or rate limit after {len(results)} failed attempts - "
+        "online password guessing is unthrottled")
+    return {"verdict": verdict, "attempts": len(results),
+            "results": results}
+
+
 def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
     """Host-header poisoning: X-Forwarded-Host canary reflected into the
     body or Location means generated absolute links can be attacker-aimed

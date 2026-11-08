@@ -146,6 +146,16 @@ def test_enum_probe(lab_url, ctx):
     assert any(t["user"] == "admin" for t in out["results"]), out
 
 
+def test_lockout_probe(lab_url, ctx):
+    body = "username=x&password=x"
+    out = probes.probe_lockout(ctx, lab_url + "/login2", body)
+    assert "no lockout" in out["verdict"], out
+    assert out["attempts"] == 10, out
+    out = probes.probe_lockout(ctx, lab_url + "/login3", body)
+    assert "throttling observed" in out["verdict"], out
+    assert out["attempts"] < 10, out  # broke early on the 429
+
+
 def test_xfh_probe(lab_url, ctx):
     out = probes.probe_xfh(ctx, lab_url + "/reset")
     assert "host-header candidate" in out["verdict"], out

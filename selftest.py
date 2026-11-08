@@ -189,6 +189,14 @@ def main() -> int:
     out = probes.probe_redirect(ctx, base + "/safedirect?next=/", "next")
     check("redirect probe bypasses path filter",
           "protocol-relative" in out["verdict"])
+    out = probes.probe_lockout(ctx, base + "/login2",
+                               data="username=x&password=y")
+    check("lockout probe flags unthrottled login",
+          "no lockout" in out["verdict"])
+    out = probes.probe_lockout(ctx, base + "/login3",
+                               data="username=x&password=y")
+    check("lockout probe sees throttled login",
+          "throttling observed" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/api/config", data="theme=x")
     check("csrf probe sees text/plain replay", "text/plain" in out["verdict"])
     out = probes.probe_cors(ctx, base + "/api/data")

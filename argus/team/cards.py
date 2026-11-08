@@ -50,7 +50,7 @@ EXPLOIT = RoleCard(
         "probe_xxe", "probe_csrf", "probe_xfh", "probe_nosqli",
         "probe_upload", "probe_race", "probe_deserialize", "probe_cache",
         "probe_ppoll", "probe_smuggle", "probe_disclosure", "probe_websocket",
-        "probe_crlf", "probe_enum",
+        "probe_crlf", "probe_enum", "probe_lockout",
         "graphql_introspect", "jwt_decode", "jwt_forge", "run_external",
         "run_exploit", "list_exploits", "emit_lead", "record_finding", "finish",
     }),

@@ -26,8 +26,10 @@ formats.
 
 - User enumeration: different error for bad user vs bad pass; timing;
   registration "already exists"; reset "if the account exists" vs 404
-- Lockout/rate-limit absent after ~10 failures -> brute-force feasibility
-  (note it; do NOT brute force beyond proof on a real target)
+- `probe_lockout` sends a bounded burst (<=15) of bad-credential attempts:
+  429/lockout text/growing latency = throttled; identical failures =
+  unthrottled guessing (a standard report line - do NOT brute force
+  beyond proof on a real target)
 - Default/common creds on a lab or staging only: admin/admin, demo/demo
 - SQLi on login fields (see `sqli` auth set)
 - Response manipulation: server returns `{"success":false}` - try

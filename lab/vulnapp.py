@@ -11,6 +11,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
                                (AND arms all return the empty page)
     POST /login                SQLi auth bypass (' OR '1'='1), user-enum errors
     POST /login2               user-enum via timing (uniform error text)
+    POST /login3               rate-limited login: 429 after 5 fails/user
     GET  /ping?host=           command injection (sleep separators)
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
     GET  /download?file=       path traversal / file read
@@ -635,6 +636,20 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                     return
             self._send(body="<html><body>Invalid credentials.</body></html>")
             return
+        if path == "/login3":
+            # rate-limited login: after 5 failed attempts on one username
+            # the account is locked - exercises probe_lockout's positive
+            # path (login2 is uniform-error, login is unthrottled)
+            b = self._body()
+            u = b.get("username", "")
+            attempts = type(self)._lockout.get(u, 0)
+            if attempts >= 5:
+                self._send(429, "<html><body>Account locked - too many "
+                                "attempts, try again later.</body></html>")
+                return
+            type(self)._lockout[u] = attempts + 1
+            self._send(body="<html><body>Invalid credentials.</body></html>")
+            return
         if path == "/xml":
             # simulated XXE-prone parser: external entities get "resolved"
             # against the fake filesystem / a canned metadata service
@@ -808,6 +823,7 @@ def make_server(port: int = 0):
     Handler.db = _init_db()
     Handler._coupons = 1
     Handler._cache = {}
+    Handler._lockout = {}
     Handler._pp = {}
     Handler._usercfg = {"theme": "dark", "lang": "en"}
     os.makedirs(WWW, exist_ok=True)
