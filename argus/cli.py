@@ -457,7 +457,8 @@ def _demo(args) -> int:
                  session_dir=Path(args.session_dir),
                  model="scripted-demo", max_turns=16, rate_rps=0)
     if args.team:
-        result = _demo_team(cfg, base, _t, args, ScriptedClient)
+        result = _demo_team(cfg, base, _t, args, ScriptedClient,
+                            tok=_tok, forged=_forged)
     else:
         result = AgentLoop(cfg, llm=ScriptedClient(script),
                            quiet=args.quiet).run()
@@ -475,7 +476,8 @@ def _demo(args) -> int:
     return 0
 
 
-def _demo_team(cfg, base, _t, args, ScriptedClient):
+def _demo_team(cfg, base, _t, args, ScriptedClient,
+               tok: str = "", forged: str = ""):
     """Same scripted assessment through the real lead/worker pipeline:
     lead seeds the lead queue, a recon worker maps the surface, an exploit
     worker pulls the leads and verifies each one. Findings cite evidence by
@@ -495,9 +497,12 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                  _t("l3", "emit_lead", kind="endpoint",
                     url=base + "/api/user/2", note="enumerable object ids"),
                  _t("l4", "emit_lead", kind="endpoint", url=base,
-                    note="web root may serve sensitive artifacts")]},
+                    note="web root may serve sensitive artifacts"),
+                 _t("l5", "emit_lead", kind="endpoint",
+                    url=base + "/api/me",
+                    note="bearer-token api - check signing strength")]},
             {"text": "Leads queued; workers drain while I close out.",
-             "tool_calls": [_t("l5", "finish_engagement",
+             "tool_calls": [_t("l6", "finish_engagement",
                               summary="Team demo: recon mapped the surface, "
                                       "exploit verified SQLi, XSS, IDOR and "
                                       "info disclosure with verbatim "
@@ -567,8 +572,33 @@ def _demo_team(cfg, base, _t, args, ScriptedClient):
                               remediation="Deny dotfile/VCS paths; rotate "
                                           "exposed secrets.",
                               cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
-            {"tool_calls": [_t("e10", "finish",
-                              summary="4/4 leads verified with verbatim "
+            {"text": "JWT endpoint last: decode, crack, forge, prove.",
+             "tool_calls": [
+                 _t("e10", "http_request", method="GET",
+                    url=base + "/token?user=alice"),
+                 _t("e11", "jwt_decode", token=tok)]},
+            {"tool_calls": [
+                _t("e12", "jwt_forge", token=tok,
+                   claims='{"user":"admin","role":"admin"}',
+                   secret="secret123"),
+                _t("e13", "http_request", method="GET",
+                   url=base + "/api/me",
+                   headers={"Authorization": f"Bearer {forged}"})]},
+            {"tool_calls": [_t("e14", "record_finding",
+                              title="JWT weak secret: forged admin token "
+                                    "accepted",
+                              severity="critical", category="jwt",
+                              url=base + "/api/me",
+                              evidence_excerpt='"role": "admin"',
+                              description="Signing secret 'secret123' is "
+                                          "dictionary-weak; a forged admin "
+                                          "token is accepted verbatim.",
+                              remediation="Rotate to a high-entropy "
+                                          "secret; prefer asymmetric "
+                                          "signing.",
+                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
+            {"tool_calls": [_t("e15", "finish",
+                              summary="5/5 leads verified with verbatim "
                                       "evidence.")]},
         ],
     }
