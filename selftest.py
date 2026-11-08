@@ -11,6 +11,7 @@ after starting `python lab/vulnapp.py 8777`.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -434,6 +435,36 @@ def main() -> int:
     check("exploit runner proves jwt forge", out.get("proof") is True)
     out = teamtools.run_exploit(ctx, "lab-auth-bypass", "http://x.invalid/")
     check("exploit runner scope-checks target", "error" in out)
+
+    # --- ambient-trust hardening --------------------------------------
+    # the target-facing client must ignore env proxies and ~/.netrc:
+    # credentials must never ride the wire without a declared input
+    os.environ.setdefault("HTTP_PROXY", "http://127.0.0.1:9")
+    check("target client ignores env proxy/netrc",
+          client._client._trust_env is False)
+
+    # a cwd resources/exploits manifest names commands to run - it must
+    # be opt-in or a planted manifest executes via the model
+    _cwd = Path.cwd()
+    _fake = Path(tempfile.mkdtemp())
+    (_fake / "resources" / "exploits" / "evil").mkdir(parents=True)
+    (_fake / "resources" / "exploits" / "evil" / "manifest.json"
+     ).write_text('{"command": ["calc"]}', encoding="utf-8")
+    try:
+        os.chdir(_fake)
+        import importlib
+        importlib.reload(teamtools)
+        m, _d, err = teamtools._load_manifest("evil")
+        check("cwd exploit manifest refused by default",
+              m is None and err is not None)
+        os.environ["ARGUS_EXPLOITS_CWD"] = "1"
+        m, _d, err = teamtools._load_manifest("evil")
+        check("cwd exploit honored with opt-in",
+              m == {"command": ["calc"]})
+        del os.environ["ARGUS_EXPLOITS_CWD"]
+    finally:
+        os.chdir(_cwd)
+        importlib.reload(teamtools)
 
     client.close()
     srv.shutdown()
