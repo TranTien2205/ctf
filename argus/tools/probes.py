@@ -822,9 +822,10 @@ def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
             "pollute_id": poll["request_id"], "after_id": after["request_id"]}
 
 
-_SMUGGLE_G = re.compile(r"G(GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)|"
-                        r"'G[A-Z]+'|unrecognized method|bad request|"
-                        r"unsupported method", re.I)
+# the 'G' byte must show up in the error to count as desync evidence -
+# a generic "Bad Request" without the echoed bogus method proves nothing
+_SMUGGLE_G = re.compile(r"G(GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)\b|"
+                        r"['\"( ]G[A-Z]{2,}['\")] ?|method '?G", re.I)
 
 
 def probe_smuggle(ctx: Context, url: str) -> dict:

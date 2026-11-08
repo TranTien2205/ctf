@@ -174,6 +174,9 @@ def main() -> int:
           "prototype-pollution candidate" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync")
     check("smuggle probe sees cl.te desync", "desync candidate" in out["verdict"])
+    out = probes.probe_smuggle(ctx, base + "/login")
+    check("smuggle probe rejects cl-only endpoint",
+          "no cl.te signal" in out["verdict"])
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
