@@ -89,6 +89,12 @@ Then use one cross-origin form submission against an object you created:
 <script>document.forms[0].submit()</script>
 ```
 
+Server-side, `tools/web/csrf_probe.py` replays the state-changing request
+three ways — as sent, with `--token-field` stripped, and under a foreign
+Origin — and grades each against the baseline. A replay accepted without
+its token is the candidate; an accepted foreign replay still carrying the
+token only means the origin check is absent, reported as context.
+
 Use only methods, fields, and content types observed in source or the live form.
 A 200 or navigation is surface evidence. The class signal is an attributable
 before/after state change, read back with a separate request. If JSON is required

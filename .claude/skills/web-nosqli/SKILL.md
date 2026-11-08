@@ -75,6 +75,12 @@ documents you did not create come back. Record the verbatim matched-count or
 the returned ids. An identical response to the baseline is a negative — the
 value never reached a query operator.
 
+On an auth/filter shape, `tools/web/nosqli_probe.py` fires the matrix for
+you: good and bad baselines, then `$ne`/`$gt`/`$regex` in both JSON and
+`user[op]` form carriers, grading each against the success side. It
+refuses a write-looking URL unless `--write-ok` — the blast-radius rule
+above applies to the tool the same as to your hands.
+
 ## Routing
 
 Shares signals with: `../web-sqli/`, `../web-prototype-pollution/`. Check those before committing to this one.

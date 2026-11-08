@@ -1677,7 +1677,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1022,
+      "skill_tokens": 1115,
       "depth_files": 3,
       "depth_tokens": 1557,
       "use_when": [
@@ -1926,7 +1926,7 @@
       "verified_by": [
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
-      "skill_tokens": 990,
+      "skill_tokens": 1077,
       "depth_files": 3,
       "depth_tokens": 1428,
       "use_when": [
