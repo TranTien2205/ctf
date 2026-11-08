@@ -1,5 +1,7 @@
 # Argus — agent for web penetration testing
 
+[![test](https://github.com/TranTien2205/ctf/actions/workflows/test.yml/badge.svg?branch=agent-v2)](https://github.com/TranTien2205/ctf/actions/workflows/test.yml)
+
 Argus is an autonomous, LLM-driven agent for **authorized** web penetration
 testing. You give it a target URL and a scope; it runs the assessment —
 recon, surface mapping, hypothesis-driven probing, verification — and writes
