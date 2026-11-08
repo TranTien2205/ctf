@@ -75,6 +75,7 @@ SOURCE_RULES = (
     (r"jwt\.(?:decode|verify|sign)|jsonwebtoken|create_signed_value|cookie_secret|APP_KEY|SECRET_KEY", "web", "auth/session secret"),
     (r"multer|\.save\s*\(\s*(?:path|filename)|move_uploaded_file|request\.files", "web", "file upload"),
     (r"gets\s*\(|strcpy\s*\(|sprintf\s*\(|printf\s*\([^\"\n]", "pwn", "memory/format string"),
+    (r"strcmp\s*\(|memcmp\s*\(|license|serial|activation|crackme", "rev", "validation check"),
     (r"RSA|Crypto\.PublicKey|modulus|ciphertext|pow\s*\(", "crypto", "RSA/custom crypto"),
     (r"pcap|tshark|wireshark|steghide|exiftool", "forensics", "forensics/stego"),
     (r"__import__|input\s*\(|sandbox|jail", "misc", "jail/sandbox"),

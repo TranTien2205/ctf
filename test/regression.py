@@ -1428,6 +1428,23 @@ class WhiteboxFixtureTests(unittest.TestCase):
 
 
 class RoutingTests(unittest.TestCase):
+    def test_source_route_fixtures_produce_findings(self):
+        """ctf.py --source must name a category for every committed handout
+        fixture. The crackme fixture scanned clean for weeks because
+        SOURCE_RULES had no reverse-engineering row at all -- a silent dead end
+        only visible when somebody ran the tool on rev-shaped source."""
+        expected = {
+            "crypto-rsa-handout": "crypto",
+            "pwn-stack-handout": "pwn",
+            "rev-crackme-handout": "rev",
+        }
+        for fixture, category in expected.items():
+            result = ctf.source_route(str(ROOT / "test" / "fixtures" / fixture))
+            found = {item["category"] for item in result["findings"]}
+            self.assertIn(category, found,
+                          "source_route found no %r signal in fixture %r: %s"
+                          % (category, fixture, result["findings"]))
+
     def test_golden_routing_cases(self):
         for case in load_cases("routing.json")["cases"]:
             with self.subTest(text=case["text"]):
