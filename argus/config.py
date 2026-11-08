@@ -241,7 +241,10 @@ def load_config(args) -> Config:
         resume=getattr(args, "resume", "") or "",
         proxy=getattr(args, "proxy", "") or "",
         # >=4 chars: a shorter 'secret' would redact innocent bytes all over
-        # the transcript
-        secret_values=[s for s in (getattr(args, "secret", None) or [])
-                       if len(s) >= 4],
+        # the transcript (the same floor is enforced in Session for direct
+        # construction)
+        secret_values=[
+            s for s in (getattr(args, "secret", None) or [])
+            + (os.environ.get("ARGUS_SECRETS") or "").split(";")
+            if len(s) >= 4],
     )
