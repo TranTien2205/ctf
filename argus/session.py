@@ -286,6 +286,15 @@ class Session:
         host = urllib.parse.urlparse(target).hostname or "target"
         self.id = time.strftime("%Y%m%d-%H%M%S") + "-" + _slug(host)
         self.dir = Path(base_dir) / self.id
+        if self.dir.exists():
+            # same-second parallel runs name the same dir - bump a suffix
+            # or both runs interleave one transcript chain and overwrite
+            # each other's meta.json/findings.json
+            for n in range(2, 100):
+                cand = Path(base_dir) / f"{self.id}-{n}"
+                if not cand.exists():
+                    self.id, self.dir = f"{self.id}-{n}", cand
+                    break
         self.dir.mkdir(parents=True, exist_ok=True)
         self.started = time.time()
         self._seq = 0
