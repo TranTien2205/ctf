@@ -165,7 +165,8 @@ CLI (argus run | argus team)
   │   │   │                  lfi, redirect, cors, methods, reflection, idor,
   │   │   │                  ssrf, xxe, csrf, xfh, upload, race, deserialize,
   │   │   │                  cache, prototype-pollution, request-smuggling
-  │   │   │                  (CL.TE/TE.CL/obf raw sends), info-disclosure, websocket
+  │   │   │                  (CL.TE/TE.CL/obf raw sends), info-disclosure,
+  │   │   │                  websocket, crlf, enum, lockout, mass-assign
   │   │   ├── analysis.py    jwt_decode, load_skill, notes, record_finding,
   │   │   │                  run_external (sqlmap/nuclei/nmap/ffuf), finish
   │   │   ├── mcp_tools.py   mcp_list, mcp_call -> external MCP servers
@@ -176,7 +177,8 @@ CLI (argus run | argus team)
   │   ├── httpclient.py  one guarded client: scope + rate limit + transcript
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
   │   ├── skills/        27 loadable methodology modules (sqli, ssrf, idor…)
-  │   └── report/        report.md + summary.json, evidence embedded
+  │   └── report/        report.md + .html + .sarif + summary.json,
+  │                      CWE/OWASP mapped, evidence embedded
   │
   └── team: team/coordinator.py   lead + role workers on shared infra
       ├── leads.py       typed, deduped, prioritized work queue
