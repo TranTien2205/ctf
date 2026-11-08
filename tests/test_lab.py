@@ -102,6 +102,8 @@ def test_ssrf_probe(lab_url, ctx):
 def test_xxe_probe(lab_url, ctx):
     out = probes.probe_xxe(ctx, lab_url + "/xml")
     assert "xxe candidate" in out["verdict"], out
+    xi = next(r for r in out["results"] if r["name"] == "xinclude-fallback")
+    assert xi["marker"], xi
 
 
 def test_csrf_probe(lab_url, ctx):

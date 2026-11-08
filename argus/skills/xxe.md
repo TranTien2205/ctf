@@ -33,6 +33,15 @@ receive callbacks, and try DNS-style channels only when observable.
 - docx/xlsx: it's a zip of XML; entities inside `word/document.xml`
 - SAML `Response`/`AuthnRequest` when the endpoint accepts POSTed XML
 - Content-Type confusion: send the same JSON endpoint `application/xml`
+- **XInclude** when DOCTYPE/ENTITY are filtered - no DTD needed:
+
+```xml
+<r xmlns:xi="http://www.w3.org/2001/XInclude">
+  <xi:include href="file:///etc/passwd" parse="text"/>
+</r>
+```
+
+`probe_xxe` tries this automatically after the entity payloads.
 
 ## Impact ranking for a report
 

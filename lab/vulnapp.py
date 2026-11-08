@@ -560,6 +560,8 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
             m = re.search(r'<!ENTITY\s+(\w+)\s+SYSTEM\s+["\']([^"\']+)["\']',
                           raw)
+            xi = re.search(
+                r'<xi:include[^>]*href=["\']([^"\']+)["\'][^>]*>', raw)
             out = raw
             if m:
                 name, uri = m.group(1), m.group(2)
@@ -577,6 +579,22 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 else:
                     content = ""
                 out = raw.replace(f"&{name};", content)
+            elif xi:
+                # XInclude: the classic DOCTYPE-filter bypass - include
+                # elements resolve without any entity declaration
+                uri = xi.group(1)
+                if uri.startswith("file://"):
+                    target = os.path.normpath(
+                        os.path.join(FAKEFS, uri[7:].lstrip("/")))
+                    try:
+                        with open(target, encoding="utf-8",
+                                  errors="replace") as fh:
+                            content = fh.read(4096)
+                    except OSError:
+                        content = "[include read failed]"
+                else:
+                    content = ""
+                out = raw.replace(xi.group(0), content)
             self._send(body=f"<response><echo>{out}</echo></response>",
                        ctype="application/xml")
             return
