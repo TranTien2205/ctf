@@ -48,16 +48,18 @@ SAN list.
 - A wildcard record inflates subdomain enumeration — confirm a found name with
   a real query before counting it.
 - Record answers change; note the TTL and the resolver used.
-- `dig`/`host` may be absent — `nslookup -type=TXT` is the fallback that exists
-  nearly everywhere.
+- `dig`/`host` may be absent — `tools/dns_query.py` covers the loop with
+  stdlib wire-format queries; `nslookup -type=TXT` is the last fallback.
 
 ## Operational probe
 
 ```bash
+python3 tools/dns_query.py --name <domain> --type TXT   # flags hide in TXT
+python3 tools/dns_query.py --name <domain> --type ANY
+python3 tools/dns_query.py --name <domain> --axfr --server <ns>   # zone transfer
+python3 tools/dns_query.py --crtsh <domain>             # SAN leak = next hop
 dig TXT <domain> +short        # or: nslookup -type=TXT <domain>
-dig ANY <domain> +short
 whois <domain>
-curl -s "https://crt.sh/?q=%25.<domain>&output=json"
 ```
 
 ## Routing
