@@ -227,7 +227,10 @@ def load_config(args) -> Config:
             # tolerate URLs and bare hosts alike: --scope api.example.com
             # and --scope https://api.example.com mean the same host
             if "://" in h:
-                h = urllib.parse.urlparse(h).hostname or h
+                try:
+                    h = urllib.parse.urlparse(h).hostname or h
+                except ValueError:
+                    raise SystemExit(f"invalid --scope entry {h!r}")
             scope_hosts.append(h)
 
     exclude_paths = []
