@@ -77,7 +77,16 @@ def _claude_code_token() -> str:
         oauth["refreshToken"] = fresh.get("refresh_token", refresh)
         if fresh.get("expires_in"):
             oauth["expiresAt"] = int(time.time() * 1000) + fresh["expires_in"] * 1000
-        path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        # atomic write: a crash mid-write would corrupt the user's
+        # Claude Code credentials file; keep the original file mode so a
+        # 0600 credentials file does not silently widen
+        tmp = path.with_name(path.name + f".tmp-{os.getpid()}")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        try:
+            os.chmod(tmp, path.stat().st_mode)
+        except OSError:
+            pass
+        os.replace(tmp, path)
         return oauth["accessToken"]
     except Exception:
         return ""
