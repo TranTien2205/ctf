@@ -170,7 +170,8 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
         excerpt = (f.get("evidence_excerpt") or "").strip()
         ids = f.get("evidence_ids") or []
         cited = [entries.get(r) for r in ids]
-        if not excerpt or not cited or None in cited or \
+        if f.get("severity") not in SEVERITIES or \
+                not excerpt or not cited or None in cited or \
                 not any(excerpt in _evidence_text_of_entry(e)
                         for e in cited):
             bad.append(f.get("id", "?"))

@@ -16,8 +16,10 @@ _RANK = {"critical": 9.5, "high": 8.0, "medium": 5.5,
 
 
 def render_sarif(session: Session) -> Path:
-    findings = sorted(session.findings,
-                      key=lambda f: list(_LEVEL).index(f["severity"]))
+    sev_order = list(_LEVEL)
+    findings = sorted(session.findings, key=lambda f:
+                      sev_order.index(f["severity"])
+                      if f["severity"] in sev_order else len(sev_order))
     rules: dict[str, dict] = {}
     results = []
     for f in findings:
