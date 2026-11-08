@@ -305,14 +305,29 @@ def _rel_path_ok(val: str) -> bool:
 def _file_target_hosts(path: Path) -> set[str]:
     """host-like tokens inside a local file: URLs, Host: headers of raw
     requests (sqlmap -r), and bare host lines (nmap -iL, nuclei -l)."""
-    text = path.read_text(encoding="utf-8", errors="replace")
+    # bounded read - a planted multi-GB "target list" must not be
+    # buffered whole just to extract hostnames
+    with path.open(encoding="utf-8", errors="replace") as fh:
+        text = fh.read(2_000_000)
     hosts = set(_URL_RE.findall(text))
     for m in re.findall(r"(?im)^\s*host:\s*(\S+)", text):
-        hosts.add("http://" + m.rsplit(":", 1)[0].strip("[]"))
+        h = m.rsplit(":", 1)[0]
+        # IPv6 Host: header keeps its brackets
+        hosts.add("http://" + (h if h.startswith("[")
+                               else h.strip("[]")))
     for line in text.splitlines():
         first = line.strip().split()[0] if line.strip() else ""
+        if not first or first.startswith("#"):
+            continue
+        if first.count(":") >= 2 or first.startswith("["):
+            # IPv6 literal ('::1', '[::1]', '[::1]:80') - split(':')
+            # would yield ''/'[' and silently skip the host check
+            tok = first.split("%")[0]  # drop any zone id
+            hosts.add("http://" + tok if tok.startswith("[")
+                      else "http://[" + tok + "]")
+            continue
         host = first.split(":")[0]
-        if host and not host.startswith("#") and _HOST_RE.fullmatch(host):
+        if _HOST_RE.fullmatch(host):
             hosts.add("http://" + host)
     return hosts
 

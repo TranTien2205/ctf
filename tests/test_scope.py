@@ -245,6 +245,11 @@ def test_nmap_arg_guards(ctx, tmp_path):
     f = tmp_path / "targets.txt"
     f.write_text("127.0.0.1\nevil.example\n")
     assert n(["-iL", str(f)])
+    # IPv6 literals inside a target file must not slip past split(':')
+    f.write_text("127.0.0.1\n::1\n")
+    assert n(["-iL", str(f)])
+    f.write_text("[fe80::1]\n")
+    assert n(["-iL", str(f)])
     f.write_text("# comment\n127.0.0.1\n")
     assert n(["-iL", str(f)]) is None
     assert n(["-iL", str(tmp_path / "nope.txt")])
