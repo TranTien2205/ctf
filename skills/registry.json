@@ -2154,7 +2154,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-2-json-unicode-waf-bypass-time-blind-sqli"
       ],
-      "skill_tokens": 1796,
+      "skill_tokens": 1856,
       "depth_files": 13,
       "depth_tokens": 17590,
       "use_when": [
