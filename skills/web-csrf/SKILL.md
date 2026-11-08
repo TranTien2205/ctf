@@ -65,6 +65,10 @@ Depth, one named file at a time:
 
 - `skills/ctf-web/client-side.md`
 
+| Signal or task | Open |
+|---|---|
+| Any CSRF delivery question | `references/delivery-shapes.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

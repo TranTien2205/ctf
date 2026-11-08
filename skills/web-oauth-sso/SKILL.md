@@ -79,6 +79,10 @@ Depth, one named file at a time:
 - `skills/web-auth-session/references/oauth-flow-issues.md`
 - `skills/ctf-web/auth-infra.md`
 
+| Signal or task | Open |
+|---|---|
+| Any OAuth/SSO flow question | `references/flow-abuse.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

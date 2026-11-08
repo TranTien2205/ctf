@@ -72,6 +72,13 @@ Depth, one named file at a time:
 - `skills/ctf-web/client-side.md`
 - `skills/web-triage/references/http-parser-differential.md`
 
+| Signal or task | Open |
+|---|---|
+| Front and back may disagree on where a body ends | `references/cl-te-desync.md` |
+| A websocket or protocol upgrade sits in the path | `references/upgrade-smuggling.md` |
+| A value lands in a request or response header, raw | `references/crlf-injection.md` |
+| The needed file is not obvious | `references/README.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

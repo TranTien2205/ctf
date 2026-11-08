@@ -26,6 +26,23 @@ If the application exposes a stable true/false response, use a bounded prefix
 oracle and binary search the character set. Keep requests sequential if the
 signal is timing-based. Establish baseline jitter before setting a threshold.
 
+## Aggregation pipelines
+
+When the endpoint accepts an *array* body, the value may reach `aggregate()`
+rather than `find()` — a much larger operator surface. The confirmed probe
+(UnEarthly Shop):
+
+```json
+[{"$limit":1},{"$unionWith":"users"},{"$match":{"username":{"$exists":true}}}]
+```
+
+`$unionWith` concatenates a *different collection* into the pipeline output —
+the product listing leaked the `users` collection. Siblings worth the same
+input path: `$lookup` (foreign-collection join), `$facet`, `$merge`/`$out`
+(write-shaped — never fire without `--write-ack`), `$function` (server-side JS
+where enabled). Falsifier: the array is rejected or validated element-by-element
+against an allowed-stage list.
+
 ## Driver caveats
 
 - ODM strict mode may strip or reject operators before they reach the database.

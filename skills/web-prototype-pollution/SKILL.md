@@ -79,6 +79,13 @@ Depth, one named file at a time:
 
 - `skills/ctf-web/node-and-prototype.md`
 
+| Signal or task | Open |
+|---|---|
+| A JSON body merges into a server-side object (Node/JS) | `references/server-side-merge.md` |
+| Python merge paths touching `__class__`/`__globals__` | `references/class-pollution-python.md` |
+| Client-side merge via URL or stored field | `references/client-side-dom.md` |
+| The needed file is not obvious | `references/README.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

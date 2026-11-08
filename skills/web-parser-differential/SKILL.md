@@ -97,6 +97,14 @@ Depth, one named file at a time:
 
 - `skills/web-triage/references/http-parser-differential.md`
 
+| Signal or task | Open |
+|---|---|
+| A path, route or host value is parsed twice | `references/path-normalization.md` |
+| A proxy adds a trust header the backend believes | `references/proxy-header-abuse.md` |
+| HTTP version or vhost may differ between layers | `references/protocol-and-vhost.md` |
+| A cookie, email header or token is decoded differently at two layers | `references/structured-field-differentials.md` |
+| The needed file is not obvious | `references/README.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
