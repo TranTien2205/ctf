@@ -17,7 +17,7 @@ Bounded: one UDP exchange per type, one TCP connection for AXFR, one
 HTTPS GET for crt.sh. NXDOMAIN/timeout/refused are reported as data,
 not retried silently.
 """
-import argparse, json, os, random, socket, struct, sys
+import argparse, json, os, random, re, socket, struct, sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "web"))
@@ -193,6 +193,80 @@ def crtsh(domain):
                     "feed them back through --type TXT/A"}
 
 
+_WHOIS_KEYS = ("domain name", "registrar", "whois server",
+               "updated date", "creation date", "registrar registration "
+               "expiration date", "registry expiry date", "expiry date",
+               "name server", "domain status", "status", "dnssec",
+               "registrant organization", "registrant org",
+               "registrant country")
+
+
+def _whois_field(body, key):
+    vals = []
+    for line in body.splitlines():
+        if line.split(":", 1)[0].strip().lower() == key:
+            v = line.split(":", 1)[1].strip()
+            if v and v not in vals:
+                vals.append(v)
+    return vals
+
+
+def whois_parse(body, server=None):
+    """Whois text -> curated fields; repeats kept as lists."""
+    out = {"server": server, "fields": {}, "emails": []}
+    for key in _WHOIS_KEYS:
+        vals = _whois_field(body, key)
+        if vals:
+            out["fields"][key] = vals if len(vals) > 1 else vals[0]
+    emails = sorted({m.group(0) for m in
+                     re.finditer(
+                         r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}",
+                         body)})
+    out["emails"] = emails
+    out["raw_head"] = body[:400]
+    return out
+
+
+def _whois_query(host, question, timeout):
+    s = socket.create_connection((host, 43), timeout)
+    try:
+        s.sendall(question.encode("utf-8", "replace") + b"\r\n")
+        out = b""
+        while len(out) < 512 * 1024:
+            d = s.recv(4096)
+            if not d:
+                break
+            out += d
+    finally:
+        s.close()
+    return out.decode("utf-8", "replace")
+
+
+def whois(target, timeout=10):
+    """TCP/43 whois: bootstrap the TLD server from whois.iana.org, then
+    query it. Works on names and bare IPs (ARIN-family referral)."""
+    if all(c.isdigit() or c == "." for c in target):
+        host = "whois.arin.net"
+        try:
+            return whois_parse(_whois_query(host, "n " + target,
+                                            timeout), host)
+        except OSError as e:
+            return {"error": "%s query failed: %s" % (host, e)}
+    tld = target.rsplit(".", 1)[-1].lower()
+    try:
+        iana = _whois_query("whois.iana.org", tld, timeout)
+    except OSError as e:
+        return {"error": "iana bootstrap failed: %s" % e}
+    server = (_whois_field(iana, "whois") or [None])[0]
+    if not server:
+        return {"error": "iana has no whois server for .%s" % tld,
+                "iana_head": iana[:400]}
+    try:
+        return whois_parse(_whois_query(server, target, timeout), server)
+    except OSError as e:
+        return {"error": "%s query failed: %s" % (server, e)}
+
+
 def _selftest() -> int:
     """Parse a canned DNS TXT answer; network paths stay untested
     offline — they are one socket each by construction."""
@@ -215,6 +289,16 @@ def _selftest() -> int:
         b"\xc0\x0c" + struct.pack(">HHIH", 5, 1, 60, 7) + name_wire
     n, o = _rname(buf2, 27)
     assert n == "x.example", (n, o)
+    # whois parser on a canned body
+    body = ("Domain Name: EXAMPLE.COM\r\n"
+            "Registrar: Example Registrar, LLC\r\n"
+            "Name Server: NS1.EXAMPLE.COM\r\nName Server: NS2.EXAMPLE.COM\r\n"
+            "Registrant Email: admin@example.com\r\n")
+    w = whois_parse(body, "whois.example")
+    assert w["fields"]["name server"] == ["NS1.EXAMPLE.COM",
+                                          "NS2.EXAMPLE.COM"], w
+    assert w["fields"]["registrar"] == "Example Registrar, LLC", w
+    assert w["emails"] == ["admin@example.com"], w
     print("dns_query selftest: ok")
     return 0
 
@@ -227,10 +311,15 @@ def main() -> int:
     ap.add_argument("--server")
     ap.add_argument("--axfr", action="store_true")
     ap.add_argument("--crtsh", metavar="DOMAIN")
+    ap.add_argument("--whois", metavar="TARGET",
+                    help="TCP/43 whois on a domain or IP")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return _selftest()
+    if a.whois:
+        print(json.dumps(whois(a.whois), indent=1))
+        return 0
     if a.crtsh:
         print(json.dumps(crtsh(a.crtsh), indent=1))
         return 0

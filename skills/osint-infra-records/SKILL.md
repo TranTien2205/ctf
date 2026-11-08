@@ -58,6 +58,7 @@ python3 tools/dns_query.py --name <domain> --type TXT   # flags hide in TXT
 python3 tools/dns_query.py --name <domain> --type ANY
 python3 tools/dns_query.py --name <domain> --axfr --server <ns>   # zone transfer
 python3 tools/dns_query.py --crtsh <domain>             # SAN leak = next hop
+python3 tools/dns_query.py --whois <domain>             # TCP/43, iana bootstrap
 dig TXT <domain> +short        # or: nslookup -type=TXT <domain>
 whois <domain>
 ```
