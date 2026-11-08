@@ -121,7 +121,7 @@ def probe_reflection(ctx: Context, url: str, param: str,
 
 
 def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
-               data: str | None = None, json_body: bool = False) -> dict:
+               data: str | None = None) -> dict:
     tool = "probe_sqli"
     base = _send(ctx, url, param, "1", method, data, tool, "baseline")
     quote = _send(ctx, url, param, "1'", method, data, tool, "syntax probe")
