@@ -109,12 +109,21 @@ def load_attempts():
         except (OSError, ValueError):
             continue
         for dead in payload.get("layers_measured_dead", []):
+            challenge = payload.get("challenge") or name
+            if isinstance(challenge, dict):
+                challenge = challenge.get("name") or name
             out.append({
-                "from_challenge": payload.get("challenge") or name,
+                "from_challenge": challenge,
                 "layer": dead.get("layer", ""),
                 "mechanism": dead.get("mechanism", ""),
-                "measurement": dead.get("what_was_measured", ""),
-                "reopen_if": dead.get("precondition_that_would_reopen", ""),
+                # older kill maps wrote the same two fields as `measurement`
+                # and `reopens_if`; reading only the new spelling silently
+                # empties the two lines a subagent needs to judge its own
+                # falsifier.
+                "measurement": dead.get("what_was_measured")
+                                or dead.get("measurement", ""),
+                "reopen_if": dead.get("precondition_that_would_reopen")
+                             or dead.get("reopens_if", ""),
             })
     return out
 
