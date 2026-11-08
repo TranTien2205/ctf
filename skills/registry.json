@@ -1569,7 +1569,7 @@
       "verified_by": [
         "htb-encodecept-charset-xss-cache-deception-orm-oracle-marshal-rce"
       ],
-      "skill_tokens": 1094,
+      "skill_tokens": 1186,
       "depth_files": 4,
       "depth_tokens": 4077,
       "use_when": [
@@ -1789,7 +1789,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 992,
+      "skill_tokens": 1060,
       "depth_files": 3,
       "depth_tokens": 738,
       "use_when": [

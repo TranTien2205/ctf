@@ -70,6 +70,11 @@ curl -i -H 'X-Original-URL: /admin' "$BASE/"                # middleware ACL
 curl -i -H 'Host: evil.example' "$BASE/robots.txt"          # canonical-URL sink
 ```
 
+`tools/web/host_probe.py` sweeps the same header set with one canary
+marker and grades each response: `reflected-into-body` (link-generation
+sink, verbatim excerpt attached) or `routing-delta` (status/signature
+change vs baseline = vhost or middleware ACL routing).
+
 ## Routing
 
 Shares signals with: `../web-parser-differential/`, `../web-cache-poisoning/`. Check those before committing to this one.

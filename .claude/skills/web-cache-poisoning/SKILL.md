@@ -71,6 +71,13 @@ curl -i -H 'X-Forwarded-Host: canary.invalid' "$BASE/"      # write the poisoned
 curl -i "$BASE/"                                            # victim view, no probe header
 ```
 
+`tools/web/cache_probe.py` runs this pair per candidate header
+(X-Forwarded-Host/Scheme/Server, X-Host, X-Original-URL, X-Rewrite-URL),
+each under its own cache-buster key so cases cannot contaminate each
+other. It reports `reflected` vs `persisted_in_clean` with verbatim
+excerpts — only persistence is poisoning; a lone reflection is recorded
+per-case.
+
 Record the cache status header on both requests AND whether the canary value
 is reflected in the victim response. Confirmation requires all three: the
 probe request stored (HIT on the second identical request), the keyed input
