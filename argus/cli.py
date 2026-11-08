@@ -297,7 +297,9 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         sums = [_summ(d) for d in args.dirs]
         if args.csv:
-            hdr = "session,mode,findings,requests,ttf_s,duration_s,endpoints,llm_calls,workers,tokens_in,tokens_out"
+            hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
+                   "endpoints,llm_calls,workers,tokens_in,tokens_out,"
+                   "cache_read,cache_write")
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
@@ -305,7 +307,8 @@ def main(argv: list[str] | None = None) -> int:
                       f"{s.get('requests','?')},{s.get('ttf') or ''},"
                       f"{s.get('duration_s') or ''},"
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
-                      f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)}")
+                      f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)},"
+                      f"{t.get('cache_read',0)},{t.get('cache_write',0)}")
             return 0
         keys = [("mode", "mode"), ("findings", "findings"),
                 ("requests", "requests"),
@@ -313,16 +316,18 @@ def main(argv: list[str] | None = None) -> int:
                 ("duration_s", "duration_s"),
                 ("coverage", "endpoints_touched"),
                 ("llm_calls", "llm_calls"), ("workers", "workers"),
-                ("tokens", "tokens_in_out")]
+                ("tokens", "tokens_in_out"), ("cache", "cache_read_write")]
         labels = [f"S{i + 1}" for i in range(len(sums))]
         w = max(24, max(len(s['dir']) for s in sums) + 2)
         print(f"{'metric':<24}" + "".join(f"{l:<{w}}" for l in labels))
         print(f"{'':24}" + "".join(f"{s['dir']:<{w}}" for s in sums))
         for k, label in keys:
             def _v(s, k=k):
+                t = s.get("tokens") or {}
                 if k == "tokens":
-                    t = s.get("tokens") or {}
                     return f"{t.get('in',0)}/{t.get('out',0)}"
+                if k == "cache":
+                    return f"{t.get('cache_read',0)}/{t.get('cache_write',0)}"
                 return str(s.get(k))
             print(f"{label:<24}" + "".join(f"{_v(s):<{w}}" for s in sums))
         return 0
