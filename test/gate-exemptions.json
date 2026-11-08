@@ -60,6 +60,10 @@
       "reason": "a migration note about moving between two trees on one machine; it must name both by their real paths, and it is not an instruction the agent runs inside the tree."
     },
     {
+      "path": "SYSTEM_AUDIT.md",
+      "reason": "a historical audit of the tree as found; it names where the tree sat at audit time to describe what was wrong, not as a command to run."
+    },
+    {
       "path": "test/gate-exemptions.json",
       "reason": "this file states the rule, so it quotes the pattern it forbids."
     }

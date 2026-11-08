@@ -34,7 +34,6 @@ Three consequences, and they are not intuitive:
 ## Minute 0 to 5 — build the board
 
 ```bash
-cd ~/ctf-v2
 python3 selfcheck.py                      # one second, offline; fix any FAIL first
 ```
 

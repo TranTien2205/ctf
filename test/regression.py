@@ -535,7 +535,8 @@ class ContractTests(unittest.TestCase):
         scanned by its own check. Paths under the challenges directory are exempt,
         being historical records of where handout source sat at solve time.
         """
-        rooted = re.compile(r"~/ctf(?:-v[0-9]+)?/(?!challenges/)[A-Za-z0-9_./-]*")
+        rooted = re.compile(
+            "~" + r"/ctf(?:-v[0-9]+)?(?:(?![\w/])|/(?!challenges/)[A-Za-z0-9_./-]*)")
         allowed = {}
         for entry in exemptions()["tree_root_mentions"]:
             self.assertTrue(entry.get("reason", "").strip(),
@@ -1075,9 +1076,12 @@ class ContractTests(unittest.TestCase):
         which is the check that would have caught it.
         """
         sources = (list((ROOT / "skills").rglob("*.md"))
+                   + list((ROOT / "tools").rglob("*.md"))
                    + [ROOT / rel for rel in CONTROL_PLANE]
                    + [ROOT / "AGENTS.md"]
-                   + sorted((ROOT / ".claude" / "commands").glob("*.md")))
+                   + sorted((ROOT / ".claude" / "commands").glob("*.md"))
+                   + sorted((ROOT / ".claude" / "workflows").glob("*.md"))
+                   + sorted((ROOT / ".claude" / "agents").glob("*.md")))
         dangling = []
         for path in sources:
             if not path.is_file():
@@ -1273,10 +1277,12 @@ class ContractTests(unittest.TestCase):
         flags as missing.
         """
         sources = (list((ROOT / "skills").rglob("*.md"))
+                   + list((ROOT / "tools").rglob("*.md"))
                    + [ROOT / rel for rel in CONTROL_PLANE]
                    + [ROOT / "AGENTS.md"]
                    + sorted((ROOT / ".claude" / "commands").glob("*.md"))
                    + sorted((ROOT / ".claude" / "agents").glob("*.md"))
+                   + sorted((ROOT / ".claude" / "workflows").glob("*.md"))
                    + sorted((ROOT / ".claude" / "workflows").glob("*.js")))
         helpcache = {}
 
