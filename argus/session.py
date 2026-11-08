@@ -49,6 +49,19 @@ def _chain(prev: str, entry: dict) -> str:
 
 
 _REDACTED = "•••redacted•••"
+_EVENT_VALUE_CAP = 60_000
+
+
+def _bound_value(v):
+    if isinstance(v, str):
+        return v if len(v) <= _EVENT_VALUE_CAP else v[:_EVENT_VALUE_CAP] + "…[truncated]"
+    try:
+        s = json.dumps(v, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        s = str(v)
+    if len(s) <= _EVENT_VALUE_CAP:
+        return v
+    return s[:_EVENT_VALUE_CAP] + "…[truncated]"
 
 
 def _redact_url(url):
@@ -559,7 +572,8 @@ class Session:
             self._seq += 1
             rid = f"r{self._seq}"
             entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind,
-                     **_redact_obj(detail, self.secret_values)}
+                     **{k: _bound_value(v) for k, v in
+                        _redact_obj(detail, self.secret_values).items()}}
             if agent:
                 entry["agent"] = agent
             entry["chain"] = _chain(self._last_chain, entry)
