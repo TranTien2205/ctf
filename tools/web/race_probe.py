@@ -612,6 +612,14 @@ class _Shop:
         # reset(): a check needs the phase boundary to fall between the serial
         # baseline and the burst.
         self.drift = {}
+        # the rendezvous the /buy handler holds a cohort at. The client's
+        # release barrier sends the burst together, but on a loaded box the OS
+        # still staggers thread starts past the check-then-act window and the
+        # oversell never happens — the selftest then fails on scheduling, not
+        # on code. The handler holding requests until a second one joins (or
+        # the window lapses) makes the overlap a property of the fixture.
+        self.release = None
+        self.waiters = 0
 
     def reset(self):
         self.stock = 1
@@ -718,6 +726,25 @@ def _mock_server(window=0.2):
                     shop.inflight -= 1
 
         def _buy(self):
+            # hold the cohort: a lone request waits out the window (a serial
+            # baseline request pays it once), a second arrival releases every
+            # waiter at once so the burst reads stock together. Without this,
+            # whether the burst overlapped depended on thread-start latency.
+            with shop.counter:
+                if shop.release is None:
+                    shop.release = threading.Event()
+                    timer = threading.Timer(shop.window, shop.release.set)
+                    timer.daemon = True
+                    timer.start()
+                ev = shop.release
+                shop.waiters += 1
+                if shop.waiters >= 2:
+                    ev.set()
+            ev.wait(10)
+            with shop.counter:
+                shop.waiters -= 1
+                if shop.waiters == 0:
+                    shop.release = None
             seen = shop.stock                    # read
             time.sleep(shop.window)              # the check-then-act window
             if seen <= 0:
