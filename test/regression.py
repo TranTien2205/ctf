@@ -302,6 +302,20 @@ class StructureTests(unittest.TestCase):
                          "ctf.sqlite3 indexes %d cards but %d are on disk; "
                          "re-run python tools/build_index.py" % (rows, expected))
 
+    def test_every_planner_technique_has_a_policy(self):
+        """A RULES technique with no first-probes.json entry silently degrades
+        to 'run the cheapest confirming probe' -- five of seventeen were in
+        that state, so the planner gave crackme and IDOR briefs no real probe.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        import plan
+        policies = json.loads(read("knowledge/first-probes.json"))
+        techniques = {t for rules in plan.RULES.values() for t, _ in rules}
+        missing = sorted(techniques - set(policies))
+        self.assertEqual(missing, [],
+                         "planner techniques with no first-probes.json policy: %s"
+                         % missing)
+
     def test_every_router_is_reachable_from_ctf_py(self):
         """The reverse direction: a router no ctf.py category resolves to is dead.
 

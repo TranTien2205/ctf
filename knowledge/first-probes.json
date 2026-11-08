@@ -59,5 +59,35 @@
   "expected": "a typed estate inventory and the list of recovery-scored services",
   "falsifier": "nothing is live or availability-scored -- route to dfir-sherlock-triage instead",
   "next": "one dfir-* class per artifact family that survives the intake"
+ },
+ "artifact-analysis": {
+  "probe": "identify the artifact type, then run metadata/strings before any deep parser",
+  "expected": "artifact type confirmed and one lead (timestamp, path, keyword) to follow",
+  "falsifier": "the artifact is intact but carries nothing beyond the surface record",
+  "next": "route to the matching forensics reference for the identified type"
+ },
+ "encoding-constraint": {
+  "probe": "normalize/decode exactly one layer and record the alphabet diff",
+  "expected": "each decode step changes the alphabet in a measurable way",
+  "falsifier": "the carrier is not a plain encoding (encrypted or keyed)",
+  "next": "name the final constraint and solve it with the cheapest solver"
+ },
+ "idor": {
+  "probe": "request the same object id as a second identity and diff the responses",
+  "expected": "the second identity reads or mutates the object",
+  "falsifier": "ownership is enforced on the server side, not just hidden client-side",
+  "next": "enumerate the id space only after the differential confirms"
+ },
+ "parameter-weakness": {
+  "probe": "collect every parameter (key size, exponent, nonce, mode) and check the known-weak list",
+  "expected": "one parameter matches a named weakness pattern",
+  "falsifier": "all parameters are strong; the attack is in usage, not parameters",
+  "next": "run the deterministic attack for the matched weakness"
+ },
+ "validation-path": {
+  "probe": "strings and symbols first; find the compare that decides correct/wrong",
+  "expected": "one deciding check with its input and expected value visible",
+  "falsifier": "the check is computed, not compared (hash, transform, VM)",
+  "next": "replicate the check outside the binary before patching it"
  }
 }
