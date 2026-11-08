@@ -1648,7 +1648,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 948,
+      "skill_tokens": 1017,
       "depth_files": 2,
       "depth_tokens": 1433,
       "use_when": [
@@ -1982,7 +1982,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 914,
+      "skill_tokens": 985,
       "depth_files": 3,
       "depth_tokens": 1058,
       "use_when": [
@@ -2378,7 +2378,7 @@
       "verified_by": [
         "htb-xxe-content-type-branch-simplexml-noent-file-read"
       ],
-      "skill_tokens": 1068,
+      "skill_tokens": 1138,
       "depth_files": 3,
       "depth_tokens": 1252,
       "use_when": [

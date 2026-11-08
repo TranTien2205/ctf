@@ -76,6 +76,11 @@ curl -i --max-time 10 \
   "$BASE/login?next=https%3A%2F%2Fattacker.invalid%2Flanding"
 ```
 
+`tools/web/redirect_probe.py` sweeps the usual parameter names (or one
+`--param`) and the boundary forms — `//host`, `%5c`, userinfo,
+subdomain — with `follow=False`, reporting any case whose `Location`
+resolves to the canary host as a candidate with the verbatim header.
+
 Record the exact `Location` value and status. Then test one parser-boundary
 variant only if the first destination is rejected: a leading `//`, encoded
 slash, backslash, userinfo form, or a scheme-relative URL must be chosen from

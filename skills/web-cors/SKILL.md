@@ -82,6 +82,11 @@ curl -i -X OPTIONS -b "$COOKIE_JAR" \
   "$BASE/api/profile"
 ```
 
+`tools/web/cors_probe.py` fires the origin matrix — foreign, `null`,
+subdomain-of-attacker, subdomain-of-target — and grades each
+ACAO/ACAC pair: `reflected-with-credentials` is the exploitable shape,
+`wildcard-no-credentials` usually is not, `absent` is a negative.
+
 Record `Access-Control-Allow-Origin`, `Access-Control-Allow-Credentials`,
 allowed methods/headers, and whether the response carries authenticated data.
 Confirmation requires a foreign origin that the browser accepts with

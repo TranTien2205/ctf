@@ -91,6 +91,10 @@ file reference that the supplied challenge definitely contains. If there is no
 echo channel, use an out-of-band URL only when the challenge provides a
 controlled callback — `tools/web/oob_listener.py serve` records each hit with
 headers and body to a JSONL log, and `canary` mints a unique URL per payload.
+`tools/web/xxe_gen.py` emits each form verbatim — `--probe` for the
+entity-echo marker, `--file PATH` for the read, `--oob URL` for the
+parameter-entity callback, `--oob URL --file PATH` for the exfiltrating
+form — so a malformed DTD is never the reason a probe fails.
 Record status, body length, parser error, and callback evidence separately. A
 malformed XML error does not prove external entity resolution.
 
