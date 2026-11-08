@@ -6,6 +6,7 @@ these cards exist to match preconditions, not to carry answers.
 """
 import json
 import os
+import sys
 
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "knowledge", "chains")
 
@@ -328,14 +329,24 @@ CHAINS = [
 
 
 def main():
+    force = "--force" in sys.argv
     os.makedirs(OUT, exist_ok=True)
+    written, kept = 0, []
     for card in CHAINS:
         card["schema_version"] = 1
         path = os.path.join(OUT, card["id"] + ".json")
+        # Cards are hand-reviewed after generation (and classified by
+        # backfill_classification.py); CHAINS no longer carries those edits.
+        # Default to leaving an existing card alone rather than reverting
+        # review work; --force rewrites from CHAINS anyway.
+        if os.path.exists(path) and not force:
+            kept.append(card["id"])
+            continue
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(card, handle, ensure_ascii=False, indent=2)
             handle.write("\n")
-    print(json.dumps({"written": len(CHAINS), "directory": OUT}))
+        written += 1
+    print(json.dumps({"written": written, "kept": kept, "directory": OUT}))
 
 
 if __name__ == "__main__":
