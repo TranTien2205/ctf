@@ -108,6 +108,7 @@ def verify_transcript(sdir: Path) -> dict:
     dig = next((e for e in reversed(list(entries.values()))
                 if e.get("kind") == "artifacts_digest"), None)
     if dig and out["chained"]:
+        out["sealed"] = sorted((dig.get("files") or {}).keys())
         mismatched = []
         for name, want in (dig.get("files") or {}).items():
             p = Path(sdir) / name
@@ -386,7 +387,7 @@ class Session:
         duration_s: both are legitimately rewritten by `argus report`
         re-renders."""
         files: dict[str, str] = {}
-        for name in ("meta.json", "findings.json"):
+        for name in ("meta.json", "findings.json", "notes.md"):
             p = self.dir / name
             if p.exists():
                 files[name] = hashlib.sha256(p.read_bytes()).hexdigest()

@@ -190,6 +190,10 @@ def main(argv: list[str] | None = None) -> int:
             print("warning: transcript chain check failed - report may "
                   "reflect an edited/truncated transcript "
                   "(run 'argus verify' for detail)", file=sys.stderr)
+        if v.get("artifact_mismatch"):
+            print(f"warning: {v['artifact_mismatch']} edited since the "
+                  "run was sealed - constraints/findings may not reflect "
+                  "the original run (run 'argus verify')", file=sys.stderr)
         bad = findings_bad(session._transcript, session.findings)
         if bad:
             print(f"warning: findings {bad} fail evidence re-validation - "
@@ -209,7 +213,11 @@ def main(argv: list[str] | None = None) -> int:
         data = json.loads(fpath.read_text(encoding="utf-8"))
         # findings.json is not chained - flag any claim whose evidence
         # fails re-validation instead of presenting it as trustworthy
-        from .session import findings_bad
+        from .session import findings_bad, verify_transcript
+        _v = verify_transcript(Path(args.session_dir))
+        if _v.get("artifact_mismatch"):
+            print(f"warning: {_v['artifact_mismatch']} edited since the "
+                  "run was sealed (run 'argus verify')", file=sys.stderr)
         bad = set(findings_bad(_reopen(Path(args.session_dir))._transcript,
                                data))
         if bad:
@@ -314,7 +322,11 @@ def main(argv: list[str] | None = None) -> int:
             else ""
         fchk = (f", {res['findings_checked']} findings re-validated"
                 if res.get("findings_checked") else "")
-        print(f"OK: {res['entries']} chained entries verified{anchored}{fchk}")
+        sealed = ", artifacts sealed" if res.get("sealed") \
+            else " (unsealed: predates artifact digests - only transcript " \
+                 "and findings integrity verified)"
+        print(f"OK: {res['entries']} chained entries verified{anchored}"
+              f"{fchk}{sealed}")
         return 0
 
     if args.cmd == "check":

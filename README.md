@@ -205,7 +205,10 @@ not just in the prompt.
   id; reports embed the proving exchange under each finding. Each entry
   carries a hash-chain link, so `argus verify <session>` can prove nothing
   was edited or deleted after the run — it also re-validates every finding
-  against the chained transcript, catching edited findings.json too.
+  against the chained transcript, catching edited findings.json too. At
+  run end an `artifacts_digest` entry seals sha256 digests of `meta.json`,
+  `findings.json`, `notes.md` and `summary.json` into the chain, so edits
+  to any session artifact are detectable.
 - **Scope-checked findings** — `record_finding` runs the finding URL
   through the scope guard, so the report cannot claim a bug on a host the
   engagement never authorized.
