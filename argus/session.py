@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import sys
 import threading
 import time
 import urllib.parse
@@ -335,7 +336,10 @@ class Session:
                 old = json.loads(mpath.read_text(encoding="utf-8"))
             except (ValueError, OSError):
                 old = {}
-            self.started = float(old.get("started") or self.started)
+            try:
+                self.started = float(old.get("started") or self.started)
+            except (TypeError, ValueError):
+                pass  # malformed started - keep the fresh timestamp
             old_target = old.get("target")
             # resuming against a different target would conflate two
             # engagements' evidence and findings - refuse loudly
@@ -369,7 +373,10 @@ class Session:
         if fpath.is_file():
             try:
                 rows = json.loads(fpath.read_text(encoding="utf-8"))
-                self.findings = rows if isinstance(rows, list) else []
+                # rows must be finding objects - stray scalars would crash
+                # dedup/render downstream
+                self.findings = [r for r in rows if isinstance(r, dict)] \
+                    if isinstance(rows, list) else []
             except (ValueError, OSError):
                 self.findings = []
         if not (sdir / "notes.md").exists():
@@ -625,9 +632,19 @@ class Session:
             f"- **[{stamp}]** " if not text.startswith(
                 ("#", ">", "-", "*")) else ""
         with self._lock:
-            with self.notes_path.open("a", encoding="utf-8", newline="") as fh:
-                fh.write(prefix + _redact_obj(
-                    text.rstrip(), self.secret_values) + "\n\n")
+            try:
+                with self.notes_path.open(
+                        "a", encoding="utf-8", newline="") as fh:
+                    fh.write(prefix + _redact_obj(
+                        text.rstrip(), self.secret_values) + "\n\n")
+            except OSError as exc:
+                # notes.md swapped for a directory or unwritable must not
+                # kill a run mid-engagement - the transcript still carries
+                # evidence; warn once so the gap is operator-visible
+                if not getattr(self, "_notes_warned", False):
+                    self._notes_warned = True
+                    print(f"[argus] notes.md unwritable: {exc}",
+                          file=sys.stderr)
 
     def stats(self) -> dict:
         return {
