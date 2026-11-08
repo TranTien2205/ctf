@@ -42,6 +42,19 @@ def test_sessions_listing(tmp_path, capsys):
     assert "findings=5" in out
 
 
+def test_sessions_json(tmp_path, capsys):
+    rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
+    assert rc == 0
+    capsys.readouterr()
+    rc = main(["sessions", "--session-dir", str(tmp_path), "--json"])
+    assert rc == 0
+    rows = json.loads(capsys.readouterr().out)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["findings"] == 5 and row["mode"] == "single"
+    assert row["requests"] > 0 and "dir" in row and "duration" in row
+
+
 def test_compare_two_sessions(tmp_path, capsys):
     """The thesis comparison table must print metrics for both runs."""
     rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
