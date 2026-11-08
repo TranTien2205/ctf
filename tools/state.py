@@ -169,6 +169,18 @@ def main():
             spent.append(args.strategy_used)
         state["strategies_used"] = spent
     if args.hypothesis:
+        if args.bug_class:
+            # A class that is not in the taxonomy can never be routed, probed
+            # or solved under -- it is a typo, and it would sail through
+            # hooks.py's class-consistency check looking legitimate. Resolved
+            # from __file__, not ROOT: the taxonomy belongs to this toolkit,
+            # not to wherever the challenge ledger happens to live.
+            taxonomy = Path(__file__).resolve().parents[1] / "knowledge" / "bug-classes.json"
+            with taxonomy.open(encoding="utf-8") as handle:
+                known = {c["id"] for c in json.load(handle)["classes"]}
+            if args.bug_class not in known:
+                ap.error("--bug-class %r is not a taxonomy class (see "
+                         "knowledge/bug-classes.json)" % args.bug_class)
         created = {"id": uuid.uuid4().hex, "name": args.hypothesis,
                    "bug_class": args.bug_class, "status": "open",
                    "priority": DEFAULT_PRIORITY, "time": time.time()}

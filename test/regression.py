@@ -1782,6 +1782,30 @@ class LedgerTests(unittest.TestCase):
                                  if h.get("status") == "open"
                                  and (h.get("priority") or 0) > 0), 3)
 
+    def test_a_typo_bug_class_is_refused_at_the_write_gate(self):
+        """--bug-class names a taxonomy class; anything else is a typo.
+
+        The hypothesis class is what decide.py routes on and hooks.py checks
+        probes against. A mistyped id is consistent inside the ledger, so the
+        class-consistency check waves it through while nothing downstream can
+        ever route, probe or solve under it. Refuse it where it enters.
+        """
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            root = Path(directory)
+            (root / "challenges").mkdir()
+            with self.assertRaises(SystemExit):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    self.ledger(root, "typo", "--hypothesis", "sql in login",
+                                "--bug-class", "web-sql")
+            self.assertFalse((root / "challenges/typo/state.json").exists()
+                             and json.loads((root / "challenges/typo/state.json")
+                                            .read_text())["hypotheses"],
+                             "a refused write must not create a hypothesis")
+            self.ledger(root, "typo", "--hypothesis", "ssti in tpl",
+                        "--bug-class", "web-ssti")
+            data = json.loads((root / "challenges/typo/state.json").read_text())
+            self.assertEqual(data["hypotheses"][0]["bug_class"], "web-ssti")
+
 
 # --------------------------------------------------------------------------- H
 class TaxonomyTests(unittest.TestCase):
