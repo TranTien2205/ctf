@@ -2546,6 +2546,33 @@ class OrchestratorTests(unittest.TestCase):
                              "AGENTS.md must stay CTF-only, no red team: "
                               + marker)
 
+    def test_agents_md_inventory_line_counts_match_the_tree(self):
+        """The bootstrap diagram restated four numbers that drifted (68/32/72/59
+        against 84/48/73/60). A bootstrap file the agent reads first cannot open
+        with a wrong map of the tree."""
+        text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        reg = json.loads(read("skills/registry.json"))
+        skills = reg["skills"]
+        tax = json.loads(read("knowledge/bug-classes.json"))
+        classes = tax["classes"] if isinstance(tax.get("classes"), list) else tax
+        n_chains = len(list((ROOT / "knowledge/chains").glob("*.json")))
+        n_solved = len(list((ROOT / "solved").glob("*.md")))
+        expected = {
+            "skills": (r"(\d+) skills:", len(skills)),
+            "routers": (r"(\d+) routers",
+                        sum(1 for s in skills if s["layer"] == "router")),
+            "classes": (r"\((\d+) classes\)", len(classes)),
+            "cards": (r"\((\d+) verified cards\)", n_chains),
+            "solved": (r"(\d+) solved challenges", n_solved),
+        }
+        for name, (pattern, want) in expected.items():
+            match = re.search(pattern, text)
+            self.assertIsNotNone(match,
+                                 "AGENTS.md diagram lost its %s count" % name)
+            self.assertEqual(int(match.group(1)), want,
+                             "AGENTS.md diagram says %s %s, the tree holds %s"
+                             % (match.group(1), name, want))
+
     def test_search_facts_plans_a_missing_fact_without_treating_search_as_proof(self):
         proc = subprocess.run(
             [sys.executable, str(ROOT / "tools/search_facts.py"), "ctf-writeup",

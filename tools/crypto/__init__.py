@@ -5,7 +5,7 @@ One tested function per textbook attack, each keyed to the observable that says
 pycryptodome are all optional, and every lattice attack falls back to the
 pure-Python LLL in `crypto.lll`.
 
-    import sys; sys.path.insert(0, "/home/kali/ctf-v2/tools")
+    import sys; sys.path.insert(0, "tools")   # from the toolkit root
     from crypto import rsa_attacks
     rsa_attacks.wiener(n, e)
 

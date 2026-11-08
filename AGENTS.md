@@ -17,9 +17,9 @@ belongs to the other toolkit and is out of scope here.
 ```
 ~/ctf-v2/
   tools/           classify · chain_match · decide · hooks · state · skill_audit …
-  skills/          68 skills: 11 routers + 32 bug classes + method/reference  ← pull one
-  knowledge/       bug-classes.json (32 classes) · chains/ (72 verified cards)
-  solved/          59 solved challenges, with evidence ancestry
+  skills/          84 skills: 1 entry + 11 routers + 48 bug classes + method/corpus  ← pull one
+  knowledge/       bug-classes.json (48 classes) · chains/ (73 verified cards)
+  solved/          60 solved challenges, with evidence ancestry
   challenges/      handout source and per-challenge state.json
 ```
 
