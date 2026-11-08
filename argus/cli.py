@@ -52,6 +52,12 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--mcp-config",
                    help="Path to mcp.json declaring MCP tool servers "
                         "(else ARGUS_MCP_CONFIG or ./mcp.json)")
+    p.add_argument("--tools",
+                   help="Comma-separated tool allowlist (run mode only), "
+                        "e.g. 'http_request,probe_sqli,record_finding'. "
+                        "Shrinks the tool-schema payload per LLM call - "
+                        "needed on token-constrained auth (OAuth extra "
+                        "usage). 'finish' is always included.")
     p.add_argument("--resume",
                    help="Session dir to continue: transcript, findings and "
                         "request ids carry over; evidence chain stays intact")
@@ -124,7 +130,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "run":
         cfg = load_config(args)
         _preflight_target(cfg)
-        loop = AgentLoop(cfg, quiet=args.quiet)
+        allowed = _parse_tools(getattr(args, "tools", "") or "")
+        loop = AgentLoop(cfg, quiet=args.quiet, allowed=allowed)
         result = loop.run()
         print(json.dumps(result, indent=2))
         return 1 if result.get("error") else 0
@@ -312,6 +319,24 @@ def main(argv: list[str] | None = None) -> int:
         return _demo(args)
 
     return 2
+
+
+def _parse_tools(raw: str):
+    """--tools allowlist -> frozenset for AgentLoop(allowed=...); None for
+    the default full surface. Validates names up front - a typo'd tool
+    silently absent for 80 turns is a wasted run."""
+    names = {t.strip() for t in raw.split(",") if t.strip()}
+    if not names:
+        return None
+    from .tools.registry import TOOL_SCHEMAS, BOARD_TOOLS
+    valid = {s["name"] for s in TOOL_SCHEMAS} - BOARD_TOOLS
+    bad = names - valid
+    if bad:
+        raise SystemExit(
+            f"--tools: unknown tool(s) {sorted(bad)}\n"
+            f"valid: {sorted(valid)}")
+    names.add("finish")  # a run without finish() can only end on budgets
+    return frozenset(names)
 
 
 def _preflight_target(cfg) -> None:

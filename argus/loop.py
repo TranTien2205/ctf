@@ -63,6 +63,7 @@ class AgentLoop:
             "max_requests": cfg.max_requests, "rate_rps": cfg.rate_rps,
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
             "tls_verify": cfg.tls_verify,
+            "tools": sorted(allowed) if allowed else "all",
         }, resume=Path(cfg.resume) if cfg.resume else None)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:

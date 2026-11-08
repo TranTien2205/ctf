@@ -597,7 +597,10 @@ def probe_idor(ctx: Context, url: str, method: str = "GET",
         sim = _similarity(other, base.get("body", ""))
         results.append({"request_id": r["request_id"], "status": r["status"],
                         "similarity_to_base": sim,
-                        "accessible": r["status"] == 200})
+                        "accessible": r["status"] == 200,
+                        # inline the first bytes - lets the model judge
+                        # "different principal" without read_response calls
+                        "excerpt": other[:200]})
     ok = [r for r in results if r["accessible"]]
     verdict = "no other object accessible"
     if ok and all(r["similarity_to_base"] < 0.98 for r in ok):
@@ -830,6 +833,9 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
             "user": u, "status": r["status"],
             "request_id": r["request_id"],
             "elapsed_ms": r["elapsed_ms"],
+            # the differing error text IS the evidence - inline it so the
+            # model can cite it without a read_response round-trip
+            "excerpt": (r.get("body") or "")[:200],
             "similarity_to_bogus": _similarity(r.get("body") or "",
                                                base_body)})
     hits = [t for t in results

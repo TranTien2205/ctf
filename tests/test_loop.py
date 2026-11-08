@@ -93,6 +93,30 @@ def test_loop_resume_seed_carries_findings(lab_url, tmp_path):
     assert result["findings"] == 1  # prior finding still counted
 
 
+def test_loop_warns_before_budget_exhaustion(lab_url, tmp_path):
+    """~80% into the turn budget the loop injects an early warning so the
+    model can record findings before the forced finish - measured real-LLM
+    behavior was deferring record_finding until the hard stop lost them."""
+    script = [{"tool_calls": [_call("note", {"text": f"turn {i}"})]}
+              for i in range(8)]
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 max_turns=8, rate_rps=0)
+    llm = ScriptedClient(script)
+    result = AgentLoop(cfg, llm=llm, quiet=True).run()
+    # 8 script turns + 1 extra turn granted by the exhaustion nudge
+    assert llm.calls == 9
+    # seen_messages shares the one growing list - scan the final state:
+    # user-role strings in order are seed, then injected nudges
+    user_strings = [m["content"] for m in llm.seen_messages[-1]
+                    if m["role"] == "user" and isinstance(m["content"], str)]
+    early = [i for i, c in enumerate(user_strings) if "Budget warning" in c]
+    final = [i for i, c in enumerate(user_strings)
+             if "Budget nearly exhausted" in c]
+    assert early, "early budget warning never injected"
+    assert final, "exhaustion nudge never injected"
+    assert early[0] < final[0], "early warning must precede the forced nudge"
+
+
 def test_loop_survives_keyboard_interrupt(lab_url, tmp_path):
     # Ctrl-C mid-run must still render report + return cleanly.
     class InterruptingClient(ScriptedClient):

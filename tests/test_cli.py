@@ -59,6 +59,19 @@ def test_compare_two_sessions(tmp_path, capsys):
     assert len([l for l in csv_out.splitlines() if l.strip()]) == 3
 
 
+def test_tools_allowlist_validation(capsys):
+    """--tools: bad names fail fast with the valid list; good names are
+    restricted to exactly those tools (finish auto-included)."""
+    import pytest
+    from argus.cli import _parse_tools
+    assert _parse_tools("") is None
+    allowed = _parse_tools("probe_sqli, http_request ,record_finding")
+    assert allowed == frozenset(
+        {"probe_sqli", "http_request", "record_finding", "finish"})
+    with pytest.raises(SystemExit):
+        _parse_tools("probe_sqli,nosuchtool")
+
+
 def test_reopen_report_findings_verify(tmp_path, capsys):
     """Regression: _reopen must restore lock/chain/started so the offline
     commands work on an existing session dir."""

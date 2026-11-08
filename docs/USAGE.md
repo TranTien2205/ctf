@@ -8,6 +8,23 @@ export ANTHROPIC_API_KEY=sk-ant-...
 # optional: ANTHROPIC_BASE_URL for a gateway, ARGUS_MODEL to change default
 ```
 
+## Credentials
+
+Checked in this order - first hit wins:
+
+1. `--api-key` / `ANTHROPIC_API_KEY` - direct API key (metered billing)
+2. `--auth-token` / `ANTHROPIC_AUTH_TOKEN` / `CLAUDE_CODE_OAUTH_TOKEN`
+3. Claude Code OAuth store `~/.claude/.credentials.json` - your Pro/Max
+   subscription, refreshed automatically when stale
+4. OpenCode auth store (`~/.local/share/opencode/auth.json` or
+   `%LOCALAPPDATA%\opencode\auth.json`)
+
+`python -m argus check` performs a real tiny API call and tells you which
+source resolved. Note: OAuth (subscription) auth bills calls to your
+account's "extra usage" budget, not plan limits - on a constrained
+account the full 54-tool schema may be rejected (`--tools` shrinks it;
+team mode splits tools across role cards and fits under the cap).
+
 ## Run
 
 ```bash
@@ -37,6 +54,7 @@ python -m argus run https://app.example \
 | `--proxy` | none | route via Burp/ZAP for inspection |
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
+| `--tools` | all | `run` only: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests |
 | `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
