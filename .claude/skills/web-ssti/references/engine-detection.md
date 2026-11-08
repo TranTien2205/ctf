@@ -6,8 +6,8 @@
 Send {{7*7}}
 ├── Returns 49 → Jinja2/Twig (Python/PHP)
 │   └── Send {{7*'7'}}
-│       ├── Returns 49 → Jinja2
-│       └── Returns 7777777 → Twig
+│       ├── Returns 7777777 → Jinja2 (python string-repeat)
+│       └── Returns 49 → Twig (php numeric cast)
 ├── No match → Send ${7*7}
 │   ├── Returns 49 → Freemarker/Velocity (Java)
 │   │   └── Send ${"abc".length()}
@@ -37,7 +37,7 @@ Send {{7*7}}
 |------|--------|------|------------|----------|
 | `{{7*7}}` | 49 | 49 | - | - |
 | `${7*7}` | - | - | 49 | 49 |
-| `{{7*'7'}}` | 49 | 7777777 | - | - |
+| `{{7*'7'}}` | 7777777 | 49 | - | - |
 
 ## Context Clues
 

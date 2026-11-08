@@ -740,7 +740,7 @@
       ],
       "skill_tokens": 2775,
       "depth_files": 18,
-      "depth_tokens": 95936,
+      "depth_tokens": 95949,
       "use_when": [
         "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
       ],
@@ -2214,9 +2214,9 @@
         "htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce",
         "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
-      "skill_tokens": 985,
+      "skill_tokens": 1054,
       "depth_files": 7,
-      "depth_tokens": 4886,
+      "depth_tokens": 4897,
       "use_when": [
         "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
         "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"

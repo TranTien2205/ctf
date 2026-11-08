@@ -83,7 +83,8 @@ hr "REQUIRED: web primitive selftests (--selftest on the tool itself -- all offl
 # confirming the check caught it.
 for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_miner.py \
          tools/web/session_dissect.py tools/web/ws_probe.py tools/web/jwt_forge.py \
-         tools/web/oob_listener.py tools/pwn_cyclic.py tools/net_dialog.py; do
+         tools/web/oob_listener.py tools/web/ssti_probe.py \
+         tools/pwn_cyclic.py tools/net_dialog.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

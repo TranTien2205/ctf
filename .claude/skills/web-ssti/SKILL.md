@@ -23,7 +23,10 @@ evidence_level: verified
 ## First probe
 
 One arithmetic marker. Confirm the engine from the evaluated form, or from the
-error string, before building any chain.
+error string, before building any chain. `tools/web/ssti_probe.py --url U --param P`
+fires the marker matrix below and reports which forms evaluated — its
+`engine_candidate` is a candidate, not a finding; confirmation still needs the
+engine's own error text or a class confirming probe.
 
 **Falsifier** - the observation that closes this class: the marker is reflected
 literally, which is an XSS shape rather than template evaluation.
@@ -36,7 +39,7 @@ literally, which is an XSS shape rather than template evaluation.
 | `${7*7}` | Freemarker, Velocity |
 | `#{7*7}` | Thymeleaf, Ruby ERB |
 | `<%= 7*7 %>` | ERB |
-| `{{7*'7'}}` | `49` is Jinja2; `7777777` is Twig |
+| `{{7*'7'}}` | `7777777` is Jinja2 (python string-repeat); `49` is Twig |
 
 Confirm against the error text: a Jinja exception, a Twig error class, a
 Freemarker core message. Full fingerprint table in
