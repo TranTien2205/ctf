@@ -41,6 +41,15 @@ def _code(text: str) -> str:
     return f"`{text}`" if "`" not in str(text) else f"`` {text} ``"
 
 
+def _tool_surface(meta: dict) -> str:
+    """`--tools` restricted runs have different coverage - the report must
+    say so. meta carries "all" or the sorted allowlist."""
+    t = meta.get("tools")
+    if isinstance(t, list):
+        return f"restricted to {len(t)} tools ({', '.join(t[:8])}{', …' if len(t) > 8 else ''})"
+    return "all"
+
+
 def _coverage(session: Session) -> dict:
     """What the run actually exercised - endpoints touched (method + path +
     param names, values stripped), probe families run, requests per tool."""
@@ -145,6 +154,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         f"{meta.get('max_requests', '?')} requests, {meta.get('rate_rps', '?')} rps",
         f"- **Proxy:** {'yes' if meta.get('proxy') else 'no'} · "
         f"**TLS verify:** {'yes' if meta.get('tls_verify') else 'no'}",
+        f"- **Tool surface:** {_tool_surface(meta)}",
         "",
     ]
 

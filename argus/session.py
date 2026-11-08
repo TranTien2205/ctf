@@ -215,6 +215,7 @@ class Session:
         self.findings = []
         self._last_chain = ""
         mpath = sdir / "meta.json"
+        old: dict = {}
         if mpath.exists():
             try:
                 old = json.loads(mpath.read_text(encoding="utf-8"))
@@ -251,6 +252,17 @@ class Session:
                 self.findings = []
         if not (sdir / "notes.md").exists():
             (sdir / "notes.md").write_text(f"# Working notes - {target}\n\n")
+        # the resumed run may carry different budgets/flags - meta.json must
+        # reflect the CURRENT engagement constraints, marked as resumed
+        try:
+            merged = dict(old)
+            merged.update(meta)
+            merged["resumed"] = True
+            mpath.write_text(json.dumps(
+                {"id": self.id, "target": target, "started": self.started,
+                 **merged}, indent=2, ensure_ascii=False))
+        except OSError:
+            pass
         self.note(f"> session resumed ({len(self._transcript)} prior exchanges, "
                   f"{len(self.findings)} prior findings)")
 

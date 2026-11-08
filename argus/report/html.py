@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 
 from ..session import Session, SEVERITIES, _cwe_of, _owasp_of
+from .markdown import _tool_surface
 from ..config import Config
 from .markdown import _coverage, _SEV_ORDER
 
@@ -94,7 +95,8 @@ def render_html(session: Session, cfg: Config, summary: str = "",
         f"<b>Budgets:</b> {_esc(meta.get('max_turns','?'))} turns, "
         f"{_esc(meta.get('max_requests','?'))} requests, {_esc(meta.get('rate_rps','?'))} rps<br>"
         f"<b>Proxy:</b> {'yes' if meta.get('proxy') else 'no'} · "
-        f"<b>TLS verify:</b> {'yes' if meta.get('tls_verify') else 'no'}</p>")
+        f"<b>TLS verify:</b> {'yes' if meta.get('tls_verify') else 'no'}<br>"
+        f"<b>Tool surface:</b> {_esc(_tool_surface(meta))}</p>")
 
     ep_rows = "".join(f"<tr><td><code>{_esc(e)}</code></td></tr>"
                       for e in coverage["endpoints"])
