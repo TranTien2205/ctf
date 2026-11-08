@@ -416,6 +416,22 @@ def main(argv: list[str] | None = None) -> int:
             return {_dkey(f): f
                     for f in json.loads(fp.read_text(encoding="utf-8"))}
         before, after = _load(args.before), _load(args.after)
+        # a diff over tampered findings is misleading - flag sessions whose
+        # stored claims fail evidence re-validation (same check as
+        # `findings`/`report`)
+        from .session import findings_bad
+        for label, d in (("before", args.before), ("after", args.after)):
+            try:
+                bad = findings_bad(
+                    _reopen(Path(d))._transcript,
+                    json.loads((Path(d) / "findings.json")
+                               .read_text(encoding="utf-8")))
+            except Exception:
+                bad = []
+            if bad:
+                print(f"warning: {label} session has findings {bad} that "
+                      "fail evidence re-validation - diff may be "
+                      "misleading", file=sys.stderr)
         fixed = [before[k] for k in sorted(set(before) - set(after))]
         still = [(before[k], after[k])
                  for k in sorted(set(before) & set(after))]
