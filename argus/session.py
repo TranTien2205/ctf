@@ -213,12 +213,15 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
     substring of any cited response/event. Used by `argus verify` and by
     `argus report` (a re-render must not silently carry tampered claims)."""
     bad = []
-    for f in findings:
+    entries = entries if isinstance(entries, dict) else {}
+    for f in findings if isinstance(findings, list) else []:
         if not isinstance(f, dict):
             bad.append("?")
             continue
         excerpt = str(f.get("evidence_excerpt") or "").strip()
         ids = f.get("evidence_ids") or []
+        if not isinstance(ids, list):
+            ids = []
         cited = [entries.get(r) for r in ids]
         if f.get("severity") not in SEVERITIES or \
                 not excerpt or not cited or None in cited or \
