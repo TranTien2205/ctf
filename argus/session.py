@@ -56,9 +56,11 @@ def _bound_value(v):
     if isinstance(v, str):
         return v if len(v) <= _EVENT_VALUE_CAP else v[:_EVENT_VALUE_CAP] + "…[truncated]"
     try:
-        s = json.dumps(v, ensure_ascii=False, default=str)
+        s = json.dumps(v, ensure_ascii=False)
     except (TypeError, ValueError):
-        s = str(v)
+        # not natively JSON-safe - the transcript writer uses plain
+        # json.dumps, so this would crash record_event without a string
+        return str(v)[:_EVENT_VALUE_CAP]
     if len(s) <= _EVENT_VALUE_CAP:
         return v
     return s[:_EVENT_VALUE_CAP] + "…[truncated]"
