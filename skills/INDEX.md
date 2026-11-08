@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 957,000 tokens across 462 files. Opening
+The depth corpus is roughly 961,000 tokens across 470 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -105,6 +105,15 @@ Open one only after a probe or a source read produced its signal.
 | Host / forwarded-header attacks | catalogue | no response element (Location | `skills/web-host-header/SKILL.md` |
 | Smart contract / web3 | catalogue | the solved condition depends on state no external caller can change | `skills/web-web3/SKILL.md` |
 | Cross-site leak / browser side channel | verified | the bot can reach no attacker-influenced state at all | `skills/web-xs-leaks/SKILL.md` |
+
+## FORENSICS bug classes
+
+Open one only after its signal fired.
+
+| Class | Evidence | Closed when (falsifier) | Skill |
+|---|---|---|---|
+| Steganography / hidden data | catalogue | no appended data | `skills/forensics-stego/SKILL.md` |
+| Capture carving / protocol extraction | catalogue | every exported object and followed stream is accounted for as normal tra | `skills/forensics-pcap-carve/SKILL.md` |
 
 ## DFIR evidence families
 

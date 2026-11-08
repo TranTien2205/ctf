@@ -1005,6 +1005,59 @@
       "skill": "skills/web-xs-leaks/SKILL.md"
     },
     {
+      "id": "forensics-stego",
+      "name": "Steganography / hidden data",
+      "skill_dir": "forensics-stego",
+      "category": "forensics",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "steg|hidden|concealed|embedded|cover image|carrier",
+        "\\.(?:png|jpe?g|bmp|gif|wav|mp3|flac)\\b.{0,80}(?:hidden|secret|flag|extract|inside)",
+        "pixel|lsb|least significant|steghide|zsteg|binwalk|outguess",
+        "(?<![a-z0-9])(?:forensics\\ stego|steganography|hidden\\ data|stego)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "file + binwalk + strings on the carrier first — the answer is often appended, not encoded",
+      "falsifier": "no appended data, no embedded signature, no metadata anomaly, and the pixel/audio payload decodes to noise on every standard channel",
+      "depth_refs": [
+        "skills/forensics-stego/references/README.md",
+        "skills/forensics-stego/references/carrier-table.md"
+      ],
+      "confusable_with": [
+        "misc-encoding-carrier",
+        "forensics-pcap-carve"
+      ],
+      "skill": "skills/forensics-stego/SKILL.md",
+      "blast_radius": null
+    },
+    {
+      "id": "forensics-pcap-carve",
+      "name": "Capture carving / protocol extraction",
+      "skill_dir": "forensics-pcap-carve",
+      "category": "forensics",
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "observation_signals": [
+        "pcap|pcapng|capture|packet|wireshark|tshark|tcpdump|network dump",
+        "follow stream|export objects|reassemble|carve.*(?:file|stream|flag)|flag.{0,30}(?:packet|stream|traffic)",
+        "(?<![a-z0-9])(?:forensics\\ pcap\\ carve|protocol\\ extraction|capture\\ carving|pcap\\ carve|pcap\\-carve)(?![a-z0-9])"
+      ],
+      "source_signals": [],
+      "first_probe": "protocol-hierarchy count first, then follow the protocol that dominates — the flag rides the busiest channel",
+      "falsifier": "every exported object and followed stream is accounted for as normal traffic",
+      "depth_refs": [
+        "skills/forensics-pcap-carve/references/README.md",
+        "skills/forensics-pcap-carve/references/extraction-order.md"
+      ],
+      "confusable_with": [
+        "dfir-network-exfil-trace",
+        "misc-encoding-carrier"
+      ],
+      "skill": "skills/forensics-pcap-carve/SKILL.md",
+      "blast_radius": null
+    },
+    {
       "id": "dfir-authentication-trace",
       "name": "Authentication and logon trace",
       "skill_dir": "dfir-authentication-trace",

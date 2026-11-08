@@ -1025,6 +1025,88 @@ python3 -c "import base64,binascii; d=open('blob.txt','rb').read().strip(); \
 strings blob.txt | grep -i "flag{"
 ```
 """,
+    "forensics-stego": """## Recognise
+
+A media file is the handout and the flag (or the next step) is hidden inside
+it: appended bytes, an embedded archive, LSB pixel data, an audio channel, or
+metadata. The carrier decides the tool — never guess a stego tool before the
+carrier is identified.
+
+## Confirm safely
+
+All reads are local and non-destructive; the only real risk is spending the
+budget on the wrong channel. Work a copy of the artifact and record which
+channel yielded.
+
+## Extraction order
+
+1. `file` + `binwalk` + `strings -n 8` — appended data and embedded archives
+   are the most common CTF carrier and the cheapest to check.
+2. `exiftool` — metadata fields hide flags and the next-step hint.
+3. `zsteg` (PNG/BMP), `steghide` (JPEG), `outguess`, or `binwalk -e` for the
+   format-specific channel; `sonic-visualiser`/Audacity for audio.
+4. Only then bit-level work: `stegsolve`/`zsteg -a` across bit planes.
+
+`references/carrier-table.md` maps carrier -> tool -> command.
+
+## Traps
+
+- `file` reporting "data" usually means a renamed container — read the magic
+  bytes with `xxd | head`, do not trust the extension.
+- A steghide passphrase often IS a string found earlier in the challenge —
+  try recovered words before brute force.
+- An all-noise LSB decode on the wrong bit plane looks identical to a
+  negative result; record which planes were tried.
+
+## Operational probe
+
+```bash
+file challenge.png && binwalk challenge.png && strings -n 8 challenge.png | head
+exiftool challenge.png
+zsteg -a challenge.png 2>/dev/null | head -20
+```
+""",
+    "forensics-pcap-carve": """## Recognise
+
+A `.pcap`/`.pcapng` capture is the handout and the answer lives in the traffic:
+a followed stream, an exported object, a protocol field, or data reassembled
+across packets. The first question is which protocol carries it.
+
+## Confirm safely
+
+All reads are local. The flag usually sits inside one flow — quoting the
+reassembled bytes verbatim is the evidence; a filter that merely LOOKS
+interesting is a lead.
+
+## Extraction order
+
+1. `tshark -r cap -q -z io,phs` — the protocol hierarchy tells you which
+   channel dominates; start there, not with a global strings run.
+2. `--export-objects` for HTTP/SMB/TFTP — reassembled files are the most
+   common flag carrier.
+3. `tshark -Y <proto> -T fields -e <field>` for field-carved data: DNS labels,
+   ICMP payload, TCP flags, packet lengths, timing.
+4. `tshark -z follow,tcp,ascii,N` on the surviving flow; then `strings` the
+   raw capture for anything the dissector missed.
+
+`references/extraction-order.md` maps carrier shape -> commands per protocol.
+
+## Traps
+
+- `strings` on the whole capture finds the easy flag and misses the split
+  one — a flag chunked one-byte-per-packet needs field reassembly, not grep.
+- Follow-stream decodes TCP only; UDP/ICMP/DNS channels need field extraction.
+- A "data" protocol entry in the hierarchy usually IS the interesting flow —
+  dissectors fail on custom encodings, which is exactly where authors hide.
+
+## Operational probe
+
+```bash
+tshark -r cap.pcap -q -z io,phs
+tshark -r cap.pcap --export-objects http,./objs
+tshark -r cap.pcap -Y dns -T fields -e dns.qry.name | sort -u | head
+```
+""",
     "osint-media-metadata": """## Recognise
 
 A media or document file is the handout and the question asks for a fact about

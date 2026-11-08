@@ -1,18 +1,18 @@
 {
-  "generated_at": "2026-11-09T00:11:33",
+  "generated_at": "2026-11-09T00:17:42",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 87,
+    "skills": 89,
     "review": 0,
     "warn": 0,
     "local_evidence_present": 22,
-    "local_evidence_stub": 29,
+    "local_evidence_stub": 31,
     "local_evidence_missing": 0,
-    "actionable_skills": 51,
+    "actionable_skills": 53,
     "basic_skills": 0
   },
   "review": [],
@@ -338,7 +338,7 @@
       "local_evidence": "present",
       "lines": 235,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
+      "nearest_neighbour": "forensics-pcap-carve",
       "overlap": 0.017,
       "trust": "local-confirmed"
     },
@@ -354,7 +354,7 @@
       "local_evidence": "stub",
       "lines": 213,
       "actionability": "operational",
-      "nearest_neighbour": "rev-managed-code",
+      "nearest_neighbour": "forensics-pcap-carve",
       "overlap": 0.025,
       "trust": "catalogue-or-unreviewed"
     },
@@ -386,7 +386,7 @@
       "local_evidence": "stub",
       "lines": 214,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
+      "nearest_neighbour": "forensics-pcap-carve",
       "overlap": 0.03,
       "trust": "catalogue-or-unreviewed"
     },
@@ -402,8 +402,8 @@
       "local_evidence": "stub",
       "lines": 229,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.032,
+      "nearest_neighbour": "forensics-pcap-carve",
+      "overlap": 0.033,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -418,7 +418,7 @@
       "local_evidence": "stub",
       "lines": 214,
       "actionability": "operational",
-      "nearest_neighbour": "web-host-header",
+      "nearest_neighbour": "forensics-pcap-carve",
       "overlap": 0.02,
       "trust": "catalogue-or-unreviewed"
     },
@@ -435,6 +435,38 @@
       "nearest_neighbour": "web-ssti",
       "overlap": 0.068,
       "trust": "local-confirmed"
+    },
+    {
+      "id": "forensics-pcap-carve",
+      "layer": "depth",
+      "path": "skills/forensics-pcap-carve/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 85,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.2,
+      "trust": "catalogue-or-unreviewed"
+    },
+    {
+      "id": "forensics-stego",
+      "layer": "depth",
+      "path": "skills/forensics-stego/SKILL.md",
+      "flags": [
+        "field-notes is a template stub (16 lines)"
+      ],
+      "score": 80,
+      "verdict": "pass",
+      "local_evidence": "stub",
+      "lines": 85,
+      "actionability": "operational",
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.201,
+      "trust": "catalogue-or-unreviewed"
     },
     {
       "id": "mcp-agent-security",
@@ -474,8 +506,8 @@
       "local_evidence": "stub",
       "lines": 88,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.19,
+      "nearest_neighbour": "forensics-stego",
+      "overlap": 0.191,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -1036,7 +1068,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 76
+      "lines": 86
     },
     {
       "id": "web-xs-leaks",

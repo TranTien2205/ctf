@@ -199,7 +199,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 660,
+      "skill_tokens": 690,
       "depth_files": 7,
       "depth_tokens": 4971,
       "use_when": [
@@ -941,6 +941,60 @@
         "web-xxe"
       ],
       "unlock_signals": "(?:\\.\\./|%2e%2e|traversal|\\blfi\\b)|(?:\\bfile://)|(?:\\?(?:file|page|path|download|doc|template)=)|(?:/proc/self)|(?:\\balias\\b|/assets\\.\\.)|(?:\\.env\\b|source (?:leak|disclosure)|leaked source)|(?:php://filter)|(?:\\bfilename\\b[^\\n]{0,30}param|param\\w*[^\\n]{0,20}\\bfilename\\b)|(?:download (?:endpoint|route|handler)|serves? (?:a |the )?file)|(?:(?:error|exception|traceback|stack trace|debug|\\b50[03]\\b[^\\n]{0,12}(?:page|error|response))[^\\n]{0,45}(?:environment|config\\w*|settings|\\.env\\b|secret))|(?:environment table|unhandled exception[^\\n]{0,40}(?:print|show|reveal|leak|dump))|(?:(?<![a-z0-9])(?:file\\ read\\ primitives|arbitrary\\ file\\ read|source\\ disclosure|read\\ primitives|read\\-primitives)(?![a-z0-9]))|(?:(?:include|require)(?:_once)?\\s*\\(\\s*\\$_(?:GET|POST|REQUEST|COOKIE))|(?:file_get_contents\\s*\\(\\s*\\$_|readfile\\s*\\(\\s*\\$)|(?:(?<![a-z])open\\s*\\(\\s*(?:os\\.path\\.join\\s*\\()?\\s*[^,)\\n]*(?:req|request|params))|(?:(?:send_file|sendFile|res\\.download|sendfile)\\s*\\([^)\\n]*(?:req|request|params|\\$\\{))|(?:path\\.join\\s*\\([^)\\n]*(?:req\\.|request\\.|params))|(?:php://filter|\\.\\./\\.\\./)",
+      "bug_class": true
+    },
+    {
+      "id": "forensics-pcap-carve",
+      "path": "skills/forensics-pcap-carve/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 891,
+      "depth_files": 3,
+      "depth_tokens": 675,
+      "use_when": [
+        "a probe or source read produced this class's signal: protocol-hierarchy count first, then follow the protocol that dominates — the flag rides the busiest channel"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: every exported object and followed stream is accounted for as normal traffic",
+        "the evidence fits one of these better: dfir-network-exfil-trace, misc-encoding-carrier",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "dfir-network-exfil-trace",
+        "misc-encoding-carrier"
+      ],
+      "unlock_signals": "(?:pcap|pcapng|capture|packet|wireshark|tshark|tcpdump|network dump)|(?:follow stream|export objects|reassemble|carve.*(?:file|stream|flag)|flag.{0,30}(?:packet|stream|traffic))|(?:(?<![a-z0-9])(?:forensics\\ pcap\\ carve|protocol\\ extraction|capture\\ carving|pcap\\ carve|pcap\\-carve)(?![a-z0-9]))",
+      "bug_class": true
+    },
+    {
+      "id": "forensics-stego",
+      "path": "skills/forensics-stego/SKILL.md",
+      "layer": "depth",
+      "categories": [
+        "forensics"
+      ],
+      "evidence_level": "catalogue",
+      "verified_by": [],
+      "skill_tokens": 871,
+      "depth_files": 3,
+      "depth_tokens": 701,
+      "use_when": [
+        "a probe or source read produced this class's signal: file + binwalk + strings on the carrier first — the answer is often appended, not encoded"
+      ],
+      "do_not_use_when": [
+        "the falsifier has been observed: no appended data, no embedded signature, no metadata anomaly, and the pixel/audio payload decodes to noise on every standard channel",
+        "the evidence fits one of these better: misc-encoding-carrier, forensics-pcap-carve",
+        "do not present its content as local experience: this class is catalogue, never solved in this toolkit"
+      ],
+      "routes_to": [
+        "misc-encoding-carrier",
+        "forensics-pcap-carve"
+      ],
+      "unlock_signals": "(?:steg|hidden|concealed|embedded|cover image|carrier)|(?:\\.(?:png|jpe?g|bmp|gif|wav|mp3|flac)\\b.{0,80}(?:hidden|secret|flag|extract|inside))|(?:pixel|lsb|least significant|steghide|zsteg|binwalk|outguess)|(?:(?<![a-z0-9])(?:forensics\\ stego|steganography|hidden\\ data|stego)(?![a-z0-9]))",
       "bug_class": true
     },
     {

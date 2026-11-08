@@ -630,6 +630,42 @@ CLASSES = [
     # there is nothing for a source scan to match. Every observation_signal below was
     # measured to match ZERO of the five tools/system_eval.py classification case
     # texts and ZERO handout files under challenges/.
+    # ---------------------------------------------------------------- forensics
+    # CTF forensics is extraction-shaped (carve the answer out of one artifact),
+    # not investigation-shaped like the dfir-* trace classes above - separate
+    # classes, separate "forensics" category, and they route through
+    # forensics-triage which already owns the corpus depth.
+    {
+        "id": "forensics-stego", "name": "Steganography / hidden data",
+        "skill_dir": "forensics-stego", "category": "forensics",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"steg|hidden|concealed|embedded|cover image|carrier",
+            r"\.(?:png|jpe?g|bmp|gif|wav|mp3|flac)\b.{0,80}(?:hidden|secret|"
+            r"flag|extract|inside)",
+            r"pixel|lsb|least significant|steghide|zsteg|binwalk|outguess"],
+        "source_signals": [],
+        "first_probe": "file + binwalk + strings on the carrier first — the answer is often appended, not encoded",
+        "falsifier": "no appended data, no embedded signature, no metadata anomaly, and the pixel/audio payload decodes to noise on every standard channel",
+        "depth_refs": ["skills/forensics-stego/references/README.md",
+                       "skills/forensics-stego/references/carrier-table.md"],
+        "confusable_with": ["misc-encoding-carrier", "forensics-pcap-carve"],
+    },
+    {
+        "id": "forensics-pcap-carve", "name": "Capture carving / protocol extraction",
+        "skill_dir": "forensics-pcap-carve", "category": "forensics",
+        "evidence_level": "catalogue", "verified_by": [],
+        "observation_signals": [
+            r"pcap|pcapng|capture|packet|wireshark|tshark|tcpdump|network dump",
+            r"follow stream|export objects|reassemble|carve.*(?:file|stream|"
+            r"flag)|flag.{0,30}(?:packet|stream|traffic)"],
+        "source_signals": [],
+        "first_probe": "protocol-hierarchy count first, then follow the protocol that dominates — the flag rides the busiest channel",
+        "falsifier": "every exported object and followed stream is accounted for as normal traffic",
+        "depth_refs": ["skills/forensics-pcap-carve/references/README.md",
+                       "skills/forensics-pcap-carve/references/extraction-order.md"],
+        "confusable_with": ["dfir-network-exfil-trace", "misc-encoding-carrier"],
+    },
     {
         "id": "dfir-authentication-trace", "name": "Authentication and logon trace",
         "skill_dir": "dfir-authentication-trace", "category": "dfir",
