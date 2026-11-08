@@ -82,6 +82,14 @@ def main() -> int:
     check("declared secret scrubbed from persisted bodies",
           "sup3rsecr3t" not in raw and "redacted" in raw)
 
+    # basic-auth creds embedded in a URL must not persist either
+    s2.record_exchange(
+        "t", {"url": "http://admin:s3cretP4ss@h/login",
+              "method": "GET"}, {"status": 200, "body": "x"})
+    raw2 = (s2.dir / "transcript.jsonl").read_text(encoding="utf-8")
+    check("url userinfo scrubbed from transcript",
+          "s3cretP4ss" not in raw2 and "redacted" in raw2)
+
     # --- probe checks against live lab -----------------------------------
     from argus.config import Config
     from argus.httpclient import GuardedClient
