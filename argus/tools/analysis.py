@@ -505,14 +505,22 @@ def _nmap_arg_check(ctx: Context, toks: list[str]) -> str | None:
 # ffuf ---------------------------------------------------------------------
 def _ffuf_arg_check(ctx: Context, toks: list[str]) -> str | None:
     """-w list:FUZZ sends every line of the file to the target - a local
-    file is exfiltrated word by word. Confine wordlists to
-    resources/wordlists/ or files inside cwd."""
+    file is exfiltrated word by word. -request reads a raw request file
+    carrying its own Host. -input-cmd RUNS a local command to generate
+    input - arbitrary code execution outside every guard."""
     wroot = (Path(__file__).resolve().parents[1]
              / "resources" / "wordlists")
+    # -request files hold the target in a Host: header - every host
+    # inside must pass the scope guard like a -iL/nuclei -l list
+    bad = _file_target_check(ctx, toks, {"-request", "--request"})
+    if bad:
+        return bad
     for i, tok in enumerate(toks):
         flag = tok.partition("=")[0]
         if flag in {"-x", "--proxy", "-replay-proxy"}:
             return f"ffuf {flag} is disabled (proxy leaves scope)"
+        if flag in {"-input-cmd", "--input-cmd"}:
+            return "ffuf -input-cmd runs local commands and is disabled"
         if flag in {"-w", "--wordlist"}:
             val = _flag_value(toks, i)
             p = Path(val.split(":")[0])
@@ -564,7 +572,11 @@ def _nuclei_arg_check(ctx: Context, toks: list[str]) -> str | None:
         return bad
     for i, tok in enumerate(toks):
         flag = tok.partition("=")[0]
-        if flag in {"-code", "-p", "--proxy"}:
+        if flag in {"-code", "-p", "--proxy", "-lfa",
+                    "-allow-local-file-access",
+                    # a custom interactsh/OOB server is a redirect of
+                    # callback traffic out of scope
+                    "-iserver", "-interactsh-server"}:
             return f"nuclei {flag} is disabled"
         if flag in {"-t", "--templates", "-turl", "--template-url",
                     "-w", "--workflows"}:
