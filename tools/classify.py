@@ -375,7 +375,7 @@ def record_classes(challenge, ranked):
             "next": "python3 tools/decide.py %s" % challenge}
 
 
-def rebuild_stats(taxonomy_path=TAXONOMY):
+def rebuild_stats(taxonomy_path=TAXONOMY, force=False):
     """Count, for every taxonomy signal, how many handouts its pattern matches.
 
     The same corpus rule chain_match.py uses: a challenge directory counts when
@@ -421,6 +421,17 @@ def rebuild_stats(taxonomy_path=TAXONOMY):
             df["%s||%s" % (entry["id"], signal)] = sum(
                 1 for text in corpus if pattern.search(text))
     data = {"corpus": len(corpus), "signals": len(df), "df": df}
+    existing = load_signal_stats(SIGNAL_STATS)
+    if (existing and not force
+            and data["corpus"] < int(existing.get("corpus", 0))):
+        print(json.dumps({
+            "refused": "the new corpus (%d handouts) is smaller than the "
+                       "recorded one (%d); a smaller corpus makes every signal "
+                       "look rare and quietly removes the discount. Rebuild "
+                       "where the full handout corpus lives, or pass --force."
+                       % (data["corpus"], existing["corpus"]),
+            "kept": existing["corpus"]}, indent=2))
+        return 2
     with open(SIGNAL_STATS, "w", encoding="utf-8") as handle:
         json.dump(data, handle, indent=2, ensure_ascii=False)
         handle.write("\n")
@@ -468,10 +479,13 @@ def main():
     parser.add_argument("--rebuild-stats", action="store_true",
                         help="recount how many handouts each taxonomy signal matches "
                              "and write knowledge/classify-signal-stats.json, then exit")
+    parser.add_argument("--force", action="store_true",
+                        help="with --rebuild-stats: allow overwriting stats built "
+                             "on a larger handout corpus")
     args = parser.parse_args()
 
     if args.rebuild_stats:
-        return rebuild_stats(args.taxonomy)
+        return rebuild_stats(args.taxonomy, force=args.force)
 
     observation = " ".join(args.observation).strip()
     if not observation and not args.source:

@@ -351,6 +351,36 @@ class StructureTests(unittest.TestCase):
                          "ctf.sqlite3 indexes %d cards but %d are on disk; "
                          "re-run python tools/build_index.py" % (rows, expected))
 
+    def test_fts_index_content_matches_a_fresh_build(self):
+        """Row-count coverage is not enough: a card whose signals or
+        first_probe changed without a rebuild keeps the count and serves stale
+        FTS results. Rebuild into a temp database and diff every row."""
+        import sqlite3
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            fresh_db = os.path.join(temp, "fresh.sqlite3")
+            proc = subprocess.run(
+                [sys.executable, str(ROOT / "tools" / "build_index.py"),
+                 "--db", fresh_db],
+                capture_output=True, text=True, cwd=str(ROOT))
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+
+            def rows_of(path):
+                db = sqlite3.connect("file:%s?mode=ro" %
+                                     Path(path).as_posix(), uri=True)
+                try:
+                    return db.execute(
+                        "SELECT id, name, event, category, technique, signals,"
+                        " first_probe, source_url FROM cards ORDER BY id"
+                    ).fetchall()
+                finally:
+                    db.close()
+
+            committed = rows_of(ROOT / "knowledge" / "ctf.sqlite3")
+            fresh = rows_of(fresh_db)
+            self.assertEqual(committed, fresh,
+                             "ctf.sqlite3 content differs from a fresh build; "
+                             "re-run python tools/build_index.py")
+
     def test_every_planner_technique_has_a_policy(self):
         """A RULES technique with no first-probes.json entry silently degrades
         to 'run the cheapest confirming probe' -- five of seventeen were in
@@ -1960,6 +1990,23 @@ class ClassifierTests(unittest.TestCase):
             self.assertFalse(any("unreviewed_magic_marker" in p
                                  for values in patterns.values() for p in values))
 
+    def test_rebuild_stats_never_shrinks_the_corpus_silently(self):
+        """A rebuild on a machine holding few handouts must not overwrite stats
+        counted over a larger corpus: every signal would look rare, the
+        discount would die, and classify would be back to plain counting."""
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            stats_path = Path(temp) / "stats.json"
+            stats_path.write_text(json.dumps(
+                {"corpus": 9999, "signals": 1, "df": {}}), encoding="utf-8")
+            with patch.object(classifier, "SIGNAL_STATS", str(stats_path)):
+                self.assertEqual(classifier.rebuild_stats(), 2)
+                self.assertEqual(json.loads(stats_path.read_text(
+                    encoding="utf-8"))["corpus"], 9999,
+                                 "a refused rebuild still wrote the file")
+                self.assertEqual(classifier.rebuild_stats(force=True), 0)
+                self.assertLess(json.loads(stats_path.read_text(
+                    encoding="utf-8"))["corpus"], 9999)
+
 
 # --------------------------------------------------------------------------- J
 class LearningLoopTests(unittest.TestCase):
@@ -2667,6 +2714,43 @@ class KnowledgeStoreTests(unittest.TestCase):
         self.assertIn('"chains"', source)
         self.assertNotIn('"cards"', source,
                          "chain_match must not read the writeup store")
+
+    def test_promote_refuses_a_rejected_critic(self):
+        """The critic gate sits before everything else: a card the critic
+        refused must not reach validation, let alone the store."""
+        sys.path.insert(0, str(ROOT / "tools"))
+        import promote_card
+        card = {"id": "never-promoted"}
+        with self.assertRaises(ValueError):
+            promote_card.promote(card, {"accept": False},
+                                 str(ROOT / "knowledge" / "cards"))
+        with self.assertRaises(ValueError):
+            promote_card.promote(card, {"accept": True, "errors": ["thin"]},
+                                 str(ROOT / "knowledge" / "cards"))
+
+    def test_promote_never_writes_outside_or_over(self):
+        try:
+            import jsonschema  # noqa: F401
+        except ImportError:
+            self.skipTest("jsonschema unavailable; validate() fails closed, "
+                          "which is itself the checked behaviour elsewhere")
+        sys.path.insert(0, str(ROOT / "tools"))
+        import promote_card
+        source = ROOT / "knowledge" / "cards" / "31c3-2014-devilish.json"
+        card = json.loads(source.read_text(encoding="utf-8"))
+        card["id"] = "promote-guard-test"
+        critic = {"accept": True}
+        with self.assertRaises(ValueError):
+            promote_card.promote(card, critic, str(ROOT.parent))
+        with tempfile.TemporaryDirectory(dir=ROOT) as temp:
+            first = promote_card.promote(card, critic, temp)
+            self.assertTrue(Path(first).is_file())
+            self.assertEqual(json.loads(Path(first).read_text(
+                encoding="utf-8"))["quality"]["review_status"], "reviewed")
+            with self.assertRaises((ValueError, OSError)):
+                promote_card.promote(card, critic, temp)
+            with self.assertRaises(ValueError):
+                promote_card.promote(dict(card, id="sub/dir"), critic, temp)
 
 
 class KnowledgeScaleTests(unittest.TestCase):
