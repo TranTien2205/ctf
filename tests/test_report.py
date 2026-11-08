@@ -96,3 +96,16 @@ def test_diff_retest(tmp_path, capsys):
     assert main(["diff", str(s1), str(s2), "--json"]) == 0
     res = json.loads(capsys.readouterr().out)
     assert len(res["fixed"]) == 1 and len(res["still_present"]) == 4
+
+
+def test_report_refuses_non_session_dir(tmp_path, capsys):
+    """`argus report` must not fabricate a sealed session out of an empty
+    directory - refuse before render/seal."""
+    import json
+    from argus.cli import main
+    empty = tmp_path / "nothing"
+    empty.mkdir()
+    assert main(["report", str(empty)]) == 1
+    assert "not a session dir" in capsys.readouterr().out
+    assert not (empty / "report.md").exists()
+    assert not (empty / "summary.json").exists()

@@ -179,6 +179,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "report":
         from .report.markdown import render_report
         sdir = Path(args.session_dir)
+        if not (sdir / "transcript.jsonl").exists():
+            # refuse: an empty dir would render a sealed, verifying
+            # "session" out of nothing - the seal must only ever anchor
+            # artifacts a real run produced
+            print(f"no transcript.jsonl in {sdir} - not a session dir")
+            return 1
         session = _reopen(sdir)
         # bare Config suffices - the renderer only reads cfg.model, and
         # resolving auth here could refresh OAuth creds as a side effect of
