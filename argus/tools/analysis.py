@@ -208,6 +208,28 @@ _HOST_RE = re.compile(
     r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?")
 
 
+def _args_scope_check(ctx: Context, args: str) -> None:
+    """Scope-check every target-looking token in an args string: full URLs,
+    bare hostnames/IPs (`nmap evil.com`), and IPv6 literals (`nmap ::1`).
+    Flags and existing filenames are skipped."""
+    for u in _URL_RE.findall(args):
+        ctx.scope.check(u)
+    for tok in _split_args(args):
+        if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
+            continue
+        host_part = tok.split(":")[0]
+        if tok.count(":") >= 2 or tok.startswith("["):
+            # IPv6 literal - split(':') would yield '' on '::1'
+            host_part = tok.strip("[]").split("%")[0]
+            ctx.scope.check(f"http://[{host_part}]")
+            continue
+        if re.search(r"\.(?:txt|xml|json|html?|list|lst|md|csv|out|log|yaml|yml|py|sh|gz|zip)$",
+                     host_part, re.I):
+            continue  # file-like, not a hostname
+        if _HOST_RE.fullmatch(host_part):
+            ctx.scope.check("http://" + host_part)
+
+
 def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> dict:
     if not ctx.cfg.external_tools:
         return {"error": "external tools disabled (--no-external)"}
@@ -218,19 +240,7 @@ def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> di
     if not binary:
         return {"error": f"{tool} is not installed on this host"}
     try:
-        for u in _URL_RE.findall(args):
-            ctx.scope.check(u)
-        # bare hostnames/IPs as arguments (e.g. `nmap evil.com`) must also be
-        # in scope; flags and existing filenames are skipped
-        for tok in _split_args(args):
-            if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
-                continue
-            host_part = tok.split(":")[0]
-            if re.search(r"\.(?:txt|xml|json|html?|list|lst|md|csv|out|log|yaml|yml|py|sh|gz|zip)$",
-                         host_part, re.I):
-                continue  # file-like, not a hostname
-            if _HOST_RE.fullmatch(host_part):
-                ctx.scope.check("http://" + host_part)
+        _args_scope_check(ctx, args)
     except Exception as exc:
         return {"error": f"args rejected by scope guard: {exc}"}
     toks = _split_args(args)

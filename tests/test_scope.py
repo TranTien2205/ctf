@@ -171,6 +171,26 @@ def test_curl_arg_guards(ctx):
     assert c(["-w", "%{http_code}", "http://x/"]) is None
 
 
+def test_external_args_scope_scan(ctx):
+    """The bare-arg scan must see targets that aren't URLs: hostnames, IPs,
+    and IPv6 literals - `nmap ::1` must not slip past split(':')."""
+    from argus.tools.analysis import _args_scope_check
+    import pytest
+    from argus.scope import ScopeError
+    ok = lambda a: _args_scope_check(ctx, a)
+    with pytest.raises(ScopeError):
+        ok("-sV evil.example")           # bare hostname
+    with pytest.raises(ScopeError):
+        ok("-sV ::1")                    # IPv6 literal (was: empty split)
+    with pytest.raises(ScopeError):
+        ok("-sV [fe80::1]")              # bracketed IPv6
+    with pytest.raises(ScopeError):
+        ok("-u http://evil.example/")    # plain URL
+    ok("-sV 127.0.0.1")                  # in-scope IP
+    ok("-sV 127.0.0.1:8080")             # in-scope host:port
+    ok("-p 80,443")                      # port list - not a host
+
+
 def test_nmap_arg_guards(ctx, tmp_path):
     """nmap -iL files are scope-checked; local script paths, random
     targets, and out-of-cwd output are refused."""
