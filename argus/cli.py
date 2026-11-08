@@ -926,17 +926,22 @@ def _reopen(sdir: Path) -> Session:
     sess._last_chain = ""
     sess.resumed = False
     mpath = sdir / "meta.json"
-    if mpath.exists():
+    if mpath.is_file():
         try:
-            sess.started = float(json.loads(
-                mpath.read_text(encoding="utf-8")).get("started") or 0.0)
+            meta = json.loads(mpath.read_text(encoding="utf-8"))
+            if isinstance(meta, dict):
+                sess.started = float(meta.get("started") or 0.0)
         except (ValueError, OSError):
             pass
     tpath = sdir / "transcript.jsonl"
-    if tpath.exists():
+    if tpath.is_file():
         # forensic reader: skip malformed lines - `argus verify` reports
         # them; crashing here would hide the rest of a damaged transcript
-        for line in tpath.read_text(encoding="utf-8").splitlines():
+        try:
+            lines = tpath.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            lines = []
+        for line in lines:
             if not line.strip():
                 continue
             try:
@@ -953,8 +958,8 @@ def _reopen(sdir: Path) -> Session:
     fpath = sdir / "findings.json"
     try:
         rows = json.loads(fpath.read_text(encoding="utf-8")) \
-            if fpath.exists() else []
-    except ValueError:
+            if fpath.is_file() else []
+    except (ValueError, OSError):
         rows = []
     sess.findings = rows if isinstance(rows, list) else []
     return sess
