@@ -463,7 +463,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 970,
+      "skill_tokens": 1040,
       "depth_files": 3,
       "depth_tokens": 639,
       "use_when": [
@@ -2042,7 +2042,7 @@
         "htb-tornadoservice-bot-csrf-class-pollution",
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
-      "skill_tokens": 1264,
+      "skill_tokens": 1354,
       "depth_files": 5,
       "depth_tokens": 4306,
       "use_when": [

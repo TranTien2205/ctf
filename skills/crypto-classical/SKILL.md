@@ -38,6 +38,10 @@ readable text or the flag format, and you can state WHICH transform did it.
 
 ## Identification order
 
+0. `tools/cipher_id.py --text 'CT'` runs the statistics for you: IC,
+   Caesar chi-squared sweep, and Kasiski period estimate in one pass,
+   each family labelled a candidate. It also tells you when the blob is
+   an encoding, not a cipher (route to `tools/enc_detect.py`).
 1. Frequency analysis first — a monoalphabetic cipher keeps the natural
    spike pattern (ETAOIN); Vigenere and transposition flatten or preserve
    letters differently.

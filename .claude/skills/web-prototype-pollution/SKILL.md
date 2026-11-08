@@ -46,6 +46,12 @@ that reads an optional property and treats absence as trusted is the target.
 Pollute one harmless property, then read it back through a path that should not
 have it. Do not jump straight at the gate you actually want.
 
+`tools/web/pp_probe.py` does this loop: `__proto__` marker through JSON,
+form, and query carriers against the merge point, then a re-read of
+`--readback`. It reports `marker-on-readback` or `readback-changed` (a
+polluted fallback changing behaviour without echoing), with the blast-
+radius reminder — a landed marker is process-global until restart.
+
 ## Reaching the write
 
 | Route | Shape |
