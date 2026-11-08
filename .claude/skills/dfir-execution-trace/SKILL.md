@@ -202,13 +202,16 @@ the header first; a wrong name parses zero rows from that source and the merge s
 
 - A blank 4688 `CommandLine` is a policy state, not a missing record; joining Sysmon 1 to 3 on `ProcessId` rather than
   `ProcessGuid` attaches the wrong connection after PID reuse.
-- **No EVTX parser is installed here today**: `command -v evtx_dump`, `evtxexport`, `chainsaw`, `hayabusa` all return
-  nothing and `import Evtx` raises `ModuleNotFoundError`, so a raw `.evtx` cannot be opened until
-  `sudo apt install --no-install-recommends python3-evtx libevtx-utils chainsaw` from
-  `../dfir-sherlock-triage/toolchain.md` has run. Day zero, `evtx_query.py` still takes `.jsonl`, `.json` and
-  `<Event>` `.xml`, which is the shape a Sherlock bundle or a colleague's export usually already has. After
-  installing: `evtx_dump` is multithreaded by default and emits records out of order, so pass `-t 1` - and
-  `evtx_query.py` re-sorts on the parsed timestamp regardless and prints `input_was_chronological`.
+- **A raw `.evtx` opens offline now**: `evtx_query.py --input FILE.evtx` decodes through
+  `tools/forensics/evtx_parse.py` (bundled stdlib BinXML: chunks, record framing, string table,
+  template instances with embedded or chunk-stored definitions). `evtx_dump` or the python `Evtx`
+  module take precedence when installed - `sudo apt install --no-install-recommends python3-evtx
+  libevtx-utils chainsaw` per `../dfir-sherlock-triage/toolchain.md`. The bundled decode covers the
+  mainstream shapes; cross-check with a real converter when one exists. Day zero, `evtx_query.py`
+  still takes `.jsonl`, `.json` and `<Event>` `.xml` too, which is the shape a Sherlock bundle or a
+  colleague's export usually already has. After installing: `evtx_dump` is multithreaded by default
+  and emits records out of order, so pass `-t 1` - and `evtx_query.py` re-sorts on the parsed
+  timestamp regardless and prints `input_was_chronological`.
 - `sysmon -s` runs on the Windows host, not from a handout; with only a bundle in hand, confirm a Sysmon field name
   from one dumped record rather than from memory.
 - Shimcache answers "was this path seen", never "was this executed"; an Amcache `FileId` over 31,457,280 bytes of file

@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Query converted Windows event log records, and stay honest when nothing parsed.
 
-EVTX answers most Sherlock questions, and this box has no EVTX parser: evtx_dump,
-chainsaw, hayabusa and the python Evtx module are all absent today. So the real
-pipeline is convert once, query many times - one converter run produces JSONL,
-and every question after that is a filter over that JSONL. This tool owns the
-query half, because that is the half that must work with nothing installed. It
-touches a converter only when one is actually on the box, and when none is, it
-says so with the install command instead of guessing.
+EVTX answers most Sherlock questions. On a bare box the bundled
+tools/forensics/evtx_parse.py stdlib BinXML decoder converts .evtx records to
+XML; evtx_dump or the python Evtx module take precedence when installed. So
+the pipeline is convert once, query many times - one converter run produces
+JSONL, and every question after that is a filter over that JSONL. This tool
+owns the query half, because that is the half that must work with nothing
+installed. It touches an external converter only when one is actually on the
+box; when none is, the bundled parser answers instead of guessing.
 
 Three traps this exists to remove:
 
@@ -32,12 +33,14 @@ and can never be proposed as verdict=confirms.
 
 What is proven and what is not, on this box, today: the .jsonl, .json and .xml
 modes and the missing-converter path all ran against the fixtures beside this
-file. The two converter branches did NOT run, because evtx_dump is not on PATH
-and the Evtx module does not import - that is precisely why this tool exists. The
-Evtx branch feeds its per-record XML through the same xml_to_record() that the
-proven .xml mode uses, so only the module handle itself is unexercised. Re-verify
-`evtx_dump -o jsonl -t 1` against `evtx_dump --help` after installing it, per
-this tree's rule against trusting an unrun tool flag.
+file. Since then a third converter path exists - bundled
+tools/forensics/evtx_parse.py, a stdlib BinXML decoder that always runs as the
+last resort, so .evtx input is no longer a dead end on a converter-less box.
+Its per-record XML feeds the same xml_to_record() the proven .xml mode uses.
+The two external converter branches (evtx_dump, python Evtx) still take
+precedence when installed; re-verify `evtx_dump -o jsonl -t 1` against
+`evtx_dump --help` after installing it, per this tree's rule against trusting
+an unrun tool flag.
 
     # what ran, chronologically, and the command line of the first process
     python3 tools/forensics/evtx_query.py --input sysmon.jsonl --event-id 1 \
@@ -457,7 +460,9 @@ def load_evtx_records(path):
         info["detected"].append("no evtx_dump on PATH")
         info["detected"].append("python Evtx module not importable: %s"
                                 % type(exc).__name__)
-        return [], info, ["no EVTX converter is installed on this box"]
+        info["detected"].append("falling back to bundled stdlib "
+                                "evtx_parse")
+        return load_evtx_records_bundled(path)
     info["detected"].append("python Evtx module imported")
     info["converter"] = "python Evtx module, records()[].xml()"
     rows = []
@@ -476,6 +481,39 @@ def load_evtx_records(path):
                                      % (os.path.basename(path),
                                         type(exc).__name__, exc)]
     return rows, info, errors
+
+
+def load_evtx_records_bundled(path):
+    """Last-resort converter: this tree's own stdlib BinXML parser.
+
+    tools/forensics/evtx_parse.py decodes the documented chunk + record +
+    template-instance structures with no dependencies, so it is always
+    available. It covers the mainstream shapes (fragment + template
+    instance with embedded or chunk-stored definitions); a record it
+    cannot frame is counted in errors, not silently dropped.
+    """
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        import evtx_parse
+        recs, errs = evtx_parse.parse_evtx(path)
+    except Exception as exc:
+        return [], {"converter": "bundled evtx_parse (import failed)"}, [
+            "evtx_parse failed to import or run: %s: %s"
+            % (type(exc).__name__, exc)]
+    rows = []
+    for r in recs:
+        try:
+            rows.append(_row(r["xml"], xml_to_record(r["xml"]),
+                             "verbatim record XML from bundled evtx_parse"))
+        except Exception as exc:
+            errs = (errs if isinstance(errs, list) else [errs]) + [
+                "record %s XML did not normalise: %s: %s"
+                % (r.get("record_id"), type(exc).__name__, exc)]
+    info = {"converter": "tools/forensics/evtx_parse.py (bundled stdlib)",
+            "converter_note": "stdlib BinXML decode; exotic record shapes "
+                              "may under-decode - cross-check with evtx_dump "
+                              "when a real converter is on the box"}
+    return rows, info, errs if isinstance(errs, list) else [errs]
 
 
 def load_records(path):

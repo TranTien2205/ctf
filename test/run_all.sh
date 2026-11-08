@@ -104,7 +104,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/web/ssti_gen.py tools/meta_read.py tools/dns_query.py \
          tools/elf_info.py tools/pe_info.py tools/web/sqli_union.py \
          tools/forensics/sqlite_carve.py tools/forensics/mft_parse.py \
-         tools/forensics/carve_scan.py; do
+         tools/forensics/evtx_parse.py tools/forensics/carve_scan.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
