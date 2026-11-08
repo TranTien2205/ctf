@@ -173,6 +173,7 @@ class Handler(BaseHTTPRequestHandler):
             self._send(body="""<html><head><title>LabShop</title></head><body>
 <h1>LabShop</h1>
 <form action="/search" method="GET"><input name="q"><button>search</button></form>
+<form action="/settings/update-email" method="GET"><input name="email"><button>save</button></form>
 <ul><li><a href="/item?id=1">item 1</a></li>
 <li><a href="/redirect?next=/">go</a></li>
 <li><a href="/download?file=welcome.txt">readme</a></li>

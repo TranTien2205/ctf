@@ -20,7 +20,9 @@ Record the real request (from crawl forms or your session), then check:
 ## GET endpoints
 
 State changes on GET are CSRF by default (img tag = request). Record any
-GET that mutates state as its own finding.
+GET that mutates state as its own finding. `probe_csrf` flags GET forms
+whose action looks state-changing (update/delete/set/...) as leads -
+confirm the endpoint really mutates state before recording.
 
 ## Minimal PoC for a report
 

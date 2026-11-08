@@ -99,6 +99,11 @@ def test_csrf_probe(lab_url, ctx):
                              data="theme=light")
     assert "text/plain" in out2["verdict"], out2
     assert out2["content_type_replay"]["processed"]
+    # a GET form whose action looks state-changing is a csrf lead even
+    # without any POST form - browsers fire cross-origin GETs trivially
+    out3 = probes.probe_csrf(ctx, lab_url + "/")
+    assert "state-changing" in out3["verdict"], out3
+    assert out3["stateful_get_forms"], out3
 
 
 def test_xfh_probe(lab_url, ctx):

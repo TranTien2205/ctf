@@ -152,6 +152,10 @@ def main() -> int:
     check("xxe probe resolves entity", "xxe candidate" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/login")
     check("csrf probe flags tokenless form", "csrf" in out["verdict"])
+    out = probes.probe_csrf(ctx, base + "/")
+    check("csrf probe flags get-form state change",
+          "get form" in out["verdict"].lower()
+          and "state-changing" in out["verdict"])
     out = probes.probe_xfh(ctx, base + "/reset")
     check("xfh probe sees reflected host", "candidate" in out["verdict"])
     out = probes.probe_nosqli(ctx, base + "/api/login",

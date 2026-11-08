@@ -532,17 +532,27 @@ def _forms(html: str) -> list[dict]:
     return forms
 
 
+_GETSTATE_RE = re.compile(
+    r"chang|updat|delet|remov|add|creat|edit|modif|set|enabl|disabl|"
+    r"transfer|pay|order|grant|revok|reset|confirm|approve", re.I)
+
+
 def probe_csrf(ctx: Context, url: str, method: str = "GET",
                data: str | None = None) -> dict:
     """CSRF surface check: POST forms without anti-CSRF tokens plus
     session cookies missing SameSite=Lax/Strict. When `data` is given,
     also replays the action with Content-Type: text/plain - a "simple"
     content type browsers may send cross-origin without a preflight;
-    an endpoint that still processes it is CSRFable."""
+    an endpoint that still processes it is CSRFable. GET forms whose
+    action looks state-changing are flagged as leads too - a browser
+    fires a cross-origin GET with a bare <img> tag, no form needed."""
     r = ctx.client.send("GET", url, tool="probe_csrf", note="form inventory")
     body = r.get("body") or ""
     forms = _forms(body)
     post_forms = [f for f in forms if f["method"] == "POST"]
+    get_forms = [f for f in forms if f["method"] == "GET"]
+    stateful_gets = [f for f in get_forms
+                     if _GETSTATE_RE.search(f["action"] or "")]
     unprotected = [f for f in post_forms
                    if not any(_CSRF_TOKEN_RE.search(n) for n in f["hidden"])]
     sc = (r.get("headers") or {}).get("set-cookie") or []
@@ -562,6 +572,11 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
         verdict = ("csrf candidate: endpoint processed a text/plain body "
                    f"(HTTP {ct_bypass['status']}) - no content-type "
                    "enforcement, submittable cross-origin without preflight")
+    elif not post_forms and stateful_gets:
+        verdict = ("csrf lead: GET form(s) with state-changing-looking "
+                   "actions - a GET state change needs no token and is "
+                   "triggerable cross-origin by any page: "
+                   + ", ".join(f["action"] for f in stateful_gets))
     elif not post_forms:
         verdict = "no state-changing forms"
     elif not unprotected:
@@ -575,6 +590,7 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
                    "session cookie seen - confirm auth is cookie-based")
     return {"verdict": verdict, "request_id": r["request_id"],
             "post_forms": post_forms, "unprotected": unprotected,
+            "stateful_get_forms": stateful_gets,
             "weak_cookies": weak_cookies,
             "content_type_replay": ct_bypass}
 
