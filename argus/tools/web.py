@@ -368,6 +368,21 @@ def fingerprint(ctx: Context, url: str) -> dict:
         version_notes.append(
             f"jquery {m.group(1)}.x detected in page source - outdated, "
             "known XSS CVEs - verify before citing")
+    # session-cookie flag hygiene: missing HttpOnly/Secure/SameSite on a
+    # session-shaped cookie is a standard report line - phrased as hygiene
+    is_https = urllib.parse.urlparse(url).scheme == "https"
+    cookie_notes = []
+    for c in cookies:
+        if not re.search(r"sess|session|sid|auth|token|jwt|login",
+                         c["name"], re.I):
+            continue
+        lacks = [n for n, ok in (("HttpOnly", c["httponly"]),
+                                 ("Secure", c["secure"] or not is_https),
+                                 ("SameSite", c["samesite"] is not None))
+                 if not ok]
+        if lacks:
+            cookie_notes.append(
+                f"session cookie '{c['name']}' missing: " + ", ".join(lacks))
     return {
         "request_id": res["request_id"],
         "status": res["status"],
@@ -376,6 +391,7 @@ def fingerprint(ctx: Context, url: str) -> dict:
         "waf_hints": waf_hints,
         "version_notes": version_notes,
         "cookies": cookies,
+        "cookie_notes": cookie_notes,
         "missing_security_headers": missing,
         "robots": robots,
         "sitemap": sitemap,

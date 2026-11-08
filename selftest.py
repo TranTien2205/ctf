@@ -135,6 +135,8 @@ def main() -> int:
           any("php" in h and "PHPSESSID" in h for h in out["stack_hints"])
           and any(c["name"] == "PHPSESSID" and not c["samesite"]
                   for c in out["cookies"]))
+    check("fingerprint flags session-cookie hygiene",
+          any("HttpOnly" in n for n in out["cookie_notes"]))
     out = web.crawl(ctx, base, depth=1)
     check("crawl finds forms/endpoints", len(out["endpoints"]) >= 4)
     out = web.js_recon(ctx, base)
