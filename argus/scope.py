@@ -111,10 +111,20 @@ class ScopeGuard:
         norm = posixpath.normpath(norm)
         if not norm.startswith("/"):
             norm = "/" + norm
+        # IIS-class targets fold case and treat '\' as a separator, so an
+        # exclusion must match the same way or /ADMIN and /x\..\admin walk
+        # straight past an '/admin' rule. Over-blocking is the safe error
+        # for an operator-declared no-go area.
+        lowered = path.lower()
+        norm_l = norm.lower()
+        folded = norm_l.replace("\\", "/")
+        folded = posixpath.normpath(folded)
         for prefix in self.exclude_paths:
-            if prefix and (
-                    path == prefix or path.startswith(prefix + "/")
-                    or norm == prefix or norm.startswith(prefix + "/")):
+            p = (prefix or "").lower()
+            if p and (path == prefix or path.startswith(prefix + "/")
+                      or norm == prefix or norm.startswith(prefix + "/")
+                      or lowered == p or lowered.startswith(p + "/")
+                      or folded == p or folded.startswith(p + "/")):
                 raise ScopeError(f"path excluded by scope rules: {path}")
         return parsed
 

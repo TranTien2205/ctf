@@ -91,6 +91,20 @@ def test_excluded_path_bypass_attempts_denied():
     g.check("https://target.example/%61dminister")
 
 
+def test_excluded_path_iis_bypass_denied():
+    """IIS-class targets fold case and treat \\ as a separator - the
+    exclusion must match the same way or the guard is cosmetic."""
+    g = ScopeGuard("https://target.example", exclude_paths=["/admin"],
+                   allow_private=False)
+    for u in ("https://target.example/ADMIN",
+              "https://target.example/Admin/Panel",
+              "https://target.example/x%5c..%5cadmin",
+              "https://target.example/x\\..\\admin"):
+        with pytest.raises(ScopeError, match="excluded"):
+            g.check(u)
+    g.check("https://target.example/administrator")  # no over-block
+
+
 def test_private_refused_by_default():
     g = ScopeGuard("https://target.example", extra_hosts=["internal.example"],
                    allow_private=False)
