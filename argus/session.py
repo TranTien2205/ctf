@@ -45,6 +45,29 @@ def _chain(prev: str, entry: dict) -> str:
     return hashlib.sha256((prev + payload).encode("utf-8")).hexdigest()
 
 
+_REDACTED = "•••redacted•••"
+
+
+def _redact_url(url):
+    """http://user:pass@host -> http://<marker>@host - basic-auth
+    credentials embedded in a URL persist nowhere; the scope guard only
+    ever needed the host."""
+    if not isinstance(url, str) or "@" not in url:
+        return url
+    try:
+        parts = urllib.parse.urlsplit(url)
+    except ValueError:
+        return url
+    if parts.username is None and parts.password is None:
+        return url
+    host = parts.hostname or ""
+    if parts.port:
+        host += f":{parts.port}"
+    return urllib.parse.urlunsplit(
+        (parts.scheme, f"{_REDACTED}@{host}" if host else _REDACTED,
+         parts.path, parts.query, parts.fragment))
+
+
 def _redact_obj(obj, secrets: set[str]):
     """Deep-copy an artifact structure replacing every occurrence of a
     declared operator secret with the redaction marker. Applied to request
@@ -57,7 +80,7 @@ def _redact_obj(obj, secrets: set[str]):
     if isinstance(obj, str):
         for v in secrets:
             if v and v in obj:
-                obj = obj.replace(v, "•••redacted•••")
+                obj = obj.replace(v, _REDACTED)
         return obj
     if isinstance(obj, dict):
         return {k: _redact_obj(v, secrets) for k, v in obj.items()}
@@ -424,14 +447,29 @@ class Session:
         with self._lock:
             self._seq += 1
             rid = f"r{self._seq}"
+            req = _redact_obj(request, self.secret_values)
+            resp = _redact_obj(response, self.secret_values)
+            # basic-auth credentials embedded in URLs (user:pass@host)
+            # are operator secrets too - strip userinfo before persisting
+            for container in (req, resp):
+                if not isinstance(container, dict):
+                    continue
+                for k in ("url", "final_url", "blocked_to"):
+                    if k in container:
+                        container[k] = _redact_url(container[k])
+                for hop in container.get("redirects") or []:
+                    if isinstance(hop, dict):
+                        for k in ("from", "to"):
+                            if k in hop:
+                                hop[k] = _redact_url(hop[k])
             entry = {
                 "id": rid,
                 "ts": round(time.time(), 3),
                 "tool": tool,
                 # operator secrets persist nowhere: redact declared values
                 # out of bodies/request_text before the bytes hit disk
-                "request": _redact_obj(request, self.secret_values),
-                "response": _redact_obj(response, self.secret_values),
+                "request": req,
+                "response": resp,
             }
             if agent:
                 entry["agent"] = agent
@@ -590,7 +628,7 @@ class Session:
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
-        key = _finding_key(category, url)
+        key = _finding_key(category, _redact_url(url))
         with self._lock:
             for existing in self.findings:
                 if _finding_key(existing["category"], existing["url"]) == key:
@@ -603,7 +641,7 @@ class Session:
                 "title": title.strip(),
                 "severity": severity,
                 "category": category.strip(),
-                "url": url,
+                "url": _redact_url(url),
                 "evidence_ids": evidence_ids,
                 "evidence_excerpt": excerpt[:2000],
                 "description": description.strip(),
