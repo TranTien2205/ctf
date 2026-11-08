@@ -29,6 +29,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET  /cached               cache poisoning (X-Forwarded-Host unkeyed)
     GET  /profile[/x.css]      cache deception (path confusion)
     GET+POST /api/config       prototype pollution (__proto__ merge)
+    POST /api/config2          proto pollution via constructor.prototype
     GET  /api/data             CORS: reflects Origin + credentials
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
@@ -695,7 +696,24 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 for k, v in b.items():
                     if k == "__proto__" and isinstance(v, dict):
                         type(self)._pp.update(v)
+                    elif (k == "constructor" and isinstance(v, dict)
+                          and isinstance(v.get("prototype"), dict)):
+                        type(self)._pp.update(v["prototype"])
                     else:
+                        self._usercfg[k] = v
+            self._send(body=json.dumps({"merged": True}),
+                       ctype="application/json")
+            return
+        if path == "/api/config2":
+            # __proto__ is "filtered" but constructor.prototype still
+            # reaches the same shared prototype - the classic bypass
+            b = self._body()
+            if isinstance(b, dict):
+                for k, v in b.items():
+                    if (k == "constructor" and isinstance(v, dict)
+                            and isinstance(v.get("prototype"), dict)):
+                        type(self)._pp.update(v["prototype"])
+                    elif k != "__proto__":
                         self._usercfg[k] = v
             self._send(body=json.dumps({"merged": True}),
                        ctype="application/json")

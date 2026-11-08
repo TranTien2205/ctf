@@ -173,6 +173,8 @@ def main() -> int:
     out = probes.probe_cors(ctx, base + "/api/data")
     check("cors probe sees credentialed reflection",
           "credentials" in out["verdict"])
+    check("cors probe sees null-origin trust",
+          "null origin" in out["verdict"])
     out = probes.probe_idor(ctx, base + "/api/user/2")
     check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
     out = probes.probe_ssrf(ctx, base + "/fetch?url=x", "url")
@@ -223,6 +225,10 @@ def main() -> int:
                              base + "/api/config")
     check("ppoll probe sees merged key",
           "prototype-pollution candidate" in out["verdict"])
+    out = probes.probe_ppoll(ctx, base + "/api/config2",
+                             base + "/api/config")
+    check("ppoll probe sees constructor carrier",
+          "constructor.prototype" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync")
     check("smuggle probe sees cl.te desync",
           "cl.te desync candidate" in out["verdict"])

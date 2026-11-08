@@ -198,6 +198,9 @@ def test_ppoll_probe(lab_url, ctx):
     out = probes.probe_ppoll(ctx, lab_url + "/api/config",
                              lab_url + "/api/config")
     assert "prototype-pollution candidate" in out["verdict"], out
+    out = probes.probe_ppoll(ctx, lab_url + "/api/config2",
+                             lab_url + "/api/config")
+    assert "constructor.prototype" in out["verdict"], out
 
 
 def test_cors_probe(lab_url, ctx):

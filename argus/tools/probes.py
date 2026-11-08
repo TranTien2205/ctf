@@ -413,23 +413,52 @@ def probe_crlf(ctx: Context, url: str, param: str,
 
 
 def probe_cors(ctx: Context, url: str) -> dict:
-    evil = "https://argus-probe.invalid"
-    r = ctx.client.send("GET", url, headers={"Origin": evil},
-                        tool="probe_cors", note="foreign origin")
-    h = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
-    acao = h.get("access-control-allow-origin", "")
-    acac = h.get("access-control-allow-credentials", "")
-    reflected = acao == evil or acao == "*"
-    credentialed = acac.lower() == "true"
-    verdict = "no cors issue"
-    if reflected and credentialed:
-        verdict = "arbitrary origin reflection WITH credentials - exploitable"
-    elif acao == "*":
-        verdict = "wildcard ACAO (no credentials)" if not credentialed else "wildcard + credentials"
-    elif reflected:
-        verdict = "origin reflected without credentials"
-    return {"verdict": verdict, "request_id": r["request_id"],
-            "acao": acao, "acac": acac}
+    """CORS origin-variant sweep: a foreign origin, `null` (sandboxed
+    iframe - trivially exploitable), an arbitrary subdomain, and a
+    prefix-confusion host. Any reflected origin WITH Allow-Credentials
+    is cross-origin data theft."""
+    host = urllib.parse.urlparse(url).netloc.split(":")[0]
+    variants = [
+        ("foreign", "https://argus-probe.invalid"),
+        ("null", "null"),
+        ("subdomain", f"https://argus.{host}"),
+        ("prefix-confuse", f"https://{host}.argus.invalid"),
+    ]
+    results = []
+    signals = []
+    for name, origin in variants:
+        r = ctx.client.send("GET", url, headers={"Origin": origin},
+                            tool="probe_cors", note=f"origin {name}")
+        h = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
+        acao = h.get("access-control-allow-origin", "")
+        acac = (h.get("access-control-allow-credentials", "")
+                .lower() == "true")
+        reflected = acao == origin or (acao == "*" and name != "null")
+        results.append({"variant": name, "origin": origin,
+                        "request_id": r["request_id"], "acao": acao,
+                        "acac": acac, "reflected": reflected})
+        if acao == "*":
+            signals.append("wildcard ACAO" + (" + credentials" if acac
+                                              else ""))
+            break  # '*' already covers every other origin
+        if reflected and acac:
+            note = {
+                "null": "null origin trusted WITH credentials - "
+                        "exploitable from any sandboxed iframe",
+                "subdomain": "arbitrary subdomain trusted WITH "
+                             "credentials - one subdomain XSS = full read",
+                "prefix-confuse": "prefix-confused host trusted WITH "
+                                  "credentials - attacker domain passes",
+            }.get(name, "arbitrary origin reflection WITH credentials - "
+                        "exploitable")
+            signals.append(note)
+        elif reflected:
+            signals.append(f"{name} origin reflected without credentials")
+    verdict = "; ".join(dict.fromkeys(signals)) if signals else "no cors issue"
+    first = results[0]
+    return {"verdict": verdict, "request_id": first["request_id"],
+            "acao": first["acao"], "acac": "true" if first["acac"] else "",
+            "origins": results}
 
 
 def probe_method(ctx: Context, url: str) -> dict:
@@ -1147,20 +1176,30 @@ def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
     canary = _marker("pp")
     before = ctx.client.send("GET", check_url, tool="probe_ppoll",
                              note="pre-merge baseline")
-    poll = ctx.client.send(
-        "POST", pollute_url,
-        headers={"Content-Type": "application/json"},
-        body=_json.dumps({"__proto__": {canary: "polluted"}}),
-        tool="probe_ppoll", note="__proto__ merge")
-    after = ctx.client.send("GET", check_url, tool="probe_ppoll",
-                            note="post-merge read")
-    polluted = (canary in (after.get("body") or "")
-                and canary not in (before.get("body") or ""))
+    carriers = [
+        ("__proto__", {"__proto__": {canary: "polluted"}}),
+        ("constructor.prototype",
+         {"constructor": {"prototype": {canary: "polluted"}}}),
+    ]
+    poll = after = polluted = None
+    carrier = ""
+    for carrier, doc in carriers:
+        poll = ctx.client.send(
+            "POST", pollute_url,
+            headers={"Content-Type": "application/json"},
+            body=_json.dumps(doc), tool="probe_ppoll",
+            note=f"{carrier} merge")
+        after = ctx.client.send("GET", check_url, tool="probe_ppoll",
+                                note="post-merge read")
+        if (canary in (after.get("body") or "")
+                and canary not in (before.get("body") or "")):
+            polluted = True
+            break
     if polluted:
-        verdict = ("prototype-pollution candidate: __proto__ key merged "
+        verdict = (f"prototype-pollution candidate: {carrier} key merged "
                    "server-side and surfaced on a different object")
     elif canary in (poll.get("body") or ""):
-        verdict = ("server echoes __proto__ input but no cross-object "
+        verdict = ("server echoes proto-path input but no cross-object "
                    "pollution observed")
     else:
         verdict = "no prototype-pollution signal"
