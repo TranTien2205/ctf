@@ -29,8 +29,10 @@ family — if you change a probe, update the lab and its test together.
   `board.py` (blackboard), `cards.py` + `roles/` (worker definitions),
   `coordinator.py` (threads + watchdog). Entry: `argus team`.
 - `argus/skills/*.md` — methodology modules loaded via `load_skill`
-- `resources/wordlists/` — `wordlist_fuzz` lists (add file = add list)
-- `resources/exploits/<id>/` — `run_exploit` manifests + scripts
+- `argus/resources/wordlists/` — bundled `wordlist_fuzz` lists;
+  `<cwd>/resources/wordlists/*.txt` extends/overrides at runtime
+- `argus/resources/exploits/<id>/` — bundled `run_exploit` manifests;
+  `<cwd>/resources/exploits/<id>/` extends/overrides
 - `argus/report/` — report.md + report.html + summary.json renderers
 - `lab/`, `tests/`, `selftest.py`
 

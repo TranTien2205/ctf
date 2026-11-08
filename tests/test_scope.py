@@ -181,7 +181,7 @@ def test_ffuf_arg_guards(ctx, tmp_path):
     assert f(["-x", "http://proxy:8080", "-u", "http://x/FUZZ"])
     assert f(["-of", "/tmp/out.json", "-u", "http://x/FUZZ"])
     repo_wl = (Path(__file__).resolve().parent.parent
-               / "resources" / "wordlists" / "dirs-small.txt")
+               / "argus" / "resources" / "wordlists" / "dirs-small.txt")
     assert f(["-w", f"{repo_wl}:FUZZ", "-u", "http://x/FUZZ"]) is None
     assert f(["-u", "http://x/FUZZ", "-mc", "200"]) is None
 

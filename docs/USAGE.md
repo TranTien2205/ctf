@@ -156,7 +156,9 @@ of re-requested. `note`/`read_notes` keep the working narrative.
 file to add a list. `resources/exploits/<id>/` — PoC manifests
 (`command`, `affects`, `proof_marker`) for `run_exploit`; add a directory
 to add an exploit. Both are data, not code — extending coverage needs no
-code change.
+code change. Lookup order is `resources/` in your working directory first,
+then the bundled `argus/resources/` (a cwd file shadows a bundled one),
+so the same mechanism works from a pip-installed `argus`.
 
 ## Reading a run
 

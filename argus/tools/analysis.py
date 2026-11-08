@@ -452,7 +452,7 @@ def _ffuf_arg_check(ctx: Context, toks: list[str]) -> str | None:
     """-w list:FUZZ sends every line of the file to the target - a local
     file is exfiltrated word by word. Confine wordlists to
     resources/wordlists/ or files inside cwd."""
-    wroot = (Path(__file__).resolve().parents[2]
+    wroot = (Path(__file__).resolve().parents[1]
              / "resources" / "wordlists")
     for i, tok in enumerate(toks):
         flag = tok.partition("=")[0]

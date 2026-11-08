@@ -13,9 +13,15 @@ from pathlib import Path
 from ..team.leads import Lead
 from .registry import Context
 
-RESOURCES = Path(__file__).resolve().parent.parent.parent / "resources"
+# Bundled defaults ship inside the package (wheels), a <cwd>/resources/
+# tree lets an operator extend wordlists/exploits without touching the
+# install — the cwd copy wins on name collisions.
+RESOURCES = Path(__file__).resolve().parents[1] / "resources"
+RESOURCES_USER = Path.cwd() / "resources"
 WORDLISTS = RESOURCES / "wordlists"
+WORDLISTS_USER = RESOURCES_USER / "wordlists"
 EXPLOITS = RESOURCES / "exploits"
+EXPLOITS_USER = RESOURCES_USER / "exploits"
 
 
 def _board(ctx: Context):
@@ -118,9 +124,12 @@ def _load_wordlist(name: str) -> tuple[list[str], str | None]:
     safe = re.sub(r"[^a-z0-9_-]", "", (name or "").lower())
     if not safe:
         return [], f"bad wordlist name {name!r}; use a file stem from resources/wordlists/"
-    path = WORDLISTS / f"{safe}.txt"
+    path = WORDLISTS_USER / f"{safe}.txt"
     if not path.exists():
-        avail = sorted(p.stem for p in WORDLISTS.glob("*.txt"))
+        path = WORDLISTS / f"{safe}.txt"
+    if not path.exists():
+        avail = sorted({p.stem for d in (WORDLISTS, WORDLISTS_USER)
+                        if d.exists() for p in d.glob("*.txt")})
         return [], f"no wordlist {safe!r}; available: {avail}"
     words = [w.strip() for w in path.read_text(encoding="utf-8").splitlines()
              if w.strip() and not w.startswith("#")]
@@ -184,34 +193,44 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
 
 # ------------------------------------------------------------- exploits
 
+def _exploit_dirs() -> list[Path]:
+    """All manifest dirs, user tree first (it shadows bundled ids)."""
+    seen, out = set(), []
+    for root in (EXPLOITS_USER, EXPLOITS):
+        if not root.exists():
+            continue
+        for d in sorted(root.iterdir()):
+            if d.is_dir() and (d / "manifest.json").exists() \
+                    and d.name not in seen:
+                seen.add(d.name)
+                out.append(d)
+    return out
+
+
 def _load_manifest(exploit_id: str) -> tuple[dict | None, Path | None, str | None]:
     safe = re.sub(r"[^a-z0-9_-]", "", (exploit_id or "").lower())
-    d = EXPLOITS / safe
-    mpath = d / "manifest.json"
-    if not mpath.exists():
-        avail = sorted(p.name for p in EXPLOITS.iterdir()
-                       if p.is_dir() and (p / "manifest.json").exists()) \
-            if EXPLOITS.exists() else []
-        return None, None, f"no exploit {safe!r}; available: {avail}"
-    try:
-        return json.loads(mpath.read_text(encoding="utf-8")), d, None
-    except (ValueError, OSError) as exc:
-        return None, None, f"bad manifest for {safe!r}: {exc}"
+    for root in (EXPLOITS_USER, EXPLOITS):
+        d = root / safe
+        mpath = d / "manifest.json"
+        if mpath.exists():
+            try:
+                return json.loads(mpath.read_text(encoding="utf-8")), d, None
+            except (ValueError, OSError) as exc:
+                return None, None, f"bad manifest for {safe!r}: {exc}"
+    avail = sorted(d.name for d in _exploit_dirs())
+    return None, None, f"no exploit {safe!r}; available: {avail}"
 
 
 def list_exploits(ctx: Context) -> dict:
     out = []
-    if EXPLOITS.exists():
-        for d in sorted(EXPLOITS.iterdir()):
-            m = d / "manifest.json"
-            if m.exists():
-                try:
-                    meta = json.loads(m.read_text(encoding="utf-8"))
-                    out.append({"id": d.name, "title": meta.get("title", ""),
-                                "affects": meta.get("affects", []),
-                                "cve": meta.get("cve")})
-                except ValueError:
-                    out.append({"id": d.name, "error": "bad manifest"})
+    for d in _exploit_dirs():
+        try:
+            meta = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+            out.append({"id": d.name, "title": meta.get("title", ""),
+                        "affects": meta.get("affects", []),
+                        "cve": meta.get("cve")})
+        except ValueError:
+            out.append({"id": d.name, "error": "bad manifest"})
     return {"exploits": out}
 
 

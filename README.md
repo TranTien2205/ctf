@@ -116,8 +116,9 @@ python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
 
         ┌───────────────────────────────────────────────────────┐
         │   RESOURCES (extend without code changes)             │
-        │   resources/wordlists/*.txt   -> wordlist_fuzz        │
-        │   resources/exploits/<id>/    -> run_exploit          │
+        │   <cwd>/resources/wordlists/*.txt   -> wordlist_fuzz  │
+        │   <cwd>/resources/exploits/<id>/    -> run_exploit    │
+        │   (bundled defaults: argus/resources/; cwd overrides) │
         │     manifest.json + script    (scope-checked,         │
         │                               timeout, proof_marker)  │
         └───────────────────────────────────────────────────────┘
@@ -207,8 +208,10 @@ not just in the prompt.
   `note()` ledger keep the agent from payload-spamming one hypothesis.
 - **Knowledge on demand** — `load_skill("sqli")` pulls one focused
   methodology module; the model never swallows a 600k-token corpus.
-- **Extensible resources** — `resources/wordlists/*.txt` feeds
-  `wordlist_fuzz`; `resources/exploits/<id>/manifest.json` describes a PoC
+- **Extensible resources** — drop files into `resources/` in your working
+  directory (or extend the bundled `argus/resources/`):
+  `resources/wordlists/*.txt` feeds `wordlist_fuzz`;
+  `resources/exploits/<id>/manifest.json` describes a PoC
   script (command template, affected fingerprints, `proof_marker` regex)
   that `run_exploit` executes scope-checked and timeout-bounded.
 - **Findings dedup** — the same bug class on the same endpoint+params can
