@@ -44,6 +44,27 @@ def _chain(prev: str, entry: dict) -> str:
     return hashlib.sha256((prev + payload).encode("utf-8")).hexdigest()
 
 
+def _redact_obj(obj, secrets: set[str]):
+    """Deep-copy an artifact structure replacing every occurrence of a
+    declared operator secret with the redaction marker. Applied to request
+    bodies, response bodies, event output and notes - the model sees the
+    real bytes (it needs them to work); only persisted artifacts redact.
+    A finding that must cite a secret to prove itself cannot be written -
+    by design."""
+    if not secrets:
+        return obj
+    if isinstance(obj, str):
+        for v in secrets:
+            if v and v in obj:
+                obj = obj.replace(v, "•••redacted•••")
+        return obj
+    if isinstance(obj, dict):
+        return {k: _redact_obj(v, secrets) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_redact_obj(v, secrets) for v in obj]
+    return obj
+
+
 def verify_transcript(sdir: Path) -> dict:
     """Recompute the hash chain over transcript.jsonl. Detects edited,
     inserted or mid-deleted entries, and tail truncation when
@@ -235,9 +256,14 @@ def _owasp_of(cwe: str) -> str:
 
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
-                 resume: Path | None = None):
+                 resume: Path | None = None,
+                 secrets: list[str] | None = None):
         self._lock = threading.Lock()
+        # >=4 chars: a shorter 'secret' would redact innocent bytes across
+        # the whole transcript - enforce the floor here, not just in CLI
+        secrets = {s for s in (secrets or []) if len(s) >= 4}
         if resume is not None:
+            self.secret_values: set[str] = secrets
             self._resume(Path(resume), target, meta)
             return
         host = urllib.parse.urlparse(target).hostname or "target"
@@ -250,10 +276,14 @@ class Session:
         self.findings: list[dict] = []
         self.resumed = False
         self._last_chain = ""
+        # operator-declared credential values, populated by GuardedClient
+        # from --secret/--header - every artifact write redacts them
+        self.secret_values: set[str] = secrets
         _atomic_write(
             self.dir / "meta.json",
             json.dumps({"id": self.id, "target": target,
-                        "started": self.started, **meta},
+                        "started": self.started,
+                        **_redact_obj(meta, self.secret_values)},
                        indent=2, ensure_ascii=False))
         with (self.dir / "notes.md").open("w", encoding="utf-8",
                                           newline="") as fh:
@@ -357,8 +387,10 @@ class Session:
                 "id": rid,
                 "ts": round(time.time(), 3),
                 "tool": tool,
-                "request": request,
-                "response": response,
+                # operator secrets persist nowhere: redact declared values
+                # out of bodies/request_text before the bytes hit disk
+                "request": _redact_obj(request, self.secret_values),
+                "response": _redact_obj(response, self.secret_values),
             }
             if agent:
                 entry["agent"] = agent
@@ -376,7 +408,8 @@ class Session:
         with self._lock:
             self._seq += 1
             rid = f"r{self._seq}"
-            entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind, **detail}
+            entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind,
+                     **_redact_obj(detail, self.secret_values)}
             if agent:
                 entry["agent"] = agent
             entry["chain"] = _chain(self._last_chain, entry)
@@ -559,7 +592,8 @@ class Session:
                 ("#", ">", "-", "*")) else ""
         with self._lock:
             with self.notes_path.open("a", encoding="utf-8", newline="") as fh:
-                fh.write(prefix + text.rstrip() + "\n\n")
+                fh.write(prefix + _redact_obj(
+                    text.rstrip(), self.secret_values) + "\n\n")
 
     def stats(self) -> dict:
         return {

@@ -195,3 +195,41 @@ def test_chain_head_anchor_catches_tail_truncation(tmp_path):
         "\n".join(lines[:-1]) + "\n")
     res = verify_transcript(s.dir)
     assert res.get("tail_truncated") is True
+
+
+def test_declared_secrets_redacted_from_artifacts(tmp_path):
+    """--secret values must not persist in ANY session artifact: transcript
+    bodies, event output, notes, meta.json - the model sees the real bytes;
+    only what hits disk is scrubbed."""
+    import json
+    from argus.session import Session
+    from argus.config import Config
+    cfg = Config(target="http://t", allow_private=True, session_dir=tmp_path,
+                 secret_values=["Sup3rSecret!", "s3ss!0n"])
+    s = Session(tmp_path, "http://t",
+                {"goal": "login as admin:Sup3rSecret!"},
+                secrets=cfg.secret_values)
+    s.record_exchange("http_request",
+                      {"method": "POST", "url": "http://t/login",
+                       "headers": {}, "body": "u=admin&p=Sup3rSecret!"},
+                      {"status": 200, "headers": {},
+                       "body": "welcome, token s3ss!0n"})
+    s.record_event("mcp_call", {"output": "echoed Sup3rSecret!",
+                                "arguments": {"q": "Sup3rSecret!"}})
+    s.note("creds admin/Sup3rSecret! verified")
+    blob = (s.dir / "transcript.jsonl").read_text() \
+        + (s.dir / "meta.json").read_text() \
+        + (s.dir / "notes.md").read_text()
+    assert "Sup3rSecret!" not in blob and "s3ss!0n" not in blob
+    assert "redacted" in blob  # marker present, bytes replaced
+
+
+def test_secrets_below_min_len_ignored(tmp_path):
+    """A 2-char 'secret' would shred innocent bytes across the whole
+    transcript - load_config drops values under 4 chars."""
+    from argus.config import Config
+    from argus.session import Session
+    s = Session(tmp_path, "http://t", {}, secrets=["ok"])
+    s.record_exchange("t", {"body": "ok ok"}, {"body": "ok"})
+    blob = (s.dir / "transcript.jsonl").read_text()
+    assert "ok ok" in blob  # nothing shredded

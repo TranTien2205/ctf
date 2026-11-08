@@ -41,6 +41,11 @@ class Config:
     mcp_config: str = ""
     resume: str = ""
     proxy: str = ""
+    # operator-declared credential values (login passwords, session tokens
+    # typed by hand): redacted verbatim from every persisted artifact -
+    # transcript bodies, event output, notes, logs - while the model still
+    # sees the real bytes it needs to work
+    secret_values: list[str] = field(default_factory=list)
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -235,4 +240,8 @@ def load_config(args) -> Config:
         mcp_config=getattr(args, "mcp_config", "") or "",
         resume=getattr(args, "resume", "") or "",
         proxy=getattr(args, "proxy", "") or "",
+        # >=4 chars: a shorter 'secret' would redact innocent bytes all over
+        # the transcript
+        secret_values=[s for s in (getattr(args, "secret", None) or [])
+                       if len(s) >= 4],
     )

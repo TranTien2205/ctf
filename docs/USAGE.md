@@ -47,6 +47,7 @@ python -m argus run https://app.example \
 | `--scope` | target host only | extra allowed hosts; subdomains included |
 | `--exclude` | none | path prefixes never touched |
 | `--header` | none | applied to every request (auth, custom UA) |
+| `--secret` | none | credential value to redact from all artifacts (repeatable) |
 | `--header-file` | none | headers from a file, one `Name: value` per line (Burp copy); framing headers (Host, Content-Length, Transfer-Encoding, Connection) dropped - the wire computes them |
 | `--model` | `claude-sonnet-4-5` | any Anthropic model id |
 | `--max-turns` | 80 | LLM tool-call turns |
@@ -232,6 +233,15 @@ names, the `Bearer` scheme, cookie names and `Set-Cookie` attributes stay
 visible. Findings cite response bodies, so redaction can never break a
 verbatim check. When full wire fidelity is needed, run with `--proxy`
 through Burp/ZAP - the interceptor sees everything Argus sends.
+
+Credential **values** anywhere else (a login password the agent posts in
+a form body, a token it quotes) are covered by `--secret VALUE`
+(repeatable, min 4 chars): every persisted artifact - transcript bodies,
+event output, `notes.md`, `agent.log`, `meta.json` - has each declared
+value replaced with a redaction marker at write time. The model still
+sees the real bytes it needs to authenticate; only what hits disk is
+scrubbed. A finding cannot cite a declared secret as its evidence
+excerpt - by design, secrets are never proving bytes.
 
 ## Resuming a run
 

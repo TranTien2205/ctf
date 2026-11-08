@@ -93,7 +93,8 @@ class AgentLoop:
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
             "tls_verify": cfg.tls_verify,
             "tools": sorted(allowed) if allowed else "all",
-        }, resume=Path(cfg.resume) if cfg.resume else None)
+        }, resume=Path(cfg.resume) if cfg.resume else None,
+            secrets=cfg.secret_values)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:
             from .ratelimit import RateLimiter
@@ -102,6 +103,7 @@ class AgentLoop:
                 default_headers=cfg.resolved_headers(),
                 tls_verify=cfg.tls_verify, max_requests=cfg.max_requests,
                 agent=agent_name, proxy=cfg.proxy,
+                secret_values=cfg.secret_values,
             )
             self._owns_client = True
         else:
@@ -145,6 +147,8 @@ class AgentLoop:
         fname = "agent.log" if self.agent_name == "agent" else \
             f"agent-{self.agent_name}.log"
         try:
+            from .session import _redact_obj
+            msg = _redact_obj(msg, self.session.secret_values)
             with (self.session.dir / fname).open("a", encoding="utf-8", newline="") as fh:
                 fh.write(f"[{time.strftime('%H:%M:%S')}] {msg}\n")
         except OSError:

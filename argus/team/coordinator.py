@@ -64,7 +64,8 @@ class TeamRun:
             "max_turns": cfg.max_turns, "max_requests": cfg.max_requests,
             "rate_rps": cfg.rate_rps, "exclude_paths": cfg.exclude_paths,
             "proxy": bool(cfg.proxy), "tls_verify": cfg.tls_verify},
-            resume=Path(cfg.resume) if cfg.resume else None)
+            resume=Path(cfg.resume) if cfg.resume else None,
+            secrets=cfg.secret_values)
         self.rate = RateLimiter(cfg.rate_rps)
         from ..mcp import MCPManager, discover_config_path
         self.mcp = MCPManager(discover_config_path(cfg.mcp_config))
@@ -118,7 +119,8 @@ class TeamRun:
             default_headers=self.cfg.resolved_headers(),
             tls_verify=self.cfg.tls_verify,
             max_requests=max_requests or self.cfg.max_requests, agent=name,
-            proxy=self.cfg.proxy)
+            proxy=self.cfg.proxy,
+            secret_values=self.cfg.secret_values)
 
     def _start_worker(self, name: str, card, task: str) -> None:
         self.board.register(name, card.name, task)

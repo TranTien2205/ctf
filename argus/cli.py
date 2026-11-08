@@ -25,6 +25,11 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
                         "computes them from the scoped URL")
     p.add_argument("--header", action="append",
                    help="'Name: value' applied to every request (e.g. auth cookie)")
+    p.add_argument("--secret", action="append",
+                   help="A credential value (password, session token, API "
+                        "key, >=4 chars) to redact verbatim from every "
+                        "persisted artifact - transcript bodies, event "
+                        "output, notes, logs. May repeat.")
     p.add_argument("--goal", help="Operator goal, e.g. 'focus on the /api surface'")
     p.add_argument("--operator",
                    help="Tester/org attribution recorded in meta.json and "

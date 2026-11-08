@@ -118,6 +118,7 @@ class GuardedClient:
         max_requests: int = 400,
         agent: str = "",
         proxy: str = "",
+        secret_values: list[str] | None = None,
     ):
         self.scope = scope
         self.session = session
@@ -130,9 +131,17 @@ class GuardedClient:
         # httpx's client-level merge - keep the operator headers for it.
         self._default_headers = default_headers or {}
         # values >=8 chars are treated as operator secrets wherever they
-        # appear in recorded headers, even under a custom header name
+        # appear in recorded headers, even under a custom header name;
+        # --secret adds operator-declared values (login passwords posted
+        # in bodies, tokens the agent quotes)
         self._secret_values = {v for v in self._default_headers.values()
-                               if len(v) >= 8}
+                               if len(v) >= 8} | {
+                                   v for v in (secret_values or [])
+                                   if len(v) >= 4}
+        # the session redacts these values inside every artifact write -
+        # bodies, event output, notes - not just headers
+        if self._secret_values:
+            self.session.secret_values |= self._secret_values
         # probe_race fires concurrent sends through one client - the budget
         # check+increment must be atomic or threads lose count
         self._sent_lock = threading.Lock()
