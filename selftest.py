@@ -59,6 +59,20 @@ def main() -> int:
           _raises(ValueError, lambda: s.add_finding(
               "t2", "low", "x", "u", [rid], "root:x", "d", "r")))
 
+    from argus.session import verify_transcript
+    res = verify_transcript(s.dir)
+    check("transcript hash chain verifies",
+          res["chained"] and not res["bad_lines"])
+    tpath = s.dir / "transcript.jsonl"
+    orig = tpath.read_text(encoding="utf-8")
+    lines = orig.splitlines()
+    e = json.loads(lines[0]); e["x"] = "edited"
+    lines[0] = json.dumps(e, ensure_ascii=False)
+    tpath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    check("tampered line is flagged",
+          verify_transcript(s.dir)["bad_lines"] == [1])
+    tpath.write_text(orig, encoding="utf-8")  # restore for the suite
+
     # --- probe checks against live lab -----------------------------------
     from argus.config import Config
     from argus.httpclient import GuardedClient
