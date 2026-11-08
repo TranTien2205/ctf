@@ -157,6 +157,36 @@
         "ad-service-triage"
       ],
       "origin": "coverage: live-estate brief reaches the ir router"
+    },
+    {
+      "observation": "attack-defense pcap dump of other teams traffic exploit replay",
+      "expect_router": "ad-service-triage",
+      "expect_depth": "ad-traffic-mining",
+      "forbid_open": [
+        "web-triage",
+        "dfir-sherlock-triage"
+      ],
+      "origin": "coverage: ad traffic-mining depth"
+    },
+    {
+      "observation": "attack-defense patch service without breaking sla checker",
+      "expect_router": "ad-service-triage",
+      "expect_depth": "ad-patch-without-breaking-sla",
+      "forbid_open": [
+        "web-triage",
+        "dfir-sherlock-triage"
+      ],
+      "origin": "coverage: ad patch depth"
+    },
+    {
+      "observation": "attack-defense rotate credentials planted backdoor sweep",
+      "expect_router": "ad-service-triage",
+      "expect_depth": "ad-planted-backdoor-hunt",
+      "forbid_open": [
+        "web-triage",
+        "dfir-sherlock-triage"
+      ],
+      "origin": "coverage: ad backdoor-hunt depth"
     }
   ],
   "chain_match": [
