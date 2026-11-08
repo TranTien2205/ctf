@@ -241,7 +241,10 @@ def _load_manifest(exploit_id: str) -> tuple[dict | None, Path | None, str | Non
         mpath = d / "manifest.json"
         if mpath.exists():
             try:
-                return json.loads(mpath.read_text(encoding="utf-8")), d, None
+                meta = json.loads(mpath.read_text(encoding="utf-8"))
+                if not isinstance(meta, dict):
+                    raise ValueError("manifest is not an object")
+                return meta, d, None
             except (ValueError, OSError) as exc:
                 return None, None, f"bad manifest for {safe!r}: {exc}"
     avail = sorted(d.name for d in _exploit_dirs())
@@ -252,11 +255,14 @@ def list_exploits(ctx: Context) -> dict:
     out = []
     for d in _exploit_dirs():
         try:
-            meta = json.loads((d / "manifest.json").read_text(encoding="utf-8"))
+            meta = json.loads((d / "manifest.json").read_text(
+                encoding="utf-8"))
+            if not isinstance(meta, dict):
+                raise ValueError("manifest is not an object")
             out.append({"id": d.name, "title": meta.get("title", ""),
                         "affects": meta.get("affects", []),
                         "cve": meta.get("cve")})
-        except ValueError:
+        except (ValueError, OSError):
             out.append({"id": d.name, "error": "bad manifest"})
     return {"exploits": out}
 
