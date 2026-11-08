@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Argus",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/TranTien2205/ctf",
+          "rules": [
+            {
+              "id": "CWE-347",
+              "name": "jwt",
+              "shortDescription": {
+                "text": "jwt"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/347.html"
+            },
+            {
+              "id": "CWE-89",
+              "name": "sqli",
+              "shortDescription": {
+                "text": "sqli"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html"
+            },
+            {
+              "id": "CWE-639",
+              "name": "idor",
+              "shortDescription": {
+                "text": "idor"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/639.html"
+            },
+            {
+              "id": "CWE-79",
+              "name": "xss",
+              "shortDescription": {
+                "text": "xss"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html"
+            },
+            {
+              "id": "CWE-200",
+              "name": "info-disclosure",
+              "shortDescription": {
+                "text": "info-disclosure"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/200.html"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-347",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "JWT weak secret: forged admin token accepted - The lab JWT verifies against the dictionary secret 'secret123'; a forged admin token is accepted and its claims echoed back verbatim."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://127.0.0.1:61192/api/me"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F05",
+            "argus/category": "jwt"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+            "cwe": "CWE-347",
+            "owasp": "A02 Cryptographic Failures",
+            "evidence_ids": [
+              "r15"
+            ],
+            "evidence_excerpt": "\"role\": \"admin\"",
+            "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
+            "agent": "agent"
+          }
+        },
+        {
+          "ruleId": "CWE-89",
+          "level": "error",
+          "rank": 8.0,
+          "message": {
+            "text": "SQL injection in /item id parameter - The quote probe produces a raw sqlite error - unsanitized input reaches the query."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://127.0.0.1:61192/item?id=1"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F01",
+            "argus/category": "sqli"
+          },
+          "properties": {
+            "argus-severity": "high",
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+            "cwe": "CWE-89",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r2"
+            ],
+            "evidence_excerpt": "sqlite3.OperationalError",
+            "remediation": "Use parameterized queries.",
+            "agent": "agent"
+          }
+        },
+        {
+          "ruleId": "CWE-639",
+          "level": "error",
+          "rank": 8.0,
+          "message": {
+            "text": "IDOR: /api/user/<id> serves any user object - Neighboring ids return other users' objects with no authorization check."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://127.0.0.1:61192/api/user/2"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F03",
+            "argus/category": "idor"
+          },
+          "properties": {
+            "argus-severity": "high",
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "cwe": "CWE-639",
+            "owasp": "A01 Broken Access Control",
+            "evidence_ids": [
+              "r13"
+            ],
+            "evidence_excerpt": "\"username\"",
+            "remediation": "Enforce per-object ownership checks.",
+            "agent": "agent"
+          }
+        },
+        {
+          "ruleId": "CWE-79",
+          "level": "warning",
+          "rank": 5.5,
+          "message": {
+            "text": "Reflected XSS in /search q parameter - Canary chars < > \" ' reflect unescaped in html context."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://127.0.0.1:61192/search?q=x"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F02",
+            "argus/category": "xss"
+          },
+          "properties": {
+            "argus-severity": "medium",
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+            "cwe": "CWE-79",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r12"
+            ],
+            "evidence_excerpt": "<>'\"&=/",
+            "remediation": "Output-encode by context; add CSP.",
+            "agent": "agent"
+          }
+        },
+        {
+          "ruleId": "CWE-200",
+          "level": "warning",
+          "rank": 5.5,
+          "message": {
+            "text": "Exposed /.env and /.git/HEAD at web root - Sensitive paths are served publicly - credentials and source-control metadata leak to anyone."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://127.0.0.1:61192/.env"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F04",
+            "argus/category": "info-disclosure"
+          },
+          "properties": {
+            "argus-severity": "medium",
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "cwe": "CWE-200",
+            "owasp": "A01 Broken Access Control",
+            "evidence_ids": [
+              "r20"
+            ],
+            "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
+            "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
+            "agent": "agent"
+          }
+        }
+      ],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "startTimeUtc": "2026-11-08T18:05:40Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+[
+  {
+    "id": "F01",
+    "title": "SQL injection in /item id parameter",
+    "severity": "high",
+    "category": "sqli",
+    "url": "http://127.0.0.1:61192/item?id=1",
+    "evidence_ids": [
+      "r2"
+    ],
+    "evidence_excerpt": "sqlite3.OperationalError",
+    "description": "The quote probe produces a raw sqlite error - unsanitized input reaches the query.",
+    "remediation": "Use parameterized queries.",
+    "ts": 1794161140.506,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-89",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F02",
+    "title": "Reflected XSS in /search q parameter",
+    "severity": "medium",
+    "category": "xss",
+    "url": "http://127.0.0.1:61192/search?q=x",
+    "evidence_ids": [
+      "r12"
+    ],
+    "evidence_excerpt": "<>'\"&=/",
+    "description": "Canary chars < > \" ' reflect unescaped in html context.",
+    "remediation": "Output-encode by context; add CSP.",
+    "ts": 1794161140.509,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+    "cwe": "CWE-79",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F03",
+    "title": "IDOR: /api/user/<id> serves any user object",
+    "severity": "high",
+    "category": "idor",
+    "url": "http://127.0.0.1:61192/api/user/2",
+    "evidence_ids": [
+      "r13"
+    ],
+    "evidence_excerpt": "\"username\"",
+    "description": "Neighboring ids return other users' objects with no authorization check.",
+    "remediation": "Enforce per-object ownership checks.",
+    "ts": 1794161140.515,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-639",
+    "owasp": "A01 Broken Access Control"
+  },
+  {
+    "id": "F04",
+    "title": "Exposed /.env and /.git/HEAD at web root",
+    "severity": "medium",
+    "category": "info-disclosure",
+    "url": "http://127.0.0.1:61192/.env",
+    "evidence_ids": [
+      "r20"
+    ],
+    "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
+    "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
+    "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
+    "ts": 1794161140.548,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-200",
+    "owasp": "A01 Broken Access Control"
+  },
+  {
+    "id": "F05",
+    "title": "JWT weak secret: forged admin token accepted",
+    "severity": "critical",
+    "category": "jwt",
+    "url": "http://127.0.0.1:61192/api/me",
+    "evidence_ids": [
+      "r15"
+    ],
+    "evidence_excerpt": "\"role\": \"admin\"",
+    "description": "The lab JWT verifies against the dictionary secret 'secret123'; a forged admin token is accepted and its claims echoed back verbatim.",
+    "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
+    "ts": 1794161140.552,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-347",
+    "owasp": "A02 Cryptographic Failures"
+  }
+]

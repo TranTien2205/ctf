@@ -1,0 +1,16 @@
+{
+  "id": "20261109-010540-127.0.0.1",
+  "target": "http://127.0.0.1:61192",
+  "started": 1794161140.22548,
+  "model": "scripted-demo",
+  "goal": "",
+  "operator": "",
+  "scope": [],
+  "max_turns": 16,
+  "max_requests": 400,
+  "rate_rps": 0,
+  "exclude_paths": [],
+  "proxy": false,
+  "tls_verify": false,
+  "tools": "all"
+}

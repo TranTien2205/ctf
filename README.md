@@ -46,6 +46,10 @@ python lab/vulnapp.py 8777          # deliberately vulnerable app, stdlib only
 python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
 ```
 
+A real demo session (report, findings, sealed transcript - passes
+`argus verify`) is checked in at `docs/sample-session/` for reading
+without running anything.
+
 ## Architecture
 
 ### System diagram
