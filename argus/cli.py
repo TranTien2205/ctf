@@ -169,6 +169,12 @@ def main(argv: list[str] | None = None) -> int:
                              "already carry role-card tool subsets")
         cfg = load_config(args)
         _preflight_target(cfg)
+        for flag, val in (("--recon", args.recon),
+                          ("--exploit", args.exploit),
+                          ("--report-workers", args.report_workers),
+                          ("--max-workers", args.max_workers)):
+            if val < 0:
+                raise SystemExit(f"{flag} must be >= 0")
         if args.exploit <= 0:
             # the lead card holds no record_finding - unless it spawns an
             # exploit worker itself, the run structurally records nothing

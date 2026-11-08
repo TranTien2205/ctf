@@ -214,6 +214,13 @@ def load_config(args) -> Config:
         # a negative rate silently disables the safety cap (interval 0) -
         # a typo must fail loud, not turn the tool loose on the target
         raise SystemExit("--rate must be >= 0 (0 = no rate cap)")
+    for flag, val in (("--max-turns", args.max_turns),
+                      ("--max-requests", args.max_requests),
+                      ("--max-time", args.max_time)):
+        if val < 0:
+            raise SystemExit(f"{flag} must be >= 0 (0 = no cap)")
+    if getattr(args, "llm_max_tokens", 1) <= 0:
+        raise SystemExit("--llm-max-tokens must be > 0")
     return Config(
         target=args.target,
         model=getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", DEFAULT_MODEL),
