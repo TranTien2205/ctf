@@ -267,6 +267,7 @@ _SSTI_TEMPLATES = [
     ("erb/ejs", "<%%= %d+%d %%>"),
     ("freemarker/velocity", "${%d+%d}"),
     ("thymeleaf/spring", "${{%d+%d}}"),
+    ("smarty", "{%d+%d}"),
 ]
 
 
@@ -1098,6 +1099,7 @@ def probe_deserialize(ctx: Context, url: str, param: str,
         ("php-object", 'O:8:"stdClass":0:{}'),
         ("php-array", 'a:1:{s:1:"a";s:1:"b";}'),
         ("python-pickle", "c__builtin__\nset\n"),
+        ("python-pickle-b64", "gASVQg=="),  # \x80\x04\x95 - proto-4 magic
         ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
         ("yaml-python", "!!python/object/apply:os.system ['id']"),
         ("dotnet-psobject", '{"$type":"System.Object"}'),
