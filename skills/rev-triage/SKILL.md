@@ -45,6 +45,13 @@ binwalk ./bin                      # embedded archives or filesystems
 binwalk -E ./bin                   # entropy: a flat high curve means packed
 ```
 
+No `file`/`strings`/`binwalk` on the box? `tools/file_type.py ./bin` does
+the same identify pass with stdlib: magic → format + route (ELF→
+pwn_triage, PE-with-CLR→rev-managed-code, pyc/class/dex→rev-bytecode-vm,
+squashfs→firmware), windowed entropy for the packed call, and
+ASCII+UTF-16 string hits grepped for flag-format and packer names — then
+it names which class skill and which tool opens the artifact.
+
 Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
 with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
 

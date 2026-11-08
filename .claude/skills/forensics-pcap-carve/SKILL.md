@@ -38,6 +38,11 @@ interesting is a lead.
 
 ## Extraction order
 
+0. No tshark on the box? `tools/forensics/pcap_parse.py` covers the same
+   order with stdlib: `convs` for the protocol-hierarchy answer, `dns`
+   for the query-name carve, `ascii` for the strings pass, `follow N`
+   for one stream per direction. Its own output says where it is weaker
+   than tshark (seq-overlap not verified).
 1. `tshark -r cap -q -z io,phs` — the protocol hierarchy tells you which
    channel dominates; start there, not with a global strings run.
 2. `--export-objects` for HTTP/SMB/TFTP — reassembled files are the most
