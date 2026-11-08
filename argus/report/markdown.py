@@ -73,6 +73,15 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "",
         summary or "_No agent summary was recorded._",
         "",
+    ]
+    meta = {}
+    mp = session.dir / "meta.json"
+    if mp.exists():
+        try:
+            meta = json.loads(mp.read_text(encoding="utf-8"))
+        except Exception:
+            meta = {}
+    lines += [
         "| Severity | Count |",
         "|---|---|",
     ]
@@ -81,6 +90,18 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             lines.append(f"| {_SEV_LABEL[sev]} | {counts[sev]} |")
     if not findings:
         lines.append("| - | 0 |")
+    lines += [
+        "",
+        "## Engagement constraints",
+        "",
+        f"- **Scope hosts:** {', '.join(meta.get('scope') or []) or '(target only)'}",
+        f"- **Excluded paths:** {', '.join(meta.get('exclude_paths') or []) or 'none'}",
+        f"- **Budgets:** {meta.get('max_turns', '?')} turns, "
+        f"{meta.get('max_requests', '?')} requests, {meta.get('rate_rps', '?')} rps",
+        f"- **Proxy:** {'yes' if meta.get('proxy') else 'no'} · "
+        f"**TLS verify:** {'yes' if meta.get('tls_verify') else 'no'}",
+        "",
+    ]
 
     lines += ["", "## Findings", ""]
     for f in findings:

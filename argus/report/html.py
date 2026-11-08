@@ -76,6 +76,22 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             f"<pre>{_esc(f['evidence_excerpt'][:1200])}</pre>"
             f"{ex}<p><b>Remediation</b><br>{_esc(f['remediation'])}</p></div>")
 
+    meta = {}
+    mp = session.dir / "meta.json"
+    if mp.exists():
+        try:
+            import json as _j
+            meta = _j.loads(mp.read_text(encoding="utf-8"))
+        except Exception:
+            meta = {}
+    constraints = (
+        f"<p><b>Scope hosts:</b> {_esc(', '.join(meta.get('scope') or []) or '(target only)')}<br>"
+        f"<b>Excluded paths:</b> {_esc(', '.join(meta.get('exclude_paths') or []) or 'none')}<br>"
+        f"<b>Budgets:</b> {_esc(meta.get('max_turns','?'))} turns, "
+        f"{_esc(meta.get('max_requests','?'))} requests, {_esc(meta.get('rate_rps','?'))} rps<br>"
+        f"<b>Proxy:</b> {'yes' if meta.get('proxy') else 'no'} · "
+        f"<b>TLS verify:</b> {'yes' if meta.get('tls_verify') else 'no'}</p>")
+
     ep_rows = "".join(f"<tr><td><code>{_esc(e)}</code></td></tr>"
                       for e in coverage["endpoints"])
     probe_row = ", ".join(f"<code>{_esc(p)}</code>"
@@ -93,6 +109,8 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 <h2>Executive summary</h2>
 <p>{_esc(summary) or '<i>No agent summary recorded.</i>'}</p>
 <table><tr><th>Severity</th><th>Count</th></tr>{sev_rows}</table>
+<h2>Engagement constraints</h2>
+{constraints}
 <h2>Findings</h2>
 {''.join(cards) or '<p><i>No findings recorded.</i></p>'}
 <h2>Test coverage</h2>
