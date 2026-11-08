@@ -40,6 +40,7 @@ python -m argus run https://app.example \
 ## Offline demo
 
 ```bash
+python -m argus check         # preflight: verify auth before a real run
 python -m argus demo          # scripted run on the bundled lab, no API key
 python -m argus demo --team   # same, through the lead/worker pipeline
 ```

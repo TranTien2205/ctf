@@ -80,6 +80,11 @@ def main(argv: list[str] | None = None) -> int:
     p_skills = sub.add_parser("skills", help="list knowledge modules")
     p_skills.set_defaults(list_skills=True)
 
+    p_check = sub.add_parser(
+        "check", help="preflight: verify auth/credentials work before a run")
+    p_check.add_argument("--api-key"); p_check.add_argument("--auth-token")
+    p_check.add_argument("--model")
+
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
 
@@ -176,6 +181,28 @@ def main(argv: list[str] | None = None) -> int:
                   f"findings={r.get('findings','?')} "
                   f"requests={r.get('requests','?')}")
         return 0
+
+    if args.cmd == "check":
+        from .config import resolve_auth, API_URL, DEFAULT_MODEL
+        from .llm import ClaudeClient
+        key, tok = resolve_auth(args)
+        src = ("api-key" if key else "oauth (Claude Code/OpenCode)"
+               if tok else None)
+        if not src:
+            print("no credentials found - set ANTHROPIC_API_KEY or sign in "
+                  "to Claude Code")
+            return 1
+        model = getattr(args, "model", None) or DEFAULT_MODEL
+        c = ClaudeClient(api_key=key or "", auth_token=tok or "",
+                         api_base=API_URL, model=model, max_tokens=8)
+        try:
+            c.chat(messages=[{"role": "user", "content": "say OK"}],
+                   tools=[], system="one word")
+            print(f"auth ok via {src}, model={model}")
+            return 0
+        except Exception as exc:
+            print(f"auth failed via {src}: {exc}")
+            return 1
 
     if args.cmd == "compare":
         def _summ(d):
