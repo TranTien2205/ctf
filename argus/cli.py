@@ -91,6 +91,11 @@ def main(argv: list[str] | None = None) -> int:
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
 
+    p_ver = sub.add_parser(
+        "verify", help="verify a session's transcript hash chain "
+                       "(tamper-evidence check)")
+    p_ver.add_argument("session_dir")
+
     p_cmp = sub.add_parser(
         "compare", help="compare two sessions' metrics side by side "
                         "(e.g. run vs team for the experiment chapter)")
@@ -187,6 +192,23 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
                   f"requests={r.get('requests','?')}")
+        return 0
+
+    if args.cmd == "verify":
+        from .session import verify_transcript
+        res = verify_transcript(Path(args.session_dir))
+        if res.get("error"):
+            print(res["error"])
+            return 1
+        if not res["chained"]:
+            print("transcript predates hash chaining - cannot verify")
+            return 1
+        if res["bad_lines"]:
+            print(f"TAMPERED: chain mismatch at lines {res['bad_lines']} "
+                  f"({res['entries']} chained entries checked)")
+            return 1
+        print(f"OK: {res['entries']} chained entries verified "
+              "(note: tail truncation is not detectable)")
         return 0
 
     if args.cmd == "check":

@@ -112,6 +112,13 @@ request counts; `python -m argus compare <dirA> <dirB>` prints a side-by-side
 metrics table (mode, findings, requests, time-to-first-finding, endpoints
 touched, llm calls, workers, tokens) for run-vs-team experiments.
 
+Every `transcript.jsonl` entry carries a `chain` field - a sha256 hash of
+the previous entry's link plus the entry itself, so edits, insertions and
+mid-file deletions are detectable after the fact. `python -m argus verify
+<session_dir>` recomputes the chain and reports any mismatch (note: the
+chain proves nothing was altered, but cannot detect tail truncation -
+archive sessions promptly).
+
 ## Resuming a run
 
 `--resume <session_dir>` continues an earlier session: transcript,

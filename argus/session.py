@@ -7,6 +7,7 @@ not trusted.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import threading
@@ -22,6 +23,46 @@ _CVSS_RE = re.compile(
 
 def _slug(host: str) -> str:
     return re.sub(r"[^a-zA-Z0-9.-]+", "_", host)[:60]
+
+
+def _chain(prev: str, entry: dict) -> str:
+    """Hash-chain link: sha256(prev_link + canonical entry). Makes silent
+    edits, insertions and mid-deletions in transcript.jsonl detectable."""
+    payload = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256((prev + payload).encode("utf-8")).hexdigest()
+
+
+def verify_transcript(sdir: Path) -> dict:
+    """Recompute the hash chain over transcript.jsonl. Detects edited,
+    inserted or mid-deleted entries; cannot detect tail truncation."""
+    tpath = Path(sdir) / "transcript.jsonl"
+    out = {"entries": 0, "bad_lines": [], "chained": False}
+    if not tpath.exists():
+        out["error"] = "no transcript.jsonl"
+        return out
+    prev = ""
+    for i, line in enumerate(
+            tpath.read_text(encoding="utf-8").splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except ValueError:
+            out["bad_lines"].append(i)
+            continue
+        stored = entry.pop("chain", None)
+        if stored is None:
+            if out["chained"]:
+                # unchained line inside a chained run = insertion/corruption
+                out["bad_lines"].append(i)
+            continue  # legacy pre-chain prefix: excluded from verification
+        out["chained"] = True
+        expect = _chain(prev, entry)
+        if expect != stored:
+            out["bad_lines"].append(i)
+        prev = stored
+        out["entries"] += 1
+    return out
 
 
 def _finding_key(category: str, url: str) -> tuple:
@@ -48,6 +89,7 @@ class Session:
         self._transcript: dict[str, dict] = {}
         self.findings: list[dict] = []
         self.resumed = False
+        self._last_chain = ""
         (self.dir / "meta.json").write_text(
             json.dumps({"id": self.id, "target": target, "started": self.started, **meta},
                        indent=2, ensure_ascii=False)
@@ -66,6 +108,7 @@ class Session:
         self._seq = 0
         self._transcript = {}
         self.findings = []
+        self._last_chain = ""
         mpath = sdir / "meta.json"
         if mpath.exists():
             try:
@@ -90,6 +133,8 @@ class Session:
                 except ValueError:
                     continue
                 self._transcript[entry["id"]] = entry
+                if entry.get("chain"):
+                    self._last_chain = entry["chain"]
                 suffix = entry["id"][1:]
                 if suffix.isdigit():
                     self._seq = max(self._seq, int(suffix))
@@ -142,6 +187,8 @@ class Session:
                 entry["agent"] = agent
             if note:
                 entry["note"] = note
+            entry["chain"] = _chain(self._last_chain, entry)
+            self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -155,6 +202,8 @@ class Session:
             entry = {"id": rid, "ts": round(time.time(), 3), "kind": kind, **detail}
             if agent:
                 entry["agent"] = agent
+            entry["chain"] = _chain(self._last_chain, entry)
+            self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(entry, ensure_ascii=False) + "\n")

