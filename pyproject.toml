@@ -23,4 +23,4 @@ argus = "argus.cli:main"
 include = ["argus*"]
 
 [tool.setuptools.package-data]
-argus = ["skills/*.md"]
+argus = ["skills/*.md", "team/roles/*.md"]
