@@ -220,7 +220,12 @@ CLASSES = [
                                 r"middleware|x-middleware|edge (?:function|runtime)",
                                 r"(?:one|only|single|front) (?:front )?layer.{0,40}authori",
                                 r"header the client can (?:set|supply|control|choose)",
-                                r"internal[- ]subrequest|x-middleware-subrequest"],
+                                r"internal[- ]subrequest|x-middleware-subrequest",
+                                # SerialFlow: the session cookie value doubles as the
+                                # server-side session-store key -- one value read
+                                # differently by two layers, which is a trust
+                                # differential, not an authentication bug.
+                                r"(?:cookie|session)[^\n]{0,60}(?:as the (?:store |session )?key|key of (?:a |the )?[a-z ]{0,25}store|store key)"],
         "source_signals": [r"headers\.get\s*\(\s*[\"']x-(?:real-ip|forwarded)",
                            r"request\.headers\[[\"']x-", r"if not .*header.*:\s*\n\s*.*local",
                            # A parser differential is a disagreement between TWO

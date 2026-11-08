@@ -119,15 +119,15 @@
     },
     {
       "id": "neg-pwn-rop",
-      "expect": null,
+      "expect": "pwn-code-reuse",
       "observation": "64-bit ELF, NX enabled, no PIE, gets() into a 64-byte stack buffer, want a ROP chain to system",
-      "provenance": "out of scope: the taxonomy is 25 web classes, this is pwn"
+      "provenance": "was a negative case while the taxonomy was web-only; pwn-code-reuse exists now and IS the right answer"
     },
     {
       "id": "neg-crypto-hastad",
-      "expect": null,
+      "expect": "crypto-rsa",
       "observation": "RSA public key with e=3 and three ciphertexts under different moduli, Hastad broadcast",
-      "provenance": "out of scope: the taxonomy is 25 web classes, this is crypto"
+      "provenance": "was a negative case while the taxonomy was web-only; crypto-rsa covers Hastad broadcast and IS the right answer"
     },
     {
       "id": "neg-ordinary-app",

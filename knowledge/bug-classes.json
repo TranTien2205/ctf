@@ -303,6 +303,7 @@
         "(?:one|only|single|front) (?:front )?layer.{0,40}authori",
         "header the client can (?:set|supply|control|choose)",
         "internal[- ]subrequest|x-middleware-subrequest",
+        "(?:cookie|session)[^\\n]{0,60}(?:as the (?:store |session )?key|key of (?:a |the )?[a-z ]{0,25}store|store key)",
         "(?<![a-z0-9])(?:web\\ parser\\ differential|parser\\ differential|parser\\-differential|proxy\\ trust)(?![a-z0-9])"
       ],
       "source_signals": [
