@@ -40,6 +40,16 @@ ws.onmessage = e => console.log(e.data);
 ws.onopen = () => ws.send(JSON.stringify({action:"ping", marker:"wsprobe"}));
 ```
 
+Outside a browser, `tools/web/ws_probe.py` performs the handshake and reads
+frames directly — the foreign-Origin check without a victim cookie, and the
+first message capture when the front-end JS names the expected protocol:
+
+```bash
+python tools/web/ws_probe.py "wss://TARGET/ws" --message '{"action":"ping"}'
+python tools/web/ws_probe.py "wss://TARGET/ws" --origin "https://evil.example"
+python tools/web/ws_probe.py "ws://TARGET/ws" --headers 'Cookie: session=abc'
+```
+
 Expected confirmation is a message the server should not have sent to that
 context, or a state change attributable to the message. A successful handshake,
 a 101 response, or an empty ping reply is surface evidence only.
