@@ -63,4 +63,9 @@ family — if you change a probe, update the lab and its test together.
   Any new record path must apply `httpclient._redact_headers`. Operator
   secrets are also opaque to the model — tool results never echo request
   headers back.
+- Declared credential values (`--secret`) never persist either:
+  `Session.secret_values` redacts them inside `record_exchange`,
+  `record_event` and `note` — bodies, output, `meta.json`, `agent.log`.
+  New write paths go through `Session` so they inherit the gate; a
+  finding that must cite a secret is rejected by design.
 - No new runtime dependencies without strong cause — `httpx` is enough.
