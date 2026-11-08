@@ -2534,6 +2534,24 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(code, 2,
                          "the challenge ceiling must still refuse a probe")
 
+    def test_web_enum_never_fires_a_destructive_verb_by_default(self):
+        """A recon battery that DELETEs what it finds is not recon.
+
+        method_matrix used to fire GET, POST and DELETE at every discovered
+        path — a destructive verb, unconditionally, on a live shared target.
+        Destructive verbs are opt-in via --methods now; the default may carry
+        at most the verbs a read-mostly sweep needs.
+        """
+        sys.path.insert(0, str(ROOT / "tools"))
+        try:
+            import inspect
+            import web_enum
+        finally:
+            sys.path.remove(str(ROOT / "tools"))
+        default = inspect.signature(web_enum.method_matrix).parameters["methods"].default
+        self.assertFalse({"DELETE", "PUT", "PATCH"} & set(default),
+                         "a destructive verb in the default matrix: %s" % (default,))
+
     def test_a_novel_white_box_challenge_plans_its_layers_first(self):
         """The case this system was worst at: source, but no chain that fits.
 

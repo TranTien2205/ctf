@@ -5,7 +5,8 @@ Four components, one JSON report:
   1. wordlist discovery (dirb common.txt by default)
   2. static-prefix alias traversal probes (nginx `location /assets + alias` class)
   3. JS endpoint extraction (fetch/axios literals in same-origin scripts)
-  4. unauthenticated method matrix (auth boundary snapshot)
+  4. unauthenticated method matrix (auth boundary snapshot; GET,POST by
+     default — destructive verbs only fire when --methods names them)
 
 Dependency-free (urllib). All probes are same-target GET/HEAD/POST only.
 """
@@ -138,11 +139,11 @@ def extract_js_endpoints(base, timeout=5):
     return sorted(paths)
 
 
-def method_matrix(base, paths, timeout=5):
+def method_matrix(base, paths, timeout=5, methods=("GET", "POST")):
     rows = []
     for p in paths:
         row = {"path": p}
-        for m in ("GET", "POST", "DELETE"):
+        for m in methods:
             st, _, body = fetch(base.rstrip("/") + p, method=m, timeout=timeout)
             row[m] = st
         # auth-boundary signal: reachable but blocked on other methods
@@ -152,7 +153,7 @@ def method_matrix(base, paths, timeout=5):
     return rows
 
 
-def run(base, workers=16, max_words=None, timeout=5):
+def run(base, workers=16, max_words=None, timeout=5, methods=("GET", "POST")):
     report = {"base": base}
     words = load_wordlist(max_words=max_words)
     found = enum_paths(base, words, workers=workers, timeout=timeout)
@@ -165,7 +166,8 @@ def run(base, workers=16, max_words=None, timeout=5):
     known = {p["path"] for p in report["paths"]} | set(js_paths)
     report["js_endpoints"] = js_paths
     matrix_paths = sorted(known | {p["path"] for p in report["paths"]})
-    report["method_matrix"] = method_matrix(base, matrix_paths, timeout=timeout)
+    report["method_matrix"] = method_matrix(base, matrix_paths, timeout=timeout,
+                                           methods=methods)
     return report
 
 
@@ -176,8 +178,14 @@ def main():
     ap.add_argument("--max-words", type=int, default=None)
     ap.add_argument("--timeout", type=float, default=5)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--methods", default="GET,POST",
+                    help="comma-separated verbs for the method matrix. GET,POST "
+                         "is the default; destructive verbs such as DELETE or "
+                         "PUT fire only when named here, on purpose")
     args = ap.parse_args()
-    rep = run(args.base_url, workers=args.workers, max_words=args.max_words, timeout=args.timeout)
+    methods = tuple(m.strip().upper() for m in args.methods.split(",") if m.strip())
+    rep = run(args.base_url, workers=args.workers, max_words=args.max_words,
+              timeout=args.timeout, methods=methods)
     text = json.dumps(rep, ensure_ascii=False, indent=1)
     if args.out:
         with open(args.out, "w", encoding="utf-8") as fh:
