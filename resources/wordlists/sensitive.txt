@@ -1,0 +1,26 @@
+# commonly-exposed sensitive paths (see probe_disclosure signatures)
+.git/HEAD
+.git/config
+.env
+.svn/entries
+.DS_Store
+server-status
+actuator/env
+actuator/heapdump
+actuator/health
+phpinfo.php
+debug
+elmah.axd
+WEB-INF/web.xml
+trace
+backup.zip
+wp-config.php~
+swagger.json
+api-docs
+metrics
+console
+docker-compose.yml
+.npmrc
+.aws/credentials
+health
+internal/status

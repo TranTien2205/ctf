@@ -5,5 +5,7 @@ Wordlists available to the `wordlist_fuzz` tool. To add one, drop a
 `wordlist_fuzz(base_url=..., wordlist="<name>")`. No code change needed.
 
 - `dirs-small.txt` — small path set for quick discovery
+- `dirs-medium.txt` — larger path set
 - `params.txt` — common parameter names (use with `mode=param`)
 - `api-paths.txt` — API-shaped paths
+- `sensitive.txt` — commonly-exposed artifacts (.git, .env, actuators…)

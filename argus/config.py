@@ -189,9 +189,12 @@ def load_config(args) -> Config:
         api_key=api_key,
         auth_token=auth_token,
         api_base=api_base,
-        max_turns=args.max_turns,
-        max_requests=args.max_requests,
-        max_time_s=args.max_time,
+        # 0 means "no cap" (explicit operator choice), not "end instantly":
+        # the loop compares turns>=max_turns so an unlimited value must be
+        # a large number, not 0
+        max_turns=args.max_turns if args.max_turns > 0 else 10**9,
+        max_requests=args.max_requests if args.max_requests > 0 else 10**9,
+        max_time_s=args.max_time if args.max_time > 0 else 10**12,
         rate_rps=args.rate,
         session_dir=Path(args.session_dir),
         scope_hosts=scope_hosts,

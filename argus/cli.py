@@ -31,10 +31,12 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--auth-token",
                    help="OAuth bearer token (Pro/Max; else ANTHROPIC_AUTH_TOKEN, "
                         "Claude Code or OpenCode credential store)")
-    p.add_argument("--max-turns", type=int, default=80)
-    p.add_argument("--max-requests", type=int, default=400)
+    p.add_argument("--max-turns", type=int, default=80,
+                   help="LLM turn budget (0 = no cap)")
+    p.add_argument("--max-requests", type=int, default=400,
+                   help="HTTP request budget per agent (0 = no cap)")
     p.add_argument("--max-time", type=float, default=2400,
-                   help="Wall-clock budget in seconds")
+                   help="Wall-clock budget in seconds (0 = no cap)")
     p.add_argument("--rate", type=float, default=5.0, help="Requests/second cap")
     p.add_argument("--proxy",
                    help="Route target traffic through a proxy for inspection "
