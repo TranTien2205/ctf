@@ -107,7 +107,7 @@ verbatim evidence from a cited response.
 | Deserialization | `probe_deserialize` | magic bytes vs parser-error signatures |
 | Cache poisoning | `probe_cache` | unkeyed XFH poison then clean fetch |
 | Prototype pollution | `probe_ppoll` | `__proto__` merge then cross-object read |
-| Request smuggling | `probe_smuggle` | CL.TE raw send; 'G' poisons own next request only |
+| Request smuggling | `probe_smuggle` | CL.TE + TE.CL + obfuscated-TE raw sends; 'G'/'GPOST' poison own next request only |
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
 | WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101) |
 | JWT/session | `jwt_decode` | decode, alg weaknesses, weak-secret crack |

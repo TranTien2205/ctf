@@ -190,6 +190,16 @@ def test_smuggle_probe_tecl(lab_url, ctx):
     assert out["statuses"][-1] == 501
 
 
+def test_smuggle_probe_obf(lab_url, ctx):
+    out = probes.probe_smuggle(ctx, lab_url + "/desync-obf")
+    assert "obfuscated TE" in out["verdict"]
+
+
+def test_smuggle_probe_clean(lab_url, ctx):
+    out = probes.probe_smuggle(ctx, lab_url + "/desync-none")
+    assert "no desync signal" in out["verdict"]
+
+
 def test_disclosure_probe(lab_url, ctx):
     out = probes.probe_disclosure(ctx, lab_url)
     paths = {h["path"] for h in out["exposed"]}

@@ -156,7 +156,7 @@ CLI (argus run | argus team)
   │   │   │                  lfi, redirect, cors, methods, reflection, idor,
   │   │   │                  ssrf, xxe, csrf, xfh, upload, race, deserialize,
   │   │   │                  cache, prototype-pollution, request-smuggling
-  │   │   │                  (CL.TE raw send), info-disclosure, websocket
+  │   │   │                  (CL.TE/TE.CL/obf raw sends), info-disclosure, websocket
   │   │   ├── analysis.py    jwt_decode, load_skill, notes, record_finding,
   │   │   │                  run_external (sqlmap/nuclei/nmap/ffuf), finish
   │   │   ├── mcp_tools.py   mcp_list, mcp_call -> external MCP servers
