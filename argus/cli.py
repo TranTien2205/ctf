@@ -148,6 +148,12 @@ def main(argv: list[str] | None = None) -> int:
                              "already carry role-card tool subsets")
         cfg = load_config(args)
         _preflight_target(cfg)
+        if args.exploit <= 0:
+            # the lead card holds no record_finding - unless it spawns an
+            # exploit worker itself, the run structurally records nothing
+            print("warning: --exploit 0 - findings require the lead to "
+                  "spawn an exploit worker; it may only map surface",
+                  file=sys.stderr)
         team = TeamRun(cfg, quiet=args.quiet,
                        n_recon=args.recon, n_exploit=args.exploit,
                        n_report=args.report_workers,
