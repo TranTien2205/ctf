@@ -59,6 +59,10 @@ Depth, one named file at a time:
 
 - `skills/ctf-web/auth-and-access.md`
 
+| Signal or task | Open |
+|---|---|
+| Any redirect-parameter question | `references/filter-bypasses.md` |
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

@@ -1706,9 +1706,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 886,
-      "depth_files": 1,
-      "depth_tokens": 155,
+      "skill_tokens": 914,
+      "depth_files": 3,
+      "depth_tokens": 1058,
       "use_when": [
         "a probe or source read produced this class's signal: one external destination in the redirect parameter, following the response Location header exactly"
       ],
