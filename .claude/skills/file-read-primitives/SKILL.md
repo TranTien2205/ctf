@@ -58,6 +58,14 @@ Record whether the response echoes the file raw or inside a structured body; tha
 decides how the extraction is scripted. Strip any prefix or suffix the page adds
 before comparing content.
 
+`tools/web/lfi_probe.py` runs this ramp end to end — absolute path, then
+traversal depth 1–8 in raw, encoded, doubled and backslash forms, then the
+`php://filter` wrapper — and grades each response by the known-file
+signature (`root:x:0:0` / win.ini `[fonts]`) or by decodable base64. Hits
+are read candidates with the verbatim signature excerpt; an all-miss run
+is inconclusive, not clean (an extension append or sequence strip may
+still block).
+
 ## Phase 3 — locate the source
 
 The process filesystem is the fastest route on Linux: the command line of the

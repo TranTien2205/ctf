@@ -79,6 +79,12 @@ curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=127.0.0.1;id'
 curl -i -b "$JAR" -X POST "$BASE/ping" -d 'host=$(sleep%205)'
 ```
 
+`tools/web/cmdi_probe.py` fires this matrix: separators carrying an echo
+marker, then bounded `sleep` forms, measured against one baseline. It
+reports which channel showed signal — `output` (marker returned, verbatim
+excerpt attached), `time` (repeatable delta), or `error` (shell text on
+injection only) — as channel candidates, not a finding.
+
 Record the verbatim output block for an injected `id`, or the measured delay
 for blind sinkholes — compare against a 5x serial baseline, not a single
 sample. Confirmation is command output (uid=... in the response) or a

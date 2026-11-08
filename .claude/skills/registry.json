@@ -955,7 +955,7 @@
         "htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli",
         "htb-red-island-ssrf-gopher-redis-lua-rce"
       ],
-      "skill_tokens": 1534,
+      "skill_tokens": 1650,
       "depth_files": 4,
       "depth_tokens": 4696,
       "use_when": [
@@ -1622,7 +1622,7 @@
       "verified_by": [
         "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
       ],
-      "skill_tokens": 1122,
+      "skill_tokens": 1210,
       "depth_files": 2,
       "depth_tokens": 5813,
       "use_when": [
