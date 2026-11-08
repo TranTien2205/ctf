@@ -228,6 +228,13 @@ def hook_pre_flag(args, current, path):
     if not (args.evidence or "").strip():
         raise Refused("pre-flag needs --evidence: the response excerpt or "
                       "artifact content the flag was read from")
+    if args.source == "live-response" and args.value not in args.evidence:
+        raise Refused(
+            "the flag is not a substring of --evidence, so the excerpt was "
+            "summarised or reconstructed rather than quoted from the response. "
+            "Paste the verbatim bytes the flag was read from. (An artifact "
+            "answer may legitimately be a label for its records, so this "
+            "substring check applies to live-response only.)")
     current["flag"] = {"value": args.value, "source": args.source,
                        "evidence": args.evidence, "time": time.time()}
     current["updated_at"] = time.time()

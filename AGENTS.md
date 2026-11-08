@@ -137,7 +137,9 @@ Hard rules — breaking one breaks the control loop:
   `post-probe` command with `--response` already filled in, so nothing is
   retyped. Hand-assembling the command means pasting the response yourself.
 - **A flag enters state only through `tools/hooks.py pre-flag`**, with
-  `--source live-response|artifact`.
+  `--source live-response|artifact`. A live-response flag must appear
+  verbatim inside `--evidence`; an artifact answer may be a label for its
+  records instead.
 - **A class becomes `confirmed` only after `tools/hooks.py pre-confirm` passes**
   (a probe with `confirms` and evidence exists). `tools/decide.py` **reopens** any
   confirm with no probe behind it.

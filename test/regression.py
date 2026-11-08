@@ -1356,7 +1356,8 @@ class ContractTests(unittest.TestCase):
                    + sorted((ROOT / ".claude" / "commands").glob("*.md"))
                    + sorted((ROOT / ".claude" / "agents").glob("*.md"))
                    + sorted((ROOT / ".claude" / "workflows").glob("*.md"))
-                   + sorted((ROOT / ".claude" / "workflows").glob("*.js")))
+                   + sorted((ROOT / ".claude" / "workflows").glob("*.js"))
+                   + sorted((ROOT / "tools").glob("**/*.py")))
         helpcache = {}
 
         def helptext(tool, sub):
@@ -1380,8 +1381,10 @@ class ContractTests(unittest.TestCase):
                 continue
             content = path.read_text(encoding="utf-8")
             # Workflows emit commands inside JS string literals, not markdown
-            # code fences; pull every line that names a tool instead.
-            if path.suffix == ".js":
+            # code fences; pull every line that names a tool instead. The same
+            # holds for tools/*.py: an emitted command lives inside a Python
+            # string literal, so a wrong flag there only surfaces at runtime.
+            if path.suffix in (".js", ".py"):
                 blocks = ["\n".join(l for l in content.splitlines()
                                     if "python3 tools/" in l)]
             else:
@@ -1409,7 +1412,7 @@ class ContractTests(unittest.TestCase):
                             bogus.append("%s -> %s%s has no %s" % (
                                 path.relative_to(ROOT), tool,
                                 (" " + sub) if sub else "", flag))
-        self.assertGreater(checked, 40,
+        self.assertGreater(checked, 200,
                            "only %d documented commands were checked; the extractor "
                            "has stopped matching and this test proves nothing" % checked)
         self.assertEqual(sorted(set(bogus)), [],
@@ -2575,9 +2578,18 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(self.hooks("pre-flag", "t8", "--value", "HTB{x}",
                                     "--source", "guess",
                                     "--evidence", "looked like one"), 2)
+        # the same hole post-probe had: shape was checked, truth was not --
+        # a live-response flag must appear inside the bytes it was read from
+        self.assertEqual(self.hooks("pre-flag", "t8", "--value", "HTB{x}",
+                                    "--source", "live-response",
+                                    "--evidence", "response showed a flag"), 2)
         self.assertEqual(self.hooks("pre-flag", "t8", "--value", "HTB{x}",
                                     "--source", "live-response",
                                     "--evidence", "response: HTB{x}"), 0)
+        # an artifact answer may be a label for its records, not a substring
+        self.assertEqual(self.hooks("pre-flag", "t8", "--value", "SSH",
+                                    "--source", "artifact",
+                                    "--evidence", "sshd: Failed password"), 0)
         self.assertEqual(decide_mod.decide("t8")["action"], "record_solve")
 
     def test_agents_md_exists_and_stays_ctf_only(self):
