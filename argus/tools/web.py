@@ -186,7 +186,12 @@ def js_recon(ctx: Context, url: str) -> dict:
     res = ctx.client.send("GET", url, tool="js_recon", note="page for JS inventory")
     body = res.get("body", "")
     surf = _parse_surface(body)
-    scripts = [urllib.parse.urljoin(url, s) for s in surf.scripts]
+    scripts = []
+    for s in surf.scripts:
+        try:
+            scripts.append(urllib.parse.urljoin(url, s))
+        except ValueError:
+            continue  # target-controlled src that even urljoin rejects
     inline = [s for s in surf.inline_js if s.strip()]
 
     ws_endpoints: list[dict] = []
@@ -229,7 +234,11 @@ def js_recon(ctx: Context, url: str) -> dict:
         # Sourcemap recovery: a deployed .map exposes the original sources -
         # comments, env refs, file paths - far richer than the minified bundle
         m = _SRCMAP.search(bundle[-2000:])
-        map_url = urllib.parse.urljoin(src, m.group(1)) if m else src + ".map"
+        try:
+            map_url = urllib.parse.urljoin(
+                src, m.group(1)) if m else src + ".map"
+        except ValueError:
+            continue  # bundle's sourceMappingURL is target-controlled too
         try:
             mr = ctx.client.send("GET", map_url, tool="js_recon",
                                  note="sourcemap probe")
