@@ -824,7 +824,7 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
 
     def do_OPTIONS(self):
         self.send_response(200)
-        self.send_header("Allow", "GET, POST, OPTIONS")
+        self.send_header("Allow", "GET, POST, OPTIONS, TRACE")
         origin = self.headers.get("Origin")
         if origin:
             self.send_header("Access-Control-Allow-Origin", origin)
@@ -833,6 +833,16 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             self.send_header("Access-Control-Allow-Credentials", "true")
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def do_TRACE(self):
+        # planted cross-site tracing vuln: TRACE echoes request headers
+        # back - leaks HttpOnly cookies/auth headers to a reading XSS
+        body = "".join(f"{k}: {v}\n" for k, v in self.headers.items())
+        self.send_response(200)
+        self.send_header("Content-Type", "message/http")
+        self.send_header("Content-Length", str(len(body.encode())))
+        self.end_headers()
+        self.wfile.write(body.encode())
 
 
 def make_server(port: int = 0):

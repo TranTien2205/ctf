@@ -313,6 +313,9 @@ def main() -> int:
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
     out = probes.probe_websocket(ctx, base + "/ws")
     check("websocket probe confirms upgrade", "confirmed" in out["verdict"])
+    out = probes.probe_method(ctx, base + "/")
+    check("method probe sees TRACE echo",
+          out.get("trace_attempt", {}).get("echoes") is True)
 
     # --- end-to-end loop with a scripted model ---------------------------
     from argus.llm import ScriptedClient
