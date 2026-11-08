@@ -234,6 +234,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "requests": session._seq,
         "time_to_first_finding_s": ttf,
         "coverage": coverage,
+        # anchoring the last chain link makes tail truncation detectable:
+        # verify compares the transcript's final link against this value
+        "transcript_chain_head": getattr(session, "_last_chain", ""),
         **extra,
     }
     (session.dir / "summary.json").write_text(

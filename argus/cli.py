@@ -215,8 +215,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"TAMPERED: chain mismatch at lines {res['bad_lines']} "
                   f"({res['entries']} chained entries checked)")
             return 1
-        print(f"OK: {res['entries']} chained entries verified "
-              "(note: tail truncation is not detectable)")
+        if res.get("tail_truncated"):
+            print("MISMATCH: transcript tail does not reach the chain head "
+                  "recorded in summary.json - tail entries were removed, "
+                  "or the session continued after its last report")
+            return 1
+        anchored = " anchored to summary.json" if res.get("head_anchor") \
+            else ""
+        print(f"OK: {res['entries']} chained entries verified{anchored}")
         return 0
 
     if args.cmd == "check":

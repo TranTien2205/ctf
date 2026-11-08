@@ -54,6 +54,7 @@ done
 
 ```bash
 python -m argus compare exp/single-1/<dir> exp/team-1/<dir>
+python -m argus compare --csv exp/single-*/2*/ exp/team-*/2*/   # N trials, one table
 python -m argus sessions --session-dir exp/single-1
 ```
 
@@ -70,3 +71,5 @@ spending tokens (3 seeded findings on both paths).
 - Report findings as count AND categories found — the lab's planted classes
   are the recall denominator.
 - Keep transcripts: they are the audit trail for every claimed finding.
+  `python -m argus verify <dir>` proves the transcript was not altered
+  before the thesis is written.

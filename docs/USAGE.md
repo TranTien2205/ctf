@@ -115,9 +115,9 @@ touched, llm calls, workers, tokens) for run-vs-team experiments.
 Every `transcript.jsonl` entry carries a `chain` field - a sha256 hash of
 the previous entry's link plus the entry itself, so edits, insertions and
 mid-file deletions are detectable after the fact. `python -m argus verify
-<session_dir>` recomputes the chain and reports any mismatch (note: the
-chain proves nothing was altered, but cannot detect tail truncation -
-archive sessions promptly).
+<session_dir>` recomputes the chain and reports any mismatch; `summary.json`
+anchors the last link, so even tail truncation is caught once a report has
+been rendered (a mismatch there means truncation OR post-report appends).
 
 ## Resuming a run
 

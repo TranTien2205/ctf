@@ -62,6 +62,18 @@ def verify_transcript(sdir: Path) -> dict:
             out["bad_lines"].append(i)
         prev = stored
         out["entries"] += 1
+    # summary.json anchors the last link - if present, a tail-truncated
+    # transcript no longer reaches the recorded head
+    spath = Path(sdir) / "summary.json"
+    if spath.exists() and out["chained"]:
+        try:
+            head = json.loads(spath.read_text(
+                encoding="utf-8")).get("transcript_chain_head")
+        except (ValueError, OSError):
+            head = None
+        out["head_anchor"] = head
+        if head and prev != head:
+            out["tail_truncated"] = True
     return out
 
 

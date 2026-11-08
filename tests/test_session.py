@@ -148,3 +148,23 @@ def test_record_finding_rejects_out_of_scope(ctx):
                          evidence_excerpt="x", description="d",
                          remediation="r")
     assert "scope guard" in out.get("error", "")
+
+
+def test_chain_head_anchor_catches_tail_truncation(tmp_path):
+    import json
+    from argus.session import Session, verify_transcript
+    from argus.report.markdown import render_report
+    from argus.config import Config
+    cfg = Config(target="http://t", allow_private=True, session_dir=tmp_path)
+    s = Session(tmp_path, "http://t", {})
+    s.record_exchange("t", {"method": "GET", "url": "http://t/"},
+                      {"status": 200, "body": "hello"})
+    s.record_event("note", {"output": "ev"})
+    render_report(s, cfg)
+    res = verify_transcript(s.dir)
+    assert res.get("head_anchor") and not res.get("tail_truncated")
+    lines = (s.dir / "transcript.jsonl").read_text().splitlines()
+    (s.dir / "transcript.jsonl").write_text(
+        "\n".join(lines[:-1]) + "\n")
+    res = verify_transcript(s.dir)
+    assert res.get("tail_truncated") is True
