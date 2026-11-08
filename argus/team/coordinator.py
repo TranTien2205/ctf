@@ -279,10 +279,16 @@ class TeamRun:
                   "cache_read": _sum_tokens("cache_read"),
                   "cache_write": _sum_tokens("cache_write")}
         calls = sum(r.get("llm_calls", 0) or 0 for r in self._results.values())
-        report_path = render_report(self.session, cfg, summary, extra={
-            "mode": "team", "agents": self.board.agents(),
-            "llm_calls": calls, "llm_tokens": tokens,
-        })
+        report_path = ""
+        try:
+            report_path = str(render_report(
+                self.session, cfg, summary, extra={
+                    "mode": "team", "agents": self.board.agents(),
+                    "llm_calls": calls, "llm_tokens": tokens,
+                }))
+        except Exception as exc:
+            # render failure must not swallow the run result or the seal
+            print(f"[argus] report render failed: {exc}", file=sys.stderr)
         # anchor every un-chained artifact (meta/findings/summary/report.*)
         # into the transcript so post-run edits are detectable by verify -
         # best-effort: a seal failure must not kill a completed run

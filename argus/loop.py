@@ -292,12 +292,18 @@ class AgentLoop:
             self.ctx.mcp.close()
         report_path = ""
         if self.report_enabled:
-            from .report.markdown import render_report
-            report_path = str(render_report(
-                self.session, self.cfg, self.ctx.finish_summary,
-                extra={"mode": "team" if self.ctx.board is not None else "single",
-                       "llm_calls": self.llm.calls,
-                       "llm_tokens": self._token_stats()}))
+            try:
+                from .report.markdown import render_report
+                report_path = str(render_report(
+                    self.session, self.cfg, self.ctx.finish_summary,
+                    extra={"mode": "team" if self.ctx.board is not None
+                           else "single",
+                           "llm_calls": self.llm.calls,
+                           "llm_tokens": self._token_stats()}))
+            except Exception as exc:
+                # a render failure must not swallow the run result or the
+                # seal below - the transcript is still intact evidence
+                self._log(f"warning: report render failed: {exc}")
             # anchor every un-chained artifact (meta/findings/summary/
             # report.*) into the transcript so post-run edits are
             # detectable by verify - best-effort: a seal failure must not
