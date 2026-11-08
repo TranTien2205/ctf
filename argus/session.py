@@ -116,6 +116,9 @@ def verify_transcript(sdir: Path) -> dict:
         except ValueError:
             out["bad_lines"].append(i)
             continue
+        if not isinstance(entry, dict):
+            out["bad_lines"].append(i)
+            continue
         stored = entry.pop("chain", None)
         if stored is None:
             if out["chained"]:
@@ -134,8 +137,9 @@ def verify_transcript(sdir: Path) -> dict:
     spath = Path(sdir) / "summary.json"
     if spath.exists() and out["chained"]:
         try:
-            head = json.loads(spath.read_text(
-                encoding="utf-8")).get("transcript_chain_head")
+            sdata = json.loads(spath.read_text(encoding="utf-8"))
+            head = sdata.get("transcript_chain_head") \
+                if isinstance(sdata, dict) else None
         except (ValueError, OSError):
             head = None
         out["head_anchor"] = head
@@ -154,6 +158,8 @@ def verify_transcript(sdir: Path) -> dict:
             stored_findings = json.loads(fpath.read_text(encoding="utf-8"))
         except (ValueError, OSError):
             stored_findings = []
+        if not isinstance(stored_findings, list):
+            stored_findings = []
         out["findings_checked"] = len(stored_findings)
         bad = findings_bad(entries, stored_findings)
         if bad:
@@ -164,9 +170,11 @@ def verify_transcript(sdir: Path) -> dict:
     dig = next((e for e in reversed(list(entries.values()))
                 if e.get("kind") == "artifacts_digest"), None)
     if dig and out["chained"]:
-        out["sealed"] = sorted((dig.get("files") or {}).keys())
+        files_dig = dig.get("files")
+        files_dig = files_dig if isinstance(files_dig, dict) else {}
+        out["sealed"] = sorted(files_dig.keys())
         mismatched = []
-        for name, want in (dig.get("files") or {}).items():
+        for name, want in files_dig.items():
             p = Path(sdir) / name
             if not p.is_file():
                 # missing - or swapped for a directory: either way the
@@ -176,6 +184,8 @@ def verify_transcript(sdir: Path) -> dict:
             if name == "summary.json":
                 try:
                     data = json.loads(p.read_text(encoding="utf-8"))
+                    if not isinstance(data, dict):
+                        raise ValueError("summary.json is not an object")
                     for k in ("transcript_chain_head", "duration_s"):
                         data.pop(k, None)
                     got = hashlib.sha256(json.dumps(
