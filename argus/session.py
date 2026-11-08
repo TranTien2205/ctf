@@ -695,6 +695,7 @@ class Session:
         return finding
 
     def note(self, text: str, agent: str = "") -> None:
+        text = str(text or "")[:20_000]
         stamp = time.strftime("%H:%M:%S")
         prefix = f"- **[{stamp} {agent}]** " if agent else \
             f"- **[{stamp}]** " if not text.startswith(

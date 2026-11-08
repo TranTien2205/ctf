@@ -176,7 +176,13 @@ def note(ctx: Context, text: str) -> dict:
 
 
 def read_notes(ctx: Context) -> dict:
-    return {"notes": ctx.session.notes_path.read_text(encoding="utf-8")}
+    try:
+        text = ctx.session.notes_path.read_text(encoding="utf-8",
+                                                errors="replace")
+    except OSError as exc:
+        return {"error": f"notes unreadable: {exc}"}
+    return {"notes": text[-50_000:],
+            "truncated": len(text) > 50_000}
 
 
 # ---------------------------------------------------------------- findings
