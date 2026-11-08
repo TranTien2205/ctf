@@ -1258,7 +1258,8 @@ class ContractTests(unittest.TestCase):
                    + [ROOT / rel for rel in CONTROL_PLANE]
                    + [ROOT / "AGENTS.md"]
                    + sorted((ROOT / ".claude" / "commands").glob("*.md"))
-                   + sorted((ROOT / ".claude" / "agents").glob("*.md")))
+                   + sorted((ROOT / ".claude" / "agents").glob("*.md"))
+                   + sorted((ROOT / ".claude" / "workflows").glob("*.js")))
         helpcache = {}
 
         def helptext(tool, sub):
@@ -1280,7 +1281,15 @@ class ContractTests(unittest.TestCase):
         for path in sources:
             if not path.is_file():
                 continue
-            for block in block_re.findall(path.read_text(encoding="utf-8")):
+            content = path.read_text(encoding="utf-8")
+            # Workflows emit commands inside JS string literals, not markdown
+            # code fences; pull every line that names a tool instead.
+            if path.suffix == ".js":
+                blocks = ["\n".join(l for l in content.splitlines()
+                                    if "python3 tools/" in l)]
+            else:
+                blocks = block_re.findall(content)
+            for block in blocks:
                 # join backslash continuations, or a flag on the second line is
                 # attributed to no command at all and silently skipped
                 for line in re.sub(r"\\\n\s*", " ", block).splitlines():
