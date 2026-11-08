@@ -118,6 +118,30 @@ def test_report_flags_bogus_severity(tmp_path, capsys):
     assert "apocalyptic" not in (sdir / "report.md").read_text()
 
 
+def test_cli_tolerates_corrupt_session_files(tmp_path, capsys):
+    """forensic commands must not traceback on damaged session dirs -
+    verify/report decide trust; the CLI's job is to read what it can."""
+    import json
+    from argus.cli import main
+    d = tmp_path / "corrupt"
+    d.mkdir()
+    (d / "transcript.jsonl").write_text(
+        '{"id":"r1","chain":"x"}\nGARBAGE\n{"id":7}\n', encoding="utf-8")
+    # non-list findings.json -> clean refusal, not a traceback
+    (d / "findings.json").write_text('{"x": 1}', encoding="utf-8")
+    assert main(["findings", str(d)]) == 1
+    assert "not a findings list" in capsys.readouterr().out
+    # invalid JSON -> same
+    (d / "findings.json").write_text("NOT JSON", encoding="utf-8")
+    assert main(["findings", str(d)]) == 1
+    # finding missing severity -> listed as UNVERIFIED, no crash
+    (d / "findings.json").write_text(json.dumps(
+        [{"id": "F1", "title": "t", "url": "u",
+          "evidence_ids": [], "evidence_excerpt": "x"}]), encoding="utf-8")
+    assert main(["findings", str(d)]) == 0
+    assert "UNVERIFIED" in capsys.readouterr().out
+
+
 def test_report_refuses_non_session_dir(tmp_path, capsys):
     """`argus report` must not fabricate a sealed session out of an empty
     directory - refuse before render/seal."""

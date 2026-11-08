@@ -167,6 +167,9 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
     `argus report` (a re-render must not silently carry tampered claims)."""
     bad = []
     for f in findings:
+        if not isinstance(f, dict):
+            bad.append("?")
+            continue
         excerpt = (f.get("evidence_excerpt") or "").strip()
         ids = f.get("evidence_ids") or []
         cited = [entries.get(r) for r in ids]

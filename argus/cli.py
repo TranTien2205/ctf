@@ -247,7 +247,14 @@ def main(argv: list[str] | None = None) -> int:
         if not fpath.exists():
             print("[]" if args.json else "no findings.json in that session dir")
             return 1
-        data = json.loads(fpath.read_text(encoding="utf-8"))
+        try:
+            data = json.loads(fpath.read_text(encoding="utf-8"))
+        except ValueError:
+            print(f"{fpath} is not valid JSON - session dir corrupt")
+            return 1
+        if not isinstance(data, list):
+            print(f"{fpath} is not a findings list - session dir corrupt")
+            return 1
         # findings.json is not chained - flag any claim whose evidence
         # fails re-validation instead of presenting it as trustworthy
         from .session import findings_bad, verify_transcript
@@ -265,12 +272,16 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
             for f in data:
+                if not isinstance(f, dict):
+                    print("[?       ] ? <malformed entry> UNVERIFIED")
+                    continue
                 cvss = f" [{f['cvss']}]" if f.get("cvss") else ""
                 cwe = f" {f['cwe']}" if f.get("cwe") else ""
                 ow = f" <{f['owasp']}>" if f.get("owasp") else ""
                 flag = " UNVERIFIED" if f.get("id") in bad else ""
-                print(f"[{f['severity'].upper():8}] {f['id']} {f['title']}"
-                      f" ({f['url']}){cwe}{ow}{cvss}{flag}")
+                sev = str(f.get("severity") or "?").upper()
+                print(f"[{sev:8}] {f.get('id', '?')} {f.get('title', '?')}"
+                      f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
         return 0
 
     if args.cmd == "skills":
@@ -450,8 +461,13 @@ def main(argv: list[str] | None = None) -> int:
             fp = Path(d) / "findings.json"
             if not fp.exists():
                 raise SystemExit(f"no findings.json in {d}")
-            return {_dkey(f): f
-                    for f in json.loads(fp.read_text(encoding="utf-8"))}
+            try:
+                rows = json.loads(fp.read_text(encoding="utf-8"))
+            except ValueError:
+                raise SystemExit(f"{fp} is not valid JSON")
+            if not isinstance(rows, list):
+                raise SystemExit(f"{fp} is not a findings list")
+            return {_dkey(f): f for f in rows if isinstance(f, dict)}
         before, after = _load(args.before), _load(args.after)
         # a diff over tampered findings is misleading - flag sessions whose
         # stored claims fail evidence re-validation (same check as
@@ -477,8 +493,8 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({
                 "fixed": fixed, "new": new,
                 "still_present": [
-                    {"id_before": b["id"], "id_after": a["id"],
-                     "title": a["title"], "category": a.get("category"),
+                    {"id_before": b.get("id"), "id_after": a.get("id"),
+                     "title": a.get("title"), "category": a.get("category"),
                      "url": a.get("url"),
                      "severity_before": b.get("severity"),
                      "severity_after": a.get("severity")}
@@ -487,14 +503,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         print(f"--- {Path(args.before).name} -> {Path(args.after).name} ---")
         for f in fixed:
-            print(f"[FIXED ] {f['id']} {f['title']} ({f['severity']})")
+            print(f"[FIXED ] {f.get('id')} {f.get('title')} "
+                  f"({f.get('severity')})")
         for b, a in still:
-            drift = (f" severity {b['severity']}->{a['severity']}"
+            drift = (f" severity {b.get('severity')}->{a.get('severity')}"
                      if b.get("severity") != a.get("severity") else "")
-            print(f"[STILL ] {b['id']}->{a['id']} {a['title']}"
-                  f" ({a['severity']}){drift}")
+            print(f"[STILL ] {b.get('id')}->{a.get('id')} {a.get('title')}"
+                  f" ({a.get('severity')}){drift}")
         for f in new:
-            print(f"[NEW   ] {f['id']} {f['title']} ({f['severity']})")
+            print(f"[NEW   ] {f.get('id')} {f.get('title')} "
+                  f"({f.get('severity')})")
         print(f"{len(fixed)} fixed, {len(still)} still present, "
               f"{len(new)} new")
         return 0
@@ -504,7 +522,12 @@ def main(argv: list[str] | None = None) -> int:
             p = Path(d) / "summary.json"
             if not p.exists():
                 return {"dir": Path(d).name}
-            s = json.loads(p.read_text(encoding="utf-8"))
+            try:
+                s = json.loads(p.read_text(encoding="utf-8"))
+            except ValueError:
+                s = {}
+            if not isinstance(s, dict):
+                s = {}
             agents = s.get("agents") or {}
             if isinstance(agents, dict):
                 agents = list(agents.values())
@@ -904,16 +927,29 @@ def _reopen(sdir: Path) -> Session:
             pass
     tpath = sdir / "transcript.jsonl"
     if tpath.exists():
+        # forensic reader: skip malformed lines - `argus verify` reports
+        # them; crashing here would hide the rest of a damaged transcript
         for line in tpath.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
-            entry = json.loads(line)
+            try:
+                entry = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(entry, dict) or not isinstance(
+                    entry.get("id"), str):
+                continue
             sess._transcript[entry["id"]] = entry
             if entry.get("chain"):
                 sess._last_chain = entry["chain"]
             sess._seq = max(sess._seq, int(entry["id"][1:]) if entry["id"][1:].isdigit() else 0)
     fpath = sdir / "findings.json"
-    sess.findings = json.loads(fpath.read_text(encoding="utf-8")) if fpath.exists() else []
+    try:
+        rows = json.loads(fpath.read_text(encoding="utf-8")) \
+            if fpath.exists() else []
+    except ValueError:
+        rows = []
+    sess.findings = rows if isinstance(rows, list) else []
     return sess
 
 
