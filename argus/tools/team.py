@@ -251,22 +251,13 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
     except Exception as exc:
         return {"error": f"target rejected by scope guard: {exc}"}
     # {args} is free text smuggled into the command line - it must not
-    # carry a foreign URL/host past the guard either
-    from .analysis import _URL_RE, _HOST_RE, _split_args
-    for u in _URL_RE.findall(args or ""):
-        try:
-            ctx.scope.check(u)
-        except Exception as exc:
-            return {"error": f"args rejected by scope guard: {exc}"}
-    for tok in _split_args(args or ""):
-        if tok.startswith("-"):
-            continue
-        host = tok.split(":")[0]
-        if _HOST_RE.fullmatch(host):
-            try:
-                ctx.scope.check("http://" + host)
-            except Exception as exc:
-                return {"error": f"args rejected by scope guard: {exc}"}
+    # carry a foreign URL/host past the guard either (URLs, bare hosts,
+    # IPv6 literals - same scan as run_external)
+    from .analysis import _args_scope_check
+    try:
+        _args_scope_check(ctx, args or "")
+    except Exception as exc:
+        return {"error": f"args rejected by scope guard: {exc}"}
     cmd_tpl = manifest.get("command")
     if not cmd_tpl:
         return {"error": "manifest has no command"}
