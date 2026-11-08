@@ -228,6 +228,8 @@ TOOL_SCHEMAS: list[dict] = [
         {
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter to test"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
         },
         ["url", "param"],
     ),
@@ -238,6 +240,8 @@ TOOL_SCHEMAS: list[dict] = [
         {
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter that names the destination"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
         },
         ["url", "param"],
     ),
@@ -356,6 +360,8 @@ TOOL_SCHEMAS: list[dict] = [
             "url": {**_STR, "description": URL_DESC + " Include the query string."},
             "param": {**_STR, "description": "Parameter carrying the "
                                              "serialized-looking value"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
         },
         ["url", "param"],
     ),
@@ -416,7 +422,9 @@ TOOL_SCHEMAS: list[dict] = [
         "header proves header control - session fixation, cache poisoning, "
         "response splitting.",
         {"url": {**_STR, "description": URL_DESC},
-         "param": {**_STR, "description": "Parameter name to inject into."}},
+         "param": {**_STR, "description": "Parameter name to inject into."},
+         "method": {**_STR, "description": "GET or POST (default GET)"},
+         "data": {**_STR, "description": "POST body template; param value is replaced"}},
         ["url", "param"],
     ),
     _schema(

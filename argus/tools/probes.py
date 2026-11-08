@@ -253,7 +253,8 @@ def probe_ssti(ctx: Context, url: str, param: str, method: str = "GET",
     }
 
 
-def probe_lfi(ctx: Context, url: str, param: str) -> dict:
+def probe_lfi(ctx: Context, url: str, param: str,
+              method: str = "GET", data: str | None = None) -> dict:
     payloads = [
         ("etc-passwd-trav", "../../../../../../etc/passwd"),
         ("etc-passwd-abs", "/etc/passwd"),
@@ -264,7 +265,7 @@ def probe_lfi(ctx: Context, url: str, param: str) -> dict:
     ]
     hits, results = [], []
     for name, payload in payloads:
-        r = _send(ctx, url, param, payload, "GET", None, "probe_lfi", name)
+        r = _send(ctx, url, param, payload, method, data, "probe_lfi", name)
         m = LFI_MARKERS.search(r.get("body", ""))
         results.append({"name": name, "status": r["status"],
                         "request_id": r["request_id"],
@@ -279,9 +280,11 @@ def probe_lfi(ctx: Context, url: str, param: str) -> dict:
     }
 
 
-def probe_redirect(ctx: Context, url: str, param: str) -> dict:
+def probe_redirect(ctx: Context, url: str, param: str,
+                   method: str = "GET", data: str | None = None) -> dict:
     dest = "https://example.org/argus-canary"
-    r = _send(ctx, url, param, dest, "GET", None, "probe_redirect", "external dest")
+    r = _send(ctx, url, param, dest, method, data, "probe_redirect",
+              "external dest")
     loc = (r.get("headers") or {}).get("location", "")
     open_r = r["status"] in (301, 302, 303, 307, 308) and "example.org" in loc
     # client-side redirects never set Location: meta refresh, window.location
@@ -299,7 +302,8 @@ def probe_redirect(ctx: Context, url: str, param: str) -> dict:
     }
 
 
-def probe_crlf(ctx: Context, url: str, param: str) -> dict:
+def probe_crlf(ctx: Context, url: str, param: str,
+               method: str = "GET", data: str | None = None) -> dict:
     """CRLF / response-splitting: a CRLF pair inside the parameter value.
     If the value lands in a header context (Location, Set-Cookie, custom
     echo headers) unencoded, the injected canary header appears in the
@@ -308,12 +312,13 @@ def probe_crlf(ctx: Context, url: str, param: str) -> dict:
     NOT reflected into the body anyway."""
     canary = _marker("acrlf")
     hdr_inj = _send(ctx, url, param, f"\r\nX-Argus-Crlf: {canary}",
-                    tool="probe_crlf", note="header inject canary")
+                    method, data, tool="probe_crlf",
+                    note="header inject canary")
     hh = {k.lower(): v for k, v in (hdr_inj.get("headers") or {}).items()}
     header_hit = "x-argus-crlf" in hh
     # response splitting: %0d%0a%0d%0a<canary> - lands past the header block
     body_inj = _send(ctx, url, param, f"\r\n\r\n{canary}",
-                     tool="probe_crlf", note="body split canary")
+                     method, data, tool="probe_crlf", note="body split canary")
     body_hit = canary in (body_inj.get("body") or "")
     if header_hit:
         verdict = ("crlf injection candidate: CRLF in parameter reached the "
@@ -802,12 +807,13 @@ _DESER_ERRORS = re.compile(
 )
 
 
-def probe_deserialize(ctx: Context, url: str, param: str) -> dict:
+def probe_deserialize(ctx: Context, url: str, param: str,
+                      method: str = "GET", data: str | None = None) -> dict:
     """Deserialization surface check: baseline then magic-bytes payloads
     per ecosystem. A framework deserialization error means the parser
     actually processes the field - real attack surface, not a guess."""
-    base = _send(ctx, url, param, "argus-plain", tool="probe_deserialize",
-                 note="baseline")
+    base = _send(ctx, url, param, "argus-plain", method, data,
+                 tool="probe_deserialize", note="baseline")
     base_err = _DESER_ERRORS.search(base.get("body") or "")
     payloads = [
         ("java-b64", "rO0ABXQABHRlc3Q="),
@@ -820,7 +826,8 @@ def probe_deserialize(ctx: Context, url: str, param: str) -> dict:
     ]
     hits = []
     for name, pl in payloads:
-        r = _send(ctx, url, param, pl, tool="probe_deserialize", note=name)
+        r = _send(ctx, url, param, pl, method, data,
+                  tool="probe_deserialize", note=name)
         body = r.get("body") or ""
         m = _DESER_ERRORS.search(body)
         hits.append({"name": name, "status": r["status"],
