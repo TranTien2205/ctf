@@ -618,7 +618,10 @@ def _preflight_target(cfg) -> None:
     before a session dir is created or an API call is burned."""
     from urllib.parse import urlparse
     from .scope import ScopeGuard
-    u = urlparse(cfg.target or "")
+    try:
+        u = urlparse(cfg.target or "")
+    except ValueError:
+        u = urlparse("")
     if u.scheme not in ("http", "https") or not u.hostname:
         raise SystemExit(
             f"invalid target {cfg.target!r}: expected http(s)://host[/path] "
