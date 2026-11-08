@@ -18,6 +18,10 @@ python -m argus run https://app.example --scope api.example \
 (Claude Pro/Max OAuth), then a signed-in **Claude Code**
 (`~/.claude/.credentials.json`, refreshed automatically), then **OpenCode**'s
 auth store. If you can run `claude` or `opencode`, `argus` just works.
+Calls are prompt-cached (the ~30KB tool schema + system prefix reads back
+at ~10% cost per turn). On constrained OAuth tiers that cap per-request
+size, `argus run --tools <comma-list>` shrinks the tool surface, or use
+`team` — each role card already carries a smaller subset.
 
 Or as a **team** — a lead agent coordinating role-specialized workers over a
 shared, typed lead queue:
@@ -83,7 +87,7 @@ python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
         │              idor · ssrf · xxe · csrf · xfh ·         │
         │              upload · race · deserialize · cache ·    │
         │              ppoll · smuggle · disclosure · websocket │
-        │              crlf · enum · lockout                    │
+        │              crlf · enum · lockout · massassign       │
         │  analysis.py jwt_decode · jwt_forge · load_skill ·    │
         │              notes · record_finding · run_external ·  │
         │              read_response · finish                   │
