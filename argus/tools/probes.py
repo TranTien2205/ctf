@@ -417,21 +417,32 @@ def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
     threshold = baseline_ms + delay_s * 700
     timed = []
     for family, sep in _CMDI_SEPARATORS[:4]:
-        r = _send(ctx, url, param,
-                  sep.format(base="127.0.0.1", cmd=f"sleep {delay_s}"),
-                  method, data, tool, f"blind/{family}")
-        if r["elapsed_ms"] >= threshold:
-            timed.append({"separator": family, "elapsed_ms": r["elapsed_ms"],
-                          "request_id": r["request_id"]})
+        payload = sep.format(base="127.0.0.1", cmd=f"sleep {delay_s}")
+        r = _send(ctx, url, param, payload, method, data, tool,
+                  f"blind/{family}")
+        if r["elapsed_ms"] < threshold:
+            continue
+        # Repeat before reporting. One slow response on a tarpit, a cold cache
+        # or a GC pause is not an injection, and the note told the caller to
+        # repeat a slow family while the probe itself did not.
+        again = _send(ctx, url, param, payload, method, data, tool,
+                      f"blind/{family}/confirm")
+        if again["elapsed_ms"] < threshold:
+            continue
+        timed.append({"separator": family,
+                      "elapsed_ms": r["elapsed_ms"],
+                      "confirm_ms": again["elapsed_ms"],
+                      "request_id": r["request_id"],
+                      "confirm_request_id": again["request_id"]})
     out["blind"] = {"threshold_ms": round(threshold, 1), "slow": timed}
     out["verdict"] = ("blind candidate: delay on " +
                       ", ".join(t["separator"] for t in timed)) if timed else \
         "no signal"
     if timed:
         out["note"] = ("a timing delta is a candidate, not an rce finding: the "
-                       "class requires command OUTPUT. Repeat the slow family "
-                       "once to rule out noise, then look for an out-of-band "
-                       "channel; if there is none, say so in the report and "
+                       "class requires command OUTPUT. The delay was measured "
+                       "twice against two baselines; look for an out-of-band "
+                       "channel, and if there is none say so in the report and "
                        "leave it a candidate")
     else:
         out["note"] = "no output and no delay on any separator family"

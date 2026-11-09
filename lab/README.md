@@ -19,7 +19,8 @@ used by `selftest.py`, `pytest` and `argus demo` for reproducible results.
 | `/ping?host=` | OS command injection — real argv execution from a seven-command allowlist (`id`, `whoami`, `uname`, `hostname`, `pwd`, `echo`, `cat`), never a shell, plus the sleep separators for the blind case |
 | `/hello?name=` | SSTI (`{{7*7}}` → 49) |
 | `/download?file=` | path traversal (`../`, fakefs) |
-| `/redirect?next=` | open redirect incl. `javascript:` scheme |
+| `/redirect?next=` | open redirect incl. `javascript:` scheme, and CRLF header injection - the `Location` value is not sanitized |
+| any route, `TRACE`/`OPTIONS` | verb handling: `TRACE` echoes the request back (cross-site tracing), `OPTIONS` advertises the method set |
 | `/safedirect?next=` | filtered redirect (`//host` bypass) |
 | `/jsredirect` | client-side DOM redirect |
 | `/api/user/<id>`, `POST /api/order` | IDOR (path + JSON body) |
