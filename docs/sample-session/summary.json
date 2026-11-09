@@ -1,12 +1,12 @@
 {
-  "session": "20261109-113916-127.0.0.1",
+  "session": "20261109-131020-127.0.0.1",
   "findings": [
     {
       "id": "F01",
       "title": "SQL injection in /item id parameter",
       "severity": "critical",
       "category": "sqli",
-      "url": "http://127.0.0.1:40117/item?id=1",
+      "url": "http://127.0.0.1:46085/item?id=1",
       "evidence_ids": [
         "r2",
         "r15"
@@ -49,7 +49,7 @@
       },
       "description": "id is interpolated into the query string. The quote probe returns a raw sqlite error; a UNION SELECT limited to five rows returns credentials from the users table.",
       "remediation": "Use parameterized queries.",
-      "ts": 1794242357.015,
+      "ts": 1794247821.721,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-89",
@@ -60,9 +60,9 @@
       "title": "OS command injection in /ping host parameter",
       "severity": "critical",
       "category": "rce",
-      "url": "http://127.0.0.1:40117/ping?host=127.0.0.1",
+      "url": "http://127.0.0.1:46085/ping?host=127.0.0.1",
       "evidence_ids": [
-        "r17"
+        "r18"
       ],
       "evidence_excerpt": "uid=1000(kali)",
       "vuln_class": "rce",
@@ -80,17 +80,17 @@
           {
             "check": "a benign command was sent",
             "ok": true,
-            "detail": "exchange r17"
+            "detail": "exchange r18"
           },
           {
             "check": "identity output returned by the target",
             "ok": true,
-            "detail": "'uid=1000(kali)' in r17"
+            "detail": "'uid=1000(kali)' in r18"
           },
           {
-            "check": "marker echoed in the output",
+            "check": "the probe nonce came back in the output",
             "ok": true,
-            "detail": "'argusqx2a0492'"
+            "detail": "'argusfejcl2os' in r18"
           },
           {
             "check": "proof command stayed benign",
@@ -102,7 +102,7 @@
       },
       "description": "host is concatenated into a shell command. `id; echo <nonce>` returns the server's own identity line and the nonce, so the output is computed by the target and not reflected.",
       "remediation": "Never pass request data to a shell; exec with an argv list and validate the host as an address.",
-      "ts": 1794242357.175,
+      "ts": 1794247821.915,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-78",
@@ -113,10 +113,10 @@
       "title": "JWT weak secret: forged admin token accepted",
       "severity": "critical",
       "category": "jwt",
-      "url": "http://127.0.0.1:40117/api/me",
+      "url": "http://127.0.0.1:46085/api/me",
       "evidence_ids": [
-        "r62",
-        "r61"
+        "r63",
+        "r62"
       ],
       "evidence_excerpt": "\"role\": \"admin\"",
       "vuln_class": "jwt",
@@ -134,24 +134,19 @@
           {
             "check": "a forged credential was accepted",
             "ok": true,
-            "detail": "exchange r61 returned 200"
+            "detail": "/api/me returned 200 with a credential"
           },
           {
-            "check": "a deliberately invalid credential is rejected",
+            "check": "the same endpoint refuses another credential",
             "ok": true,
-            "detail": "exchange r62"
-          },
-          {
-            "check": "privileged content returned",
-            "ok": true,
-            "detail": "in r61"
+            "detail": "/api/me answered 401 to a credentialed request"
           }
         ],
         "missing": []
       },
       "description": "The session JWT verifies against the dictionary secret 'secret123'. A token forged offline with role=admin is accepted and its claims echoed back; the same request with a broken signature is refused with 401, so the endpoint does verify - against a guessable key.",
       "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
-      "ts": 1794242359.544,
+      "ts": 1794247824.255,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-347",
@@ -162,10 +157,10 @@
       "title": "IDOR: /api/user/<id> serves any user object",
       "severity": "high",
       "category": "idor",
-      "url": "http://127.0.0.1:40117/api/user/2",
+      "url": "http://127.0.0.1:46085/api/user/2",
       "evidence_ids": [
-        "r19",
-        "r21"
+        "r20",
+        "r22"
       ],
       "evidence_excerpt": "\"username\": \"admin\"",
       "vuln_class": "idor",
@@ -173,7 +168,7 @@
       "proof": {
         "vuln_class": "idor",
         "grade": "proven",
-        "requirement": "actor A reading actor B's subject, with the control showing the difference is the identity and not the page",
+        "requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
         "checks": [
           {
             "check": "proof read from the wire",
@@ -181,26 +176,31 @@
             "detail": ""
           },
           {
-            "check": "two distinct object references requested",
+            "check": "two distinct object references on one endpoint",
             "ok": true,
-            "detail": "['1', '2']"
+            "detail": "['2'] vs ['1'] on /api/user/{id}"
           },
           {
             "check": "another subject's data returned",
             "ok": true,
-            "detail": "in r21"
+            "detail": "present in r22, absent from r20"
           },
           {
-            "check": "outcomes actually differ",
+            "check": "the data identifies a subject",
             "ok": true,
-            "detail": "present in r21, absent from r19"
+            "detail": ""
+          },
+          {
+            "check": "the caller was not entitled to it",
+            "ok": true,
+            "detail": "no credential was presented and subject data came back"
           }
         ],
         "missing": []
       },
       "description": "Object ids are not checked against the caller. Reading id 2 returns alice; reading id 1 returns the admin record, with no credential distinguishing the two requests.",
       "remediation": "Enforce per-object ownership checks.",
-      "ts": 1794242357.463,
+      "ts": 1794247822.179,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-639",
@@ -211,9 +211,9 @@
       "title": "Exposed /.env and /.git/HEAD at web root",
       "severity": "medium",
       "category": "info-disclosure",
-      "url": "http://127.0.0.1:40117/.env",
+      "url": "http://127.0.0.1:46085/.env",
       "evidence_ids": [
-        "r26"
+        "r27"
       ],
       "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
       "vuln_class": "disclosure",
@@ -236,14 +236,14 @@
           {
             "check": "it came from a response",
             "ok": true,
-            "detail": "in r26"
+            "detail": "in r27"
           }
         ],
         "missing": []
       },
       "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
       "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
-      "ts": 1794242359.42,
+      "ts": 1794247824.143,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-200",
@@ -254,9 +254,9 @@
       "title": "Reflected XSS in /search q parameter",
       "severity": "medium",
       "category": "xss",
-      "url": "http://127.0.0.1:40117/search?q=x",
+      "url": "http://127.0.0.1:46085/search?q=x",
       "evidence_ids": [
-        "r18"
+        "r19"
       ],
       "evidence_excerpt": "<>'\"&=/",
       "vuln_class": "xss",
@@ -274,7 +274,7 @@
           {
             "check": "payload reflected unencoded into HTML",
             "ok": true,
-            "detail": "'<>\"\\'' survived into r18"
+            "detail": "'<>\"\\'' survived into r19"
           },
           {
             "check": "a real browser executed it",
@@ -288,7 +288,7 @@
       },
       "description": "Canary chars < > \" ' reflect unescaped in an html context. Execution is not shown here - this engagement had no browser, so the class stays a candidate.",
       "remediation": "Output-encode by context; add CSP.",
-      "ts": 1794242357.239,
+      "ts": 1794247821.974,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       "cwe": "CWE-79",
@@ -304,13 +304,13 @@
     "proven": 5,
     "candidate": 1
   },
-  "requests": 63,
+  "requests": 64,
   "duration_s": 3.4,
   "time_to_first_finding_s": 0.8,
   "coverage": {
     "requests_by_tool": {
       "http_request": 2,
-      "probe_cmdi": 2,
+      "probe_cmdi": 3,
       "probe_disclosure": 38,
       "probe_idor": 4,
       "probe_reflection": 1,
@@ -338,7 +338,7 @@
       "GET /api/user/1",
       "GET /api/user/2",
       "GET /api/user/3",
-      "GET /arg404xs8ywc68",
+      "GET /arg404kki8zvgg",
       "GET /backup.zip",
       "GET /composer.json",
       "GET /console",
@@ -375,7 +375,7 @@
       "probe_xfh"
     ]
   },
-  "transcript_chain_head": "ef9b50951bb1732c6fa5bf76abe360d0e97ec5b710c1fb0042c598f573a1e251",
+  "transcript_chain_head": "bea7027fca3a9be7371072232d6d9f4096dfb071ed9eb3c682f5d4cb8769d9b1",
   "mode": "single",
   "llm_calls": 17,
   "llm_tokens": {

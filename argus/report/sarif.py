@@ -47,8 +47,11 @@ def render_sarif(session: Session) -> Path:
                 rules[rule_id]["helpUri"] = (
                     "https://cwe.mitre.org/data/definitions/"
                     f"{_num}.html")
-        grade = f.get("grade") or ""
-        kind = _KIND.get(grade, "fail")
+        grade = str(f.get("grade") or "").strip().lower()
+        # An unrecognized or absent grade defaults to "review", not "fail".
+        # Defaulting to fail promoted an ungraded legacy finding - and any row
+        # whose grade was edited to something unknown - into a CI build break.
+        kind = _KIND.get(grade, "review" if grade or f.get("proof") else "fail")
         verdict = f.get("proof") if isinstance(f.get("proof"), dict) else {}
         missing = [str(m) for m in (verdict.get("missing") or [])]
         prefix = "" if kind == "fail" else f"[{grade.upper()}] "

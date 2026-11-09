@@ -39,7 +39,7 @@ system. All notable milestones on `agent-v2`.
 - The verbatim gate proves the bytes were observed, not that the class was
   demonstrated: a benign page reading `uid=1 selected` satisfied it for a
   claimed critical RCE. Every finding is now also graded against a
-  requirement written per class — 25 classes, four grades (`proven`,
+  requirement written per class — 29 classes, four grades (`proven`,
   `candidate`, `unproven`, `refused`).
 - Verifiers read the recorded request AND response of the cited exchanges,
   never a probe's self-report, so a probe cannot grade itself. `rce` needs
@@ -57,7 +57,7 @@ system. All notable milestones on `agent-v2`.
   missing evidence **upgrades** the finding in place rather than being
   refused as a duplicate. `--require-proof` refuses anything below `proven`.
   A `refused` class (dos) cannot be recorded at all.
-- `category` is an enum of the 25 classes and the dedup key is the canonical
+- `category` is an enum of the 29 classes and the dedup key is the canonical
   class, so `SQLi`, `sql-injection` and `sqlinjection` are one bug and not
   three — the cross-worker dedup the docs promised but normalized free text
   could not deliver.
@@ -73,16 +73,17 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 49 of the 55 tools served over
+- `user -> LLM -> MCP -> tool`: 45 of the 55 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
 - The driver moves outside; the guards do not. Scope, rate limit,
   transcript, dedup and grading stay on this side, and `initialize` returns
   the operating contract as `instructions`.
-- Withheld: the four team-orchestration tools (the host LLM is the
-  orchestrator) plus `mcp_list`/`mcp_call` (argus calling out while serving
-  is a loop the operator cannot see).
+- Withheld: all eight board tools (the host LLM is the orchestrator, and
+  outside team mode there is no Board, so the four that were advertised could
+  only raise) plus `mcp_list`/`mcp_call` (argus calling out while serving is a
+  loop the operator cannot see).
 
 ### Probe coverage (27 matched-pair probes)
 - Injection: sqli (quoted/numeric/OR-pair/xpath/UNION + opt-in bounded
@@ -219,12 +220,12 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 238 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 266 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + CLI + external-tool
   subprocess path + hardening regressions).
 - The proof matrix is tested in both directions per class: an evidence set
   that must grade `proven`, and one that must not. The second is the one that
-  matters, and `test_every_class_refuses_a_benign_page` runs all 25 against a
+  matters, and `test_every_class_refuses_a_benign_page` runs all 29 against a
   page with no bug in it. Four defects were found that way — three checks
   that passed without the claimant doing anything class-specific, and a
   relative `Location: /home` read as the host `home`.

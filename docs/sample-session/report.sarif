@@ -79,7 +79,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/item?id=1"
+                  "uri": "http://127.0.0.1:46085/item?id=1"
                 }
               }
             }
@@ -118,7 +118,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/ping?host=127.0.0.1"
+                  "uri": "http://127.0.0.1:46085/ping?host=127.0.0.1"
                 }
               }
             }
@@ -137,7 +137,7 @@
             "cwe": "CWE-78",
             "owasp": "A03 Injection",
             "evidence_ids": [
-              "r17"
+              "r18"
             ],
             "evidence_excerpt": "uid=1000(kali)",
             "remediation": "Never pass request data to a shell; exec with an argv list and validate the host as an address.",
@@ -156,7 +156,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/api/me"
+                  "uri": "http://127.0.0.1:46085/api/me"
                 }
               }
             }
@@ -175,8 +175,8 @@
             "cwe": "CWE-347",
             "owasp": "A02 Cryptographic Failures",
             "evidence_ids": [
-              "r62",
-              "r61"
+              "r63",
+              "r62"
             ],
             "evidence_excerpt": "\"role\": \"admin\"",
             "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
@@ -195,7 +195,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/api/user/2"
+                  "uri": "http://127.0.0.1:46085/api/user/2"
                 }
               }
             }
@@ -208,14 +208,14 @@
             "argus-severity": "high",
             "argus-grade": "proven",
             "argus-vuln-class": "idor",
-            "argus-proof-requirement": "actor A reading actor B's subject, with the control showing the difference is the identity and not the page",
+            "argus-proof-requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
             "argus-proof-missing": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
             "cwe": "CWE-639",
             "owasp": "A01 Broken Access Control",
             "evidence_ids": [
-              "r19",
-              "r21"
+              "r20",
+              "r22"
             ],
             "evidence_excerpt": "\"username\": \"admin\"",
             "remediation": "Enforce per-object ownership checks.",
@@ -234,7 +234,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/.env"
+                  "uri": "http://127.0.0.1:46085/.env"
                 }
               }
             }
@@ -253,7 +253,7 @@
             "cwe": "CWE-200",
             "owasp": "A01 Broken Access Control",
             "evidence_ids": [
-              "r26"
+              "r27"
             ],
             "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
             "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
@@ -272,7 +272,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:40117/search?q=x"
+                  "uri": "http://127.0.0.1:46085/search?q=x"
                 }
               }
             }
@@ -293,7 +293,7 @@
             "cwe": "CWE-79",
             "owasp": "A03 Injection",
             "evidence_ids": [
-              "r18"
+              "r19"
             ],
             "evidence_excerpt": "<>'\"&=/",
             "remediation": "Output-encode by context; add CSP.",
@@ -304,7 +304,7 @@
       "invocations": [
         {
           "executionSuccessful": true,
-          "startTimeUtc": "2026-11-09T16:39:16Z"
+          "startTimeUtc": "2026-11-09T18:10:20Z"
         }
       ]
     }

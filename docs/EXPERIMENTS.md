@@ -15,7 +15,12 @@ python lab/vulnapp.py 8777            # deterministic vulnerable app
 Auth note: subscription OAuth bills to the account's "extra usage" pool
 and caps per-request size — the full 55-tool schema (~32KB) may be
 rejected there. For constrained auth, run `run` with
-`--tools fingerprint,crawl,http_request,probe_sqli,probe_idor,probe_reflection,probe_disclosure,record_finding,note,load_skill,read_response`
+`--tools fingerprint,crawl,http_request,probe_sqli,probe_cmdi,probe_ssti,probe_lfi,probe_idor,probe_reflection,probe_disclosure,record_finding,note,load_skill,read_response`
+
+`probe_cmdi` is in that list deliberately: the planted-class list below
+includes OS command injection, so a subset without it makes the class
+unreachable while still counting in the recall denominator. Any tool subset
+used for a measured run has to be able to reach every class being scored.
 or use `team` (role cards already subset tools per worker). Metered API
 keys are unaffected.
 

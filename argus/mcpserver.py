@@ -44,10 +44,13 @@ from .tools.registry import TOOL_SCHEMAS
 
 SERVER_INFO = {"name": "argus", "version": "1.0"}
 
-WITHHELD = frozenset({
-    "spawn_worker", "request_worker", "list_workers", "finish_engagement",
-    "mcp_list", "mcp_call",
-})
+# Every board tool, not four of them: `read_board`, `post_board_note`,
+# `emit_lead` and `pull_leads` were advertised in the manifest and can only
+# ever raise outside team mode, because there is no Board. A manifest entry a
+# host can never call successfully is a lie in the catalogue.
+from .tools.registry import BOARD_TOOLS                    # noqa: E402
+
+WITHHELD = frozenset(BOARD_TOOLS) | frozenset({"mcp_list", "mcp_call"})
 
 # JSON-RPC 2.0
 PARSE_ERROR = -32700
@@ -136,8 +139,11 @@ class ArgusMCPServer:
         if not isinstance(method, str):
             self._error(rid, INVALID_REQUEST, "missing method")
             return
-        # notifications carry no id and get no reply, ever
-        if rid is None and method.startswith("notifications/"):
+        # A JSON-RPC notification is any message with no id, whatever its
+        # method. Replying to one - which this did for every method outside
+        # the notifications/ namespace - is a protocol violation that some
+        # hosts treat as a desync.
+        if rid is None:
             if method == "notifications/initialized":
                 self._initialized = True
             return
@@ -179,8 +185,19 @@ class ArgusMCPServer:
                           "the orchestrator in this mode"}, is_error=True))
             return
         out = dispatch(self.ctx, name, arguments)
-        # dispatch never raises; an error is data the host should read
-        self._reply(rid, self._content(out, is_error="error" in out))
+        # dispatch never raises; an error is data the host should read. The
+        # envelope is only half of it: a tool that refuses internally - a scope
+        # guard rejection, a finding the proof matrix will not accept - returns
+        # {"result": {"error": ...}}, which reported isError=False and read to
+        # the host as a success.
+        inner = out.get("result")
+        failed = "error" in out or (isinstance(inner, dict) and "error" in inner)
+        self._reply(rid, self._content(out, is_error=failed))
+        if name == "finish" and not failed:
+            # A served engagement never sealed, so `argus verify` passed a
+            # transcript with its tail deleted. finish() is the end of the
+            # assessment in this mode too: render and seal.
+            self._finalize()
 
     @staticmethod
     def _content(payload: dict, is_error: bool = False) -> dict:
@@ -212,6 +229,22 @@ class ArgusMCPServer:
                 self._error(msg.get("id") if isinstance(msg, dict) else None,
                             INTERNAL_ERROR, f"{type(exc).__name__}: {exc}")
         return 0
+
+    def _finalize(self) -> None:
+        """Render and seal, the way AgentLoop does at the end of a run."""
+        try:
+            from .report import render_report
+            from .report.html import render_html
+            from .report.sarif import render_sarif
+            summary = getattr(self.ctx, "finish_summary", "") or ""
+            render_report(self.session, self.cfg, summary=summary,
+                          extra={"mode": "mcp-serve"})
+            render_html(self.session, self.cfg, summary=summary)
+            render_sarif(self.session)
+            self.session.seal_artifacts()
+        except Exception as exc:                            # pragma: no cover
+            print(f"[argus] could not finalize session: "
+                  f"{type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
     def close(self) -> None:
         try:

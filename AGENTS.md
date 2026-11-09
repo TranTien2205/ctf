@@ -24,7 +24,7 @@ family — if you change a probe, update the lab and its test together.
   rate + transcript
 - `argus/session.py` — evidence store; findings need verbatim excerpts AND
   a proof grade
-- `argus/proof.py` — the proof matrix: 25 classes, what each must produce
+- `argus/proof.py` — the proof matrix: 29 classes, what each must produce
 - `argus/mcpserver.py` — argus AS an MCP server (`argus mcp-serve`)
 - `argus/tools/` — tool schemas (registry.py) + implementations
   (`team.py` holds the multi-agent tools; `mcp_tools.py` bridges MCP servers)

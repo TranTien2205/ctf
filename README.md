@@ -44,7 +44,7 @@ sent, and the model cannot widen it.
 python -m argus demo                # scripted full run on the lab - no API key
 python selftest.py                  # offline check, no API key needed
 python -m argus proof rce           # what a class must produce to be a finding
-python -m argus proof               # all 25 requirements
+python -m argus proof               # all 29 requirements
 # or point it at the lab yourself:
 python lab/vulnapp.py 8777          # deliberately vulnerable app, stdlib only
 python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
@@ -131,7 +131,7 @@ one stays a `candidate` and the report says why.
 
         ┌───────────────────────────────────────────────────────┐
         │   PROOF MATRIX  (proof.py) — at record_finding time   │
-        │   25 classes, each with a requirement read from the   │
+        │   29 classes, each with a requirement read from the   │
         │   cited request AND response:                         │
         │     proven    the class artifact and its control      │
         │     candidate a real signal, a named check missing    │
@@ -208,7 +208,7 @@ CLI (argus run | argus team)
   │   ├── scope.py       fail-closed host/path/private-IP guard
   │   ├── httpclient.py  one guarded client: scope + rate limit + transcript
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
-  │   ├── proof.py       the proof matrix: 25 classes, what each must produce
+  │   ├── proof.py       the proof matrix: 29 classes, what each must produce
   │   ├── mcpserver.py   argus AS an MCP server - `argus mcp-serve`
   │   ├── skills/        27 loadable methodology modules (sqli, ssrf, idor…)
   │   └── report/        report.md + .html + .sarif + summary.json,
@@ -290,7 +290,7 @@ the assessment, over MCP:
 python -m argus mcp-serve https://app.example --scope api.example     --require-proof
 ```
 
-49 of the 55 tools are served over newline-delimited stdio JSON-RPC. Register
+45 of the 55 tools are served over newline-delimited stdio JSON-RPC. Register
 it with any MCP host — Claude Code, an MCP-speaking IDE, an agent runtime:
 
 ```json
@@ -308,11 +308,14 @@ as `argus run` would grade it. `initialize` returns the operating contract as
 `instructions`, so a host that never read argus's system prompt still gets
 the scope and the evidence rules.
 
-Six tools are withheld, each for a reason: `spawn_worker`, `request_worker`,
-`list_workers` and `finish_engagement` are team orchestration, and the host
-LLM is the orchestrator in this mode — a second one inside argus would
-re-interpret the same intent; `mcp_list` and `mcp_call` would let argus call
-out to other servers while serving as one, a loop the operator cannot see.
+Ten tools are withheld, each for a reason. The eight board tools —
+`spawn_worker`, `request_worker`, `list_workers`, `finish_engagement`,
+`read_board`, `post_board_note`, `emit_lead`, `pull_leads` — are team
+orchestration: the host LLM is the orchestrator in this mode, a second one
+inside argus would re-interpret the same intent, and outside team mode there
+is no Board for them to reach, so advertising them would be a catalogue entry
+that can only fail. `mcp_list` and `mcp_call` would let argus call out to
+other servers while serving as one, a loop the operator cannot see.
 
 ### argus as the client (optional)
 

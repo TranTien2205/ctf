@@ -28,6 +28,11 @@ Two consequences, both deliberate:
 
   * A probe cannot self-report its way to `proven`. There is no `extracted`
     dict to trust - the checks re-read the bytes on the wire.
+  * A verifier may only rely on what survives redaction. Operator credentials
+    are recorded as `Bearer <redacted>`, so "the two requests used different
+    credentials" is not checkable from the artifacts and must not be a check -
+    what is checkable is that both presented one, on the same endpoint, and
+    one was refused.
   * Scanner output is not class evidence. `run_external` and `mcp_call` record
     events that carry `output` and no `response`; a claim citing only those
     fails the wire check for every class, which is what the docs always said
@@ -47,27 +52,127 @@ GRADES = ("proven", "candidate", "unproven", "refused")
 # Real `id` output, not the substring "uid=" that any ?uid=1 page carries:
 # the parenthesised name, or uid and gid together.
 IDENTITY_RE = re.compile(r"uid=\d+\([^)\n]{1,64}\)|uid=\d+\s+gid=\d+")
-WINIDENT_RE = re.compile(r"(?i)\b(nt authority\\[a-z ]+|[a-z0-9_.-]+\\[a-z0-9_.-]+)\s*$", re.M)
+# `machine\user` is also the shape of a path and of a sentence, so the shape
+# alone cannot carry this check: the old pattern matched C:\Windows\System32
+# and the words "domain\user" in prose, and its `\s*$` anchor denied a real
+# Windows proof whenever the output was not at the end of a line. Strong forms
+# only: a named service account anywhere, or a machine\user token alone on its
+# own line - which is exactly what `whoami` prints.
+WINIDENT_RE = re.compile(
+    r"(?im)(?:^|[^\w.:\\-])(nt authority\\{1,2}"
+    r"(?:system|local service|network service|iusr))\b"
+    r"|^\s*([a-z0-9_-]{1,15}\\{1,2}[a-z0-9_.-]{1,20}\$?)\s*$")
+# The marker this system sends. `probe_cmdi` builds it with _marker("argus"),
+# and the matrix requires that prefix: accepting "any 6-32 char token present
+# in both the request and the response" passed for free on every page that
+# echoes a parameter, so `?host=aaaaaa` was a valid nonce.
+NONCE_RE = re.compile(r"(?i)\bargus[a-z0-9]{4,24}\b")
+# A deserialization payload carries its command inside a gadget, not after a
+# shell separator - so `deserialize` inherited a declaration check it could
+# never pass, and the class was unprovable by construction.
+SERIALIZED_RE = re.compile(
+    r"(?i)(!!python/(?:object|name)|cos\nsystem|c__builtin__|\bpickle\b"
+    r"|O:\d+:|a:\d+:\{|rO0AB|aced0005"
+    r"|__proto__|constructor\[|\$\$ND\b|TypeObject|ObjectDataProvider"
+    r"|yaml\.load|ruby/object|marshal|BinaryFormatter)")
 # A command was actually sent - a separator followed by a benign read.
 COMMAND_SENT_RE = re.compile(
     r"(?i)(?:[;|&\n]|\$\(|`|%0a|%3b|\|\|)\s*"
     r"(id|whoami|uname|hostname|echo|cat|type|set)\b")
+# The veto. It exists so a demonstration whose proof is the damage cannot be
+# recorded, and the first version missed 21 of 24 payloads an auditor tried -
+# a webshell drop, a reverse shell, crontab persistence, powershell, a piped
+# curl. `passwd` is matched as a command (`passwd bob`), not as the path
+# /etc/passwd, which is an ordinary read.
 DESTRUCTIVE_RE = re.compile(
-    r"(?i)\b(rm\s+-rf|mkfs|dd\s+if=|shutdown|reboot|:\(\)\s*\{|useradd|"
-    r"net\s+user\s+\S+\s+/add|nc\s+-e|bash\s+-i|/dev/tcp/|certutil\s+-urlcache|"
-    r"invoke-webrequest\s+-outfile|chmod\s+777\s+/)")
+    r"(?i)("
+    r"\brm\s+-[a-z]*[rf]|\bmkfs\b|\bdd\s+if=|\bshred\b"
+    r"|\b(shutdown|reboot|halt|poweroff)\b|\b:\s*\(\s*\)\s*\{|>\s*/dev/sd"
+    r"|\b(useradd|adduser|usermod)\b|\bpasswd\s+[a-z]|net\s+user\s+\S+\s+/add"
+    r"|\b(crontab|at\s+now|schtasks|systemctl\s+enable|launchctl\s+load)\b"
+    r"|\bauthorized_keys\b|\bchmod\s+[0-7]*[1357][0-7]*\s|\bchmod\s+\+s\b"
+    r"|\bnc\s+-[a-z]*e|\b(bash|sh|zsh)\s+-i\b|/dev/tcp/|/dev/udp/"
+    r"|\bsocat\b|\bmkfifo\b|\bpty\.spawn\b"
+    r"|\b(curl|wget)\b[^|;&\n]*\|\s*(ba)?sh"
+    r"|\b(curl\s+-[a-zA-Z]*o|wget\s+-[a-zA-Z]*O)\b"
+    r"|\bcertutil\s+-urlcache|\binvoke-webrequest\b|\bbitsadmin\b"
+    r"|\bbase64\s+-d[^|]*\|\s*(ba)?sh|\bpython3?\s+-c\b|\bperl\s+-e\b"
+    r"|\bruby\s+-e\b|\bpowershell\b|\bIEX\s*\(|\bFromBase64String\b"
+    r"|>\s*\S*/(?:www|html|htdocs|webroot|public|wwwroot)/"
+    r"|\btee\s+\S*/(?:www|html|htdocs|public)/"
+    r")")
 
+# A query operator, not any key that starts with `$`: `{"$schema": ...}` and
+# `{"$ref": ...}` are ordinary JSON and used to prove nosqli, while the
+# bracketed urlencoded carrier `?user[$ne]=x` - which is how the carrier
+# actually arrives - proved nothing.
 NOSQL_OP_RE = re.compile(
-    r'(?i)[\"\']?\$(ne|gt|gte|lt|lte|regex|where|in|nin|exists|expr|function)[\"\']?\s*:'
-    r'|\{\s*[\"\']?\$\w+')
+    r"(?i)("
+    r"[\"']?\$(?:ne|gt|gte|lt|lte|regex|where|in|nin|exists|expr|function|or|and|not)"
+    r"[\"']?\s*:"
+    r"|\[\s*\$(?:ne|gt|gte|lt|lte|regex|where|in|nin|exists)\s*\]"
+    r"|%5b%24(?:ne|gt|gte|lt|lte|regex|where|in|nin|exists)%5d"
+    r")")
+
 DBMS_RE = re.compile(
-    r"(?i)(sqlite3?\.\w*error|sqlite_master|you have an error in your sql syntax|"
-    r"mysql_fetch|mariadb|psycopg2|pg::|postgresql|org\.postgresql|ORA-\d{5}|"
-    r"microsoft (?:ole db|sql server)|sqlstate\[|sqlserverexception|"
-    r"\d+\.\d+\.\d+-(?:mariadb|log)|sqlite version \d)")
+    r"(?i)("
+    r"sqlite3?\.\w*error|sqlite_master|sqlite_version|sqlite version \d"
+    r"|you have an error in your sql syntax|mysql_fetch|mysqli?_|mariadb"
+    r"|\b\d+\.\d+\.\d+-\d*(?:mariadb|log|ubuntu|debian|mysql|azure|aws)"
+    r"|psycopg2?|pg::|postgresql|postgres\s+\d|org\.postgresql|pg_catalog"
+    r"|ORA-\d{5}|oracle database|pl/sql|v\$version"
+    r"|microsoft (?:ole db|sql server)|sqlstate\[|sqlserverexception"
+    r"|incorrect syntax near|unclosed quotation mark|\bsql server\s+\d{4}\b"
+    r")")
+
+# "the query named its target" has to mean the request carried SQL that names
+# a table. The first version was `\b(?:from|join|into|update)\s+<ident>` over
+# req_text - which unquote_plus-es the whole request - so `?q=mail+from+bob`
+# became "mail from bob" and named the table `bob`. An ordinary search box
+# satisfied the check, and sqli graded `proven` on a target with no injection
+# in it. Measured against /search?q=mail+from+bob.
 TABLE_RE = re.compile(
-    r"(?i)\b(?:from|join|into|update)\s+[`\"\[]?([a-z_][a-z0-9_.]*)[`\"\]]?"
-    r"|\b(information_schema|sqlite_master|pg_catalog)\b")
+    r"(?i)(?:union[\s/*]+(?:all[\s/*]+)?select\b[\s\S]{0,400}?\bfrom\s+"
+    r"[`\"\[]?([a-z_][a-z0-9_.]*)"
+    r"|\bselect\b[\s\S]{0,400}?\bfrom\s+[`\"\[]?([a-z_][a-z0-9_.]*)"
+    r"|\b(information_schema\.[a-z_]+|sqlite_master|pg_catalog\.[a-z_]+|"
+    r"msysobjects|all_tables|user_tables|dba_tables)\b)")
+
+# A file read asked for a file. Without this, any page quoting a passwd line -
+# a security blog, this project's own README - graded as an arbitrary read.
+TRAVERSAL_RE = re.compile(
+    r"(?i)(\.\.[/\\]|%2e%2e|\.\.%2f|%252e|/etc/[a-z]|c:\\\\?win|boot\.ini"
+    r"|file://|php://|zip://|data://|expect://|/proc/self|win\.ini"
+    r"|%00|\x00|\.\./)")
+
+# What makes data a SUBJECT rather than a page: an access-control claim needs
+# the bytes to identify a person or an account, or `/page/1` vs `/page/2`
+# grades as broken access control.
+SUBJECT_RE = re.compile(
+    r"(?i)\"?(user_?name|login|e?-?mail|user_?id|uid|full_?name|first_?name|"
+    r"last_?name|phone|mobile|ssn|dob|address|role|roles|is_?admin|"
+    r"account_?(?:id|no|number)|customer_?id|owner|owner_?id|tenant|"
+    r"card_?(?:number|no)|iban|balance)\"?\s*[:=]")
+
+# A write the defence would have stopped carries one of these.
+CSRF_TOKEN_RE = re.compile(
+    r"(?i)(csrf[-_]?token|xsrf[-_]?token|authenticity_token|__requestverification"
+    r"|x-csrf|anti[-_]?forgery|_token\b|state=)")
+
+# Fields a caller should not be able to set on itself.
+PRIVILEGED_FIELD_RE = re.compile(
+    r"(?i)\"?(is_?admin|isadmin|admin|role|roles|permissions?|scopes?|"
+    r"is_?staff|is_?superuser|verified|email_?verified|balance|credit|"
+    r"price|discount|owner_?id|user_?id|account_?type|plan|tier)\"?\s*[:=]")
+
+# A placeholder is not a credential: `password=changeme` in an install
+# document used to grade `disclosure` proven.
+PLACEHOLDER_RE = re.compile(
+    r"(?i)^(?:your|my|the)?[-_ ]?(?:x{3,}|\*{3,}|\.{3,}|<[^>]+>|\{\{?[^}]+\}?\}|"
+    r"\$\{[^}]+\}|changeme|change_me|placeholder|example|examplekey|sample|"
+    r"dummy|test|testing|secret|password|passwd|pass|hunter2|redacted|none|"
+    r"null|nil|todo|tbd|insert[-_ ]?\w+[-_ ]?here|your[-_ ]?\w+[-_ ]?here|"
+    r"api[-_ ]?key)[-_ ]?(?:here|value|goes[-_ ]?here)?$")
 
 PASSWD_RE = re.compile(r"root:.?:0:0:")
 WIN_INI_RE = re.compile(r"(?i)\[(fonts|extensions|mci extensions|boot loader)\]")
@@ -160,6 +265,68 @@ def _check(name: str, ok: bool, detail: str = "") -> dict:
     return {"check": name, "ok": bool(ok), "detail": detail}
 
 
+def _witness(candidates, build, required: tuple[str, ...]) -> list[dict]:
+    """Grade against ONE witness, not against the union of the cited set.
+
+    This is the fix for the deepest hole the matrix shipped with. `_grade`
+    ANDs its checks, and every check used to scan the whole cited set
+    independently - so an rce claim reached `proven` by citing a request that
+    sent `id` and got nothing back, PLUS an unrelated debug page that happened
+    to print `uid=33(www-data)`. Each check passed somewhere; nothing was
+    executed anywhere. Measured, not imagined.
+
+    A proof is an observation. The conjunction has to hold on one exchange, or
+    on one correlated pair - so each candidate witness is scored on its own
+    checks and the best-scoring one is reported. A class whose proof genuinely
+    spans exchanges (a sentinel and its control, a dump and its fingerprint)
+    passes those as separate checks, or passes a PAIR as the candidate.
+    """
+    best, best_score = None, -1
+    for cand in candidates:
+        checks = build(cand)
+        passed = {c["check"] for c in checks if c["ok"]}
+        score = sum(1 for name in required if name in passed)
+        if score > best_score:
+            best, best_score = checks, score
+    return best if best is not None else build(None)
+
+
+def _pairs(exchanges: list[dict]) -> list:
+    """Ordered pairs of distinct cited exchanges, for classes whose proof is a
+    contrast. Ordered, because "A reached B's data" is not the same claim as
+    "B reached A's".
+
+    Each exchange also appears alone, as `(a, None)`. Without that a claim
+    citing one exchange scored zero on every check and came back `unproven`
+    with nothing to act on - the half of the requirement it DID meet has to
+    still register, so the missing half can be named.
+    """
+    out = [(a, b) for a in exchanges for b in exchanges if a is not b]
+    out += [(a, None) for a in exchanges]
+    return out
+
+
+_GRADE_RANK_ORDER = ("unproven", "candidate", "proven")
+
+
+def _clamp(grade: str, ceiling: str) -> str:
+    """Hold a grade at a class's ceiling.
+
+    Some classes cannot be settled by anything this system observes: xss needs
+    a browser, and seven classes were graded by "these two responses differ",
+    which is true of any two pages on any site. Capping them at `candidate` and
+    naming what a proof would need is the honest answer; letting them reach
+    `proven` on a difference was not.
+    """
+    if not ceiling or grade in ("refused",):
+        return grade
+    try:
+        return _GRADE_RANK_ORDER[min(_GRADE_RANK_ORDER.index(grade),
+                                     _GRADE_RANK_ORDER.index(ceiling))]
+    except ValueError:
+        return grade
+
+
 def _grade(checks: list[dict], required: tuple[str, ...],
            veto: tuple[str, ...] = (), floor: tuple[str, ...] = ()) -> str:
     """`candidate` means partial progress on the requirement itself.
@@ -209,6 +376,69 @@ def _discriminates(claim: Claim, name: str = "the excerpt discriminates against 
     return _check(name, ok, detail)
 
 
+ACL_HEADER_RE = re.compile(
+    r"(?i)x-original-url|x-rewrite-url|x-forwarded-host|x-forwarded-for|"
+    r"x-forwarded-server|x-host|x-custom-ip-authorization|x-remote-addr|"
+    r"x-real-ip|x-originating-ip|x-client-ip")
+
+
+def _req_headers(entry: dict) -> dict:
+    headers = (entry.get("request") or {}).get("headers") if entry else None
+    return headers if isinstance(headers, dict) else {}
+
+
+def _path_of(entry: dict) -> str:
+    url = str((entry.get("request") or {}).get("url") or "") if entry else ""
+    return urllib.parse.urlparse(url).path or "/"
+
+
+def _redirect_host(location: str) -> str:
+    """The host a Location header actually sends the browser to, or "" when it
+    stays on the current origin.
+
+    `/home` is relative and therefore in-origin; an early version prefixed
+    anything without "//" with it and read `/home` as the host `home`, so the
+    in-origin control graded as the finding itself.
+    """
+    value = str(location or "").strip()
+    if not value:
+        return ""
+    if value.startswith("//"):
+        return urllib.parse.urlparse("http:" + value).hostname or ""
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.hostname or ""
+    if parsed.scheme or value.startswith("/") or not parsed.netloc:
+        return ""
+    return urllib.parse.urlparse("http://" + value).hostname or ""
+
+
+def _endpoint_shape(entry: dict) -> str:
+    """The resource two exchanges have to share to be a pair: the path with
+    its numeric segments collapsed, plus the sorted parameter names.
+
+    `/api/user/1` and `/api/user/2` are one endpoint; `/api/user/1` and
+    `/articles/2` are not, and comparing them as a pair is how pagination
+    graded as broken access control.
+    """
+    url = str((entry.get("request") or {}).get("url") or "")
+    parsed = urllib.parse.urlparse(url)
+    path = re.sub(r"/\d+(?=/|$)", "/{id}", parsed.path or "/")
+    params = tuple(sorted(k for k, _ in urllib.parse.parse_qsl(parsed.query)))
+    return path + ("?" + ",".join(params) if params else "")
+
+
+def _credential(entry: dict) -> str:
+    """The credential a request presented, as one comparable string. Empty when
+    it presented none."""
+    parts = []
+    for key, value in _req_headers(entry).items():
+        if str(key).lower() in ("authorization", "cookie", "x-api-key",
+                                "x-auth-token", "api-key", "x-access-token"):
+            parts.append(f"{str(key).lower()}={value}")
+    return "|".join(sorted(parts))
+
+
 def _object_refs(entry: dict) -> set[str]:
     url = str((entry.get("request") or {}).get("url") or "")
     refs = set()
@@ -220,129 +450,194 @@ def _object_refs(entry: dict) -> set[str]:
 # --- verifiers ---------------------------------------------------------------
 
 def verify_command_output(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """Code execution. The identity line is what a reflection cannot fake."""
-    checks = []
-    sent = [e for e in claim.exchanges if COMMAND_SENT_RE.search(req_text(e))]
-    checks.append(_check("a benign command was sent", bool(sent),
-                         f"exchange {sent[0].get('id')}" if sent else
-                         "no cited request carries a separator followed by a read-only "
-                         "command (id/whoami/uname/echo)"))
-    identity, reflected = None, None
-    for entry in claim.exchanges:
-        body = resp_body(entry)
-        hit = IDENTITY_RE.search(body) or WINIDENT_RE.search(body)
-        if not hit:
-            continue
-        # the same literal in the request means the target echoed our bytes
-        if hit.group(0) in req_text(entry):
-            reflected = entry
-            continue
-        identity = (hit.group(0), entry)
-    checks.append(_check(
-        "identity output returned by the target", identity is not None,
-        f"{identity[0]!r} in {identity[1].get('id')}" if identity else
-        (f"the identity line in {reflected.get('id')} is also in its own request - "
-         "that is a reflection, not execution" if reflected else
-         "no uid=N(...)/whoami line in any cited response. Echoing `id` back as "
-         "text does not produce one")))
-    marker = None
-    for entry in sent:
-        body, request = resp_body(entry), req_text(entry)
-        for token in re.findall(r"[a-z0-9]{6,32}", request.lower()):
-            if token in body.lower() and token not in ("whoami", "hostname"):
-                marker, _ = token, None
-                break
-        if marker:
-            break
-    checks.append(_check("marker echoed in the output", marker is not None,
-                         f"{marker!r}" if marker else
-                         "no token from the probe appears in its own output; send "
-                         "`id; echo <nonce>` so the nonce ties output to this probe"))
+    """Code execution. One exchange has to carry the whole proof.
+
+    The requirement is a single observation: a benign command went out and its
+    output came back. Evaluating the three checks over the cited SET let a
+    claim combine a request that sent `id` and got nothing with an unrelated
+    debug page printing `uid=33(www-data)`, and grade `proven` with nothing
+    executed. So each exchange is scored on its own, and the best one is
+    reported.
+    """
     destructive = [e.get("id") for e in claim.exchanges
                    if DESTRUCTIVE_RE.search(req_text(e))]
-    checks.append(_check("proof command stayed benign", not destructive,
-                         "" if not destructive else
-                         f"{destructive} sent more than a read - the evidence is void"))
-    return checks
+
+    def build(entry: dict | None) -> list[dict]:
+        checks = []
+        request = req_text(entry) if entry else ""
+        body = resp_body(entry) if entry else ""
+        rid = (entry or {}).get("id", "?")
+
+        if spec.declares == "serialized":
+            sent = bool(entry) and bool(SERIALIZED_RE.search(request))
+            checks.append(_check(
+                "a serialized payload was sent", sent,
+                f"exchange {rid}" if sent else
+                "no cited request carries a serialization gadget "
+                "(!!python/object, O:n:\"...\", rO0AB, pickle opcodes)"
+                if entry else "no exchange cited"))
+        else:
+            sent = bool(entry) and bool(COMMAND_SENT_RE.search(request))
+            checks.append(_check(
+                "a benign command was sent", sent,
+                f"exchange {rid}" if sent else
+                "no cited request carries a separator followed by a read-only "
+                "command (id/whoami/uname/echo)" if entry else "no exchange cited"))
+
+        hit = (IDENTITY_RE.search(body) or WINIDENT_RE.search(body)) if entry else None
+        reflected = bool(hit) and hit.group(0).strip() in request
+        checks.append(_check(
+            "identity output returned by the target",
+            bool(hit) and not reflected,
+            f"{hit.group(0).strip()!r} in {rid}" if hit and not reflected else
+            (f"the identity line in {rid} is also in its own request - that is "
+             "a reflection, not execution" if reflected else
+             "no uid=N(...) or whoami line in this response. Echoing `id` back "
+             "as text does not produce one")))
+
+        # The nonce this system sends, in the same exchange, both ways.
+        nonce = None
+        if entry:
+            for token in NONCE_RE.findall(request):
+                if token.lower() in body.lower():
+                    nonce = token
+                    break
+        checks.append(_check(
+            "the probe nonce came back in the output", nonce is not None,
+            f"{nonce!r} in {rid}" if nonce else
+            "this exchange did not send an argus<random> nonce and get it back. "
+            "Send `id; echo <nonce>` so the output is tied to this probe - a "
+            "token the page happens to echo is not a nonce"))
+
+        checks.append(_check(
+            "proof command stayed benign", not destructive,
+            "" if not destructive else
+            f"{destructive} sent more than a read - the evidence is void"))
+        return checks
+
+    return _witness(claim.exchanges or [None], build, spec.required)
 
 
 def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """Injection into a data store. A named table and real rows out of it."""
+    """Injection into a data store: a named read, and its rows.
+
+    The fingerprint may legitimately come from a different exchange than the
+    dump - that is the documented workflow, one `@@version` read and then the
+    extraction - so it stays a set-wide check. The other two must hold on ONE
+    exchange: a request that names a table and a response that returns rows
+    from it. Scoring them separately let a claim pair an unrelated SQL-shaped
+    request with any row-looking text elsewhere.
+    """
     checks = []
     if spec.fingerprint:
         banner = next((DBMS_RE.search(resp_text(e)) for e in claim.exchanges
                        if DBMS_RE.search(resp_text(e))), None)
         checks.append(_check("data store fingerprinted", banner is not None,
                              banner.group(0)[:80] if banner else
-                             "no engine named in any cited response; read @@version / "
-                             "version() once, or cite the error that names it"))
-    named = None
-    for entry in claim.exchanges:
-        text = req_text(entry)
-        m = TABLE_RE.search(text)
-        if m:
-            named = (m.group(1) or m.group(2), entry)
-            break
-        # A document store has no FROM clause: the operator injection is what
-        # names the query as reaching the store. Requiring SQL syntax here made
-        # every nosqli claim unprovable.
-        if not spec.fingerprint:
-            op = NOSQL_OP_RE.search(text)
-            if op:
-                named = (op.group(0).strip(), entry)
-                break
-    checks.append(_check("the query named its target", named is not None,
-                         f"{named[0]} in {named[1].get('id')}" if named else
-                         ("no cited request carries an operator query ($ne, "
-                          "$regex, $where) or names a collection"
-                          if not spec.fingerprint else
-                          "no cited request names a table or information_schema "
-                          "- a differential proves the channel, not the read")))
-    extracted = None
-    for entry in claim.exchanges:
-        body = resp_body(entry)
-        if not claim.excerpt or claim.excerpt not in body:
-            continue
-        if DBMS_RE.search(claim.excerpt):
-            continue           # the engine's error message is not its data
-        text = req_text(entry)
-        if TABLE_RE.search(text) or (not spec.fingerprint
-                                     and NOSQL_OP_RE.search(text)):
-            extracted = entry
-            break
-    checks.append(_check("rows returned, not an error message", extracted is not None,
-                         f"quoted from {extracted.get('id')}" if extracted else
-                         "the excerpt is an error string, or the exchange it came from "
-                         "never named a table. Quote a row"))
+                             "no engine named in any cited response; read "
+                             "@@version / version() / sqlite_version() once, or "
+                             "cite the error that names it"))
+
+    def build(entry: dict | None) -> list[dict]:
+        out = []
+        request = req_text(entry) if entry else ""
+        body = resp_body(entry) if entry else ""
+        rid = (entry or {}).get("id", "?")
+        named = TABLE_RE.search(request) if entry else None
+        if not named and entry and not spec.fingerprint:
+            # a document store has no FROM clause: the operator injection is
+            # what names the query as reaching the store
+            named = NOSQL_OP_RE.search(request)
+        out.append(_check(
+            "the query named its target", named is not None,
+            f"{(named.group(1) or named.group(2) or named.group(0)).strip()} "
+            f"in {rid}" if named else
+            ("no cited request carries an operator query ($ne, $regex, $where) "
+             "or names a collection" if not spec.fingerprint else
+             "no cited request carries SQL that names a table - a boolean "
+             "differential proves the channel, not the read")))
+        quoted = bool(claim.excerpt) and claim.excerpt in body
+        is_error = bool(claim.excerpt) and bool(DBMS_RE.search(claim.excerpt))
+        out.append(_check(
+            "rows returned, not an error message",
+            bool(named) and quoted and not is_error,
+            f"quoted from {rid}" if named and quoted and not is_error else
+            ("the excerpt is the engine's error message, not its data"
+             if is_error else
+             f"the quoted bytes are not in {rid}" if named and not quoted else
+             "the exchange the rows are quoted from never named a table")))
+        return out
+
+    checks += _witness(claim.exchanges or [None], build,
+                       ("the query named its target",
+                        "rows returned, not an error message"))
     rows = claim.excerpt.count("\n") + 1 if claim.excerpt else 0
     checks.append(_check("extraction stayed minimal", rows <= 20,
                          "" if rows <= 20 else
-                         f"{rows} lines quoted - five rows is a proof, a dump is an incident"))
+                         f"{rows} lines quoted - five rows is a proof, a dump "
+                         "is an incident"))
     return checks
 
 
 def verify_file_read(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    checks, hit, control = [], None, None
+    """Arbitrary read: a sentinel out of a file, from a request that asked for
+    one, plus a control path that does not exist.
+
+    The first version never looked at the request, so a documentation page
+    quoting `root:x:0:0` - or a security blog, or this project's own README -
+    graded `candidate` for lfi. The sentinel also has to be absent from the
+    request, or an attacker who posts the passwd line gets it echoed back.
+    """
+    control = None
     for entry in claim.exchanges:
         body = resp_body(entry)
-        for label, pattern in FILE_SENTINELS:
-            if pattern.search(body):
-                hit = hit or (label, entry)
-        if not any(p.search(body) for _, p in FILE_SENTINELS):
+        if not any(pat.search(body) for _, pat in FILE_SENTINELS) \
+                and TRAVERSAL_RE.search(req_text(entry)):
             control = control or entry
-    checks.append(_check("known-file sentinel observed", hit is not None,
-                         f"{hit[0]} in {hit[1].get('id')}" if hit else
-                         "no /etc/passwd, win.ini or private-key signature in any "
-                         "cited response"))
-    checks.append(_check("negative control recorded", control is not None,
-                         f"exchange {control.get('id')}" if control else
-                         "cite a request for a path that does not exist, so the "
-                         "sentinel is shown to come from the file and not the page"))
-    return checks
+
+    def build(entry: dict | None) -> list[dict]:
+        out = []
+        request = req_text(entry) if entry else ""
+        body = resp_body(entry) if entry else ""
+        rid = (entry or {}).get("id", "?")
+        asked = bool(entry) and bool(TRAVERSAL_RE.search(request))
+        hit = None
+        for label, pattern in FILE_SENTINELS:
+            m = pattern.search(body) if entry else None
+            if m and m.group(0) not in request:
+                hit = (label, m)
+                break
+        out.append(_check(
+            "the request asked for a file", asked,
+            f"exchange {rid}" if asked else
+            "no traversal, absolute path or file:// wrapper in this request - "
+            "a page that merely contains a passwd line is not a file read"))
+        out.append(_check(
+            "known-file sentinel observed", hit is not None,
+            f"{hit[0]} in {rid}" if hit else
+            "no /etc/passwd, win.ini or private-key signature in this response "
+            "that was not already in its own request"))
+        out.append(_check(
+            "negative control recorded", control is not None,
+            f"exchange {control.get('id')}" if control else
+            "cite a request for a path that does not exist, so the sentinel is "
+            "shown to come from the file and not from the page"))
+        return out
+
+    return _witness(claim.exchanges or [None], build, spec.required)
 
 
 def verify_template_eval(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    evaluated, echoed = None, None
+    """Server-side template injection: an arithmetic result the engine
+    computed, plus a second operand pair that confirms it.
+
+    One pair is not enough, and that was the hole: `{{2*2}}` plus any page
+    containing the digit 4 - "Showing 4 results" - graded proven. A product is
+    only evidence when a DIFFERENT pair produces ITS product too, because no
+    page contains both by accident.
+    """
+    seen = []          # (literal, product, entry)
+    echoed = None
     for entry in claim.exchanges:
         m = TEMPLATE_MATH_RE.search(req_text(entry))
         if not m:
@@ -350,249 +645,360 @@ def verify_template_eval(claim: Claim, spec: "ProofSpec") -> list[dict]:
         left, op, right = int(m.group(2)), m.group(3), int(m.group(4))
         product = str(left * right if op == "*" else left + right)
         body = resp_body(entry)
-        literal = m.group(0)
-        if literal in body:
+        if m.group(0) in body:
             echoed = entry
-        elif product in body and product != str(left) and product != str(right):
-            evaluated = (literal, product, entry)
-    return [_check(
-        "expression evaluated, not echoed", evaluated is not None,
-        f"{evaluated[0]} rendered as {evaluated[1]} in {evaluated[2].get('id')}"
-        if evaluated else
-        (f"{echoed.get('id')} returned the expression unchanged - that is reflection"
-         if echoed else
-         "no cited request carries an arithmetic template expression "
-         "({{7*7}}); a payload that is merely reflected proves nothing"))]
+        elif product in body and product not in (str(left), str(right)):
+            seen.append((m.group(0), product, entry, (left, op, right)))
+    first = seen[0] if seen else None
+    second = next((row for row in seen[1:]
+                   if row[3] != first[3] and row[1] != first[1]), None) \
+        if first else None
+    return [
+        _check(
+            "expression evaluated, not echoed", first is not None,
+            f"{first[0]} rendered as {first[1]} in {first[2].get('id')}"
+            if first else
+            (f"{echoed.get('id')} returned the expression unchanged - that is "
+             "reflection" if echoed else
+             "no cited request carries an arithmetic template expression "
+             "({{7*7}}); a payload that is merely reflected proves nothing")),
+        _check(
+            "a second operand pair confirms it", second is not None,
+            f"{second[0]} rendered as {second[1]} in {second[2].get('id')}"
+            if second else
+            "send a different pair - {{3*7}} after {{7*7}} - and cite it. One "
+            "product can be a coincidence in the page; two cannot"),
+    ]
 
 
 def verify_differential(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    refs = set()
-    for entry in claim.exchanges:
-        refs |= _object_refs(entry)
-    checks = [_check("two distinct object references requested", len(refs) >= 2,
-                     f"{sorted(refs)}" if len(refs) >= 2 else
-                     f"only {sorted(refs) or 'no'} object reference(s) cited - an "
-                     "access-control claim needs the other actor's subject too")]
-    present = [e.get("id") for e in claim.exchanges
-               if claim.excerpt and claim.excerpt in resp_body(e)]
-    checks.append(_check("another subject's data returned", bool(present),
-                         f"in {present[0]}" if present else
-                         "the quoted bytes are in no cited response"))
-    checks.append(_discriminates(claim, "outcomes actually differ"))
-    return checks
+    """Object-level access control: one actor reaching another's subject.
+
+    Neighbouring ids returning different content is pagination as often as it
+    is a bug - `/page/1` and `/page/2` graded proven. Two things make it this
+    class: the data has to identify a SUBJECT, and the caller has to have been
+    unentitled to it - either the two requests presented different credentials
+    for the same resource, or no credential was presented at all and subject
+    data came back anyway.
+    """
+    def build(pair) -> list[dict]:
+        out = []
+        if pair is None:
+            mine = theirs = None
+        else:
+            mine, theirs = pair
+        refs_a = _object_refs(mine) if mine else set()
+        refs_b = _object_refs(theirs) if theirs else set()
+        distinct = bool(refs_a and refs_b and refs_a != refs_b)
+        same_shape = bool(mine) and bool(theirs) and \
+            _endpoint_shape(mine) == _endpoint_shape(theirs)
+        out.append(_check(
+            "two distinct object references on one endpoint",
+            distinct and same_shape,
+            f"{sorted(refs_a)} vs {sorted(refs_b)} on {_endpoint_shape(theirs)}"
+            if distinct and same_shape else
+            ("the two cited requests are on different endpoints - cite the same "
+             "endpoint with two ids" if distinct else
+             "the cited requests do not carry two different object references")))
+        body_b = resp_body(theirs) if theirs else ""
+        body_a = resp_body(mine) if mine else ""
+        quoted = bool(claim.excerpt) and claim.excerpt in body_b \
+            and claim.excerpt not in body_a
+        out.append(_check(
+            "another subject's data returned", quoted,
+            f"present in {theirs.get('id')}, absent from {mine.get('id')}"
+            if quoted and theirs and mine else
+            "the quoted bytes are in both cited responses, or in neither - that "
+            "is boilerplate, not another subject"))
+        subject = bool(claim.excerpt) and bool(SUBJECT_RE.search(claim.excerpt))
+        out.append(_check(
+            "the data identifies a subject", subject,
+            "" if subject else
+            "the quoted bytes name no subject field (username, email, role, "
+            "owner, account id) - differing page content is not an access-"
+            "control finding"))
+        cred_a = _credential(mine) if mine else ""
+        cred_b = _credential(theirs) if theirs else ""
+        unentitled = bool(theirs) and (not cred_b or (cred_a and cred_a != cred_b))
+        out.append(_check(
+            "the caller was not entitled to it", unentitled,
+            ("no credential was presented and subject data came back"
+             if theirs is not None and not cred_b else
+             "the two requests presented different credentials")
+            if unentitled else
+            "both requests carried the same credential, so this may be the "
+            "caller's own data. Re-read it as another identity, or with none"))
+        return out
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
 
 
 def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    accepted, rejected = None, None
-    for entry in claim.exchanges:
-        creds = str((entry.get("request") or {}).get("headers") or "")
-        bearing = bool(re.search(r"(?i)authorization|cookie|x-api-key|token", creds))
-        code = status_of(entry)
-        if bearing and 200 <= code < 300:
-            accepted = accepted or entry
-        if 401 <= code <= 403:
-            rejected = rejected or entry
-    privileged = [e.get("id") for e in claim.exchanges
-                  if claim.excerpt and claim.excerpt in resp_body(e)
-                  and 200 <= status_of(e) < 300]
-    return [
-        _check("a forged credential was accepted", accepted is not None,
-               f"exchange {accepted.get('id')} returned {status_of(accepted)}"
-               if accepted else
-               "no cited exchange sends a credential and gets a 2xx"),
-        _check("a deliberately invalid credential is rejected", rejected is not None,
-               f"exchange {rejected.get('id')}" if rejected else
-               "cite the control: the same request with a wrong signature must "
-               "come back 401/403, or the endpoint simply needs no auth"),
-        _check("privileged content returned", bool(privileged),
-               f"in {privileged[0]}" if privileged else
-               "the quoted bytes are in no accepted response"),
-    ]
+    """A forged or absent credential accepted where a wrong one is refused.
 
-
-def _redirect_host(location: str) -> str:
-    """The host a Location header actually sends the browser to, or "" when it
-    stays on the current origin.
-
-    `/home` is relative and therefore in-origin; an early version prefixed
-    anything without "//" with it and read `/home` as the host `home`, so the
-    in-origin control graded as the finding.
+    "Any 2xx whose headers mention a cookie, plus any 401 anywhere" is not that
+    claim - every browser-shaped request carries a Cookie, and every site has a
+    401 somewhere. The pair has to be the same endpoint with DIFFERENT
+    credentials, one accepted and one refused.
     """
-    value = str(location or "").strip()
-    if not value:
-        return ""
-    if value.startswith("//"):                      # protocol-relative
-        return urllib.parse.urlparse("http:" + value).hostname or ""
-    parsed = urllib.parse.urlparse(value)
-    if parsed.scheme and parsed.netloc:
-        return parsed.hostname or ""
-    if parsed.scheme or value.startswith("/") or not parsed.netloc:
-        return ""                                   # relative, or a non-http scheme
-    return urllib.parse.urlparse("http://" + value).hostname or ""
+    def build(pair) -> list[dict]:
+        accepted, rejected = (pair if pair else (None, None))
+        same = bool(accepted) and bool(rejected) and \
+            _endpoint_shape(accepted) == _endpoint_shape(rejected)
+        cred_a = _credential(accepted) if accepted else ""
+        cred_r = _credential(rejected) if rejected else ""
+        ok_code = bool(accepted) and 200 <= status_of(accepted) < 300
+        deny = bool(rejected) and status_of(rejected) in (401, 403)
+        # NOT "the credentials differ": GuardedClient redacts auth headers at
+        # record time, so both exchanges persist as `Bearer <redacted>` and the
+        # values are identical in every artifact. A verifier may only rely on
+        # what survives redaction - what it can check is that the control
+        # presented a credential too, on the same endpoint, and was refused.
+        differ = bool(cred_r)
+        quoted = bool(claim.excerpt) and bool(accepted) \
+            and claim.excerpt in resp_body(accepted)
+        return [
+            _check("a forged credential was accepted",
+                   ok_code and bool(cred_a) and quoted,
+                   f"{_endpoint_shape(accepted)} returned "
+                   f"{status_of(accepted)} with a credential"
+                   if ok_code and cred_a and quoted else
+                   "no cited exchange presents a credential, gets a 2xx and "
+                   "carries the quoted bytes"),
+            _check("the same endpoint refuses another credential",
+                   same and deny and differ,
+                   f"{_endpoint_shape(rejected)} answered "
+                   f"{status_of(rejected)} to a credentialed request"
+                   if same and deny and differ else
+                   ("the refusal is on a different endpoint - cite the SAME "
+                    "request with a broken signature" if deny and not same else
+                    "cite the control: the same endpoint must refuse a "
+                    "credential it does not accept. An anonymous 401 shows only "
+                    "that auth is required, which is a different finding")),
+        ]
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
 
 
 def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    off, control = None, None
-    for entry in claim.exchanges:
-        location = header_of(entry, "Location")
-        if not location:
-            continue
-        req_host = (urllib.parse.urlparse(str((entry.get("request") or {})
-                                              .get("url") or "")).hostname or "")
-        dest = _redirect_host(location)
-        if dest and dest.lower() != req_host.lower():
-            off = off or (location, entry)
-        else:
-            control = control or entry
-    return [
-        _check("the Location points off origin", off is not None,
-               f"{off[0][:120]} in {off[1].get('id')}" if off else
-               "no cited response carries a Location header leaving the origin"),
-        _check("control recorded for the expected outcome", control is not None,
-               f"exchange {control.get('id')}" if control else
-               "cite the in-origin case too, so the parameter is shown to be "
-               "honoured rather than ignored"),
-    ]
+    """A 3xx Location off origin, carrying a destination the request supplied.
 
-
-ACL_HEADER_RE = re.compile(
-    r"(?i)x-original-url|x-rewrite-url|x-forwarded-host|x-forwarded-for|"
-    r"x-forwarded-server|x-host|x-custom-ip-authorization|x-remote-addr|"
-    r"x-real-ip|x-originating-ip|x-client-ip")
-
-
-def _req_headers(entry: dict) -> dict:
-    headers = (entry.get("request") or {}).get("headers")
-    return headers if isinstance(headers, dict) else {}
-
-
-def _path_of(entry: dict) -> str:
-    url = str((entry.get("request") or {}).get("url") or "")
-    return urllib.parse.urlparse(url).path or "/"
-
-
-def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """Header-based access-control bypass.
-
-    This used to be graded by `verify_unkeyed_input`, because xfh and
-    host-header were aliased onto the cache-poisoning spec. They are not the
-    same bug: cache poisoning asks that a value reach a requester who did not
-    send it, while this asks that restricted content reach a requester who was
-    refused it a moment earlier. The lab plants exactly this - an
-    `X-Original-URL: /admin` middleware bypass - and a real proof of it graded
-    `unproven` under the wrong requirement.
+    An apex-to-www redirect is off origin too, and used to grade as the
+    finding. What makes it open redirect is that the destination came from the
+    request.
     """
-    served, refused = None, None
-    for entry in claim.exchanges:
-        headers = " ".join(f"{k}: {v}" for k, v in _req_headers(entry).items())
-        spoofed = bool(ACL_HEADER_RE.search(headers))
-        code = status_of(entry)
-        quoted = bool(claim.excerpt) and claim.excerpt in resp_body(entry)
-        if spoofed and 200 <= code < 300 and quoted:
-            served = served or entry
-        elif code in (401, 403, 404) or (not spoofed and not quoted
-                                         and 200 <= code < 300):
-            refused = refused or entry
-    both = served is not None and refused is not None
-    same_path = both and _path_of(served) == _path_of(refused)
-    return [
-        _check("restricted content returned with the header", served is not None,
-               f"{status_of(served)} on {_path_of(served)} in {served.get('id')}"
-               if served else
-               "no cited exchange adds an ACL-relevant header (X-Original-URL, "
-               "X-Forwarded-Host, X-Real-IP, ...), gets a 2xx, and carries the "
-               "quoted bytes"),
-        _check("the same request is refused without it", both and same_path,
-               f"{_path_of(refused)} answered {status_of(refused)} in "
-               f"{refused.get('id')}" if both and same_path else
-               ("the control is on a different path than the bypass - cite the "
-                f"refusal of {_path_of(served)} itself" if both else
-                "cite the control: the same request without the header must be "
-                "refused, or the resource was never restricted")),
-    ]
+    def build(pair) -> list[dict]:
+        off, control = (pair if pair else (None, None))
+        loc = header_of(off, "Location") if off else ""
+        host = _redirect_host(loc)
+        req_host = (urllib.parse.urlparse(
+            str((off.get("request") or {}).get("url") or "")).hostname or "") \
+            if off else ""
+        foreign = bool(host) and host.lower() != req_host.lower()
+        supplied = foreign and host.lower() in req_text(off).lower()
+        c_loc = header_of(control, "Location") if control else ""
+        c_host = _redirect_host(c_loc)
+        in_origin = bool(control) and bool(c_loc) and (
+            not c_host or c_host.lower() == (urllib.parse.urlparse(
+                str((control.get("request") or {}).get("url") or "")
+            ).hostname or "").lower())
+        return [
+            _check("the Location points off origin, to a host we supplied",
+                   supplied,
+                   f"{loc[:120]} in {off.get('id')}" if supplied else
+                   (f"{loc[:80]} leaves the origin but that host is not in the "
+                    "request - an apex-to-www hop is not an open redirect"
+                    if foreign else
+                    "no cited response carries a Location header leaving the "
+                    "origin")),
+            _check("control recorded for the expected outcome", in_origin,
+                   f"exchange {control.get('id')}" if in_origin else
+                   "cite the in-origin case too, so the parameter is shown to "
+                   "be honoured rather than ignored"),
+        ]
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
 
 
 def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """Cache poisoning / deception / smuggling: a value one requester sent came
-    back to a requester that did not send it."""
-    sent_by, served_to = None, None
-    for entry in claim.exchanges:
-        sends = bool(claim.excerpt) and claim.excerpt in req_text(entry)
-        serves = bool(claim.excerpt) and claim.excerpt in resp_body(entry)
-        if sends:
-            sent_by = sent_by or entry
-        if serves and not sends:
-            served_to = served_to or entry
-    # Both halves, in two different exchanges. "A response carries bytes its own
-    # request did not send" is true of every page ever served, so on its own it
-    # graded any excerpt a candidate - the pairing is the whole claim.
-    paired = served_to is not None and sent_by is not None
-    return [
-        _check("the value reached a requester that did not send it", paired,
-               f"sent in {sent_by.get('id')}, served to {served_to.get('id')}"
-               if paired else
-               ("the value is in no cited request - cite the poisoning request, "
-                "otherwise this is an ordinary page and not a cache"
-                if served_to is not None else
-                "every cited response carrying the value was answering a request "
-                "that sent it - that is an echo, not a cache")),
-        _check("the injecting request is on record", sent_by is not None,
-               f"exchange {sent_by.get('id')}" if sent_by else
-               "cite the poisoning request as well as the victim read"),
-    ]
+    """Cache poisoning / deception: a value one requester sent, served to a
+    requester that did not send it, on the same resource.
+
+    Without the same-resource condition a reflected search term that also
+    appears somewhere else on the site graded as poisoning.
+    """
+    def build(pair) -> list[dict]:
+        poisoner, victim = (pair if pair else (None, None))
+        sent = bool(poisoner) and bool(claim.excerpt) \
+            and claim.excerpt in req_text(poisoner)
+        served = bool(victim) and bool(claim.excerpt) \
+            and claim.excerpt in resp_body(victim) \
+            and claim.excerpt not in req_text(victim)
+        same = bool(poisoner) and bool(victim) and \
+            _endpoint_shape(poisoner) == _endpoint_shape(victim)
+        return [
+            _check("the value reached a requester that did not send it",
+                   sent and served and same,
+                   f"sent in {poisoner.get('id')}, served to {victim.get('id')} "
+                   f"on {_endpoint_shape(victim)}" if sent and served and same
+                   else ("the two exchanges are on different resources - a value "
+                         "appearing elsewhere on the site is not a cache entry"
+                         if sent and served else
+                         "no cited pair has one request sending the value and "
+                         "another response returning it")),
+            _check("the injecting request is on record", sent,
+                   f"exchange {poisoner.get('id')}" if sent else
+                   "cite the poisoning request as well as the victim read"),
+        ]
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
+
+
+def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """Header-based access-control bypass: restricted content returned when an
+    ACL-relevant header is added, refused on the same path without it.
+
+    The refusal has to be a refusal. The first version accepted an ordinary
+    2xx as the control, so any in-scope page could stand in for the denial.
+    """
+    def build(pair) -> list[dict]:
+        served, refused = (pair if pair else (None, None))
+        hdrs = " ".join(f"{k}: {v}" for k, v in _req_headers(served).items()) \
+            if served else ""
+        spoofed = bool(ACL_HEADER_RE.search(hdrs))
+        quoted = bool(claim.excerpt) and bool(served) \
+            and claim.excerpt in resp_body(served)
+        got = bool(served) and spoofed and 200 <= status_of(served) < 300 and quoted
+        r_hdrs = " ".join(f"{k}: {v}" for k, v in _req_headers(refused).items()) \
+            if refused else ""
+        denied = bool(refused) and status_of(refused) in (401, 403, 404) \
+            and not ACL_HEADER_RE.search(r_hdrs)
+        same = bool(served) and bool(refused) and \
+            _path_of(served) == _path_of(refused)
+        return [
+            _check("restricted content returned with the header", got,
+                   f"{status_of(served)} on {_path_of(served)} in "
+                   f"{served.get('id')}" if got else
+                   "no cited exchange adds an ACL-relevant header "
+                   "(X-Original-URL, X-Forwarded-Host, X-Real-IP, ...), gets a "
+                   "2xx, and carries the quoted bytes"),
+            _check("the same request is refused without it", denied and same,
+                   f"{_path_of(refused)} answered {status_of(refused)} in "
+                   f"{refused.get('id')}" if denied and same else
+                   ("the refusal is on a different path than the bypass - cite "
+                    "the refusal of this path itself" if denied else
+                    "cite the control: the same path without the header must "
+                    "answer 401/403/404, or the resource was never restricted")),
+        ]
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
 
 
 def verify_cors(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    reflecting, creds = None, None
-    for entry in claim.exchanges:
-        allow = header_of(entry, "Access-Control-Allow-Origin")
+    """A foreign origin reflected into Access-Control-Allow-Origin, with
+    credentials allowed. A correct allowlist echoing the site's own origin is
+    not a finding, and used to grade as one.
+    """
+    def build(entry: dict | None) -> list[dict]:
+        allow = header_of(entry, "Access-Control-Allow-Origin") if entry else ""
         origin = ""
-        headers = (entry.get("request") or {}).get("headers") or {}
-        if isinstance(headers, dict):
-            for k, v in headers.items():
-                if str(k).lower() == "origin":
-                    origin = str(v)
-        if allow and origin and allow.strip() == origin.strip():
-            reflecting = reflecting or (origin, entry)
-        if header_of(entry, "Access-Control-Allow-Credentials").strip().lower() == "true":
-            creds = creds or entry
-    return [
-        _check("the probe origin is reflected", reflecting is not None,
-               f"{reflecting[0]} echoed in {reflecting[1].get('id')}" if reflecting else
-               "no cited response echoes the Origin it was sent"),
-        _check("credentials are allowed with it", creds is not None,
-               f"exchange {creds.get('id')}" if creds else
-               "without Access-Control-Allow-Credentials: true a reflected origin "
-               "reads nothing authenticated - rate it info"),
-    ]
+        for k, v in _req_headers(entry).items() if entry else ():
+            if str(k).lower() == "origin":
+                origin = str(v)
+        host = (urllib.parse.urlparse(
+            str((entry.get("request") or {}).get("url") or "")).hostname or "") \
+            if entry else ""
+        o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
+        foreign = bool(o_host) and o_host.lower() != host.lower()
+        reflects = bool(allow) and bool(origin) and allow.strip() == origin.strip()
+        creds = header_of(entry, "Access-Control-Allow-Credentials") \
+            .strip().lower() == "true" if entry else False
+        return [
+            _check("a foreign probe origin is reflected", reflects and foreign,
+                   f"{origin} echoed in {entry.get('id')}"
+                   if reflects and foreign else
+                   ("the reflected origin is the site's own - that is an "
+                    "allowlist working" if reflects else
+                    "no cited response echoes the Origin it was sent")),
+            _check("credentials are allowed with it", creds,
+                   f"exchange {entry.get('id')}" if creds else
+                   "without Access-Control-Allow-Credentials: true a reflected "
+                   "origin reads nothing authenticated - rate it info"),
+        ]
+
+    return _witness(claim.exchanges or [None], build, spec.required)
 
 
 def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A cross-origin write that no token protected, read back afterwards.
+
+    "Any GET plus any POST plus any difference" is not CSRF - it is a web site.
+    The write has to carry no anti-CSRF token and a foreign Origin/Referer.
+    """
     reads = [e for e in claim.exchanges
-             if str((e.get("request") or {}).get("method") or "GET").upper() == "GET"]
-    writes = [e for e in claim.exchanges
-              if str((e.get("request") or {}).get("method") or "GET").upper()
-              in ("POST", "PUT", "PATCH", "DELETE")]
-    return [
-        _check("the state-changing request is on record", bool(writes),
-               f"exchange {writes[0].get('id')}" if writes else
-               "no cited request changes state"),
-        _check("the state was read back", len(reads) >= 1,
-               f"{len(reads)} read(s) cited" if reads else
-               "cite the read that shows the change landed"),
-        _discriminates(claim, "the readback differs from before"),
-    ]
+             if str((e.get("request") or {}).get("method") or "GET").upper()
+             == "GET"]
+
+    def build(entry: dict | None) -> list[dict]:
+        method = str((entry.get("request") or {}).get("method") or "GET").upper() \
+            if entry else "GET"
+        write = method in ("POST", "PUT", "PATCH", "DELETE")
+        request = req_text(entry) if entry else ""
+        tokened = bool(CSRF_TOKEN_RE.search(request))
+        origin = ""
+        for k, v in _req_headers(entry).items() if entry else ():
+            if str(k).lower() in ("origin", "referer"):
+                origin = str(v)
+        host = (urllib.parse.urlparse(
+            str((entry.get("request") or {}).get("url") or "")).hostname or "") \
+            if entry else ""
+        o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
+        cross = bool(o_host) and o_host.lower() != host.lower()
+        after = [e for e in reads
+                 if bool(claim.excerpt) and claim.excerpt in resp_body(e)]
+        before = [e for e in reads
+                  if not claim.excerpt or claim.excerpt not in resp_body(e)]
+        return [
+            _check("the state-changing request carried no anti-CSRF token",
+                   write and not tokened,
+                   f"{method} {_endpoint_shape(entry)}" if write and not tokened
+                   else ("the write carries a CSRF token - that is the defence "
+                         "working" if write else "no cited request changes state")),
+            _check("it was sent cross-origin", cross,
+                   f"Origin/Referer {origin}" if cross else
+                   "the write carries no foreign Origin or Referer, so nothing "
+                   "shows a third-party site could have sent it"),
+            _check("the state changed between two reads",
+                   bool(after) and bool(before),
+                   f"absent in {before[0].get('id')}, present in "
+                   f"{after[0].get('id')}" if after and before else
+                   "cite the read before and the read after; the quoted bytes "
+                   "must appear only in the second"),
+        ]
+
+    return _witness(claim.exchanges or [None], build, spec.required)
 
 
 def verify_secret_leak(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A credential observed in a response. A placeholder is not a credential,
+    and an install document full of `password=changeme` used to grade proven.
+    """
     hit = SECRET_RE.search(claim.excerpt or "")
+    placeholder = ""
+    if hit:
+        value = re.split(r"[:=]", hit.group(0), maxsplit=1)
+        if len(value) > 1 and PLACEHOLDER_RE.match(value[1].strip().strip("\"'")):
+            placeholder = value[1].strip()
     in_response = [e.get("id") for e in claim.exchanges
                    if claim.excerpt and claim.excerpt in resp_body(e)]
     return [
-        _check("a credential-shaped secret was observed", hit is not None,
-               hit.group(0)[:24] + "..." if hit else
-               "the quoted bytes do not look like a credential; quote the key, "
-               "token or key-value line itself"),
+        _check("a credential-shaped secret was observed",
+               hit is not None and not placeholder,
+               hit.group(0)[:24] + "..." if hit and not placeholder else
+               (f"{placeholder!r} is a placeholder, not a credential"
+                if placeholder else
+                "the quoted bytes do not look like a credential; quote the key, "
+                "token or key-value line itself")),
         _check("it came from a response", bool(in_response),
                f"in {in_response[0]}" if in_response else
                "the quoted bytes are in no cited response"),
@@ -604,9 +1010,7 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
     The signal is a metacharacter surviving unencoded into an HTML response -
     not the presence of a `<script>` tag nearby, which an early version looked
-    for. A reflected-XSS payload BRINGS its own context; requiring the context
-    to exist already failed the lab's own `<>'"&=/` canary, which is the
-    textbook positive case.
+    for and which failed the lab's own `<>'"&=/` canary.
     """
     reflected, encoded = None, None
     raw = [ch for ch in "<>\"'" if ch in (claim.excerpt or "")]
@@ -623,16 +1027,94 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
             encoded = entry
     return [
         _check("payload reflected unencoded into HTML", reflected is not None,
-               f"{reflected[1]!r} survived into {reflected[0].get('id')}" if reflected
+               f"{reflected[1]!r} survived into {reflected[0].get('id')}"
+               if reflected
                else ("the response entity-encodes the payload - that is the fix "
                      f"working ({encoded.get('id')})" if encoded else
-                     "the quoted bytes carry no raw < > \" ' and so cannot break out "
-                     "of their context, or they are in no cited HTML response")),
+                     "the quoted bytes carry no raw < > \" ' and so cannot break "
+                     "out of their context, or they are in no cited HTML "
+                     "response")),
         _check("a real browser executed it", False,
                "this system has no browser, so execution is not provable here. "
                "Drive one over mcp_call and cite the nonce it reports, or leave "
                "this a candidate and say so in the report"),
     ]
+
+
+def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A privileged field the caller sent, set on the server and read back.
+
+    This was graded by the idor verifier, which asks about object references
+    and knows nothing about fields.
+    """
+    def build(pair) -> list[dict]:
+        wrote, read = (pair if pair else (None, None))
+        request = req_text(wrote) if wrote else ""
+        field = PRIVILEGED_FIELD_RE.search(request) if wrote else None
+        method = str((wrote.get("request") or {}).get("method") or "GET").upper() \
+            if wrote else "GET"
+        sent = bool(field) and method in ("POST", "PUT", "PATCH")
+        back = bool(read) and bool(claim.excerpt) \
+            and claim.excerpt in resp_body(read) \
+            and claim.excerpt not in req_text(read)
+        return [
+            _check("a privileged field was sent", sent,
+                   f"{field.group(0)} in {wrote.get('id')}" if sent else
+                   "no cited write carries a field the caller should not be "
+                   "able to set (role, is_admin, isAdmin, balance, verified, "
+                   "owner, permissions)"),
+            _check("a later read shows it set", back,
+                   f"read back in {read.get('id')}" if back else
+                   "cite the read that shows the field took effect - the write "
+                   "echoing its own input proves only that it was accepted"),
+        ]
+
+    return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
+
+
+def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """Introspection answered, or a query returning records outside scope.
+
+    This class was graded by the extraction verifier, which wants a FROM
+    clause or a Mongo operator - neither of which a GraphQL query ever sends,
+    so the class was unprovable by construction.
+    """
+    def build(entry: dict | None) -> list[dict]:
+        request = req_text(entry) if entry else ""
+        body = resp_body(entry) if entry else ""
+        rid = (entry or {}).get("id", "?")
+        asked = bool(entry) and bool(
+            re.search(r"(?i)__schema|__type|\bquery\s*\{|\bmutation\s*\{", request))
+        introspected = asked and bool(
+            re.search(r'(?i)"__schema"|"types"\s*:\s*\[|"queryType"', body))
+        records = asked and bool(claim.excerpt) and claim.excerpt in body \
+            and claim.excerpt not in request
+        return [
+            _check("a GraphQL query was sent", asked,
+                   f"exchange {rid}" if asked else
+                   "no cited request carries a GraphQL query, mutation or "
+                   "introspection selection"),
+            _check("the endpoint answered with schema or records",
+                   introspected or records,
+                   ("introspection answered" if introspected else
+                    f"records quoted from {rid}") if introspected or records else
+                   "the response carries neither the schema nor the quoted "
+                   "records"),
+        ]
+
+    return _witness(claim.exchanges or [None], build, spec.required)
+
+
+def verify_generic(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """Classes whose artifact this system measures as a difference and nothing
+    more.
+
+    These are capped at `candidate` by their spec's ceiling, because
+    "these two responses differ" is true of any two pages on any site and used
+    to grade seven classes `proven`. The requirement sentence says what would
+    settle each one; this check says only that a difference is on record.
+    """
+    return [_discriminates(claim)]
 
 
 def verify_refused(claim: Claim, spec: "ProofSpec") -> list[dict]:
@@ -658,6 +1140,9 @@ class ProofSpec:
     fingerprint: bool = True
     refusal: str = ""
     notes: str = ""
+    ceiling: str = ""
+    declares: str = "command"
+    advisories: tuple[str, ...] = ()
 
     def verify(self, claim: Claim) -> "Verdict":
         wire = _wire_check(claim)
@@ -669,11 +1154,14 @@ class ProofSpec:
             return Verdict(self.vuln_class, "unproven", [wire], [wire["check"]],
                            self.requirement, self.notes)
         checks = [wire, *self.verifier(claim, self)]
-        grade = _grade(checks, self.required, self.veto, self.floor)
+        grade = _clamp(_grade(checks, self.required, self.veto, self.floor),
+                       self.ceiling)
         named = (*self.required, *self.veto, *self.floor)
         missing = [c["check"] for c in checks if not c["ok"] and c["check"] in named]
+        warnings = [c["check"] for c in checks
+                    if not c["ok"] and c["check"] in self.advisories]
         return Verdict(self.vuln_class, grade, checks, missing,
-                       self.requirement, self.notes)
+                       self.requirement, self.notes, warnings)
 
 
 @dataclass
@@ -684,6 +1172,9 @@ class Verdict:
     missing: list[str] = field(default_factory=list)
     requirement: str = ""
     notes: str = ""
+    # failed checks that do not change the grade but must still be read: the
+    # bug is proven AND the tester took more than the proof
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def proven(self) -> bool:
@@ -694,6 +1185,8 @@ class Verdict:
                "requirement": self.requirement, "checks": self.checks}
         if self.missing:
             out["missing"] = self.missing
+        if self.warnings:
+            out["warnings"] = self.warnings
         return out
 
     def explain(self) -> str:
@@ -705,10 +1198,17 @@ class Verdict:
 
 
 RCE_REQUIRED = ("a benign command was sent", "identity output returned by the target",
-                "marker echoed in the output")
+                "the probe nonce came back in the output")
 RCE_VETO = ("proof command stayed benign",)
 SQLI_REQUIRED = ("data store fingerprinted", "the query named its target",
                  "rows returned, not an error message")
+# Not a veto and not a requirement. The bug is real either way; taking more
+# than the proof is a conduct problem, so it is reported rather than graded -
+# it used to be in no set at all, which meant it was never even printed.
+EXTRACTION_ADVISORY = ("extraction stayed minimal",)
+DESERIALIZE_REQUIRED = ("a serialized payload was sent",
+                        "identity output returned by the target",
+                        "the probe nonce came back in the output")
 EXTRACTION_REQUIRED = ("the query named its target",
                        "rows returned, not an error message")
 
@@ -731,58 +1231,83 @@ for _s in [
                        "shell-injection"),
               notes="No shell, no download, no persistence. The nonce is the proof."),
     ProofSpec("deserialize", "code execution proven the way rce is, from a "
-              "serialized payload",
-              RCE_REQUIRED, verify_command_output, veto=RCE_VETO,
+              "serialized payload: the gadget sent, the identity line and the "
+              "nonce returned",
+              DESERIALIZE_REQUIRED, verify_command_output, veto=RCE_VETO,
               floor=("identity output returned by the target",),
+              declares="serialized",
               aliases=("deserialization", "insecure-deserialization", "pickle",
                        "java-deserialization")),
     ProofSpec("sqli", "the DBMS fingerprint plus at least one row from a named "
               "table, bounded to what proves the read",
               SQLI_REQUIRED, verify_data_extraction,
+              advisories=EXTRACTION_ADVISORY,
               aliases=("sql-injection", "sqlinjection", "blind-sqli",
                        "second-order-sqli"),
               notes="Five rows is a proof. A full dump is an incident."),
     ProofSpec("nosqli", "documents returned from a named collection the query "
               "should not have reached",
               EXTRACTION_REQUIRED, verify_data_extraction, fingerprint=False,
+              advisories=EXTRACTION_ADVISORY,
               aliases=("nosql-injection", "mongo-injection")),
-    ProofSpec("graphql", "a query returning records outside the caller's scope",
-              EXTRACTION_REQUIRED, verify_data_extraction, fingerprint=False,
-              aliases=("graphql-exposure",)),
-    ProofSpec("lfi", "a sentinel from a file whose contents are known, plus a "
-              "control path that does not exist",
-              ("known-file sentinel observed", "negative control recorded"),
-              verify_file_read, floor=("known-file sentinel observed",),
+    ProofSpec("graphql", "a GraphQL query the endpoint answered with its "
+              "schema or with records the caller should not reach",
+              ("a GraphQL query was sent",
+               "the endpoint answered with schema or records"),
+              verify_graphql, floor=("a GraphQL query was sent",),
+              aliases=("graphql-exposure", "graphql-introspection")),
+    ProofSpec("lfi", "a request that asked for a file, a sentinel from a file "
+              "whose contents are known, and a control path that does not exist",
+              ("the request asked for a file", "known-file sentinel observed",
+               "negative control recorded"),
+              verify_file_read, floor=("the request asked for a file",),
               aliases=("file-read", "fileread", "path-traversal", "pathtraversal",
                        "arbitrary-file-read", "directory-traversal", "rfi")),
-    ProofSpec("xxe", "a local file read through the parser",
-              ("known-file sentinel observed",), verify_file_read,
+    ProofSpec("xxe", "a local file read through the parser, from a request "
+              "that declared the entity",
+              ("the request asked for a file", "known-file sentinel observed"),
+              verify_file_read, floor=("the request asked for a file",),
               aliases=("xml-external-entity",)),
     ProofSpec("ssti", "an arithmetic result rendered by the template engine, "
               "with the expression itself absent from the response",
-              ("expression evaluated, not echoed",), verify_template_eval,
+              ("expression evaluated, not echoed",
+               "a second operand pair confirms it"), verify_template_eval,
+              floor=("expression evaluated, not echoed",),
               aliases=("template-injection", "el-injection", "expression-injection")),
-    ProofSpec("idor", "actor A reading actor B's subject, with the control "
-              "showing the difference is the identity and not the page",
-              ("two distinct object references requested",
-               "another subject's data returned", "outcomes actually differ"),
-              verify_differential, floor=("outcomes actually differ",),
+    ProofSpec("idor", "one actor reaching another's subject on the same "
+              "endpoint, with subject-identifying data and nothing entitling "
+              "the caller to it",
+              ("two distinct object references on one endpoint",
+               "another subject's data returned", "the data identifies a subject",
+               "the caller was not entitled to it"),
+              verify_differential,
+              # the check that makes the evidence ABOUT access control. With
+              # the floor on "another subject's data returned" - which is any
+              # excerpt present in one cited response and absent from another -
+              # two pages of a paginated list graded as a candidate.
+              floor=("the data identifies a subject",),
               aliases=("bola", "authorization-bypass", "broken-access-control",
-                       "access-control", "massassign", "massassignment",
-                       "mass-assignment")),
+                       "access-control")),
+    ProofSpec("massassign", "a privileged field the caller sent, set on the "
+              "server and shown set by a later read",
+              ("a privileged field was sent", "a later read shows it set"),
+              verify_mass_assignment,
+              floor=("a privileged field was sent",),
+              aliases=("mass-assignment", "massassignment",
+                       "parameter-binding", "autobinding")),
     ProofSpec("jwt", "a forged or absent credential accepted on a privileged "
               "resource, with an invalid one rejected",
               ("a forged credential was accepted",
-               "a deliberately invalid credential is rejected",
-               "privileged content returned"),
+               "the same endpoint refuses another credential"),
               verify_token_forgery, floor=("a forged credential was accepted",),
               aliases=("auth-bypass", "authbypass", "jwt-forgery",
                        "session-fixation", "mfa-bypass", "auth")),
     ProofSpec("redirect", "a 3xx Location pointing off origin, with the in-origin "
               "control showing the destination parameter is honoured",
-              ("the Location points off origin",
+              ("the Location points off origin, to a host we supplied",
                "control recorded for the expected outcome"),
-              verify_off_origin_redirect, floor=("the Location points off origin",),
+              verify_off_origin_redirect,
+              floor=("the Location points off origin, to a host we supplied",),
               aliases=("open-redirect", "openredirect")),
     ProofSpec("cache", "a value only the poisoning request sent, returned to a "
               "requester that did not send it",
@@ -791,8 +1316,15 @@ for _s in [
               verify_unkeyed_input,
               floor=("the value reached a requester that did not send it",),
               aliases=("cache-poisoning", "cachepoisoning", "web-cache-deception",
-                       "cache-deception", "smuggle", "request-smuggling",
-                       "requestsmuggling")),
+                       "cache-deception")),
+    ProofSpec("smuggle", "a request boundary the front end and the back end "
+              "disagreed about, shown by a response arriving on a connection "
+              "that did not ask for it. This system sends the desync pair and "
+              "reads the difference, which is a candidate",
+              ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
+              aliases=("request-smuggling", "requestsmuggling", "desync",
+                       "cl-te", "te-cl")),
     ProofSpec("xfh", "restricted content returned when an ACL-relevant header "
               "is added, with the control showing the same request refused "
               "without it",
@@ -803,55 +1335,86 @@ for _s in [
               aliases=("host-header", "hostheader", "x-original-url",
                        "acl-bypass", "header-acl-bypass"),
               notes="Quote the restricted content, not the header you sent."),
-    ProofSpec("cors", "the probe origin reflected in Access-Control-Allow-Origin "
-              "with credentials allowed",
-              ("the probe origin is reflected", "credentials are allowed with it"),
-              verify_cors, floor=("the probe origin is reflected",)),
+    ProofSpec("cors", "a FOREIGN origin reflected in Access-Control-Allow-Origin "
+              "with credentials allowed - an allowlist echoing the site's own "
+              "origin is the defence working",
+              ("a foreign probe origin is reflected",
+               "credentials are allowed with it"),
+              verify_cors, floor=("a foreign probe origin is reflected",)),
     ProofSpec("xss", "a headless browser executing the payload and reporting the "
               "probe nonce",
               ("payload reflected unencoded into HTML",
                "a real browser executed it"),
-              verify_browser_execution,
-              aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection",
-                       "ppoll", "prototype-pollution", "prototypepollution")),
-    ProofSpec("csrf", "a cross-origin request changing state, read back afterwards",
-              ("the state-changing request is on record", "the state was read back",
-               "the readback differs from before"),
-              verify_state_change, floor=("the readback differs from before",),
-              aliases=("logic-flaw", "logicflaw", "business-logic", "race",
-                       "race-condition", "racecondition", "toctou")),
+              verify_browser_execution, ceiling="candidate",
+              aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection")),
+    ProofSpec("ppoll", "a polluted property observably changing behaviour - "
+              "which needs a browser or a server response that only the "
+              "pollution explains",
+              ("payload reflected unencoded into HTML",
+               "a real browser executed it"),
+              verify_browser_execution, ceiling="candidate",
+              aliases=("prototype-pollution", "prototypepollution")),
+    ProofSpec("csrf", "a state-changing request that carried no anti-CSRF "
+              "token, sent cross-origin, with the change shown by a read "
+              "before and a read after",
+              ("the state-changing request carried no anti-CSRF token",
+               "it was sent cross-origin", "the state changed between two reads"),
+              verify_state_change,
+              floor=("the state changed between two reads",),
+              aliases=("logic-flaw", "logicflaw", "business-logic")),
+    ProofSpec("race", "an outcome impossible under serial execution, with the "
+              "serial control on record - which this system measures as a "
+              "difference only",
+              ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate", aliases=("race-condition", "racecondition",
+                                            "toctou", "limit-overrun")),
     ProofSpec("disclosure", "the credential or source observed in a response, "
               "quoted as the bytes that leaked",
               ("a credential-shaped secret was observed", "it came from a response"),
               verify_secret_leak, floor=("a credential-shaped secret was observed",),
               aliases=("info-disclosure", "infodisclosure", "information-disclosure",
                        "secret-exposure", "source-leak", "credential-leak")),
-    ProofSpec("ssrf", "a response only the internal network could have given, "
-              "against the control that the same fetch from outside does not",
+    ProofSpec("ssrf", "a callback at a collector we control carrying the probe "
+              "nonce, or a response only the internal network could give. This "
+              "system has no collector, so it measures the difference and stops "
+              "at a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
               aliases=("server-side-request-forgery", "blind-ssrf")),
     ProofSpec("enum", "the same request distinguishing a real account from an "
-              "absent one, with both on record",
+              "absent one, repeated enough to rule out noise. This system "
+              "records one difference, which is a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
               aliases=("user-enumeration", "enumeration", "username-enum")),
-    ProofSpec("crlf", "a header or body boundary the response honoured, with the "
-              "clean control",
+    ProofSpec("crlf", "an injected header observed as a HEADER in the response, "
+              "not as body text, with the clean control. This system compares "
+              "bodies, so it stops at a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
               aliases=("header-injection", "response-splitting")),
-    ProofSpec("upload", "a file stored and served back with active content-type, "
-              "proven by what the server executed or served",
+    ProofSpec("upload", "the uploaded file served back with an active "
+              "content-type, or executed - which is then an rce finding and "
+              "graded as one. On its own this measures a difference",
               ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
               aliases=("file-upload", "unrestricted-file-upload")),
-    ProofSpec("method", "a method the endpoint should refuse being honoured, with "
-              "the refused control",
+    ProofSpec("method", "a method the endpoint should refuse being honoured AND "
+              "having an effect - a PUT that lands, a TRACE that echoes a "
+              "header. A status difference alone is a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
+              ceiling="candidate",
               aliases=("http-method", "verb-tampering", "trace")),
-    ProofSpec("lockout", "repeated failures never refused, counted on record",
+    ProofSpec("lockout", "a counted series of failures never refused - the "
+              "count is the evidence, and this system records a difference, "
+              "not a count",
               ("the excerpt discriminates against a control",), verify_generic,
-              aliases=("no-rate-limit", "bruteforce")),
-    ProofSpec("websocket", "a message accepted across origin, with the control",
+              ceiling="candidate", aliases=("no-rate-limit", "bruteforce")),
+    ProofSpec("websocket", "a cross-origin handshake accepted and a message "
+              "answered - which needs a real WebSocket client. This system "
+              "compares the handshake only",
               ("the excerpt discriminates against a control",), verify_generic,
-              aliases=("cswsh", "ws")),
+              ceiling="candidate", aliases=("cswsh", "ws")),
     ProofSpec("dos", "this system does not prove availability impact",
               (), verify_refused,
               refusal="Denial of service is out of scope by construction: the proof "

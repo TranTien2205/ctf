@@ -297,7 +297,7 @@ e.g. `-b name=value` instead of a cookie-jar path.
 ## Proof requirements
 
 ```
-python -m argus proof            # all 25 classes, one line each
+python -m argus proof            # all 29 classes, one line each
 python -m argus proof rce        # one class in full
 python -m argus proof sqli --json
 ```
@@ -329,7 +329,7 @@ python -m argus mcp-serve http://127.0.0.1:8777 --allow-private \
     --require-proof --session-dir sessions
 ```
 
-Speaks newline-delimited stdio JSON-RPC and serves 49 of the 55 tools.
+Speaks newline-delimited stdio JSON-RPC and serves 45 of the 55 tools.
 Takes the same flags as `run`. Register it with any MCP host:
 
 ```json
@@ -341,9 +341,11 @@ Takes the same flags as `run`. Register it with any MCP host:
 
 The scope guard, rate limiter, transcript, dedup and proof matrix stay on
 this side. `initialize` returns the operating contract as `instructions`.
-Withheld: the four team-orchestration tools (the host LLM is the
-orchestrator) and `mcp_list`/`mcp_call` (argus calling out while serving
-would be a loop the operator cannot see).
+Withheld: the eight board tools (the host LLM is the orchestrator here, and
+outside team mode there is no Board for them to reach) and
+`mcp_list`/`mcp_call` (argus calling out while serving would be a loop the
+operator cannot see). `finish` renders and seals the session, so
+`argus verify` has an anchor for a served engagement too.
 
 ## MCP tool servers
 

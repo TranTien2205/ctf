@@ -106,10 +106,21 @@ def test_rce_timing_only_is_not_proof():
     assert proof.grade("rce", "PING ok", [blind]).grade == "unproven"
 
 
-def test_deserialize_shares_the_rce_requirement():
-    assert proof.spec_for("deserialize").required == proof.spec_for("rce").required
+def test_deserialize_declares_a_gadget_not_a_shell_separator():
+    """Sharing rce's "a benign command was sent" made deserialize unprovable:
+    a serialized payload carries its command inside the gadget."""
+    spec = proof.spec_for("deserialize")
+    assert "a serialized payload was sent" in spec.required
+    assert "a benign command was sent" not in spec.required
+    gadget = ex("r40", "http://t.local/import", method="POST",
+                req_body='data=!!python/object/apply:os.system '
+                         '["id; echo argusk3m9"]',
+                body="uid=33(www-data) gid=33(www-data)\nargusk3m9")
     assert proof.grade("deserialization", "uid=33(www-data) gid=33(www-data)",
-                       [RCE_PROOF]).grade == "proven"
+                       [gadget]).grade == "proven"
+    # the rce proof itself is NOT a deserialization proof: no gadget was sent
+    assert proof.grade("deserialize", "uid=33(www-data) gid=33(www-data)",
+                       [RCE_PROOF]).grade == "candidate"
 
 
 # --- sqli -------------------------------------------------------------------
@@ -170,20 +181,41 @@ def test_lfi_needs_a_sentinel_and_a_control():
               "not found")
     assert proof.grade("lfi", "root:x:0:0", [hit]).grade == "candidate"
     assert proof.grade("lfi", "root:x:0:0", [hit, miss]).grade == "proven"
-    assert proof.grade("lfi", "not found", [miss]).grade == "unproven"
+    # the control alone: the parameter does take a path, which is the surface,
+    # so it is a candidate - but no file came back
+    v = proof.grade("lfi", "not found", [miss])
+    assert v.grade == "candidate"
+    assert "known-file sentinel observed" in v.missing
+    # a page that merely QUOTES a passwd line is not a file read at all
+    blog = ex("r41", "http://t.local/blog/lfi",
+              "<pre>root:x:0:0:root:/root:/bin/bash</pre>")
+    assert proof.grade("lfi", "root:x:0:0", [blog]).grade == "unproven"
 
 
-def test_ssti_distinguishes_evaluation_from_an_echo():
+def test_ssti_needs_two_operand_pairs():
+    """One product can be a coincidence in the page: `{{2*2}}` plus "Showing 4
+    results" graded proven. Two different pairs cannot both land by accident.
+    """
     done = ex("r12", "http://t.local/hello?name=%7B%7B7*7%7D%7D", "Hello 49")
+    second = ex("r14", "http://t.local/hello?name=%7B%7B3*5%7D%7D", "Hello 15")
     echo = ex("r13", "http://t.local/hello?name=%7B%7B7*7%7D%7D", "Hello {{7*7}}")
-    assert proof.grade("ssti", "Hello 49", [done]).grade == "proven"
+    assert proof.grade("ssti", "Hello 49", [done]).grade == "candidate"
+    assert proof.grade("ssti", "Hello 49", [done, second]).grade == "proven"
     assert proof.grade("ssti", "Hello {{7*7}}", [echo]).grade == "unproven"
+    # the coincidence the audit demonstrated
+    coincide = ex("r15", "http://t.local/p?name=%7B%7B2*2%7D%7D",
+                  "<html>Showing 4 results</html>")
+    assert proof.grade("ssti", "Showing 4 results", [coincide]).grade == "candidate"
 
 
 def test_idor_needs_two_subjects_and_a_difference():
     mine = ex("r14", "http://t.local/api/user/1", '{"id":1,"username":"me"}')
     theirs = ex("r15", "http://t.local/api/user/2", '{"id":2,"username":"admin"}')
-    assert proof.grade("idor", '"username":"admin"', [theirs]).grade == "unproven"
+    # one unauthenticated request returning a user record IS a real signal -
+    # what it is missing is the second id on the same endpoint
+    one = proof.grade("idor", '"username":"admin"', [theirs])
+    assert one.grade == "candidate"
+    assert "two distinct object references on one endpoint" in one.missing
     assert proof.grade("idor", '"username":"admin"',
                        [mine, theirs]).grade == "proven"
     # the boilerplate case: the quoted bytes are in both responses, so the
@@ -397,10 +429,21 @@ def test_header_acl_bypass_is_graded_as_access_control_not_caching():
     assert proof.grade("xfh", "Welcome", [BENIGN]).grade == "unproven"
 
 
-def test_cache_no_longer_answers_for_xfh():
+def test_each_mechanism_has_its_own_class():
+    """Aliasing distinct mechanisms onto one class makes them share a dedup
+    key, so the second genuine finding on an endpoint is refused as a
+    duplicate of the first. Smuggling is not cache poisoning - different
+    mechanism, different CWE - and an ACL bypass is neither."""
     assert proof.canonical("cache-poisoning") == "cache"
-    assert proof.canonical("request-smuggling") == "cache"
+    assert proof.canonical("web-cache-deception") == "cache"
+    assert proof.canonical("request-smuggling") == "smuggle"
     assert proof.canonical("x-original-url") == "xfh"
+    assert proof.canonical("mass-assignment") == "massassign"
+    assert proof.canonical("prototype-pollution") == "ppoll"
+    assert proof.canonical("race-condition") == "race"
+    from argus.session import _cwe_of
+    assert _cwe_of("cache") != _cwe_of("smuggle")
+    assert _cwe_of("xfh") != _cwe_of("smuggle")
 
 
 # --- a refused class is not a finding ---------------------------------------
@@ -513,3 +556,324 @@ def test_sanitized_findings_survives_a_hand_edited_proof_block():
     assert rows[0]["proof"] == {}
     assert rows[0]["grade"] == "123"
     assert rows[1]["proof"]["checks"] == [] and rows[1]["proof"]["missing"] == []
+
+def test_no_spec_declares_a_check_its_verifier_never_emits():
+    """A renamed check leaves the spec pointing at a name nothing produces.
+    The grade then depends on a check that can never pass, so the class is
+    silently unprovable - which is how `cors` lost its floor during a rename
+    and graded every claim unproven.
+    """
+    rich = [
+        ex("w1", "http://t.local/x?file=../../etc/passwd",
+           "root:x:0:0:root:/root:/bin/bash"),
+        ex("w2", "http://t.local/admin", "Forbidden", 403),
+        ex("w3", "http://t.local/p?n=%7B%7B7*7%7D%7D", "49"),
+        ex("w4", "http://t.local/api/me", '{"role":"admin","username":"a"}',
+           200, req_headers={"host": "t.local", "authorization": "Bearer x",
+                             "origin": "http://evil.test"}),
+        ex("w5", "http://t.local/go", "", 302,
+           headers={"location": "http://evil.test/"}),
+        ex("w6", "http://t.local/w", "ok", 200, method="POST",
+           req_body="role=admin"),
+    ]
+    orphans = {}
+    for name in proof.classes():
+        spec = proof.spec_for(name)
+        if spec.verifier is proof.verify_refused:
+            continue
+        produced = set()
+        for subset in ([], rich, rich[:1], rich[:2]):
+            checks = spec.verifier(proof.Claim("root:x:0:0", subset), spec)
+            produced |= {c["check"] for c in checks}
+        declared = (set(spec.required) | set(spec.veto) | set(spec.floor)
+                    | set(spec.advisories))
+        missing = sorted(declared - produced)
+        if missing:
+            orphans[name] = missing
+    assert not orphans, f"specs declare checks nothing emits: {orphans}"
+
+
+def test_every_class_states_what_it_cannot_settle():
+    """A class capped at `candidate` must say so in its requirement, because
+    the cap is the honest answer and a reader has to be able to see it."""
+    for name in proof.classes():
+        spec = proof.spec_for(name)
+        if spec.ceiling != "candidate":
+            continue
+        text = (spec.requirement + " " + spec.notes).lower()
+        assert any(w in text for w in ("candidate", "browser", "collector",
+                                       "this system", "stops at", "measures",
+                                       "needs a")), \
+            f"{name} is capped at candidate without saying why: {spec.requirement}"
+
+
+# --- the bypasses an adversarial audit demonstrated, kept closed -----------
+#
+# Every case below graded `proven` once, on evidence containing no
+# vulnerability at all. They are the regression net for the structural fix:
+# a check that scans the whole cited set independently is not a proof, because
+# the conjunction can be satisfied by combining unrelated exchanges.
+
+def test_rce_cannot_be_assembled_from_two_exchanges():
+    """Cite a request that sent `id` and got nothing, plus an unrelated debug
+    page that prints an identity line. Each check passed somewhere; nothing
+    was executed anywhere."""
+    sent = ex("b1", "http://t.local/ping?host=aaaaaa;%20id",
+              "<html>PING aaaaaa: 4 packets</html>")
+    elsewhere = ex("b2", "http://t.local/debug",
+                   "<html><pre>uid=33(www-data) gid=33(www-data)</pre></html>")
+    v = proof.grade("rce", "uid=33(www-data) gid=33(www-data)",
+                    [sent, elsewhere])
+    assert v.grade == "unproven", v.explain()
+    assert "identity output returned by the target" in v.missing
+
+
+def test_rce_nonce_must_be_the_one_this_system_sends():
+    """"any 6-32 char token present in both the request and the response" made
+    every page that echoes a parameter carry a valid nonce."""
+    echo = ex("b3", "http://t.local/ping?host=aaaaaa;%20id",
+              "PING aaaaaa\nuid=0(root) gid=0(root)\n")
+    v = proof.grade("rce", "uid=0(root) gid=0(root)", [echo])
+    assert "the probe nonce came back in the output" in v.missing
+    real = ex("b4", "http://t.local/ping?host=1;%20id;%20echo%20argus7k2m9x",
+              "uid=0(root) gid=0(root)\nargus7k2m9x\n")
+    assert proof.grade("rce", "uid=0(root) gid=0(root)", [real]).grade == "proven"
+
+
+def test_sqli_not_proven_by_the_english_word_from():
+    """req_text unquote_plus-es the request, so `?q=mail+from+bob` became
+    "mail from bob" and named the table `bob`. An ordinary search box satisfied
+    "the query named its target", and a page mentioning a database satisfied
+    the fingerprint."""
+    page = ex("b5", "http://t.local/search?q=mail+from+bob",
+              "<html>We moved to PostgreSQL in 2019. "
+              "Results: <li>alice - note</li></html>")
+    v = proof.grade("sqli", "alice - note", [page])
+    assert v.grade == "candidate", v.explain()
+    assert "the query named its target" in v.missing
+    for benign in ("GET /flights?from=london&to=paris",
+                   'POST /t {"from":"alice","to":"bob"}',
+                   "GET /p?ref=news+from+paris"):
+        assert not proof.TABLE_RE.search(
+            __import__("urllib.parse", fromlist=["parse"]).unquote_plus(benign)), benign
+
+
+def test_difference_only_classes_cannot_reach_proven():
+    """verify_generic is `_discriminates` alone - true of any two pages on any
+    site - and it graded seven classes proven."""
+    a = ex("b6", "http://t.local/a", "<html>Page A unique</html>")
+    b = ex("b7", "http://t.local/b", "<html>Page B different</html>")
+    for name in ("ssrf", "enum", "crlf", "upload", "method", "lockout",
+                 "websocket", "race"):
+        v = proof.grade(name, "Page A unique", [a, b])
+        assert v.grade == "candidate", f"{name} graded {v.grade}"
+        assert proof.spec_for(name).ceiling == "candidate"
+
+
+def test_jwt_needs_the_same_endpoint_and_a_different_credential():
+    """Any Cookie-bearing 2xx plus any 401 anywhere graded jwt proven - and
+    every browser-shaped request carries a Cookie."""
+    api = ex("b8", "http://t.local/api/me", '{"role":"admin"}', 200,
+             req_headers={"cookie": "session=abc"})
+    logout = ex("b9", "http://t.local/logout", "unauthorized", 401)
+    assert proof.grade("jwt", '{"role":"admin"}', [api, logout]).grade != "proven"
+    same = ex("b10", "http://t.local/api/me", "invalid signature", 401,
+              req_headers={"cookie": "session=tampered"})
+    assert proof.grade("jwt", '{"role":"admin"}', [api, same]).grade == "proven"
+
+
+def test_idor_is_not_pagination():
+    """`/page/1` and `/page/2` differ, so they graded broken access control."""
+    p1 = ex("b11", "http://t.local/page/1", "<html>Articles page 1: alpha</html>")
+    p2 = ex("b12", "http://t.local/page/2", "<html>Articles page 2: beta</html>")
+    assert proof.grade("idor", "page 2: beta", [p1, p2]).grade == "unproven"
+    mine = ex("b13", "http://t.local/api/user/1", '{"id":1,"username":"me"}')
+    theirs = ex("b14", "http://t.local/api/user/2",
+                '{"id":2,"username":"admin","email":"a@b.c"}')
+    assert proof.grade("idor", '"username":"admin"',
+                       [mine, theirs]).grade == "proven"
+
+
+def test_disclosure_ignores_placeholder_credentials():
+    """An install document full of `password=changeme` graded proven."""
+    doc = ex("b15", "http://t.local/install.md",
+             "<pre>password=changeme\napi_key=YOUR_KEY_HERE\n"
+             "token=${TOKEN}</pre>")
+    for quote in ("password=changeme", "api_key=YOUR_KEY_HERE", "token=${TOKEN}"):
+        assert proof.grade("disclosure", quote, [doc]).grade == "unproven", quote
+    real = ex("b16", "http://t.local/.env", "SECRET_KEY=lab-secret-0123\n")
+    assert proof.grade("disclosure", "SECRET_KEY=lab-secret-0123",
+                       [real]).grade == "proven"
+
+
+def test_redirect_needs_the_destination_to_come_from_the_request():
+    """An apex-to-www hop is off origin too, and graded as the finding."""
+    apex = ex("b17", "http://t.local/go", "", 302,
+              headers={"location": "https://www.t.local/"})
+    assert proof.grade("redirect", "", [apex]).grade == "unproven"
+    supplied = ex("b18", "http://t.local/go?next=http://evil.test/", "", 302,
+                  headers={"location": "http://evil.test/"})
+    home = ex("b19", "http://t.local/go?next=/home", "", 302,
+              headers={"location": "/home"})
+    assert proof.grade("redirect", "", [supplied, home]).grade == "proven"
+
+
+def test_cors_allowlist_working_is_not_a_finding():
+    """The verifier never compared the Origin with the request's own host, so
+    a correct allowlist echoing the site's origin graded proven."""
+    own = ex("b20", "http://t.local/api/data", "{}", 200,
+             headers={"access-control-allow-origin": "http://t.local",
+                      "access-control-allow-credentials": "true"},
+             req_headers={"origin": "http://t.local"})
+    assert proof.grade("cors", "{}", [own]).grade == "unproven"
+    foreign = ex("b21", "http://t.local/api/data", "{}", 200,
+                 headers={"access-control-allow-origin": "http://evil.test",
+                          "access-control-allow-credentials": "true"},
+                 req_headers={"origin": "http://evil.test"})
+    assert proof.grade("cors", "{}", [foreign]).grade == "proven"
+
+
+def test_csrf_needs_a_tokenless_cross_origin_write():
+    """Any GET plus any POST plus any difference graded csrf - that is a web
+    site, not a finding."""
+    before = ex("b22", "http://t.local/settings", "<p>email: old@x.test</p>")
+    write = ex("b23", "http://t.local/settings/update-email", "ok", 200,
+               method="POST", req_body="email=new@evil.test")
+    after = ex("b24", "http://t.local/settings", "<p>email: new@evil.test</p>")
+    assert proof.grade("csrf", "new@evil.test",
+                       [before, write, after]).grade != "proven"
+    cross = ex("b25", "http://t.local/settings/update-email", "ok", 200,
+               method="POST", req_body="email=new@evil.test",
+               req_headers={"origin": "http://evil.test"})
+    assert proof.grade("csrf", "new@evil.test",
+                       [before, cross, after]).grade == "proven"
+    tokened = ex("b26", "http://t.local/settings/update-email", "ok", 200,
+                 method="POST",
+                 req_body="email=new@evil.test&csrf_token=abc",
+                 req_headers={"origin": "http://evil.test"})
+    assert proof.grade("csrf", "new@evil.test",
+                       [before, tokened, after]).grade != "proven"
+
+
+def test_cache_pair_must_be_the_same_resource():
+    """A reflected search term that also appears on another page graded cache
+    poisoning."""
+    search = ex("b27", "http://t.local/search?q=evil.attacker.test",
+                "<p>Results for evil.attacker.test</p>")
+    other = ex("b28", "http://t.local/sitemap",
+               "<a href='http://evil.attacker.test'>x</a>")
+    assert proof.grade("cache", "evil.attacker.test",
+                       [search, other]).grade == "unproven"
+    poisoner = ex("b29", "http://t.local/cached", "ok", 200,
+                  req_headers={"x-forwarded-host": "evil.attacker.test"})
+    victim = ex("b30", "http://t.local/cached",
+                "<link href='http://evil.attacker.test/a.css'>")
+    assert proof.grade("cache-poisoning", "evil.attacker.test",
+                       [poisoner, victim]).grade == "proven"
+
+
+def test_mass_assignment_and_prototype_pollution_have_their_own_classes():
+    """Both were graded by verifiers that know nothing about fields."""
+    assert proof.canonical("mass-assignment") == "massassign"
+    assert proof.canonical("prototype-pollution") == "ppoll"
+    write = ex("b31", "http://t.local/api/register", '{"id":9}', 200,
+               method="POST", req_body='{"user":"x","is_admin":true}')
+    read = ex("b32", "http://t.local/api/user/9",
+              '{"id":9,"user":"x","is_admin":true}')
+    assert proof.grade("massassign", '"is_admin":true',
+                       [write, read]).grade == "proven"
+    assert proof.grade("massassign", '"is_admin":true',
+                       [write]).grade == "candidate"
+
+
+def test_graphql_has_a_verifier_it_can_pass():
+    """It was graded by the extraction verifier, which wants a FROM clause a
+    GraphQL query never sends - so the class was unprovable."""
+    q = ex("b33", "http://t.local/graphql",
+           '{"data":{"__schema":{"types":[{"name":"User"}]}}}', 200,
+           method="POST", req_body='{"query":"{__schema{types{name}}}"}')
+    assert proof.grade("graphql", '"types":[', [q]).grade == "proven"
+
+
+def test_upgrade_keeps_the_original_timestamp_and_the_new_metadata(tmp_path):
+    """`ts` is when the finding was FIRST recorded and
+    time_to_first_finding_s is computed from it; the upgrade rewrote it to the
+    upgrade time and discarded the upgrading author's cvss and agent."""
+    import time
+    s = _sess(tmp_path)
+    r1 = s.record_exchange("probe_sqli",
+                           {"method": "GET", "url": "http://t.local/i?id=1'"},
+                           {"status": 500, "headers": {},
+                            "body": "sqlite3.OperationalError: near"})
+    first = s.add_finding(
+        "sqli", "high", "sqli", "http://t.local/i?id=1", [r1],
+        "sqlite3.OperationalError", "d", "r", agent="exploit-1",
+        cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N")
+    original_ts = first["ts"]
+    time.sleep(0.01)
+    r2 = s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://t.local/i?id=1' UNION SELECT a,b "
+                                 "FROM users LIMIT 5-- -"},
+        {"status": 200, "headers": {}, "body": "<li>admin - s3cr3t</li>"})
+    up = s.add_finding(
+        "sqli", "critical", "sqli", "http://t.local/i?id=1", [r1, r2],
+        "admin - s3cr3t", "dumped", "bind", agent="exploit-2",
+        cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")
+    assert up["grade"] == "proven"
+    assert up["ts"] == original_ts
+    assert up["upgraded_ts"] > original_ts
+    assert up["agent"] == "exploit-2"
+    assert up["cvss"].endswith("C:H/I:H/A:H")
+
+
+def test_upgrade_keeps_the_superseded_citation(tmp_path):
+    """The upgrade replaced evidence_ids wholesale, so a second worker's
+    better evidence erased the first worker's reference."""
+    s = _sess(tmp_path)
+    r1 = s.record_exchange("probe_cmdi",
+                           {"method": "GET",
+                            "url": "http://t.local/p?h=1;%20sleep%204"},
+                           {"status": 200, "headers": {}, "body": "PING ok"})
+    s.add_finding("cmdi", "high", "rce", "http://t.local/p", [r1],
+                  "PING ok", "timing only", "r")
+    r2 = s.record_exchange(
+        "probe_cmdi",
+        {"method": "GET",
+         "url": "http://t.local/p?h=1;%20id;%20echo%20argus7k2m9x"},
+        {"status": 200, "headers": {},
+         "body": "uid=0(root) gid=0(root)\nargus7k2m9x"})
+    up = s.add_finding("cmdi", "critical", "rce", "http://t.local/p", [r2],
+                       "uid=0(root) gid=0(root)", "output", "argv")
+    assert up["grade"] == "proven"
+    assert r1 in up["superseded_evidence_ids"]
+
+
+def test_auto_resolution_prefers_an_exchange_over_an_event(tmp_path):
+    """The most recent match can be a scanner's output line, and citing that
+    fails the wire check for every class - so a provable finding came back
+    unproven because an external_result quoted the same bytes."""
+    s = _sess(tmp_path)
+    wire = s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://t.local/i?id=1' UNION SELECT a,b "
+                                 "FROM users LIMIT 5-- -"},
+        {"status": 200, "headers": {}, "body": "<li>admin - s3cr3t</li>"})
+    event = s.record_event("external_result",
+                           {"output": "sqlmap says: admin - s3cr3t"})
+    f = s.add_finding("sqli", "high", "nosqli", "http://t.local/i", [],
+                      "admin - s3cr3t", "d", "r")
+    assert f["evidence_ids"] == [wire], f"cited {f['evidence_ids']}, not {wire}"
+    assert event not in f["evidence_ids"]
+
+
+def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
+    """_KIND defaulted to "fail", so an ungraded legacy row - or a row whose
+    grade was edited to something unrecognized - broke a CI build."""
+    from argus.report.sarif import _KIND
+    assert _KIND.get("candidate") == "review"
+    assert _KIND.get("proven") == "fail"
+    import inspect
+    from argus.report import sarif
+    src = inspect.getsource(sarif.render_sarif)
+    assert '"review" if grade or f.get("proof") else "fail"' in src

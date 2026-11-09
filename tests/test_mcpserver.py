@@ -221,3 +221,52 @@ def test_round_trip_over_stdio(tmp_path, lab_url):
         assert payload["request_id"] == "r1"
     finally:
         client.close()
+
+
+def test_a_notification_of_any_method_gets_no_reply(served):
+    """A JSON-RPC notification is any message with no id, whatever its method.
+    This replied to every method outside the notifications/ namespace."""
+    server, pipe = served
+    pipe.send({"jsonrpc": "2.0", "method": "some/other/method"})
+    pipe.send({"jsonrpc": "2.0", "method": "notifications/cancelled"})
+    server.serve()
+    assert pipe.frames() == []
+
+
+def test_board_tools_are_not_advertised(served):
+    """read_board, post_board_note, emit_lead and pull_leads were in the
+    manifest and can only raise outside team mode - there is no Board."""
+    server, pipe = served
+    reply = _one(server, pipe, {"jsonrpc": "2.0", "id": 90,
+                                "method": "tools/list"})
+    names = {t["name"] for t in reply["result"]["tools"]}
+    for board in ("read_board", "post_board_note", "emit_lead", "pull_leads",
+                  "spawn_worker", "request_worker", "list_workers",
+                  "finish_engagement"):
+        assert board not in names, board
+
+
+def test_a_tool_level_refusal_is_reported_as_an_error(served):
+    """dispatch wraps a tool's own refusal as {"result": {"error": ...}}, so
+    isError read False and the host saw a success."""
+    server, pipe = served
+    reply = _one(server, pipe, {
+        "jsonrpc": "2.0", "id": 91, "method": "tools/call",
+        "params": {"name": "http_request",
+                   "arguments": {"method": "GET", "url": "http://evil.test/"}}})
+    assert reply["result"]["isError"] is True
+    assert "scope" in reply["result"]["content"][0]["text"].lower()
+
+
+def test_finish_renders_and_seals_a_served_session(served):
+    """A served engagement never sealed, so `argus verify` passed a
+    transcript with its tail deleted."""
+    from argus.cli import main
+    server, pipe = served
+    _one(server, pipe, {
+        "jsonrpc": "2.0", "id": 92, "method": "tools/call",
+        "params": {"name": "finish", "arguments": {"summary": "served run"}}})
+    names = {p.name for p in server.session.dir.iterdir()}
+    assert {"report.md", "report.html", "report.sarif",
+            "summary.json"} <= names
+    assert main(["verify", str(server.session.dir)]) == 0

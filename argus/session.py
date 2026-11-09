@@ -253,9 +253,27 @@ def findings_overgraded(entries: dict, findings: list) -> list[dict]:
     for f in findings if isinstance(findings, list) else []:
         if not isinstance(f, dict):
             continue
-        stored = str(f.get("grade") or "")
+        stored = str(f.get("grade") or "").strip().lower()
+        if not stored:
+            # no grade at all: recorded before grading existed, or by a tool
+            # that does not grade. Only flag it when the row carries a proof
+            # block, which means it WAS graded and the grade was removed.
+            if isinstance(f.get("proof"), dict) and f["proof"].get("checks"):
+                out.append({"id": f.get("id", "?"), "claimed": "(removed)",
+                            "evidence_supports": "unknown",
+                            "missing": ["the grade was deleted from a graded "
+                                        "finding"]})
+            continue
         if stored not in _GRADE_RANK:
-            continue                      # recorded before grading existed
+            # `Proven`, `proven `, `PROVEN`, `prooven` - normalizing catches
+            # the first three, and anything still unrecognized is an edit, not
+            # a legacy row. Skipping it let a one-word change defeat the whole
+            # control.
+            out.append({"id": f.get("id", "?"), "claimed": str(f.get("grade")),
+                        "evidence_supports": "not a grade",
+                        "missing": [f"{f.get('grade')!r} is not one of "
+                                    f"{sorted(_GRADE_RANK)}"]})
+            continue
         ids = f.get("evidence_ids")
         cited = [entries.get(r) for r in ids if isinstance(r, str)] \
             if isinstance(ids, list) else []
@@ -340,7 +358,8 @@ _CWE = {
     "csrf": "CWE-352", "xfh": "CWE-290", "hostheader": "CWE-290",
     "upload": "CWE-434",
     "race": "CWE-362", "deserialize": "CWE-502",
-    "deserialization": "CWE-502", "cache": "CWE-525",
+    "deserialization": "CWE-502", "cache": "CWE-525", "massassign": "CWE-915",
+    "ppoll": "CWE-1321", "race": "CWE-362",
     "cachepoisoning": "CWE-525", "ppoll": "CWE-1321",
     "prototypepollution": "CWE-1321", "smuggle": "CWE-444",
     "requestsmuggling": "CWE-444", "disclosure": "CWE-200",
@@ -794,9 +813,18 @@ class Session:
             # reached past it to an earlier IDOR response that happened to
             # contain the same bytes. The proving exchange is the one just
             # sent, not the first one that ever matched.
-            evidence_ids = [r for r in reversed(list(transcript_snapshot))
-                            if excerpt in self._evidence_text_of(
-                                transcript_snapshot.get(r))][:1]
+            matches = [r for r in reversed(list(transcript_snapshot))
+                       if excerpt in self._evidence_text_of(
+                           transcript_snapshot.get(r))]
+            # Prefer a real request/response over a non-HTTP event. The most
+            # recent match can be a scanner's output line, and citing that
+            # fails the proof matrix's wire check for every class - so a
+            # provable finding came back unproven because an `external_result`
+            # happened to quote the same bytes.
+            exchanges = [r for r in matches
+                         if isinstance((transcript_snapshot.get(r) or {})
+                                       .get("response"), dict)]
+            evidence_ids = (exchanges or matches)[:1]
             if not evidence_ids:
                 raise ValueError(
                     "evidence_excerpt is not a verbatim substring of any "
@@ -847,7 +875,7 @@ class Session:
                 # transcript still resolve.
                 if _GRADE_RANK.get(verdict.grade, 0) > \
                         _GRADE_RANK.get(existing.get("grade", ""), 0):
-                    existing.update({
+                    fields = {
                         "title": str(title or "").strip() or existing.get("title"),
                         "severity": severity,
                         "evidence_ids": evidence_ids,
@@ -855,8 +883,24 @@ class Session:
                         "grade": verdict.grade,
                         "proof": verdict.to_dict(),
                         "upgraded_from": existing.get("grade", ""),
-                        "ts": round(time.time(), 3),
-                    })
+                        # the ORIGINAL citation stays readable: the upgrade
+                        # replaced evidence_ids wholesale, so a second worker
+                        # grading higher erased the first worker's reference
+                        # and the report could no longer show what it had.
+                        "superseded_evidence_ids": [
+                            *(existing.get("superseded_evidence_ids") or []),
+                            *[i for i in (existing.get("evidence_ids") or [])
+                              if i not in evidence_ids]],
+                        # `ts` is when the finding was FIRST recorded, and
+                        # time_to_first_finding_s is computed from it - the
+                        # upgrade used to rewrite it to the upgrade time
+                        "upgraded_ts": round(time.time(), 3),
+                    }
+                    if cvss:
+                        fields["cvss"] = cvss
+                    if agent:
+                        fields["agent"] = agent
+                    existing.update(fields)
                     if description:
                         existing["description"] = str(description).strip()
                     if remediation:

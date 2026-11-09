@@ -316,14 +316,19 @@ _CMDI_SEPARATORS = [
     ("pipe", "{base}| {cmd}"),
     ("and", "{base}&& {cmd}"),
     ("background", "{base}& {cmd}"),
-    ("newline", "{base}%0a{cmd}"),
+    ("newline", "{base}\n{cmd}"),      # a real newline; _inject urlencodes it
     ("subshell", "{base}$({cmd})"),
     ("backtick", "{base}`{cmd}`"),
     ("quoted-break", '{base}"; {cmd} #'),
 ]
 
-_CMDI_IDENT_RE = re.compile(r"uid=\d+\([^)\n]{1,64}\)|uid=\d+\s+gid=\d+")
-_CMDI_WINIDENT_RE = re.compile(r"(?i)\b(nt authority\\[a-z ]+|[a-z0-9_.-]+\\[a-z0-9_.-]+)")
+# The probe and the gate have to agree on what a proof is, or the probe tells
+# the model it has one and the recorder disagrees. These are the matrix's own
+# signatures, imported rather than re-spelled: the earlier copies drifted, and
+# the Windows one matched a JSON `\r` escape on any JSON-returning target.
+from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
+from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
+from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
 
 
 def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
@@ -346,7 +351,10 @@ def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
     nonce = _marker("argus")
     base = _send(ctx, url, param, "127.0.0.1", method, data, tool, "baseline")
     base_body = base.get("body", "") or ""
-    baseline_ms = base["elapsed_ms"]
+    # two baselines, max - one measurement on a slow target reads as a delay,
+    # which is why probe_time takes two as well
+    base2 = _send(ctx, url, param, "127.0.0.2", method, data, tool, "baseline-2")
+    baseline_ms = max(base["elapsed_ms"], base2["elapsed_ms"])
 
     # unix and windows, because the identity line differs and the operator
     # does not always know which one is answering
@@ -362,7 +370,7 @@ def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
             ident = _CMDI_IDENT_RE.search(body) or _CMDI_WINIDENT_RE.search(body)
             # the nonce must come back, and the identity line must NOT be in
             # what we sent - otherwise this is the page echoing our payload
-            reflected = bool(ident) and ident.group(0) in payload
+            reflected = bool(ident) and ident.group(0).strip() in payload
             hit = bool(ident) and not reflected and nonce in body
             results.append({
                 "separator": family, "os": os_family,
@@ -419,13 +427,16 @@ def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
     out["verdict"] = ("blind candidate: delay on " +
                       ", ".join(t["separator"] for t in timed)) if timed else \
         "no signal"
-    out["note"] = ("a timing delta is a candidate, not an rce finding: the class "
-                   "requires command OUTPUT. Try an out-of-band channel or a "
-                   "write-then-read on a path the app serves, and if neither is "
-                   "available say so in the report" if timed else
-                   "no output and no delay on any separator family")
-    if base_body and not timed:
-        out["note"] += " - the parameter may never reach a shell"
+    if timed:
+        out["note"] = ("a timing delta is a candidate, not an rce finding: the "
+                       "class requires command OUTPUT. Repeat the slow family "
+                       "once to rule out noise, then look for an out-of-band "
+                       "channel; if there is none, say so in the report and "
+                       "leave it a candidate")
+    else:
+        out["note"] = "no output and no delay on any separator family"
+        if base_body:
+            out["note"] += " - the parameter may never reach a shell"
     return out
 
 

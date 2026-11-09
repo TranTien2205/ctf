@@ -154,7 +154,7 @@ waste budget inside scope.
 ## Served mode (`argus mcp-serve`)
 
 A third plane, and the one that spells out the chain the project is built
-against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 49 of
+against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 45 of
 the 55 tools over newline-delimited stdio JSON-RPC, symmetric with the client
 in `argus/mcp.py`, so the two halves of the protocol are testable against
 each other rather than against a mock.
@@ -175,11 +175,13 @@ grade it. `initialize` hands back `build_system(cfg, scope)` as
 `instructions`, so a host that never read argus's system prompt still
 receives the scope and the evidence rules.
 
-Withheld: `spawn_worker`, `request_worker`, `list_workers`,
-`finish_engagement` — team orchestration, and the host LLM is the
-orchestrator here; a second one inside argus would re-interpret the same
-intent. Plus `mcp_list`/`mcp_call`, which would let argus call out to other
-servers while serving as one.
+Withheld: every board tool — `spawn_worker`, `request_worker`,
+`list_workers`, `finish_engagement`, `read_board`, `post_board_note`,
+`emit_lead`, `pull_leads`. They are team orchestration, the host LLM is the
+orchestrator here, and outside team mode there is no Board for them to reach,
+so advertising them would put entries in the catalogue that can only raise.
+Plus `mcp_list`/`mcp_call`, which would let argus call out to other servers
+while serving as one.
 
 ## Team mode (`argus team`)
 

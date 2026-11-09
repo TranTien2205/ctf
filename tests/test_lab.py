@@ -466,3 +466,59 @@ def test_sqli_extraction_refuses_a_non_identifier(lab_url, ctx):
                             extract_table="users; DROP TABLE users",
                             extract_columns="username")
     assert "not a table identifier" in out["extract"]["error"]
+
+
+def test_allowlisted_commands_take_no_arguments():
+    """An allowlisted NAME is not a bounded command: `hostname -F <file>`
+    reads a file, a bare argument sets the host name, and `id <user>`
+    enumerates accounts. SECURITY.md's claim was false as written."""
+    import vulnapp
+    for cmd in ("hostname -F /etc/passwd", "hostname evil", "id root",
+                "uname -a /etc/shadow", "pwd /root"):
+        out = vulnapp._lab_exec(cmd)
+        assert "extra operand" in out or "command not found" in out, (cmd, out)
+    # the no-argument forms still work, which is what the rce proof needs
+    assert "uid=" in vulnapp._lab_exec("id") or \
+        "command not found" in vulnapp._lab_exec("id")
+
+
+def test_a_path_component_is_not_an_allowlisted_name():
+    """basename("./id") is "id", and shutil.which would then resolve it
+    against PATH rather than against the path that was given."""
+    import vulnapp
+    for cmd in ("./id", "../../bin/id", "/bin/id", "sub/dir/echo hi"):
+        assert "command not found" in vulnapp._lab_exec(cmd), cmd
+
+
+def test_injected_segments_are_bounded():
+    """A 64 KB value of `;id` was ~21,500 fork/execs on one thread."""
+    import vulnapp
+    many = vulnapp._injected_commands("1" + ";id" * 5000)
+    assert len(many) <= vulnapp._EXEC_MAX_SEGMENTS
+    # a NUL raised ValueError out of shlex and the request died with no reply
+    assert vulnapp._injected_commands("1;\x00id") == ["id"]
+    assert vulnapp._lab_exec("echo a\x00b") is not None
+
+
+def test_cat_containment_is_not_prefix_based():
+    """startswith on the directory name lets /x/fake-other through when the
+    root is /x/fake, and a symlink inside the tree pointed anywhere."""
+    import os
+    import vulnapp
+    assert "root:x:0:0" in vulnapp._lab_exec("cat /etc/passwd")
+    for path in ("../../../etc/shadow", "/../etc/shadow",
+                 "..%2f..%2fetc%2fshadow"):
+        out = vulnapp._lab_exec(f"cat {path}")
+        assert "Permission denied" in out or "No such file" in out, (path, out)
+    sibling = os.path.realpath(vulnapp.FAKEFS) + "-other"
+    assert not os.path.realpath(
+        os.path.join(vulnapp.FAKEFS, "x")).startswith(sibling)
+
+
+def test_external_tools_do_not_inherit_stdin():
+    """Under `argus mcp-serve` the agent's stdin IS the host's JSON-RPC
+    channel; a tool that reads it consumes the host's frames."""
+    import inspect
+    from argus.tools import _subproc
+    src = inspect.getsource(_subproc)
+    assert "stdin=subprocess.DEVNULL" in src

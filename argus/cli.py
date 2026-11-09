@@ -542,8 +542,11 @@ def main(argv: list[str] | None = None) -> int:
         def _dkey(f):
             # retests usually run on a fresh instance (new port) - match on
             # host + path + params + class, ignoring the port
+            # the canonical class, not the author's spelling: keying on raw
+            # category made one unfixed finding report as both FIXED and NEW
+            # when the two runs spelled the class differently
             cat, _netloc, path, params = _finding_key(
-                f.get("category"), f.get("url"))
+                f.get("vuln_class") or f.get("category"), f.get("url"))
             u = str(f.get("url") or "")
             try:
                 host = _up.urlparse(

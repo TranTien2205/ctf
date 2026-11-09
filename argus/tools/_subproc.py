@@ -24,7 +24,13 @@ def run_capped(cmd: list[str], timeout_s: float, cwd: str | None = None,
     marker in the middle of a huge output is still caught."""
     with tempfile.TemporaryFile(mode="w+b") as fo, \
             tempfile.TemporaryFile(mode="w+b") as fe:
+        # stdin=DEVNULL, not inherited. Under `argus mcp-serve` the agent's
+        # stdin IS the host's JSON-RPC channel: an external tool that reads it
+        # - sqlmap prompting, curl with no URL, anything interactive - consumes
+        # the host's frames and the session wedges with no error anywhere.
+        # A pentest tool has no business reading our stdin in any mode.
         proc = subprocess.run(cmd, stdout=fo, stderr=fe,
+                              stdin=subprocess.DEVNULL,
                               timeout=timeout_s, cwd=cwd, env=env)
         so_size, se_size = fo.tell(), fe.tell()
 
