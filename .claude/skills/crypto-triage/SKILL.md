@@ -89,6 +89,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | A modulus with no other handle — always try first | factordb and small-factor sweep | `n` is a clean two-prime product absent from factordb | `fermat --n N`, then `../ctf-crypto/triage-toolbox.md` |
 | Letter-only ciphertext, no key material, a named classical cipher or none | Classical cipher (Caesar/Vigenere/substitution/transposition) | statistics show encoding, not cipher — route to misc-encoding-carrier | — → class `crypto-classical` (`../crypto-classical/`) |
 | A bare hash string to crack ("find the password/preimage") | format identification first — salted formats change everything | `tools/hash_id.py` names family + hashcat mode + first move; an unrecognised result routes to enc_detect | `python3 tools/hash_id.py <hash>` |
+| An encrypted `.zip` ("extract the flag", password unknown) | ZipCrypto dictionary attack — flag bit 0 set, 12-byte check header | flag bit 3 check byte or AES entries | `python3 tools/zip_crack.py secret.zip words.txt` (12-byte check rejects a wrong password before any decompress) |
 || A binary ciphertext blob, no key, XOR-looking (high-byte or key-period hints) | Repeating-key XOR crack (hamming key-length, per-column single-byte) | no key length decodes to language — it is a cipher, not XOR | `python3 tools/xor_solve.py crack --hex HEX` (`single` for one-byte pads; `cipher_id` if it is letters) |
 
 ## Route to depth — attack family to the one file
