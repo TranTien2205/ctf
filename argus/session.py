@@ -721,8 +721,16 @@ class Session:
         if not evidence_ids:
             # Resolve the proving exchange from the excerpt itself - the
             # verbatim gate is unchanged: the quote must exist in a recorded
-            # response/event. Cite the first entry that contains it.
-            evidence_ids = [r for r in transcript_snapshot
+            # response/event. Cite the MOST RECENT entry that contains it.
+            #
+            # It used to cite the first, and that is how the checked-in sample
+            # session came to carry a critical "forged admin token accepted"
+            # whose evidence is `GET /api/user/1`: the demo sent the forged
+            # token, got `"role": "admin"` back, and the auto-resolution
+            # reached past it to an earlier IDOR response that happened to
+            # contain the same bytes. The proving exchange is the one just
+            # sent, not the first one that ever matched.
+            evidence_ids = [r for r in reversed(list(transcript_snapshot))
                             if excerpt in self._evidence_text_of(
                                 transcript_snapshot.get(r))][:1]
             if not evidence_ids:

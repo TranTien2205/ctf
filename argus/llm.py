@@ -158,7 +158,11 @@ class ClaudeClient:
 
 
 class ScriptedClient:
-    """Deterministic stand-in for tests: replays canned tool_use turns."""
+    """Deterministic stand-in for tests: replays canned tool_use turns.
+
+    A turn is a dict, or a callable taking the messages so far and returning
+    one - enough to thread an id from one tool result into the next call.
+    """
 
     def __init__(self, script: list[dict]):
         self.script = list(script)
@@ -176,6 +180,13 @@ class ScriptedClient:
             return {"stop_reason": "end_turn",
                     "content": [{"type": "text", "text": "script exhausted"}]}
         step = self.script.pop(0)
+        if callable(step):
+            # A step may be a function of the conversation so far, which is
+            # what a real model is: the demo reads request_ids out of the
+            # previous tool_result exactly as Claude would, instead of
+            # hard-coding numbers that drift the moment a probe sends one
+            # more request.
+            step = step(messages) or {}
         content = []
         if step.get("text"):
             content.append({"type": "text", "text": step["text"]})

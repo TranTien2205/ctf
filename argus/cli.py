@@ -720,6 +720,27 @@ def _preflight_target(cfg) -> None:
         raise SystemExit(f"target rejected by scope guard: {exc}")
 
 
+def _demo_last(messages: list) -> dict:
+    """The most recent tool_result payload, as the model sees it.
+
+    Both demo arms thread request ids through this: a scripted turn reads the
+    previous result the same way Claude does, so the citations are built the
+    way a real run builds them rather than from hard-coded request numbers.
+    """
+    for msg in reversed(messages):
+        blocks = msg.get("content")
+        if not isinstance(blocks, list):
+            continue
+        for block in reversed(blocks):
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                try:
+                    out = json.loads(block.get("content") or "{}")
+                except ValueError:
+                    return {}
+                return out.get("result", out) if isinstance(out, dict) else {}
+    return {}
+
+
 def _demo(args) -> int:
     """Offline demo for presentations/defense: spins up the lab and runs a
     scripted agent sequence through the real loop - scope guard, probes,
@@ -750,52 +771,147 @@ def _demo(args) -> int:
     def _t(i, name, **kw):
         return {"id": f"d{i}", "name": name, "type": "tool_use", "input": kw}
 
-    # Request numbering is deterministic: sqli=4, reflection=1, idor=3,
-    # disclosure=1+paths, xfh=1 - evidence cites excerpts, not request ids.
+    _last = _demo_last
+
+    # Ids are threaded out of each probe result, the way a real agent threads
+    # them - every probe returns the request_ids it spent. The demo used to
+    # omit evidence_ids and let the recorder resolve them from the excerpt,
+    # which is how its "forged admin token accepted" finding came to cite
+    # `GET /api/user/1`: an earlier response contained the same bytes.
+    def _sqli_finding(messages):
+        out = _last(messages)
+        ids = out.get("request_ids") or {}
+        extract = out.get("extract") or {}
+        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        return {"text": "Error channel named the engine; the bounded UNION read "
+                        "returned rows. Both go in the citation - the class "
+                        "needs the engine AND the data.",
+                "tool_calls": [_t(2, "record_finding",
+                    title="SQL injection in /item id parameter",
+                    severity="critical", category="sqli",
+                    url=base + "/item?id=1", evidence_ids=cited,
+                    evidence_excerpt="admin - $s3cr3t-admin-pw",
+                    description="id is interpolated into the query string. The "
+                                "quote probe returns a raw sqlite error; a "
+                                "UNION SELECT limited to five rows returns "
+                                "credentials from the users table.",
+                    remediation="Use parameterized queries.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _rce_finding(messages):
+        out = _last(messages)
+        rid = out.get("proof_request_id")
+        row = next((r for r in out.get("results") or []
+                    if r.get("request_id") == rid and r.get("identity")), None)
+        return {"text": "The host parameter reaches a shell: the identity line "
+                        "came back with the probe nonce.",
+                "tool_calls": [_t(4, "record_finding",
+                    title="OS command injection in /ping host parameter",
+                    severity="critical", category="rce",
+                    url=base + "/ping?host=127.0.0.1",
+                    evidence_ids=[rid] if rid else [],
+                    evidence_excerpt=(row or {}).get("identity") or "uid=",
+                    description="host is concatenated into a shell command. "
+                                "`id; echo <nonce>` returns the server's own "
+                                "identity line and the nonce, so the output is "
+                                "computed by the target and not reflected.",
+                    remediation="Never pass request data to a shell; exec with "
+                                "an argv list and validate the host as an "
+                                "address.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _idor_finding(messages):
+        out = _last(messages)
+        other = next((r for r in out.get("results") or []
+                      if r.get("accessible") and "admin" in (r.get("excerpt") or "")),
+                     None)
+        cited = [i for i in (out.get("base_id"),
+                             (other or {}).get("request_id")) if i]
+        return {"text": "Two object ids, two principals, one of them not mine.",
+                "tool_calls": [_t(7, "record_finding",
+                    title="IDOR: /api/user/<id> serves any user object",
+                    severity="high", category="idor",
+                    url=base + "/api/user/2", evidence_ids=cited,
+                    evidence_excerpt='"username": "admin"',
+                    description="Object ids are not checked against the caller. "
+                                "Reading id 2 returns alice; reading id 1 "
+                                "returns the admin record, with no credential "
+                                "distinguishing the two requests.",
+                    remediation="Enforce per-object ownership checks.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]}
+
+    def _jwt_finding(messages):
+        # the forged request is two turns back, the rejected control is last
+        ids = []
+        for msg in reversed(messages):
+            blocks = msg.get("content")
+            if not isinstance(blocks, list):
+                continue
+            for block in reversed(blocks):
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    try:
+                        out = json.loads(block.get("content") or "{}")
+                    except ValueError:
+                        continue
+                    rid = (out.get("result") or {}).get("request_id") \
+                        if isinstance(out.get("result"), dict) else None
+                    if rid:
+                        ids.append(rid)
+            if len(ids) >= 2:
+                break
+        return {"text": "Forged token accepted, deliberately invalid token "
+                        "rejected - the acceptance is the signature check, not "
+                        "a missing one.",
+                "tool_calls": [_t(12, "record_finding",
+                    title="JWT weak secret: forged admin token accepted",
+                    severity="critical", category="jwt",
+                    url=base + "/api/me", evidence_ids=ids[:2],
+                    evidence_excerpt='"role": "admin"',
+                    description="The session JWT verifies against the "
+                                "dictionary secret 'secret123'. A token forged "
+                                "offline with role=admin is accepted and its "
+                                "claims echoed back; the same request with a "
+                                "broken signature is refused with 401, so the "
+                                "endpoint does verify - against a guessable "
+                                "key.",
+                    remediation="Rotate to a high-entropy secret; prefer "
+                                "asymmetric signing.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
     script = [
-        {"text": "Baseline-diffed probes first: /item looks injectable.",
+        {"text": "Baseline-diffed probes first: /item looks injectable, and "
+                 "the class needs the engine named plus a row from a table.",
          "tool_calls": [_t(1, "probe_sqli", url=base + "/item?id=1",
-                          param="id")]},
-        {"tool_calls": [_t(2, "record_finding",
-                         title="SQL injection in /item id parameter",
-                         severity="high", category="sqli",
-                         url=base + "/item?id=1",
-                                                  evidence_excerpt="sqlite3.OperationalError",
-                         description="The quote probe produces a raw sqlite "
-                                     "error - unsanitized input reaches the "
-                                     "query.",
-                         remediation="Use parameterized queries.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
-         "text": "Error channel confirms SQLi - recording with verbatim "
-                 "evidence."},
-        {"tool_calls": [_t(3, "probe_reflection",
-                         url=base + "/search?q=x", param="q")],
-         "text": "Now the reflected-parameter family."},
-        {"tool_calls": [_t(4, "record_finding",
+                           param="id", union_cols=6, extract_table="users",
+                           extract_columns="username,password")]},
+        _sqli_finding,
+        {"text": "A diagnostic endpoint takes a host - probe for command "
+                 "OUTPUT, not for a delay.",
+         "tool_calls": [_t(3, "probe_cmdi", url=base + "/ping?host=127.0.0.1",
+                           param="host")]},
+        _rce_finding,
+        {"text": "Now the reflected-parameter family.",
+         "tool_calls": [_t(5, "probe_reflection",
+                           url=base + "/search?q=x", param="q")]},
+        {"tool_calls": [_t(6, "record_finding",
                          title="Reflected XSS in /search q parameter",
                          severity="medium", category="xss",
                          url=base + "/search?q=x",
-                                                  evidence_excerpt="<>'\"&=/",
-                         description="Canary chars < > \" ' reflect "
-                                     "unescaped in html context.",
+                         evidence_excerpt="<>'\"&=/",
+                         description="Canary chars < > \" ' reflect unescaped "
+                                     "in an html context. Execution is not "
+                                     "shown here - this engagement had no "
+                                     "browser, so the class stays a candidate.",
                          remediation="Output-encode by context; add CSP.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")],
-         "text": "Reflected with unescaped special chars - XSS lead."},
-        {"tool_calls": [_t(5, "probe_idor", url=base + "/api/user/2")],
+         "text": "Unescaped reflection. Recording it as what it is: a "
+                 "candidate, because nothing here executed it."},
+        {"tool_calls": [_t(6, "probe_idor", url=base + "/api/user/2")],
          "text": "Object-level authorization next."},
-        {"tool_calls": [_t(6, "record_finding",
-                         title="IDOR: /api/user/<id> serves any user object",
-                         severity="high", category="idor",
-                         url=base + "/api/user/2",
-                                                  evidence_excerpt="\"username\"",
-                         description="Neighboring ids return other users' "
-                                     "objects with no authorization check.",
-                         remediation="Enforce per-object ownership checks.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
-         "text": "Neighbor id returns a different principal - IDOR."},
-        {"tool_calls": [_t(7, "probe_disclosure", url=base)],
+        _idor_finding,
+        {"tool_calls": [_t(8, "probe_disclosure", url=base)],
          "text": "Sensitive-artifact sweep before finishing."},
-        {"tool_calls": [_t(8, "record_finding",
+        {"tool_calls": [_t(9, "record_finding",
                          title="Exposed /.env and /.git/HEAD at web root",
                          severity="medium", category="info-disclosure",
                          url=base + "/.env",
@@ -807,38 +923,32 @@ def _demo(args) -> int:
                                      "server; rotate exposed secrets.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
          "text": "Exposed secrets on the web root - recording."},
-        {"tool_calls": [_t(9, "jwt_decode", token=_tok)],
+        {"tool_calls": [_t(10, "jwt_decode", token=_tok)],
          "text": "The session token itself is the next surface."},
-        {"tool_calls": [_t(10, "jwt_forge", token=_tok,
+        {"tool_calls": [_t(11, "jwt_forge", token=_tok,
                            claims='{"user":"admin","role":"admin"}',
                            secret="secret123")],
-         "text": "Weak HMAC secret recovered offline - forge an admin "
-                 "token and prove acceptance."},
-        {"tool_calls": [_t(11, "http_request", method="GET",
+         "text": "Weak HMAC secret recovered offline - forge an admin token, "
+                 "then send a deliberately broken one as the control."},
+        {"tool_calls": [_t(12, "http_request", method="GET",
+                           url=base + "/api/me",
+                           headers={"Authorization": f"Bearer {_forged}"})]},
+        {"tool_calls": [_t(13, "http_request", method="GET",
                            url=base + "/api/me",
                            headers={"Authorization":
-                                    f"Bearer {_forged}"})]},
-        {"tool_calls": [_t(12, "record_finding",
-                         title="JWT weak secret: forged admin token accepted",
-                         severity="critical", category="jwt",
-                         url=base + "/api/me",
-                         evidence_excerpt='"role": "admin"',
-                         description="The lab JWT verifies against the "
-                                     "dictionary secret 'secret123'; a "
-                                     "forged admin token is accepted and "
-                                     "its claims echoed back verbatim.",
-                         remediation="Rotate to a high-entropy secret; "
-                                     "prefer asymmetric signing.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
-         "text": "Forged claims returned by the server - privilege "
-                 "escalation proven end to end."},
-        {"tool_calls": [_t(13, "probe_xfh", url=base + "/reset")]},
-        {"tool_calls": [_t(14, "finish",
-                         summary="Demo run: SQLi + XSS + IDOR + info "
-                                 "disclosure + forged-JWT admin takeover "
-                                 "verified with verbatim evidence; "
-                                 "host-header reflection left as a lead "
-                                 "for manual follow-up.")]},
+                                    f"Bearer {_forged[:-4]}AAAA"})],
+         "text": "The control: same request, signature broken by four bytes."},
+        _jwt_finding,
+        {"tool_calls": [_t(14, "probe_xfh", url=base + "/reset")]},
+        {"tool_calls": [_t(15, "finish",
+                         summary="Demo run. Proven: SQL injection (engine "
+                                 "named plus five rows from users), OS command "
+                                 "injection (identity line with the probe "
+                                 "nonce), IDOR across two principals, exposed "
+                                 "secrets, and a forged JWT accepted against a "
+                                 "rejected control. Candidate: reflected XSS - "
+                                 "unescaped, but no browser executed it. "
+                                 "Host-header reflection left as a lead.")]},
     ]
     cfg = Config(target=base, allow_private=True,
                  session_dir=Path(args.session_dir),
@@ -882,6 +992,86 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
     despite workers sharing one transcript."""
     from .team.coordinator import TeamRun
 
+    # Same threading as the single-agent demo: every probe returns the
+    # request_ids it spent, and the citation is built from them. The team arm
+    # has to earn the same grades, or the run-vs-team comparison is comparing
+    # two different standards of evidence.
+    def _team_sqli_finding(messages):
+        out = _demo_last(messages)
+        ids = out.get("request_ids") or {}
+        extract = out.get("extract") or {}
+        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        return {"tool_calls": [_t("e3", "record_finding",
+            title="SQL injection in /item id parameter", severity="critical",
+            category="sqli", url=base + "/item?id=1", evidence_ids=cited,
+            evidence_excerpt="admin - $s3cr3t-admin-pw",
+            description="id is interpolated into the query; a UNION read "
+                        "limited to five rows returns users.username and "
+                        "users.password.",
+            remediation="Use parameterized queries.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _team_rce_finding(messages):
+        out = _demo_last(messages)
+        rid = out.get("proof_request_id")
+        row = next((r for r in out.get("results") or []
+                    if r.get("request_id") == rid and r.get("identity")), None)
+        return {"tool_calls": [_t("e4b", "record_finding",
+            title="OS command injection in /ping host parameter",
+            severity="critical", category="rce",
+            url=base + "/ping?host=127.0.0.1",
+            evidence_ids=[rid] if rid else [],
+            evidence_excerpt=(row or {}).get("identity") or "uid=",
+            description="`id; echo <nonce>` returns the server's identity "
+                        "line and the nonce - computed by the target.",
+            remediation="Exec with an argv list; validate the host.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _team_idor_finding(messages):
+        out = _demo_last(messages)
+        other = next((r for r in out.get("results") or []
+                      if r.get("accessible")
+                      and "admin" in (r.get("excerpt") or "")), None)
+        cited = [i for i in (out.get("base_id"),
+                             (other or {}).get("request_id")) if i]
+        return {"tool_calls": [_t("e7", "record_finding",
+            title="IDOR: /api/user/<id> serves any user",
+            severity="high", category="idor", url=base + "/api/user/2",
+            evidence_ids=cited, evidence_excerpt='"username": "admin"',
+            description="Reading id 2 returns alice, reading id 1 returns the "
+                        "admin record, with no credential telling the two "
+                        "requests apart.",
+            remediation="Enforce per-object ownership checks.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]}
+
+    def _team_jwt_finding(messages):
+        ids = []
+        for msg in reversed(messages):
+            blocks = msg.get("content")
+            if not isinstance(blocks, list):
+                continue
+            for block in reversed(blocks):
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    try:
+                        payload = json.loads(block.get("content") or "{}")
+                    except ValueError:
+                        continue
+                    result = payload.get("result")
+                    if isinstance(result, dict) and result.get("request_id"):
+                        ids.append(result["request_id"])
+            if len(ids) >= 2:
+                break
+        return {"tool_calls": [_t("e14", "record_finding",
+            title="JWT weak secret: forged admin token accepted",
+            severity="critical", category="jwt", url=base + "/api/me",
+            evidence_ids=ids[:2], evidence_excerpt='"role": "admin"',
+            description="The secret 'secret123' is dictionary-weak: a forged "
+                        "admin token is accepted, while the same request with "
+                        "a broken signature is refused 401.",
+            remediation="Rotate to a high-entropy secret; prefer asymmetric "
+                        "signing.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
     scripts = {
         "lead": [
             {"text": "Seeding the pipeline with the most promising "
@@ -919,19 +1109,18 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
         "exploit": [
             {"text": "Pulling queued surface leads.",
              "tool_calls": [_t("e1", "pull_leads", max_n=5)]},
-            {"text": "Confirming the injectable id parameter.",
+            {"text": "Confirming the injectable id parameter, and reading "
+                     "rows: the class needs the engine named plus data.",
              "tool_calls": [_t("e2", "probe_sqli", url=base + "/item?id=1",
-                              param="id")]},
-            {"tool_calls": [_t("e3", "record_finding",
-                              title="SQL injection in /item id parameter",
-                              severity="high", category="sqli",
-                              url=base + "/item?id=1",
-                              evidence_excerpt="sqlite3.OperationalError",
-                              description="Quote probe yields a raw sqlite "
-                                          "error - unsanitized input reaches "
-                                          "the query.",
-                              remediation="Use parameterized queries.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
+                              param="id", union_cols=6,
+                              extract_table="users",
+                              extract_columns="username,password")]},
+            _team_sqli_finding,
+            {"text": "A diagnostic endpoint takes a host - probe for output.",
+             "tool_calls": [_t("e3b", "probe_cmdi",
+                              url=base + "/ping?host=127.0.0.1",
+                              param="host")]},
+            _team_rce_finding,
             {"tool_calls": [_t("e4", "probe_reflection",
                               url=base + "/search?q=x", param="q")]},
             {"tool_calls": [_t("e5", "record_finding",
@@ -946,16 +1135,7 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                               cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")]},
             {"tool_calls": [_t("e6", "probe_idor",
                               url=base + "/api/user/2")]},
-            {"tool_calls": [_t("e7", "record_finding",
-                              title="IDOR: /api/user/<id> serves any user",
-                              severity="high", category="idor",
-                              url=base + "/api/user/2",
-                              evidence_excerpt="\"username\"",
-                              description="Neighboring ids return other "
-                                          "users' objects, no authz check.",
-                              remediation="Enforce per-object ownership "
-                                          "checks.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
+            _team_idor_finding,
             {"tool_calls": [_t("e8", "probe_disclosure", url=base)]},
             {"tool_calls": [_t("e9", "record_finding",
                               title="Exposed /.env and /.git/HEAD at web "
@@ -981,19 +1161,12 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                 _t("e13", "http_request", method="GET",
                    url=base + "/api/me",
                    headers={"Authorization": f"Bearer {forged}"})]},
-            {"tool_calls": [_t("e14", "record_finding",
-                              title="JWT weak secret: forged admin token "
-                                    "accepted",
-                              severity="critical", category="jwt",
+            {"text": "The control: same request, signature broken.",
+             "tool_calls": [_t("e13b", "http_request", method="GET",
                               url=base + "/api/me",
-                              evidence_excerpt='"role": "admin"',
-                              description="Signing secret 'secret123' is "
-                                          "dictionary-weak; a forged admin "
-                                          "token is accepted verbatim.",
-                              remediation="Rotate to a high-entropy "
-                                          "secret; prefer asymmetric "
-                                          "signing.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
+                              headers={"Authorization":
+                                       f"Bearer {forged[:-4]}AAAA"})]},
+            _team_jwt_finding,
             {"tool_calls": [_t("e15", "finish",
                               summary="5/5 leads verified with verbatim "
                                       "evidence.")]},
