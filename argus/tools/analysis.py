@@ -659,6 +659,6 @@ def _is_windows() -> bool:
 
 def finish(ctx: Context, summary: str) -> dict:
     ctx.finished = True
-    ctx.finish_summary = summary
+    ctx.finish_summary = summary if isinstance(summary, str) else str(summary)
     ctx.session.note(f"## Agent summary ({ctx.agent_name})\n\n{summary}")
     return {"finished": True, "stats": ctx.session.stats()}
