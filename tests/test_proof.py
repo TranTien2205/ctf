@@ -682,8 +682,10 @@ def test_difference_only_classes_cannot_reach_proven():
     b = ex("b7", "http://t.local/b", "<html>Page B different</html>")
     # lockout left this set: its artifact is the ABSENCE of a difference, and
     # being graded by `_discriminates` inverted it
-    for name in ("ssrf", "enum", "crlf", "upload", "method",
-                 "websocket", "race"):
+    # enum left this set too: the series its probe sends IS in the transcript,
+    # so "one difference is not a counted series" was a missing implementation
+    # described as a limit
+    for name in ("ssrf", "crlf", "upload", "method", "websocket", "race"):
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
         assert proof.spec_for(name).ceiling == "candidate"
@@ -915,7 +917,6 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 CANNOT_BE_PROVEN_HERE = {
     "xss": "no browser",
     "ssrf": "no collector",
-    "enum": "one difference is not a counted series",
     "crlf": "the verifier compares bodies, not headers",
     "upload": "serving is not executing",
     "method": "a status difference is not an effect",
@@ -1299,3 +1300,23 @@ def test_the_seal_key_is_never_written_to_an_artifact(tmp_path):
     assert key not in blob
     meta = json.loads((s.dir / "meta.json").read_text(encoding="utf-8"))
     assert meta["chain_keyed"] is True and "seal_key" not in meta
+
+
+def test_enum_needs_two_answers_each_seen_twice():
+    """`_discriminates` asked only that two responses differ, which is true of
+    any two pages - so the class was capped with "one difference is not a
+    counted series" as the reason. The series is in the transcript."""
+    def login(rid, body, status):
+        return ex(rid, "http://t.local/login", body, status, method="POST",
+                  req_body="u=x&p=y")
+    real = [login("E1", "No such user", 404), login("E2", "No such user", 404),
+            login("E3", "Wrong password", 401), login("E4", "Wrong password", 401)]
+    assert proof.grade("enum", "Wrong password", real).grade == "proven"
+    once = [login("E5", "No such user", 404),
+            login("E6", "Wrong password", 401)]
+    v = proof.grade("enum", "Wrong password", once)
+    assert v.grade == "candidate"
+    assert "each answer was observed more than once" in v.missing
+    same = [login(f"E{7+i}", "Invalid credentials", 401) for i in range(4)]
+    assert proof.grade("enum", "Invalid credentials", same).grade == "unproven"
+    assert proof.spec_for("enum").ceiling == ""

@@ -551,10 +551,34 @@ def main() -> int:
     for status, line in results:
         print(f"[{status}] {line}")
     _doc_consistency()
+    _doc_selftest_count()
 
     failed = [r for r in results if r[0] == FAIL]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     return 1 if failed else 0
+
+
+def _doc_selftest_count() -> None:
+    """The selftest count the docs state, checked against this run.
+
+    It has to be the LAST check: at that moment `len(results)` is one short of
+    the final tally, so `+1` is exact rather than a guess about how many
+    checks are still to come. An earlier draft guessed, and was right by
+    accident.
+    """
+    import re as _re
+    joined = ""
+    for name in ("CHANGELOG.md", "README.md", "AGENTS.md", "docs/USAGE.md",
+                 "docs/ARCHITECTURE.md"):
+        fp = ROOT / name
+        if fp.is_file():
+            joined += fp.read_text(encoding="utf-8")
+    stated = {int(n) for n in _re.findall(r"(\d+) offline checks", joined)}
+    total = len(results) + 1
+    check(f"doc selftest count matches this run ({total})",
+          bool(stated) and stated == {total},
+          f"docs state {sorted(stated) or 'NO COUNT AT ALL'}, this run has "
+          f"{total}")
 
 
 # --- documentation names only things that exist ---------------------------
@@ -706,6 +730,26 @@ def _doc_consistency() -> None:
     check(f"docs name only real flags ({len(real_flags)})", not invented,
           f"{invented} accepted by no parser")
 
+    # 3c. the test and selftest counts the docs state. I corrected both by
+    #     hand six times in one session, which is exactly the kind of number
+    #     that rots - so it is checked against a collection run, not trusted.
+    import subprocess
+    stated_tests = {int(n) for n in
+                    _re.findall(r"pytest tests/ -q`?: (\d+) tests", joined)}
+    if stated_tests:
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pytest", "tests/", "--collect-only",
+                 "-q"], cwd=str(ROOT), capture_output=True, text=True,
+                timeout=180)
+            m = _re.search(r"(\d+) tests? collected", proc.stdout)
+            actual = int(m.group(1)) if m else 0
+        except (OSError, subprocess.SubprocessError):
+            actual = 0
+        check(f"doc pytest count matches collection ({actual})",
+              actual > 0 and stated_tests == {actual},
+              f"docs state {sorted(stated_tests)}, collection finds {actual}"
+              if actual else "could not collect; skipped")
     # 4. every ARGUS_* environment variable the docs name is one the code
     #    reads. Writing a plausible-looking opt-in flag into a README is the
     #    same defect as naming a removed command, and I made exactly that

@@ -250,6 +250,60 @@ role-specialized **workers** through a shared blackboard.
   `time_to_first_finding_s` — the measurement surface for comparing
   single-agent `run` against the streaming `team` pipeline.
 
+## Known residuals
+
+Two adversarial audits - the second against a frozen tree, with every finding
+put to three independent skeptics - produced the fixes recorded in
+`CHANGELOG.md`. What follows is what they found and this system does NOT fix,
+written down so it is a decision rather than an omission. `argus proof <class>`
+prints each class's own version of this.
+
+**Six classes are capped at `candidate` and the cap is a missing
+implementation, not a law of nature.** `crlf` is decided on bodies while the
+artifact is a response header; `method` would be settled by a TRACE echo or a
+PUT that lands; `upload` by the served content-type; `websocket` by a real
+client; `smuggle` by the desync response on the wire; `race` by a serial
+control. Each is checkable from what the transcript already records, and each
+needs a verifier written. `lockout` and `enum` were in this list and came out
+of it - the pattern works, the rest is labour. Until then the requirement
+sentence says what would settle the class, and
+`tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code so
+the list cannot grow in silence.
+
+**`xss`, client-side `ppoll` and `ssrf` are capped for a real reason.** The
+first two need a browser and the third needs an out-of-band collector; this
+system has neither. Driving one over `mcp_call` is the path, and nothing here
+does it yet.
+
+**`probe_csrf` cannot produce evidence its own class accepts, by design.** The
+proof needs a state-changing write, and the probe is read-only. The agent
+reaches `proven` with `http_request`; the probe's job ends at detection.
+
+**A re-render re-seals.** `argus report` recomputes the artifact digests,
+which is what makes a legitimate re-render verify - and therefore what lets an
+edit made before the re-render come out the other side digest-valid. The grade
+is recomputed and corrected, and `--seal-key` closes the forgery case, but an
+edit to `notes.md` before a re-render is not detectable by the seal alone.
+
+**`argus compare` and `argus sessions` read `summary.json` as given.** They
+are reporting tools over a file `argus verify` is the check for; a tampered
+summary misreports there until you verify.
+
+**The doc gate checks what it can name.** Tools, subcommands, flags, proof
+classes, `ARGUS_*` variables, and the stated counts of tools, classes, skills,
+tests and selftest checks - all against the code. It does not check prose
+claims, and `_NOT_TOOLS` is a hand-maintained allowlist of identifiers that
+look like tools and are not.
+
+**Windows is checked, not run, on this host.** `tests/test_windows.py`
+exercises the path and separator logic through `ntpath` and `os.name`, which
+is the half that differs; CI runs the real thing on windows-latest.
+
+**The research measurements have not been run.** `docs/EXPERIMENTS.md` is a
+protocol. Every number in this repository is a test count, a tool count or a
+measurement of the system on its own lab - none is a result about agent
+performance.
+
 ## What it deliberately does not do
 
 - No exploit payloads that persist (no webshells, no shells period). Code

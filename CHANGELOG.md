@@ -215,7 +215,7 @@ system. All notable milestones on `agent-v2`.
   per-server errors instead of crashing startup.
 
 ### Verification & packaging
-- `python selftest.py`: 129 offline checks, including a documentation
+- `python selftest.py`: 131 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

@@ -1286,6 +1286,43 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return _witness(claim.exchanges or [None], build, spec.required)
 
 
+def verify_oracle(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """User enumeration: the same request telling a real account from an
+    absent one, with both answers on record and the difference repeated.
+
+    `_discriminates` asked only that two responses differ, which is true of
+    any two pages - so this was capped at `candidate` with "one difference is
+    not a counted series" as the reason. The series IS in the transcript: the
+    probe sends a known and an unknown account, more than once.
+    """
+    by_shape: dict[str, list[dict]] = {}
+    for entry in claim.exchanges:
+        by_shape.setdefault(_endpoint_shape(entry), []).append(entry)
+    series, shape = [], ""
+    for key, rows in by_shape.items():
+        if len(rows) > len(series):
+            series, shape = rows, key
+    # group the answers: body+status is the observable
+    answers: dict[tuple, list[dict]] = {}
+    for entry in series:
+        answers.setdefault((resp_body(entry), status_of(entry)), []).append(entry)
+    distinct = len(answers) >= 2
+    repeated = distinct and all(len(v) >= 2 for v in
+                                sorted(answers.values(), key=len,
+                                       reverse=True)[:2])
+    return [
+        _check("the same request gave two different answers", distinct,
+               f"{len(answers)} distinct answers over {len(series)} requests "
+               f"on {shape}" if distinct else
+               f"all {len(series)} cited requests on one endpoint answered "
+               "alike - there is no oracle here"),
+        _check("each answer was observed more than once", repeated,
+               "both answers repeat" if repeated else
+               "send each case twice: one differing response is noise until it "
+               "repeats, which is why this needs a series and not a pair"),
+    ]
+
+
 def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """No lockout: a counted series of failed attempts, none of them refused.
 
@@ -1642,12 +1679,14 @@ for _s in [
               ("the excerpt discriminates against a control",), verify_generic,
               ceiling="candidate",
               aliases=("server-side-request-forgery", "blind-ssrf")),
-    ProofSpec("enum", "the same request distinguishing a real account from an "
-              "absent one, repeated enough to rule out noise. This system "
-              "records one difference, which is a candidate",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              aliases=("user-enumeration", "enumeration", "username-enum")),
+    ProofSpec("enum", "the same request giving two different answers for a "
+              "known and an unknown account, each observed more than once",
+              ("the same request gave two different answers",
+               "each answer was observed more than once"),
+              verify_oracle,
+              floor=("the same request gave two different answers",),
+              aliases=("user-enumeration", "enumeration", "username-enum",
+                       "account-oracle")),
     ProofSpec("crlf", "an injected header observed as a HEADER in the response, "
               "not as body text, with the clean control. This system compares "
               "bodies, so it stops at a candidate",
