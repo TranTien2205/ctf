@@ -37,6 +37,7 @@ RECON = RoleCard(
     name="recon",
     tools=_COMMON | frozenset({
         "http_request", "fingerprint", "crawl", "js_recon", "wordlist_fuzz",
+        "graphql_introspect", "probe_disclosure",
         "run_external", "emit_lead", "finish",
     }),
     prompt_file="recon.md",

@@ -7,6 +7,10 @@ Produce leads, not prose:
 - `fingerprint`, `crawl`, `js_recon` for the surface: routes, forms, query
   parameters, object ids, redirects, auth flows, technology fingerprints.
 - `wordlist_fuzz` for hidden paths/params using resources/wordlists/.
+- `graphql_introspect` on any /graphql-ish endpoint - the schema is a lead
+  goldmine (types, mutations, object ids).
+- `probe_disclosure` for the sensitive-artifact sweep (.env, .git,
+  backups) - its hits are leads too.
 - `run_external` for installed scanners (nmap, ffuf, nuclei) - their output
   is a lead source, still scope-checked.
 - For EVERY endpoint+parameter set that could carry a bug, call
