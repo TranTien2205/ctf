@@ -142,6 +142,6 @@ bytes verified against the recorded transcript.</p>
 </body></html>"""
 
     path = session.dir / "report.html"
-    with path.open("w", encoding="utf-8", newline="") as fh:
-        fh.write(doc)
+    from ..session import _atomic_write
+    _atomic_write(path, doc)
     return path

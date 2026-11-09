@@ -81,6 +81,6 @@ def render_sarif(session: Session) -> Path:
         }],
     }
     path = session.dir / "report.sarif"
-    with path.open("w", encoding="utf-8", newline="") as fh:
-        fh.write(json.dumps(doc, indent=2, ensure_ascii=False))
+    from ..session import _atomic_write
+    _atomic_write(path, json.dumps(doc, indent=2, ensure_ascii=False))
     return path

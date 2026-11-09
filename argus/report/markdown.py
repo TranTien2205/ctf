@@ -316,9 +316,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                 "</details>",
             ]
 
+    from ..session import _atomic_write
     path = session.dir / "report.md"
-    with path.open("w", encoding="utf-8", newline="") as fh:
-        fh.write("\n".join(lines))
+    _atomic_write(path, "\n".join(lines))
     summary_json = {
         "session": session.id,
         "findings": findings,
@@ -332,7 +332,6 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "transcript_chain_head": getattr(session, "_last_chain", ""),
         **extra,
     }
-    from ..session import _atomic_write
     _atomic_write(session.dir / "summary.json",
                   json.dumps(summary_json, indent=2, ensure_ascii=False))
     try:

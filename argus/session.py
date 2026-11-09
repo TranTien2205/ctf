@@ -620,15 +620,16 @@ class Session:
         if sp.exists():
             try:
                 data = json.loads(sp.read_text(encoding="utf-8"))
-                data["sealed"] = sorted(set(files) | {"summary.json"})
-                # cheap surface for `sessions`/report readers that skip
-                # the transcript - set BEFORE the digest so the stored
-                # value itself is covered
-                for k in ("transcript_chain_head", "duration_s"):
-                    data.pop(k, None)
-                files["summary.json"] = hashlib.sha256(json.dumps(
-                    data, sort_keys=True, ensure_ascii=False).encode()
-                ).hexdigest()
+                if isinstance(data, dict):
+                    data["sealed"] = sorted(set(files) | {"summary.json"})
+                    # cheap surface for `sessions`/report readers that skip
+                    # the transcript - set BEFORE the digest so the stored
+                    # value itself is covered
+                    for k in ("transcript_chain_head", "duration_s"):
+                        data.pop(k, None)
+                    files["summary.json"] = hashlib.sha256(json.dumps(
+                        data, sort_keys=True, ensure_ascii=False).encode()
+                    ).hexdigest()
             except (ValueError, OSError):
                 pass
         if not files:
@@ -648,10 +649,11 @@ class Session:
         if sp.exists():
             try:
                 data = json.loads(sp.read_text(encoding="utf-8"))
-                data["transcript_chain_head"] = self._last_chain
-                data["sealed"] = sorted(set(files) | {"summary.json"})
-                _atomic_write(sp, json.dumps(data, indent=2,
-                                             ensure_ascii=False))
+                if isinstance(data, dict):
+                    data["transcript_chain_head"] = self._last_chain
+                    data["sealed"] = sorted(set(files) | {"summary.json"})
+                    _atomic_write(sp, json.dumps(data, indent=2,
+                                                 ensure_ascii=False))
             except (ValueError, OSError):
                 pass
         return rid
