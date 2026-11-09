@@ -213,17 +213,39 @@ class MCPManager:
         except (OSError, ValueError) as exc:
             self._errors["<config>"] = f"unreadable MCP config: {exc}"
             return
-        for name, spec in (data.get("servers") or {}).items():
+        if not isinstance(data, dict):
+            self._errors["<config>"] = "MCP config root is not an object"
+            return
+        servers = data.get("servers")
+        if not isinstance(servers, dict):
+            self._errors["<config>"] = "MCP config 'servers' is not an object"
+            return
+        for name, spec in servers.items():
+            if not isinstance(spec, dict):
+                self._errors[str(name)] = "server entry is not an object"
+                continue
             cmd = spec.get("command")
             if not cmd:
-                self._errors[name] = "server entry has no 'command'"
+                self._errors[str(name)] = "server entry has no 'command'"
                 continue
             if isinstance(cmd, str):
                 import shlex
-                cmd = shlex.split(cmd, posix=(os.name != "nt"))
-            self._clients[name] = MCPClient(
-                name, [str(c) for c in cmd], env=spec.get("env"),
-                timeout_s=float(spec.get("timeout_s", 30)))
+                try:
+                    cmd = shlex.split(cmd, posix=(os.name != "nt"))
+                except ValueError:
+                    cmd = []
+            if not isinstance(cmd, list) or not cmd:
+                self._errors[str(name)] = "server 'command' is not a list"
+                continue
+            try:
+                timeout_s = float(spec.get("timeout_s", 30))
+            except (TypeError, ValueError):
+                timeout_s = 30.0
+            env = spec.get("env")
+            self._clients[str(name)] = MCPClient(
+                str(name), [str(c) for c in cmd],
+                env=env if isinstance(env, dict) else None,
+                timeout_s=max(1.0, min(timeout_s, 600.0)))
 
     def servers(self) -> list[str]:
         return sorted(self._clients)
