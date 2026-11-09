@@ -32,6 +32,9 @@ with audit artifacts.
 - LLM credentials resolved from `~/.claude/.credentials.json` or OpenCode are
   used in memory only and never written to transcripts or reports.
 - The private-address check resolves every record via `getaddrinfo` before
-  each request, but a hostile DNS server could still answer differently at
-  connect time (rebinding). Do not point Argus at targets whose DNS you
-  believe is attacker-controlled.
+  each request AND inspects the connected peer address, so a hostile DNS
+  server that answers differently at connect time (rebinding into private
+  space) is refused. Residual: a hostile resolver could still bind the
+  hostname to a different *public* address than the operator intended, and
+  external tools own their sockets (their peer can't be inspected) — do not
+  point Argus at targets whose DNS you believe is attacker-controlled.
