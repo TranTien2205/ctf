@@ -534,9 +534,119 @@ def main() -> int:
     print("\n=== argus selftest ===")
     for status, line in results:
         print(f"[{status}] {line}")
+    _doc_consistency()
+
     failed = [r for r in results if r[0] == FAIL]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     return 1 if failed else 0
+
+
+# --- documentation names only things that exist ---------------------------
+#
+# This project's claim is that it does not invent endpoints, versions or
+# numbers. A README naming a removed command, or a count that drifted when a
+# tool was added, is the same defect in the documentation - and it is the one
+# a reader checks first. So the docs are verified against the code, not
+# proof-read.
+
+_DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
+              "docs/ARCHITECTURE.md", "docs/USAGE.md", "docs/EXPERIMENTS.md",
+              "lab/README.md", "argus/skills/INDEX.md")
+
+# words that look like a tool name but are not one
+_NOT_TOOLS = {
+    "probe_", "probe_x", "probe_name", "record_exchange", "record_event",
+    "add_finding", "load_config", "render_report", "verify_transcript",
+    "findings_bad", "findings_overgraded", "seal_artifacts", "make_server",
+    "serve_forever", "proof_marker", "input_schema", "tool_manifest",
+    "build_system", "build_seed", "sanitized_findings", "time_to_first",
+}
+
+
+def _doc_consistency() -> None:
+    import re as _re
+    from argus.tools.registry import TOOL_SCHEMAS
+    from argus.mcpserver import tool_manifest
+    from argus import proof
+
+    texts = {}
+    for name in _DOC_FILES:
+        fp = ROOT / name
+        if fp.is_file():
+            texts[name] = fp.read_text(encoding="utf-8")
+    check("doc set is present", len(texts) == len(_DOC_FILES),
+          f"found {sorted(texts)}")
+
+    tool_names = {t["name"] for t in TOOL_SCHEMAS}
+
+    # 1. every tool-shaped identifier in the docs is a registered tool
+    unknown = {}
+    for name, text in texts.items():
+        for ident in set(_re.findall(r"\b(probe_[a-z_]+|run_external|"
+                                     r"run_exploit|record_finding|load_skill|"
+                                     r"mcp_call|mcp_list|jwt_forge|jwt_decode|"
+                                     r"wordlist_fuzz|emit_lead|pull_leads|"
+                                     r"spawn_worker|read_response|"
+                                     r"graphql_introspect|js_recon|"
+                                     r"http_request)\b", text)):
+            if ident not in tool_names and ident not in _NOT_TOOLS:
+                unknown.setdefault(name, set()).add(ident)
+    check("docs name only registered tools", not unknown,
+          "; ".join(f"{k}: {sorted(v)}" for k, v in unknown.items()))
+
+    # 2. every `argus <subcommand>` in the docs is a real subcommand
+    # the add_parser calls wrap across lines, so read the file whole
+    cli_src = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+    real = set(_re.findall(r'sub\.add_parser\(\s*\n?\s*"([a-z-]+)"', cli_src))
+    # only COMMAND-shaped mentions: `python -m argus <cmd>` or `argus <cmd>`
+    # inside backticks. Prose like "argus as the server" is not a claim about
+    # a subcommand, and treating it as one made this check cry wolf.
+    named = set()
+    for text in texts.values():
+        named |= set(_re.findall(r"python -m argus ([a-z][a-z-]+)", text))
+        named |= set(_re.findall(r"`argus ([a-z][a-z-]+)", text))
+    bogus = sorted(n for n in named if n not in real)
+    check(f"docs name only real subcommands ({len(real)})", not bogus,
+          f"{bogus} not in {sorted(real)}")
+
+    # 3. counts claimed in prose match the code
+    joined = "\n".join(texts.values())
+    claims = [
+        ("tool", len(tool_names), _re.findall(r"(\d+)[- ]tools?\b", joined)
+         + _re.findall(r"\b(\d+) of the (?:\d+) tools", joined)),
+        ("class", len(proof.classes()),
+         _re.findall(r"(\d+) (?:proof-matrix )?classes", joined)),
+        ("skill", len(list((ROOT / "argus" / "skills").glob("*.md"))) - 1,
+         _re.findall(r"(\d+) (?:loadable )?(?:methodology |knowledge )?modules",
+                     joined)),
+    ]
+    served = len(tool_manifest())
+    for label, actual, found in claims:
+        nums = {int(n) for n in found}
+        # `49 of the 55 tools` contributes both numbers legitimately
+        allowed = {actual, served} if label == "tool" else {actual}
+        wrong = sorted(nums - allowed)
+        # A regex that stops matching would make this check pass forever on
+        # nothing. If the docs no longer state the count anywhere, that is
+        # itself the failure - say so rather than reporting success.
+        check(f"doc {label} counts match the code ({actual})",
+              bool(nums) and not wrong,
+              f"docs state {sorted(nums) or 'NO COUNT AT ALL'}, "
+              f"code has {sorted(allowed)}"
+              + (f" - wrong: {wrong}" if wrong else ""))
+
+    # 4. every proof class named in a doc exists, and every class the docs
+    #    claim is refused really is
+    classes = set(proof.classes())
+    named_classes = set(_re.findall(r"argus proof ([a-z-]+)", joined))
+    missing = sorted(c for c in named_classes
+                     if c and proof.spec_for(c) is None)
+    check("docs name only real proof classes", not missing, f"{missing}")
+    check("the matrix still refuses dos",
+          proof.spec_for("dos") is not None
+          and proof.spec_for("dos").verifier is proof.verify_refused)
+    check("every proof class has a requirement sentence",
+          all(proof.requirement_of(c) for c in classes))
 
 
 def _ok(fn) -> bool:

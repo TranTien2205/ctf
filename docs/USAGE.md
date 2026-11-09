@@ -25,7 +25,7 @@ source resolved, then retries with the full tool schema. Exit codes:
 auth rejected; 2 = auth works but the tool surface was rejected
 (degraded - constrain it). Note: OAuth (subscription) auth bills calls
 to your account's "extra usage" budget, not plan limits - on a
-constrained account the full ~46-tool schema may be rejected
+constrained account the full ~55-tool schema may be rejected
 (`--tools` shrinks it; team mode splits tools across role cards and
 fits under the cap).
 
@@ -60,6 +60,7 @@ python -m argus run https://app.example \
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
 | `--tools` | all | `run` only: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests |
+| `--require-proof` | off | refuse a finding whose evidence does not meet the proof requirement for its class. Off by default: a candidate is worth recording and re-testing. On, `findings.json` holds only what was proven — the condition an evaluation wants to be able to state |
 | `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
@@ -119,9 +120,10 @@ verbatim evidence from a cited response.
 | Bug class | Tool | Detection approach |
 |---|---|---|
 | Reflected XSS | `probe_reflection` | canary reflection, context detection |
-| SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count |
+| SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count, opt-in bounded read (`extract_table`/`extract_columns`, LIMIT applied in the tool) |
 | NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` JSON + urlencoded `param[$op]` carrier |
-| Command injection | `probe_time` | sleep separators vs measured baseline latency |
+| Command injection | `probe_cmdi` | `id; echo <nonce>` across 8 separator families, reads the OUTPUT; reports a reflection as a reflection; falls back to the timing oracle, which stays a candidate |
+| Command injection (blind) | `probe_time` | sleep separators vs measured baseline latency |
 | SSTI | `probe_ssti` | `{{7*7}}`-family eval per engine syntax |
 | File read / LFI | `probe_lfi` | traversal/absolute/encoded/null-byte + `file://`, `php://filter` decode |
 | Open redirect | `probe_redirect` | canonical + //host, backslash, userinfo, suffix-confuse; meta/JS hops |
@@ -195,8 +197,24 @@ compare `run` vs `team` on speed, coverage and cost.
 Each finding carries `severity`, optional `cvss`, and an auto-mapped `cwe`
 (the named bug class resolves to the canonical CWE identifier, e.g.
 `sqli` -> CWE-89 -> OWASP A03 Injection; unknown categories simply omit
-both), plus verbatim
-`evidence_excerpt` and cited `evidence_ids`.
+both), plus verbatim `evidence_excerpt` and cited `evidence_ids`.
+
+It also carries `vuln_class`, `grade` and a `proof` block listing every
+check with its outcome:
+
+| grade | means | in the report |
+|---|---|---|
+| `proven` | the class artifact and its control are both on record | listed first; SARIF `kind: fail` |
+| `candidate` | a real signal, a named check still missing | listed after, with the missing check printed; SARIF `kind: review`, `level: none` |
+| `unproven` | nothing in the cited evidence meets the requirement | listed last with the requirement quoted |
+| `refused` | this system does not prove the class | cannot be recorded at all |
+
+`summary.json` carries `grades` as counts. Read the candidates as work to
+finish, not as results: `argus proof <class>` prints what each one needs.
+
+`argus verify <dir>` recomputes the grades from the chained transcript, so a
+grade raised by hand in `findings.json` fails the check — including after an
+`argus report` re-render has recomputed the artifact seal.
 
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
@@ -276,6 +294,57 @@ proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
 working directory. If a run is refused, pick the in-scope equivalent —
 e.g. `-b name=value` instead of a cookie-jar path.
 
+## Proof requirements
+
+```
+python -m argus proof            # all 25 classes, one line each
+python -m argus proof rce        # one class in full
+python -m argus proof sqli --json
+```
+
+Read it before probing a class, not after writing the finding —
+`load_skill("<class>")` attaches the same requirement to the methodology
+module, which is the moment it still changes what gets sent.
+
+```
+rce - proof requirement
+
+  the output of `id; echo <nonce>` returned by the target, with the nonce
+  tying the output to the probe
+
+  checks that must pass:
+    - a benign command was sent
+    - identity output returned by the target
+    - marker echoed in the output
+  without this one, nothing above 'unproven' is available:
+    - identity output returned by the target
+  disqualifies the evidence entirely:
+    - proof command stayed benign
+```
+
+## Serving argus to your own LLM (`argus mcp-serve`)
+
+```
+python -m argus mcp-serve http://127.0.0.1:8777 --allow-private \
+    --require-proof --session-dir sessions
+```
+
+Speaks newline-delimited stdio JSON-RPC and serves 49 of the 55 tools.
+Takes the same flags as `run`. Register it with any MCP host:
+
+```json
+{"mcpServers": {"argus": {
+  "command": "python",
+  "args": ["-m", "argus", "mcp-serve", "http://127.0.0.1:8777",
+           "--allow-private", "--require-proof"]}}}
+```
+
+The scope guard, rate limiter, transcript, dedup and proof matrix stay on
+this side. `initialize` returns the operating contract as `instructions`.
+Withheld: the four team-orchestration tools (the host LLM is the
+orchestrator) and `mcp_list`/`mcp_call` (argus calling out while serving
+would be a loop the operator cannot see).
+
 ## MCP tool servers
 
 `mcp_list` / `mcp_call` bridge external MCP servers (search, fetch, CVE
@@ -317,3 +386,8 @@ sensitive data read → high-critical; verified primitives with unclear
 reach → medium; hygiene issues → low/info. A finding only exists if the
 excerpt proving it is inside a recorded response — if `report.md` says
 it, `transcript.jsonl` shows it.
+
+Severity and grade answer different questions, and both are printed.
+Severity is how bad it would be; the grade is how sure we are. A
+`critical` + `candidate` row is a lead worth a day of someone's time, not a
+result — and `probe_*` verdicts say "candidate" for the same reason.

@@ -21,6 +21,17 @@ ClaudeClient.chat(messages, TOOL_SCHEMAS, system)   ← Anthropic tool_use API
                      result → tool_result → next turn
    │
    └─ finish(summary) or budget exhausted → report/markdown.py
+
+record_finding(...) is the one tool with a second gate behind it:
+
+    excerpt verbatim in a cited response?   → no: rejected
+                │ yes
+    proof.grade(class, excerpt, cited)      → proven / candidate /
+                │                              unproven / refused
+    refused class?                          → rejected, always
+    --require-proof and not proven?         → rejected
+                │
+    recorded, carrying vuln_class + grade + every check
 ```
 
 Design choices and why:
@@ -33,9 +44,18 @@ Design choices and why:
   desync probes that httpx cannot express go through
   `GuardedClient.send_raw`, which keeps the same scope/budget/transcript
   guarantees on a controlled raw channel.
-- **Evidence gating at write time.** `Session.add_finding` asserts the
-  excerpt is a substring of a cited response. Same idea as a flag gate,
-  generalized: the machine validates the *truth* of a claim, not its shape.
+- **Evidence gating at write time, in two layers.** `Session.add_finding`
+  asserts the excerpt is a substring of a cited response. That is necessary
+  and not sufficient: it proves the bytes were observed, not that the class
+  was demonstrated, and a benign page reading `uid=1 selected` satisfies it
+  for a claimed critical RCE. So the claim is then graded by
+  `argus/proof.py` against a requirement written per class — read from the
+  cited request *and* response, never from a probe's self-report, so a probe
+  cannot grade itself. Four grades: `proven`, `candidate`, `unproven`,
+  `refused`. The grade does not block the record; it comes back with the
+  names of the checks that did not pass, and re-recording with the missing
+  evidence upgrades the finding in place. `--require-proof` refuses anything
+  below `proven`.
 - **Baseline-diffed probes.** Each `probe_*` returns `verdict` +
   `request_ids`, never "you are vulnerable". The agent confirms and
   rates severity itself.
@@ -49,7 +69,7 @@ Design choices and why:
 - **Cost-aware LLM calls.** `ClaudeClient` marks the static prefix
   (system + tools + conversation tail) with ephemeral cache breakpoints —
   billed input drops ~90% on cache hits. A 400 mentioning cache disables
-  it transparently. The full 54-tool schema is ~30KB/call, so constrained
+  it transparently. The full 55-tool schema is ~32KB/call, so constrained
   auth paths can pass `--tools` (run) or rely on role-card subsets (team).
 - **Bounded context.** Tool results older than the last 8 result-messages
   compact to a stub naming their request_ids (re-inspect via
@@ -84,11 +104,14 @@ prompt wording can widen it.
 | loopback/private pivot to infra | private-address refusal over ALL resolved records (v4+v6 via `getaddrinfo` - one private answer denies) plus a **connect-time peer check**: `send()` inspects `network_stream.server_addr` and `send_raw()` inspects `sock.getpeername()`, so a DNS answer that flips between check and connect (rebinding) is refused on the real peer IP; `--allow-private` opts in, auto-allowed only when the declared target is itself private. Residual: external scanners run their own sockets and re-resolve independently - their args are vetted against scope but the wire itself is the tool's | `ScopeGuard`, `GuardedClient` |
 | flood the target | shared token bucket; redirect hops count too | `RateLimiter`, `GuardedClient` |
 | invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
+| a claim stronger than its evidence | the class requirement is re-checked against the cited request/response; a shortfall grades `candidate`/`unproven` and names the missing check, and `--require-proof` refuses it | `proof.grade`, `Session.add_finding` |
+| a class this system cannot prove | `dos` is `refused` by construction and cannot be recorded at all, at any grade | `proof.verify_refused` |
+| a proof grade raised by hand after the run | `argus verify` recomputes every grade from the chained transcript; an inflated grade fails even after a legitimate `argus report` re-render has recomputed the artifact seal | `findings_overgraded` |
 | finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |
 | post-run transcript tampering | sha256 hash chain per entry + chain head anchored in `summary.json` | `verify_transcript`, `argus verify` |
 | post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript (the file itself is not hashed) | `verify_transcript` findings pass |
 | post-run artifact tampering (meta/findings/notes/report.*/summary) | run-end `artifacts_digest` transcript entry stores per-file sha256; verify recomputes (summary digest skips mutable head/duration so legit re-renders stay clean) | `seal_artifacts`, `artifact_mismatch` |
-| scanner output treated as proof | `run_external`/`mcp_call` output is a lead until an `http_request` re-verifies or a `proof_marker` matches | tool notes + evidence gate |
+| scanner output treated as proof | enforced, not advised: `run_external`/`mcp_call` record events carrying `output` and no `response`, and a claim citing only those fails the wire check for every class. A `proof_marker` match or an `http_request` that reproduces it is what makes a lead citable | `proof._wire_check` |
 | exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to bundled/cwd `resources/wordlists`; bundled shorts parsed | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
 | redirect connection out of scope | `curl --resolve/--connect-to/-x/proxies`, `nmap --proxies`, `ffuf -x`, `sqlmap --proxy/--tor` refused | arg guards |
@@ -112,12 +135,51 @@ waste budget inside scope.
 - New probe: add a function in `tools/probes.py`, register in
   `tools/registry.py` (`_impl` + `_schema`). It must send via
   `ctx.client.send` — then scope, rate limit and evidence are free.
-- New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`.
+- New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`. Name
+  it after a proof-matrix class and `load_skill` attaches the requirement to
+  it automatically.
+- New proof class: a `ProofSpec` in `argus/proof.py` — a requirement
+  sentence, the named checks, a verifier, and `floor`/`veto` where they
+  apply. It needs a test in BOTH directions: an evidence set that must grade
+  `proven`, and one that must not. The second is the one that matters. Watch
+  for a check that passes trivially — three of them shipped and had to be
+  fixed, because the verbatim gate already guarantees the excerpt exists, so
+  "the quoted bytes are in a response" carries no information.
 - New report format: `argus/report/` takes `Session` + `Config`.
 - External tool providers: drop a server into `mcp.json` — `argus/mcp.py`
   speaks stdio JSON-RPC, `mcp_list`/`mcp_call` expose it to every role.
 - Different model: `ClaudeClient` is ~40 lines of HTTP; `llm.ScriptedClient`
   shows the duck-typed interface (`chat(messages, tools, system)`).
+
+## Served mode (`argus mcp-serve`)
+
+A third plane, and the one that spells out the chain the project is built
+against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 49 of
+the 55 tools over newline-delimited stdio JSON-RPC, symmetric with the client
+in `argus/mcp.py`, so the two halves of the protocol are testable against
+each other rather than against a mock.
+
+```
+   MCP host (Claude Code / IDE / agent runtime)
+        │  tools/list · tools/call          stdio JSON-RPC
+        ▼
+   ArgusMCPServer ── dispatch(ctx, name, args)
+        │
+        └─ the same ScopeGuard · RateLimiter · Session · proof matrix
+```
+
+The driver moves outside; the guards do not. A host LLM gets argus's hands,
+not argus's permissions: it cannot widen scope, cannot send a byte that is
+not recorded, and a finding it records is graded exactly as `argus run` would
+grade it. `initialize` hands back `build_system(cfg, scope)` as
+`instructions`, so a host that never read argus's system prompt still
+receives the scope and the evidence rules.
+
+Withheld: `spawn_worker`, `request_worker`, `list_workers`,
+`finish_engagement` — team orchestration, and the host LLM is the
+orchestrator here; a second one inside argus would re-interpret the same
+intent. Plus `mcp_list`/`mcp_call`, which would let argus call out to other
+servers while serving as one.
 
 ## Team mode (`argus team`)
 
@@ -176,7 +238,10 @@ role-specialized **workers** through a shared blackboard.
 
 ## What it deliberately does not do
 
-- No exploit payloads that persist (no webshells, no shells period).
+- No exploit payloads that persist (no webshells, no shells period). Code
+  execution is proven with `id; echo <nonce>` and stops there: the matrix
+  vetoes an rce claim whose cited request carries a destructive payload, so
+  the evidence is void even when the command ran.
 - No authentication-agnostic scanning of foreign hosts — scope is explicit.
 - `run_external` and `run_exploit` output is a lead, not evidence:
   scanner claims are verified through `http_request` (or a manifest's

@@ -13,7 +13,7 @@ python lab/vulnapp.py 8777            # deterministic vulnerable app
 ```
 
 Auth note: subscription OAuth bills to the account's "extra usage" pool
-and caps per-request size — the full 54-tool schema (~30KB) may be
+and caps per-request size — the full 55-tool schema (~32KB) may be
 rejected there. For constrained auth, run `run` with
 `--tools fingerprint,crawl,http_request,probe_sqli,probe_idor,probe_reflection,probe_disclosure,record_finding,note,load_skill,read_response`
 or use `team` (role cards already subset tools per worker). Metered API
@@ -22,10 +22,16 @@ keys are unaffected.
 The lab plants one bug per probe family (SQLi, NoSQLi, XSS, IDOR, SSRF,
 XXE, CSRF, XFH/ACL-bypass, upload, race, deserialization, cache
 poisoning+deception, prototype pollution, JWT weak secret, CORS,
-open-redirect, CRLF, LFI, SSTI, time-based injection, request smuggling,
-user-enum, login lockout, mass-assignment, GraphQL, WebSocket, info
-disclosure, cross-site tracing via TRACE echo) plus recon surface (robots, .git, sourcemap, hidden routes).
-Each run resets state at `make_server`.
+open-redirect, CRLF, LFI, SSTI, OS command injection, time-based injection,
+request smuggling, user-enum, login lockout, mass-assignment, GraphQL,
+WebSocket, info disclosure, cross-site tracing via TRACE echo) plus recon
+surface (robots, .git, sourcemap, hidden routes). Each run resets state at
+`make_server`.
+
+`/ping` executes for real — argv through a seven-command allowlist, never a
+shell, bound to loopback — so `id` returns the host's own identity line and
+the rce class is provable end to end. A destructive payload comes back
+"command not found", which is also what a hardened target looks like.
 
 ## Procedure
 
@@ -52,6 +58,7 @@ done
 | metric | meaning |
 |---|---|
 | `findings`, `counts` | evidence-gated findings (full list + per-severity counts) |
+| `grades` | per-grade counts: `proven` / `candidate` / `unproven`. Report this beside `findings` — a configuration that records more findings at a lower proven rate is not better, and a count alone cannot show that |
 | `requests` | real wire requests spent (budget discipline) |
 | `duration_s` | wall-clock length of the run |
 | `time_to_first_finding_s` | speed to first confirmed result |
@@ -70,8 +77,10 @@ python -m argus compare --csv exp/single-*/2*/ exp/team-*/2*/   # N trials, one 
 python -m argus sessions --session-dir exp/single-1
 ```
 
-Report medians per configuration: findings count, requests, tokens,
-time-to-first-finding, endpoints covered. The offline check
+Report medians per configuration: **proven** findings, candidates,
+requests, tokens, time-to-first-finding, endpoints covered. Proven count is
+the primary measure; total findings without the grade split invites a
+configuration to win by recording more leads. The offline check
 `python -m argus demo` / `demo --team` reproduces the pipeline shape without
 spending tokens (5 seeded findings on both paths).
 
@@ -81,7 +90,12 @@ spending tokens (5 seeded findings on both paths).
   `make_server`; counters/caches reset).
 - Same `--goal`, `--max-turns`, `--rate`, `--max-requests` across A/B.
 - Report findings as count AND categories found — the lab's planted classes
-  are the recall denominator.
+  are the recall denominator — and split each by grade. A class found but
+  left a candidate is a partial result; say so rather than scoring it as a
+  hit or discarding it.
+- Run each arm a second time with `--require-proof` to get the strict-mode
+  numbers. The two conditions answer different questions: the default
+  measures what the agent noticed, strict measures what it finished.
 - Keep transcripts: they are the audit trail for every claimed finding.
   `python -m argus verify <dir>` proves the transcript was not altered,
   re-validates every finding's evidence against it, and recomputes the

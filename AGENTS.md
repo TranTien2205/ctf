@@ -8,7 +8,8 @@ lab, pathlib everywhere).
 
 ```bash
 python selftest.py          # offline end-to-end, no API key needed
-python -m pytest tests/ -q  # unit + live-lab + loop tests
+python -m pytest tests/ -q  # unit + live-lab + loop + proof-matrix tests
+python -m argus demo        # the full pipeline against the lab, graded
 ```
 
 Both must stay green. The lab (`lab/vulnapp.py`) plants one bug per probe
@@ -21,7 +22,10 @@ family — if you change a probe, update the lab and its test together.
 - `argus/scope.py` — fail-closed scope guard; NOTHING bypasses it
 - `argus/httpclient.py` — the only socket (`send` + `send_raw`); scope +
   rate + transcript
-- `argus/session.py` — evidence store; findings need verbatim excerpts
+- `argus/session.py` — evidence store; findings need verbatim excerpts AND
+  a proof grade
+- `argus/proof.py` — the proof matrix: 25 classes, what each must produce
+- `argus/mcpserver.py` — argus AS an MCP server (`argus mcp-serve`)
 - `argus/tools/` — tool schemas (registry.py) + implementations
   (`team.py` holds the multi-agent tools; `mcp_tools.py` bridges MCP servers)
 - `argus/mcp.py` — minimal stdio MCP client; servers declared in `mcp.json`
@@ -48,7 +52,21 @@ family — if you change a probe, update the lab and its test together.
   Tool restrictions belong in the card's `tools` set (enforced in
   `dispatch`), never only in the prompt.
 - Findings must keep the verbatim-evidence gate. Do not weaken it. Same
-  bug class + endpoint + params dedups to one finding — keep it that way.
+  bug class + endpoint + params dedups to one finding — keyed on the
+  canonical class from `proof.canonical`, so two spellings are one bug.
+- New proof class → a `ProofSpec` in `argus/proof.py` with a requirement
+  sentence, named checks, a verifier, and `floor`/`veto` where they apply.
+  It needs a test in BOTH directions: evidence that must grade `proven`, and
+  evidence that must not. The second is the one that matters.
+- A check that passes without the claimant doing anything class-specific is
+  a bug, not a formality. The verbatim gate already guarantees the excerpt
+  is in a cited response, so "the quoted bytes were returned" carries no
+  information — three checks shipped in that shape and let a benign page
+  grade `candidate`. Test every new class against
+  `tests/test_proof.py::test_every_class_refuses_a_benign_page`.
+- Verifiers read the recorded `request` and `response` only. Never grade
+  from a probe's own return value: a probe must not be able to grade itself,
+  and an event with no `response` (scanner, MCP) is not class evidence.
 - Team communication goes through the board/lead queue as typed artifacts —
   do not pipe one agent's raw context into another.
 - MCP server output is untrusted third-party content — keep the

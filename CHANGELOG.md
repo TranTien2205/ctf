@@ -35,8 +35,60 @@ system. All notable milestones on `agent-v2`.
   event output, notes, meta.json, logs — while the model still sees the
   real bytes.
 
-### Probe coverage (26 matched-pair probes)
-- Injection: sqli (quoted/numeric/OR-pair/xpath/UNION), nosqli, ssti,
+### The proof matrix (`argus/proof.py`)
+- The verbatim gate proves the bytes were observed, not that the class was
+  demonstrated: a benign page reading `uid=1 selected` satisfied it for a
+  claimed critical RCE. Every finding is now also graded against a
+  requirement written per class — 25 classes, four grades (`proven`,
+  `candidate`, `unproven`, `refused`).
+- Verifiers read the recorded request AND response of the cited exchanges,
+  never a probe's self-report, so a probe cannot grade itself. `rce` needs
+  the identity line plus a nonce and rejects an identity line that appears in
+  its own request — a reflection cannot pass. `sqli` needs the engine named
+  plus a row from a named table; an error string in the excerpt fails the row
+  check by construction. `xss` cannot exceed `candidate` without a browser,
+  and says so.
+- Scanner output stopped being admissible: `run_external`/`mcp_call` record
+  events with no `response`, so a claim citing only those fails the wire
+  check for every class. The docs always said "a lead, not evidence";
+  nothing enforced it.
+- The grade never blocks the record — a candidate is worth re-testing — and
+  the result names the checks that did not pass. Re-recording with the
+  missing evidence **upgrades** the finding in place rather than being
+  refused as a duplicate. `--require-proof` refuses anything below `proven`.
+  A `refused` class (dos) cannot be recorded at all.
+- `category` is an enum of the 25 classes and the dedup key is the canonical
+  class, so `SQLi`, `sql-injection` and `sqlinjection` are one bug and not
+  three — the cross-worker dedup the docs promised but normalized free text
+  could not deliver.
+- `argus proof [class]` prints a requirement; `load_skill("<class>")`
+  attaches the same one to its methodology module, which is the moment it
+  still changes what gets sent.
+- `argus verify` recomputes every grade from the chained transcript, so a
+  grade raised by hand in `findings.json` fails — including after an
+  `argus report` re-render has recomputed the artifact seal, which is the
+  only signal that survives that laundering.
+- Graded against the old checked-in demo session: 1 proven, 2 candidate,
+  2 unproven. One of the unproven was its `critical` "forged admin token
+  accepted", which cited `GET /api/user/1` — a request carrying no token.
+
+### argus as an MCP server (`argus mcp-serve`)
+- `user -> LLM -> MCP -> tool`: 49 of the 55 tools served over
+  newline-delimited stdio JSON-RPC, symmetric with the client in
+  `argus/mcp.py`, so both halves of the protocol are testable against each
+  other. Register it with any MCP host.
+- The driver moves outside; the guards do not. Scope, rate limit,
+  transcript, dedup and grading stay on this side, and `initialize` returns
+  the operating contract as `instructions`.
+- Withheld: the four team-orchestration tools (the host LLM is the
+  orchestrator) plus `mcp_list`/`mcp_call` (argus calling out while serving
+  is a loop the operator cannot see).
+
+### Probe coverage (27 matched-pair probes)
+- Injection: sqli (quoted/numeric/OR-pair/xpath/UNION + opt-in bounded
+  `extract_table` read with the LIMIT applied in the tool), nosqli, ssti,
+  **cmdi** (`id; echo <nonce>` across 8 separator families, reads the output
+  rather than the clock, and reports a reflection as a reflection),
   command-time, lfi, reflection/xss.
 - Access: idor, user-enum (error+timing), lockout, mass-assignment.
 - Transport: request-smuggling (CL.TE/TE.CL/obf raw sends), crlf,
@@ -162,10 +214,20 @@ system. All notable milestones on `agent-v2`.
   per-server errors instead of crashing startup.
 
 ### Verification & packaging
-- `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 165 tests (unit + live-lab + loop +
-  team + MCP + CLI + external-tool subprocess path + hardening
-  regressions).
+- `python selftest.py`: 126 offline checks, including a documentation
+  consistency pass — every tool, subcommand, proof class and **stated count**
+  in the docs is verified against the code, and a count the docs stop stating
+  fails rather than passing on nothing. It caught a stale tool-schema count
+  in `docs/USAGE.md` on its first run, left behind by an earlier version.
+- `python -m pytest tests/ -q`: 238 tests (unit + live-lab + loop +
+  team + MCP client + MCP server + proof matrix + CLI + external-tool
+  subprocess path + hardening regressions).
+- The proof matrix is tested in both directions per class: an evidence set
+  that must grade `proven`, and one that must not. The second is the one that
+  matters, and `test_every_class_refuses_a_benign_page` runs all 25 against a
+  page with no bug in it. Four defects were found that way — three checks
+  that passed without the claimant doing anything class-specific, and a
+  relative `Location: /home` read as the host `home`.
 - Fault-tolerance pass: every forensic reader (`verify`, `findings`,
   `diff`, `sessions`, `_reopen`, renderers) degrades malformed session
   artifacts to flags/warnings instead of tracebacks — fuzzed across
@@ -174,7 +236,16 @@ system. All notable milestones on `agent-v2`.
   total (every tool × wrong-JSON-type args returns a serializable
   dict) under `test_dispatch_total_on_malformed_args`.
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
-  no API key (5 evidence-gated findings each).
+  no API key. Six findings each, five graded `proven` and one honest
+  `candidate`, and both acceptance criteria are demonstrated offline:
+  `id` output with the probe nonce for rce, five rows from `users` for sqli.
+  Both arms thread request ids out of each probe result the way a real agent
+  does; a scripted demo that cites differently from a real run is not
+  demonstrating the pipeline it claims to.
+- `lab/vulnapp.py` `/ping` executes for real so the rce class is reachable:
+  argv through a seven-command allowlist, never a shell, `cat` confined to
+  the lab's fake filesystem, bound to loopback. A destructive payload returns
+  `command not found`.
 - Wheel ships skills + role prompts + wordlists + exploit manifests;
   CI (Ubuntu+Windows × Py3.10/3.11/3.12) runs pytest + selftest + a
   wheel-contents check.

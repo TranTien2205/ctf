@@ -4,6 +4,12 @@ Load one at a time with `load_skill("<name>")` - only when the signal points
 at that bug class. Each module carries: when it applies, first probes, what
 actually confirms the bug, and bypasses for common filters.
 
+When the name matches a proof-matrix class, the result also carries that
+class's `proof_requirement` and the checks it has to pass. Read it here,
+before probing - after you have written the finding is too late to choose a
+different request. `argus proof <class>` prints the same thing from the
+command line.
+
 ## Signal -> skill
 
 | Observed | Skill |
