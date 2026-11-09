@@ -151,10 +151,19 @@ system. All notable milestones on `agent-v2`.
 - Target-controlled URLs are fuzz-safe: `crawl`, `js_recon`, `diff`,
   renderers, `_redact_url` and `_finding_key` all skip/degrade on
   `http://[bad`-class input instead of tracebacking.
+- Model-supplied JSON types are coerce-hardened end to end: every tool
+  param that flows through `.lower()`/`.strip()`/`int()` is str/typed
+  before use, numeric clamps share `registry._ival` (wrong type falls
+  back to the default instead of killing the tool call), and
+  `record_finding`/`finish`/team tools gate clean on int/list input.
+- Operator-input validation is fail-fast: `--proxy` scheme (incl. a
+  clear socks5-needs-socksio message), `--resume` session-dir check,
+  `--session-dir` not-a-file check, malformed `--mcp-config` lands
+  per-server errors instead of crashing startup.
 
 ### Verification & packaging
 - `python selftest.py`: 110 offline checks.
-- `python -m pytest tests/ -q`: 160 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 163 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions).
 - Fault-tolerance pass: every forensic reader (`verify`, `findings`,
