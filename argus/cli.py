@@ -540,18 +540,24 @@ def main(argv: list[str] | None = None) -> int:
                 s = {}
             if not isinstance(s, dict):
                 s = {}
-            agents = s.get("agents") or {}
+            agents = s.get("agents")
             if isinstance(agents, dict):
                 agents = list(agents.values())
+            if not isinstance(agents, list):
+                agents = []
+            _cov = s.get("coverage")
+            _eps = _cov.get("endpoints") if isinstance(_cov, dict) else None
+            _tok = s.get("llm_tokens")
             return {
                 "dir": Path(d).name, "mode": s.get("mode", "single"),
-                "findings": len(s.get("findings") or []),
+                "findings": len(s.get("findings"))
+                            if isinstance(s.get("findings"), list) else 0,
                 "requests": s.get("requests", 0),
                 "ttf": s.get("time_to_first_finding_s"),
                 "duration_s": s.get("duration_s"),
-                "coverage": len((s.get("coverage") or {}).get("endpoints") or []),
+                "coverage": len(_eps) if isinstance(_eps, list) else 0,
                 "llm_calls": s.get("llm_calls", 0),
-                "tokens": (s.get("llm_tokens") or {}),
+                "tokens": _tok if isinstance(_tok, dict) else {},
                 "workers": len(agents),
             }
         if len(args.dirs) < 2:
