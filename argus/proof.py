@@ -489,6 +489,13 @@ def _redirect_host(location: str) -> str:
     value = str(location or "").strip()
     if not value:
         return ""
+    # `javascript:` and `data:` have no host, and returning "" read them as
+    # in-origin - so a redirect to `javascript:alert(1)`, which the lab plants
+    # and probe_redirect detects, graded `unproven`. They are the most
+    # dangerous destination a Location can carry, not the safest.
+    scheme = value.split(":", 1)[0].lower() if ":" in value else ""
+    if scheme in ("javascript", "data", "vbscript", "file"):
+        return f"{scheme}:"
     if value.startswith("//"):
         return urllib.parse.urlparse("http:" + value).hostname or ""
     parsed = urllib.parse.urlparse(value)
@@ -1269,6 +1276,42 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return _witness(claim.exchanges or [None], build, spec.required)
 
 
+def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """No lockout: a counted series of failed attempts, none of them refused.
+
+    This class was graded by `_discriminates`, which asks for a DIFFERENCE
+    between two responses - and the bug is characterised by the absence of
+    one. So the real bug (every attempt answers 401 alike) graded `unproven`
+    while the defence working (the sixth attempt answers 429) graded
+    `candidate`. The requirement was backwards, and the `candidate` cap hid
+    it: a cap that is really a missing implementation reads as a limit.
+    """
+    by_endpoint: dict[str, list[dict]] = {}
+    for entry in claim.exchanges:
+        by_endpoint.setdefault(_endpoint_shape(entry), []).append(entry)
+    series, shape = [], ""
+    for key, rows in by_endpoint.items():
+        if len(rows) > len(series):
+            series, shape = rows, key
+    throttled = [e for e in series
+                 if status_of(e) == 429
+                 or re.search(r"(?i)too many|rate limit|locked|try again later|"
+                              r"temporarily (?:blocked|disabled)", resp_body(e))]
+    enough = len(series) >= 5
+    return [
+        _check("a counted series of attempts is on record", enough,
+               f"{len(series)} attempts on {shape}" if enough else
+               f"only {len(series)} attempt(s) on one endpoint - send at least "
+               "five, so 'never refused' means something"),
+        _check("none of them was refused", enough and not throttled,
+               f"all {len(series)} answered without a throttle" if enough
+               and not throttled else
+               (f"{throttled[0].get('id')} answered "
+                f"{status_of(throttled[0])} - that is the lockout working"
+                if throttled else "no series to judge")),
+    ]
+
+
 def verify_generic(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Classes whose artifact this system measures as a difference and nothing
     more.
@@ -1283,11 +1326,6 @@ def verify_generic(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
 def verify_refused(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return [_check("class is provable by this system", False, spec.refusal)]
-
-
-def verify_generic(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """Classes whose artifact is a measured difference and nothing more."""
-    return [_discriminates(claim)]
 
 
 # --- the matrix --------------------------------------------------------------
@@ -1613,11 +1651,13 @@ for _s in [
               ("the excerpt discriminates against a control",), verify_generic,
               ceiling="candidate",
               aliases=("http-method", "verb-tampering", "trace")),
-    ProofSpec("lockout", "a counted series of failures never refused - the "
-              "count is the evidence, and this system records a difference, "
-              "not a count",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate", aliases=("no-rate-limit", "bruteforce")),
+    ProofSpec("lockout", "a counted series of failed attempts on one "
+              "endpoint, none of them refused - the count is the evidence",
+              ("a counted series of attempts is on record",
+               "none of them was refused"),
+              verify_no_throttle,
+              floor=("a counted series of attempts is on record",),
+              aliases=("no-rate-limit", "bruteforce", "no-lockout")),
     ProofSpec("websocket", "a cross-origin handshake accepted and a message "
               "answered - which needs a real WebSocket client. This system "
               "compares the handshake only",

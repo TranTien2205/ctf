@@ -676,7 +676,9 @@ def test_difference_only_classes_cannot_reach_proven():
     site - and it graded seven classes proven."""
     a = ex("b6", "http://t.local/a", "<html>Page A unique</html>")
     b = ex("b7", "http://t.local/b", "<html>Page B different</html>")
-    for name in ("ssrf", "enum", "crlf", "upload", "method", "lockout",
+    # lockout left this set: its artifact is the ABSENCE of a difference, and
+    # being graded by `_discriminates` inverted it
+    for name in ("ssrf", "enum", "crlf", "upload", "method",
                  "websocket", "race"):
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
@@ -903,7 +905,6 @@ CANNOT_BE_PROVEN_HERE = {
     "ppoll": "no browser",
     "ssrf": "no collector",
     "enum": "one difference is not a counted series",
-    "lockout": "one difference is not a count",
     "crlf": "the verifier compares bodies, not headers",
     "upload": "serving is not executing",
     "method": "a status difference is not an effect",
@@ -1153,3 +1154,57 @@ def test_the_aria_role_attribute_is_not_a_subject_field(html):
     on any HTML page."""
     assert not proof.SUBJECT_RE.search(html)
     assert not proof.PRIVILEGED_FIELD_RE.search(html)
+
+
+def test_no_module_defines_a_function_twice():
+    """A block rewrite left two `verify_generic` definitions in proof.py, the
+    second silently shadowing the first. Nothing caught it: both happened to
+    behave the same, and the next pair might not."""
+    import ast
+    import pathlib
+    root = pathlib.Path(proof.__file__).resolve().parent
+    offenders = {}
+    for path in sorted(root.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        names = [n.name for n in tree.body
+                 if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                   ast.ClassDef))]
+        dups = sorted({n for n in names if names.count(n) > 1})
+        if dups:
+            offenders[path.name] = dups
+    assert not offenders, f"shadowed top-level definitions: {offenders}"
+
+
+def test_lockout_is_the_absence_of_a_difference():
+    """It was graded by `_discriminates`, which asks for a difference - and
+    this bug is characterised by not having one. The real bug graded
+    `unproven` while the defence working graded `candidate`, and the
+    `candidate` cap made the inversion look like a limit."""
+    series = [ex(f"L{i}", "http://t.local/login", "Invalid credentials", 401,
+                 method="POST", req_body="u=a&p=b") for i in range(6)]
+    assert proof.grade("lockout", "Invalid credentials",
+                       series).grade == "proven"
+    throttled = series[:5] + [
+        ex("L9", "http://t.local/login", "Too many attempts", 429,
+           method="POST", req_body="u=a&p=b")]
+    v = proof.grade("lockout", "Invalid credentials", throttled)
+    assert v.grade == "candidate"
+    assert "none of them was refused" in v.missing
+    # two attempts is not a counted series
+    assert proof.grade("lockout", "Invalid credentials",
+                       series[:2]).grade == "unproven"
+    assert proof.spec_for("lockout").ceiling == ""
+
+
+def test_a_dangerous_scheme_in_location_is_off_origin():
+    """`javascript:` has no host, so returning "" read it as in-origin and a
+    redirect to `javascript:alert(1)` - which the lab plants and
+    probe_redirect detects - graded `unproven`."""
+    assert proof._redirect_host("javascript:alert(1)") == "javascript:"
+    assert proof._redirect_host("data:text/html,x") == "data:"
+    assert proof._redirect_host("/home") == ""
+    js = ex("J1", "http://t.local/go?next=javascript:alert(1)", "", 302,
+            headers={"location": "javascript:alert(1)"})
+    home = ex("J2", "http://t.local/go?next=/home", "", 302,
+              headers={"location": "/home"})
+    assert proof.grade("redirect", "", [js, home]).grade == "proven"
