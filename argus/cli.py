@@ -77,8 +77,9 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="argus", description="Argus - LLM agent for authorized web pentests")
+    from . import __version__
     parser.add_argument("--version", action="version",
-                        version="argus 1.0.0")
+                        version=f"argus {__version__}")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_run = sub.add_parser("run", help="run an autonomous assessment")
