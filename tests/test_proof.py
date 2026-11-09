@@ -118,9 +118,13 @@ def test_deserialize_declares_a_gadget_not_a_shell_separator():
                 body="uid=33(www-data) gid=33(www-data)\nargusk3m9")
     assert proof.grade("deserialization", "uid=33(www-data) gid=33(www-data)",
                        [gadget]).grade == "proven"
-    # the rce proof itself is NOT a deserialization proof: no gadget was sent
+    # the rce proof itself is NOT a deserialization proof: no gadget was sent,
+    # and the gadget is the floor - a page that merely prints an identity line
+    # must not grade this class at all
     assert proof.grade("deserialize", "uid=33(www-data) gid=33(www-data)",
-                       [RCE_PROOF]).grade == "candidate"
+                       [RCE_PROOF]).grade == "unproven"
+    assert proof.spec_for("deserialize").floor == (
+        "a serialized payload was sent",)
 
 
 # --- sqli -------------------------------------------------------------------

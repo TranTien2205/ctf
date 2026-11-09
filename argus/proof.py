@@ -1469,7 +1469,10 @@ for _s in [
               "serialized payload: the gadget sent, the identity line and the "
               "nonce returned",
               DESERIALIZE_REQUIRED, verify_command_output, veto=RCE_VETO,
-              floor=("identity output returned by the target",),
+              # the GADGET is what makes this class rather than rce, so it is
+              # the floor: with the floor on the identity line, a page that
+              # happened to print `uid=0(root)` graded deserialize a candidate
+              floor=("a serialized payload was sent",),
               declares="serialized",
               aliases=("deserialization", "insecure-deserialization", "pickle",
                        "java-deserialization")),
