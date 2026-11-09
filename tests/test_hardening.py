@@ -160,3 +160,49 @@ def test_mcp_config_malformed_shapes(tmp_path):
         errs = m.errors()
         assert errs, f"{payload!r} should produce an error"
         assert want in str(errs), errs
+
+
+def test_dispatch_total_on_malformed_args(ctx):
+    """Every registered tool x wrong-JSON-type args must return a
+    JSON-serializable dict - dispatch is the run's only boundary between
+    model output and a crash, so it must be total, not just usually
+    safe."""
+    from argus.tools.registry import TOOL_SCHEMAS, dispatch
+
+    pool = [None, True, 0, -1, 1.5, "x", "", "http://[bad", [1, 2],
+            {"a": 1}, 1e9]
+    for schema in TOOL_SCHEMAS:
+        name = schema["name"]
+        keys = list((schema.get("input_schema") or {})
+                    .get("properties") or {}) or ["x"]
+        for bad_value in pool[:5]:
+            args = {k: bad_value for k in keys[:3]}
+            out = dispatch(ctx, name, args)
+            assert isinstance(out, dict), (name, args, out)
+            json.dumps(out)  # must be serializable for tool_result
+            assert "result" in out or "error" in out, (name, out)
+
+
+def test_readers_survive_mutated_session_dir(tmp_path):
+    """argus verify/report/findings on a tampered session dir must degrade
+    to warnings/errors - these readers exist to audit artifacts an
+    attacker or accident may have corrupted, so crashing is the worst
+    possible answer."""
+    from argus.cli import main as cli_main
+
+    sdir = tmp_path / "sess"
+    sdir.mkdir()
+    (sdir / "transcript.jsonl").write_text(
+        json.dumps({"id": "r1", "chain": "x",
+                    "response": "x"}) + "\n[1,2]\n")
+    (sdir / "meta.json").write_text("[1]")
+    (sdir / "summary.json").write_text('"x"')
+    (sdir / "findings.json").write_text(
+        '[1,"x",{"id":"F","severity":"high","evidence_excerpt":"b",'
+        '"evidence_ids":[[1]]}]')
+    for cmd in ("verify", "report", "findings"):
+        argv = [cmd, str(sdir)]
+        if cmd == "findings":
+            argv += ["--json"]
+        rc = cli_main(argv)
+        assert isinstance(rc, int)  # returned a status, never raised
