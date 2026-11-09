@@ -238,7 +238,8 @@ def main(argv: list[str] | None = None) -> int:
                   "excluded from this report (run 'argus verify' for detail)",
                   file=sys.stderr)
             session.findings = [f for f in session.findings
-                                if f.get("id") not in bad]
+                                if isinstance(f, dict)
+                                and f.get("id") not in bad]
         path = render_report(session, cfg)
         # a re-render is a new attested artifact state: seal again so the
         # delivered report.* files are digest-anchored too
