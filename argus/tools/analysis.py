@@ -31,7 +31,7 @@ def _b64url(part: str) -> bytes:
 
 
 def jwt_decode(ctx: Context, token: str) -> dict:
-    token = token.strip().strip('"\'')
+    token = str(token or "").strip().strip('"\'')
     parts = token.split(".")
     if len(parts) not in (2, 3):
         return {"error": "not a JWT (expected 2 or 3 segments)"}
@@ -44,7 +44,7 @@ def jwt_decode(ctx: Context, token: str) -> dict:
     if not isinstance(header, dict) or not isinstance(payload, dict):
         out["issues"] = ["decoded segments are not JSON objects"]
         return out
-    alg = (header.get("alg") or "").lower()
+    alg = str(header.get("alg") or "").lower()
     issues = []
     if alg == "none":
         issues.append("alg=none token presented - try dropping the signature")
@@ -82,7 +82,7 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
     produce an alg=none variant. The LLM cannot compute HMAC - after
     jwt_decode recovers a secret this tool is the only way to mint a valid
     forged token to send back through http_request."""
-    token = token.strip().strip('"\'')
+    token = str(token or "").strip().strip('"\'')
     parts = token.split(".")
     if len(parts) not in (2, 3):
         return {"error": "not a JWT (expected 2 or 3 segments)"}
@@ -94,7 +94,8 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
     if not isinstance(header, dict) or not isinstance(payload, dict):
         return {"error": "decoded segments are not JSON objects"}
     try:
-        overrides = json.loads(claims or "{}")
+        overrides = json.loads(claims if isinstance(claims, str)
+                               else "{}")
         if not isinstance(overrides, dict):
             raise ValueError("claims must be a JSON object")
     except ValueError as exc:
@@ -102,7 +103,7 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
     payload.update(overrides)
 
     out: dict = {}
-    src_alg = (header.get("alg") or "").lower()
+    src_alg = str(header.get("alg") or "").lower()
     if secret:
         if not src_alg.startswith("hs"):
             return {"error": f"token is {header.get('alg')}; only HS* "
@@ -113,7 +114,7 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
         h64 = _b64url_enc(json.dumps(h, separators=(",", ":")).encode())
         algo = {"hs256": hashlib.sha256, "hs384": hashlib.sha384,
                 "hs512": hashlib.sha512}.get(src_alg, hashlib.sha256)
-        sig = _b64url_enc(_hmac.new(secret.encode(),
+        sig = _b64url_enc(_hmac.new(str(secret).encode(),
                                     f"{h64}.{p64}".encode(),
                                     algo).digest())
         out["resigned"] = f"{h64}.{p64}.{sig}"
@@ -132,6 +133,7 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
 
 def load_skill(ctx: Context, name: str) -> dict:
     skills_dir = Path(ctx.skills_dir)
+    name = name if isinstance(name, str) else ""
     if name.strip().lower() in ("index", "list", ""):
         index = skills_dir / "INDEX.md"
         listing = sorted(p.stem for p in skills_dir.glob("*.md") if p.name != "INDEX.md")
@@ -152,7 +154,7 @@ def read_response(ctx: Context, request_id: str,
 
     Tool output truncates bodies at 12k chars while the transcript keeps
     200k - page through a long response here instead of refetching."""
-    entry = ctx.session.get_exchange((request_id or "").strip())
+    entry = ctx.session.get_exchange(str(request_id or "").strip())
     if not entry:
         return {"error": f"no exchange {request_id!r} in transcript"}
     resp = entry.get("response") or {}

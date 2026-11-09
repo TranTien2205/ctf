@@ -691,15 +691,15 @@ class Session:
         agent: str = "",
         cvss: str = "",
     ) -> dict:
-        severity = severity.lower()
+        severity = str(severity or "").lower()
         if severity not in SEVERITIES:
             raise ValueError(f"severity must be one of {SEVERITIES}")
-        cvss = (cvss or "").strip()
+        cvss = str(cvss or "").strip()
         if cvss and not _CVSS_RE.match(cvss):
             raise ValueError(
                 "cvss must be a base vector like "
                 "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
-        excerpt = (evidence_excerpt or "").strip()
+        excerpt = str(evidence_excerpt or "").strip()
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
         with self._lock:  # snapshot: other workers keep appending mid-check
@@ -726,25 +726,27 @@ class Session:
         key = _finding_key(category, _redact_url(url))
         with self._lock:
             for existing in self.findings:
-                if _finding_key(existing["category"], existing["url"]) == key:
+                if _finding_key(existing.get("category"),
+                                existing.get("url")) == key:
                     raise ValueError(
-                        f"duplicate of {existing['id']} ({category} on {url}); "
+                        f"duplicate of {existing.get('id')} "
+                        f"({category} on {url}); "
                         "same bug class + endpoint is one finding - put extra "
                         "evidence in note() instead")
             finding = {
                 "id": f"F{len(self.findings) + 1:02d}",
-                "title": title.strip(),
+                "title": str(title or "").strip(),
                 "severity": severity,
-                "category": category.strip(),
+                "category": str(category or "").strip(),
                 "url": _redact_url(url),
                 "evidence_ids": evidence_ids,
                 "evidence_excerpt": excerpt[:2000],
-                "description": description.strip(),
-                "remediation": remediation.strip(),
+                "description": str(description or "").strip(),
+                "remediation": str(remediation or "").strip(),
                 "ts": round(time.time(), 3),
             }
             if agent:
-                finding["agent"] = agent
+                finding["agent"] = str(agent)
             if cvss:
                 finding["cvss"] = cvss
             cwe = _cwe_of(category)

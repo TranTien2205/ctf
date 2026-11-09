@@ -824,7 +824,7 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
     base = _send(ctx, url, param, bogus, "POST", data,
                  "probe_enum", "bogus user")
     base_body = base.get("body") or ""
-    tests = [u.strip() for u in (users or "").split(",") if u.strip()][:8]
+    tests = [u.strip() for u in str(users or "").split(",") if u.strip()][:8]
     results = []
     for u in tests:
         r = _send(ctx, url, param, u, "POST", data, "probe_enum",

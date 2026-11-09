@@ -80,7 +80,7 @@ def mcp_call(ctx: Context, server: str, tool: str, arguments: dict | None = None
         mcp = _manager(ctx)
     except MCPError as exc:
         return {"error": str(exc)}
-    client = mcp.client((server or "").strip())
+    client = mcp.client(str(server or "").strip())
     if client is None:
         return {"error": f"no MCP server {server!r}; "
                          f"configured: {mcp.servers()}"}

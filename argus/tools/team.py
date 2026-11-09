@@ -136,7 +136,7 @@ def finish_engagement(ctx: Context, summary: str) -> dict:
 # ------------------------------------------------------------- wordlists
 
 def _load_wordlist(name: str, limit: int = 50_000) -> tuple[list[str], str | None]:
-    safe = re.sub(r"[^a-z0-9_-]", "", (name or "").lower())
+    safe = re.sub(r"[^a-z0-9_-]", "", str(name or "").lower())
     if not safe:
         return [], f"bad wordlist name {name!r}; use a file stem from resources/wordlists/"
     path = WORDLISTS_USER / f"{safe}.txt"
@@ -236,7 +236,7 @@ def _exploit_dirs() -> list[Path]:
 
 
 def _load_manifest(exploit_id: str) -> tuple[dict | None, Path | None, str | None]:
-    safe = re.sub(r"[^a-z0-9_-]", "", (exploit_id or "").lower())
+    safe = re.sub(r"[^a-z0-9_-]", "", str(exploit_id or "").lower())
     roots = (EXPLOITS_USER, EXPLOITS) \
         if os.environ.get("ARGUS_EXPLOITS_CWD") == "1" else (EXPLOITS,)
     for root in roots:
