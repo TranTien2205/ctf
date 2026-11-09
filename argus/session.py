@@ -16,6 +16,8 @@ import time
 import urllib.parse
 from pathlib import Path
 
+from . import proof
+
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 _CVSS_RE = re.compile(
     r"^CVSS:3\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]"
@@ -264,6 +266,9 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
     return str(body or "") or str(entry.get("output") or "")
 
 
+_GRADE_RANK = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
+
+
 def _finding_key(category: str, url: str) -> tuple:
     """Dedup key: same bug class on the same endpoint+params is one finding."""
     cat = re.sub(r"[^a-z0-9]", "", str(category or "").lower())
@@ -368,8 +373,10 @@ def sanitized_findings(rows) -> list[dict]:
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
                  resume: Path | None = None,
-                 secrets: list[str] | None = None):
+                 secrets: list[str] | None = None,
+                 require_proof: bool = False):
         self._lock = threading.Lock()
+        self.require_proof = bool(require_proof)
         # >=4 chars: a shorter 'secret' would redact innocent bytes across
         # the whole transcript - enforce the floor here, not just in CLI
         secrets = {s for s in (secrets or []) if len(s) >= 4}
@@ -730,16 +737,56 @@ class Session:
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
-        key = _finding_key(category, _redact_url(url))
+        vuln_class = proof.canonical(category)
+        cited = [transcript_snapshot.get(r) for r in evidence_ids]
+        verdict = proof.grade(category, excerpt, cited)
+        if getattr(self, "require_proof", False) and not verdict.proven:
+            raise ValueError(
+                f"--require-proof: {vuln_class} graded {verdict.grade}, not proven. "
+                f"Requirement: {verdict.requirement or 'class not in the proof matrix'}. "
+                f"Missing: {', '.join(verdict.missing) or 'n/a'}. "
+                "Collect those and record again, or keep it in note()")
+        # The class, not the author's spelling. `SQLi`, `sql-injection` and
+        # `sqlinjection` normalized to three different keys, so two workers
+        # could record one bug three times - the dedup the docs promised.
+        key = _finding_key(vuln_class, _redact_url(url))
         with self._lock:
             for existing in self.findings:
-                if _finding_key(existing.get("category"),
-                                existing.get("url")) == key:
-                    raise ValueError(
-                        f"duplicate of {existing.get('id')} "
-                        f"({category} on {url}); "
-                        "same bug class + endpoint is one finding - put extra "
-                        "evidence in note() instead")
+                if _finding_key(existing.get("vuln_class") or existing.get("category"),
+                                existing.get("url")) != key:
+                    continue
+                # Better evidence for a bug already on record is an UPGRADE,
+                # not a duplicate. Refusing it was a trap the grading itself
+                # created: the agent is told which checks a candidate is
+                # missing, goes and collects them, and then had nowhere to put
+                # them. The finding keeps its id so earlier references and the
+                # transcript still resolve.
+                if _GRADE_RANK.get(verdict.grade, 0) > \
+                        _GRADE_RANK.get(existing.get("grade", ""), 0):
+                    existing.update({
+                        "title": str(title or "").strip() or existing.get("title"),
+                        "severity": severity,
+                        "evidence_ids": evidence_ids,
+                        "evidence_excerpt": excerpt[:2000],
+                        "grade": verdict.grade,
+                        "proof": verdict.to_dict(),
+                        "upgraded_from": existing.get("grade", ""),
+                        "ts": round(time.time(), 3),
+                    })
+                    if description:
+                        existing["description"] = str(description).strip()
+                    if remediation:
+                        existing["remediation"] = str(remediation).strip()
+                    _atomic_write(
+                        self.findings_path,
+                        json.dumps(self.findings, indent=2, ensure_ascii=False))
+                    return dict(existing)
+                raise ValueError(
+                    f"duplicate of {existing.get('id')} "
+                    f"({vuln_class} on {url}, already {existing.get('grade', 'recorded')}); "
+                    "same bug class + endpoint is one finding. Re-record only "
+                    "with evidence that grades higher - otherwise put the extra "
+                    "evidence in note()")
             finding = {
                 "id": f"F{len(self.findings) + 1:02d}",
                 "title": str(title or "").strip(),
@@ -748,6 +795,9 @@ class Session:
                 "url": _redact_url(url),
                 "evidence_ids": evidence_ids,
                 "evidence_excerpt": excerpt[:2000],
+                "vuln_class": vuln_class,
+                "grade": verdict.grade,
+                "proof": verdict.to_dict(),
                 "description": str(description or "").strip(),
                 "remediation": str(remediation or "").strip(),
                 "ts": round(time.time(), 3),
@@ -756,7 +806,7 @@ class Session:
                 finding["agent"] = str(agent)
             if cvss:
                 finding["cvss"] = cvss
-            cwe = _cwe_of(category)
+            cwe = _cwe_of(vuln_class) or _cwe_of(category)
             if cwe:
                 finding["cwe"] = cwe
                 owasp = _owasp_of(cwe)

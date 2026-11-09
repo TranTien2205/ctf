@@ -46,6 +46,11 @@ class Config:
     # transcript bodies, event output, notes, logs - while the model still
     # sees the real bytes it needs to work
     secret_values: list[str] = field(default_factory=list)
+    # Strict admission: refuse a finding whose evidence does not meet the proof
+    # requirement for its class. Off by default because a candidate is worth
+    # recording and re-testing; on, the findings file holds only what was
+    # proven, which is the condition an evaluation wants to be able to state.
+    require_proof: bool = False
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -323,6 +328,7 @@ def load_config(args) -> Config:
         tls_verify=args.tls_verify,
         extra_headers=headers,
         external_tools=not args.no_external,
+        require_proof=bool(getattr(args, "require_proof", False)),
         goal=getattr(args, "goal", "") or "",
         operator=getattr(args, "operator", "") or "",
         llm_max_tokens=args.llm_max_tokens,

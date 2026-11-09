@@ -101,8 +101,9 @@ class AgentLoop:
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
             "tls_verify": cfg.tls_verify,
             "tools": sorted(allowed) if allowed else "all",
+            "require_proof": cfg.require_proof,
         }, resume=Path(cfg.resume) if cfg.resume else None,
-            secrets=cfg.secret_values)
+            secrets=cfg.secret_values, require_proof=cfg.require_proof)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:
             from .ratelimit import RateLimiter

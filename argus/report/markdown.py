@@ -104,6 +104,33 @@ def _duration(session: Session) -> float:
     return round(time.time() - session.started, 1)
 
 
+_GRADE_ORDER = {"proven": 0, "candidate": 1, "unproven": 2, "refused": 3}
+_GRADE_MEANING = {
+    "proven": "the class-specific artifact and its control are on record",
+    "candidate": "a real signal; a named check is still missing",
+    "unproven": "nothing in the cited evidence meets the requirement",
+    "refused": "this system does not prove this class",
+    "ungraded": "recorded before grading existed",
+}
+
+
+def _proof_block(f: dict) -> list[str]:
+    """What this finding still needs, in the report itself."""
+    verdict = f.get("proof") or {}
+    if not verdict:
+        return []
+    out = [f"**Proof grade: {f.get('grade', '?')}**  ", ""]
+    if verdict.get("requirement"):
+        out += [f"_Requirement for {verdict.get('vuln_class', '')}:_ "
+                f"{verdict['requirement']}", ""]
+    for check in verdict.get("checks") or []:
+        mark = "x" if check.get("ok") else " "
+        detail = f" - {check['detail']}" if check.get("detail") else ""
+        out.append(f"- [{mark}] {check.get('check', '')}{detail}")
+    out.append("")
+    return out
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
@@ -124,7 +151,12 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                      **extra}
     coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
-                      key=lambda f: _SEV_ORDER.get(f["severity"], 99))
+                      key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
+                                     _SEV_ORDER.get(f["severity"], 99)))
+    grades: dict[str, int] = {}
+    for f in findings:
+        grades[f.get("grade") or "ungraded"] = \
+            grades.get(f.get("grade") or "ungraded", 0) + 1
     counts: dict[str, int] = {}
     for f in findings:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
@@ -166,6 +198,11 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             lines.append(f"| {_SEV_LABEL[sev]} | {counts[sev]} |")
     if not findings:
         lines.append("| - | 0 |")
+    if grades:
+        lines += ["", "| Proof grade | Count | Meaning |", "|---|---|---|"]
+        for g in ("proven", "candidate", "unproven", "refused", "ungraded"):
+            if grades.get(g):
+                lines.append(f"| **{g}** | {grades[g]} | {_GRADE_MEANING[g]} |")
     def _o(f):
         return f.get("owasp") or _owasp_of(
             f.get("cwe") or _cwe_of(f.get("category")))
@@ -198,7 +235,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             "",
             f"- **Severity:** {_SEV_LABEL.get(f['severity'], f['severity'])}",
             *([f"- **CVSS:** `{f['cvss']}`"] if f.get("cvss") else []),
-            f"- **Category:** {f['category']}",
+            f"- **Category:** {f['category']}"
+            + (f" · **proof: {f['grade']}**" if f.get("grade") else ""),
             *([f"- **CWE:** `{f.get('cwe') or _cwe_of(f['category'])}`"]
               if f.get("cwe") or _cwe_of(f.get("category")) else []),
             *([f"- **OWASP:** {f.get('owasp') or _owasp_of(f.get('cwe') or _cwe_of(f['category']))}"]
@@ -217,6 +255,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             "**Remediation**  ",
             f"{f['remediation']}",
             "",
+            *_proof_block(f),
         ]
         for rid in f["evidence_ids"]:
             entry = session.get_exchange(rid)
@@ -296,6 +335,12 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         f"The complete request/response transcript is in `transcript.jsonl`",
         f"({session._seq} entries). Working notes are in `notes.md`.",
         "",
+        "Every finding is graded against the proof requirement for its class",
+        "(`argus proof <class>`): **proven** means the class-specific artifact",
+        "and its control are both on record; **candidate** means a real signal",
+        "with a named check still missing. A candidate is reported because it",
+        "is worth re-testing, not because it is a result.",
+        "",
         "_All findings cite verbatim response excerpts verified against the",
         "recorded transcript at write time._",
     ]
@@ -323,6 +368,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "session": session.id,
         "findings": findings,
         "counts": counts,
+        "grades": grades,
         "requests": session._seq,
         "duration_s": _duration(session),
         "time_to_first_finding_s": ttf,

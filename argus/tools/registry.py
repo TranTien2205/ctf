@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from .. import proof
 from ..config import Config
 from ..httpclient import GuardedClient
 from ..scope import ScopeGuard
@@ -570,11 +571,18 @@ TOOL_SCHEMAS: list[dict] = [
         "request_id whose recorded response literally contains "
         "evidence_excerpt. A finding without verbatim response evidence is "
         "rejected. Record only confirmed issues - 'looks suspicious' is a note, "
-        "not a finding.",
+        "not a finding. The result grades the claim against the proof "
+        "requirement for its class (proven / candidate / unproven) and names "
+        "the checks that did not pass - collect those and record again rather "
+        "than leaving a candidate behind.",
         {
             "title": {**_STR, "description": "Short title, e.g. 'Reflected XSS in /search q parameter'"},
             "severity": {**_STR, "description": "critical | high | medium | low | info"},
-            "category": {**_STR, "description": "Bug class, e.g. xss, sqli, ssrf, idor, cors"},
+            # An enum, not free text: the class selects the proof requirement
+            # AND the dedup key, so `SQLi` / `sql-injection` / `sqlinjection`
+            # must not be three different classes.
+            "category": {**_STR, "enum": list(proof.classes()),
+                          "description": "Bug class - selects the proof requirement checked against the evidence"},
             "url": {**_STR, "description": "Affected endpoint"},
             "evidence_ids": {**_STRARR, "description": "request_ids from tool results that prove it; optional - if omitted, the exchange containing evidence_excerpt is cited automatically"},
             "evidence_excerpt": {**_STR, "description": "Verbatim quote from a cited response that proves the bug"},

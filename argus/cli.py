@@ -13,6 +13,10 @@ from .session import Session
 
 def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("target", help="Base URL of the in-scope target")
+    p.add_argument("--require-proof", action="store_true",
+                   help="refuse findings whose evidence does not meet the "
+                        "proof requirement for their class (default: record "
+                        "them graded as candidate/unproven)")
     p.add_argument("--scope", action="append",
                    help="Extra in-scope hosts (comma-separated ok); may repeat")
     p.add_argument("--exclude", action="append",
@@ -116,6 +120,12 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--model")
     p_check.add_argument("--json", action="store_true",
                          help="machine-readable verdict (ok/degraded/error)")
+
+    p_proof = sub.add_parser(
+        "proof", help="print the proof requirement for a bug class, or list "
+                      "all classes with 'proof'")
+    p_proof.add_argument("vuln_class", nargs="?", default=None)
+    p_proof.add_argument("--json", action="store_true")
 
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
@@ -289,8 +299,56 @@ def main(argv: list[str] | None = None) -> int:
                 ow = f" <{f['owasp']}>" if f.get("owasp") else ""
                 flag = " UNVERIFIED" if f.get("id") in bad else ""
                 sev = str(f.get("severity") or "?").upper()
-                print(f"[{sev:8}] {f.get('id', '?')} {f.get('title', '?')}"
+                grade = f" {str(f.get('grade') or '').upper()}" \
+                    if f.get("grade") else ""
+                print(f"[{sev:8}]{grade} {f.get('id', '?')} {f.get('title', '?')}"
                       f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
+        return 0
+
+    if args.cmd == "proof":
+        from . import proof as proof_mod
+        if not args.vuln_class:
+            if args.json:
+                print(json.dumps({c: proof_mod.requirement_of(c)
+                                  for c in proof_mod.classes()}, indent=2))
+                return 0
+            print(f"{len(proof_mod.classes())} classes in the proof matrix "
+                  "- `argus proof <class>` for one:\n")
+            for name in proof_mod.classes():
+                print(f"  {name:14} {proof_mod.requirement_of(name)[:90]}")
+            return 0
+        spec = proof_mod.spec_for(args.vuln_class)
+        if spec is None:
+            print(f"no proof requirement for {args.vuln_class!r}. "
+                  f"Classes: {', '.join(proof_mod.classes())}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps({
+                "vuln_class": spec.vuln_class, "requirement": spec.requirement,
+                "required": list(spec.required), "veto": list(spec.veto),
+                "floor": list(spec.floor), "aliases": list(spec.aliases),
+                "notes": spec.notes, "refusal": spec.refusal}, indent=2))
+            return 0
+        print(f"{spec.vuln_class} - proof requirement\n")
+        print(f"  {spec.requirement}\n")
+        if spec.refusal:
+            print(f"  REFUSED: {spec.refusal}")
+            return 0
+        print("  checks that must pass:")
+        for name in spec.required:
+            print(f"    - {name}")
+        if spec.floor:
+            print("  without this one, nothing above 'unproven' is available:")
+            for name in spec.floor:
+                print(f"    - {name}")
+        if spec.veto:
+            print("  disqualifies the evidence entirely:")
+            for name in spec.veto:
+                print(f"    - {name}")
+        if spec.notes:
+            print(f"\n  {spec.notes}")
+        if spec.aliases:
+            print(f"\n  also accepted as: {', '.join(spec.aliases)}")
         return 0
 
     if args.cmd == "skills":
@@ -788,7 +846,8 @@ def _demo(args) -> int:
         for f in _flist if isinstance(_flist, list) else []:
             if isinstance(f, dict):
                 sev = str(f.get("severity") or "?").upper()
-                print(f"  [{sev}] {f.get('title', '?')}")
+                grade = f" ({f['grade']})" if f.get("grade") else ""
+                print(f"  [{sev}]{grade} {f.get('title', '?')}")
     print(f"  findings={result['findings']}  requests={result['requests']}")
     print(f"  report: {result['report']}")
     html_path = Path(result['report']).with_suffix('.html')

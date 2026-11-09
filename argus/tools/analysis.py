@@ -13,6 +13,7 @@ import subprocess
 import urllib.parse
 from pathlib import Path
 
+from .. import proof
 from ..scope import ScopeError
 from .registry import Context, _ival
 
@@ -143,7 +144,20 @@ def load_skill(ctx: Context, name: str) -> dict:
     path = skills_dir / f"{safe}.md"
     if not path.exists():
         return {"error": f"no skill named {name!r}; call load_skill('index')"}
-    return {"skill": safe, "content": path.read_text(encoding="utf-8")}
+    out = {"skill": safe, "content": path.read_text(encoding="utf-8")}
+    # The requirement belongs here, not only in the record_finding result: the
+    # skill is read BEFORE probing the class, which is when knowing what has to
+    # be collected still changes what gets sent.
+    spec = proof.spec_for(safe)
+    if spec is not None:
+        out["vuln_class"] = spec.vuln_class
+        out["proof_requirement"] = spec.requirement
+        out["proof_checks"] = list(spec.required)
+        if spec.refusal:
+            out["refused"] = spec.refusal
+        if spec.notes:
+            out["proof_notes"] = spec.notes
+    return out
 
 
 # ---------------------------------------------------------------- transcript
@@ -212,8 +226,26 @@ def record_finding(ctx: Context, title: str, severity: str, category: str,
         evidence_excerpt=evidence_excerpt, description=description,
         remediation=remediation, agent=ctx.agent_name, cvss=cvss,
     )
-    return {"recorded": finding["id"], "title": finding["title"],
-            "severity": finding["severity"]}
+    out = {"recorded": finding["id"], "title": finding["title"],
+           "severity": finding["severity"],
+           "vuln_class": finding.get("vuln_class", ""),
+           "grade": finding.get("grade", "")}
+    verdict = finding.get("proof") or {}
+    if verdict.get("requirement"):
+        out["requirement"] = verdict["requirement"]
+    missing = verdict.get("missing") or []
+    if missing:
+        # Naming the checks is the point: a candidate left as a candidate is a
+        # finding the report has to hedge. The details say what to send next.
+        out["missing"] = missing
+        out["details"] = [c["detail"] for c in verdict.get("checks") or []
+                          if not c.get("ok") and c.get("detail")]
+        out["note"] = ("this claim is a " + (finding.get("grade") or "candidate") +
+                       ": collect the missing checks and record_finding again "
+                       "(the duplicate guard allows a re-record only after you "
+                       "delete nothing - instead cite the new ids in note() and "
+                       "say so in finish)")
+    return out
 
 
 # ---------------------------------------------------------------- external
