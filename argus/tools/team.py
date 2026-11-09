@@ -186,10 +186,12 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
     if err:
         return {"error": err}
     keep = None
+    statuses = str(statuses or "")
     if statuses.strip():
         keep = {int(s) for s in re.split(r"[^0-9]+", statuses) if s}
     sep = "&" if "?" in base_url else "?"
-    method = (method or "GET").upper()
+    method = str(method or "GET").upper()
+    data = data if isinstance(data, str) else (None if data is None else str(data))
     post = method != "GET" and data is not None
     headers = None
     if post:
