@@ -28,7 +28,14 @@ _KEEP_FULL_RESULTS = 8
 
 
 def _truncate_result(result: dict) -> str:
-    text = json.dumps(result, ensure_ascii=False)
+    try:
+        text = json.dumps(result, ensure_ascii=False)
+    except (TypeError, ValueError):
+        # an impl returning a non-JSON value must not kill the run -
+        # render it and let the next llm call decide
+        text = str(result)
+    if not isinstance(text, str):
+        text = str(text)
     if len(text) > _MAX_RESULT_CHARS:
         text = text[:_MAX_RESULT_CHARS] + "...[truncated]"
     return text
@@ -279,8 +286,9 @@ class AgentLoop:
                 # tools signal soft errors as {"error": ...} inside the
                 # dispatch {"result": ...} wrapper - flag both layers so the
                 # API marks the tool_result as an error for the model
+                res = out.get("result")
                 is_error = "error" in out or \
-                    "error" in (out.get("result") or {})
+                    (isinstance(res, dict) and "error" in res)
                 # the model sees real response headers (it needs them); the
                 # persisted log gets the redacted copy, same as transcript
                 logged = dict(out)
