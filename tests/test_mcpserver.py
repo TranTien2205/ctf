@@ -329,3 +329,53 @@ def test_a_disconnect_without_finish_still_seals(tmp_path, lab_url):
         assert summary.get("transcript_chain_head")
     finally:
         server.close()
+
+
+def test_an_empty_connection_leaves_no_session_behind(tmp_path, lab_url):
+    """The Session is built before any client connects, and a host restarts
+    its servers on every reconnect and config reload - so each one left a
+    directory and a meta.json. An engagement that sent no request and recorded
+    no finding is not an engagement."""
+    from argus.config import Config
+    from argus.mcpserver import ArgusMCPServer
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 rate_rps=0)
+    for _ in range(5):
+        pipe = _Pipe()
+        server = ArgusMCPServer(cfg, stdin=pipe, stdout=pipe)
+        pipe.send({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                   "params": {}})
+        server.serve()
+        server.close()
+    assert list(tmp_path.iterdir()) == []
+    # one that did something is kept, rendered and sealed
+    pipe = _Pipe()
+    server = ArgusMCPServer(cfg, stdin=pipe, stdout=pipe)
+    pipe.send({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+               "params": {"name": "http_request",
+                          "arguments": {"method": "GET", "url": lab_url + "/"}}})
+    server.serve()
+    server.close()
+    kept = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert len(kept) == 1
+    from argus.cli import main
+    assert main(["verify", str(kept[0])]) == 0
+
+
+def test_a_finalize_failure_reaches_the_host_not_only_stderr(served, monkeypatch):
+    """A host discards stderr. A session that silently failed to seal is one
+    whose `argus verify` has no anchor, with nothing anywhere saying why."""
+    server, pipe = served
+    monkeypatch.setattr(server.session, "seal_artifacts",
+                        lambda: (_ for _ in ()).throw(OSError("disk full")))
+    pipe.send({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+               "params": {"name": "finish", "arguments": {"summary": "x"}}})
+    server.serve()
+    frames = pipe.frames()
+    notes = [f for f in frames
+             if f.get("method") == "notifications/message"]
+    assert notes, f"no log notification among {[f.get('method') for f in frames]}"
+    assert "not sealed" in notes[0]["params"]["data"]
+    entries = [e for e in server.session._transcript.values()
+               if e.get("kind") == "finalize_failed"]
+    assert entries and "disk full" in entries[0]["error"]

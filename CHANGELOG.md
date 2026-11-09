@@ -220,7 +220,7 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 326 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 330 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + CLI + external-tool
   subprocess path + hardening regressions).
 - The proof matrix is tested in both directions per class: an evidence set

@@ -949,10 +949,15 @@ class Session:
                 owasp = _owasp_of(cwe)
                 if owasp:
                     finding["owasp"] = owasp
-            self.findings.append(finding)
+            # Write first, commit second. Appending before the write left a
+            # finding in memory that never reached findings.json if the write
+            # failed, so `stats()` and summary.json counted a finding the file
+            # did not have.
+            pending = [*self.findings, finding]
             _atomic_write(
                 self.findings_path,
-                json.dumps(self.findings, indent=2, ensure_ascii=False))
+                json.dumps(pending, indent=2, ensure_ascii=False))
+            self.findings = pending
         return finding
 
     def note(self, text: str, agent: str = "") -> None:

@@ -79,7 +79,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/item?id=1"
+                  "uri": "http://127.0.0.1:37481/item?id=1"
                 }
               }
             }
@@ -94,6 +94,7 @@
             "argus-vuln-class": "sqli",
             "argus-proof-requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
             "argus-proof-missing": [],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
             "cwe": "CWE-89",
             "owasp": "A03 Injection",
@@ -118,7 +119,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/ping?host=127.0.0.1"
+                  "uri": "http://127.0.0.1:37481/ping?host=127.0.0.1"
                 }
               }
             }
@@ -133,6 +134,7 @@
             "argus-vuln-class": "rce",
             "argus-proof-requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
             "argus-proof-missing": [],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
             "cwe": "CWE-78",
             "owasp": "A03 Injection",
@@ -156,7 +158,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/api/me"
+                  "uri": "http://127.0.0.1:37481/api/me"
                 }
               }
             }
@@ -171,6 +173,7 @@
             "argus-vuln-class": "jwt",
             "argus-proof-requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint",
             "argus-proof-missing": [],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
             "cwe": "CWE-347",
             "owasp": "A02 Cryptographic Failures",
@@ -196,7 +199,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/api/user/2"
+                  "uri": "http://127.0.0.1:37481/api/user/2"
                 }
               }
             }
@@ -211,6 +214,7 @@
             "argus-vuln-class": "idor",
             "argus-proof-requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
             "argus-proof-missing": [],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
             "cwe": "CWE-639",
             "owasp": "A01 Broken Access Control",
@@ -235,7 +239,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/.env"
+                  "uri": "http://127.0.0.1:37481/.env"
                 }
               }
             }
@@ -250,6 +254,7 @@
             "argus-vuln-class": "disclosure",
             "argus-proof-requirement": "the credential or source observed in a response, quoted as the bytes that leaked",
             "argus-proof-missing": [],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
             "cwe": "CWE-200",
             "owasp": "A01 Broken Access Control",
@@ -273,7 +278,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:34943/search?q=x"
+                  "uri": "http://127.0.0.1:37481/search?q=x"
                 }
               }
             }
@@ -290,6 +295,7 @@
             "argus-proof-missing": [
               "a real browser executed it"
             ],
+            "argus-proof-advisories": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
             "cwe": "CWE-79",
             "owasp": "A03 Injection",
@@ -305,7 +311,7 @@
       "invocations": [
         {
           "executionSuccessful": true,
-          "startTimeUtc": "2026-11-09T21:11:58Z"
+          "startTimeUtc": "2026-11-09T21:22:03Z"
         }
       ]
     }

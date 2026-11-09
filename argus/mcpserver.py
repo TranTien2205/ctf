@@ -89,6 +89,14 @@ class ArgusMCPServer:
         self.scope = ScopeGuard(cfg.target, extra_hosts=cfg.scope_hosts,
                                 exclude_paths=cfg.exclude_paths,
                                 allow_private=cfg.allow_private)
+        self._allowed_arg = allowed
+        self._session = None
+        self._ctx = None
+        self._init_session()
+
+    def _init_session(self) -> None:
+        cfg = self.cfg
+        allowed = self._allowed_arg
         self.session = Session(
             cfg.session_dir, cfg.target,
             meta={"model": "mcp-host", "goal": cfg.goal,
@@ -209,8 +217,14 @@ class ArgusMCPServer:
         if name == "finish" and not failed:
             # A served engagement never sealed, so `argus verify` passed a
             # transcript with its tail deleted. finish() is the end of the
-            # assessment in this mode too: render and seal.
-            self._finalize()
+            # assessment in this mode too: render and seal - and if that
+            # fails, the host hears about it rather than only stderr.
+            why = self._finalize()
+            if why:
+                self._write({"jsonrpc": "2.0", "method":
+                             "notifications/message",
+                             "params": {"level": "error", "logger": "argus",
+                                        "data": f"session not sealed: {why}"}})
 
     @staticmethod
     def _content(payload: dict, is_error: bool = False) -> dict:
@@ -249,10 +263,15 @@ class ArgusMCPServer:
             self._finalize()
         return 0
 
-    def _finalize(self) -> None:
-        """Render and seal, the way AgentLoop does at the end of a run."""
+    def _finalize(self) -> str:
+        """Render and seal, the way AgentLoop does at the end of a run.
+
+        Returns "" on success or the failure, because a host discards stderr
+        and a session that silently failed to seal is a session whose
+        `argus verify` has no anchor - with nothing anywhere saying why.
+        """
         if self._finalized:
-            return
+            return ""
         self._finalized = True
         try:
             from .report import render_report
@@ -264,14 +283,54 @@ class ArgusMCPServer:
             render_html(self.session, self.cfg, summary=summary)
             render_sarif(self.session)
             self.session.seal_artifacts()
+            return ""
         except Exception as exc:                            # pragma: no cover
-            print(f"[argus] could not finalize session: "
-                  f"{type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+            why = f"{type(exc).__name__}: {exc}"
+            print(f"[argus] could not finalize session: {why}",
+                  file=sys.stderr, flush=True)
+            # and into the artifact, so the failure is on record even when the
+            # host threw our stderr away
+            try:
+                self.session.record_event("finalize_failed", {"error": why})
+            except Exception:
+                pass
+            return why
 
     def close(self) -> None:
         try:
             self.client.close()
         except Exception:
+            pass
+        self._discard_if_empty()
+
+    def _discard_if_empty(self) -> None:
+        """Remove the session directory when nothing happened in it.
+
+        The Session is built in __init__, before any client connects, and a
+        host restarts its servers - on every reconnect, and on every config
+        reload. That left a directory and a meta.json per connection. An
+        engagement that sent no request and recorded no finding is not an
+        engagement.
+
+        Deliberately narrow: only the two files this class creates, only when
+        the sequence is zero and nothing was found and nothing was resumed, and
+        `os.rmdir` rather than a recursive delete - so anything unexpected in
+        the directory makes the removal fail instead of taking it with us.
+        """
+        import os
+        if self.session.resumed or self.session._seq or self.session.findings:
+            return
+        try:
+            names = sorted(p.name for p in self.session.dir.iterdir())
+        except OSError:
+            return
+        if names and set(names) - {"meta.json", "notes.md"}:
+            return
+        try:
+            for name in names:
+                os.remove(self.session.dir / name)
+            os.rmdir(self.session.dir)
+        except OSError:
             pass
 
 

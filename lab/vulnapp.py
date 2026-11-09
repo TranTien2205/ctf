@@ -1003,8 +1003,12 @@ def _lab_exec(command: str) -> str:
         # realpath, and compare against the directory WITH its separator: a
         # prefix test lets /x/fake-other through when the root is /x/fake, and
         # a symlink inside the tree pointed anywhere at all.
-        root = os.path.realpath(FAKEFS)
-        real = os.path.realpath(path)
+        # normcase, because on NT the comparison is case-insensitive and a
+        # plain startswith refuses `FAKE\x` inside root `fake` - failing closed,
+        # but refusing a legitimate read the rce/lfi demo depends on. Verified
+        # against ntpath semantics rather than assumed.
+        root = os.path.normcase(os.path.realpath(FAKEFS))
+        real = os.path.normcase(os.path.realpath(path))
         if real != root and not real.startswith(root + os.sep):
             return f"cat: {parts[1]}: Permission denied"
         try:

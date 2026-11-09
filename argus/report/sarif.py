@@ -81,6 +81,10 @@ def render_sarif(session: Session) -> Path:
                 "argus-vuln-class": f.get("vuln_class", ""),
                 "argus-proof-requirement": str(verdict.get("requirement") or ""),
                 "argus-proof-missing": missing,
+                # a conduct flag visible in report.md and report.html was
+                # absent from the machine contract
+                "argus-proof-advisories": [str(w) for w in
+                                           (verdict.get("warnings") or [])],
                 "cvss": f.get("cvss", ""),
                 "cwe": cwe,
                 "owasp": f.get("owasp") or _owasp_of(cwe),

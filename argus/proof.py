@@ -453,12 +453,22 @@ def _discriminates(claim: Claim, name: str = "the excerpt discriminates against 
     present = [rid for rid, body in bodies if claim.excerpt and claim.excerpt in body]
     absent = [rid for rid, body in bodies if not claim.excerpt or claim.excerpt not in body]
     ok = bool(present and absent)
+    # The body is not the only channel. User enumeration and verb handling
+    # often answer with identical bodies and different statuses, and reading
+    # bodies alone made those differences invisible - `_discriminates` returned
+    # "that is boilerplate" for a 200 against a 429.
+    statuses = {status_of(e) for e in claim.exchanges}
+    status_diff = len(claim.exchanges) >= 2 and len(statuses) > 1
     if ok:
         detail = f"present in {present[0]}, absent from {absent[0]}"
+    elif status_diff:
+        ok, detail = True, (f"identical bodies, statuses {sorted(statuses)} - "
+                            "the difference is in the status line")
     elif len(bodies) < 2:
         detail = "only one exchange cited; a difference needs its control"
     else:
-        detail = "the excerpt is in every cited response - that is boilerplate, not a difference"
+        detail = ("the excerpt is in every cited response and the statuses "
+                  "match - that is boilerplate, not a difference")
     return _check(name, ok, detail)
 
 
