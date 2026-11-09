@@ -125,8 +125,28 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
     p64 = _b64url_enc(json.dumps(payload, separators=(",", ":")).encode())
     out["alg_none"] = f"{h_none}.{p64}."
     out["payload_used"] = payload
+    # Leave an artifact. Without one there is nothing in the session showing
+    # that THIS SYSTEM minted the credential, and a working auth check - good
+    # session 200, expired session 401 - has the same shape on the wire as a
+    # forgery. The signature is fingerprinted, not stored: a usable credential
+    # does not belong in an artifact, and the fingerprint is enough to link
+    # the mint to the request that carried it.
+    import hashlib as _h
+    fp = {}
+    for kind in ("resigned", "alg_none"):
+        if out.get(kind):
+            fp[kind] = _h.sha256(out[kind].encode()).hexdigest()[:16]
+    out["event_id"] = ctx.session.record_event(
+        "jwt_forge",
+        {"claims_set": overrides, "payload_used": payload,
+         "alg_in": header.get("alg"), "weak_secret_used": bool(secret),
+         "token_sha256_16": fp},
+        agent=ctx.agent_name) if getattr(ctx, "session", None) else ""
     out["note"] = ("send 'resigned' or 'alg_none' as the Bearer token via "
-                   "http_request; a 200 echoing your claims is the finding")
+                   "http_request; a 200 echoing your claims is the finding. "
+                   "Cite event_id alongside the accepted request: it is what "
+                   "shows the credential was minted here and not simply a "
+                   "valid session")
     return out
 
 
@@ -277,11 +297,40 @@ def _hostish_token(tok: str) -> bool:
     if re.fullmatch(r"[0-9a-fA-FxX.]+", tok) and \
             ("." in tok or "x" in tok.lower()):
         return True  # numeric IP spelling - let the scope guard decide
-    try:
-        socket.getaddrinfo(tok, None)
+    return _resolves(host_or_token=tok)
+
+
+_RESOLVE_CACHE: dict[str, bool] = {}
+_RESOLVE_BUDGET = [256]
+
+
+def _resolves(host_or_token: str) -> bool:
+    """Does this token resolve? Cached, budgeted and deadlined.
+
+    It is called once per line of a `-iL`/`-r`/`-l`/`--bulk-file` target list,
+    and it used to call `socket.getaddrinfo` with no cache, no cap and no
+    deadline - so a 50k-line target file was 50k blocking lookups on the
+    agent's thread, and a slow resolver turned a scope check into a hang.
+    """
+    key = host_or_token.lower()
+    if key in _RESOLVE_CACHE:
+        return _RESOLVE_CACHE[key]
+    if _RESOLVE_BUDGET[0] <= 0:
+        # Budget spent: treat it as a host. Failing CLOSED is the only safe
+        # default here - an unresolvable token that we guess is a host gets
+        # scope-checked, and the scope check is what we want to happen.
         return True
+    _RESOLVE_BUDGET[0] -= 1
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        socket.setdefaulttimeout(2.0)
+        socket.getaddrinfo(host_or_token, None)
+        _RESOLVE_CACHE[key] = True
     except OSError:
-        return False
+        _RESOLVE_CACHE[key] = False
+    finally:
+        socket.setdefaulttimeout(old_timeout)
+    return _RESOLVE_CACHE[key]
 
 
 def _args_scope_check(ctx: Context, args: str) -> None:
@@ -295,6 +344,13 @@ def _args_scope_check(ctx: Context, args: str) -> None:
         # 'http://host:8080/' token also trips the >=2-colon IPv6 branch
         # and gets falsely rejected as an invalid literal
         if "://" in tok:
+            # http(s) was already handled by _URL_RE. Anything else was
+            # skipped entirely, so `curl file:///etc/passwd` and
+            # `curl gopher://evil.test/` reached the external tool with no
+            # scope check at all - ScopeGuard refuses a non-http scheme, so
+            # hand it the token and let it say so.
+            if not re.match(r"(?i)https?://", tok):
+                ctx.scope.check(tok)
             continue
         if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
             continue

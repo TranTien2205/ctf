@@ -79,7 +79,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/item?id=1"
+                  "uri": "http://127.0.0.1:35631/item?id=1"
                 }
               }
             }
@@ -118,7 +118,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/ping?host=127.0.0.1"
+                  "uri": "http://127.0.0.1:35631/ping?host=127.0.0.1"
                 }
               }
             }
@@ -156,7 +156,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/api/me"
+                  "uri": "http://127.0.0.1:35631/api/me"
                 }
               }
             }
@@ -169,12 +169,13 @@
             "argus-severity": "critical",
             "argus-grade": "proven",
             "argus-vuln-class": "jwt",
-            "argus-proof-requirement": "a forged or absent credential accepted on a privileged resource, with an invalid one rejected",
+            "argus-proof-requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint",
             "argus-proof-missing": [],
             "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
             "cwe": "CWE-347",
             "owasp": "A02 Cryptographic Failures",
             "evidence_ids": [
+              "r64",
               "r63",
               "r62"
             ],
@@ -195,7 +196,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/api/user/2"
+                  "uri": "http://127.0.0.1:35631/api/user/2"
                 }
               }
             }
@@ -234,7 +235,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/.env"
+                  "uri": "http://127.0.0.1:35631/.env"
                 }
               }
             }
@@ -272,7 +273,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44463/search?q=x"
+                  "uri": "http://127.0.0.1:35631/search?q=x"
                 }
               }
             }
@@ -304,7 +305,7 @@
       "invocations": [
         {
           "executionSuccessful": true,
-          "startTimeUtc": "2026-11-09T18:40:44Z"
+          "startTimeUtc": "2026-11-09T20:12:37Z"
         }
       ]
     }

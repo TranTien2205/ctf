@@ -379,14 +379,33 @@ class Handler(BaseHTTPRequestHandler):
                        f"content='0;url={nxt}'></head><body>go</body></html>")
 
         elif path == "/fetch":
+            # A real server-side fetch, bounded the same way /ping is. It used
+            # to pass the parameter straight to urlopen, so
+            # `?url=file:///etc/passwd` returned the OPERATOR'S real
+            # /etc/passwd - the same line the `cat` allowlist exists to
+            # prevent, through a different door. http(s) to loopback only;
+            # the cloud-metadata address answers from a fixture so the SSRF
+            # demonstration still works without touching a real network.
             u = p.get("url", "")
-            try:
-                with urllib.request.urlopen(u, timeout=3) as resp:
-                    data = resp.read(4096)
-                self._send(body=b"FETCHED:\n" + data)
-            except Exception as exc:
-                self._send(502, f"fetch error for {u}: {exc}",
-                           ctype="text/plain")
+            parsed = urllib.parse.urlparse(u)
+            host = (parsed.hostname or "").lower()
+            if host in ("169.254.169.254", "metadata.google.internal"):
+                self._send(body=b"FETCHED:\n" + _FAKE_METADATA)
+            elif parsed.scheme not in ("http", "https"):
+                self._send(502, f"fetch error for {u}: unsupported scheme "
+                                f"{parsed.scheme!r}", ctype="text/plain")
+            elif host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0",
+                              "[::1]"):
+                self._send(502, f"fetch error for {u}: only loopback is "
+                                "reachable from this lab", ctype="text/plain")
+            else:
+                try:
+                    with urllib.request.urlopen(u, timeout=3) as resp:
+                        data = resp.read(4096)
+                    self._send(body=b"FETCHED:\n" + data)
+                except Exception as exc:
+                    self._send(502, f"fetch error for {u}: {exc}",
+                               ctype="text/plain")
 
         elif path.startswith("/api/user/"):
             uid = path.rsplit("/", 1)[-1]
@@ -916,6 +935,14 @@ def make_server(port: int = 0):
 # takes `-F <file>` (reads a file) and a bare argument (sets the host name),
 # and `id <user>` enumerates accounts. The commands that need no arguments are
 # run with none; only echo and cat take any, and cat's is confined below.
+# What the metadata address answers with, so an SSRF proof has something only
+# the "internal network" would return - without reaching one.
+_FAKE_METADATA = (
+    b'{"ami-id":"ami-0lab00000000","instance-id":"i-0labfixture0000",'
+    b'"local-ipv4":"10.0.0.17","local-hostname":"ip-10-0-0-17.lab.internal",'
+    b'"iam":{"info":{"InstanceProfileArn":'
+    b'"arn:aws:iam::000000000000:instance-profile/lab-role"}}}')
+
 _EXEC_NOARGS = {"id", "whoami", "uname", "hostname", "pwd"}
 _EXEC_WITHARGS = {"echo", "cat"}
 _EXEC_ALLOW = _EXEC_NOARGS | _EXEC_WITHARGS

@@ -58,10 +58,18 @@ IDENTITY_RE = re.compile(r"uid=\d+\([^)\n]{1,64}\)|uid=\d+\s+gid=\d+")
 # Windows proof whenever the output was not at the end of a line. Strong forms
 # only: a named service account anywhere, or a machine\user token alone on its
 # own line - which is exactly what `whoami` prints.
+# `nt authority\<service>` is unambiguous. A bare `machine\user` is not: it is
+# also `docs\readme` and `bin\tool.exe`, and a page containing one of those on
+# its own line graded rce when the request happened to carry a nonce. So the
+# ambiguous form is accepted only out of a NON-HTML body - `whoami` output
+# arrives as text or JSON from a diagnostic endpoint, while the false positive
+# lives in incidental HTML content.
 WINIDENT_RE = re.compile(
-    r"(?im)(?:^|[^\w.:\\-])(nt authority\\{1,2}"
-    r"(?:system|local service|network service|iusr))\b"
-    r"|^\s*([a-z0-9_-]{1,15}\\{1,2}[a-z0-9_.-]{1,20}\$?)\s*$")
+    r"(?i)(?:^|[^\w.:\\-])(nt authority\\{1,2}"
+    r"(?:system|local service|network service|iusr))\b")
+WINIDENT_WEAK_RE = re.compile(
+    r"(?im)^\s*([a-z0-9][a-z0-9_-]{1,14}\\{1,2}[a-z0-9_.-]{1,20}\$?)\s*$")
+
 # The marker this system sends. `probe_cmdi` builds it with _marker("argus"),
 # and the matrix requires that prefix: accepting "any 6-32 char token present
 # in both the request and the response" passed for free on every page that
@@ -71,14 +79,17 @@ NONCE_RE = re.compile(r"(?i)\bargus[a-z0-9]{4,24}\b")
 # shell separator - so `deserialize` inherited a declaration check it could
 # never pass, and the class was unprovable by construction.
 SERIALIZED_RE = re.compile(
-    r"(?i)(!!python/(?:object|name)|cos\nsystem|c__builtin__|\bpickle\b"
-    r"|O:\d+:|a:\d+:\{|rO0AB|aced0005"
-    r"|__proto__|constructor\[|\$\$ND\b|TypeObject|ObjectDataProvider"
-    r"|yaml\.load|ruby/object|marshal|BinaryFormatter)")
-# A command was actually sent - a separator followed by a benign read.
+    r"(?i)(!!python/(?:object|name)|!!ruby/object|cos\nsystem|c__builtin__"
+    r"|__reduce__|cPickle|O:\d+:[\"']|a:\d+:\{|rO0AB|aced0005"
+    r"|\$\$ND\b|ObjectDataProvider|BinaryFormatter|TypeConfuseDelegate"
+    r"|__proto__\s*[\":]|constructor\s*\[\s*[\"']prototype"
+    r"|yaml\.(?:unsafe_)?load\s*\()")
+
 COMMAND_SENT_RE = re.compile(
     r"(?i)(?:[;|&\n]|\$\(|`|%0a|%3b|\|\|)\s*"
-    r"(id|whoami|uname|hostname|echo|cat|type|set)\b")
+    r"(?:id|whoami|uname|hostname|pwd|ver|cat|echo)"
+    r"(?=\s|;|\||&|$|\)|`|'|\")")
+
 # The veto. It exists so a demonstration whose proof is the damage cannot be
 # recorded, and the first version missed 21 of 24 payloads an auditor tried -
 # a webshell drop, a reverse shell, crontab persistence, powershell, a piped
@@ -86,20 +97,36 @@ COMMAND_SENT_RE = re.compile(
 # /etc/passwd, which is an ordinary read.
 DESTRUCTIVE_RE = re.compile(
     r"(?i)("
-    r"\brm\s+-[a-z]*[rf]|\bmkfs\b|\bdd\s+if=|\bshred\b"
-    r"|\b(shutdown|reboot|halt|poweroff)\b|\b:\s*\(\s*\)\s*\{|>\s*/dev/sd"
-    r"|\b(useradd|adduser|usermod)\b|\bpasswd\s+[a-z]|net\s+user\s+\S+\s+/add"
-    r"|\b(crontab|at\s+now|schtasks|systemctl\s+enable|launchctl\s+load)\b"
-    r"|\bauthorized_keys\b|\bchmod\s+[0-7]*[1357][0-7]*\s|\bchmod\s+\+s\b"
-    r"|\bnc\s+-[a-z]*e|\b(bash|sh|zsh)\s+-i\b|/dev/tcp/|/dev/udp/"
-    r"|\bsocat\b|\bmkfifo\b|\bpty\.spawn\b"
-    r"|\b(curl|wget)\b[^|;&\n]*\|\s*(ba)?sh"
+    # destroy or truncate
+    r"\brm\s+-[a-z]*[rf]|\bmkfs\b|\bdd\s+if=|\bshred\b|\btruncate\s+-s"
+    r"|\b(shutdown|reboot|halt|poweroff|init\s+[06])\b"
+    r"|\b:\s*\(\s*\)\s*\{|>\s*/dev/sd|\bwipefs\b"
+    # persist or escalate
+    r"|\b(useradd|adduser|usermod|groupadd)\b|\bpasswd\s+[a-z]"
+    r"|net\s+user\s+\S+\s+/add|\bnet\s+localgroup\b"
+    r"|\b(crontab|at\s+now|schtasks|systemctl\s+enable|launchctl\s+load"
+    r"|reg\s+add)\b"
+    r"|\bauthorized_keys\b|/etc/sudoers|\bvisudo\b|\bsetfacl\b|\bxattr\b"
+    r"|\bchmod\s+[0-7]*[1357][0-7]*\s|\bchmod\s+[ugoa]*\+s\b|\bchown\s+root"
+    r"|\bln\s+-s|\bmv\s+/|\bcp\s+/bin/|\binstall\s+-m\s*[0-7]*[1357]"
+    # shell out
+    r"|\bnc\s+-[a-z]*e|\b(ba|z|k)?sh\s+-i\b|/dev/tcp/|/dev/udp/"
+    r"|\bsocat\b|\bmkfifo\b|\bpty\.spawn\b|\bbusybox\s+nc\b"
+    r"|\btelnet\s+\d|\bssh\s+-R\b|\bchisel\b|\bligolo\b"
+    # download-and-run, or run code
+    r"|\b(curl|wget|fetch)\b[^|;&\n]*\|\s*(ba)?sh"
     r"|\b(curl\s+-[a-zA-Z]*o|wget\s+-[a-zA-Z]*O)\b"
     r"|\bcertutil\s+-urlcache|\binvoke-webrequest\b|\bbitsadmin\b"
-    r"|\bbase64\s+-d[^|]*\|\s*(ba)?sh|\bpython3?\s+-c\b|\bperl\s+-e\b"
-    r"|\bruby\s+-e\b|\bpowershell\b|\bIEX\s*\(|\bFromBase64String\b"
-    r"|>\s*\S*/(?:www|html|htdocs|webroot|public|wwwroot)/"
-    r"|\btee\s+\S*/(?:www|html|htdocs|public)/"
+    r"|\bbase64\s+-d[^|]*\|\s*(ba)?sh"
+    r"|\b(python3?|perl|ruby|php|node|lua|osascript)\s+-[ecr]\b"
+    r"|\bpowershell\b|\bpwsh\b|\bIEX\s*\(|\bFromBase64String\b"
+    r"|\b(pip3?|npm|gem|apt-get|apt|yum|dnf|brew)\s+(install|i)\b"
+    r"|\bdocker\s+(run|exec|cp)\b|\bkubectl\s+(exec|cp|apply)\b"
+    r"|\baws\s+s3\s+(cp|sync|mv)\b|\bgcloud\s+storage\b|\bscp\b|\brsync\b"
+    # write into anything served, or append to a config
+    r"|>>?\s*\S*/(?:www|html|htdocs|webroot|public|wwwroot|cgi-bin)/"
+    r"|\btee\s+(-a\s+)?\S*/(?:www|html|htdocs|public|etc)/"
+    r"|>>\s*/etc/"
     r")")
 
 # A query operator, not any key that starts with `$`: `{"$schema": ...}` and
@@ -141,18 +168,24 @@ TABLE_RE = re.compile(
 # A file read asked for a file. Without this, any page quoting a passwd line -
 # a security blog, this project's own README - graded as an arbitrary read.
 TRAVERSAL_RE = re.compile(
-    r"(?i)(\.\.[/\\]|%2e%2e|\.\.%2f|%252e|/etc/[a-z]|c:\\\\?win|boot\.ini"
-    r"|file://|php://|zip://|data://|expect://|/proc/self|win\.ini"
-    r"|%00|\x00|\.\./)")
+    r"(?i)(\.\.[/\\]|%2e%2e|\.\.%2f|%252e"
+    r"|/etc/(?:passwd|shadow|hosts|group|issue|hostname|fstab|crontab)"
+    r"|/proc/(?:self|\d+)/|c:[/\\]{1,2}win|boot\.ini|win\.ini"
+    r"|file://|php://|zip://|data://|expect://|/windows/win"
+    r"|%00|\x00)")
 
 # What makes data a SUBJECT rather than a page: an access-control claim needs
 # the bytes to identify a person or an account, or `/page/1` vs `/page/2`
 # grades as broken access control.
+# JSON-quoted, or a form/query parameter. `<div role="navigation">` matched the
+# bare `role=` form, which re-opened the pagination bypass on any HTML page.
 SUBJECT_RE = re.compile(
-    r"(?i)\"?(user_?name|login|e?-?mail|user_?id|uid|full_?name|first_?name|"
-    r"last_?name|phone|mobile|ssn|dob|address|role|roles|is_?admin|"
-    r"account_?(?:id|no|number)|customer_?id|owner|owner_?id|tenant|"
-    r"card_?(?:number|no)|iban|balance)\"?\s*[:=]")
+    r"(?i)(?:\"(?:user_?name|login|e?-?mail|user_?id|uid|full_?name|"
+    r"first_?name|last_?name|phone|mobile|ssn|dob|address|role|roles|"
+    r"is_?admin|account_?(?:id|no|number)|customer_?id|owner|owner_?id|"
+    r"tenant|card_?(?:number|no)|iban|balance)\"\s*:"
+    r"|[?&](?:username|login|email|user_id|uid|account_id|customer_id|"
+    r"owner|role)=)")
 
 # A write the defence would have stopped carries one of these.
 CSRF_TOKEN_RE = re.compile(
@@ -161,9 +194,11 @@ CSRF_TOKEN_RE = re.compile(
 
 # Fields a caller should not be able to set on itself.
 PRIVILEGED_FIELD_RE = re.compile(
-    r"(?i)\"?(is_?admin|isadmin|admin|role|roles|permissions?|scopes?|"
+    r"(?i)(?:\"(?:is_?admin|isadmin|admin|role|roles|permissions?|scopes?|"
     r"is_?staff|is_?superuser|verified|email_?verified|balance|credit|"
-    r"price|discount|owner_?id|user_?id|account_?type|plan|tier)\"?\s*[:=]")
+    r"price|discount|owner_?id|account_?type|plan|tier)\"\s*:"
+    r"|[?&](?:is_admin|isAdmin|admin|role|permissions|scope|verified|"
+    r"balance|price|discount|owner_id|account_type|plan|tier)=)")
 
 # A placeholder is not a credential: `password=changeme` in an install
 # document used to grade `disclosure` proven.
@@ -177,6 +212,14 @@ PLACEHOLDER_RE = re.compile(
 PASSWD_RE = re.compile(r"root:.?:0:0:")
 WIN_INI_RE = re.compile(r"(?i)\[(fonts|extensions|mci extensions|boot loader)\]")
 PRIVKEY_RE = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |)PRIVATE KEY-----")
+# A response that REFUSED the injection is not its data: `nosqli` graded
+# `proven` on `{"error":"invalid operator"}` because the excerpt was in the
+# response and nothing asked whether the response was a rejection.
+REFUSAL_RE = re.compile(
+    r"(?i)\b(error|errors|invalid|illegal|malformed|unsupported|not allowed|"
+    r"not permitted|denied|forbidden|unauthorized|rejected|bad request|"
+    r"disabled|unavailable|failed|failure)\b")
+
 FILE_SENTINELS = (("unix /etc/passwd", PASSWD_RE),
                   ("windows win.ini", WIN_INI_RE),
                   ("private key", PRIVKEY_RE))
@@ -193,8 +236,14 @@ SECRET_RE = re.compile(
 TEMPLATE_MATH_RE = re.compile(
     r"(\{\{|\$\{|#\{|\{%|\*\{)\s*(\d{1,6})\s*([*+])\s*(\d{1,6})\s*(\}\}|\}|%\})")
 
-OBJECT_REF_RE = re.compile(r"(?i)(?:^|[/?&])(?:id|uid|user_?id|order|account|"
-                           r"doc|object|num|pk)=(\w{1,64})|/(\d{1,12})(?:/|$)")
+# An object reference is not always an integer. Matching only digits made
+# idor unprovable on every API that uses uuids or opaque ids, which is most of
+# them.
+OBJECT_REF_RE = re.compile(
+    r"(?i)(?:^|[/?&])(?:id|uid|user_?id|order|account|doc|object|num|pk|ref|"
+    r"key|guid|uuid)=([\w.-]{1,64})"
+    r"|/(\d{1,12}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    r"|[0-9a-f]{24,64})(?=/|$|\?)")
 
 
 # --- the claim ---------------------------------------------------------------
@@ -291,6 +340,11 @@ def _witness(candidates, build, required: tuple[str, ...]) -> list[dict]:
     return best if best is not None else build(None)
 
 
+# How many cited exchanges take part in pairing. Beyond this the first N are
+# used and the verdict records that the citation was truncated for grading.
+_MAX_PAIRED = 16
+
+
 def _pairs(exchanges: list[dict]) -> list:
     """Ordered pairs of distinct cited exchanges, for classes whose proof is a
     contrast. Ordered, because "A reached B's data" is not the same claim as
@@ -301,8 +355,13 @@ def _pairs(exchanges: list[dict]) -> list:
     with nothing to act on - the half of the requirement it DID meet has to
     still register, so the missing half can be named.
     """
-    out = [(a, b) for a in exchanges for b in exchanges if a is not b]
-    out += [(a, None) for a in exchanges]
+    # Bounded: the pairing is O(N^2) and `_witness` runs the verifier on every
+    # candidate, so a claim citing 200 exchanges was 40,000 verifier runs over
+    # full response bodies. A contrast needs two exchanges, not two hundred;
+    # the cap is generous and the verdict says when it bit.
+    kept = exchanges[:_MAX_PAIRED]
+    out = [(a, b) for a in kept for b in kept if a is not b]
+    out += [(a, None) for a in kept]
     return out
 
 
@@ -348,6 +407,33 @@ def _grade(checks: list[dict], required: tuple[str, ...],
 
 
 # --- shared checks -----------------------------------------------------------
+
+def _echo_check(claim: Claim, spec: "ProofSpec") -> dict:
+    """The target produced the quoted bytes - the request did not.
+
+    A precondition of EVERY class, and I implemented it twice as a per-class
+    detail (lfi's sentinel, disclosure's secret) instead of once here. The cost
+    was measured: one search box echoing its query graded `sqli` and `nosqli`
+    **proven**, and lfi, xxe and massassign `candidate`, on a target with
+    nothing behind it. Send `SELECT a,b FROM users -- admin - s3cr3t` and quote
+    `admin - s3cr3t` out of the reflection.
+
+    The exception is the classes whose artifact IS a reflection - xss, prototype
+    pollution, crlf - which declare `reflection_is_the_finding`.
+    """
+    if spec.reflection_is_the_finding or not claim.excerpt:
+        return _check("the target produced the quoted bytes", True, "")
+    carrying = [e for e in claim.exchanges if claim.excerpt in resp_body(e)]
+    produced = [e for e in carrying if claim.excerpt not in req_text(e)]
+    ok = bool(produced)
+    return _check(
+        "the target produced the quoted bytes", ok,
+        f"from {produced[0].get('id')}" if ok else
+        ("every cited response carrying the quoted bytes was answering a "
+         "request that already contained them - that is an echo, not a finding"
+         if carrying else
+         "the quoted bytes are in no cited response"))
+
 
 def _wire_check(claim: Claim) -> dict:
     """Every class needs bytes from the wire. A claim citing only scanner or
@@ -423,9 +509,18 @@ def _endpoint_shape(entry: dict) -> str:
     """
     url = str((entry.get("request") or {}).get("url") or "")
     parsed = urllib.parse.urlparse(url)
-    path = re.sub(r"/\d+(?=/|$)", "/{id}", parsed.path or "/")
+    # The HOST is part of the endpoint. Dropping it made two tenants of a
+    # multi-tenant app - alice.saas.test and bob.saas.test, each reading their
+    # own record - compare as one endpoint, and two legitimate accounts graded
+    # as broken access control.
+    host = (parsed.hostname or "").lower()
+    # an opaque id is an id: a uuid or a long slug segment collapses too, or
+    # idor is unprovable on every API that does not use integers
+    path = re.sub(r"/(?:\d+|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-"
+                  r"[0-9a-f]{12}|[0-9a-f]{24,64})(?=/|$)",
+                  "/{id}", parsed.path or "/", flags=re.I)
     params = tuple(sorted(k for k, _ in urllib.parse.parse_qsl(parsed.query)))
-    return path + ("?" + ",".join(params) if params else "")
+    return host + path + ("?" + ",".join(params) if params else "")
 
 
 def _credential(entry: dict) -> str:
@@ -445,6 +540,12 @@ def _object_refs(entry: dict) -> set[str]:
     for m in OBJECT_REF_RE.finditer(url):
         refs.add(m.group(1) or m.group(2))
     return {r for r in refs if r}
+
+
+def _ceiling_reason(spec: "ProofSpec") -> str:
+    """Why a class cannot be settled here, for the verdict to carry."""
+    return (spec.notes or spec.requirement or
+            "this system cannot settle this class")
 
 
 # --- verifiers ---------------------------------------------------------------
@@ -484,7 +585,14 @@ def verify_command_output(claim: Claim, spec: "ProofSpec") -> list[dict]:
                 "no cited request carries a separator followed by a read-only "
                 "command (id/whoami/uname/echo)" if entry else "no exchange cited"))
 
-        hit = (IDENTITY_RE.search(body) or WINIDENT_RE.search(body)) if entry else None
+        html = bool(entry) and bool(re.search(
+            r"(?i)text/html|application/xhtml",
+            str(((entry.get("response") or {}).get("headers")) or "")))
+        hit = None
+        if entry:
+            hit = IDENTITY_RE.search(body) or WINIDENT_RE.search(body)
+            if hit is None and not html:
+                hit = WINIDENT_WEAK_RE.search(body)
         reflected = bool(hit) and hit.group(0).strip() in request
         checks.append(_check(
             "identity output returned by the target",
@@ -557,13 +665,18 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
              "no cited request carries SQL that names a table - a boolean "
              "differential proves the channel, not the read")))
         quoted = bool(claim.excerpt) and claim.excerpt in body
-        is_error = bool(claim.excerpt) and bool(DBMS_RE.search(claim.excerpt))
+        is_error = bool(claim.excerpt) and (
+            bool(DBMS_RE.search(claim.excerpt))
+            or bool(REFUSAL_RE.search(claim.excerpt)))
+        answered = bool(entry) and status_of(entry) < 400
         out.append(_check(
             "rows returned, not an error message",
-            bool(named) and quoted and not is_error,
-            f"quoted from {rid}" if named and quoted and not is_error else
-            ("the excerpt is the engine's error message, not its data"
-             if is_error else
+            bool(named) and quoted and not is_error and answered,
+            f"quoted from {rid}" if named and quoted and not is_error
+            and answered else
+            ("the excerpt is an error or a refusal, not data" if is_error else
+             f"{rid} answered {status_of(entry)} - the store refused the query"
+             if named and quoted and not answered else
              f"the quoted bytes are not in {rid}" if named and not quoted else
              "the exchange the rows are quoted from never named a table")))
         return out
@@ -741,6 +854,15 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
     401 somewhere. The pair has to be the same endpoint with DIFFERENT
     credentials, one accepted and one refused.
     """
+    # The mint, from the non-HTTP events the claim also cites. A working
+    # authorisation check has the same shape on the wire as a forgery - a good
+    # credential accepted, another refused - so what separates them is that
+    # this system minted the one that was accepted. `jwt_forge` records it.
+    minted = next((e for e in claim.events
+                   if (e.get("kind") or "") == "jwt_forge"), None)
+    claims_set = (minted or {}).get("claims_set")
+    claims_set = claims_set if isinstance(claims_set, dict) else {}
+
     def build(pair) -> list[dict]:
         accepted, rejected = (pair if pair else (None, None))
         same = bool(accepted) and bool(rejected) and \
@@ -757,7 +879,20 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
         differ = bool(cred_r)
         quoted = bool(claim.excerpt) and bool(accepted) \
             and claim.excerpt in resp_body(accepted)
+        echoed = [str(v) for v in claims_set.values()
+                  if str(v) and accepted
+                  and str(v) in resp_body(accepted)]
         return [
+            _check("this system minted the credential",
+                   minted is not None and bool(echoed),
+                   f"jwt_forge {minted.get('id')} set "
+                   f"{sorted(claims_set)}, echoed {echoed[0]!r}"
+                   if minted is not None and echoed else
+                   ("cite the jwt_forge event: nothing in the session shows the "
+                    "accepted credential was minted here, and a working auth "
+                    "check looks the same on the wire" if minted is None else
+                    "none of the forged claims come back in the accepted "
+                    "response - the server did not honour them")),
             _check("a forged credential was accepted",
                    ok_code and bool(cred_a) and quoted,
                    f"{_endpoint_shape(accepted)} returned "
@@ -958,7 +1093,14 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
                  if bool(claim.excerpt) and claim.excerpt in resp_body(e)]
         before = [e for e in reads
                   if not claim.excerpt or claim.excerpt not in resp_body(e)]
+        landed = bool(entry) and 200 <= status_of(entry) < 400
         return [
+            _check("the state-changing request succeeded", write and landed,
+                   f"{method} returned {status_of(entry)}"
+                   if write and landed else
+                   (f"the write was refused with {status_of(entry)} - that is "
+                    "the defence working, not a finding" if write else
+                    "no cited request changes state")),
             _check("the state-changing request carried no anti-CSRF token",
                    write and not tokened,
                    f"{method} {_endpoint_shape(entry)}" if write and not tokened
@@ -1062,16 +1204,20 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
         field = PRIVILEGED_FIELD_RE.search(request) if wrote else None
         method = str((wrote.get("request") or {}).get("method") or "GET").upper() \
             if wrote else "GET"
-        sent = bool(field) and method in ("POST", "PUT", "PATCH")
+        sent = bool(field) and method in ("POST", "PUT", "PATCH") \
+            and 200 <= status_of(wrote) < 400
         back = bool(read) and bool(claim.excerpt) \
             and claim.excerpt in resp_body(read) \
             and claim.excerpt not in req_text(read)
         return [
-            _check("a privileged field was sent", sent,
-                   f"{field.group(0)} in {wrote.get('id')}" if sent else
-                   "no cited write carries a field the caller should not be "
-                   "able to set (role, is_admin, isAdmin, balance, verified, "
-                   "owner, permissions)"),
+            _check("a privileged field was sent and accepted", sent,
+                   f"{field.group(0)} in {wrote.get('id')}, "
+                   f"{status_of(wrote)}" if sent else
+                   (f"the write was refused with {status_of(wrote)}"
+                    if wrote is not None and field else
+                    "no cited write carries a field the caller should not be "
+                    "able to set (role, is_admin, isAdmin, balance, verified, "
+                    "owner, permissions)")),
             _check("a later read shows it set", back,
                    f"read back in {read.get('id')}" if back else
                    "cite the read that shows the field took effect - the write "
@@ -1094,10 +1240,15 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
         rid = (entry or {}).get("id", "?")
         asked = bool(entry) and bool(
             re.search(r"(?i)__schema|__type|\bquery\s*\{|\bmutation\s*\{", request))
-        introspected = asked and bool(
+        answered = bool(entry) and status_of(entry) < 400
+        # an `errors` array with no `data` is the endpoint declining, and a
+        # 404 plus "introspection is disabled" used to grade `proven`
+        declined = bool(re.search(r'(?i)"errors"\s*:\s*\[', body)) and not \
+            re.search(r'(?i)"data"\s*:\s*[\[{]\s*[^\s\]}]', body)
+        introspected = asked and answered and not declined and bool(
             re.search(r'(?i)"__schema"|"types"\s*:\s*\[|"queryType"', body))
-        records = asked and bool(claim.excerpt) and claim.excerpt in body \
-            and claim.excerpt not in request
+        records = asked and answered and not declined and bool(claim.excerpt) \
+            and claim.excerpt in body and claim.excerpt not in request
         return [
             _check("a GraphQL query was sent", asked,
                    f"exchange {rid}" if asked else
@@ -1107,8 +1258,12 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
                    introspected or records,
                    ("introspection answered" if introspected else
                     f"records quoted from {rid}") if introspected or records else
-                   "the response carries neither the schema nor the quoted "
-                   "records"),
+                   (f"{rid} answered {status_of(entry)}" if entry is not None
+                    and not answered else
+                    "the response is an `errors` array with no data - the "
+                    "endpoint declined" if declined else
+                    "the response carries neither the schema nor the quoted "
+                    "records")),
         ]
 
     return _witness(claim.exchanges or [None], build, spec.required)
@@ -1152,6 +1307,9 @@ class ProofSpec:
     ceiling: str = ""
     declares: str = "command"
     advisories: tuple[str, ...] = ()
+    # xss, prototype pollution and crlf are proven BY the reflection, so the
+    # universal "the target produced these bytes" veto does not apply to them
+    reflection_is_the_finding: bool = False
 
     def verify(self, claim: Claim) -> "Verdict":
         wire = _wire_check(claim)
@@ -1162,15 +1320,37 @@ class ProofSpec:
         if not wire["ok"]:
             return Verdict(self.vuln_class, "unproven", [wire], [wire["check"]],
                            self.requirement, self.notes)
-        checks = [wire, *self.verifier(claim, self)]
-        grade = _clamp(_grade(checks, self.required, self.veto, self.floor),
-                       self.ceiling)
-        named = (*self.required, *self.veto, *self.floor)
+        echo = _echo_check(claim, self)
+        checks = [wire, echo, *self.verifier(claim, self)]
+        raw = _grade(checks, self.required,
+                     (*self.veto, "the target produced the quoted bytes"),
+                     self.floor)
+        grade = _clamp(raw, self.ceiling)
+        named = (*self.required, *self.veto, *self.floor,
+                 "the target produced the quoted bytes")
         missing = [c["check"] for c in checks if not c["ok"] and c["check"] in named]
         warnings = [c["check"] for c in checks
                     if not c["ok"] and c["check"] in self.advisories]
+        capped = ""
+        if len(claim.exchanges) > _MAX_PAIRED:
+            checks = [*checks, _check(
+                "the citation is small enough to grade whole", False,
+                f"{len(claim.exchanges)} exchanges cited; the first "
+                f"{_MAX_PAIRED} were paired. A contrast needs two exchanges - "
+                "cite the pair that proves it")]
+        if grade != raw:
+            # Otherwise the artifact says every check passed and `missing: []`
+            # while the grade says candidate - a reader cannot tell whether the
+            # evidence fell short or the class is capped, and the two mean
+            # entirely different things.
+            capped = _ceiling_reason(self)
+            checks = [*checks, _check(
+                f"settled by this system (held at {self.ceiling})", False,
+                capped)]
+            missing = [*missing,
+                       f"settled by this system (held at {self.ceiling})"]
         return Verdict(self.vuln_class, grade, checks, missing,
-                       self.requirement, self.notes, warnings)
+                       self.requirement, self.notes, warnings, capped)
 
 
 @dataclass
@@ -1184,6 +1364,9 @@ class Verdict:
     # failed checks that do not change the grade but must still be read: the
     # bug is proven AND the tester took more than the proof
     warnings: list[str] = field(default_factory=list)
+    # set when the class's ceiling held the grade down rather than the evidence
+    # falling short - the two are different facts and a reader needs both
+    capped: str = ""
 
     @property
     def proven(self) -> bool:
@@ -1196,6 +1379,8 @@ class Verdict:
             out["missing"] = self.missing
         if self.warnings:
             out["warnings"] = self.warnings
+        if self.capped:
+            out["capped_by_this_system"] = self.capped
         return out
 
     def explain(self) -> str:
@@ -1220,6 +1405,9 @@ DESERIALIZE_REQUIRED = ("a serialized payload was sent",
                         "the probe nonce came back in the output")
 EXTRACTION_REQUIRED = ("the query named its target",
                        "rows returned, not an error message")
+# nosqli had no floor at all, so one exchange that merely carried an operator
+# query graded `proven` - including one whose response refused it.
+EXTRACTION_FLOOR = ("rows returned, not an error message",)
 
 MATRIX: dict[str, ProofSpec] = {}
 
@@ -1257,13 +1445,14 @@ for _s in [
     ProofSpec("nosqli", "documents returned from a named collection the query "
               "should not have reached",
               EXTRACTION_REQUIRED, verify_data_extraction, fingerprint=False,
-              advisories=EXTRACTION_ADVISORY,
+              advisories=EXTRACTION_ADVISORY, floor=EXTRACTION_FLOOR,
               aliases=("nosql-injection", "mongo-injection")),
     ProofSpec("graphql", "a GraphQL query the endpoint answered with its "
               "schema or with records the caller should not reach",
               ("a GraphQL query was sent",
                "the endpoint answered with schema or records"),
-              verify_graphql, floor=("a GraphQL query was sent",),
+              verify_graphql,
+              floor=("the endpoint answered with schema or records",),
               aliases=("graphql-exposure", "graphql-introspection")),
     ProofSpec("lfi", "a request that asked for a file, a sentinel from a file "
               "whose contents are known, and a control path that does not exist",
@@ -1299,16 +1488,23 @@ for _s in [
                        "access-control")),
     ProofSpec("massassign", "a privileged field the caller sent, set on the "
               "server and shown set by a later read",
-              ("a privileged field was sent", "a later read shows it set"),
+              ("a privileged field was sent and accepted",
+               "a later read shows it set"),
               verify_mass_assignment,
-              floor=("a privileged field was sent",),
+              floor=("a privileged field was sent and accepted",),
               aliases=("mass-assignment", "massassignment",
                        "parameter-binding", "autobinding")),
-    ProofSpec("jwt", "a forged or absent credential accepted on a privileged "
-              "resource, with an invalid one rejected",
-              ("a forged credential was accepted",
+    ProofSpec("jwt", "a credential this system minted, accepted on a "
+              "privileged resource with its claims echoed back, and another "
+              "credential refused on the same endpoint",
+              ("this system minted the credential",
+               "a forged credential was accepted",
                "the same endpoint refuses another credential"),
-              verify_token_forgery, floor=("a forged credential was accepted",),
+              verify_token_forgery,
+              # the mint is what makes this class: a good credential accepted
+              # and a bad one refused is an auth system working, and with the
+              # floor elsewhere every authenticated endpoint became a candidate
+              floor=("this system minted the credential",),
               aliases=("auth-bypass", "authbypass", "jwt-forgery",
                        "session-fixation", "mfa-bypass", "auth")),
     ProofSpec("redirect", "a 3xx Location pointing off origin, with the in-origin "
@@ -1355,21 +1551,22 @@ for _s in [
               ("payload reflected unencoded into HTML",
                "a real browser executed it"),
               verify_browser_execution, ceiling="candidate",
-              aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection")),
+              aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection"), reflection_is_the_finding=True),
     ProofSpec("ppoll", "a polluted property observably changing behaviour - "
               "which needs a browser or a server response that only the "
               "pollution explains",
               ("payload reflected unencoded into HTML",
                "a real browser executed it"),
               verify_browser_execution, ceiling="candidate",
-              aliases=("prototype-pollution", "prototypepollution")),
+              aliases=("prototype-pollution", "prototypepollution"), reflection_is_the_finding=True),
     ProofSpec("csrf", "a state-changing request that carried no anti-CSRF "
               "token, sent cross-origin, with the change shown by a read "
               "before and a read after",
-              ("the state-changing request carried no anti-CSRF token",
+              ("the state-changing request succeeded",
+               "the state-changing request carried no anti-CSRF token",
                "it was sent cross-origin", "the state changed between two reads"),
               verify_state_change,
-              floor=("the state changed between two reads",),
+              floor=("the state-changing request succeeded",),
               aliases=("logic-flaw", "logicflaw", "business-logic")),
     ProofSpec("race", "an outcome impossible under serial execution, with the "
               "serial control on record - which this system measures as a "
@@ -1403,7 +1600,7 @@ for _s in [
               "bodies, so it stops at a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
               ceiling="candidate",
-              aliases=("header-injection", "response-splitting")),
+              aliases=("header-injection", "response-splitting"), reflection_is_the_finding=True),
     ProofSpec("upload", "the uploaded file served back with an active "
               "content-type, or executed - which is then an rce finding and "
               "graded as one. On its own this measures a difference",

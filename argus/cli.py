@@ -780,6 +780,27 @@ def _preflight_target(cfg) -> None:
         raise SystemExit(f"target rejected by scope guard: {exc}")
 
 
+def _demo_scan(messages: list, key: str):
+    """The newest tool_result carrying `key`, searching back through the whole
+    conversation - the forge event is several turns behind the request that
+    used its token."""
+    for msg in reversed(messages):
+        blocks = msg.get("content")
+        if not isinstance(blocks, list):
+            continue
+        for block in reversed(blocks):
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            try:
+                out = json.loads(block.get("content") or "{}")
+            except ValueError:
+                continue
+            result = out.get("result") if isinstance(out, dict) else None
+            if isinstance(result, dict) and result.get(key):
+                return result[key]
+    return None
+
+
 def _demo_last(messages: list) -> dict:
     """The most recent tool_result payload, as the model sees it.
 
@@ -919,13 +940,15 @@ def _demo(args) -> int:
                         ids.append(rid)
             if len(ids) >= 2:
                 break
+        mint = _demo_scan(messages, "event_id")
+        cited = ids[:2] + ([mint] if mint else [])
         return {"text": "Forged token accepted, deliberately invalid token "
-                        "rejected - the acceptance is the signature check, not "
-                        "a missing one.",
+                        "rejected - and the forge event is cited too, because "
+                        "a working auth check looks the same on the wire.",
                 "tool_calls": [_t(12, "record_finding",
                     title="JWT weak secret: forged admin token accepted",
                     severity="critical", category="jwt",
-                    url=base + "/api/me", evidence_ids=ids[:2],
+                    url=base + "/api/me", evidence_ids=cited,
                     evidence_excerpt='"role": "admin"',
                     description="The session JWT verifies against the "
                                 "dictionary secret 'secret123'. A token forged "
@@ -1121,10 +1144,12 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                         ids.append(result["request_id"])
             if len(ids) >= 2:
                 break
+        mint = _demo_scan(messages, "event_id")
+        cited = ids[:2] + ([mint] if mint else [])
         return {"tool_calls": [_t("e14", "record_finding",
             title="JWT weak secret: forged admin token accepted",
             severity="critical", category="jwt", url=base + "/api/me",
-            evidence_ids=ids[:2], evidence_excerpt='"role": "admin"',
+            evidence_ids=cited, evidence_excerpt='"role": "admin"',
             description="The secret 'secret123' is dictionary-weak: a forged "
                         "admin token is accepted, while the same request with "
                         "a broken signature is refused 401.",

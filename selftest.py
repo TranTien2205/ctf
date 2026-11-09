@@ -240,9 +240,20 @@ def main() -> int:
     check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
     out = probes.probe_ssrf(ctx, base + "/fetch?url=x", "url")
     check("ssrf probe sees self-fetch", "ssrf" in out["verdict"])
-    check("ssrf probe sees file-scheme content",
+    # The lab used to pass /fetch's parameter straight to urlopen, so this
+    # check asserted that the probe could read the OPERATOR'S real
+    # /etc/passwd. That is the behaviour the `cat` allowlist exists to
+    # prevent, through a different door. The lab now refuses a non-http
+    # scheme, and what the probe must still see is the internal-only
+    # response - the metadata fixture - because that is what an SSRF proof
+    # rests on.
+    check("ssrf probe is refused the file scheme",
+          not any(h["marker"] for h in out["results"]
+                  if h["name"].startswith("file")))
+    check("ssrf probe sees an internal-only response",
           any(h["marker"] for h in out["results"]
-              if h["name"].startswith("file")))
+              if "metadata" in h["name"] or "aws" in h["name"]
+              or "169.254" in str(h.get("payload", ""))))
     out = probes.probe_xxe(ctx, base + "/xml")
     check("xxe probe resolves entity", "xxe candidate" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/login")
