@@ -205,6 +205,15 @@ def _validate_resume(resume: str) -> str:
     return resume
 
 
+def _validate_session_dir(p: Path) -> Path:
+    """--session-dir pointing at an existing FILE surfaces as a
+    FileExistsError traceback when the session dir is created."""
+    if p.exists() and not p.is_dir():
+        raise SystemExit(
+            f"--session-dir {p}: exists and is not a directory")
+    return p
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
     _load_dotenv()
@@ -301,7 +310,7 @@ def load_config(args) -> Config:
         max_requests=args.max_requests if args.max_requests > 0 else 10**9,
         max_time_s=args.max_time if args.max_time > 0 else 10**12,
         rate_rps=args.rate,
-        session_dir=Path(args.session_dir),
+        session_dir=_validate_session_dir(Path(args.session_dir)),
         scope_hosts=scope_hosts,
         exclude_paths=exclude_paths,
         allow_private=args.allow_private,
