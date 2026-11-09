@@ -1,7 +1,7 @@
 {
-  "id": "20261109-010802-127.0.0.1",
-  "target": "http://127.0.0.1:42394",
-  "started": 1794161282.7318895,
+  "id": "20261109-113916-127.0.0.1",
+  "target": "http://127.0.0.1:40117",
+  "started": 1794242356.2038898,
   "model": "scripted-demo",
   "goal": "",
   "operator": "",
@@ -12,5 +12,6 @@
   "exclude_paths": [],
   "proxy": false,
   "tls_verify": false,
-  "tools": "all"
+  "tools": "all",
+  "require_proof": false
 }

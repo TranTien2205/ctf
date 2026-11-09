@@ -15,11 +15,21 @@ _RANK = {"critical": 9.5, "high": 8.0, "medium": 5.5,
          "low": 3.0, "info": 1.0}
 
 
+# SARIF 2.1.0: `level` is meaningful only when `kind` is "fail". Anything this
+# system has not proven is a "review" result at level "none" - a candidate that
+# entered a dashboard as an error would fail a build on evidence the project
+# itself grades as incomplete, which is the opposite of the point.
+_KIND = {"proven": "fail", "candidate": "review", "unproven": "review",
+         "refused": "informational"}
+
+
 def render_sarif(session: Session) -> Path:
     sev_order = list(_LEVEL)
-    findings = sorted(sanitized_findings(session.findings), key=lambda f:
-                      sev_order.index(f.get("severity"))
-                      if f.get("severity") in sev_order else len(sev_order))
+    grade_order = {"proven": 0, "candidate": 1, "unproven": 2, "refused": 3}
+    findings = sorted(sanitized_findings(session.findings), key=lambda f: (
+        grade_order.get(f.get("grade") or "", 0),
+        sev_order.index(f.get("severity"))
+        if f.get("severity") in sev_order else len(sev_order)))
     rules: dict[str, dict] = {}
     results = []
     for f in findings:
@@ -37,12 +47,22 @@ def render_sarif(session: Session) -> Path:
                 rules[rule_id]["helpUri"] = (
                     "https://cwe.mitre.org/data/definitions/"
                     f"{_num}.html")
+        grade = f.get("grade") or ""
+        kind = _KIND.get(grade, "fail")
+        verdict = f.get("proof") if isinstance(f.get("proof"), dict) else {}
+        missing = [str(m) for m in (verdict.get("missing") or [])]
+        prefix = "" if kind == "fail" else f"[{grade.upper()}] "
         results.append({
             "ruleId": rule_id,
-            "level": _LEVEL.get(f.get("severity"), "warning"),
-            "rank": _RANK.get(f.get("severity"), 5.0),
-            "message": {"text": f"{f.get('title')} - "
-                               f"{f.get('description', '')}"},
+            "kind": kind,
+            "level": _LEVEL.get(f.get("severity"), "warning")
+            if kind == "fail" else "none",
+            "rank": _RANK.get(f.get("severity"), 5.0)
+            if kind == "fail" else -1.0,
+            "message": {"text": prefix + f"{f.get('title')} - "
+                               f"{f.get('description', '')}"
+                        + (f" [unmet proof checks: {', '.join(missing)}]"
+                           if missing else "")},
             "locations": [{"physicalLocation": {
                 "artifactLocation": {"uri": str(f.get("url") or "")}}}],
             "partialFingerprints": {
@@ -51,6 +71,10 @@ def render_sarif(session: Session) -> Path:
             },
             "properties": {
                 "argus-severity": f.get("severity", ""),
+                "argus-grade": grade,
+                "argus-vuln-class": f.get("vuln_class", ""),
+                "argus-proof-requirement": str(verdict.get("requirement") or ""),
+                "argus-proof-missing": missing,
                 "cvss": f.get("cvss", ""),
                 "cwe": cwe,
                 "owasp": f.get("owasp") or _owasp_of(cwe),

@@ -1,6 +1,6 @@
-# Working notes - http://127.0.0.1:42394
+# Working notes - http://127.0.0.1:40117
 
 ## Agent summary (agent)
 
-Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verified with verbatim evidence; host-header reflection left as a lead for manual follow-up.
+Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a forged JWT accepted against a rejected control. Candidate: reflected XSS - unescaped, but no browser executed it. Host-header reflection left as a lead.
 

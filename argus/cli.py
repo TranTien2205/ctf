@@ -426,6 +426,7 @@ def main(argv: list[str] | None = None) -> int:
                              or res.get("tail_truncated")
                              or res.get("anchor_missing")
                              or res.get("findings_bad")
+                             or res.get("findings_overgraded")
                              or res.get("artifact_mismatch"))
             print(json.dumps(res, indent=2, ensure_ascii=False))
             return 0 if res["ok"] else 1
@@ -454,6 +455,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"TAMPERED: findings {res['findings_bad']} no longer "
                   "verify - evidence ids missing from the transcript or "
                   "excerpt not verbatim")
+            return 1
+        if res.get("findings_overgraded"):
+            for row in res["findings_overgraded"]:
+                print(f"TAMPERED: {row['id']} claims grade "
+                      f"'{row['claimed']}' but its cited evidence supports "
+                      f"'{row['evidence_supports']}'"
+                      + (f" - unmet: {', '.join(row['missing'])}"
+                         if row.get("missing") else ""))
             return 1
         if res.get("artifact_mismatch"):
             print(f"TAMPERED: {res['artifact_mismatch']} edited since the "
