@@ -7,7 +7,7 @@ import urllib.parse
 from html.parser import HTMLParser
 
 from ..scope import ScopeError
-from .registry import Context
+from .registry import Context, _ival
 
 
 def http_request(ctx: Context, method: str, url: str,
@@ -78,8 +78,8 @@ def _parse_surface(html: str) -> _SurfaceParser:
 
 
 def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
-    depth = max(0, min(int(depth or 2), 4))
-    max_pages = max(1, min(int(max_pages or 40), 200))
+    depth = _ival(depth, 2, 0, 4)
+    max_pages = _ival(max_pages, 40, 1, 200)
     seen: set[str] = set()
     queue: list[tuple[str, int]] = [(url, 0)]
     pages: list[dict] = []

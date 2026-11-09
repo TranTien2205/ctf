@@ -13,7 +13,7 @@ import re
 import string
 import urllib.parse
 
-from .registry import Context
+from .registry import Context, _ival
 
 SQL_ERRORS = re.compile(
     r"sql syntax|mysql|mariadb|sqlite3?|postgresql|pg_query|ORA-\d{4}|"
@@ -207,7 +207,7 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         frag = (lambda n: f"1 ORDER BY {n}-- -") if numeric_ctx \
             else (lambda n: f"1' ORDER BY {n}-- -")
         cols, trace = None, []
-        for n in range(1, min(int(union_cols), 30) + 1):
+        for n in range(1, _ival(union_cols, 8, 0, 30) + 1):
             rr = _send(ctx, url, param, frag(n), method, data, tool,
                        f"orderby-{n}")
             rbody = rr.get("body") or ""
@@ -228,7 +228,7 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
 
 def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
                data: str | None = None, delay_s: int = 4) -> dict:
-    delay_s = max(2, min(int(delay_s or 4), 10))
+    delay_s = _ival(delay_s, 4, 2, 10)
     tool = "probe_time"
     b1 = _send(ctx, url, param, "1", method, data, tool, "baseline-1")
     b2 = _send(ctx, url, param, "2", method, data, tool, "baseline-2")
@@ -886,7 +886,7 @@ def probe_lockout(ctx: Context, url: str, data: str,
     means throttling exists; N identical failures means password guessing
     is unthrottled - a standard report line. Kept deliberately small so it
     cannot itself be a brute-force run."""
-    tries = max(3, min(int(tries or 10), 15))
+    tries = _ival(tries, 10, 3, 15)
     bogus_u = _marker("lk")
     results = []
     for i in range(tries):
@@ -1162,7 +1162,7 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
     def _ok(r):
         return 200 <= r["status"] < 300
 
-    n = max(2, min(int(n or 8), 16))
+    n = _ival(n, 8, 2, 16)
     t0 = _time.monotonic()
     with concurrent.futures.ThreadPoolExecutor(max_workers=n) as ex:
         rs = list(ex.map(lambda _: _fire(), range(n)))

@@ -26,6 +26,15 @@ class Context:
     allowed: object = None      # frozenset of permitted tool names (None = all)
 
 
+def _ival(v, default: int, lo: int, hi: int) -> int:
+    """Clamped int for model-supplied numerics: a JSON-legal 'x'/[1]
+    falls back to default instead of crashing the tool call."""
+    try:
+        return max(lo, min(int(v if v not in (None, "") else default), hi))
+    except (TypeError, ValueError):
+        return default
+
+
 # Tool functions are imported lazily inside _impl() to keep module import cheap.
 def _impl(name: str) -> Callable:
     from . import analysis, mcp_tools, probes, team, web  # noqa: F401

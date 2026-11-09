@@ -14,7 +14,7 @@ import json
 
 from ..mcp import MCPError
 from ..scope import ScopeError
-from .registry import Context
+from .registry import Context, _ival
 
 RETURN_CAP = 12_000
 
@@ -86,7 +86,7 @@ def mcp_call(ctx: Context, server: str, tool: str, arguments: dict | None = None
                          f"configured: {mcp.servers()}"}
     if arguments is not None and not isinstance(arguments, dict):
         return {"error": "arguments must be a JSON object"}
-    timeout_s = max(5, min(int(timeout_s or 30), 120))
+    timeout_s = _ival(timeout_s, 30, 5, 120)
     # MCP servers fetch their own URLs outside GuardedClient - scope-check
     # any http(s) URL the call carries so a fetch server cannot be used to
     # reach out-of-scope targets

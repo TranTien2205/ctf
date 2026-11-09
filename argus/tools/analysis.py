@@ -14,7 +14,7 @@ import urllib.parse
 from pathlib import Path
 
 from ..scope import ScopeError
-from .registry import Context
+from .registry import Context, _ival
 
 # ---------------------------------------------------------------- jwt
 
@@ -159,8 +159,8 @@ def read_response(ctx: Context, request_id: str,
         return {"error": f"no exchange {request_id!r} in transcript"}
     resp = entry.get("response") or {}
     body = resp.get("body", "") or ""
-    offset = max(0, int(offset or 0))
-    length = max(1, min(int(length or 12000), 50000))
+    offset = _ival(offset, 0, 0, 10**9)
+    length = _ival(length, 12000, 1, 50000)
     out = {"request_id": entry["id"], "status": resp.get("status"),
            "tool": entry.get("tool"), "note": entry.get("note", ""),
            "headers": resp.get("headers") or {},
@@ -298,7 +298,7 @@ def run_external(ctx: Context, tool: str, args: str, timeout_s: int = 120) -> di
         bad = check(ctx, toks)
         if bad:
             return {"error": bad}
-    timeout_s = max(5, min(int(timeout_s or 120), 600))
+    timeout_s = _ival(timeout_s, 120, 5, 600)
     cmd = [binary] + _split_args(args)
     rid = ctx.session.record_event("external_cmd", {"cmd": cmd},
                                    agent=ctx.agent_name)
@@ -646,6 +646,7 @@ _ARG_CHECKS = {
 
 def _split_args(args: str) -> list[str]:
     import shlex
+    args = args if isinstance(args, str) else str(args or "")
     try:
         return shlex.split(args, posix=False) if _is_windows() else shlex.split(args)
     except ValueError:

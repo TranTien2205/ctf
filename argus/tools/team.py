@@ -11,7 +11,7 @@ import urllib.parse
 from pathlib import Path
 
 from ..team.leads import Lead
-from .registry import Context
+from .registry import Context, _ival
 
 # Bundled defaults ship inside the package (wheels). A <cwd>/resources/
 # tree lets an operator extend wordlists without touching the install —
@@ -40,7 +40,7 @@ def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
               method: str = "GET", tech: str = "", note: str = "",
               source: str = "", priority: int = 5) -> dict:
     board = _board(ctx)
-    kind = (kind or "endpoint").lower()
+    kind = str(kind or "endpoint").lower()
     if kind not in ("endpoint", "param", "credential", "note"):
         return {"error": f"kind must be endpoint|param|credential|note, got {kind!r}"}
     if kind in ("endpoint", "param"):
@@ -48,12 +48,21 @@ def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
             ctx.scope.check(url)
         except Exception as exc:
             return {"error": f"lead url rejected by scope guard: {exc}"}
+    url = str(url or "")
+    if isinstance(params, (list, tuple)):
+        params = [str(p) for p in params][:50]
+    else:
+        params = []
+    try:
+        prio = int(priority or 5)
+    except (TypeError, ValueError):
+        prio = 5
     lead = Lead(kind=kind, url=url.strip()[:2000],
-                params=tuple(sorted(params or []))[:50],
-                method=(method or "GET").upper(),
-                tech=(tech or "")[:500], note=(note or "")[:2000],
-                source=source or ctx.agent_name,
-                priority=max(0, min(int(priority or 5), 9)))
+                params=tuple(sorted(params)),
+                method=str(method or "GET").upper(),
+                tech=str(tech or "")[:500], note=str(note or "")[:2000],
+                source=str(source or ctx.agent_name),
+                priority=max(0, min(prio, 9)))
     if not board.leads.push(lead):
         return {"queued": False, "reason": "duplicate of an existing lead"}
     return {"queued": True, "pending": board.leads.pending}
@@ -61,8 +70,8 @@ def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
 
 def pull_leads(ctx: Context, max_n: int = 5, wait_s: int = 20) -> dict:
     board = _board(ctx)
-    leads, closed = board.leads.pull(max_n=max(1, min(int(max_n or 5), 10)),
-                                   wait_s=max(1, min(int(wait_s or 20), 60)))
+    leads, closed = board.leads.pull(max_n=_ival(max_n, 5, 1, 10),
+                                   wait_s=_ival(wait_s, 20, 1, 60))
     if closed and not leads:
         return {"leads": [], "closed": True,
                 "hint": "queue closed and drained - call finish()"}
@@ -172,7 +181,7 @@ def wordlist_fuzz(ctx: Context, base_url: str, wordlist: str = "dirs-small",
     request still passes the scope guard, rate limiter and budget."""
     from .probes import _inject_body
     ctx.scope.check(base_url)  # fail fast before burning the budget
-    max_words = max(1, min(int(max_words or 80), 400))
+    max_words = _ival(max_words, 80, 1, 400)
     words, err = _load_wordlist(wordlist, limit=max_words)
     if err:
         return {"error": err}
@@ -306,7 +315,7 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
     if cmd[0].endswith(".py"):
         import sys
         cmd = [sys.executable] + cmd
-    timeout_s = max(5, min(int(timeout_s or manifest.get("timeout_s", 60)), 300))
+    timeout_s = _ival(timeout_s, manifest.get("timeout_s", 60), 5, 300)
     try:
         # exploit PoCs are the least-trusted local code (often downloaded)
         # - scrub credentials from the environment they inherit
