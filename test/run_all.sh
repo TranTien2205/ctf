@@ -106,7 +106,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/sqlite_carve.py tools/forensics/mft_parse.py \
          tools/forensics/evtx_parse.py tools/forensics/carve_scan.py \
          tools/forensics/lnk_parse.py tools/forensics/usn_parse.py \
-         tools/forensics/recycle_i.py tools/forensics/prefetch.py; do
+         tools/forensics/recycle_i.py tools/forensics/prefetch.py \
+         tools/forensics/hive_parse.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

@@ -148,6 +148,12 @@ execution in mandiant's testing, but mandiant/ShimCacheParser's own README says 
 unknown" and that it must not conclusively determine execution; the Windows 10 format has no such flag. The cache is
 written at shutdown, so a live-captured hive can lack the newest entries.
 
+`python3 tools/forensics/hive_parse.py <hive> tree` walks the whole key tree (path, last-write time,
+subkey/value counts); `... get 'Control/Session Manager/AppCompatCache'` prints a key's values with type-aware
+decoding, and `... NTUSER.DAT userassist` emits every UserAssist row (ROT13-decoded path, run count, focus ms,
+FILETIME) for the v5 16-byte and v7 68/72-byte blob layouts. It reads the hive as written - replay `.LOG1`/`.LOG2`
+with regipy first when the bundle ships transaction logs.
+
 ## Per-user execution: UserAssist, RunMRU, RecentDocs, history, transcripts
 
 | Artifact | Path and structure |
