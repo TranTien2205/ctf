@@ -163,13 +163,16 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 163 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 165 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions).
 - Fault-tolerance pass: every forensic reader (`verify`, `findings`,
   `diff`, `sessions`, `_reopen`, renderers) degrades malformed session
   artifacts to flags/warnings instead of tracebacks — fuzzed across
-  dir-swaps, non-dict JSON, null fields and truncated files.
+  dir-swaps, non-dict JSON, null fields and truncated files; locked in
+  by `test_readers_survive_mutated_session_dir`. `dispatch` itself is
+  total (every tool × wrong-JSON-type args returns a serializable
+  dict) under `test_dispatch_total_on_malformed_args`.
 - `python -m argus demo` / `demo --team`: scripted end-to-end on the lab,
   no API key (5 evidence-gated findings each).
 - Wheel ships skills + role prompts + wordlists + exploit manifests;
