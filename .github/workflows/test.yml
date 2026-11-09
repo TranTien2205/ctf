@@ -33,7 +33,11 @@ jobs:
         run: |
           set -o pipefail
           python -m pytest tests/ -q -rf --tb=short 2>&1 | tee pytest.out
-      - name: pytest failure summary
+      # The job summary turned out to be invisible from outside: the Actions
+      # check-run exposes `output.summary` as null. Annotations ARE public, so
+      # the failure travels as one - head AND tail, because a collection error
+      # prints at the start and a test failure at the end.
+      - name: pytest failure annotation
         if: failure()
         shell: bash
         run: |
@@ -43,22 +47,42 @@ jobs:
             tail -n 120 pytest.out || echo "(no output captured)"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import pathlib
+          try:
+              lines = pathlib.Path("pytest.out").read_text(
+                  encoding="utf-8", errors="replace").splitlines()
+          except OSError:
+              lines = ["(no pytest.out)"]
+          keep = lines[:25] + (["..."] if len(lines) > 55 else []) + lines[-30:]
+          msg = "%0A".join(l.replace("%", "%25").replace("\r", "")
+                           for l in keep)
+          print(f"::error title=pytest::{msg}")
+          PY
       - name: selftest
         shell: bash
         run: |
           set -o pipefail
           python selftest.py 2>&1 | tee selftest.out
-      - name: selftest failure summary
+      - name: selftest failure annotation
         if: failure()
         shell: bash
         run: |
-          {
-            echo "### selftest on ${{ matrix.os }} / py${{ matrix.python }}"
-            echo '```'
-            grep -E "^\[FAIL\]|FAIL|Traceback|Error" selftest.out | tail -n 60 \
-              || tail -n 60 selftest.out || echo "(no output captured)"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import pathlib
+          import re
+          try:
+              text = pathlib.Path("selftest.out").read_text(
+                  encoding="utf-8", errors="replace")
+          except OSError:
+              text = "(no selftest.out)"
+          bad = [l for l in text.splitlines()
+                 if re.search(r"FAIL|Traceback|Error", l)]
+          keep = (bad or text.splitlines())[-30:]
+          msg = "%0A".join(l.replace("%", "%25").replace("\r", "")
+                           for l in keep)
+          print(f"::error title=selftest::{msg}")
+          PY
 
   wheel:
     # packaging regressions are invisible to tests run from the repo tree -
