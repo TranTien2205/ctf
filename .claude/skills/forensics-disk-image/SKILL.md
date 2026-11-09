@@ -51,6 +51,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
    (`source=freeblock|unallocated|freelist`); add `--live` to diff against
    live cells.
+7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
+   `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
+   dumps every module's decompressed source via the CFB container and
+   MS-OVBA chunking - oledump without the dependency, for the
+   "macro extracts a payload/flag" shape.
 
 `references/deleted-and-unallocated.md` carries the per-tool commands.
 
