@@ -31,9 +31,12 @@ def render_sarif(session: Session) -> Path:
             "shortDescription": {"text": f.get("category", "")},
             "properties": {},
         })
-        if cwe:
-            rules[rule_id]["helpUri"] = (
-                f"https://cwe.mitre.org/data/definitions/{cwe.split('-')[1]}.html")
+        if cwe and "-" in cwe:
+            _num = cwe.split("-", 1)[1]
+            if _num.isdigit():
+                rules[rule_id]["helpUri"] = (
+                    "https://cwe.mitre.org/data/definitions/"
+                    f"{_num}.html")
         results.append({
             "ruleId": rule_id,
             "level": _LEVEL.get(f.get("severity"), "warning"),
