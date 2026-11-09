@@ -64,8 +64,8 @@ def mcp_list(ctx: Context) -> dict:
     for name in mcp.servers():
         client = mcp.client(name)
         try:
-            tools = [{"name": t.get("name"),
-                      "description": (t.get("description") or "")[:160]}
+            tools = [{"name": str(t.get("name") or ""),
+                      "description": str(t.get("description") or "")[:160]}
                      for t in client.tools()]
             out.append({"server": name, "tools": tools})
         except MCPError as exc:
