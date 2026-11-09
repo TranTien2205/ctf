@@ -45,9 +45,16 @@ python -m argus demo                # scripted full run on the lab - no API key
 python selftest.py                  # offline check, no API key needed
 python -m argus proof rce           # what a class must produce to be a finding
 python -m argus proof               # all 29 requirements
-# or point it at the lab yourself:
+python -m argus mcp-serve http://127.0.0.1:8777 --allow-private
+                                    # serve the tools to your own LLM
+```
+
+With credentials, point a real run at the lab:
+
+```bash
 python lab/vulnapp.py 8777          # deliberately vulnerable app, stdlib only
-python -m argus run http://127.0.0.1:8777 --goal "map and test everything"
+python -m argus run http://127.0.0.1:8777 --allow-private \
+    --goal "map and test everything" --require-proof
 ```
 
 A demo session — report, findings, sealed transcript, passes

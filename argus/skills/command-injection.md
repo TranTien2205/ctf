@@ -52,7 +52,8 @@ holds after a repeat measurement.
 
 ## When only the timing oracle holds
 
-A delay is a candidate, not an rce finding: the class requires output. Say so
+A delay is NOT a recordable rce finding - the class floor is the identity
+line, so a timing-only claim grades `unproven`, not `candidate`. Say so
 in the report, name the separator family that delayed, and record it as a
 candidate rather than rounding it up - `probe_cmdi` does exactly this and
 returns the blind results separately.

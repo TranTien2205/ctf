@@ -19,8 +19,14 @@ rejected there. For constrained auth, run `run` with
 
 `probe_cmdi` is in that list deliberately: the planted-class list below
 includes OS command injection, so a subset without it makes the class
-unreachable while still counting in the recall denominator. Any tool subset
-used for a measured run has to be able to reach every class being scored.
+unreachable while still counting in the recall denominator.
+
+**This subset is not a measurement configuration.** It reaches seven classes;
+the other twenty-two have no probe in it. Use it only to get a constrained
+account running, and when you do, narrow the denominator to the classes its
+tools can reach - or the recall figure measures the subset, not the agent. For
+a measured run pass no `--tools` at all, or use `team`, where the role cards
+subset per worker rather than per run.
 or use `team` (role cards already subset tools per worker). Metered API
 keys are unaffected.
 
@@ -100,6 +106,18 @@ proven count, not the total.
   are the recall denominator — and split each by grade. A class found but
   left a candidate is a partial result; say so rather than scoring it as a
   hit or discarding it.
+- **Nine classes cannot reach `proven` in this system at all**, by
+  construction and by their own requirement sentences: `xss` and the
+  client-side half of prototype pollution need a browser; `ssrf` needs an
+  out-of-band collector; `enum` and `method` and `upload` and `crlf` and
+  `websocket` and `smuggle` and `race` are measured here as a difference
+  where the artifact is a count, a header, an execution or an ordering.
+  `dos` is refused outright. Score those classes as found-as-candidate, and
+  state the ceiling in the table - a recall figure that counts them in the
+  denominator while they can only ever be candidates is measuring the
+  system's honesty as if it were the agent's failure.
+  `python -m argus proof` prints each one's requirement and says what would
+  settle it.
 - Run each arm a second time with `--require-proof` to get the strict-mode
   numbers. The two conditions answer different questions: the default
   measures what the agent noticed, strict measures what it finished.

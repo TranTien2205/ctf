@@ -65,12 +65,18 @@ Design choices and why:
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real
   limits; the loop warns once near ~80% ("record now, prioritize"), nudges
   once at exhaustion, then stops. Measured on a real run: the early
-  warning turned a deferred-finding loss into a 5x recording rate.
+  warning turned a deferred-finding loss into a 5x recording rate. That
+  number is from a development run whose session was not kept, so treat it as
+  the reason the warning exists rather than as a measurement - the research
+  measurements have not been run.
 - **Cost-aware LLM calls.** `ClaudeClient` marks the static prefix
   (system + tools + conversation tail) with ephemeral cache breakpoints —
   billed input drops ~90% on cache hits. A 400 mentioning cache disables
-  it transparently. The full 55-tool schema is ~32KB/call, so constrained
-  auth paths can pass `--tools` (run) or rely on role-card subsets (team).
+  it transparently. The tool schema alone is ~32KB; a call also carries the
+  system prompt and the conversation, so the request is larger than that and
+  the figure is a floor, not the payload. Constrained auth paths can pass
+  `--tools` (run and mcp-serve) or rely on role-card subsets (team) - the
+  exploit card is the largest, so measure it rather than assuming it fits.
 - **Bounded context.** Tool results older than the last 8 result-messages
   compact to a stub naming their request_ids (re-inspect via
   `read_response`), so an 80-turn run cannot silently overrun the context
@@ -112,7 +118,7 @@ prompt wording can widen it.
 | post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript, AND recomputes its grade; `findings.json` is also in the run-end seal, so an edit is caught twice over - except after a legitimate `argus report` re-render recomputes the seal, which is why the re-grade is not redundant | `verify_transcript` findings pass, `findings_overgraded` |
 | post-run artifact tampering (meta/findings/notes/report.*/summary) | run-end `artifacts_digest` transcript entry stores per-file sha256; verify recomputes (summary digest skips mutable head/duration so legit re-renders stay clean) | `seal_artifacts`, `artifact_mismatch` |
 | scanner output treated as proof | enforced, not advised: `run_external`/`mcp_call` record events carrying `output` and no `response`, and a claim citing only those fails the wire check for every class. A `proof_marker` match is recorded as a `run_exploit` event and is subject to the same rule - what makes a lead citable is an `http_request` that reproduces it on the wire | `proof._wire_check` |
-| exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to bundled/cwd `resources/wordlists`; bundled shorts parsed | `run_external` arg guards |
+| exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` must name a stem under the bundled or cwd `resources/wordlists` tree, so an arbitrary path is refused - but any file placed in that tree is readable, and the cwd tree is operator-controlled | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
 | redirect connection out of scope | `curl --resolve/--connect-to/-x/proxies`, `nmap --proxies`, `ffuf -x`, `sqlmap --proxy/--tor` refused | arg guards |
 | foreign hosts inside arg files | `-iL`/`-r`/`-l`/`-m`/`--bulk-file`/nuclei `-l` contents scanned per host | `_file_target_check` |

@@ -7,9 +7,9 @@ engagements where you hold written permission for the target, plus CTF and lab
 work. Pointing it at a system you do not own or have not been engaged to test
 is prohibited and may be unlawful.
 
-The tool enforces a hard target scope (`--target` plus optional
-`--scope`/`--exclude`), request budgets, and rate limits in code — not in
-prompts.
+The tool enforces a hard target scope (the target is the positional argument
+to `argus run`, plus optional `--scope`/`--exclude`), request budgets, and
+rate limits in code — not in prompts.
 These guardrails exist to keep an authorized engagement inside its letter of
 authorization; they are not a license to point at anything.
 

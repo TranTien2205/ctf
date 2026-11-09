@@ -565,9 +565,17 @@ def main() -> int:
 # a reader checks first. So the docs are verified against the code, not
 # proof-read.
 
+# Nine files was 9 of the 40 tracked markdown files. The skills and the role
+# cards are read by the MODEL at runtime, so a stale tool name in one of them
+# is worse than a stale one in the README - it goes straight into a prompt.
 _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
               "docs/ARCHITECTURE.md", "docs/USAGE.md", "docs/EXPERIMENTS.md",
-              "lab/README.md", "argus/skills/INDEX.md")
+              "lab/README.md", "argus/skills/INDEX.md",
+              "argus/resources/exploits/README.md",
+              "argus/resources/wordlists/README.md",
+              "argus/team/roles/lead.md", "argus/team/roles/recon.md",
+              "argus/team/roles/exploit.md", "argus/team/roles/report.md",
+              ".env.example")
 
 # words that look like a tool name but are not one
 _NOT_TOOLS = {
@@ -595,8 +603,14 @@ def _doc_consistency() -> None:
         fp = ROOT / name
         if fp.is_file():
             texts[name] = fp.read_text(encoding="utf-8")
-    check("doc set is present", len(texts) == len(_DOC_FILES),
-          f"found {sorted(texts)}")
+    # every methodology module as well: load_skill puts these in front of the
+    # model, so a tool it names has to exist
+    for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
+        texts[f"argus/skills/{fp.name}"] = fp.read_text(encoding="utf-8")
+    absent = sorted(n for n in _DOC_FILES if n not in texts)
+    check(f"doc set is present ({len(_DOC_FILES)} named + "
+          f"{len(texts) - len(_DOC_FILES) + len(absent)} skills)",
+          not absent, f"missing {absent}")
 
     tool_names = {t["name"] for t in TOOL_SCHEMAS}
 
@@ -663,6 +677,34 @@ def _doc_consistency() -> None:
               f"docs state {sorted(nums) or 'NO COUNT AT ALL'}, "
               f"code has {sorted(allowed)}"
               + (f" - wrong: {wrong}" if wrong else ""))
+
+    # 3b. every `--flag` the docs name is one a parser accepts. It checked no
+    #     flags at all, so a doc naming `--max-depth` or `--target` passed.
+    cli_src_all = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+    cfg_src = (ROOT / "argus" / "config.py").read_text(encoding="utf-8")
+    real_flags = set(_re.findall(r'add_argument\(\s*"(--[a-z0-9-]+)"',
+                                 cli_src_all + cfg_src))
+    real_flags |= {"--help", "--version", "--json", "--csv", "--team",
+                   "--quiet"}
+    # A flag named on the same LINE as one of the external tools argus drives
+    # belongs to that tool, not to argus. Self-maintaining: the allowlist was a
+    # hand-written set, and `--alert` (sqlmap's) was already outside it.
+    from argus.tools.analysis import _ALLOWED_TOOLS
+    doc_flags, foreign = set(), set()
+    flag_re = _re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]{2,})")
+    for name, text in texts.items():
+        for line in text.splitlines():
+            found = set(flag_re.findall(line))
+            if not found:
+                continue
+            if any(t in line for t in _ALLOWED_TOOLS) \
+                    or "docker" in line or "pip " in line:
+                foreign |= found
+            else:
+                doc_flags |= found
+    invented = sorted(doc_flags - real_flags - foreign)
+    check(f"docs name only real flags ({len(real_flags)})", not invented,
+          f"{invented} accepted by no parser")
 
     # 4. every ARGUS_* environment variable the docs name is one the code
     #    reads. Writing a plausible-looking opt-in flag into a README is the

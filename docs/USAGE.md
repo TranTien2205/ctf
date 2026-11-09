@@ -126,7 +126,7 @@ verbatim evidence from a cited response.
 | Reflected XSS | `probe_reflection` | canary reflection, context detection |
 | SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count, opt-in bounded read (`extract_table`/`extract_columns`, LIMIT applied in the tool) |
 | NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` JSON + urlencoded `param[$op]` carrier |
-| Command injection | `probe_cmdi` | `id; echo <nonce>` across 8 separator families, reads the OUTPUT; reports a reflection as a reflection; falls back to the timing oracle, which stays a candidate |
+| Command injection | `probe_cmdi` | `id; echo <nonce>` across 8 separator families, reads the OUTPUT; reports a reflection as a reflection; falls back to the timing oracle, measured twice against two baselines. A delay alone is **not recordable as an rce finding** - the class floor is the identity line, so it grades `unproven`. Put it in `note()` and say what you could not reach |
 | Command injection (blind) | `probe_time` | sleep separators vs measured baseline latency |
 | SSTI | `probe_ssti` | `{{7*7}}`-family eval per engine syntax |
 | File read / LFI | `probe_lfi` | traversal/absolute/encoded/null-byte + `file://`, `php://filter` decode |
