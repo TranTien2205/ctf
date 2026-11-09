@@ -109,3 +109,54 @@ def test_bound_value_handles_unserializable():
     assert v == "weird" or isinstance(v, str)
     # a normal small dict passes through untouched
     assert _bound_value({"a": 1}) == {"a": 1}
+
+
+def test_ival_falls_back_on_wrong_types():
+    from argus.tools.registry import _ival
+    assert _ival("x", 8, 1, 30) == 8      # str garbage -> default
+    assert _ival([1], 5, 1, 10) == 5      # list -> default
+    assert _ival(None, 7, 1, 10) == 7     # missing -> default
+    assert _ival("", 3, 1, 10) == 3       # empty str -> default
+    assert _ival(3.9, 5, 1, 10) == 3      # float truncates
+    assert _ival(50, 5, 1, 10) == 10      # over-hi clamps
+    assert _ival(-2, 5, 1, 10) == 1       # under-lo clamps
+    assert _ival(6, 5, 1, 10) == 6        # good value passes
+
+
+def test_tool_params_coerce_wrong_json_types(ctx):
+    """JSON-legal wrong types on model params must degrade to an error
+    dict or a safe default - not a stack trace the model can't parse."""
+    from argus.tools import analysis, team
+    from argus.session import Session
+
+    # jwt_decode on an int token -> error dict, not AttributeError
+    assert "error" in analysis.jwt_decode(ctx, 123)
+    # load_skill int name -> falls back to the index, never crashes
+    assert isinstance(analysis.load_skill(ctx, 123), dict)
+    # _split_args int -> str'd, not a TypeError
+    assert analysis._split_args(123) == ["123"]
+    # add_finding int severity -> gate ValueError, not AttributeError
+    with pytest.raises(ValueError, match="severity"):
+        ctx.session.add_finding(
+            title="t", severity=5, category="c", url="http://x",
+            evidence_ids=[], evidence_excerpt="e", description="",
+            remediation="")
+
+
+def test_mcp_config_malformed_shapes(tmp_path):
+    from argus.mcp import MCPManager
+    # a valid-JSON wrong-shape config must not crash startup
+    for payload, want in (
+        ([1, 2], "root"),
+        ("x", "root"),
+        ({"servers": "x"}, "servers"),
+        ({"servers": {"a": "y"}}, "not an object"),
+        ({"servers": {"a": {"command": 'unbal "q'}}}, "command"),
+        ({"servers": {"a": {"command": 5}}}, "command"),
+    ):
+        p = tmp_path / "mcp.json"
+        p.write_text(json.dumps(payload))
+        m = MCPManager(p)
+        errs = m.errors()
+        assert errs, f"{payload!r} should produce an error"
+        assert want in str(errs), errs
