@@ -119,12 +119,18 @@ The `$R` hex-payload trick is at `../ctf-forensics/windows.md:148-152`. Deleted 
 `icat` still extracts it until the record is reused, and `tsk_recover -e -o <offset> image.dd outdir`
 pulls allocated and unallocated together.
 
+Extracted artifacts decode without sleuthkit. `python3 tools/forensics/usn_parse.py J.bin`
+emits every `USN_RECORD_V2` as JSONL - usn, file/parent ref, FILETIME, decoded reason bits, name -
+and `--deleted` keeps only FILE_DELETE/RENAME_OLD_NAME rows.
+`python3 tools/forensics/recycle_i.py '$IXYZ'` reads the v1/v2 header, original size,
+deletion FILETIME and original path.
+
 ## Shell artifacts that outlive the file
 
 | Artifact | Fields that answer |
 |---|---|
 | `Zone.Identifier` ADS | `ZoneId=3` is URLZONE_INTERNET (Microsoft Learn, URLZONE: 0 LOCAL_MACHINE, 1 INTRANET, 2 TRUSTED, 3 INTERNET, 4 UNTRUSTED); `HostUrl` is the download source, `ReferrerUrl` the page. `../ctf-forensics/windows.md:255-262` shows only the live-host read (`Get-Content -Stream Zone.Identifier`); from an image the stream is an ADS row in `fls -r -p` and comes out with `icat -o <off> image.dd <inode>-128-<id>` |
-| LNK `ShellLinkHeader` | 0x4C bytes: HeaderSize `0x0000004C` at 0, LinkCLSID `00021401-0000-0000-C000-000000000046` at 4, LinkFlags 0x14, FileAttributes 0x18, **CreationTime 0x1C, AccessTime 0x24, WriteTime 0x2C** (target FILETIMEs, zero when unset), FileSize 0x34 (MS-SHLLINK 2.1) |
+| LNK `ShellLinkHeader` | 0x4C bytes: HeaderSize `0x0000004C` at 0, LinkCLSID `00021401-0000-0000-C000-000000000046` at 4, LinkFlags 0x14, FileAttributes 0x18, **CreationTime 0x1C, AccessTime 0x24, WriteTime 0x2C** (target FILETIMEs, zero when unset), FileSize 0x34 (MS-SHLLINK 2.1). `python3 tools/forensics/lnk_parse.py file.lnk` emits the header, LinkInfo volume/base-path/suffix and the string-data blocks as JSON |
 | LNK `LinkInfo` / `VolumeID` | `LinkInfo` header (MS-SHLLINK 2.3): `LinkInfoSize` 0, `LinkInfoHeaderSize` 4 (0x1C, or >=0x24 when the Unicode offsets are present), `LinkInfoFlags` 8, `VolumeIDOffset` 12, `LocalBasePathOffset` 16, `CommonNetworkRelativeLinkOffset` 20, `CommonPathSuffixOffset` 24 - the target path is `LocalBasePath` concatenated with `CommonPathSuffix`. `VolumeID` (2.3.1): `VolumeIDSize` 0, `DriveType` 4 (0 UNKNOWN, 1 NO_ROOT_DIR, 2 REMOVABLE, 3 FIXED, 4 REMOTE, 5 CDROM, 6 RAMDISK), `DriveSerialNumber` 8, `VolumeLabelOffset` 12; `DriveType 2` with a serial not matching `$Boot` answers "removable media" |
 | `DestList` in `<AppId>.automaticDestinations-ms` | OLE compound file under `%AppData%\Microsoft\Windows\Recent\AutomaticDestinations\`. 32-byte header: version 0 (1 = Win7, 3 and 4 = Win10), entry count 4, pinned count 8. Entry: droid volume GUID 8, droid file GUID 24, birth droid volume GUID 40, birth droid file GUID 56, hostname ASCII 72 (16 bytes), entry number 88, last-modified FILETIME 100, pin status 108 (-1 unpinned), then path size 112 / path 114 for v1, path size 128 / path 130 for v3+ (libyal/dtformats, Jump lists format). The birth droid GUIDs name the volume the file was *first* seen on |
 | ShellBags | `UsrClass.dat\Local Settings\Software\Microsoft\Windows\Shell\BagMRU` and `\Shell\Bags`, plus `NTUSER.DAT\Software\Microsoft\Windows\Shell\BagMRU`; `NodeSlot` ties a `BagMRU` subkey to its `Bags` view settings. A `BagMRU` chain proves a folder was opened in Explorer and survives its deletion - the answer for "name the folder that is gone" |
