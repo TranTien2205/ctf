@@ -118,7 +118,7 @@ class TeamRun:
             # a huge lead-written task lands verbatim in the worker seed -
             # bound it like board notes
             self._start_worker(name, card,
-                               (task or _DEFAULT_TASKS[role])[:4000])
+                               str(task or _DEFAULT_TASKS[role])[:4000])
             return {"spawned": name, "role": role}
 
     def _mk_client(self, name: str, max_requests: int = 0) -> GuardedClient:
@@ -273,12 +273,15 @@ class TeamRun:
         lead_res = self._results.get("lead", {})
         summary = lead_res.get("summary") or ""
         def _sum_tokens(key: str) -> int:
-            return sum((r.get("llm_tokens") or {}).get(key, 0)
-                       for r in self._results.values())
+            return sum((r.get("llm_tokens") if isinstance(
+                r.get("llm_tokens"), dict) else {}).get(key, 0)
+                for r in self._results.values())
         tokens = {"in": _sum_tokens("in"), "out": _sum_tokens("out"),
                   "cache_read": _sum_tokens("cache_read"),
                   "cache_write": _sum_tokens("cache_write")}
-        calls = sum(r.get("llm_calls", 0) or 0 for r in self._results.values())
+        calls = sum(r.get("llm_calls", 0)
+                    if isinstance(r.get("llm_calls"), int) else 0
+                    for r in self._results.values())
         report_path = ""
         try:
             report_path = str(render_report(
