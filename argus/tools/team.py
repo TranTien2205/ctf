@@ -80,17 +80,19 @@ def read_board(ctx: Context) -> dict:
 
 
 def post_board_note(ctx: Context, text: str) -> dict:
-    _board(ctx).post_note(ctx.agent_name, text)
+    _board(ctx).post_note(ctx.agent_name, str(text))
     return {"ok": True}
 
 
 def request_worker(ctx: Context, role: str, task: str, reason: str = "") -> dict:
     board = _board(ctx)
-    role = (role or "").lower()
+    role = str(role or "").lower()
     if role not in ("recon", "exploit", "report"):
         return {"error": f"role must be recon|exploit|report, got {role!r}"}
+    task = task if isinstance(task, str) else ""
     if not task.strip():
         return {"error": "task is required"}
+    reason = reason if isinstance(reason, str) else ""
     board.request_worker(ctx.agent_name, role, task.strip(), reason.strip())
     return {"requested": True,
             "note": "the lead sees this on read_board and decides whether to spawn"}
@@ -100,7 +102,8 @@ def request_worker(ctx: Context, role: str, task: str, reason: str = "") -> dict
 
 def spawn_worker(ctx: Context, role: str, task: str) -> dict:
     board = _board(ctx)
-    return board.spawn((role or "").lower(), (task or "").strip())
+    return board.spawn(str(role or "").lower(),
+                       str(task or "").strip())
 
 
 def list_workers(ctx: Context) -> dict:
@@ -124,8 +127,8 @@ def finish_engagement(ctx: Context, summary: str) -> dict:
     board.leads.close()
     board.engagement_done.set()
     ctx.finished = True
-    ctx.finish_summary = summary
-    ctx.session.note(f"## Lead summary\n\n{summary}")
+    ctx.finish_summary = summary if isinstance(summary, str) else str(summary)
+    ctx.session.note(f"## Lead summary\n\n{ctx.finish_summary}")
     return {"finished": True, "queue_closed": True,
             "stats": ctx.session.stats()}
 
