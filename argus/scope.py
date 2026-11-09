@@ -60,9 +60,13 @@ class ScopeGuard:
         parsed = urllib.parse.urlparse(target if "://" in target else "http://" + target)
         if not parsed.hostname:
             raise ScopeError(f"cannot parse target: {target!r}")
-        self.allowed_hosts = {parsed.hostname.lower()}
+        # strip the DNS-root dot at store time too - host_allowed rstrips
+        # lookups, so '--target http://t.example.' would otherwise deny
+        # 't.example' while allowing nothing else (fail-closed but
+        # inconsistent)
+        self.allowed_hosts = {parsed.hostname.lower().rstrip(".")}
         for host in extra_hosts or []:
-            self.allowed_hosts.add(host.lower())
+            self.allowed_hosts.add(host.lower().rstrip("."))
         self.exclude_paths = [p.rstrip("/") for p in (exclude_paths or [])]
         self.include_subdomains = include_subdomains
         # Labs run on loopback; if the target is private, private stays allowed
