@@ -139,11 +139,15 @@ class GuardedClient:
         # values >=8 chars are treated as operator secrets wherever they
         # appear in recorded headers, even under a custom header name;
         # --secret adds operator-declared values (login passwords posted
-        # in bodies, tokens the agent quotes)
-        self._secret_values = {v for v in self._default_headers.values()
-                               if len(v) >= 8} | {
-                                   v for v in (secret_values or [])
-                                   if len(v) >= 4}
+        # in bodies, tokens the agent quotes). User-Agent is excepted: it
+        # is a public banner sent on every request, not a credential - and
+        # a target echoing it back must not turn the evidence into
+        # redaction noise.
+        self._secret_values = {
+            v for k, v in self._default_headers.items()
+            if isinstance(v, str) and len(v) >= 8
+            and str(k).lower() != "user-agent"} | {
+                v for v in (secret_values or []) if len(v) >= 4}
         # the session redacts these values inside every artifact write -
         # bodies, event output, notes - not just headers
         if self._secret_values:
