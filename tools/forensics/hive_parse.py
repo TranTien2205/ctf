@@ -5,6 +5,8 @@ Usage:
   python3 tools/forensics/hive_parse.py hive.dat tree
   python3 tools/forensics/hive_parse.py hive.dat get 'Path/To/Key'
   python3 tools/forensics/hive_parse.py NTUSER.DAT userassist
+  python3 tools/forensics/hive_parse.py SYSTEM shimcache
+  python3 tools/forensics/hive_parse.py Amcache.hve amcache
   python3 tools/forensics/hive_parse.py --selftest
 
 regf: 4096-byte header ("regf", root-cell offset at 0x24), then hbins
@@ -194,6 +196,75 @@ def userassist(hv):
     return rows
 
 
+def _control_set(hv):
+    """offline hives carry ControlSet00N, no CurrentControlSet link."""
+    cur = 1
+    sel, _ = hv.find("Select")
+    if sel:
+        for v in hv.values(sel):
+            if v["name"].lower() == "current" and len(v["raw"]) >= 4:
+                cur = struct.unpack("<I", v["raw"][:4])[0]
+    suffix = "Control/Session Manager/AppCompatCache"
+    for cand in (f"CurrentControlSet/{suffix}",
+                 f"ControlSet{cur:03d}/{suffix}",
+                 f"ControlSet001/{suffix}"):
+        node, _ = hv.find(cand)
+        if node:
+            return node, cand
+    return None, None
+
+
+def shimcache(hv):
+    """Win10/11 layout (documented): u32 header size at 0, then
+    entries '10ts' | u32 seq | u32 data size | u16 path size |
+    UTF-16 path | FILETIME | u32 trailing size | trailing."""
+    node, path = _control_set(hv)
+    if not node:
+        return {"error": "AppCompatCache key not found"}
+    vals = {v["name"].lower(): v["raw"] for v in hv.values(node)}
+    blob = vals.get("appcompatcache", b"")
+    if len(blob) < 4:
+        return {"error": "no AppCompatCache value", "key": path}
+    hdr = struct.unpack("<I", blob[:4])[0]
+    if hdr >= len(blob) or hdr < 4:
+        return {"error": f"unexpected header size {hdr} - layout "
+                         "not Win10/11", "key": path,
+                "blob_size": len(blob)}
+    rows, pos = [], hdr
+    while pos + 14 <= len(blob) and blob[pos:pos + 4] == b"10ts":
+        dsize = struct.unpack("<I", blob[pos + 8:pos + 12])[0]
+        plen = struct.unpack("<H", blob[pos + 12:pos + 14])[0]
+        p0 = pos + 14
+        rows.append({
+            "path": blob[p0:p0 + plen]
+            .decode("utf-16-le", "replace").lstrip("\\?"),
+            "mtime": _ft(blob[p0 + plen:p0 + plen + 8])})
+        pos += 12 + dsize
+    return {"key": path, "entries": rows, "parsed": len(rows),
+            "note": "mtime is the file's $STANDARD_INFORMATION mtime, "
+                    "not an execution time"}
+
+
+def amcache(hv):
+    node, _ = hv.find("Root/InventoryApplicationFile")
+    if not node:
+        node, _ = hv.find("InventoryApplicationFile")
+    rows = []
+    if not node:
+        return rows
+    for off in hv.sub_offsets(node["sublist"]):
+        k = hv.nk(off)
+        if not k:
+            continue
+        rec = {}
+        for v in hv.values(k):
+            rec[v["name"]] = _val_text(v)
+        fid = str(rec.get("FileId", "")).lstrip("0")
+        rows.append({"path": rec.get("LowerCaseLongPath", k["name"]),
+                     "sha1": fid, "time": k["time"]})
+    return rows
+
+
 def _cell(content):
     """content -> full cell: negative size header + pad to 8."""
     size = 4 + len(content)
@@ -219,9 +290,11 @@ def _vk(name, dtype, doff, dsize):
             + struct.pack("<I", dtype) + struct.pack("<HH", 1, 0) + nb)
 
 
-def _selftest():
-    # build cells in order, tracking each one's hbin-relative offset
-    offs, cells, pos = {}, [], 0
+def _mkhive(root_name, kids):
+    """kids: {subkey_name: {"sub": {...}, "vals": [(name, type, raw)]}}
+    returns hive bytes. Post-order: leaf cells first, offsets known
+    before the parent's lf/nk is emitted."""
+    cells, pos = [], 0
 
     def put(content):
         nonlocal pos
@@ -230,36 +303,78 @@ def _selftest():
         o, pos = pos, pos + len(c)
         return o
 
-    data = "flag{x}".encode("utf-16-le") + b"\x00\x00"
-    # full-size placeholders: offsets patched in place, size unchanged
-    offs["root"] = put(_nk("ROOT"))
-    offs["sub"] = put(_nk("Sub"))
-    offs["lf"] = put(b"lf" + struct.pack("<H", 1)
-                     + struct.pack("<I", offs["sub"]))
-    offs["vlist"] = put(b"\x00" * 4)          # one vk offset, patched
-    offs["vk"] = put(_vk("Val", 1, 0, 0))
-    offs["data"] = put(data)
-    cells[0] = _cell(_nk("ROOT", sublist=offs["lf"], nsub=1))
-    cells[1] = _cell(_nk("Sub", vallist=offs["vlist"], nval=1))
-    cells[3] = _cell(struct.pack("<I", offs["vk"]))
-    cells[4] = _cell(_vk("Val", 1, offs["data"], len(data)))
+    def node(name, spec):
+        subs = spec.get("sub", {})
+        kids = [node(n, s) for n, s in subs.items()]
+        lf_off = -1
+        if kids:
+            lf = b"lf" + struct.pack("<H", len(kids))
+            lf += b"".join(struct.pack("<I", o) + b"\x00" * 4
+                           for o in kids)
+            lf_off = put(lf)
+        voff = -1
+        vals = spec.get("vals", [])
+        if vals:
+            vks = []
+            for vn, vt, raw in vals:
+                if len(raw) <= 4:
+                    vks.append(put(_vk(vn, vt,
+                                       int.from_bytes(
+                                           raw.ljust(4, b"\x00"),
+                                           "little"),
+                                       0x80000000 | len(raw))))
+                else:
+                    do = put(raw)
+                    vks.append(put(_vk(vn, vt, do, len(raw))))
+            voff = put(b"".join(struct.pack("<I", o) for o in vks))
+        return put(_nk(name, sublist=lf_off, nsub=len(kids),
+                       vallist=voff, nval=len(vals)))
+
+    root = node(root_name, {"sub": kids})
     body = b"".join(cells)
     hive = bytearray(0x1000 + max(0x1000, len(body) + 0x20))
     hive[:4] = b"regf"
-    struct.pack_into("<I", hive, 0x24, 0)
+    struct.pack_into("<I", hive, 0x24, root)
     struct.pack_into("<I", hive, 0x28, len(body))
     hive[0x1000:0x1004] = b"hbin"
     struct.pack_into("<I", hive, 0x1008, len(body) + 0x20)
     hive[0x1020:0x1020 + len(body)] = body
+    return bytes(hive)
+
+
+def _selftest():
+    # shimcache blob: u32 header size, then one '10ts' entry
+    path = "\\??\\C:\\flag\\run.exe".encode("utf-16-le")
+    body = struct.pack("<I", 8 + len(path))
+    entry = (b"10ts" + b"\x00" * 4 + struct.pack("<I", len(body))
+             + struct.pack("<H", len(path)) + path
+             + struct.pack("<Q", 133000000000000000)
+             + struct.pack("<I", 0))
+    blob = struct.pack("<I", 0x30) + b"\x00" * (0x30 - 4) + entry
+    hive = _mkhive("Root", {
+        "Select": {"vals": [("Current", 4,
+                            struct.pack("<I", 2))]},
+        "ControlSet002": {"sub": {"Control": {"sub": {
+            "Session Manager": {"sub": {"AppCompatCache": {
+                "vals": [("AppCompatCache", 3, blob)]}}}}}}},
+        "InventoryApplicationFile": {"sub": {
+            "file1": {"vals": [
+                ("FileId", 1, "0000aabbccdd".encode("utf-16-le")),
+                ("LowerCaseLongPath", 1,
+                 "c:\\flag\\drop.exe".encode("utf-16-le"))]}}}})
     tmp = Path(tempfile.mkdtemp()) / "t.dat"
-    tmp.write_bytes(bytes(hive))
+    tmp.write_bytes(hive)
     hv = Hive(tmp)
     t = hv.tree()
-    assert [r["path"] for r in t] == ["ROOT", "ROOT/Sub"], t
-    node, _ = hv.find("Sub")
-    vals = hv.values(node)
-    assert vals[0]["name"] == "Val" and \
-        _val_text(vals[0]) == "flag{x}", (vals, _val_text(vals[0]))
+    paths = [r["path"] for r in t]
+    assert "Root/ControlSet002/Control/Session Manager/AppCompatCache" \
+        in paths, paths
+    node, _ = hv.find("Select")
+    assert _val_text(hv.values(node)[0]) == 2
+    sc = shimcache(hv)
+    assert sc["parsed"] == 1 and "run.exe" in sc["entries"][0]["path"], sc
+    ac = amcache(hv)
+    assert ac[0]["sha1"] == "aabbccdd" and "drop.exe" in ac[0]["path"], ac
     print("hive_parse selftest: ok")
 
 
@@ -268,7 +383,8 @@ def main():
         description="read an offline registry hive (regf)")
     ap.add_argument("hive", nargs="?")
     ap.add_argument("cmd", nargs="?", default="tree",
-                    choices=["tree", "get", "userassist"])
+                    choices=["tree", "get", "userassist",
+                             "shimcache", "amcache"])
     ap.add_argument("key", nargs="?")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -293,6 +409,10 @@ def main():
                           "values": vals}, indent=1))
     elif a.cmd == "userassist":
         print(json.dumps(userassist(hv), indent=1))
+    elif a.cmd == "shimcache":
+        print(json.dumps(shimcache(hv), indent=1))
+    elif a.cmd == "amcache":
+        print(json.dumps(amcache(hv), indent=1))
 
 
 if __name__ == "__main__":

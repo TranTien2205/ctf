@@ -150,9 +150,12 @@ written at shutdown, so a live-captured hive can lack the newest entries.
 
 `python3 tools/forensics/hive_parse.py <hive> tree` walks the whole key tree (path, last-write time,
 subkey/value counts); `... get 'Control/Session Manager/AppCompatCache'` prints a key's values with type-aware
-decoding, and `... NTUSER.DAT userassist` emits every UserAssist row (ROT13-decoded path, run count, focus ms,
-FILETIME) for the v5 16-byte and v7 68/72-byte blob layouts. It reads the hive as written - replay `.LOG1`/`.LOG2`
-with regipy first when the bundle ships transaction logs.
+decoding, `... NTUSER.DAT userassist` emits every UserAssist row (ROT13-decoded path, run count, focus ms,
+FILETIME) for the v5 16-byte and v7 68/72-byte blob layouts, `... SYSTEM shimcache` resolves `Select\Current`
+to the right ControlSet and decodes the Win10/11 `10ts` entries (the emitted mtime is the file's
+`$STANDARD_INFORMATION` mtime, not a run time), and `... Amcache.hve amcache` lists `InventoryApplicationFile`
+rows as path + `FileId` SHA-1. It reads the hive as written - replay `.LOG1`/`.LOG2` with regipy first when
+the bundle ships transaction logs.
 
 ## Per-user execution: UserAssist, RunMRU, RecentDocs, history, transcripts
 
