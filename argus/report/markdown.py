@@ -117,10 +117,11 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     if _prev.exists():
         try:
             _old = json.loads(_prev.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            _old = None
+        if isinstance(_old, dict):
             extra = {**{k: v for k, v in _old.items() if k not in _BASE},
                      **extra}
-        except (ValueError, OSError):
-            pass
     coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: _SEV_ORDER.get(f["severity"], 99))
