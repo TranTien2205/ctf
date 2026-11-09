@@ -877,3 +877,88 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
     from argus.report import sarif
     src = inspect.getsource(sarif.render_sarif)
     assert '"review" if grade or f.get("proof") else "fail"' in src
+
+
+# --- coverage, measured rather than assumed ---------------------------------
+
+CANNOT_BE_PROVEN_HERE = {
+    "xss": "no browser",
+    "ppoll": "no browser",
+    "ssrf": "no collector",
+    "enum": "one difference is not a counted series",
+    "lockout": "one difference is not a count",
+    "crlf": "the verifier compares bodies, not headers",
+    "upload": "serving is not executing",
+    "method": "a status difference is not an effect",
+    "websocket": "no WebSocket client",
+    "race": "no serial control is measured",
+    "smuggle": "the desync pair is read as a difference",
+    "dos": "refused by construction",
+}
+
+
+def test_every_class_either_has_a_proven_test_or_declares_it_cannot():
+    """The honest coverage statement. A class with no positive test is either
+    a gap or a cap, and the difference has to be written down - an auditor
+    measured 12 classes with no `proven` assertion and could not tell which
+    were which."""
+    import pathlib
+    import re
+    src = pathlib.Path(__file__).read_text(encoding="utf-8")
+    covered = set()
+    for m in re.finditer(r'grade\(\s*["\']([a-z-]+)["\'][\s\S]{0,260}?=="?\s*'
+                         r'"proven"', src):
+        covered.add(proof.canonical(m.group(1)))
+    for name in proof.classes():
+        if name in covered:
+            continue
+        assert name in CANNOT_BE_PROVEN_HERE, \
+            f"{name} has no test asserting `proven` and no declared reason"
+        spec = proof.spec_for(name)
+        assert spec.ceiling == "candidate" or spec.verifier is proof.verify_refused, \
+            f"{name} is listed as unprovable here but its spec allows `proven`"
+
+
+@pytest.mark.parametrize("name", sorted(n for n in CANNOT_BE_PROVEN_HERE
+                                        if n != "dos"))
+def test_a_capped_class_still_reaches_candidate_on_real_evidence(name):
+    """A cap must not collapse to "never useful": the class still has to
+    register a real difference as a candidate, which is what the report lists
+    as work to finish."""
+    if name in ("xss", "ppoll"):
+        # a browser class needs its own shape: a raw metacharacter surviving
+        # into an HTML response, which is the part that IS checkable here
+        refl = ex("c3", "http://t.local/s?q=x%3C%3E%27%22",
+                  "<html><body>Results for: x<>'\"</body></html>", 200,
+                  headers={"content-type": "text/html; charset=utf-8"})
+        v = proof.grade(name, "x<>'\"", [refl])
+    else:
+        a = ex("c1", "http://t.local/x?p=probe", "<html>baseline body</html>")
+        b = ex("c2", "http://t.local/x?p=probe2", "<html>the difference</html>")
+        v = proof.grade(name, "the difference", [a, b])
+    assert v.grade == "candidate", f"{name} graded {v.grade}: {v.explain()}"
+    assert v.requirement, name
+
+
+def test_xxe_reads_a_file_through_the_parser():
+    hit = ex("x1", "http://t.local/xml", "root:x:0:0:root:/root:/bin/bash",
+             method="POST",
+             req_body='<!DOCTYPE r [<!ENTITY e SYSTEM "file:///etc/passwd">]>'
+                      '<r>&e;</r>')
+    assert proof.grade("xxe", "root:x:0:0", [hit]).grade == "proven"
+    # the entity declaration is what makes it this class
+    plain = ex("x2", "http://t.local/xml", "root:x:0:0:root:/root:/bin/bash",
+               method="POST", req_body="<r>hello</r>")
+    assert proof.grade("xxe", "root:x:0:0", [plain]).grade == "unproven"
+
+
+def test_the_capped_set_is_not_silently_growing():
+    """If a class gains a real requirement its cap should come off, and if one
+    is capped it must appear above. Either way the list is the statement."""
+    capped = {n for n in proof.classes()
+              if proof.spec_for(n).ceiling == "candidate"}
+    refused = {n for n in proof.classes()
+               if proof.spec_for(n).verifier is proof.verify_refused}
+    assert capped | refused == set(CANNOT_BE_PROVEN_HERE), (
+        f"capped/refused in code: {sorted(capped | refused)}, "
+        f"declared here: {sorted(CANNOT_BE_PROVEN_HERE)}")

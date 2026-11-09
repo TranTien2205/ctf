@@ -264,6 +264,28 @@ def main(argv: list[str] | None = None) -> int:
             session.findings = [f for f in session.findings
                                 if isinstance(f, dict)
                                 and f.get("id") not in bad]
+        # A stored grade stronger than its evidence is the same kind of
+        # tampering, and the re-render would have re-sealed it: `argus report`
+        # computed nothing about grades, so an inflated claim came out of the
+        # other side with a fresh, valid digest over it. Correct it to what
+        # the evidence supports and say so.
+        from .session import findings_overgraded
+        inflated = findings_overgraded(session._transcript, session.findings)
+        if inflated:
+            by_id = {row["id"]: row for row in inflated}
+            for f in session.findings:
+                row = by_id.get(f.get("id")) if isinstance(f, dict) else None
+                if not row:
+                    continue
+                print(f"warning: {row['id']} claims grade "
+                      f"'{row['claimed']}' but its evidence supports "
+                      f"'{row['evidence_supports']}' - corrected in this "
+                      "report (run 'argus verify' for detail)",
+                      file=sys.stderr)
+                if row["evidence_supports"] in ("proven", "candidate",
+                                                "unproven", "refused"):
+                    f["grade"] = row["evidence_supports"]
+                    f["grade_corrected_from"] = row["claimed"]
         path = render_report(session, cfg)
         # a re-render is a new attested artifact state: seal again so the
         # delivered report.* files are digest-anchored too
@@ -616,6 +638,20 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "compare":
+        def _g(s, grade):
+            g = s.get("grades")
+            if isinstance(g, dict):
+                try:
+                    return int(g.get(grade, 0) or 0)
+                except (TypeError, ValueError):
+                    return 0
+            # a session rendered before grading existed: count from the rows
+            rows = s.get("findings")
+            if not isinstance(rows, list):
+                return 0
+            return sum(1 for f in rows
+                       if isinstance(f, dict) and f.get("grade") == grade)
+
         def _summ(d):
             p = Path(d) / "summary.json"
             if not p.exists():
@@ -638,6 +674,13 @@ def main(argv: list[str] | None = None) -> int:
                 "dir": Path(d).name, "mode": s.get("mode", "single"),
                 "findings": len(s.get("findings"))
                             if isinstance(s.get("findings"), list) else 0,
+                # The grade split, because a total alone invites a
+                # configuration to win by recording more leads: EXPERIMENTS
+                # makes the proven count the primary measure, and this is the
+                # tool it tells the reader to use for it.
+                "proven": _g(s, "proven"),
+                "candidate": _g(s, "candidate"),
+                "unproven": _g(s, "unproven"),
                 "requests": s.get("requests", 0),
                 "ttf": s.get("time_to_first_finding_s"),
                 "duration_s": s.get("duration_s"),
@@ -651,13 +694,16 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         sums = [_summ(d) for d in args.dirs]
         if args.csv:
-            hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
+            hdr = ("session,mode,findings,proven,candidate,unproven,"
+                   "requests,ttf_s,duration_s,"
                    "endpoints,llm_calls,workers,tokens_in,tokens_out,"
                    "cache_read,cache_write")
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
                 print(f"{s['dir']},{s.get('mode','?')},{s.get('findings','?')},"
+                      f"{s.get('proven',0)},{s.get('candidate',0)},"
+                      f"{s.get('unproven',0)},"
                       f"{s.get('requests','?')},{s.get('ttf') or ''},"
                       f"{s.get('duration_s') or ''},"
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
@@ -665,6 +711,8 @@ def main(argv: list[str] | None = None) -> int:
                       f"{t.get('cache_read',0)},{t.get('cache_write',0)}")
             return 0
         keys = [("mode", "mode"), ("findings", "findings"),
+                ("proven", "proven"), ("candidate", "candidate"),
+                ("unproven", "unproven"),
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
                 ("duration_s", "duration_s"),

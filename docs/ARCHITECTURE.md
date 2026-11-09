@@ -109,16 +109,16 @@ prompt wording can widen it.
 | a proof grade raised by hand after the run | `argus verify` recomputes every grade from the chained transcript; an inflated grade fails even after a legitimate `argus report` re-render has recomputed the artifact seal | `findings_overgraded` |
 | finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |
 | post-run transcript tampering | sha256 hash chain per entry + chain head anchored in `summary.json` | `verify_transcript`, `argus verify` |
-| post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript (the file itself is not hashed) | `verify_transcript` findings pass |
+| post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript, AND recomputes its grade; `findings.json` is also in the run-end seal, so an edit is caught twice over - except after a legitimate `argus report` re-render recomputes the seal, which is why the re-grade is not redundant | `verify_transcript` findings pass, `findings_overgraded` |
 | post-run artifact tampering (meta/findings/notes/report.*/summary) | run-end `artifacts_digest` transcript entry stores per-file sha256; verify recomputes (summary digest skips mutable head/duration so legit re-renders stay clean) | `seal_artifacts`, `artifact_mismatch` |
-| scanner output treated as proof | enforced, not advised: `run_external`/`mcp_call` record events carrying `output` and no `response`, and a claim citing only those fails the wire check for every class. A `proof_marker` match or an `http_request` that reproduces it is what makes a lead citable | `proof._wire_check` |
+| scanner output treated as proof | enforced, not advised: `run_external`/`mcp_call` record events carrying `output` and no `response`, and a claim citing only those fails the wire check for every class. A `proof_marker` match is recorded as a `run_exploit` event and is subject to the same rule - what makes a lead citable is an `http_request` that reproduces it on the wire | `proof._wire_check` |
 | exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to bundled/cwd `resources/wordlists`; bundled shorts parsed | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
 | redirect connection out of scope | `curl --resolve/--connect-to/-x/proxies`, `nmap --proxies`, `ffuf -x`, `sqlmap --proxy/--tor` refused | arg guards |
 | foreign hosts inside arg files | `-iL`/`-r`/`-l`/`-m`/`--bulk-file`/nuclei `-l` contents scanned per host | `_file_target_check` |
 | local code execution via tool | `sqlmap --eval`, `nmap --script <path>`, `nuclei -t <file>`, `-code` refused | arg guards |
 | credential leak to subprocesses | `KEY/TOKEN/SECRET/PASSWORD/CREDENTIAL` env vars scrubbed for MCP servers and exploit PoCs | `MCPClient`, `run_exploit` |
-| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); credentials used outside headers (form bodies, tokens) are declared via `--secret VALUE`/`ARGUS_SECRETS` (>=4 chars) and scrubbed from every persisted object at write time - model sees real bytes, artifacts get `REDACTED:` markers; reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `Session._redact_obj`, `render_report` |
+| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); credentials used outside headers (form bodies, tokens) are declared via `--secret VALUE`/`ARGUS_SECRETS` (>=4 chars) and scrubbed from every persisted object at write time - model sees real bytes, artifacts get `REDACTED:` markers; reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `session._redact_obj`, `render_report` |
 | exploit PoC escapes its dir / hits foreign host | relative manifest commands confined to the manifest dir under `resources/exploits/<id>` (cwd or bundled); `{args}` scope-scanned | `run_exploit` |
 | worker exceeds its role | card `tools` set enforced at `dispatch`; only lead holds `spawn_worker`/`finish_engagement` | `cards.py`, `dispatch` |
 | resume mixes two engagements | `--resume` refuses a session whose `meta.json` target differs | `Session._resume` |
@@ -148,7 +148,7 @@ waste budget inside scope.
 - New report format: `argus/report/` takes `Session` + `Config`.
 - External tool providers: drop a server into `mcp.json` — `argus/mcp.py`
   speaks stdio JSON-RPC, `mcp_list`/`mcp_call` expose it to every role.
-- Different model: `ClaudeClient` is ~40 lines of HTTP; `llm.ScriptedClient`
+- Different model: `ClaudeClient` is ~130 lines of HTTP; `llm.ScriptedClient`
   shows the duck-typed interface (`chat(messages, tools, system)`).
 
 ## Served mode (`argus mcp-serve`)
@@ -230,9 +230,14 @@ role-specialized **workers** through a shared blackboard.
   holds `manifest.json` (command template, `affects`, `proof_marker`
   regex) + script. Target URL is scope-checked before substitution; a
   `proof=True` run id is citable as finding evidence.
-- **Findings dedup across workers.** `Session.add_finding` rejects a
-  second finding with the same normalized bug class + endpoint + params —
-  two exploit workers can't double-count the same bug.
+- **Findings dedup across workers.** `Session.add_finding` keys on the
+  canonical class + endpoint + params, so two exploit workers cannot
+  double-count the same bug and two spellings of one class are one finding.
+  A second record with evidence that grades HIGHER upgrades the finding in
+  place rather than being refused - otherwise the grading would tell a worker
+  which checks it was missing and leave it nowhere to put them. The original
+  citation is kept under `superseded_evidence_ids` and `ts` stays the first
+  record's.
 - **Per-agent metrics.** `summary.json` carries each agent's turns,
   requests, LLM calls, token usage and credited findings, plus
   `time_to_first_finding_s` — the measurement surface for comparing

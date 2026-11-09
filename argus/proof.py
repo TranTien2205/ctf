@@ -989,8 +989,15 @@ def verify_secret_leak(claim: Claim, spec: "ProofSpec") -> list[dict]:
         value = re.split(r"[:=]", hit.group(0), maxsplit=1)
         if len(value) > 1 and PLACEHOLDER_RE.match(value[1].strip().strip("\"'")):
             placeholder = value[1].strip()
+    # ...and not bytes the claimant sent themselves. A search box echoing
+    # `?q=SECRET_KEY=lab-secret-0123` graded disclosure proven; the same trap
+    # the lfi sentinel check already guards against.
     in_response = [e.get("id") for e in claim.exchanges
-                   if claim.excerpt and claim.excerpt in resp_body(e)]
+                   if claim.excerpt and claim.excerpt in resp_body(e)
+                   and claim.excerpt not in req_text(e)]
+    reflected = bool(claim.excerpt) and any(
+        claim.excerpt in resp_body(e) and claim.excerpt in req_text(e)
+        for e in claim.exchanges) and not in_response
     return [
         _check("a credential-shaped secret was observed",
                hit is not None and not placeholder,
@@ -999,9 +1006,11 @@ def verify_secret_leak(claim: Claim, spec: "ProofSpec") -> list[dict]:
                 if placeholder else
                 "the quoted bytes do not look like a credential; quote the key, "
                 "token or key-value line itself")),
-        _check("it came from a response", bool(in_response),
+        _check("it came from a response, not from the request", bool(in_response),
                f"in {in_response[0]}" if in_response else
-               "the quoted bytes are in no cited response"),
+               ("the quoted bytes are in the request that produced them - the "
+                "page echoed what you sent" if reflected else
+                "the quoted bytes are in no cited response")),
     ]
 
 
@@ -1370,8 +1379,10 @@ for _s in [
                                             "toctou", "limit-overrun")),
     ProofSpec("disclosure", "the credential or source observed in a response, "
               "quoted as the bytes that leaked",
-              ("a credential-shaped secret was observed", "it came from a response"),
+              ("a credential-shaped secret was observed",
+               "it came from a response, not from the request"),
               verify_secret_leak, floor=("a credential-shaped secret was observed",),
+              # named explicitly so the rename cannot orphan it again
               aliases=("info-disclosure", "infodisclosure", "information-disclosure",
                        "secret-exposure", "source-leak", "credential-leak")),
     ProofSpec("ssrf", "a callback at a collector we control carrying the probe "

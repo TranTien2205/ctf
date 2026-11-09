@@ -912,13 +912,26 @@ def make_server(port: int = 0):
 # what a hardened target looks like. The injection is real; the blast radius is
 # not. `cat` is confined to the lab's fake filesystem: a lab must not read the
 # operator's real files to make a point.
-_EXEC_ALLOW = {"id", "whoami", "uname", "hostname", "pwd", "echo", "cat"}
+# Two sets, because an allowlisted NAME is not a bounded command: `hostname`
+# takes `-F <file>` (reads a file) and a bare argument (sets the host name),
+# and `id <user>` enumerates accounts. The commands that need no arguments are
+# run with none; only echo and cat take any, and cat's is confined below.
+_EXEC_NOARGS = {"id", "whoami", "uname", "hostname", "pwd"}
+_EXEC_WITHARGS = {"echo", "cat"}
+_EXEC_ALLOW = _EXEC_NOARGS | _EXEC_WITHARGS
+# One GET must not become thousands of fork/execs: a 64 KB value of `;id`
+# produced ~21,500 of them on one thread.
+_EXEC_MAX_SEGMENTS = 8
 
 
 def _injected_commands(value: str) -> list[str]:
     """The command segments an injected parameter carries, loosely as a shell
-    would split them. Segment 0 is the host argument itself, not a command."""
-    text = str(value or "").replace("%0a", "\n")
+    would split them. Segment 0 is the host argument itself, not a command.
+
+    Bounded at _EXEC_MAX_SEGMENTS: a real shell would run them all, and this
+    is a lab that must not be a way to pin the operator's own machine.
+    """
+    text = str(value or "")[:8192].replace("%0a", "\n")
     segments = [a or b for a, b in
                 re.findall(r"\$\(([^)]*)\)|`([^`]*)`", text)]
     outside = re.sub(r"\$\([^)]*\)|`[^`]*`", "", text)
@@ -926,8 +939,13 @@ def _injected_commands(value: str) -> list[str]:
     out = []
     for segment in segments:
         segment = segment.strip().strip('"').strip("'").split("#")[0].strip()
+        # a NUL anywhere raises ValueError out of shlex/subprocess, and the
+        # request died with no response at all
+        segment = segment.replace("\x00", "")
         if segment:
             out.append(segment)
+        if len(out) >= _EXEC_MAX_SEGMENTS:
+            break
     return out
 
 
@@ -941,14 +959,26 @@ def _lab_exec(command: str) -> str:
     name = os.path.basename(parts[0])
     if name not in _EXEC_ALLOW:
         return f"sh: {parts[0]}: command not found"
+    # basename("/bin/rm") is "rm" and refused, but basename("./id") is "id" and
+    # shutil.which would resolve it against PATH, not against the path given -
+    # so a leading path component is simply rejected.
+    if parts[0] != name:
+        return f"sh: {parts[0]}: command not found"
+    if name in _EXEC_NOARGS and len(parts) > 1:
+        return f"{name}: extra operand '{parts[1]}'"
     if name == "echo":
         return " ".join(parts[1:])
     if name == "cat":
         if len(parts) < 2:
             return ""
-        target = os.path.normpath(parts[1]).lstrip("/\\")
+        target = os.path.normpath(parts[1].replace("\x00", "")).lstrip("/\\")
         path = os.path.join(FAKEFS, target)
-        if not os.path.abspath(path).startswith(os.path.abspath(FAKEFS)):
+        # realpath, and compare against the directory WITH its separator: a
+        # prefix test lets /x/fake-other through when the root is /x/fake, and
+        # a symlink inside the tree pointed anywhere at all.
+        root = os.path.realpath(FAKEFS)
+        real = os.path.realpath(path)
+        if real != root and not real.startswith(root + os.sep):
             return f"cat: {parts[1]}: Permission denied"
         try:
             with open(path, encoding="utf-8", errors="replace") as fh:

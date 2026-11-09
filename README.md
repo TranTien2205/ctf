@@ -272,6 +272,11 @@ not just in the prompt.
   `resources/exploits/<id>/manifest.json` describes a PoC
   script (command template, affected fingerprints, `proof_marker` regex)
   that `run_exploit` executes scope-checked and timeout-bounded.
+  A cwd `resources/wordlists/` loads freely, but a cwd
+  `resources/exploits/` tree only under `ARGUS_EXPLOITS_CWD=1`: a manifest
+  names commands to run, and running argus inside an untrusted directory -
+  extracted target source, say - would otherwise let a planted manifest
+  execute through the model. The bundled `argus/resources/` always loads.
 - **Findings dedup** — the same bug class on the same endpoint+params can
   only be recorded once (per-category normalization), even across workers.
 - **Per-agent metrics** — `summary.json` carries per-worker
@@ -320,8 +325,10 @@ other servers while serving as one, a loop the operator cannot see.
 ### argus as the client (optional)
 
 Argus can call external MCP (Model Context Protocol) servers — search,
-fetchers, CVE databases — through `mcp_list` / `mcp_call`. Declare them in
-`mcp.json` (or `--mcp-config` / `ARGUS_MCP_CONFIG`):
+fetchers, CVE databases — through `mcp_list` / `mcp_call`. Declare them with
+`--mcp-config` or `ARGUS_MCP_CONFIG`. An `mcp.json` sitting in the working
+directory is **ignored** unless you set `ARGUS_MCP_CWD=1` - a config file
+names subprocesses to spawn, and the cwd is untrusted input:
 
 ```json
 {"servers": {

@@ -560,6 +560,11 @@ _NOT_TOOLS = {
     "findings_bad", "findings_overgraded", "seal_artifacts", "make_server",
     "serve_forever", "proof_marker", "input_schema", "tool_manifest",
     "build_system", "build_seed", "sanitized_findings", "time_to_first",
+    # module and field names that share a prefix with a tool family:
+    # `mcp_tools` is the module behind mcp_list/mcp_call, and `request_id(s)`
+    # is the transcript field every probe returns
+    "mcp_tools", "request_id", "request_ids", "request_text",
+    "proof_requirement", "proof_checks", "proof_notes",
 }
 
 
@@ -579,19 +584,21 @@ def _doc_consistency() -> None:
 
     tool_names = {t["name"] for t in TOOL_SCHEMAS}
 
-    # 1. every tool-shaped identifier in the docs is a registered tool
+    # 1. every tool-shaped identifier in the docs is a registered tool.
+    #    The names come from TOOL_SCHEMAS, not from a hand-written regex: the
+    #    first version listed 43 of the 55 by hand, so a doc naming one of the
+    #    other 12 was never checked at all.
+    families = sorted({n.split("_", 1)[0] for n in tool_names if "_" in n}
+                      | {n for n in tool_names if "_" not in n})
+    ident_re = _re.compile(
+        r"\b((?:" + "|".join(_re.escape(f) for f in families)
+        + r")_[a-z0-9_]+)\b")
     unknown = {}
     for name, text in texts.items():
-        for ident in set(_re.findall(r"\b(probe_[a-z_]+|run_external|"
-                                     r"run_exploit|record_finding|load_skill|"
-                                     r"mcp_call|mcp_list|jwt_forge|jwt_decode|"
-                                     r"wordlist_fuzz|emit_lead|pull_leads|"
-                                     r"spawn_worker|read_response|"
-                                     r"graphql_introspect|js_recon|"
-                                     r"http_request)\b", text)):
+        for ident in set(ident_re.findall(text)):
             if ident not in tool_names and ident not in _NOT_TOOLS:
                 unknown.setdefault(name, set()).add(ident)
-    check("docs name only registered tools", not unknown,
+    check(f"docs name only registered tools ({len(tool_names)})", not unknown,
           "; ".join(f"{k}: {sorted(v)}" for k, v in unknown.items()))
 
     # 2. every `argus <subcommand>` in the docs is a real subcommand
@@ -605,6 +612,12 @@ def _doc_consistency() -> None:
     for text in texts.values():
         named |= set(_re.findall(r"python -m argus ([a-z][a-z-]+)", text))
         named |= set(_re.findall(r"`argus ([a-z][a-z-]+)", text))
+        # inside a fenced shell block the command often has no backticks and
+        # no `python -m` prefix, which is where most examples live
+        for block in _re.findall(r"```(?:bash|sh|console)?\n(.*?)```", text,
+                                 _re.S):
+            named |= set(_re.findall(r"(?m)^\s*(?:\$\s*)?argus\s+([a-z][a-z-]+)",
+                                     block))
     bogus = sorted(n for n in named if n not in real)
     check(f"docs name only real subcommands ({len(real)})", not bogus,
           f"{bogus} not in {sorted(real)}")
@@ -635,7 +648,20 @@ def _doc_consistency() -> None:
               f"code has {sorted(allowed)}"
               + (f" - wrong: {wrong}" if wrong else ""))
 
-    # 4. every proof class named in a doc exists, and every class the docs
+    # 4. every ARGUS_* environment variable the docs name is one the code
+    #    reads. Writing a plausible-looking opt-in flag into a README is the
+    #    same defect as naming a removed command, and I made exactly that
+    #    mistake while fixing the others.
+    code = ""
+    for src in (ROOT / "argus").rglob("*.py"):
+        code += src.read_text(encoding="utf-8")
+    real_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", code))
+    doc_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", joined))
+    invented = sorted(doc_env - real_env)
+    check(f"docs name only real ARGUS_* variables ({len(real_env)})",
+          not invented, f"{invented} not read anywhere in argus/")
+
+    # 5. every proof class named in a doc exists, and every class the docs
     #    claim is refused really is
     classes = set(proof.classes())
     named_classes = set(_re.findall(r"argus proof ([a-z-]+)", joined))

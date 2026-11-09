@@ -87,7 +87,9 @@ requests, tokens, time-to-first-finding, endpoints covered. Proven count is
 the primary measure; total findings without the grade split invites a
 configuration to win by recording more leads. The offline check
 `python -m argus demo` / `demo --team` reproduces the pipeline shape without
-spending tokens (5 seeded findings on both paths).
+spending tokens: 6 findings on both paths, 5 of them `proven` and one an
+honest `candidate`. `argus compare` prints the grade split - report the
+proven count, not the total.
 
 ## Controls
 

@@ -138,8 +138,13 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     # render recorded (mode, llm_calls, llm_tokens, agents) - they land as
     # top-level summary keys, so carry forward every key the canonical
     # schema does not own, under any freshly supplied ones
-    _BASE = {"session", "findings", "counts", "requests", "duration_s",
-             "time_to_first_finding_s", "coverage", "transcript_chain_head"}
+    # Every key this render RECOMPUTES. A key missing from this set is carried
+    # forward from the previous summary.json and then overwritten - or not,
+    # depending on merge order - and `grades` was missing, so a re-render after
+    # the findings changed reported the old grade counts.
+    _BASE = {"session", "findings", "counts", "grades", "requests",
+             "duration_s", "time_to_first_finding_s", "coverage",
+             "transcript_chain_head"}
     _prev = session.dir / "summary.json"
     if _prev.exists():
         try:

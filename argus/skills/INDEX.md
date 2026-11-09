@@ -4,8 +4,11 @@ Load one at a time with `load_skill("<name>")` - only when the signal points
 at that bug class. Each module carries: when it applies, first probes, what
 actually confirms the bug, and bypasses for common filters.
 
-When the name matches a proof-matrix class, the result also carries that
-class's `proof_requirement` and the checks it has to pass. Read it here,
+When the name maps to a proof-matrix class - directly or as one of its
+aliases, so `command-injection` resolves to `rce` and `file-read` to `lfi` -
+the result carries `vuln_class` plus that class's `proof_requirement` and the
+checks it has to pass. Three modules are methodology only and carry no
+requirement: `auth-enum`, `auth-session`, `triage`. Read it here,
 before probing - after you have written the finding is too late to choose a
 different request. `argus proof <class>` prints the same thing from the
 command line.

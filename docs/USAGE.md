@@ -33,12 +33,15 @@ fits under the cap).
 
 ```bash
 python -m argus run https://app.example
+# --scope adds in-scope hosts, --header repeats, --require-proof refuses
+# anything the proof matrix does not settle
 python -m argus run https://app.example \
-    --scope api.example,cdn.example \   # extra in-scope hosts
+    --scope api.example,cdn.example \
     --exclude /logout --exclude /admin/reset \
-    --header "Cookie: session=abc" \    # auth'd session (repeatable)
+    --header "Cookie: session=abc" \
     --header "Authorization: Bearer x" \
     --goal "prioritize /api and the checkout flow" \
+    --require-proof \
     --rate 3 --max-requests 600 --max-time 3600
 ```
 
@@ -59,7 +62,7 @@ python -m argus run https://app.example \
 | `--proxy` | none | route via Burp/ZAP for inspection — the only proxy path; env `HTTP(S)_PROXY` and `~/.netrc` are ignored for target traffic (LLM API calls still honor env proxies) |
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
-| `--tools` | all | `run` only: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests |
+| `--tools` | all | `run` and `mcp-serve`: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests. `team` refuses it: role cards already subset tools per worker |
 | `--require-proof` | off | refuse a finding whose evidence does not meet the proof requirement for its class. Off by default: a candidate is worth recording and re-testing. On, `findings.json` holds only what was proven — the condition an evaluation wants to be able to state |
 | `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
@@ -77,7 +80,8 @@ python -m argus demo --team   # same, through the lead/worker pipeline
 ```
 
 Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
-agent loop, and lands five evidence-gated findings (SQLi, XSS, IDOR,
+agent loop, and lands six graded findings (SQLi, OS command injection,
+XSS, IDOR,
 info-disclosure, weak-JWT forge) in a
 normal session dir - use it to demo the pipeline at a defense without
 spending tokens. `--team` runs the same assessment through TeamRun: a lead
