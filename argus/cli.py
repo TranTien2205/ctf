@@ -13,6 +13,11 @@ from .session import Session
 
 def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("target", help="Base URL of the in-scope target")
+    p.add_argument("--seal-key", default=None,
+                   help="HMAC key (or a path to a file holding one) for the "
+                        "transcript chain. Unkeyed, the chain proves the file "
+                        "was not edited; keyed, only a holder of the key can "
+                        "produce a chain that verifies. Also ARGUS_SEAL_KEY")
     p.add_argument("--require-proof", action="store_true",
                    help="refuse findings whose evidence does not meet the "
                         "proof requirement for their class (default: record "
@@ -109,6 +114,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_rep = sub.add_parser("report", help="re-render report.md for a session dir")
     p_rep.add_argument("session_dir")
+    p_rep.add_argument("--seal-key", default=None,
+                       help="the key the run was sealed with, if any - a "
+                            "re-render re-seals, and chaining unkeyed over a "
+                            "keyed transcript would break it")
 
     p_find = sub.add_parser("findings", help="print findings of a session dir")
     p_find.add_argument("session_dir")
@@ -142,6 +151,8 @@ def main(argv: list[str] | None = None) -> int:
         "verify", help="verify a session's transcript hash chain "
                        "(tamper-evidence check)")
     p_ver.add_argument("session_dir")
+    p_ver.add_argument("--seal-key", default=None,
+                       help="the key the run was sealed with, if any")
     p_ver.add_argument("--json", action="store_true",
                        help="print the raw verification result as JSON")
 
@@ -224,7 +235,8 @@ def main(argv: list[str] | None = None) -> int:
             # artifacts a real run produced
             print(f"no transcript.jsonl in {sdir} - not a session dir")
             return 1
-        session = _reopen(sdir)
+        from .config import _seal_key
+        session = _reopen(sdir, _seal_key(args))
         if not session._transcript:
             # a transcript with zero entries means the run died at init -
             # rendering + sealing a zero-evidence report fabricates an
@@ -449,8 +461,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "verify":
+        from .config import _seal_key
         from .session import verify_transcript
-        res = verify_transcript(Path(args.session_dir))
+        res = verify_transcript(Path(args.session_dir), _seal_key(args))
         if args.json:
             # machine-readable verdict for CI: ok mirrors the exit code
             res["ok"] = not (res.get("error") or not res.get("chained")
@@ -459,11 +472,17 @@ def main(argv: list[str] | None = None) -> int:
                              or res.get("anchor_missing")
                              or res.get("findings_bad")
                              or res.get("findings_overgraded")
+                             or res.get("key_required")
                              or res.get("artifact_mismatch"))
             print(json.dumps(res, indent=2, ensure_ascii=False))
             return 0 if res["ok"] else 1
         if res.get("error"):
             print(res["error"])
+            return 1
+        if res.get("key_required"):
+            print("UNVERIFIABLE: this run was sealed with a key. Pass "
+                  "--seal-key (or set ARGUS_SEAL_KEY) - verifying it unkeyed "
+                  "would report every line as tampered")
             return 1
         if not res["chained"]:
             print("transcript predates hash chaining - cannot verify")
@@ -1276,8 +1295,13 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                    n_recon=1, n_exploit=1, n_report=0).run()
 
 
-def _reopen(sdir: Path) -> Session:
-    """Rebuild a Session view over an existing session directory."""
+def _reopen(sdir: Path, seal_key: str = "") -> Session:
+    """Rebuild a Session view over an existing session directory.
+
+    `seal_key` matters here: `argus report` re-seals, and chaining the seal
+    entry unkeyed over a keyed transcript would break the chain this command
+    exists to preserve.
+    """
     import threading
     sess = Session.__new__(Session)
     sess.dir = sdir
@@ -1288,6 +1312,8 @@ def _reopen(sdir: Path) -> Session:
     sess._lock = threading.Lock()
     sess._last_chain = ""
     sess.resumed = False
+    sess.require_proof = False
+    sess.seal_key = str(seal_key or "")
     mpath = sdir / "meta.json"
     if mpath.is_file():
         try:

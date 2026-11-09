@@ -27,6 +27,21 @@ Please include: the component, a minimal reproduction, and whether the issue
 lets an attacker-controlled target escape scope, forge findings, or tamper
 with audit artifacts.
 
+## What the audit chain proves
+
+The hash chain over `transcript.jsonl` is **tamper-evident, not
+forgery-resistant**, and the distinction matters when a report is read by
+someone who did not watch the run. Unkeyed, each link is
+`sha256(previous + entry)` - computable by anyone with this code - so it
+proves no entry was edited, inserted or removed after the run, and proves
+nothing about whether the run happened. `--seal-key <key-or-keyfile>` (or
+`ARGUS_SEAL_KEY`) makes each link HMAC-SHA256 instead; only a holder of the
+key can then produce a chain that verifies. The key is never written to any
+artifact - `meta.json` records only that the chain is keyed - and
+`argus verify --seal-key ...` is how a keyed run is checked. Without the key
+verify reports that it cannot check rather than reporting every line as
+tampered.
+
 ## Known constraints
 
 - The bundled `lab/vulnapp.py` is intentionally vulnerable. Bind it to

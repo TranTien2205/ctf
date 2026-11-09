@@ -65,9 +65,11 @@ class TeamRun:
             "max_turns": cfg.max_turns, "max_requests": cfg.max_requests,
             "rate_rps": cfg.rate_rps, "exclude_paths": cfg.exclude_paths,
             "proxy": bool(cfg.proxy), "tls_verify": cfg.tls_verify,
-            "require_proof": cfg.require_proof},
+            "require_proof": cfg.require_proof,
+            "chain_keyed": bool(cfg.seal_key)},
             resume=Path(cfg.resume) if cfg.resume else None,
-            secrets=cfg.secret_values, require_proof=cfg.require_proof)
+            secrets=cfg.secret_values, require_proof=cfg.require_proof,
+            seal_key=cfg.seal_key)
         self.rate = RateLimiter(cfg.rate_rps)
         from ..mcp import MCPManager, discover_config_path
         self.mcp = MCPManager(discover_config_path(cfg.mcp_config))

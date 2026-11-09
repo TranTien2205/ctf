@@ -51,6 +51,10 @@ class Config:
     # recording and re-testing; on, the findings file holds only what was
     # proven, which is the condition an evaluation wants to be able to state.
     require_proof: bool = False
+    # HMAC key for the transcript chain. Unkeyed, the chain proves the file was
+    # not edited; keyed, it proves the run happened - only a holder of the key
+    # can produce a chain that verifies. Never written to an artifact.
+    seal_key: str = ""
 
     def resolved_headers(self) -> dict[str, str]:
         base = {"User-Agent": "Argus/1.0 (authorized pentest)"}
@@ -219,6 +223,22 @@ def _validate_session_dir(p: Path) -> Path:
     return p
 
 
+def _seal_key(args) -> str:
+    """The chain key, from --seal-key or ARGUS_SEAL_KEY. A path is read as a
+    key file so the key need not appear in a process listing."""
+    raw = str(getattr(args, "seal_key", "") or
+              os.environ.get("ARGUS_SEAL_KEY", "") or "")
+    if not raw:
+        return ""
+    candidate = Path(raw).expanduser()
+    try:
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return raw
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
     _load_dotenv()
@@ -329,6 +349,7 @@ def load_config(args) -> Config:
         extra_headers=headers,
         external_tools=not args.no_external,
         require_proof=bool(getattr(args, "require_proof", False)),
+        seal_key=_seal_key(args),
         goal=getattr(args, "goal", "") or "",
         operator=getattr(args, "operator", "") or "",
         llm_max_tokens=args.llm_max_tokens,

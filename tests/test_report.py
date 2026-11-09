@@ -277,3 +277,41 @@ def test_an_ungraded_row_appears_in_the_grade_table(tmp_path):
     html = (sdir / "report.html").read_text(encoding="utf-8")
     assert "F99" in html
     assert "UNGRADED" in html
+
+
+def test_a_rerender_of_a_keyed_session_keeps_the_chain(tmp_path):
+    """`argus report` re-seals, so chaining the seal entry unkeyed over a
+    keyed transcript would break the chain this command exists to preserve."""
+    import threading
+    from argus.cli import main
+    from argus.config import Config
+    from argus.httpclient import GuardedClient
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+    import sys as _sys
+    from pathlib import Path as _P
+    _sys.path.insert(0, str(_P(__file__).resolve().parent.parent / "lab"))
+    import vulnapp
+    srv = vulnapp.make_server(0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    key = "engagement-key-2026"
+    try:
+        scope = ScopeGuard(base, allow_private=True)
+        s = Session(tmp_path, base, meta={"chain_keyed": True}, seal_key=key)
+        client = GuardedClient(scope, s, RateLimiter(0), tls_verify=False,
+                               max_requests=10)
+        try:
+            client.send("GET", base + "/", tool="t")
+        finally:
+            client.close()
+        s.seal_artifacts()
+        assert main(["verify", str(s.dir), "--seal-key", key]) == 0
+        # without the key, verify refuses rather than crying tamper
+        assert main(["verify", str(s.dir)]) == 1
+        # a re-render with the key keeps it verifying
+        assert main(["report", str(s.dir), "--seal-key", key]) == 0
+        assert main(["verify", str(s.dir), "--seal-key", key]) == 0
+    finally:
+        srv.shutdown()

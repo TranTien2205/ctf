@@ -63,6 +63,7 @@ python -m argus run https://app.example \
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
 | `--tools` | all | `run` and `mcp-serve`: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests. `team` refuses it: role cards already subset tools per worker |
+| `--seal-key` | none | HMAC key, or a path to a file holding one, for the transcript chain (also `ARGUS_SEAL_KEY`). Unkeyed the chain proves the file was not edited after the run; keyed, only a holder of the key can produce a chain that verifies. Never written to an artifact — `argus verify --seal-key ...` checks it |
 | `--require-proof` | off | refuse a finding whose evidence does not meet the proof requirement for its class. Off by default: a candidate is worth recording and re-testing. On, `findings.json` holds only what was proven — the condition an evaluation wants to be able to state |
 | `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
@@ -219,6 +220,14 @@ finish, not as results: `argus proof <class>` prints what each one needs.
 `argus verify <dir>` recomputes the grades from the chained transcript, so a
 grade raised by hand in `findings.json` fails the check — including after an
 `argus report` re-render has recomputed the artifact seal.
+
+What the chain proves is narrower than it looks. Unkeyed it is
+`sha256(previous + entry)`, computable by anyone with this code: it proves no
+entry was edited, inserted or removed after the run, and nothing about whether
+the run happened. For an engagement whose report will be read by someone who
+did not watch it, pass `--seal-key` — each link becomes HMAC-SHA256 and only a
+holder of the key can produce a chain that verifies. `argus verify` then needs
+the same key and says so rather than reporting every line as tampered.
 
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;

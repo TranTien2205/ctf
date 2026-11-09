@@ -106,9 +106,11 @@ class ArgusMCPServer:
                   "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
                   "tls_verify": cfg.tls_verify,
                   "require_proof": cfg.require_proof,
+                  "chain_keyed": bool(cfg.seal_key),
                   "tools": sorted(allowed) if allowed else "all"},
             resume=Path(cfg.resume) if cfg.resume else None,
-            secrets=cfg.secret_values, require_proof=cfg.require_proof)
+            secrets=cfg.secret_values, require_proof=cfg.require_proof,
+            seal_key=cfg.seal_key)
         self.client = GuardedClient(
             self.scope, self.session, RateLimiter(cfg.rate_rps),
             default_headers=cfg.resolved_headers(), tls_verify=cfg.tls_verify,

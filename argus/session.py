@@ -8,6 +8,7 @@ not trusted.
 from __future__ import annotations
 
 import hashlib
+import hmac as _hmac
 import json
 import re
 import sys
@@ -43,10 +44,25 @@ def _atomic_write(path: Path, text: str) -> None:
         tmp.unlink(missing_ok=True)   # a failed write leaves no litter
 
 
-def _chain(prev: str, entry: dict) -> str:
-    """Hash-chain link: sha256(prev_link + canonical entry). Makes silent
-    edits, insertions and mid-deletions in transcript.jsonl detectable."""
+def _chain(prev: str, entry: dict, key: str = "") -> str:
+    """Hash-chain link over the canonical entry.
+
+    Unkeyed (the default) this is sha256(prev + entry): it makes silent edits,
+    insertions and mid-deletions detectable, which is what "tamper-evident"
+    means and all it means. It does NOT resist forgery - anyone with this code
+    can build a self-consistent session from nothing, because the chain is
+    computable by anyone.
+
+    With a key it is HMAC-SHA256, and then only a holder of the key can
+    produce a chain that verifies. That is the difference between "this file
+    was not edited after the run" and "this run happened", and an engagement
+    whose report will be read by someone who did not watch it run wants the
+    second. `--seal-key` supplies one; it is never written to any artifact.
+    """
     payload = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+    if key:
+        return _hmac.new(key.encode("utf-8"), (prev + payload).encode("utf-8"),
+                         hashlib.sha256).hexdigest()
     return hashlib.sha256((prev + payload).encode("utf-8")).hexdigest()
 
 
@@ -112,7 +128,7 @@ def _redact_obj(obj, secrets: set[str]):
     return obj
 
 
-def verify_transcript(sdir: Path) -> dict:
+def verify_transcript(sdir: Path, seal_key: str = "") -> dict:
     """Recompute the hash chain over transcript.jsonl. Detects edited,
     inserted or mid-deleted entries, and tail truncation when
     summary.json still anchors the recorded chain head."""
@@ -149,12 +165,23 @@ def verify_transcript(sdir: Path) -> dict:
                 out["bad_lines"].append(i)
             continue  # legacy pre-chain prefix: excluded from verification
         out["chained"] = True
-        expect = _chain(prev, entry)
+        expect = _chain(prev, entry, seal_key)
         if expect != stored:
             out["bad_lines"].append(i)
         prev = stored
         out["entries"] += 1
         entries[entry.get("id", "")] = entry
+    # A keyed run cannot be verified without the key, and verifying it
+    # unkeyed would report every line as tampered - say which it is rather
+    # than producing a confident wrong answer.
+    mpath = Path(sdir) / "meta.json"
+    if mpath.is_file():
+        try:
+            meta = json.loads(mpath.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            meta = None
+        if isinstance(meta, dict) and meta.get("chain_keyed") and not seal_key:
+            out["key_required"] = True
     # summary.json anchors the last link - if present, a tail-truncated
     # transcript no longer reaches the recorded head
     spath = Path(sdir) / "summary.json"
@@ -466,9 +493,13 @@ class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
                  resume: Path | None = None,
                  secrets: list[str] | None = None,
-                 require_proof: bool = False):
+                 require_proof: bool = False,
+                 seal_key: str = ""):
         self._lock = threading.Lock()
         self.require_proof = bool(require_proof)
+        # never persisted: meta.json records that the chain is keyed, never
+        # the key, or the artifact would carry its own forging material
+        self.seal_key = str(seal_key or "")
         # >=4 chars: a shorter 'secret' would redact innocent bytes across
         # the whole transcript - enforce the floor here, not just in CLI
         secrets = {s for s in (secrets or []) if len(s) >= 4}
@@ -673,7 +704,7 @@ class Session:
                 entry["agent"] = agent
             if note:
                 entry["note"] = note
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry, getattr(self, "seal_key", ""))
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
@@ -690,7 +721,7 @@ class Session:
                         _redact_obj(detail, self.secret_values).items()}}
             if agent:
                 entry["agent"] = agent
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry, getattr(self, "seal_key", ""))
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
@@ -739,7 +770,7 @@ class Session:
         with self._lock:
             entry = {"id": "seal", "ts": round(time.time(), 3),
                      "kind": "artifacts_digest", "files": files}
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry, getattr(self, "seal_key", ""))
             self._last_chain = entry["chain"]
             self._transcript["seal"] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:

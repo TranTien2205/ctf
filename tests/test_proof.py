@@ -1252,3 +1252,50 @@ def test_sarif_never_defaults_an_unknown_grade_to_a_build_break():
     from argus.report import sarif
     src = inspect.getsource(sarif.render_sarif)
     assert '_KIND.get(grade, "review")' in src
+
+
+# --- what the chain does and does not prove ---------------------------------
+
+def test_an_unkeyed_chain_does_not_resist_forgery(tmp_path):
+    """The honest property. sha256(prev + entry) is computable by anyone, so a
+    self-consistent session can be built from nothing - the chain proves the
+    file was not edited after the run, which is what tamper-EVIDENT means and
+    all it means."""
+    from argus.session import verify_transcript
+    s = Session(tmp_path, "http://t.local", meta={})
+    s.record_exchange("t", {"method": "GET", "url": "http://t.local/x"},
+                      {"status": 200, "headers": {}, "body": "invented"})
+    res = verify_transcript(s.dir)
+    assert res["chained"] and not res["bad_lines"]
+
+
+def test_a_keyed_chain_resists_it(tmp_path):
+    """With a key the link is HMAC-SHA256, so only a holder of the key can
+    produce a chain that verifies: the difference between "this file was not
+    edited" and "this run happened"."""
+    from argus.session import verify_transcript
+    key = "engagement-key-2026"
+    s = Session(tmp_path, "http://t.local", meta={"chain_keyed": True},
+                seal_key=key)
+    s.record_exchange("t", {"method": "GET", "url": "http://t.local/x"},
+                      {"status": 200, "headers": {}, "body": "real"})
+    assert not verify_transcript(s.dir, key)["bad_lines"]
+    # without the key, verify says so instead of calling every line tampered
+    unkeyed = verify_transcript(s.dir)
+    assert unkeyed["key_required"] is True
+    assert verify_transcript(s.dir, "wrong")["bad_lines"] == [1]
+
+
+def test_the_seal_key_is_never_written_to_an_artifact(tmp_path):
+    """An artifact carrying its own forging material would defeat the point."""
+    import json
+    key = "engagement-key-2026"
+    s = Session(tmp_path, "http://t.local", meta={"chain_keyed": True},
+                seal_key=key)
+    s.record_exchange("t", {"method": "GET", "url": "http://t.local/x"},
+                      {"status": 200, "headers": {}, "body": "real"})
+    blob = "".join(p.read_text(encoding="utf-8", errors="replace")
+                   for p in s.dir.iterdir())
+    assert key not in blob
+    meta = json.loads((s.dir / "meta.json").read_text(encoding="utf-8"))
+    assert meta["chain_keyed"] is True and "seal_key" not in meta
