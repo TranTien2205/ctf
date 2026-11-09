@@ -101,6 +101,12 @@ def main(argv: list[str] | None = None) -> int:
     p_team.add_argument("--max-workers", type=int, default=6,
                         help="cap on concurrently running workers (default 6)")
 
+    p_serve = sub.add_parser(
+        "mcp-serve",
+        help="serve argus's tools to an MCP host over stdio - the LLM that "
+             "drives the assessment lives outside, the guards stay here")
+    _add_run_args(p_serve)
+
     p_rep = sub.add_parser("report", help="re-render report.md for a session dir")
     p_rep.add_argument("session_dir")
 
@@ -173,6 +179,14 @@ def main(argv: list[str] | None = None) -> int:
         result = loop.run()
         print(json.dumps(result, indent=2))
         return 1 if result.get("error") else 0
+
+    if args.cmd == "mcp-serve":
+        from .mcpserver import serve
+        cfg = load_config(args)
+        # no _preflight_target: the host may connect before the target is up,
+        # and a server that exits on a cold target is a server the host cannot
+        # keep registered
+        return serve(cfg, allowed=_parse_tools(getattr(args, "tools", "") or ""))
 
     if args.cmd == "team":
         from .team.coordinator import TeamRun
