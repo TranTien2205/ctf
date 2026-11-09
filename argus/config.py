@@ -282,6 +282,12 @@ def load_config(args) -> Config:
             continue
         exclude_paths.append(p if p.startswith("/") else "/" + p)
 
+    import math
+    # non-finite floats slip past '< 0' comparisons (nan < 0 is False) and
+    # silently disable the cap the flag exists to set - reject them loud
+    for flag, val in (("--rate", args.rate), ("--max-time", args.max_time)):
+        if not math.isfinite(val):
+            raise SystemExit(f"{flag} must be a finite number, got {val!r}")
     if args.rate < 0:
         # a negative rate silently disables the safety cap (interval 0) -
         # a typo must fail loud, not turn the tool loose on the target
