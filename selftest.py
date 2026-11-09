@@ -502,6 +502,32 @@ def main() -> int:
     finally:
         os.chdir(_cwd2)
 
+    # operator-input validation: startup flags fail fast with clean
+    # errors instead of tracebacks deep in the runtime
+    from argus.config import (_validate_proxy, _validate_resume,
+                              _validate_session_dir)
+    check("proxy socks5 rejected (no socksio)",
+          _raises(SystemExit, lambda: _validate_proxy("socks5://x")))
+    check("proxy scheme-garbage rejected",
+          _raises(SystemExit, lambda: _validate_proxy("://bad")))
+    check("proxy http accepted",
+          _validate_proxy("http://127.0.0.1:8080") ==
+          "http://127.0.0.1:8080")
+    check("resume non-dir rejected",
+          _raises(SystemExit,
+                  lambda: _validate_resume("/nonexistent-argus-dir")))
+    check("resume real session dir accepted",
+          _validate_resume(str(s.dir)) == str(s.dir))
+    _f = Path(tempfile.mktemp())
+    _f.write_text("x")
+    check("session-dir-as-file rejected",
+          _raises(SystemExit, lambda: _validate_session_dir(_f)))
+    from argus.mcp import MCPManager
+    _badcfg = Path(tempfile.mktemp(suffix=".json"))
+    _badcfg.write_text('{"servers": {"x": "not-an-object"}}')
+    check("malformed mcp config yields per-entry errors",
+          bool(MCPManager(_badcfg).errors()))
+
     client.close()
     srv.shutdown()
 
