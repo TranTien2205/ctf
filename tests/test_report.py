@@ -237,3 +237,43 @@ def test_verify_rejects_an_inflated_grade_even_after_a_rerender(tmp_path):
     fp.write_text(json.dumps(data, indent=2), encoding="utf-8")
     assert main(["report", str(sdir)]) == 0          # launders the seal
     assert main(["verify", str(sdir)]) == 1
+
+
+def test_a_rerender_keeps_the_executive_summary(tmp_path):
+    """`argus report` replaced the agent's summary with "_No agent summary was
+    recorded._" and then re-sealed, so the delivered artifact was worse than
+    the original and digest-valid."""
+    import json
+    from argus.cli import main
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    first = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "_No agent summary was recorded._" not in first
+    summary = json.loads((sdir / "summary.json").read_text(encoding="utf-8"))
+    assert summary["agent_summary"].startswith("Demo run")
+    assert main(["report", str(sdir)]) == 0
+    again = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "_No agent summary was recorded._" not in again
+    assert summary["agent_summary"][:60] in again
+    assert main(["verify", str(sdir)]) == 0
+
+
+def test_an_ungraded_row_appears_in_the_grade_table(tmp_path):
+    """It rendered as a card with no line in the table that is supposed to
+    summarise the cards."""
+    import json
+    from argus.cli import main
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    fp = sdir / "findings.json"
+    rows = json.loads(fp.read_text(encoding="utf-8"))
+    rows.append({"id": "F99", "title": "legacy row", "severity": "high",
+                 "category": "sqli", "url": "http://x/",
+                 "evidence_ids": rows[0]["evidence_ids"],
+                 "evidence_excerpt": rows[0]["evidence_excerpt"],
+                 "description": "x", "remediation": "x"})
+    fp.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    assert main(["report", str(sdir)]) == 0
+    html = (sdir / "report.html").read_text(encoding="utf-8")
+    assert "F99" in html
+    assert "UNGRADED" in html

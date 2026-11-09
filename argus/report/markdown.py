@@ -144,7 +144,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     # the findings changed reported the old grade counts.
     _BASE = {"session", "findings", "counts", "grades", "requests",
              "duration_s", "time_to_first_finding_s", "coverage",
-             "transcript_chain_head"}
+             "transcript_chain_head", "agent_summary"}
     _prev = session.dir / "summary.json"
     if _prev.exists():
         try:
@@ -206,7 +206,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     if grades:
         lines += ["", "| Proof grade | Count | Meaning |", "|---|---|---|"]
         for g in ("proven", "candidate", "unproven", "refused", "ungraded"):
-            if grades.get(g):
+            if grades.get(g):   # "ungraded" is counted above, not skipped
                 lines.append(f"| **{g}** | {grades[g]} | {_GRADE_MEANING[g]} |")
     def _o(f):
         return f.get("owasp") or _owasp_of(
@@ -374,6 +374,11 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "findings": findings,
         "counts": counts,
         "grades": grades,
+        # Persisted so `argus report` can put it back. A re-render used to
+        # replace the agent's summary with "_No agent summary was recorded._"
+        # and then re-seal, so the delivered artifact was worse than the
+        # original and digest-valid.
+        "agent_summary": summary or "",
         "requests": session._seq,
         "duration_s": _duration(session),
         "time_to_first_finding_s": ttf,

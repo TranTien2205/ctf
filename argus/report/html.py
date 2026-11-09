@@ -13,7 +13,8 @@ from ..config import Config
 from .markdown import (_coverage, _GRADE_MEANING, _GRADE_ORDER, _SEV_ORDER)
 
 _GRADE_COLOR = {"proven": "#1e7b34", "candidate": "#b8860b",
-                "unproven": "#6b7280", "refused": "#4b5563"}
+                "unproven": "#6b7280", "refused": "#4b5563",
+                "ungraded": "#6b7280"}
 
 
 def _proof_html(f: dict) -> str:
@@ -76,14 +77,16 @@ def render_html(session: Session, cfg: Config, summary: str = "",
     grades: dict[str, int] = {}
     for f in findings:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
-        if f.get("grade"):
-            grades[f["grade"]] = grades.get(f["grade"], 0) + 1
+        # an ungraded row was counted nowhere, so it appeared as a card with no
+        # line in the table that is supposed to summarise the cards
+        key = f.get("grade") or "ungraded"
+        grades[key] = grades.get(key, 0) + 1
 
     grade_rows = "".join(
         f"<tr><td><span class='badge' style='background:"
         f"{_GRADE_COLOR.get(g, '#999')}'>{g.upper()}</span></td>"
         f"<td>{grades[g]}</td><td>{_GRADE_MEANING.get(g, '')}</td></tr>"
-        for g in ("proven", "candidate", "unproven", "refused")
+        for g in ("proven", "candidate", "unproven", "refused", "ungraded")
         if grades.get(g))
 
     sev_rows = "".join(

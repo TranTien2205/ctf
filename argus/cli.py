@@ -286,7 +286,17 @@ def main(argv: list[str] | None = None) -> int:
                                                 "unproven", "refused"):
                     f["grade"] = row["evidence_supports"]
                     f["grade_corrected_from"] = row["claimed"]
-        path = render_report(session, cfg)
+        # the agent's summary lives in summary.json; without it the
+        # re-rendered report says "_No agent summary was recorded._"
+        carried = ""
+        try:
+            prev = json.loads((sdir / "summary.json").read_text(
+                encoding="utf-8"))
+            if isinstance(prev, dict):
+                carried = str(prev.get("agent_summary") or "")
+        except (ValueError, OSError):
+            carried = ""
+        path = render_report(session, cfg, summary=carried)
         # a re-render is a new attested artifact state: seal again so the
         # delivered report.* files are digest-anchored too
         try:
