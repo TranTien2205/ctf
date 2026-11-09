@@ -24,7 +24,7 @@ XXE, CSRF, XFH/ACL-bypass, upload, race, deserialization, cache
 poisoning+deception, prototype pollution, JWT weak secret, CORS,
 open-redirect, CRLF, LFI, SSTI, time-based injection, request smuggling,
 user-enum, login lockout, mass-assignment, GraphQL, WebSocket, info
-disclosure) plus recon surface (robots, .git, sourcemap, hidden routes).
+disclosure, cross-site tracing via TRACE echo) plus recon surface (robots, .git, sourcemap, hidden routes).
 Each run resets state at `make_server`.
 
 ## Procedure
