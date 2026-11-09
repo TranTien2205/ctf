@@ -108,7 +108,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/lnk_parse.py tools/forensics/usn_parse.py \
          tools/forensics/recycle_i.py tools/forensics/prefetch.py \
          tools/forensics/hive_parse.py tools/forensics/cfb_parse.py \
-         tools/pyc_dis.py; do
+         tools/pyc_dis.py tools/pyinst_extract.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

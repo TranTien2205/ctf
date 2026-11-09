@@ -54,6 +54,10 @@ it names which class skill and which tool opens the artifact.
 
 Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
 with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
+A `MEI\x0c` cookie near EOF means PyInstaller, not a packer:
+`python3 tools/pyinst_extract.py ./bin outdir` extracts the frozen
+entries (`s`-type = marshalled code object, `z`-type = PYZ module
+archive), and the `main`-shaped payloads feed `tools/pyc_dis.py`.
 
 For the deciding-check hunt without `nm`/`readelf`/`objdump`:
 `python3 tools/elf_info.py ./bin` lists sections, dynamic + static
