@@ -250,10 +250,19 @@ def findings_overgraded(entries: dict, findings: list) -> list[dict]:
     """
     out = []
     entries = entries if isinstance(entries, dict) else {}
-    for f in findings if isinstance(findings, list) else []:
-        if not isinstance(f, dict):
-            continue
+    rows = [f for f in (findings or []) if isinstance(f, dict)]
+    # Does this file grade at all? If any row carries a grade, a row without
+    # one had it removed - deleting the grade AND the proof block together
+    # otherwise looked exactly like a session recorded before grading existed.
+    graded_file = any(str(f.get("grade") or "").strip() for f in rows)
+    for f in rows:
         stored = str(f.get("grade") or "").strip().lower()
+        if not stored and graded_file:
+            out.append({"id": f.get("id", "?"), "claimed": "(removed)",
+                        "evidence_supports": "unknown",
+                        "missing": ["the grade is missing from a row in a "
+                                    "graded findings file"]})
+            continue
         if not stored:
             # no grade at all: recorded before grading existed, or by a tool
             # that does not grade. Only flag it when the row carries a proof

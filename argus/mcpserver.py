@@ -113,6 +113,7 @@ class ArgusMCPServer:
             agent_name="mcp-host",
             allowed=None if allowed is None else frozenset(allowed) - WITHHELD)
         self._initialized = False
+        self._finalized = False
 
     # ------------------------------------------------------------- framing
     def _write(self, msg: dict) -> None:
@@ -133,6 +134,10 @@ class ArgusMCPServer:
             self._error(None, INVALID_REQUEST, "frame is not an object")
             return
         method = msg.get("method")
+        # A notification is a message with NO id. `"id": null` is a request
+        # with a null id and must be answered with one - treating it as a
+        # notification left the host waiting forever.
+        has_id = "id" in msg
         rid = msg.get("id")
         params = msg.get("params")
         params = params if isinstance(params, dict) else {}
@@ -143,7 +148,7 @@ class ArgusMCPServer:
         # method. Replying to one - which this did for every method outside
         # the notifications/ namespace - is a protocol violation that some
         # hosts treat as a desync.
-        if rid is None:
+        if not has_id:
             if method == "notifications/initialized":
                 self._initialized = True
             return
@@ -178,6 +183,14 @@ class ArgusMCPServer:
         arguments = arguments if isinstance(arguments, dict) else {}
         if not isinstance(name, str) or not name:
             self._error(rid, INVALID_REQUEST, "tools/call needs a name")
+            return
+        if getattr(self.ctx, "finished", False) and name != "finish":
+            # After finish the session is rendered and sealed. A tool call
+            # that still ran appended to the transcript past the seal, and
+            # `argus verify` then reported the tail as truncated.
+            self._reply(rid, self._content(
+                {"error": "the engagement is finished; this session is sealed"},
+                is_error=True))
             return
         if name in WITHHELD:
             self._reply(rid, self._content(
@@ -228,10 +241,19 @@ class ArgusMCPServer:
             except Exception as exc:          # a crash must not kill the host
                 self._error(msg.get("id") if isinstance(msg, dict) else None,
                             INTERNAL_ERROR, f"{type(exc).__name__}: {exc}")
+        # stdin closed. A host that disconnects without calling finish - which
+        # is how a host stops a server - left the session unrendered and
+        # unsealed, so `argus verify` had no anchor and a truncated tail
+        # verified clean. Seal whatever the engagement produced.
+        if self.session._seq or self.session.findings:
+            self._finalize()
         return 0
 
     def _finalize(self) -> None:
         """Render and seal, the way AgentLoop does at the end of a run."""
+        if self._finalized:
+            return
+        self._finalized = True
         try:
             from .report import render_report
             from .report.html import render_html

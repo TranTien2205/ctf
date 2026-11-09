@@ -270,3 +270,62 @@ def test_finish_renders_and_seals_a_served_session(served):
     assert {"report.md", "report.html", "report.sarif",
             "summary.json"} <= names
     assert main(["verify", str(server.session.dir)]) == 0
+
+
+def test_a_null_id_is_a_request_not_a_notification(served):
+    """`msg.get("id")` returns None for both an absent id and `"id": null`,
+    so a request with a null id was treated as a notification and the host
+    waited forever."""
+    server, pipe = served
+    pipe.send({"jsonrpc": "2.0", "id": None, "method": "ping"})
+    pipe.send({"jsonrpc": "2.0", "method": "ping"})      # a real notification
+    server.serve()
+    frames = pipe.frames()
+    assert len(frames) == 1
+    assert frames[0]["id"] is None and frames[0]["result"] == {}
+
+
+def test_a_tool_call_after_finish_is_refused(served, lab_url):
+    """finish renders and seals. A call that still ran appended to the
+    transcript past the seal, and `argus verify` then reported the tail as
+    truncated."""
+    from argus.cli import main
+    server, pipe = served
+    _one(server, pipe, {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                        "params": {"name": "finish",
+                                   "arguments": {"summary": "done"}}})
+    reply = _one(server, pipe, {
+        "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+        "params": {"name": "http_request",
+                   "arguments": {"method": "GET", "url": lab_url + "/"}}})
+    assert reply["result"]["isError"] is True
+    assert "finished" in reply["result"]["content"][0]["text"]
+    assert main(["verify", str(server.session.dir)]) == 0
+
+
+def test_a_disconnect_without_finish_still_seals(tmp_path, lab_url):
+    """A host stops a server by closing its stdin. That left the session
+    unrendered and unsealed, so `argus verify` had no anchor and a truncated
+    tail verified clean."""
+    import json as _json
+    from argus.cli import main
+    from argus.config import Config
+    from argus.mcpserver import ArgusMCPServer
+    pipe = _Pipe()
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 rate_rps=0)
+    server = ArgusMCPServer(cfg, stdin=pipe, stdout=pipe)
+    try:
+        pipe.send({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                   "params": {"name": "http_request",
+                              "arguments": {"method": "GET",
+                                            "url": lab_url + "/"}}})
+        server.serve()          # stdin closes, no finish
+        names = {p.name for p in server.session.dir.iterdir()}
+        assert {"report.md", "summary.json"} <= names
+        assert main(["verify", str(server.session.dir)]) == 0
+        summary = _json.loads(
+            (server.session.dir / "summary.json").read_text(encoding="utf-8"))
+        assert summary.get("transcript_chain_head")
+    finally:
+        server.close()

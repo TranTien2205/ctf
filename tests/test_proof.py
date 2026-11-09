@@ -903,7 +903,7 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
     import inspect
     from argus.report import sarif
     src = inspect.getsource(sarif.render_sarif)
-    assert '"review" if grade or f.get("proof") else "fail"' in src
+    assert '_KIND.get(grade, "review")' in src
 
 
 # --- coverage, measured rather than assumed ---------------------------------
@@ -1219,3 +1219,32 @@ def test_a_dangerous_scheme_in_location_is_off_origin():
     home = ex("J2", "http://t.local/go?next=/home", "", 302,
               headers={"location": "/home"})
     assert proof.grade("redirect", "", [js, home]).grade == "proven"
+
+
+def test_a_grade_stripped_with_its_proof_block_is_still_detected(tmp_path):
+    """Deleting `grade` AND `proof` together looked exactly like a session
+    recorded before grading existed. If any row in the file carries a grade,
+    a row without one had it removed."""
+    from argus.session import findings_overgraded
+    s = _sess(tmp_path)
+    rid = s.record_exchange("p", {"method": "GET", "url": "http://t.local/i"},
+                            {"status": 500, "headers": {},
+                             "body": "sqlite3.OperationalError: near"})
+    a = s.add_finding("a", "high", "sqli", "http://t.local/i?id=1", [rid],
+                      "sqlite3.OperationalError", "d", "r")
+    b = s.add_finding("b", "low", "disclosure", "http://t.local/e", [rid],
+                      "sqlite3.OperationalError", "d", "r")
+    stripped = {k: v for k, v in a.items() if k not in ("grade", "proof")}
+    rows = findings_overgraded({rid: s.get_exchange(rid)}, [stripped, b])
+    assert rows and rows[0]["claimed"] == "(removed)"
+    # a file with no grades anywhere is a legacy session, not a tampered one
+    legacy = [{k: v for k, v in r.items() if k not in ("grade", "proof")}
+              for r in (a, b)]
+    assert findings_overgraded({rid: s.get_exchange(rid)}, legacy) == []
+
+
+def test_sarif_never_defaults_an_unknown_grade_to_a_build_break():
+    import inspect
+    from argus.report import sarif
+    src = inspect.getsource(sarif.render_sarif)
+    assert '_KIND.get(grade, "review")' in src

@@ -51,7 +51,10 @@ def render_sarif(session: Session) -> Path:
         # An unrecognized or absent grade defaults to "review", not "fail".
         # Defaulting to fail promoted an ungraded legacy finding - and any row
         # whose grade was edited to something unknown - into a CI build break.
-        kind = _KIND.get(grade, "review" if grade or f.get("proof") else "fail")
+        # "review", never "fail", for a grade we do not recognise. An ungraded
+        # row - legacy, or one whose grade was stripped - is a thing we do not
+        # know about, and breaking a build on it is worse than understating it.
+        kind = _KIND.get(grade, "review")
         verdict = f.get("proof") if isinstance(f.get("proof"), dict) else {}
         missing = [str(m) for m in (verdict.get("missing") or [])]
         prefix = "" if kind == "fail" else f"[{grade.upper()}] "
