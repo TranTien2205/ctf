@@ -51,13 +51,16 @@ done
 
 | metric | meaning |
 |---|---|
-| `findings` (count) | evidence-gated findings recorded |
+| `findings`, `counts` | evidence-gated findings (full list + per-severity counts) |
 | `requests` | real wire requests spent (budget discipline) |
+| `duration_s` | wall-clock length of the run |
 | `time_to_first_finding_s` | speed to first confirmed result |
 | `coverage.endpoints` | endpoints touched (method+path+param names) |
 | `coverage.probes` | probe families exercised |
+| `coverage.requests_by_tool` | wire requests per tool — shows where budget went |
 | `llm_calls`, `llm_tokens` | cost — `in`/`out` are billed tokens; `cache_read`/`cache_write` show prompt-cached volume (~10% cost) |
 | `agents` (team only) | per-worker turns/requests/tokens/findings |
+| `transcript_chain_head`, `sealed` | integrity anchors — the hash-chain head and the sealed-artifact list `argus verify` checks |
 
 ## Compare
 
