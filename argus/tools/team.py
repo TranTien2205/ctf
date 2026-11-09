@@ -300,9 +300,10 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
     except Exception as exc:
         return {"error": f"args rejected by scope guard: {exc}"}
     cmd_tpl = manifest.get("command")
-    if not cmd_tpl:
-        return {"error": "manifest has no command"}
-    cmd = [part.replace("{target}", target).replace("{args}", args or "")
+    if not isinstance(cmd_tpl, list) or not cmd_tpl:
+        return {"error": "manifest 'command' is not a non-empty list"}
+    cmd = [str(part).replace("{target}", target)
+              .replace("{args}", str(args or ""))
            for part in cmd_tpl]
     if Path(cmd[0]).is_absolute():
         script = Path(cmd[0])
@@ -323,7 +324,13 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
         env = {k: v for k, v in os.environ.items()
                if not any(s in k.upper() for s in MCPClient._SECRET_RE)}
         from ._subproc import run_capped
-        marker = manifest.get("proof_marker") or ""
+        marker = manifest.get("proof_marker")
+        marker = marker if isinstance(marker, str) else ""
+        if marker:
+            try:
+                re.compile(marker.encode())
+            except re.error:
+                marker = ""
         rc, head, tail, proof = run_capped(
             cmd, timeout_s, cwd=str(edir), env=env,
             needle=marker or None)
