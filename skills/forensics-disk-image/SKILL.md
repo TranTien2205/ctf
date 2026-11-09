@@ -50,7 +50,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    survive in freeblocks and freelist pages until VACUUM.
    `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
    (`source=freeblock|unallocated|freelist`); add `--live` to diff against
-   live cells.
+   live cells. `python3 tools/forensics/browser_hist.py <db>` reads the
+   live browser side directly - Chrome `History`/`Cookies`/`Downloads`
+   (WebKit-microsecond times) and Firefox `places.sqlite`/`moz_cookies`
+   (unix microseconds) detected by schema, visits + downloads + cookies
+   as JSON.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and
