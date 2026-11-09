@@ -316,20 +316,38 @@ def _resolves(host_or_token: str) -> bool:
     if key in _RESOLVE_CACHE:
         return _RESOLVE_CACHE[key]
     if _RESOLVE_BUDGET[0] <= 0:
-        # Budget spent: treat it as a host. Failing CLOSED is the only safe
-        # default here - an unresolvable token that we guess is a host gets
-        # scope-checked, and the scope check is what we want to happen.
-        return True
+        return False        # see the note on the default, below
     _RESOLVE_BUDGET[0] -= 1
-    old_timeout = socket.getdefaulttimeout()
-    try:
-        socket.setdefaulttimeout(2.0)
-        socket.getaddrinfo(host_or_token, None)
-        _RESOLVE_CACHE[key] = True
-    except OSError:
-        _RESOLVE_CACHE[key] = False
-    finally:
-        socket.setdefaulttimeout(old_timeout)
+    # Bounded WITHOUT touching socket.setdefaulttimeout: that is
+    # process-global, so it leaked into every socket created while a lookup
+    # was in flight - including the target connections and, in the test
+    # suite, the lab's own server. getaddrinfo takes no timeout, so the
+    # lookup runs on a daemon thread and the join is the deadline.
+    import threading
+    result: list[bool] = []
+
+    def _lookup() -> None:
+        try:
+            socket.getaddrinfo(host_or_token, None)
+            result.append(True)
+        except OSError:
+            result.append(False)
+
+    worker = threading.Thread(target=_lookup, daemon=True)
+    worker.start()
+    worker.join(2.0)
+    # Default False - "not a host" - which is what the unbounded version did,
+    # because a failed lookup raised OSError. It is tempting to fail closed
+    # here and scope-check anything we cannot resolve, and that is wrong: this
+    # heuristic exists to tell a single-label HOSTNAME (`localhost`, `db01`)
+    # from a WORD, and the words it sees are things like `Host` - the header
+    # name in a saved request file - `vuln` and `80`. Failing closed refused a
+    # legitimate `sqlmap -r request.txt` because the file says `Host:`.
+    #
+    # Dotted names and IP literals never reach here: `_HOST_RE` matches them
+    # without a lookup. So what a spent budget or a timeout gives up is
+    # single-label names past the 256th distinct token in one argument list.
+    _RESOLVE_CACHE[key] = result[0] if result else False
     return _RESOLVE_CACHE[key]
 
 
