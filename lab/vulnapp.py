@@ -165,7 +165,13 @@ class Handler(BaseHTTPRequestHandler):
             self.connection.setblocking(1)
 
     def _body(self):
-        n = int(self.headers.get("Content-Length") or 0)
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = 0
+        # a huge declared length just waits for bytes that never come -
+        # cap so a hostile client cannot pin the handler thread forever
+        n = min(n, 1_000_000)
         raw = self.rfile.read(n).decode("utf-8", "replace") if n else ""
         if (self.headers.get("Content-Type") or "").startswith("application/json"):
             try:
