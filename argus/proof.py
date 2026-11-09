@@ -1590,13 +1590,15 @@ for _s in [
                "a real browser executed it"),
               verify_browser_execution, ceiling="candidate",
               aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection"), reflection_is_the_finding=True),
-    ProofSpec("ppoll", "a polluted property observably changing behaviour - "
-              "which needs a browser or a server response that only the "
-              "pollution explains",
-              ("payload reflected unencoded into HTML",
-               "a real browser executed it"),
-              verify_browser_execution, ceiling="candidate",
-              aliases=("prototype-pollution", "prototypepollution"), reflection_is_the_finding=True),
+    ProofSpec("ppoll", "a property only the polluting request sent, observed "
+              "in a later read that did not send it - which is what the "
+              "server-side half of prototype pollution looks like. A browser "
+              "is needed only for the client-side variant",
+              ("the value reached a requester that did not send it",
+               "the injecting request is on record"),
+              verify_unkeyed_input,
+              floor=("the value reached a requester that did not send it",),
+              aliases=("prototype-pollution", "prototypepollution")),
     ProofSpec("csrf", "a state-changing request that carried no anti-CSRF "
               "token, sent cross-origin, with the change shown by a read "
               "before and a read after",

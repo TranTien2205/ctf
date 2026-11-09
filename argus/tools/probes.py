@@ -465,24 +465,57 @@ def probe_ssti(ctx: Context, url: str, param: str, method: str = "GET",
     base = _send(ctx, url, param, _marker("s"), method, data, "probe_ssti", "baseline")
     # a random arithmetic sum is virtually never present naturally -
     # the classic "49" from {{7*7}} collides with dates/ids everywhere
-    a, b = random.randint(10000, 89999), random.randint(1000, 8999)
-    expect = str(a + b)
+    # Two operand pairs, not one. A single product can be a coincidence in the
+    # page - `{{2*2}}` plus "Showing 4 results" - which is why the ssti class
+    # requires a second pair, and a probe that sends one cannot produce
+    # evidence its own class accepts.
+    pairs = [(random.randint(10000, 89999), random.randint(1000, 8999)),
+             (random.randint(90000, 199999), random.randint(9000, 19999))]
     hits = []
     for family, tpl in _SSTI_TEMPLATES:
-        payload = tpl % (a, b)
-        r = _send(ctx, url, param, payload, method, data, "probe_ssti", family)
-        body = r.get("body", "")
-        if expect in body and payload not in body:
-            hits.append({"family": family, "request_id": r["request_id"],
-                         "evidence": f"{payload} -> {expect} in response"})
-        elif payload in body:
-            hits.append({"family": family, "request_id": r["request_id"],
-                         "evidence": "reflected unrendered (not SSTI)", "negative": True})
+        rendered = []
+        for a, b in pairs:
+            payload = tpl % (a, b)
+            expect = str(a + b)
+            r = _send(ctx, url, param, payload, method, data, "probe_ssti",
+                      f"{family}/{a}+{b}")
+            body = r.get("body", "")
+            if expect in body and payload not in body:
+                rendered.append({"request_id": r["request_id"],
+                                 "payload": payload, "product": expect})
+            elif payload in body:
+                hits.append({"family": family, "request_id": r["request_id"],
+                             "evidence": "reflected unrendered (not SSTI)",
+                             "negative": True})
+                break
+            else:
+                break        # the first pair did not render; no second send
+        if len(rendered) == 2:
+            hits.append({
+                "family": family,
+                "request_id": rendered[0]["request_id"],
+                "confirm_request_id": rendered[1]["request_id"],
+                "evidence": f"{rendered[0]['payload']} -> "
+                            f"{rendered[0]['product']} and "
+                            f"{rendered[1]['payload']} -> "
+                            f"{rendered[1]['product']}"})
+        elif len(rendered) == 1:
+            hits.append({
+                "family": family, "request_id": rendered[0]["request_id"],
+                "evidence": f"{rendered[0]['payload']} -> "
+                            f"{rendered[0]['product']}, second pair did not "
+                            "render - one product can be a coincidence",
+                "unconfirmed": True})
     return {
-        "verdict": ("ssti candidate: " + "; ".join(h["evidence"] for h in hits if not h.get("negative")))
-        if any(not h.get("negative") for h in hits) else "no template evaluation",
+        "verdict": ("ssti candidate: " + "; ".join(
+            h["evidence"] for h in hits if not h.get("negative")))
+        if any(not h.get("negative") for h in hits)
+        else "no template evaluation",
         "baseline_id": base["request_id"],
         "results": hits,
+        "note": ("cite BOTH request_ids of a confirmed family - the class "
+                 "requires two operand pairs, because one product can be a "
+                 "coincidence in the page"),
     }
 
 
@@ -1129,7 +1162,11 @@ def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
                if where else [])
 
     out = {"request_id": r["request_id"], "canary": canary,
-           "reflected_in": where}
+           "reflected_in": where,
+           "note": ("reflection alone is a candidate. The xfh class needs the "
+                    "PAIR - the restricted path refused without the header and "
+                    "served with it - so pass `restricted` (e.g. /admin) and "
+                    "cite both request_ids")}
     if restricted:
         p = urllib.parse.urlparse(url)
         direct = ctx.client.send(
@@ -1547,7 +1584,10 @@ def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
     else:
         verdict = "no prototype-pollution signal"
     return {"verdict": verdict, "before_id": before["request_id"],
-            "pollute_id": poll["request_id"], "after_id": after["request_id"]}
+            "pollute_id": poll["request_id"], "after_id": after["request_id"],
+            "note": ("cite all three ids: the class needs the marker sent by "
+                     "the polluting request and observed in a later read that "
+                     "did not send it")}
 
 
 # the 'G' byte must show up in the error to count as desync evidence -

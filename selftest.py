@@ -98,7 +98,12 @@ def main() -> int:
 
     cfg = Config(target=base, allow_private=True, session_dir=tmp)
     scope = ScopeGuard(base, allow_private=True)
-    client = GuardedClient(scope, s, RateLimiter(0), max_requests=300)
+    # 600, not 300: the probes legitimately send more now - ssti sends a
+    # second operand pair because one product can be a coincidence, cmdi takes
+    # a second baseline and re-sends a slow family before calling it a delay,
+    # and lockout needs a counted series. The budget is the harness's, not a
+    # claim about the system.
+    client = GuardedClient(scope, s, RateLimiter(0), max_requests=600)
     ctx = Context(cfg=cfg, scope=scope, session=s, client=client,
                   skills_dir=ROOT / "argus" / "skills")
 

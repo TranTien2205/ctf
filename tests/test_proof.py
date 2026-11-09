@@ -793,6 +793,14 @@ def test_mass_assignment_and_prototype_pollution_have_their_own_classes():
     """Both were graded by verifiers that know nothing about fields."""
     assert proof.canonical("mass-assignment") == "massassign"
     assert proof.canonical("prototype-pollution") == "ppoll"
+    # and ppoll is now provable from what its own probe collects
+    pollute = ex("b31p", "http://t.local/api/config", '{"merged":true}', 200,
+                 method="POST",
+                 req_body='{"__proto__":{"argusmark1":"polluted"}}')
+    read = ex("b31r", "http://t.local/api/config",
+              '{"theme":"dark","argusmark1":"polluted"}')
+    assert proof.grade("prototype-pollution", "argusmark1",
+                       [pollute, read]).grade == "proven"
     write = ex("b31", "http://t.local/api/register", '{"id":9}', 200,
                method="POST", req_body='{"user":"x","is_admin":true}')
     read = ex("b32", "http://t.local/api/user/9",
@@ -902,7 +910,6 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 
 CANNOT_BE_PROVEN_HERE = {
     "xss": "no browser",
-    "ppoll": "no browser",
     "ssrf": "no collector",
     "enum": "one difference is not a counted series",
     "crlf": "the verifier compares bodies, not headers",
@@ -1020,7 +1027,11 @@ def test_reflection_classes_are_exempt_from_the_echo_veto():
     """xss, prototype pollution and crlf are proven BY the reflection, so the
     veto must not apply to them - a universal rule written without the
     exemption would have deleted three classes."""
-    for name in ("xss", "ppoll", "crlf"):
+    # ppoll left this set: the server-side half - a property only the
+    # polluting request sent, observed in a later read - is checkable, and
+    # grading it by the browser verifier made the evidence its own probe
+    # collects unusable
+    for name in ("xss", "crlf"):
         assert proof.spec_for(name).reflection_is_the_finding, name
     refl = ex("e2", "http://t.local/s?q=x%3C%3E%27%22",
               "<html><body>Results for: x<>'\"</body></html>", 200,
