@@ -162,7 +162,7 @@ system. All notable milestones on `agent-v2`.
   per-server errors instead of crashing startup.
 
 ### Verification & packaging
-- `python selftest.py`: 110 offline checks.
+- `python selftest.py`: 117 offline checks.
 - `python -m pytest tests/ -q`: 163 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions).
