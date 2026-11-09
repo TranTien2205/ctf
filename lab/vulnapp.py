@@ -12,7 +12,9 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     POST /login                SQLi auth bypass (' OR '1'='1), user-enum errors
     POST /login2               user-enum via timing (uniform error text)
     POST /login3               rate-limited login: 429 after 5 fails/user
-    GET  /ping?host=           command injection (sleep separators)
+    GET  /ping?host=           command injection: real argv execution from an
+                               allowlist (id/whoami/uname/echo/cat), plus the
+                               sleep separators for the blind case
     GET  /hello?name=          SSTI ({{expr}} arithmetic evaluation)
     GET  /download?file=       path traversal / file read
     GET  /redirect?next=       open redirect + CRLF header injection
@@ -51,7 +53,10 @@ import hmac
 import json
 import os
 import re
+import shlex
+import shutil
 import sqlite3
+import subprocess
 import sys
 import threading
 import time
@@ -304,8 +309,16 @@ class Handler(BaseHTTPRequestHandler):
                 # heavy query: iterations, not seconds - ~1s per million
                 time.sleep(min(int(bench.group(1)) // 1_000_000, 8))
                 self._send(body="<html><body>PING ok</body></html>")
-            elif re.search(r"[;&|`$(]", host):
-                self._send(500, "<html><body>sh: syntax error</body></html>")
+            elif re.search(r"[;&|`$(]", host) or "%0a" in host:
+                # real execution, allowlisted and shell-free (see _lab_exec)
+                outputs = [_lab_exec(c) for c in _injected_commands(host)]
+                outputs = [o for o in outputs if o]
+                if outputs:
+                    body = "\n".join(outputs)
+                    self._send(body="<html><body><pre>PING 127.0.0.1: 4 "
+                                    f"packets, 0% loss\n{body}</pre></body></html>")
+                else:
+                    self._send(500, "<html><body>sh: syntax error</body></html>")
             else:
                 self._send(body=f"<html><body>PING {host}: 4 packets, 0% loss"
                                 f"</body></html>")
@@ -884,6 +897,73 @@ def make_server(port: int = 0):
                  "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n")
     srv = _LabServer(("127.0.0.1", port), Handler)
     return srv
+
+
+# --- /ping command injection: a real output channel, deliberately bounded ----
+#
+# The point of this endpoint is that the agent can obtain the output of `id`,
+# because that is what an rce finding has to quote (`argus proof rce`). A
+# simulated `sh: syntax error` string gave the probe nothing to read, so the
+# class was unprovable anywhere in the project.
+#
+# Real execution, two bounds. The server binds 127.0.0.1 only, and commands run
+# as argv through an allowlist - never through a shell - so a destructive or
+# networked payload is inert and comes back "command not found", which is also
+# what a hardened target looks like. The injection is real; the blast radius is
+# not. `cat` is confined to the lab's fake filesystem: a lab must not read the
+# operator's real files to make a point.
+_EXEC_ALLOW = {"id", "whoami", "uname", "hostname", "pwd", "echo", "cat"}
+
+
+def _injected_commands(value: str) -> list[str]:
+    """The command segments an injected parameter carries, loosely as a shell
+    would split them. Segment 0 is the host argument itself, not a command."""
+    text = str(value or "").replace("%0a", "\n")
+    segments = [a or b for a, b in
+                re.findall(r"\$\(([^)]*)\)|`([^`]*)`", text)]
+    outside = re.sub(r"\$\([^)]*\)|`[^`]*`", "", text)
+    segments += re.split(r"[;&|\n]+", outside)[1:]
+    out = []
+    for segment in segments:
+        segment = segment.strip().strip('"').strip("'").split("#")[0].strip()
+        if segment:
+            out.append(segment)
+    return out
+
+
+def _lab_exec(command: str) -> str:
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return f"sh: {command}: syntax error"
+    if not parts:
+        return ""
+    name = os.path.basename(parts[0])
+    if name not in _EXEC_ALLOW:
+        return f"sh: {parts[0]}: command not found"
+    if name == "echo":
+        return " ".join(parts[1:])
+    if name == "cat":
+        if len(parts) < 2:
+            return ""
+        target = os.path.normpath(parts[1]).lstrip("/\\")
+        path = os.path.join(FAKEFS, target)
+        if not os.path.abspath(path).startswith(os.path.abspath(FAKEFS)):
+            return f"cat: {parts[1]}: Permission denied"
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                return fh.read(4096)
+        except OSError:
+            return f"cat: {parts[1]}: No such file or directory"
+    exe = shutil.which(name)
+    if not exe:
+        return f"sh: {name}: command not found"
+    try:
+        done = subprocess.run([exe, *parts[1:]], capture_output=True,
+                              text=True, timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return f"sh: {name}: cannot execute"
+    return (done.stdout or done.stderr or "")[:4096]
 
 
 class _LabServer(ThreadingHTTPServer):

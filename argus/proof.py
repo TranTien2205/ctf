@@ -57,6 +57,9 @@ DESTRUCTIVE_RE = re.compile(
     r"net\s+user\s+\S+\s+/add|nc\s+-e|bash\s+-i|/dev/tcp/|certutil\s+-urlcache|"
     r"invoke-webrequest\s+-outfile|chmod\s+777\s+/)")
 
+NOSQL_OP_RE = re.compile(
+    r'(?i)[\"\']?\$(ne|gt|gte|lt|lte|regex|where|in|nin|exists|expr|function)[\"\']?\s*:'
+    r'|\{\s*[\"\']?\$\w+')
 DBMS_RE = re.compile(
     r"(?i)(sqlite3?\.\w*error|sqlite_master|you have an error in your sql syntax|"
     r"mysql_fetch|mariadb|psycopg2|pg::|postgresql|org\.postgresql|ORA-\d{5}|"
@@ -275,14 +278,26 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
                              "version() once, or cite the error that names it"))
     named = None
     for entry in claim.exchanges:
-        m = TABLE_RE.search(req_text(entry))
+        text = req_text(entry)
+        m = TABLE_RE.search(text)
         if m:
             named = (m.group(1) or m.group(2), entry)
             break
-    checks.append(_check("a named table was queried", named is not None,
+        # A document store has no FROM clause: the operator injection is what
+        # names the query as reaching the store. Requiring SQL syntax here made
+        # every nosqli claim unprovable.
+        if not spec.fingerprint:
+            op = NOSQL_OP_RE.search(text)
+            if op:
+                named = (op.group(0).strip(), entry)
+                break
+    checks.append(_check("the query named its target", named is not None,
                          f"{named[0]} in {named[1].get('id')}" if named else
-                         "no cited request names a table or information_schema - "
-                         "a differential proves the channel, not the read"))
+                         ("no cited request carries an operator query ($ne, "
+                          "$regex, $where) or names a collection"
+                          if not spec.fingerprint else
+                          "no cited request names a table or information_schema "
+                          "- a differential proves the channel, not the read")))
     extracted = None
     for entry in claim.exchanges:
         body = resp_body(entry)
@@ -290,7 +305,9 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
             continue
         if DBMS_RE.search(claim.excerpt):
             continue           # the engine's error message is not its data
-        if TABLE_RE.search(req_text(entry)):
+        text = req_text(entry)
+        if TABLE_RE.search(text) or (not spec.fingerprint
+                                     and NOSQL_OP_RE.search(text)):
             extracted = entry
             break
     checks.append(_check("rows returned, not an error message", extracted is not None,
@@ -393,6 +410,27 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+def _redirect_host(location: str) -> str:
+    """The host a Location header actually sends the browser to, or "" when it
+    stays on the current origin.
+
+    `/home` is relative and therefore in-origin; an early version prefixed
+    anything without "//" with it and read `/home` as the host `home`, so the
+    in-origin control graded as the finding.
+    """
+    value = str(location or "").strip()
+    if not value:
+        return ""
+    if value.startswith("//"):                      # protocol-relative
+        return urllib.parse.urlparse("http:" + value).hostname or ""
+    parsed = urllib.parse.urlparse(value)
+    if parsed.scheme and parsed.netloc:
+        return parsed.hostname or ""
+    if parsed.scheme or value.startswith("/") or not parsed.netloc:
+        return ""                                   # relative, or a non-http scheme
+    return urllib.parse.urlparse("http://" + value).hostname or ""
+
+
 def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
     off, control = None, None
     for entry in claim.exchanges:
@@ -401,9 +439,8 @@ def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             continue
         req_host = (urllib.parse.urlparse(str((entry.get("request") or {})
                                               .get("url") or "")).hostname or "")
-        dest = urllib.parse.urlparse(location if "//" in location
-                                     else "//" + location.lstrip("/"), scheme="http")
-        if dest.hostname and dest.hostname.lower() != req_host.lower():
+        dest = _redirect_host(location)
+        if dest and dest.lower() != req_host.lower():
             off = off or (location, entry)
         else:
             control = control or entry
@@ -613,9 +650,10 @@ class Verdict:
 RCE_REQUIRED = ("a benign command was sent", "identity output returned by the target",
                 "marker echoed in the output")
 RCE_VETO = ("proof command stayed benign",)
-SQLI_REQUIRED = ("data store fingerprinted", "a named table was queried",
+SQLI_REQUIRED = ("data store fingerprinted", "the query named its target",
                  "rows returned, not an error message")
-EXTRACTION_REQUIRED = ("a named table was queried", "rows returned, not an error message")
+EXTRACTION_REQUIRED = ("the query named its target",
+                       "rows returned, not an error message")
 
 MATRIX: dict[str, ProofSpec] = {}
 

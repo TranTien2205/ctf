@@ -48,6 +48,7 @@ def _impl(name: str) -> Callable:
         "probe_reflection": probes.probe_reflection,
         "probe_sqli": probes.probe_sqli,
         "probe_time": probes.probe_time,
+        "probe_cmdi": probes.probe_cmdi,
         "probe_ssti": probes.probe_ssti,
         "probe_lfi": probes.probe_lfi,
         "probe_redirect": probes.probe_redirect,
@@ -208,6 +209,9 @@ TOOL_SCHEMAS: list[dict] = [
                                                 "enumeration up to this n to "
                                                 "bound the UNION SELECT "
                                                 "column count"},
+            "extract_table": {**_STR, "description": "Opt-in bounded read: table to UNION-select from, once the column count and context are known"},
+            "extract_columns": {**_STR, "description": "Comma-separated columns to read from extract_table"},
+            "extract_rows": {**_INT, "description": "Row cap for the read (default 5, max 20) - five rows is a proof, a dump is an incident"},
         },
         ["url", "param"],
     ),
@@ -223,6 +227,24 @@ TOOL_SCHEMAS: list[dict] = [
             "method": {**_STR, "description": "GET or POST (default GET)"},
             "data": {**_STR, "description": "POST body template; param value is replaced"},
             "delay_s": {**_INT, "description": "Requested sleep seconds (default 4)"},
+        },
+        ["url", "param"],
+    ),
+    _schema(
+        "probe_cmdi",
+        "OS command injection, probed for command OUTPUT rather than timing: "
+        "sends `id; echo <nonce>` (and the Windows pair) across separator "
+        "families and reads the response. Confirms only when an identity line "
+        "comes back that is NOT present in the request that produced it - a "
+        "reflected payload is reported as a reflection, not as execution. "
+        "Falls back to the timing oracle, which is a candidate: the rce class "
+        "requires output. Sends nothing destructive.",
+        {
+            "url": {**_STR, "description": URL_DESC + " Include the query string."},
+            "param": {**_STR, "description": "Parameter to test"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
+            "delay_s": {**_INT, "description": "Sleep seconds for the blind fallback (default 4)"},
         },
         ["url", "param"],
     ),
