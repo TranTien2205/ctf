@@ -243,7 +243,11 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
         ids = f.get("evidence_ids") or []
         if not isinstance(ids, list):
             ids = []
-        cited = [entries.get(r) for r in ids]
+        # ids are transcript keys - a tampered finding can carry
+        # unhashable members ([1,2]) which must fail as "bad",
+        # not crash the verifier
+        cited = [entries.get(r) if isinstance(r, str) else None
+                 for r in ids]
         if f.get("severity") not in SEVERITIES or \
                 not excerpt or not cited or None in cited or \
                 not any(excerpt in _evidence_text_of_entry(e)
@@ -253,10 +257,11 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
 
 
 def _evidence_text_of_entry(entry: dict | None) -> str:
-    if not entry:
+    if not isinstance(entry, dict):
         return ""
     resp = entry.get("response") or {}
-    return str(resp.get("body") or "") or str(entry.get("output") or "")
+    body = resp.get("body") if isinstance(resp, dict) else None
+    return str(body or "") or str(entry.get("output") or "")
 
 
 def _finding_key(category: str, url: str) -> tuple:
