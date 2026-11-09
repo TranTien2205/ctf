@@ -189,6 +189,22 @@ def _validate_proxy(proxy: str) -> str:
     return proxy
 
 
+def _validate_resume(resume: str) -> str:
+    """Fail fast on a --resume path that cannot be a session dir - a
+    typo'd path currently surfaces as a FileNotFoundError traceback
+    deep inside Session.__init__."""
+    if not resume:
+        return ""
+    p = Path(resume)
+    if not p.is_dir() or not (
+            (p / "meta.json").is_file()
+            or (p / "transcript.jsonl").is_file()):
+        raise SystemExit(
+            f"--resume {resume!r}: not a session dir "
+            "(needs meta.json or transcript.jsonl)")
+    return resume
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
     _load_dotenv()
@@ -296,7 +312,7 @@ def load_config(args) -> Config:
         operator=getattr(args, "operator", "") or "",
         llm_max_tokens=args.llm_max_tokens,
         mcp_config=getattr(args, "mcp_config", "") or "",
-        resume=getattr(args, "resume", "") or "",
+        resume=_validate_resume(getattr(args, "resume", "") or ""),
         proxy=_validate_proxy(getattr(args, "proxy", "") or ""),
         # >=4 chars: a shorter 'secret' would redact innocent bytes all over
         # the transcript (the same floor is enforced in Session for direct
