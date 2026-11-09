@@ -779,8 +779,14 @@ def _demo(args) -> int:
     print("\n=== demo complete ===")
     fpath = Path(result["session_dir"]) / "findings.json"
     if fpath.exists():
-        for f in json.loads(fpath.read_text(encoding="utf-8")):
-            print(f"  [{f['severity'].upper()}] {f['title']}")
+        try:
+            _flist = json.loads(fpath.read_text(encoding="utf-8"))
+        except ValueError:
+            _flist = []
+        for f in _flist if isinstance(_flist, list) else []:
+            if isinstance(f, dict):
+                sev = str(f.get("severity") or "?").upper()
+                print(f"  [{sev}] {f.get('title', '?')}")
     print(f"  findings={result['findings']}  requests={result['requests']}")
     print(f"  report: {result['report']}")
     html_path = Path(result['report']).with_suffix('.html')
