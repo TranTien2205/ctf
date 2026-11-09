@@ -172,6 +172,23 @@ def _load_dotenv(path: Path = Path(".env")) -> None:
         pass
 
 
+def _validate_proxy(proxy: str) -> str:
+    """Reject proxy URLs httpx would fail on at client init (ValueError
+    traceback) or at connect time - an operator typo should be a clean
+    startup error. socks5 is valid httpx but needs the 'socksio' extra
+    which is not an Argus dependency."""
+    if not proxy:
+        return ""
+    if proxy.startswith(("socks4://", "socks5://")):
+        raise SystemExit(
+            f"--proxy {proxy}: SOCKS needs httpx[socks] (socksio) - "
+            "not an Argus dependency; use an http:// proxy")
+    if not proxy.startswith(("http://", "https://")):
+        raise SystemExit(
+            f"--proxy {proxy!r}: expected http:// or https:// URL")
+    return proxy
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
     _load_dotenv()
@@ -280,7 +297,7 @@ def load_config(args) -> Config:
         llm_max_tokens=args.llm_max_tokens,
         mcp_config=getattr(args, "mcp_config", "") or "",
         resume=getattr(args, "resume", "") or "",
-        proxy=getattr(args, "proxy", "") or "",
+        proxy=_validate_proxy(getattr(args, "proxy", "") or ""),
         # >=4 chars: a shorter 'secret' would redact innocent bytes all over
         # the transcript (the same floor is enforced in Session for direct
         # construction)
