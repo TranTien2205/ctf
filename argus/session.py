@@ -187,6 +187,9 @@ def verify_transcript(sdir: Path) -> dict:
         bad = findings_bad(entries, stored_findings)
         if bad:
             out["findings_bad"] = bad
+        inflated = findings_overgraded(entries, stored_findings)
+        if inflated:
+            out["findings_overgraded"] = inflated
     # a run sealed with artifacts_digest anchors every un-chained file:
     # meta.json, findings.json and summary.json (minus the mutable head/
     # duration fields). Any post-run edit surfaces as a digest mismatch.
@@ -227,6 +230,42 @@ def verify_transcript(sdir: Path) -> dict:
                 mismatched.append(name)
         if mismatched:
             out["artifact_mismatch"] = mismatched
+    return out
+
+
+def findings_overgraded(entries: dict, findings: list) -> list[dict]:
+    """Findings claiming a proof grade the cited evidence does not support.
+
+    `argus verify` already re-validates that every excerpt is verbatim bytes
+    from a chained exchange. That catches an invented finding and leaves the
+    next edit open: raise `"grade"` from candidate to proven in findings.json
+    and the claim gets stronger with no new evidence. The grade is recomputed
+    here from the chained entries, so the claim has to hold against the
+    transcript rather than against the file it is written in.
+
+    Only an INFLATED grade is reported. A stored grade weaker than the
+    recomputed one means the matrix grew more permissive since the run, which
+    is benign - failing a verify on that would make every requirement change
+    retroactively condemn old sessions.
+    """
+    out = []
+    entries = entries if isinstance(entries, dict) else {}
+    for f in findings if isinstance(findings, list) else []:
+        if not isinstance(f, dict):
+            continue
+        stored = str(f.get("grade") or "")
+        if stored not in _GRADE_RANK:
+            continue                      # recorded before grading existed
+        ids = f.get("evidence_ids")
+        cited = [entries.get(r) for r in ids if isinstance(r, str)] \
+            if isinstance(ids, list) else []
+        verdict = proof.grade(f.get("vuln_class") or f.get("category") or "",
+                              str(f.get("evidence_excerpt") or ""),
+                              [e for e in cited if isinstance(e, dict)])
+        if _GRADE_RANK.get(stored, 0) > _GRADE_RANK.get(verdict.grade, 0):
+            out.append({"id": f.get("id", "?"), "claimed": stored,
+                        "evidence_supports": verdict.grade,
+                        "missing": verdict.missing})
     return out
 
 
@@ -287,13 +326,19 @@ def _finding_key(category: str, url: str) -> tuple:
 # names maps to the canonical CWE automatically (normalized: strip
 # non-alphanumerics, so "info-disclosure" == "infodisclosure").
 _CWE = {
-    "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
+    # rce is the canonical class the matrix normalizes command injection to,
+    # and it was the one class with no mapping - so the project's headline
+    # finding carried no CWE and no OWASP row in the report.
+    "rce": "CWE-78", "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
     "time": "CWE-78", "cmdinjection": "CWE-78", "lfi": "CWE-22",
     "rfi": "CWE-98", "xss": "CWE-79", "reflection": "CWE-79",
     "idor": "CWE-639", "enum": "CWE-204", "enumeration": "CWE-204",
     "lockout": "CWE-307", "massassign": "CWE-915",
     "massassignment": "CWE-915", "ssrf": "CWE-918", "xxe": "CWE-611",
-    "csrf": "CWE-352", "xfh": "CWE-444", "upload": "CWE-434",
+    # CWE-444 is request smuggling; an X-Forwarded-Host ACL bypass is header
+    # neutralization, and the two are separate classes in the matrix now.
+    "csrf": "CWE-352", "xfh": "CWE-290", "hostheader": "CWE-290",
+    "upload": "CWE-434",
     "race": "CWE-362", "deserialize": "CWE-502",
     "deserialization": "CWE-502", "cache": "CWE-525",
     "cachepoisoning": "CWE-525", "ppoll": "CWE-1321",
@@ -302,6 +347,7 @@ _CWE = {
     "infodisclosure": "CWE-200", "websocket": "CWE-1385",
     "crlf": "CWE-113", "redirect": "CWE-601", "openredirect": "CWE-601",
     "cors": "CWE-942", "jwt": "CWE-347", "method": "CWE-749",
+    "graphql": "CWE-639", "dos": "CWE-400",
 }
 
 
@@ -339,6 +385,7 @@ _OWASP = {
     "CWE-502": "A08 Integrity Failures",
     "CWE-918": "A10 SSRF",
     "CWE-98": "A08 Integrity Failures",
+    "CWE-290": "A01 Broken Access Control",
 }
 
 
@@ -357,8 +404,25 @@ def sanitized_findings(rows) -> list[dict]:
         g = dict(f)
         for k in ("id", "severity", "title", "category", "url",
                   "description", "remediation", "cvss", "cwe", "owasp",
-                  "agent", "evidence_excerpt"):
+                  "agent", "evidence_excerpt", "vuln_class", "grade"):
             g[k] = str(g.get(k) or "")
+        # the report renders the proof block from this; an edited file may
+        # carry anything at all under those keys
+        verdict = g.get("proof")
+        if not isinstance(verdict, dict):
+            g["proof"] = {}
+        else:
+            checks = verdict.get("checks")
+            verdict = dict(verdict)
+            verdict["checks"] = [c for c in checks
+                                 if isinstance(c, dict)] \
+                if isinstance(checks, list) else []
+            missing = verdict.get("missing")
+            verdict["missing"] = [str(x) for x in missing] \
+                if isinstance(missing, list) else []
+            for k in ("vuln_class", "requirement"):
+                verdict[k] = str(verdict.get(k) or "")
+            g["proof"] = verdict
         ids = g.get("evidence_ids")
         g["evidence_ids"] = [str(i) for i in ids] \
             if isinstance(ids, list) else []
@@ -748,6 +812,18 @@ class Session:
         vuln_class = proof.canonical(category)
         cited = [transcript_snapshot.get(r) for r in evidence_ids]
         verdict = proof.grade(category, excerpt, cited)
+        if verdict.grade == "refused":
+            # Not gated on require_proof: the matrix does not say this evidence
+            # is thin, it says the system does not prove this class at all.
+            # Recording it anyway - the old behaviour kept a `critical` dos
+            # finding on file - is the exact assertion-instead-of-proof the
+            # gate exists to stop.
+            spec = proof.spec_for(category)
+            raise ValueError(
+                f"{vuln_class} is a refused class: "
+                f"{(spec.refusal if spec else '') or verdict.requirement}. "
+                "Describe the mechanism in note() instead - there is no "
+                "evidence that would make this a finding here")
         if getattr(self, "require_proof", False) and not verdict.proven:
             raise ValueError(
                 f"--require-proof: {vuln_class} graded {verdict.grade}, not proven. "

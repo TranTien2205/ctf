@@ -371,3 +371,145 @@ def test_require_proof_accepts_what_is_proven(tmp_path):
     f = s.add_finding("sqli", "critical", "sqli", "http://t.local/item?id=1",
                       [r1, r2], "admin - s3cr3t", "d", "r")
     assert f["grade"] == "proven"
+
+
+# --- the classes a wrong requirement made unprovable ------------------------
+
+def test_header_acl_bypass_is_graded_as_access_control_not_caching():
+    """xfh and host-header used to be aliased onto the cache-poisoning spec,
+    so the lab's own `X-Original-URL: /admin` bypass graded unproven under a
+    requirement about caches."""
+    denied = ex("r30", "http://t.local/admin", "Forbidden", 403)
+    served = ex("r31", "http://t.local/admin",
+                "<h1>Admin panel</h1> user list", 200,
+                req_headers={"x-original-url": "/admin"})
+    assert proof.canonical("xfh") == "xfh"
+    assert proof.grade("xfh", "<h1>Admin panel</h1>",
+                       [denied, served]).grade == "proven"
+    # the bypass alone is a candidate: nothing shows the resource was restricted
+    assert proof.grade("host-header", "<h1>Admin panel</h1>",
+                       [served]).grade == "candidate"
+    # a control on a different path does not prove THIS path was restricted
+    elsewhere = ex("r32", "http://t.local/other", "<h1>Admin panel</h1>", 200,
+                   req_headers={"x-original-url": "/admin"})
+    assert proof.grade("xfh", "<h1>Admin panel</h1>",
+                       [denied, elsewhere]).grade == "candidate"
+    assert proof.grade("xfh", "Welcome", [BENIGN]).grade == "unproven"
+
+
+def test_cache_no_longer_answers_for_xfh():
+    assert proof.canonical("cache-poisoning") == "cache"
+    assert proof.canonical("request-smuggling") == "cache"
+    assert proof.canonical("x-original-url") == "xfh"
+
+
+# --- a refused class is not a finding ---------------------------------------
+
+def test_a_refused_class_cannot_be_recorded(tmp_path):
+    """The matrix does not say the dos evidence is thin, it says the system
+    does not prove the class. Keeping a `critical` dos finding on file was the
+    assertion-instead-of-proof the gate exists to stop."""
+    s = _sess(tmp_path)
+    rid = s.record_exchange("t", {"method": "GET", "url": "http://t.local/x"},
+                            {"status": 200, "headers": {}, "body": "slow"})
+    with pytest.raises(ValueError, match="refused class"):
+        s.add_finding("thread exhaustion", "critical", "dos",
+                      "http://t.local/x", [rid], "slow", "d", "r")
+    with pytest.raises(ValueError, match="refused class"):
+        s.add_finding("slowloris", "high", "resource-exhaustion",
+                      "http://t.local/x", [rid], "slow", "d", "r")
+    assert s.findings == []
+
+
+# --- identifiers -------------------------------------------------------------
+
+def test_every_class_maps_to_a_cwe():
+    from argus.session import _cwe_of
+    unmapped = [c for c in proof.classes() if not _cwe_of(c)]
+    assert unmapped == [], f"no CWE for {unmapped}"
+
+
+def test_rce_carries_cwe_and_owasp(tmp_path):
+    """The headline acceptance class was the one with no identifiers."""
+    from argus.session import _cwe_of, _owasp_of
+    assert _cwe_of("rce") == "CWE-78"
+    assert _owasp_of("CWE-78")
+    s = _sess(tmp_path)
+    rid = s.record_exchange(
+        "probe_cmdi",
+        {"method": "GET",
+         "url": "http://t.local/ping?host=127.0.0.1;%20id;%20echo%20argusk3m9"},
+        {"status": 200, "headers": {},
+         "body": "uid=33(www-data) gid=33(www-data)\nargusk3m9"})
+    f = s.add_finding("cmdi", "critical", "command-injection",
+                      "http://t.local/ping", [rid],
+                      "uid=33(www-data) gid=33(www-data)", "d", "r")
+    assert f["grade"] == "proven"
+    assert f["cwe"] == "CWE-78" and f["owasp"]
+
+
+def test_xfh_no_longer_claims_the_smuggling_cwe():
+    from argus.session import _cwe_of
+    assert _cwe_of("xfh") == "CWE-290"
+    assert _cwe_of("smuggle") == "CWE-444"
+
+
+# --- tamper-evidence over the grade -----------------------------------------
+
+def test_verify_detects_an_inflated_grade(tmp_path):
+    """findings.json is operator-editable. Raising a stored grade makes the
+    claim stronger with no new evidence; the grade is recomputed from the
+    chained transcript, so the claim has to hold against it."""
+    from argus.session import findings_overgraded
+    s = _sess(tmp_path)
+    rid = s.record_exchange("probe_sqli",
+                            {"method": "GET", "url": "http://t.local/item?id=1'"},
+                            {"status": 500, "headers": {},
+                             "body": "sqlite3.OperationalError: near"})
+    f = s.add_finding("sqli", "high", "sqli", "http://t.local/item?id=1",
+                      [rid], "sqlite3.OperationalError", "d", "r")
+    assert f["grade"] == "candidate"
+    entries = {rid: s.get_exchange(rid)}
+    assert findings_overgraded(entries, s.findings) == []
+    inflated = [{**f, "grade": "proven"}]
+    rows = findings_overgraded(entries, inflated)
+    assert rows and rows[0]["claimed"] == "proven"
+    assert rows[0]["evidence_supports"] == "candidate"
+    assert rows[0]["missing"]
+
+
+def test_a_weaker_stored_grade_is_not_a_tamper_signal(tmp_path):
+    """A requirement loosening later must not retroactively condemn a session."""
+    from argus.session import findings_overgraded
+    s = _sess(tmp_path)
+    rid = s.record_exchange(
+        "probe_cmdi",
+        {"method": "GET",
+         "url": "http://t.local/ping?host=1;%20id;%20echo%20argusk3m9"},
+        {"status": 200, "headers": {},
+         "body": "uid=0(root) gid=0(root)\nargusk3m9"})
+    f = s.add_finding("rce", "critical", "rce", "http://t.local/ping", [rid],
+                      "uid=0(root) gid=0(root)", "d", "r")
+    assert f["grade"] == "proven"
+    understated = [{**f, "grade": "candidate"}]
+    assert findings_overgraded({rid: s.get_exchange(rid)}, understated) == []
+
+
+def test_legacy_findings_without_a_grade_are_skipped():
+    from argus.session import findings_overgraded
+    assert findings_overgraded({}, [{"id": "F01", "severity": "high"}]) == []
+    assert findings_overgraded({}, ["not a dict", None]) == []
+
+
+# --- the renderers tell the same story --------------------------------------
+
+def test_sanitized_findings_survives_a_hand_edited_proof_block():
+    from argus.session import sanitized_findings
+    rows = sanitized_findings([
+        {"id": "F01", "severity": "high", "grade": 123, "proof": "not a dict"},
+        {"id": "F02", "proof": {"checks": "nope", "missing": 5,
+                                "requirement": None}},
+    ])
+    assert rows[0]["proof"] == {}
+    assert rows[0]["grade"] == "123"
+    assert rows[1]["proof"]["checks"] == [] and rows[1]["proof"]["missing"] == []

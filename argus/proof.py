@@ -455,6 +455,63 @@ def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+ACL_HEADER_RE = re.compile(
+    r"(?i)x-original-url|x-rewrite-url|x-forwarded-host|x-forwarded-for|"
+    r"x-forwarded-server|x-host|x-custom-ip-authorization|x-remote-addr|"
+    r"x-real-ip|x-originating-ip|x-client-ip")
+
+
+def _req_headers(entry: dict) -> dict:
+    headers = (entry.get("request") or {}).get("headers")
+    return headers if isinstance(headers, dict) else {}
+
+
+def _path_of(entry: dict) -> str:
+    url = str((entry.get("request") or {}).get("url") or "")
+    return urllib.parse.urlparse(url).path or "/"
+
+
+def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """Header-based access-control bypass.
+
+    This used to be graded by `verify_unkeyed_input`, because xfh and
+    host-header were aliased onto the cache-poisoning spec. They are not the
+    same bug: cache poisoning asks that a value reach a requester who did not
+    send it, while this asks that restricted content reach a requester who was
+    refused it a moment earlier. The lab plants exactly this - an
+    `X-Original-URL: /admin` middleware bypass - and a real proof of it graded
+    `unproven` under the wrong requirement.
+    """
+    served, refused = None, None
+    for entry in claim.exchanges:
+        headers = " ".join(f"{k}: {v}" for k, v in _req_headers(entry).items())
+        spoofed = bool(ACL_HEADER_RE.search(headers))
+        code = status_of(entry)
+        quoted = bool(claim.excerpt) and claim.excerpt in resp_body(entry)
+        if spoofed and 200 <= code < 300 and quoted:
+            served = served or entry
+        elif code in (401, 403, 404) or (not spoofed and not quoted
+                                         and 200 <= code < 300):
+            refused = refused or entry
+    both = served is not None and refused is not None
+    same_path = both and _path_of(served) == _path_of(refused)
+    return [
+        _check("restricted content returned with the header", served is not None,
+               f"{status_of(served)} on {_path_of(served)} in {served.get('id')}"
+               if served else
+               "no cited exchange adds an ACL-relevant header (X-Original-URL, "
+               "X-Forwarded-Host, X-Real-IP, ...), gets a 2xx, and carries the "
+               "quoted bytes"),
+        _check("the same request is refused without it", both and same_path,
+               f"{_path_of(refused)} answered {status_of(refused)} in "
+               f"{refused.get('id')}" if both and same_path else
+               ("the control is on a different path than the bypass - cite the "
+                f"refusal of {_path_of(served)} itself" if both else
+                "cite the control: the same request without the header must be "
+                "refused, or the resource was never restricted")),
+    ]
+
+
 def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Cache poisoning / deception / smuggling: a value one requester sent came
     back to a requester that did not send it."""
@@ -735,7 +792,17 @@ for _s in [
               floor=("the value reached a requester that did not send it",),
               aliases=("cache-poisoning", "cachepoisoning", "web-cache-deception",
                        "cache-deception", "smuggle", "request-smuggling",
-                       "requestsmuggling", "xfh", "host-header")),
+                       "requestsmuggling")),
+    ProofSpec("xfh", "restricted content returned when an ACL-relevant header "
+              "is added, with the control showing the same request refused "
+              "without it",
+              ("restricted content returned with the header",
+               "the same request is refused without it"),
+              verify_restricted_access,
+              floor=("restricted content returned with the header",),
+              aliases=("host-header", "hostheader", "x-original-url",
+                       "acl-bypass", "header-acl-bypass"),
+              notes="Quote the restricted content, not the header you sent."),
     ProofSpec("cors", "the probe origin reflected in Access-Control-Allow-Origin "
               "with credentials allowed",
               ("the probe origin is reflected", "credentials are allowed with it"),
