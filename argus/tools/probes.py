@@ -49,6 +49,8 @@ def _inject(url: str, param: str, value: str) -> str:
 
 def _inject_body(data: str, param: str, value: str) -> str:
     """Replace param's value inside a urlencoded or JSON body template."""
+    data = data if isinstance(data, str) else str(data or "")
+    param, value = str(param), str(value)
     try:
         obj = _json.loads(data)
         if isinstance(obj, dict):
@@ -68,7 +70,9 @@ def _inject_body(data: str, param: str, value: str) -> str:
 def _send(ctx: Context, url: str, param: str, value: str,
           method: str = "GET", data: str | None = None,
           tool: str = "probe", note: str = ""):
-    method = (method or "GET").upper()
+    method = str(method or "GET").upper()
+    data = data if isinstance(data, str) else (
+        None if data is None else str(data))
     if method == "GET" or data is None:
         return ctx.client.send("GET", _inject(url, param, value), tool=tool, note=note)
     body = _inject_body(data, param, value)
@@ -550,7 +554,9 @@ def probe_idor(ctx: Context, url: str, method: str = "GET",
     numeric id +/-1 - in the URL path/query, or inside a POST body template
     when `data` is given. A different object at the same access level means
     access control is per-object (or missing)."""
-    method = (method or "GET").upper()
+    method = str(method or "GET").upper()
+    data = data if isinstance(data, str) else (
+        None if data is None else str(data))
     headers = None
     p = urllib.parse.urlparse(url)
     if method != "GET" and data is not None:
