@@ -735,11 +735,15 @@ def test_difference_only_classes_cannot_reach_proven():
     # described the verifier, not the evidence. Two different pages now grade
     # `unproven` for crlf rather than `candidate`, which is the point: there
     # is no header in evidence to have been injected.
-    for name in ("ssrf", "websocket"):
+    # websocket left it as well, and it was the one genuinely blocked on a
+    # missing client rather than a missing verifier: `GuardedClient.send_ws`
+    # frames now, so the handshake AND the answered message are both on
+    # record and both checkable.
+    for name in ("ssrf", "smuggle"):
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
         assert proof.spec_for(name).ceiling == "candidate"
-    for left in ("crlf", "method", "upload", "race"):
+    for left in ("crlf", "method", "upload", "race", "websocket"):
         v = proof.grade(left, "Page A unique", [a, b])
         assert v.grade == "unproven", \
             f"{left} graded {v.grade} on two stray pages"
@@ -973,7 +977,6 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 CANNOT_BE_PROVEN_HERE = {
     "xss": "no browser",
     "ssrf": "no collector",
-    "websocket": "no WebSocket client",
     "smuggle": "the desync pair is read as a difference",
     "dos": "refused by construction",
 }
@@ -1800,19 +1803,20 @@ def test_the_capped_set_is_exactly_what_the_docs_claim():
     capped = {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
     refused = {s.vuln_class for s in proof.MATRIX.values()
                if s.verifier is proof.verify_refused}
-    assert capped == {"websocket", "smuggle", "xss", "ssrf"}, capped
+    assert capped == {"smuggle", "xss", "ssrf"}, capped
     assert refused == {"dos"}, refused
     # `verify_generic` is `_discriminates` alone, which is what "no verifier
     # written yet" looks like. ssrf shares it for a different reason: the
     # evidence it would need is an out-of-band hit this package cannot see,
     # so writing a verifier would not help.
-    assert {"websocket", "smuggle", "ssrf"} == {
+    assert {"smuggle", "ssrf"} == {
         s.vuln_class for s in proof.MATRIX.values()
         if s.verifier is proof.verify_generic}
     assert proof.spec_for("xss").verifier is not proof.verify_generic, \
         "xss has a real verifier; its cap is the missing browser"
     # and the five that came off the list keep real verifiers
-    for name in ("lockout", "enum", "crlf", "upload", "method", "race"):
+    for name in ("lockout", "enum", "crlf", "upload", "method", "race",
+                 "websocket"):
         spec = proof.spec_for(name)
         assert spec.ceiling == "", f"{name} is capped again"
         assert spec.verifier not in (proof.verify_generic,
@@ -1838,7 +1842,7 @@ def test_the_unimplemented_caps_are_exactly_the_generic_verifier_ones():
     specs = {s.vuln_class: s for s in proof.MATRIX.values()}.values()
     unimplemented = {s.vuln_class for s in specs
                      if s.cap_reason == proof.CAP_UNIMPLEMENTED}
-    assert unimplemented == {"websocket", "smuggle"}, unimplemented
+    assert unimplemented == {"smuggle"}, unimplemented
     generic = {s.vuln_class for s in specs
                if s.verifier is proof.verify_generic}
     assert unimplemented < generic
@@ -1852,7 +1856,7 @@ def test_a_capped_class_says_so_when_printed():
     import io
     import contextlib
     from argus.cli import main
-    for klass, expect in (("websocket", "labour, not a limit"),
+    for klass, expect in (("smuggle", "labour, not a limit"),
                           ("xss", "no browser ships"),
                           ("dos", "REFUSED")):
         buf = io.StringIO()
@@ -1925,3 +1929,100 @@ def test_a_crlf_control_must_be_the_same_endpoint():
               headers={"server": "nginx"})
     assert proof.grade("crlf", "x-argus-probe: argusab12cd",
                        [inject, same]).grade == "proven"
+
+
+def _ws_handshake(rid, url, origin, key="KcNOB35svW/4TfvzJHyc2w==",
+                  accept=None, status=101):
+    import base64
+    import hashlib
+    if accept is None:
+        accept = base64.b64encode(hashlib.sha1(
+            (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
+        ).digest()).decode()
+    headers = {"host": "t.local", "Upgrade": "websocket",
+               "Connection": "Upgrade", "Sec-WebSocket-Key": key,
+               "Sec-WebSocket-Version": "13"}
+    if origin:
+        headers["Origin"] = origin
+    return {"id": rid,
+            "request": {"method": "GET", "url": url, "headers": headers,
+                        "body": None},
+            "response": {"status": status,
+                         "headers": {"Upgrade": "websocket",
+                                     "Sec-WebSocket-Accept": accept},
+                         "body": ""}}
+
+
+def _ws_frame(rid, url, sent, got):
+    return {"id": rid,
+            "request": {"method": "WSFRAME", "url": url, "headers": {},
+                        "body": sent},
+            "response": {"status": 101, "headers": {}, "body": got}}
+
+
+def test_websocket_is_proven_by_a_cross_origin_channel_that_answers():
+    """`websocket` came off the CANNOT_BE_PROVEN_HERE list.
+
+    Its note read "needs a real WebSocket client. This system compares the
+    handshake only" - which was a missing client, not a missing proof.
+    `GuardedClient.send_ws` frames now, so both halves are recordable.
+    """
+    url = "http://t.local/ws"
+    shake = _ws_handshake("w1", url, "https://argus-probe.invalid")
+    frame = _ws_frame("w2", url, "arguswsab12 argus-probe",
+                      "echo: arguswsab12 argus-probe")
+    assert proof.grade("websocket", "echo: arguswsab12 argus-probe",
+                       [shake, frame]).grade == "proven"
+
+
+def test_a_websocket_handshake_alone_is_not_a_hijackable_channel():
+    url = "http://t.local/ws"
+    shake = _ws_handshake("w3", url, "https://argus-probe.invalid")
+    verdict = proof.grade("websocket", "101 Switching Protocols", [shake])
+    assert verdict.grade != "proven"
+    assert "the channel answered a message" in verdict.missing
+
+
+def test_a_same_origin_websocket_is_the_endpoint_working():
+    url = "http://t.local/ws"
+    shake = _ws_handshake("w4", url, "http://t.local")
+    frame = _ws_frame("w5", url, "arguswsab12 x", "echo: arguswsab12 x")
+    verdict = proof.grade("websocket", "echo: arguswsab12 x", [shake, frame])
+    assert verdict.grade != "proven"
+    assert "accepted from an origin the target does not own" in verdict.missing
+
+
+def test_a_101_without_the_rfc_challenge_is_not_a_websocket_endpoint():
+    url = "http://t.local/ws"
+    fake = _ws_handshake("w6", url, "https://argus-probe.invalid",
+                         accept="not-the-right-token")
+    frame = _ws_frame("w7", url, "arguswsab12 x", "echo: arguswsab12 x")
+    verdict = proof.grade("websocket", "echo: arguswsab12 x", [fake, frame])
+    assert verdict.grade != "proven"
+    assert "the handshake completed the RFC 6455 challenge" in verdict.missing
+
+
+def test_a_websocket_answer_must_carry_a_nonce_the_frame_sent():
+    url = "http://t.local/ws"
+    shake = _ws_handshake("w8", url, "https://argus-probe.invalid")
+    # the channel said something, but nothing tying it to our frame
+    frame = _ws_frame("w9", url, "hello", "welcome to the chat")
+    verdict = proof.grade("websocket", "welcome to the chat", [shake, frame])
+    assert verdict.grade != "proven"
+    assert "the channel answered a message" in verdict.missing
+
+
+def test_a_websocket_frame_on_another_endpoint_does_not_count():
+    shake = _ws_handshake("wa", "http://t.local/ws",
+                          "https://argus-probe.invalid")
+    frame = _ws_frame("wb", "http://t.local/other-ws",
+                      "arguswsab12 x", "echo: arguswsab12 x")
+    verdict = proof.grade("websocket", "echo: arguswsab12 x", [shake, frame])
+    assert verdict.grade != "proven"
+
+
+def test_a_refused_upgrade_proves_nothing():
+    shake = _ws_handshake("wc", "http://t.local/ws-strict",
+                          "https://argus-probe.invalid", status=403)
+    assert proof.grade("websocket", "origin not allowed",
+                       [shake]).grade != "proven"

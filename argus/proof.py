@@ -1689,6 +1689,115 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return checks
 
 
+_WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+
+def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A cross-origin handshake accepted, and a message the channel answered.
+
+    The note said "needs a real WebSocket client. This system compares the
+    handshake only" - which was true, and was a missing client rather than a
+    missing proof. `GuardedClient.send_ws` is that client now, so both halves
+    are on record and both are checkable here.
+
+    Three checks, and each rules out a different wrong conclusion:
+
+    1. **the handshake was accepted** - a 101 whose `Sec-WebSocket-Accept` is
+       the SHA-1 of the key this request sent plus the RFC 6455 GUID. A
+       middleware or mock that answers 101 without completing the challenge
+       is not a WebSocket endpoint, and recomputing the token is the only way
+       to tell from the record;
+    2. **from an origin the target does not own** - the whole class is that a
+       foreign page can open this channel. A same-origin handshake succeeding
+       is a WebSocket endpoint working as designed;
+    3. **and the channel answered a message** - a frame carrying a nonce this
+       claim's own frame sent. A 101 followed by silence is not a hijackable
+       channel; it is a handshake.
+
+    What it does not show, and the requirement does not claim: that the
+    answer contained anything the caller should not reach. This grades the
+    channel being open cross-origin, which is the finding. Data taken over
+    it is a different class and is graded as one.
+    """
+    import base64 as _b64
+    import hashlib as _hashlib
+
+    exchanges = claim.exchanges
+    checks: list[dict] = []
+
+    def _accept_ok(entry: dict) -> bool:
+        headers = _req_headers(entry)
+        key = next((v for k, v in headers.items()
+                    if k.lower() == "sec-websocket-key"), "")
+        got = header_of(entry, "sec-websocket-accept")
+        if not key or not got:
+            return False
+        want = _b64.b64encode(_hashlib.sha1(
+            (str(key).strip() + _WS_GUID).encode()).digest()).decode()
+        return got.strip() == want
+
+    handshakes = [e for e in exchanges
+                  if status_of(e) == 101 and _accept_ok(e)]
+    checks.append(_check(
+        "the handshake completed the RFC 6455 challenge",
+        bool(handshakes),
+        f"101 with a valid accept token in {handshakes[0].get('id')}"
+        if handshakes else
+        ("no cited exchange is a 101 whose Sec-WebSocket-Accept is the SHA-1 "
+         "of the key it sent - a 101 without the challenge is middleware or "
+         "a mock, not a WebSocket endpoint")))
+
+    foreign, why = None, ""
+    for entry in handshakes:
+        origin = next((v for k, v in _req_headers(entry).items()
+                       if k.lower() == "origin"), "")
+        if not origin:
+            why = (f"{entry.get('id')} sent no Origin - a handshake with no "
+                   "Origin says nothing about whether a foreign page could "
+                   "make it")
+            continue
+        o_host = (urllib.parse.urlparse(str(origin)).hostname or "").lower()
+        t_host = (urllib.parse.urlparse(
+            str((entry.get("request") or {}).get("url") or "")).hostname
+            or "").lower()
+        if o_host and t_host and o_host != t_host:
+            foreign = (entry, origin)
+            break
+        why = (f"{entry.get('id')} sent Origin {origin} on a channel at "
+               f"{t_host} - a same-origin handshake is the endpoint working")
+    checks.append(_check(
+        "accepted from an origin the target does not own",
+        foreign is not None,
+        f"Origin {foreign[1]} accepted on {foreign[0].get('id')}"
+        if foreign else (why or "no handshake to check an Origin on")))
+
+    answered, detail = None, "no frame on record"
+    if foreign is not None:
+        shape = _endpoint_shape(foreign[0])
+        for entry in exchanges:
+            if _method_of(entry) != "WSFRAME":
+                continue
+            if _endpoint_shape(entry) != shape:
+                detail = (f"{entry.get('id')} is a frame on a different "
+                          "endpoint than the handshake")
+                continue
+            sent = str(((entry.get("request") or {}).get("body") or ""))
+            got = resp_body(entry)
+            back = [m.group(0) for m in NONCE_RE.finditer(sent)
+                    if m.group(0) in got]
+            if back:
+                answered = (entry, back[0])
+                break
+            detail = (f"{entry.get('id')} carries no probe nonce that its own "
+                      "frame sent - without one the answer cannot be tied to "
+                      "this channel")
+    checks.append(_check(
+        "the channel answered a message", answered is not None,
+        f"{answered[1]} sent and returned on {answered[0].get('id')}"
+        if answered else detail))
+    return checks
+
+
 _WRITE_METHODS = ("PUT", "DELETE", "PATCH")
 
 
@@ -2193,12 +2302,19 @@ for _s in [
               verify_no_throttle,
               floor=("a counted series of attempts is on record",),
               aliases=("no-rate-limit", "bruteforce", "no-lockout")),
-    ProofSpec("websocket", "a cross-origin handshake accepted and a message "
-              "answered - which needs a real WebSocket client. This system "
-              "compares the handshake only",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              cap_reason="unimplemented", aliases=("cswsh", "ws")),
+    ProofSpec("websocket", "a 101 whose accept token answers the key this "
+              "request sent, from an Origin the target does not own, and a "
+              "frame the channel answered carrying the probe nonce",
+              ("the handshake completed the RFC 6455 challenge",
+               "accepted from an origin the target does not own",
+               "the channel answered a message"),
+              verify_websocket_channel,
+              floor=("accepted from an origin the target does not own",
+                     "the channel answered a message"),
+              aliases=("cswsh", "ws"),
+              notes="Grades the channel being open cross-origin. Data taken "
+                    "over it is a different class and is graded as one.",
+              reflection_is_the_finding=True),
     ProofSpec("dos", "this system does not prove availability impact",
               (), verify_refused,
               refusal="Denial of service is out of scope by construction: the proof "

@@ -56,6 +56,8 @@ VULNERABLE = [
      lambda c, b: probes.probe_crlf(c, b + "/redirect?next=/", "next")),
     ("probe_upload", "upload", lambda c, b: probes.probe_upload(c, b + "/upload")),
     ("probe_cors", "cors", lambda c, b: probes.probe_cors(c, b + "/api/data")),
+    ("probe_websocket", "websocket",
+     lambda c, b: probes.probe_websocket(c, b + "/ws")),
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -76,6 +78,11 @@ CLEAN = [
     ("probe_nosqli", "nosqli",
      lambda c, b: probes.probe_nosqli(
          c, b + "/search?q=widget", '{"q":"widget"}', "q")),
+    # `/ws-strict` is the same endpoint with the Origin check in place: the
+    # probe's foreign Origin is refused before the upgrade, which is the
+    # defence working and must not grade
+    ("probe_websocket", "websocket",
+     lambda c, b: probes.probe_websocket(c, b + "/ws-strict")),
 ]
 # `cors` has no clean case here: the lab reflects any `Origin` with
 # credentials from the shared response helper, so every endpoint is
@@ -173,5 +180,6 @@ def test_both_directions_are_exercised_for_the_classes_that_have_both():
     vulnerable = {k for _, k, _ in VULNERABLE}
     clean = {k for _, k, _ in CLEAN}
     both = vulnerable & clean
-    assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect"} <= both, (
+    assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect",
+            "websocket"} <= both, (
         f"classes exercised in both directions: {sorted(both)}")

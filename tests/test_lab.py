@@ -302,9 +302,21 @@ def test_crlf_probe(lab_url, ctx):
 
 def test_websocket_probe(lab_url, ctx):
     out = probes.probe_websocket(ctx, lab_url + "/ws")
-    assert "confirmed" in out["verdict"]
-    out2 = probes.probe_websocket(ctx, lab_url + "/")
-    assert "no ws" in out2["verdict"]
+    # the class needs both halves, so assert both rather than the prose
+    assert out["accept_ok"] is True, out
+    assert out["answered"] is True, out
+    assert out["canary"] in out["reply"], out
+    assert out["handshake_id"] and out["message_id"], out
+    assert "hijacking" in out["verdict"], out
+
+    # the same endpoint WITH the Origin check: refused before the upgrade
+    strict = probes.probe_websocket(ctx, lab_url + "/ws-strict")
+    assert strict["accept_ok"] is False, strict
+    assert strict["status"] == 403, strict
+
+    plain = probes.probe_websocket(ctx, lab_url + "/")
+    assert plain["accept_ok"] is False, plain
+    assert plain["answered"] is False, plain
 
 
 def test_js_recon_finds_websocket(lab_url, ctx):

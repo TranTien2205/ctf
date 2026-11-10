@@ -470,10 +470,16 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_websocket",
-        "WebSocket discovery: RFC 6455 upgrade handshake. A 101 with "
-        "Upgrade: websocket confirms a live ws channel; further "
-        "message-level testing needs a ws client.",
-        {"url": {**_STR, "description": URL_DESC}},
+        "Cross-site WebSocket hijacking: completes an RFC 6455 handshake "
+        "carrying a FOREIGN Origin, then sends one masked text frame with a "
+        "probe nonce and reads the answer off the wire. A 101 followed by "
+        "silence is a handshake, not a hijackable channel - the frame is "
+        "what separates them, and the proof requirement needs both. Record "
+        "it citing the handshake AND the frame.",
+        {"url": {**_STR, "description": "ws:// or http:// endpoint URL"},
+         "message": {**_STR, "description": "Optional application-level "
+                                            "message; a nonce is prepended "
+                                            "either way"}},
         ["url"],
     ),
     _schema(

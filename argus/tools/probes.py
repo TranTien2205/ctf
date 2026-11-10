@@ -1856,46 +1856,59 @@ def probe_disclosure(ctx: Context, url: str) -> dict:
                     "quote it verbatim when recording"}
 
 
-def probe_websocket(ctx: Context, url: str) -> dict:
-    """WebSocket discovery: RFC 6455 upgrade handshake. A 101 with
-    Upgrade: websocket confirms a live ws channel - then test authz and
-    message-level controls manually (raw ws framing is out of httpx's
-    scope, so this probe stops at the handshake)."""
-    import base64
-    import os
-    key = base64.b64encode(os.urandom(16)).decode()
-    r = ctx.client.send(
-        "GET", url,
-        headers={"Upgrade": "websocket", "Connection": "Upgrade",
-                 "Sec-WebSocket-Key": key, "Sec-WebSocket-Version": "13"},
-        tool="probe_websocket", note="ws upgrade handshake")
-    hdrs = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
-    upgrade = str(hdrs.get("upgrade", "")).lower()
-    accept = hdrs.get("sec-websocket-accept", "")
-    if r["status"] == 101 and "websocket" in upgrade:
-        # verify the accept token: a broken server may 101 without
-        # completing the RFC 6455 challenge - worth noting either way
-        import hashlib
-        want = base64.b64encode(hashlib.sha1(
-            (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
-        ).digest()).decode()
-        if accept and accept != want:
-            verdict = ("websocket 101 received but Sec-WebSocket-Accept is "
-                       "WRONG - handshake not RFC-compliant; the endpoint "
-                       "may be a mock or middleware, probe manually")
-        else:
-            verdict = ("websocket endpoint confirmed (101 + valid accept) "
-                       "- channel is open; test per-message authorization "
-                       "and input handling with a ws client")
-    elif r["status"] in (400, 426):
-        verdict = f"upgrade refused (HTTP {r['status']}) - endpoint may not be ws"
-    elif r["status"] == 200:
-        verdict = ("no ws upgrade: plain 200 - endpoint ignores the "
-                   "handshake headers")
+def probe_websocket(ctx: Context, url: str, message: str = "") -> dict:
+    """Cross-site WebSocket hijacking: a foreign Origin, and a real frame.
+
+    This probe used to stop at the handshake, because httpx cannot frame.
+    `GuardedClient.send_ws` can, so it now does both halves the class needs:
+    a handshake carrying an Origin the target does not own, and one masked
+    text frame whose answer is read back off the wire.
+
+    A 101 followed by silence is a handshake, not a hijackable channel, and
+    the difference is the whole point - so the frame is not optional.
+    """
+    canary = _marker("argusws")
+    probe_origin = "https://argus-probe.invalid"
+    out = ctx.client.send_ws(url, message or f"{canary} argus-probe",
+                             origin=probe_origin, tool="probe_websocket",
+                             note="cross-origin ws handshake + one frame")
+    res = {"verdict": "", "canary": canary, "origin_sent": probe_origin,
+           "handshake_id": out.get("handshake_id", ""),
+           "message_id": out.get("message_id", ""),
+           "status": out.get("status", 0),
+           "accept_ok": bool(out.get("accept_ok")),
+           "answered": bool(out.get("answered")),
+           "reply": str(out.get("reply") or "")[:2000]}
+    if out.get("error"):
+        res["error"] = out["error"]
+    echoed = res["answered"] and canary in res["reply"]
+    if res["accept_ok"] and echoed:
+        res["verdict"] = (
+            "cross-site websocket hijacking: the handshake was accepted from "
+            f"{probe_origin} - an origin this target does not own - and the "
+            "channel answered a frame carrying our nonce. Any page can open "
+            "this socket in a victim's browser, with the victim's cookies. "
+            "Record it citing the handshake AND the frame")
+    elif res["accept_ok"] and res["answered"]:
+        res["verdict"] = (
+            "cross-origin handshake accepted and a frame came back, but it "
+            "carries no nonce we sent - the answer cannot be tied to this "
+            "channel. Re-send with a canary before recording")
+    elif res["accept_ok"]:
+        res["verdict"] = (
+            "cross-origin handshake accepted (101 + valid accept) but the "
+            "channel answered nothing - a handshake is not a hijackable "
+            "channel. Try an application-level message the endpoint expects")
+    elif res["status"] == 101:
+        res["verdict"] = (
+            "101 received but Sec-WebSocket-Accept does not answer the key "
+            "we sent - middleware or a mock, not a WebSocket endpoint")
+    elif res["status"] in (400, 403, 426):
+        res["verdict"] = (
+            f"upgrade refused (HTTP {res['status']}) - either not a ws "
+            "endpoint, or the Origin check this class is about is working")
     else:
-        verdict = f"no ws signal (HTTP {r['status']})"
-    out = {"verdict": verdict, "request_id": r["request_id"],
-           "status": r["status"]}
-    if accept:
-        out["accept_token"] = accept
-    return out
+        res["verdict"] = f"no ws signal (HTTP {res['status']})"
+    return res
+
+

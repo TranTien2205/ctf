@@ -41,7 +41,8 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     POST /desync, /desync-cl, /desync-obf, /desync-none
                                request smuggling sims: CL.TE, TE.CL,
                                obfuscated-TE differential, agreed framing
-    GET  /ws                   websocket handshake (101)
+    GET  /ws                   websocket: 101, NO Origin check, echoes a frame
+    GET  /ws-strict            the same with the Origin check in place (403)
 
 Run:  python lab/vulnapp.py [port]
 """
@@ -134,6 +135,64 @@ class Handler(BaseHTTPRequestHandler):
             super().finish()
 
     # -- helpers ---------------------------------------------------------
+    _WS_MAX_FRAME = 4096
+
+    def _ws_echo_once(self) -> None:
+        """Read one masked client frame and echo its payload back.
+
+        Enough to make the channel provable and no more: one frame, bounded,
+        then a close. A lab that only completes the handshake cannot show
+        that the channel answers, which is the half of the finding that
+        matters - an endpoint that 101s and then says nothing is not a
+        hijackable channel.
+        """
+        import struct
+        sock = self.connection
+        try:
+            sock.settimeout(3.0)
+            head = sock.recv(2)
+            if len(head) < 2:
+                return
+            opcode = head[0] & 0x0F
+            masked = bool(head[1] & 0x80)
+            length = head[1] & 0x7F
+            if length == 126:
+                length = struct.unpack(">H", sock.recv(2))[0]
+            elif length == 127:
+                length = struct.unpack(">Q", sock.recv(8))[0]
+            if length > self._WS_MAX_FRAME:
+                return
+            mask = sock.recv(4) if masked else b""
+            payload = b""
+            while len(payload) < length:
+                chunk = sock.recv(length - len(payload))
+                if not chunk:
+                    break
+                payload += chunk
+            if masked and mask:
+                payload = bytes(b ^ mask[i % 4]
+                                for i, b in enumerate(payload))
+            if opcode == 0x8:                      # client said close
+                sock.sendall(b"\x88\x00")
+                return
+            body = b"echo: " + payload[:self._WS_MAX_FRAME]
+            frame = bytearray([0x81])              # FIN + text, unmasked
+            if len(body) < 126:
+                frame.append(len(body))
+            else:
+                frame.append(126)
+                frame += struct.pack(">H", len(body))
+            frame += body
+            sock.sendall(bytes(frame))
+            sock.sendall(b"\x88\x00")             # and close politely
+        except (OSError, struct.error, IndexError):
+            return
+        finally:
+            try:
+                sock.settimeout(None)
+            except OSError:
+                pass
+
     def _send(self, status=200, body="", ctype="text/html; charset=utf-8",
               headers=None):
         data = body.encode() if isinstance(body, str) else body
@@ -452,8 +511,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(body="DB_HOST=db.internal\nDB_PASSWORD=hunter2\n"
                             "SECRET_KEY=lab-secret-0123\n", ctype="text/plain")
 
-        elif path == "/ws":
-            # RFC 6455 handshake: a live ws endpoint answers 101 + Accept
+        elif path == "/ws-strict":
+            # the same endpoint with the check in place: a foreign Origin is
+            # refused before the upgrade. Present so the probe and the gate
+            # can both be shown refusing a channel that is not hijackable.
+            origin = self.headers.get("Origin", "")
+            host = self.headers.get("Host", "")
+            o_host = origin.split("//", 1)[-1].split("/", 1)[0] if origin \
+                else ""
+            if origin and o_host != host:
+                self._send(403, body="origin not allowed")
+                return
             key = self.headers.get("Sec-WebSocket-Key", "")
             accept = base64.b64encode(hashlib.sha1(
                 (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
@@ -463,6 +531,23 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "Upgrade")
             self.send_header("Sec-WebSocket-Accept", accept)
             self.end_headers()
+            self._ws_echo_once()
+
+        elif path == "/ws":
+            # RFC 6455 handshake: a live ws endpoint answers 101 + Accept
+            key = self.headers.get("Sec-WebSocket-Key", "")
+            accept = base64.b64encode(hashlib.sha1(
+                (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
+            ).digest()).decode()
+            # Deliberately broken: no Origin check at all. That is the bug -
+            # any page on the internet can open this channel in the victim's
+            # browser, with the victim's cookies, and read the answers.
+            self.send_response(101, "Switching Protocols")
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", accept)
+            self.end_headers()
+            self._ws_echo_once()
 
         elif path == "/static/app.js":
             self._send(body="""fetch('/api/user/1').then(r=>r.json());

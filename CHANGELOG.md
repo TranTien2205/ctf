@@ -161,9 +161,9 @@ system. All notable milestones on `agent-v2`.
   `application/octet-stream`, `image/png`, none at all), an active type served
   as an attachment, a 404 on the stored path, a fetch of somebody else's file,
   and an ordinary HTML page with no upload in evidence.
-- **The count, stated once.** `websocket` and `smuggle` remain capped at
-  `candidate` for want of a verifier - two, down from six: `lockout`, `enum`,
-  `crlf`, `upload`, `method` and `race` came off that list. `xss` (no browser
+- **The count, stated once.** `smuggle` alone remains capped at `candidate`
+  for want of a verifier - one, down from six: `lockout`, `enum`, `crlf`,
+  `upload`, `method`, `race` and `websocket` came off that list. `xss` (no browser
   ships here) and `ssrf` (no out-of-band collector) are capped for reasons
   that are not labour, and `dos` is refused by construction; those three will
   not move. The count used to be restated in three places written at three
@@ -171,6 +171,34 @@ system. All notable milestones on `agent-v2`.
   `test_the_capped_set_is_exactly_what_the_docs_claim` now asserts the set
   against the matrix - a doc gate cannot read prose, but a test can hold the
   claim it makes.
+
+### websocket: the package has a WebSocket client now
+- The cap read "needs a real WebSocket client. This system compares the
+  handshake only" - a missing capability, not a missing proof.
+  `GuardedClient.send_ws` is that client: one masked text frame out, one
+  frame in, close. It is the third socket-owning path here, because after a
+  101 the connection stops speaking HTTP and `http.client.HTTPResponse`
+  cannot read a frame - and it goes through the same guards as the other two
+  (scope check with the connect-time rebinding re-check, rate limiter,
+  request budget, recorded exchanges). No fragmentation, no binary, no
+  second message.
+- `verify_websocket_channel` checks three things, each ruling out a different
+  wrong conclusion: the 101 answers the key the request sent (recomputed from
+  the record, because middleware that 101s without the RFC 6455 challenge is
+  not a WebSocket endpoint); the Origin is one the target does not own (a
+  same-origin handshake succeeding is the endpoint working as designed); and
+  the channel answered a frame carrying a nonce that frame sent (a 101
+  followed by silence is a handshake, not a hijackable channel).
+- `probe_websocket` sends a foreign Origin and a nonce frame, and reports
+  `accept_ok`, `answered`, `canary`, `reply` and both request ids. It no
+  longer tells the operator to "test message-level controls manually".
+- The lab grew `/ws`, which echoes one frame and checks no Origin, and
+  `/ws-strict`, the same endpoint with the check in place. Both directions are
+  exercised against a real server, not only a fixture: seven synthetic cases
+  plus the live pair in `test_probe_matrix_agreement.py`.
+- What it does **not** claim, and the requirement does not either: that the
+  answer contained anything the caller should not reach. Data taken over the
+  channel is a different class and is graded as one.
 
 ### The reason a class is capped is data now, not prose
 - `ProofSpec.cap_reason` holds why a ceiling is there: `"unimplemented"` means
@@ -192,10 +220,16 @@ system. All notable milestones on `agent-v2`.
   sentence also names the classes that came off the list, so that is prose,
   and a gate that guesses at prose is worse than one that says what it cannot
   check.
+- The count check had a bug of its own, found the moment the count reached
+  one: its regex said `classes?`, which is `classe` plus an optional `s` and
+  never matches the singular. A gate that silently matches nothing reports
+  "docs say nothing" rather than passing, which is why it surfaced at all -
+  the earlier fix that made count checks fail on no match instead of passing
+  on nothing is what caught it.
 - Two tests hold the code side: a ceiling without a reason is undocumented, a
   reason without a ceiling is a leftover from a freed class, and the
   `unimplemented` set is exactly the `verify_generic` set minus `ssrf`.
-- Standing: `websocket` and `smuggle` capped for want of a verifier; `ssrf`
+- Standing: `smuggle` capped for want of a verifier; `ssrf`
   (no out-of-band collector) and `xss` (no browser) capped for real reasons;
   `dos` refused by construction. `lockout`, `enum`, `crlf`, `upload`, `method`
   and `race` have come off.
@@ -444,12 +478,12 @@ system. All notable milestones on `agent-v2`.
   per-server errors instead of crashing startup.
 
 ### Verification & packaging
-- `python selftest.py`: 137 offline checks, including a documentation
+- `python selftest.py`: 139 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 476 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 484 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +

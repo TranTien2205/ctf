@@ -414,6 +414,219 @@ class GuardedClient:
             out["error"] = error
         return out
 
+    _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+    _WS_MAX_FRAME = 16384
+
+    def send_ws(
+        self,
+        url: str,
+        message: str,
+        origin: str = "",
+        tool: str = "probe_websocket",
+        note: str = "",
+    ) -> dict:
+        """One WebSocket handshake and one framed message, on one socket.
+
+        `send_raw` cannot do this: after a 101 the connection stops speaking
+        HTTP, and `http.client.HTTPResponse` has no way to read a frame. So
+        this is the third socket-owning path in the package, and it goes
+        through the same guards as the other two - scope check with the
+        rebinding re-check at connect time, the rate limiter, the request
+        budget, and two recorded exchanges.
+
+        Deliberately minimal: masked text frame out, one frame in, close.
+        No fragmentation, no binary, no continuation, no second message. The
+        proof this supports is "the channel accepted a cross-origin
+        handshake and answered a message", and nothing here needs more than
+        one frame to show that.
+        """
+        import base64
+        import hashlib
+        import http.client
+        import os as _os
+        import struct
+
+        parsed = self.scope.check(url)
+        path = parsed.path or "/"
+        if parsed.query:
+            path += "?" + parsed.query
+        host_port = f"{parsed.hostname}:{parsed.port}" if parsed.port \
+            else parsed.hostname
+        port = parsed.port or (443 if parsed.scheme in ("https", "wss")
+                               else 80)
+        key = base64.b64encode(_os.urandom(16)).decode()
+        want = base64.b64encode(hashlib.sha1(
+            (key + self._WS_GUID).encode()).digest()).decode()
+
+        if parsed.scheme in ("https", "wss"):
+            import ssl
+            sctx = ssl.create_default_context()
+            if not self._tls_verify:
+                sctx.check_hostname = False
+                sctx.verify_mode = ssl.CERT_NONE
+            conn: http.client.HTTPConnection = http.client.HTTPSConnection(
+                parsed.hostname, port, timeout=15, context=sctx)
+        else:
+            conn = http.client.HTTPConnection(parsed.hostname, port,
+                                              timeout=15)
+        out: dict = {"handshake_id": "", "message_id": "", "accept_ok": False,
+                     "answered": False, "reply": "", "status": 0}
+        try:
+            conn.connect()
+            if not self.scope.allow_private and conn.sock is not None:
+                try:
+                    peer_ip = _ipaddress.ip_address(
+                        conn.sock.getpeername()[0])
+                except (ValueError, TypeError, OSError):
+                    peer_ip = None
+                if peer_ip is not None and _ip_private(peer_ip):
+                    conn.close()
+                    raise ScopeError(
+                        f"connection to {parsed.hostname} resolved to "
+                        f"private address {peer_ip} at connect time "
+                        f"(DNS rebinding protection)")
+            lines = [f"GET {path} HTTP/1.1", f"Host: {host_port}",
+                     "Upgrade: websocket", "Connection: Upgrade",
+                     f"Sec-WebSocket-Key: {key}",
+                     "Sec-WebSocket-Version: 13"]
+            if origin:
+                lines.append(f"Origin: {origin}")
+            emitted = {"host", "connection", "upgrade", "origin",
+                       "sec-websocket-key", "sec-websocket-version"}
+            for k, v in self._default_headers.items():
+                if k.lower() in emitted:
+                    continue
+                emitted.add(k.lower())
+                lines.append(f"{k}: {v}")
+            if "user-agent" not in emitted:
+                lines.append("User-Agent: argus-ws/1.0")
+            raw = ("\r\n".join(lines) + "\r\n\r\n").encode()
+
+            self.rate.wait()
+            with self._sent_lock:
+                if self.sent >= self.max_requests:
+                    raise RequestBudgetExhausted(
+                        f"request budget exhausted ({self.max_requests}); "
+                        "call finish")
+                self.sent += 1
+            started = time.monotonic()
+            conn.sock.sendall(raw)
+            resp = http.client.HTTPResponse(conn.sock, method="GET")
+            resp.begin()
+            headers = dict(resp.getheaders())
+            out["status"] = resp.status
+            lower = {k.lower(): v for k, v in headers.items()}
+            accept = str(lower.get("sec-websocket-accept") or "")
+            out["accept_ok"] = (resp.status == 101
+                                and "websocket" in str(
+                                    lower.get("upgrade") or "").lower()
+                                and accept == want)
+            out["handshake_id"] = self.session.record_exchange(
+                tool=tool,
+                request={"method": "GET", "url": url,
+                         "headers": _redact_headers(
+                             {l.split(": ", 1)[0]: l.split(": ", 1)[1]
+                              for l in lines[1:]}, self._secret_values),
+                         "request_text": "\r\n".join(lines)},
+                response={"status": resp.status, "headers": headers,
+                          "body": "",
+                          "elapsed_ms": round(
+                              (time.monotonic() - started) * 1000, 1)},
+                note=note or "websocket upgrade handshake",
+                agent=self.agent)
+            if not out["accept_ok"]:
+                return out
+
+            # masked text frame, as RFC 6455 requires of a client
+            payload = message.encode()[:self._WS_MAX_FRAME]
+            mask = _os.urandom(4)
+            frame = bytearray([0x81])
+            if len(payload) < 126:
+                frame.append(0x80 | len(payload))
+            elif len(payload) < 1 << 16:
+                frame.append(0x80 | 126)
+                frame += struct.pack(">H", len(payload))
+            else:
+                frame.append(0x80 | 127)
+                frame += struct.pack(">Q", len(payload))
+            frame += mask
+            frame += bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+
+            self.rate.wait()
+            with self._sent_lock:
+                if self.sent >= self.max_requests:
+                    raise RequestBudgetExhausted(
+                        f"request budget exhausted ({self.max_requests}); "
+                        "call finish")
+                self.sent += 1
+            started = time.monotonic()
+            conn.sock.settimeout(5.0)
+            conn.sock.sendall(bytes(frame))
+            reply, error = self._ws_read_frame(conn.sock), None
+        except (http.client.HTTPException, OSError, TimeoutError,
+                struct.error) as exc:
+            reply, error = "", f"{type(exc).__name__}: {exc}"
+            if not out["handshake_id"]:
+                out["error"] = error
+                return out
+        finally:
+            try:
+                conn.sock.sendall(b"\x88\x00")   # close frame, best effort
+            except (OSError, AttributeError):
+                pass
+            conn.close()
+        out["answered"] = bool(reply)
+        out["reply"] = reply[:self._WS_MAX_FRAME]
+        out["message_id"] = self.session.record_exchange(
+            tool=tool,
+            request={"method": "WSFRAME", "url": url,
+                     "headers": {}, "body": message},
+            response={"status": 101 if reply else 0, "headers": {},
+                      "body": reply,
+                      "elapsed_ms": round(
+                          (time.monotonic() - started) * 1000, 1)},
+            note=note or "websocket text frame",
+            agent=self.agent)
+        if error:
+            out["error"] = error
+        return out
+
+    def _ws_read_frame(self, sock) -> str:
+        """One server frame's text payload, bounded. Server frames are
+        never masked, so a masked one is a protocol violation and is read
+        as no answer rather than silently unmasked."""
+        import struct
+
+        def _exact(n: int) -> bytes:
+            buf = b""
+            while len(buf) < n:
+                chunk = sock.recv(n - len(buf))
+                if not chunk:
+                    return buf
+                buf += chunk
+            return buf
+
+        head = _exact(2)
+        if len(head) < 2:
+            return ""
+        opcode = head[0] & 0x0F
+        if head[1] & 0x80:
+            return ""                      # masked server frame: invalid
+        length = head[1] & 0x7F
+        if length == 126:
+            raw = _exact(2)
+            if len(raw) < 2:
+                return ""
+            length = struct.unpack(">H", raw)[0]
+        elif length == 127:
+            raw = _exact(8)
+            if len(raw) < 8:
+                return ""
+            length = struct.unpack(">Q", raw)[0]
+        if opcode in (0x8, 0x9, 0xA) or length > self._WS_MAX_FRAME:
+            return ""                      # close/ping/pong is not an answer
+        return _exact(length).decode("utf-8", "replace")
+
     def send_raw(
         self,
         url: str,

@@ -356,15 +356,30 @@ as the budget unit, so five probes spread over five endpoints never trigger
 `park_and_switch`. Neither is a soundness problem - it never claims a proof -
 but both are reasons the ladder is advice and not a plan.
 
-**Two classes are capped at `candidate` and the cap is a missing
-implementation, not a law of nature.** `websocket` would be settled by a real
-client; `smuggle` by the desync response on the wire. Both are checkable from
-what the transcript already records, and both need a verifier written.
-`lockout`, `enum`, `crlf`, `method`, `upload` and `race` were in this list and
-came out of it - the pattern works, the rest is labour.
+**One class is capped at `candidate` and the cap is a missing
+implementation, not a law of nature.** `smuggle` would be settled by the
+desync response on the wire. It is checkable from what the transcript already
+records, and it needs a verifier written. `lockout`, `enum`, `crlf`, `method`,
+`upload`, `race` and `websocket` were in this list and came out of it - the
+pattern works, the rest is labour.
 Until then the requirement sentence says what would settle the class, and
 `tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code so
 the list cannot grow in silence.
+
+`websocket` is the one that needed a real capability rather than a reading:
+`GuardedClient.send_ws` is a third socket-owning path in the package, because
+after a 101 the connection stops speaking HTTP and `http.client.HTTPResponse`
+has no way to read a frame. It goes through the same guards as the other two -
+scope check with the connect-time rebinding re-check, rate limiter, request
+budget, two recorded exchanges - and does exactly one masked text frame out,
+one frame in, close. No fragmentation, no binary, no second message: the proof
+is "the channel accepted a cross-origin handshake and answered", and one frame
+shows that. The verifier recomputes `Sec-WebSocket-Accept` from the key the
+request sent, because a middleware that answers 101 without completing the
+challenge is not a WebSocket endpoint and the record is the only place to tell
+from. The lab grew a `/ws-strict` route - the same endpoint with the Origin
+check in place - so the refusing direction is exercised against a real server
+rather than only a fixture.
 
 `crlf`, `method`, `upload` and `race` are the worked examples of what coming
 off that list costs, and all four followed the same shape: the note described the

@@ -335,7 +335,13 @@ def main() -> int:
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
     out = probes.probe_websocket(ctx, base + "/ws")
-    check("websocket probe confirms upgrade", "confirmed" in out["verdict"])
+    check("websocket probe completes the cross-origin handshake",
+          out["accept_ok"] and bool(out["handshake_id"]))
+    check("websocket probe gets a frame back carrying its nonce",
+          out["answered"] and out["canary"] in out["reply"])
+    out = probes.probe_websocket(ctx, base + "/ws-strict")
+    check("websocket probe is refused where Origin is checked",
+          not out["accept_ok"] and out["status"] == 403)
     out = probes.probe_method(ctx, base + "/")
     check("method probe sees TRACE echo",
           out.get("trace_attempt", {}).get("echoes") is True)
@@ -796,7 +802,7 @@ def _doc_consistency() -> None:
     stated = set()
     for text in texts.values():
         for word in _re.findall(
-                r"(?i)\*\*([A-Za-z]+) classes? (?:are|is) capped at "
+                r"(?i)\*\*([A-Za-z]+) class(?:es)? (?:are|is) capped at "
                 r"`candidate`", text):
             if word.lower() in _WORDS:
                 stated.add(_WORDS[word.lower()])

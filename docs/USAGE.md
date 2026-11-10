@@ -165,7 +165,7 @@ verbatim evidence from a cited response.
 | Prototype pollution | `probe_ppoll` | `__proto__` + `constructor.prototype` carriers, cross-object read |
 | Request smuggling | `probe_smuggle` | CL.TE + TE.CL + obfuscated-TE raw sends; 'G'/'GPOST' poison own next request only |
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
-| WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101 + accept check) |
+| WebSocket | `probe_websocket` | cross-origin RFC 6455 handshake (101 + accept recomputed) **and** one masked text frame, read back off the wire |
 | CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
 | User enumeration | `probe_enum` | bogus vs real usernames - error text/status + timing differential |
 | Login rate-limit | `probe_lockout` | bounded bad-cred burst: 429/lockout text/latency = throttled |
