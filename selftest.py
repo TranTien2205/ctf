@@ -297,15 +297,16 @@ def main() -> int:
     # loaded runner serialises the burst - all three Windows CI jobs failed
     # this way once. The probe reports which happened, so check that it
     # reported honestly rather than that the machine cooperated.
-    if out["overlapped"]:
-        check("race probe multi-redeems", out["verdict"].startswith("race:"))
+    if out["verdict"].startswith("race:"):
+        check("race probe multi-redeems", out["overlapped"] is True)
         check("race probe records the serial refusal",
               bool(out["serial_statuses"])
               and all(s >= 400 for s in out["serial_statuses"]))
     else:
-        check("race probe says so when the burst was serialized",
-              "inconclusive" in out["verdict"] or "no race" in out["verdict"],
-              out["verdict"][:90])
+        check("race probe says so when it saw no race",
+              "inconclusive" in out["verdict"]
+              or "no race window" in out["verdict"]
+              or "repeatable" in out["verdict"], out["verdict"][:90])
         check("race probe reports the burst timing either way",
               isinstance(out.get("burst_seconds"), (int, float)))
     out = probes.probe_race(ctx, base + "/hello", n=6)

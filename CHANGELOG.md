@@ -289,15 +289,20 @@ caught on a platform this machine cannot run. The probe now reports the
 gate's own reconstruction and keeps the wall-clock figure beside it as
 `wall_clock_overlap`, a measurement rather than a verdict.
 
-The second one CI found: three live `race` assertions required the burst to
-have actually overlapped on the wire, and all three Windows jobs failed while
-every Ubuntu job passed. The verifier was right to refuse - a burst the server
-serialised cannot evidence a race, and `probe_race` says so itself with
-`overlapped: false` and an "inconclusive" verdict. Asserting that a
-timing-dependent probe always proves is asserting something the probe does not
-claim, so those three now check that it reported honestly rather than that the
-machine cooperated. The unconditional assertions for the class are synthetic
-and live in `tests/test_proof.py`, where no clock is involved.
+The second one CI found over three rounds, and the end of it is a decision
+rather than a fix: **`race` has no live proving case any more.** Three
+Windows jobs failed because the burst was serialised; after the first fix they
+failed because the windows intersected while only ONE request got past the
+guard; after the second, because the agreement case had become a test of the
+host's scheduler. Whether eight threads overlap on a loaded runner is a fact
+about the machine, not about the probe or the gate.
+
+So the class keeps its CLEAN live entry, which is deterministic, and its
+unconditional both-direction assertions are synthetic: three overlapping wins
+plus a 409 naming the action spent proves; a 404, a 302, a 500, a 429 or a 409
+carrying the burst's own body do not. That is the whole requirement, asserted
+without a clock. The table says so in place, so the case is not re-added by
+somebody reading only the list.
 
 ### smuggle: the last class capped for want of a verifier
 - The note read "this system sends the desync pair and reads the difference,
@@ -637,7 +642,7 @@ and live in `tests/test_proof.py`, where no clock is involved.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 510 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 509 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +

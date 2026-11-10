@@ -26,6 +26,11 @@ this asserts against evidence:
 * **CLEAN** - the same probe against an endpoint without the bug must NOT
   reach `proven`. This is the direction that matters: it is the one that fails
   when a verifier is too loose rather than when a probe is too thin.
+
+One class is absent from the proving direction on purpose. `race` is evidenced
+by wall-clock concurrency, so whether it can be proven here is a fact about
+the host's scheduler; see the note on the tables below. Its unconditional
+assertions are synthetic.
 """
 from __future__ import annotations
 
@@ -67,33 +72,22 @@ VULNERABLE = [
     ("probe_lockout", "lockout",
      lambda c, b: probes.probe_lockout(c, b + "/login2",
                                        "username=x&password=x")),
-    # `/redeem` holds ONE coupon in a class variable shared by every test on
-    # the session-scoped server, so reset it first or there is nothing to race
-    ("probe_race", "race", lambda c, b: _race_or_skip(c, b)),
+    # `race` is deliberately NOT here in the proving direction. Its evidence
+    # is wall-clock concurrency, and whether eight threads actually overlap
+    # on a loaded runner is a property of the host, not of the probe or the
+    # gate: three rounds of Windows CI failures came from it, first because
+    # the burst was serialised, then because the windows intersected while
+    # only ONE request got past the guard. Two conditional skips later the
+    # case was testing the scheduler.
+    #
+    # It keeps its CLEAN entry below, which is deterministic, and its
+    # unconditional both-direction assertions are synthetic in
+    # `tests/test_proof.py` - where three overlapping wins plus a 409 naming
+    # the action spent proves, and a 404, a 302, a 500, a 429 or a 409
+    # carrying the burst's own body do not. That is the whole requirement,
+    # asserted without a clock. If you re-add a live proving case here,
+    # expect it to fail on somebody else's machine.
 ]
-
-
-def _race_or_skip(ctx, base):
-    """Drive the race probe, and skip if the environment serialised it.
-
-    This is the one case here whose evidence depends on wall-clock
-    concurrency, and on a loaded CI runner the burst does not always overlap -
-    all three Windows jobs failed this way while Ubuntu passed. The verifier
-    is RIGHT to refuse then: a burst the server serialised cannot evidence a
-    race, and `probe_race` says so itself with `overlapped: false` and an
-    "inconclusive" verdict. Asserting that a timing-dependent probe always
-    proves would be asserting something the probe does not claim, so the
-    honest test is conditional on the probe having actually overlapped. The
-    unconditional assertions for this class are synthetic, in
-    `tests/test_proof.py`.
-    """
-    ctx.client.send("GET", base + "/redeem/reset", tool="http_request",
-                    note="reset the coupon")
-    out = probes.probe_race(ctx, base + "/redeem", n=8)
-    if not out.get("overlapped"):
-        pytest.skip(f"the burst did not overlap here, so there is no race to "
-                    f"grade: {out.get('verdict', '')[:90]}")
-    return out
 
 # The same probes where the lab has no such bug. `proven` here would be the
 # verifier accepting something it should refuse.
@@ -228,5 +222,5 @@ def test_both_directions_are_exercised_for_the_classes_that_have_both():
     clean = {k for _, k, _ in CLEAN}
     both = vulnerable & clean
     assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect",
-            "websocket", "smuggle", "nosqli", "lockout", "race"} <= both, (
+            "websocket", "smuggle", "nosqli", "lockout"} <= both, (
         f"classes exercised in both directions: {sorted(both)}")

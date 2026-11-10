@@ -212,12 +212,16 @@ def test_race_probe(lab_url, ctx):
     # reports which happened, so assert that it reported honestly rather than
     # that the machine cooperated. The gate reconstructs the overlap from
     # ts + elapsed_ms either way.
-    if out["overlapped"]:
-        assert out["verdict"].startswith("race:"), out
+    if out["verdict"].startswith("race:"):
+        assert out["overlapped"] is True, out
         assert out["serial_statuses"] and all(
             s >= 400 for s in out["serial_statuses"]), out
     else:
-        assert "inconclusive" in out["verdict"], out
+        # intersecting windows with only ONE winner is the action working
+        # once, which is a different outcome than a serialised burst
+        assert ("inconclusive" in out["verdict"]
+                or "no race window" in out["verdict"]
+                or "repeatable" in out["verdict"]), out
     assert isinstance(out["burst_seconds"], (int, float)), out
     # serial baseline disambiguates: a repeatable endpoint is not a race
     out2 = probes.probe_race(ctx, lab_url + "/hello", n=6)

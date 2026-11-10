@@ -97,12 +97,14 @@ family — if you change a probe, update the lab and its test together.
   A probe must not claim what the gate will deny, so the probe now reports
   the gate's own reconstruction and keeps the wall-clock figure beside it as
   a measurement rather than a verdict.
-- **A live assertion must not require the clock to cooperate.** Three `race`
-  assertions demanded that an 8-request burst actually overlapped on the wire;
-  all three Windows CI jobs failed while every Ubuntu job passed. The gate was
-  right - a burst the server serialised cannot evidence a race - and the probe
-  reports which happened. Assert that it reported honestly, and put the
-  unconditional version in `tests/test_proof.py` where no clock is involved.
+- **A live assertion must not require the clock to cooperate.** `race` is
+  evidenced by wall-clock concurrency, so whether it can be proven against the
+  lab is a fact about the host's scheduler. Three rounds of Windows CI
+  failures and two conditional skips later, the live proving case was deleted:
+  the class keeps its deterministic CLEAN entry in
+  `tests/test_probe_matrix_agreement.py` and asserts both directions
+  synthetically in `tests/test_proof.py`. Put a timing-dependent assertion
+  where no clock is involved, or do not make it.
 - **Assert a probe's structured output, never its verdict prose.** Six
   assertions broke at once when three classes came off the capped list,
   because they matched the word "candidate" in a verdict sentence - and a
