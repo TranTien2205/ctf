@@ -333,6 +333,14 @@ put to three independent skeptics - produced the fixes recorded in
 written down so it is a decision rather than an omission. `argus proof <class>`
 prints each class's own version of this.
 
+**`upload` separates the file from a page about it proportionally, which is a
+heuristic.** "The nonce came back" cannot tell a stored file from an "Upload
+complete - saved `<your svg>`" page, and the only thing available is how much
+of the response the uploaded bytes actually are. A confirmation page where the
+echoed file is more than half the body still passes. The alternative - trusting
+the nonce alone - graded `proven` against apps that stored nothing, so this is
+the better of two imperfect tests, not an exact one.
+
 **A judge is one call and one opinion.** There is no panel, no majority, and
 no second round: a single model from one other family reads each finding once.
 That is enough to catch a misfiled class or an indefensible severity and not
@@ -348,22 +356,69 @@ as the budget unit, so five probes spread over five endpoints never trigger
 `park_and_switch`. Neither is a soundness problem - it never claims a proof -
 but both are reasons the ladder is advice and not a plan.
 
-**Six classes are capped at `candidate` and the cap is a missing
-implementation, not a law of nature.** `crlf` is decided on bodies while the
-artifact is a response header; `method` would be settled by a TRACE echo or a
-PUT that lands; `upload` by the served content-type; `websocket` by a real
-client; `smuggle` by the desync response on the wire; `race` by a serial
-control. Each is checkable from what the transcript already records, and each
-needs a verifier written. `lockout` and `enum` were in this list and came out
-of it - the pattern works, the rest is labour. Until then the requirement
-sentence says what would settle the class, and
+**Two classes are capped at `candidate` and the cap is a missing
+implementation, not a law of nature.** `websocket` would be settled by a real
+client; `smuggle` by the desync response on the wire. Both are checkable from
+what the transcript already records, and both need a verifier written.
+`lockout`, `enum`, `crlf`, `method`, `upload` and `race` were in this list and
+came out of it - the pattern works, the rest is labour.
+Until then the requirement sentence says what would settle the class, and
 `tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code so
 the list cannot grow in silence.
 
-**`xss`, client-side `ppoll` and `ssrf` are capped for a real reason.** The
-first two need a browser and the third needs an out-of-band collector; this
-system has neither. Driving one over `mcp_call` is the path, and nothing here
-does it yet.
+`crlf`, `method`, `upload` and `race` are the worked examples of what coming
+off that list costs, and all four followed the same shape: the note described the
+verifier, not the evidence, and the evidence was already in the transcript.
+In each case fixing the verifier also exposed a defect in the probe, which is
+the pattern worth noticing - a class nobody could prove is a class whose probe
+nobody had to get right.
+
+`method` read "a status difference is not an effect" - true, and `probe_method`
+was already recording both effects this class can have. A **write that
+landed** is a `PUT` answered 2xx plus a later `GET` of the same path returning
+the bytes the PUT carried; the status alone proves nothing, because an endpoint
+can answer 201 and discard the body. **TRACE enabled** is a `TRACE` answered
+with a value in the body that was only ever in the request's headers - that is
+cross-site tracing, and it hands HttpOnly cookies to a reading XSS. Fixing the
+verifier also exposed a defect in the probe: `put_verified` looked for the
+canary *filename* in the GET response, while the bytes written were a fixed
+string, so a server that stored the file correctly returned something the
+check could not recognise and a working PUT read as unverified.
+
+`upload` read "serving is not executing" - true, and the requirement sentence
+already dealt with execution by saying it is an rce finding graded as one.
+What was left was what this evidence does settle: a file served back with its
+bytes intact **and** a content-type that makes those bytes script. The
+content-type is the entire discriminator and it was the one thing nothing
+checked - the same `.svg` is inert as `text/plain` and runs in the uploader's
+origin as `image/svg+xml`, and a `Content-Disposition: attachment` neutralises
+it again. `probe_upload` was calling a `.svg` served as `text/plain` an upload
+candidate, which conflated "an active file type was stored" with "it is served
+as something a browser runs"; it now records the served content-type and
+disposition, because nothing downstream can recover them.
+
+`crlf` was the first of the three. The old note
+read "this system compares bodies, so it stops at a candidate" - which was
+true of the verifier it had, and the wrong place to stop, because the
+transcript records response headers as a dict. The proof is now a header the
+request asked for, present in the response and **absent from a control to the
+same endpoint**. That third check is what makes it a proof: a server that
+always sends `X-Cache: MISS` would otherwise satisfy the second one for a
+payload that happened to name `X-Cache`. `probe_crlf` now sends the control
+first, because the requirement is unanswerable without it.
+
+**`xss` and `ssrf` are capped for a real reason.** The first needs a browser to
+execute the payload and the second needs an out-of-band collector the target
+can reach; this system has neither. (`ppoll` was listed here and should not
+have been: it is **not** capped. Its server-side half - a property only the
+polluting request sent, read back by a request that did not send it - is
+provable from the transcript and `verify_unkeyed_input` proves it. Only the
+client-side variant is out of reach, and that is not a separate class.) Driving one over `mcp_call` is the path, and nothing here
+does it yet. `ssrf` sits on `verify_generic` alongside the two above, which
+makes it look like the same situation in the code and is not;
+`test_the_capped_set_is_exactly_what_the_docs_claim` holds the distinction, so
+this paragraph and the matrix cannot drift apart. `xss` has a real verifier -
+its cap is only the missing browser.
 
 **`probe_csrf` cannot produce evidence its own class accepts, by design.** The
 proof needs a state-changing write, and the probe is read-only. The agent

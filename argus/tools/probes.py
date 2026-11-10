@@ -329,6 +329,7 @@ _CMDI_SEPARATORS = [
 from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
 from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
 from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
+from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
 
 
 def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
@@ -567,6 +568,15 @@ def probe_redirect(ctx: Context, url: str, param: str,
     'starts with /' filters), backslash, userinfo host@, and suffix-
     confusion host.example.org (passes 'contains our host' filters)."""
     host = urllib.parse.urlparse(url).netloc
+    # An in-origin control comes first and is not optional. The requirement
+    # for this class is "a Location off origin, WITH the in-origin control
+    # showing the destination parameter is honoured" - without it the
+    # evidence stops at `candidate`, because a 302 to example.org could be
+    # the app's own behaviour rather than something the parameter caused.
+    ctl = _send(ctx, url, param, "/argus-control", method, data,
+                "probe_redirect", "in-origin control")
+    control = {"request_id": ctl["request_id"], "status": ctl["status"],
+               "location": (ctl.get("headers") or {}).get("location", "")}
     variants = [
         ("canonical", "https://example.org/argus-canary"),
         ("protocol-relative", "//example.org/argus-canary"),
@@ -616,6 +626,10 @@ def probe_redirect(ctx: Context, url: str, param: str,
         "status": first["status"],
         "location": first["location"],
         "variants": hits,
+        "control": control,
+        "note": "cite control.request_id alongside the off-origin hit - the "
+                "requirement is a Location off origin WITH the in-origin "
+                "control showing the parameter is honoured",
     }
 
 
@@ -628,20 +642,30 @@ def probe_crlf(ctx: Context, url: str, param: str,
     checks body splitting, though it is only meaningful when the param is
     NOT reflected into the body anyway."""
     canary = _marker("acrlf")
+    # The control comes FIRST and is not optional. A server that always sends
+    # `x-argus-crlf` would be absurd, but one that always sends `x-cache` is
+    # not, and the proof requirement for this class is a header the request
+    # created - which is unanswerable without a clean response to compare.
+    control = _send(ctx, url, param, "argus-control",
+                    method, data, tool="probe_crlf",
+                    note="clean control for the header comparison")
+    ch = {k.lower() for k in (control.get("headers") or {})}
     hdr_inj = _send(ctx, url, param, f"\r\nX-Argus-Crlf: {canary}",
                     method, data, tool="probe_crlf",
                     note="header inject canary")
     hh = {k.lower(): v for k, v in (hdr_inj.get("headers") or {}).items()}
-    header_hit = "x-argus-crlf" in hh
+    header_hit = "x-argus-crlf" in hh and "x-argus-crlf" not in ch
     # response splitting: %0d%0a%0d%0a<canary> - lands past the header block
     body_inj = _send(ctx, url, param, f"\r\n\r\n{canary}",
                      method, data, tool="probe_crlf", note="body split canary")
     body_hit = canary in (body_inj.get("body") or "")
     if header_hit:
-        verdict = ("crlf injection candidate: CRLF in parameter reached the "
-                   "response as a real 'x-argus-crlf' header - header "
-                   "control allows session fixation, cache poisoning and "
-                   "response splitting")
+        verdict = ("crlf injection: CRLF in the parameter reached the response "
+                   "as a real 'x-argus-crlf' header, and the control response "
+                   "has no such header - header control allows session "
+                   "fixation, cache poisoning and response splitting. Record "
+                   "it citing the inject AND the control, quoting the header "
+                   "line verbatim")
     elif body_hit:
         verdict = ("crlf lead: canary appears in the response body after a "
                    "double-CRLF - could be response splitting OR plain "
@@ -650,11 +674,14 @@ def probe_crlf(ctx: Context, url: str, param: str,
     else:
         verdict = "no crlf signal"
     return {"verdict": verdict,
+            "control_id": control["request_id"],
             "header_inject_id": hdr_inj["request_id"],
             "body_split_id": body_inj["request_id"],
             "injected_header": header_hit,
-            "note": "verify with a second canary header (e.g. Set-Cookie) "
-                    "before recording; quote the injected header verbatim"}
+            "canary": canary,
+            "note": "cite control_id AND header_inject_id - the proof is a "
+                    "header present in one and absent from the other. A "
+                    "canary in the BODY only is reflection, not splitting"}
 
 
 def probe_cors(ctx: Context, url: str) -> dict:
@@ -723,6 +750,7 @@ def probe_cors(ctx: Context, url: str) -> dict:
 
 
 def probe_method(ctx: Context, url: str) -> dict:
+    canary = ""
     r = ctx.client.send("OPTIONS", url, tool="probe_method", note="options")
     h = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
     allow = h.get("allow") or h.get("access-control-allow-methods", "")
@@ -730,10 +758,15 @@ def probe_method(ctx: Context, url: str) -> dict:
     dangerous = [m for m in ("PUT", "DELETE", "TRACE", "CONNECT")
                  if m in allow.upper()]
     if "PUT" in allow.upper():
-        canary = _marker("put")
+        canary = _marker("argusput")
+        # The canary goes in the BODY, not only the path. `put_verified` used
+        # to look for the filename in the GET response, which a server that
+        # stored the file correctly would never return - so a PUT that really
+        # landed read as unverified. The proof is "the bytes I wrote came
+        # back", and that needs the bytes to be identifiable.
         p = ctx.client.send("PUT", url.rstrip("/") + f"/{canary}.txt",
-                            body="argus method probe", tool="probe_method",
-                            note="PUT canary")
+                            body=f"argus method probe {canary}",
+                            tool="probe_method", note="PUT canary")
         out["put_attempt"] = {"status": p["status"], "request_id": p["request_id"]}
         if p["status"] in (200, 201, 204):
             g = ctx.client.send("GET", url.rstrip("/") + f"/{canary}.txt",
@@ -746,7 +779,7 @@ def probe_method(ctx: Context, url: str) -> dict:
     if "TRACE" in allow.upper():
         # TRACE that echoes request headers back is cross-site tracing -
         # it leaks HttpOnly cookies/auth headers to a reading XSS
-        canary = _marker("tr")
+        canary = _marker("argustr")
         t = ctx.client.send("TRACE", url, headers={"X-Argus-Trace": canary},
                             tool="probe_method", note="TRACE echo")
         out["trace_attempt"] = {"status": t["status"],
@@ -754,12 +787,19 @@ def probe_method(ctx: Context, url: str) -> dict:
                                 "echoes": canary in (t.get("body") or "")}
     out["dangerous_methods"] = dangerous
     if out.get("put_verified"):
-        verdict = "writable method confirmed"
+        verdict = ("writable method confirmed: the PUT was accepted and a "
+                   "later GET returned the bytes it wrote. Record it citing "
+                   "the PUT and the GET - the proof is the pair, not the "
+                   "status")
     elif out.get("trace_attempt", {}).get("echoes"):
-        verdict = "TRACE echoes request (cross-site tracing candidate)"
+        verdict = ("TRACE is enabled and echoes request headers back in the "
+                   "body - cross-site tracing leaks HttpOnly cookies and auth "
+                   "headers to a reading XSS. Record it citing the TRACE "
+                   "exchange and quoting the echoed header line")
     else:
         verdict = f"methods: {allow or 'none advertised'}"
     out["verdict"] = verdict
+    out["canary"] = canary
     return out
 
 
@@ -1302,7 +1342,9 @@ def probe_upload(ctx: Context, url: str) -> dict:
     """Unrestricted-upload check: a benign control plus active-content
     files; the stored file being served back with bytes intact is the
     signal (stored XSS / webshell depending on stack)."""
-    canary = _marker("upl")
+    # the prefix has to match proof.NONCE_RE or the gate cannot tie the
+    # served bytes back to this upload
+    canary = _marker("argusupl")
 
     def _multipart(fname: str, ctype: str, content: str):
         b = "----argus" + canary
@@ -1353,13 +1395,40 @@ def probe_upload(ctx: Context, url: str) -> dict:
                                 tool="probe_upload", note=f"fetch {name}")
             entry["fetch_id"] = g["request_id"]
             entry["served"] = canary in (g.get("body") or "")
+            # How it is SERVED is the whole question. The same bytes are
+            # inert as text/plain and script as image/svg+xml, and a
+            # Content-Disposition: attachment neutralises them again - so
+            # record both, because nothing downstream can recover them.
+            gh = {k.lower(): v for k, v in (g.get("headers") or {}).items()}
+            entry["served_ctype"] = gh.get("content-type", "")
+            entry["served_disposition"] = gh.get("content-disposition", "")
+            entry["served_active"] = bool(
+                entry["served"]
+                and _UPLOAD_ACTIVE_RE.match(entry["served_ctype"])
+                and "attachment" not in
+                entry["served_disposition"].lower())
         results.append(entry)
     served = [r for r in results if r["served"]]
-    active = [r for r in served if r["name"] != "control-txt"]
+    # "an active file type was stored" is not the finding; "it is served as
+    # something a browser runs" is. The old verdict conflated them and called
+    # a .svg served as text/plain a candidate.
+    active = [r for r in served
+              if r.get("served_active") and r["name"] != "control-txt"]
+    stored_only = [r for r in served
+                   if r["name"] != "control-txt" and not r.get("served_active")]
     if active:
-        verdict = ("upload candidate: active file type stored and served "
-                   f"({', '.join(r['name'] for r in active)}) - stored "
-                   "XSS or code execution depending on server stack")
+        verdict = ("unrestricted upload: stored and served as active content "
+                   + "; ".join(f"{r['name']} as {r['served_ctype']}"
+                               for r in active)
+                   + " - stored XSS in this origin. Record it citing the "
+                     "upload AND the fetch; the content-type is the proof")
+    elif stored_only:
+        verdict = ("uploads of active file types are STORED but served "
+                   + "; ".join(f"{r['name']} as "
+                               f"{r['served_ctype'] or '(no content-type)'}"
+                               for r in stored_only)
+                   + " - inert as served. Worth a note, not a finding, unless "
+                     "another path serves the same file differently")
     elif served:
         verdict = ("uploads are stored and served; active types blocked "
                    "or undisclosed - try extensions/content manually")
@@ -1417,11 +1486,14 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                    f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
                    "raise --rate or increase n and retry")
     elif len(ok) > 1:
-        verdict = (f"race candidate: {len(ok)}/{n} concurrent requests "
-                   f"succeeded but serial probes now return "
-                   f"{[r['status'] for r in serial]} - a limited action "
-                   "was crossed under concurrency; confirm by checking "
-                   "server-side state")
+        verdict = (f"race: {len(ok)}/{n} concurrent requests succeeded but "
+                   f"serial probes now return "
+                   f"{[r['status'] for r in serial]} - a limited action was "
+                   "crossed under concurrency. Record it citing the "
+                   "overlapping burst requests AND the serial baseline; the "
+                   "refusal is what shows there was a limit, and the gate "
+                   "reconstructs the overlap from the recorded timings "
+                   "rather than taking this probe's word for it")
     elif len(ok) == 1:
         verdict = ("single success in burst - no race window observed "
                    "(or the action was already consumed)")

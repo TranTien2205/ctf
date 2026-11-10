@@ -183,7 +183,13 @@ def test_nosqli_probe(lab_url, ctx):
 
 def test_upload_probe(lab_url, ctx):
     out = probes.probe_upload(ctx, lab_url + "/upload")
-    assert "upload candidate" in out["verdict"], out
+    # the verdict stopped saying "candidate" when the class stopped being
+    # capped at it; assert the structure the requirement actually names
+    assert "unrestricted upload" in out["verdict"], out
+    active = [r for r in out["results"]
+              if r.get("served") and r.get("served_active")]
+    assert active, out
+    assert all(r.get("served_ctype") for r in active), out
 
 
 def test_graphql_introspect(lab_url, ctx):
@@ -196,8 +202,13 @@ def test_graphql_introspect(lab_url, ctx):
 
 def test_race_probe(lab_url, ctx):
     out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
-    assert "race candidate" in out["verdict"], out
+    assert out["verdict"].startswith("race:"), out
     assert out["statuses"].get(200, 0) > 1, out
+    # the gate reconstructs the overlap from ts + elapsed_ms, so the probe
+    # must actually have overlapped and must have recorded the refusal
+    assert out["overlapped"] is True, out
+    assert out["serial_statuses"] and all(
+        s >= 400 for s in out["serial_statuses"]), out
     # serial baseline disambiguates: a repeatable endpoint is not a race
     out2 = probes.probe_race(ctx, lab_url + "/hello", n=6)
     assert "repeatable" in out2["verdict"], out2
@@ -282,8 +293,11 @@ def test_disclosure_probe(lab_url, ctx):
 
 def test_crlf_probe(lab_url, ctx):
     out = probes.probe_crlf(ctx, lab_url + "/redirect?next=/", "next")
-    assert "crlf injection candidate" in out["verdict"]
+    assert "crlf injection" in out["verdict"]
     assert out["injected_header"] is True
+    # the requirement needs a control to compare against, so the probe has
+    # to have sent one and has to name it
+    assert out.get("control_id"), out
 
 
 def test_websocket_probe(lab_url, ctx):

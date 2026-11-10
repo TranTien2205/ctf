@@ -730,10 +730,21 @@ def test_difference_only_classes_cannot_reach_proven():
     # enum left this set too: the series its probe sends IS in the transcript,
     # so "one difference is not a counted series" was a missing implementation
     # described as a limit
-    for name in ("ssrf", "crlf", "upload", "method", "websocket", "race"):
+    # crlf left it as well: the artifact is a response HEADER, and the
+    # transcript records headers as a dict - so "this system compares bodies"
+    # described the verifier, not the evidence. Two different pages now grade
+    # `unproven` for crlf rather than `candidate`, which is the point: there
+    # is no header in evidence to have been injected.
+    for name in ("ssrf", "websocket"):
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
         assert proof.spec_for(name).ceiling == "candidate"
+    for left in ("crlf", "method", "upload", "race"):
+        v = proof.grade(left, "Page A unique", [a, b])
+        assert v.grade == "unproven", \
+            f"{left} graded {v.grade} on two stray pages"
+        assert proof.spec_for(left).ceiling == "", \
+            f"{left} has a real verifier now; a ceiling would hold it down"
 
 
 def test_jwt_needs_the_same_endpoint_and_a_different_credential():
@@ -962,14 +973,377 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 CANNOT_BE_PROVEN_HERE = {
     "xss": "no browser",
     "ssrf": "no collector",
-    "crlf": "the verifier compares bodies, not headers",
-    "upload": "serving is not executing",
-    "method": "a status difference is not an effect",
     "websocket": "no WebSocket client",
-    "race": "no serial control is measured",
     "smuggle": "the desync pair is read as a difference",
     "dos": "refused by construction",
 }
+
+
+def test_crlf_is_proven_by_a_header_the_request_created():
+    """`crlf` came off the CANNOT_BE_PROVEN_HERE list.
+
+    The old note read "the verifier compares bodies, not headers" - true of
+    the verifier it had, and the wrong place to stop: the transcript records
+    response headers as a dict, so the real artifact is checkable. All four
+    directions are asserted, and the third is the one that matters.
+    """
+    inject = ex("r1", "http://t.local/r?next=%2Fhome%0d%0aX-Argus-Crlf%3A%20argusab12cd",
+                "redirecting", headers={"server": "nginx",
+                                        "x-argus-crlf": "argusab12cd"})
+    control = ex("r2", "http://t.local/r?next=%2Fhome", "redirecting",
+                 headers={"server": "nginx"})
+    assert proof.grade("crlf", "x-argus-crlf: argusab12cd",
+                       [inject, control]).grade == "proven"
+
+    # 1. reflected into the BODY only is not header control
+    body_only = ex("r3", "http://t.local/r?next=%0d%0aX-Argus-Crlf%3A%20argusab12cd",
+                   "bad next value: X-Argus-Crlf: argusab12cd",
+                   headers={"server": "nginx"})
+    verdict = proof.grade("crlf", "X-Argus-Crlf: argusab12cd",
+                          [body_only, control])
+    assert verdict.grade != "proven"
+    assert "the response carries it as a header" in verdict.missing
+
+    # 2. a header the server sends anyway is not one the request created
+    named = ex("r4", "http://t.local/r?next=%0d%0aX-Cache%3A%20HIT", "x",
+               headers={"x-cache": "HIT"})
+    always = ex("r5", "http://t.local/r?next=%2Fhome", "x",
+                headers={"x-cache": "HIT"})
+    verdict = proof.grade("crlf", "x-cache: HIT", [named, always])
+    assert verdict.grade != "proven"
+    assert "a control response does not carry it" in verdict.missing
+
+    # 3. no control at all
+    assert proof.grade("crlf", "x-argus-crlf: argusab12cd",
+                       [inject]).grade != "proven"
+
+    # 4. a bare CRLF with nothing after it splits nothing
+    bare = ex("r6", "http://t.local/r?next=%0d%0a", "x",
+              headers={"server": "nginx"})
+    verdict = proof.grade("crlf", "server: nginx", [bare, control])
+    assert verdict.grade != "proven"
+    assert "the request asked for a header" in verdict.missing
+
+
+def test_probe_crlf_sends_the_control_the_requirement_needs():
+    import inspect
+    from argus.tools import probes
+    src = inspect.getsource(probes.probe_crlf)
+    assert "clean control" in src, (
+        "the crlf requirement needs a control response; a probe that never "
+        "sends one cannot produce evidence that grades proven")
+    assert src.index("control = _send") < src.index("hdr_inj = _send"), \
+        "the control should be sent before the payload"
+
+
+def test_method_is_proven_by_an_effect_not_by_a_status():
+    """`method` came off the CANNOT_BE_PROVEN_HERE list.
+
+    The note read "a status difference is not an effect" - right about the
+    verifier it had, wrong about the evidence: `probe_method` already records
+    both shapes of effect this class can have, and both are pairs.
+    """
+    put = ex("r1", "http://t.local/up/argusputab12.txt", "", 201,
+             method="PUT", req_body="argus method probe argusputab12")
+    get = ex("r2", "http://t.local/up/argusputab12.txt",
+             "argus method probe argusputab12")
+    assert proof.grade("method", "argus method probe argusputab12",
+                       [put, get]).grade == "proven"
+
+    # a 201 on a write whose body was discarded is not an effect
+    gone = ex("r3", "http://t.local/up/argusputab12.txt",
+              "<h1>404 not found</h1>", 404)
+    verdict = proof.grade("method", "argus method probe argusputab12",
+                          [put, gone])
+    assert verdict.grade != "proven"
+    assert "the method had an observable effect" in verdict.missing
+
+    # the status alone, with no read-back cited
+    assert proof.grade("method", "201 Created", [put]).grade != "proven"
+
+    # a read-back of a DIFFERENT path proves nothing about what was written
+    other = ex("r4", "http://t.local/up/other.txt",
+               "argus method probe argusputab12")
+    assert proof.grade("method", "argus method probe argusputab12",
+                       [put, other]).grade != "proven"
+
+
+def test_trace_is_proven_by_echoing_a_header_the_probe_sent():
+    trace = ex("r5", "http://t.local/", "TRACE / HTTP/1.1\nHost: t.local\n"
+               "X-Argus-Trace: argustrzz99", method="TRACE",
+               req_headers={"host": "t.local",
+                            "x-argus-trace": "argustrzz99"})
+    assert proof.grade("method", "X-Argus-Trace: argustrzz99",
+                       [trace]).grade == "proven"
+
+    # TRACE answered, but the echo carries no nonce this probe sent - so the
+    # echo cannot be tied to it
+    bare = ex("r6", "http://t.local/", "TRACE / HTTP/1.1", method="TRACE",
+              req_headers={"host": "t.local",
+                           "x-argus-trace": "argustrzz99"})
+    verdict = proof.grade("method", "TRACE / HTTP/1.1", [bare])
+    assert verdict.grade != "proven"
+    assert "the method had an observable effect" in verdict.missing
+
+
+def test_a_mere_status_difference_is_not_a_method_finding():
+    allowed = ex("r7", "http://t.local/x", "ok")
+    refused = ex("r8", "http://t.local/x", "no", 405, method="DELETE")
+    verdict = proof.grade("method", "ok", [allowed, refused])
+    assert verdict.grade != "proven"
+    assert "a method the endpoint should refuse was honoured" in verdict.missing
+
+
+def test_probe_method_puts_its_canary_in_the_bytes_it_writes():
+    """The read-back check tested nothing before this.
+
+    `put_verified` looked for the canary FILENAME in the GET response body,
+    but the body written was the fixed string "argus method probe" - so a
+    server that stored the file correctly returned bytes the check could not
+    recognise, and a PUT that really landed read as unverified.
+    """
+    import inspect
+    from argus.tools import probes
+    src = inspect.getsource(probes.probe_method)
+    assert 'body=f"argus method probe {canary}"' in src
+    assert '_marker("argusput")' in src, \
+        "the canary must match proof.NONCE_RE for the verifier to tie it back"
+    assert proof.NONCE_RE.search("argusput" + "a1b2c3d4")
+
+
+_UPLOAD_NONCE = "argusupl9f3a"
+_UPLOAD_SVG = ("<svg xmlns=\"http://www.w3.org/2000/svg\">"
+               f"<script>/*{_UPLOAD_NONCE}*/alert(1)</script></svg>")
+_UPLOAD_POST = (
+    "--b\r\nContent-Disposition: form-data; name=\"file\"; "
+    f"filename=\"{_UPLOAD_NONCE}.svg\"\r\n"
+    f"Content-Type: image/svg+xml\r\n\r\n{_UPLOAD_SVG}\r\n--b--\r\n")
+
+
+def _upload_pair(ctype: str, disposition: str = "", status: int = 200):
+    up = ex("r1", "http://t.local/upload",
+            '{"url": "/files/%s.svg"}' % _UPLOAD_NONCE, 201,
+            method="POST", req_body=_UPLOAD_POST)
+    headers = {"content-type": ctype}
+    if disposition:
+        headers["content-disposition"] = disposition
+    fetch = ex("r2", f"http://t.local/files/{_UPLOAD_NONCE}.svg",
+               _UPLOAD_SVG, status, headers=headers)
+    return up, fetch
+
+
+def test_upload_is_proven_by_how_it_is_served_not_by_what_it_is_called():
+    """`upload` came off the CANNOT_BE_PROVEN_HERE list.
+
+    The note read "serving is not executing" - true, and the requirement
+    sentence already handled execution by saying it is an rce finding graded
+    as one. What was left unproven was the thing this evidence settles: a
+    file served back with its bytes intact AND a content-type that makes
+    those bytes script. The content-type was the one part nothing checked.
+    """
+    assert proof.grade("upload", _UPLOAD_SVG,
+                       list(_upload_pair("image/svg+xml"))).grade == "proven"
+
+    # the same bytes, inert
+    for ctype in ("text/plain; charset=utf-8", "application/octet-stream",
+                  "image/png", ""):
+        verdict = proof.grade("upload", _UPLOAD_SVG,
+                              list(_upload_pair(ctype)))
+        assert verdict.grade != "proven", f"{ctype!r} graded {verdict.grade}"
+        assert "served with a content-type a browser acts on" in \
+            verdict.missing
+
+    # active type, but the browser is told to download it
+    verdict = proof.grade("upload", _UPLOAD_SVG, list(_upload_pair(
+        "image/svg+xml", disposition='attachment; filename="x.svg"')))
+    assert verdict.grade != "proven"
+
+    # stored path answers 404 - nothing was served
+    verdict = proof.grade("upload", _UPLOAD_SVG,
+                          list(_upload_pair("image/svg+xml", status=404)))
+    assert verdict.grade != "proven"
+    assert "it is served back with the bytes intact" in verdict.missing
+
+    # an ordinary html page with no upload in evidence
+    page = ex("r9", "http://t.local/a", "<html>hi</html>",
+              headers={"content-type": "text/html"})
+    verdict = proof.grade("upload", "<html>hi</html>", [page])
+    assert verdict.grade != "proven"
+    assert "a file was uploaded with a probe nonce in it" in verdict.missing
+
+
+def test_the_upload_fetch_must_return_this_uploads_own_bytes():
+    up, _ = _upload_pair("image/svg+xml")
+    someone_elses = ex("r3", "http://t.local/files/other.svg",
+                       "<svg><script>alert(1)</script></svg>",
+                       headers={"content-type": "image/svg+xml"})
+    verdict = proof.grade("upload", "<svg><script>alert(1)</script></svg>",
+                          [up, someone_elses])
+    assert verdict.grade != "proven"
+    assert "it is served back with the bytes intact" in verdict.missing
+
+
+def test_a_confirmation_page_that_names_the_upload_is_not_the_stored_file():
+    """"The nonce came back" does not distinguish the file from a page.
+
+    An "Upload complete - saved <your svg>" page carries the nonce too, and
+    served as text/html it satisfied every other check in this verifier. Only
+    comparing against the bytes actually sent separates them.
+    """
+    up, _ = _upload_pair("image/svg+xml")
+    confirmation = ex(
+        "r2", f"http://t.local/files/{_UPLOAD_NONCE}.svg",
+        f"<html><body><h1>Upload complete</h1><p>saved {_UPLOAD_SVG}</p>"
+        "<p>Thanks for using our service.</p></body></html>",
+        headers={"content-type": "text/html"})
+    verdict = proof.grade("upload", _UPLOAD_SVG, [up, confirmation])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "it is served back with the bytes intact" in verdict.missing
+
+    # the same bytes served AS the response body are the stored file
+    stored = ex("r3", f"http://t.local/files/{_UPLOAD_NONCE}.html",
+                _UPLOAD_SVG, headers={"content-type": "text/html"})
+    assert proof.grade("upload", _UPLOAD_SVG, [up, stored]).grade == "proven"
+
+
+def test_the_content_type_check_does_not_call_an_active_type_inert():
+    """A wrong reason sends a reader to fix the wrong thing.
+
+    The detail read "served as text/html - inert" whenever an earlier check
+    failed, which is a false statement about a type a browser does act on.
+    """
+    up, _ = _upload_pair("image/svg+xml")
+    # the surrounding page has to dominate, or this IS the served file - the
+    # verifier's test is proportional, which is a heuristic and the only one
+    # available: "the nonce came back" cannot tell a file from a page about it
+    page = ex("r2", f"http://t.local/files/{_UPLOAD_NONCE}.svg",
+              "<html><head><title>Upload complete</title></head><body>"
+              "<h1>Thanks</h1><p>Your file was received and queued for "
+              "review by a moderator. You will be notified by email once it "
+              f"has been approved.</p><pre>saved as {_UPLOAD_SVG}</pre>"
+              "<footer>Example Corp - all rights reserved</footer>"
+              "</body></html>", headers={"content-type": "text/html"})
+    verdict = proof.grade("upload", _UPLOAD_SVG, [up, page])
+    detail = next(c["detail"] for c in verdict.checks
+                  if c["check"] == "served with a content-type a browser "
+                                   "acts on")
+    assert "inert" not in detail, detail
+    assert "would be acted on" in detail
+
+    # and an actually-inert type still says so
+    _, inert = _upload_pair("application/octet-stream")
+    verdict = proof.grade("upload", _UPLOAD_SVG, [up, inert])
+    detail = next(c["detail"] for c in verdict.checks
+                  if c["check"] == "served with a content-type a browser "
+                                   "acts on")
+    assert "inert" in detail, detail
+
+
+def test_probe_upload_records_how_the_file_came_back():
+    """The probe called a `.svg` served as text/plain an upload candidate.
+
+    "An active file type was stored" is not the finding; "it is served as
+    something a browser runs" is. Nothing downstream can recover the
+    content-type, so the probe has to record it.
+    """
+    import inspect
+    from argus.tools import probes
+    src = inspect.getsource(probes.probe_upload)
+    assert '_marker("argusupl")' in src, \
+        "the canary must match proof.NONCE_RE or the gate cannot tie it back"
+    for field in ("served_ctype", "served_disposition", "served_active"):
+        assert field in src, field
+    assert 'r["name"] != "control-txt"' in src, \
+        "the control upload exists to show storage works; it is not a finding"
+
+
+def _race(rid, ts, elapsed, status=200, body="ok",
+          url="http://t.local/redeem"):
+    return {"id": rid, "ts": ts,
+            "request": {"method": "POST", "url": url,
+                        "headers": {"host": "t.local"}, "body": "code=X"},
+            "response": {"status": status, "headers": {}, "body": body,
+                         "elapsed_ms": elapsed}}
+
+
+def test_race_is_proven_by_an_overlap_and_a_refusal():
+    """`race` came off the CANNOT_BE_PROVEN_HERE list.
+
+    The note read "no serial control is measured" - true of the verifier and
+    false of the probe: `probe_race` sends the serial baseline, and every
+    exchange carries `ts` and `elapsed_ms`, so the overlap is reconstructable
+    from the record instead of taken on the probe's word.
+    """
+    burst = [_race("r1", 1000.30, 300), _race("r2", 1000.32, 300),
+             _race("r3", 1000.31, 300, status=409, body="already used")]
+    serial = [_race("r4", 1001.00, 50, status=409, body="already used"),
+              _race("r5", 1001.20, 50, status=409, body="already used")]
+    assert proof.grade("race", "ok", burst + serial).grade == "proven"
+
+    # the action is simply repeatable: the serial attempts succeed too
+    repeatable = [_race("r4", 1001.00, 50), _race("r5", 1001.20, 50)]
+    verdict = proof.grade("race", "ok", burst + repeatable)
+    assert verdict.grade != "proven"
+    assert "a serial attempt afterwards was refused" in verdict.missing
+
+    # the server serialized the burst - nothing was concurrent
+    serialized = [_race("r1", 1000.30, 100), _race("r2", 1000.90, 100),
+                  _race("r3", 1001.50, 100)]
+    verdict = proof.grade("race", "ok",
+                          serialized + [_race("r6", 1002.5, 50, status=409)])
+    assert verdict.grade != "proven"
+    assert "two attempts were on the wire at once" in verdict.missing
+
+    # one success in a burst is the action working once, as designed
+    one = [_race("r1", 1000.30, 300),
+           _race("r2", 1000.32, 300, status=409),
+           _race("r3", 1000.31, 300, status=409)]
+    verdict = proof.grade("race", "ok", one + serial)
+    assert verdict.grade != "proven"
+    assert "more than one of them succeeded" in verdict.missing
+
+
+def test_race_fails_closed_when_the_timings_are_missing():
+    """A zero-width window overlaps nothing.
+
+    Two entries with the same `ts` and no `elapsed_ms` look simultaneous and
+    are not evidence of it - the transcript simply did not record when they
+    were on the wire.
+    """
+    bare = [{"id": "r1", "ts": 1000.3,
+             "request": {"method": "POST", "url": "http://t.local/redeem",
+                         "headers": {}, "body": ""},
+             "response": {"status": 200, "headers": {}, "body": "ok"}},
+            {"id": "r2", "ts": 1000.3,
+             "request": {"method": "POST", "url": "http://t.local/redeem",
+                         "headers": {}, "body": ""},
+             "response": {"status": 200, "headers": {}, "body": "ok"}}]
+    verdict = proof.grade("race", "ok", bare)
+    assert verdict.grade != "proven"
+    assert "two attempts were on the wire at once" in verdict.missing
+
+
+def test_overlap_is_computed_from_the_recorded_window_not_the_order():
+    a = _race("r1", 1000.30, 300)      # on the wire 1000.00 - 1000.30
+    b = _race("r2", 1000.70, 300)      # on the wire 1000.40 - 1000.70
+    assert not proof._overlaps(a, b), "adjacent is not concurrent"
+    c = _race("r3", 1000.40, 300)      # 1000.10 - 1000.40
+    assert proof._overlaps(a, c)
+    assert proof._window(a) == (1000.0, 1000.30)
+
+
+def test_probe_race_tells_the_agent_to_cite_the_serial_baseline():
+    import inspect
+    import re
+    from argus.tools import probes
+    # Adjacent string literals are joined before matching: the message is
+    # wrapped across several of them, so a phrase that reads continuously to
+    # the agent straddles a boundary in the source. Asserting on raw source
+    # made this test fail on a reflow that changed nothing the agent sees.
+    src = re.sub(r'"\s*\n\s*"', "",
+                 inspect.getsource(probes.probe_race))
+    assert "serial baseline" in src
+    assert "the refusal is what shows there was a limit" in src
 
 
 def test_every_class_either_has_a_proven_test_or_declares_it_cannot():
@@ -1365,3 +1739,189 @@ def test_enum_needs_two_answers_each_seen_twice():
     same = [login(f"E{7+i}", "Invalid credentials", 401) for i in range(4)]
     assert proof.grade("enum", "Invalid credentials", same).grade == "unproven"
     assert proof.spec_for("enum").ceiling == ""
+
+
+def test_a_confirmation_page_is_not_a_stored_upload():
+    """`verify_served_upload` required the nonce back and an active
+    content-type, and both are true of an "Upload complete - saved <your
+    svg>" page. Served as text/html it graded `proven` against an app that
+    stored nothing. The response has to BE the file."""
+    boundary = "----argusupl1"
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg">'
+           "<script>/*argusupl1234*/alert(1)</script></svg>")
+    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+            f'filename="x.svg"\r\nContent-Type: image/svg+xml\r\n\r\n'
+            f"{svg}\r\n--{boundary}--\r\n")
+    upload = {"id": "u1",
+              "request": {"method": "POST", "url": "http://t.local/upload",
+                          "headers": {}, "body": body},
+              "response": {"status": 200, "headers": {},
+                           "body": '{"url":"/files/x.svg"}'}}
+
+    def fetch(rid, path, served, ctype, status=200, disposition=None):
+        headers = {"content-type": ctype}
+        if disposition:
+            headers["content-disposition"] = disposition
+        return {"id": rid,
+                "request": {"method": "GET", "url": "http://t.local" + path,
+                            "headers": {}, "body": None},
+                "response": {"status": status, "headers": headers,
+                             "body": served}}
+
+    stored = fetch("u2", "/files/x.svg", svg, "image/svg+xml")
+    assert proof.grade("upload", svg[:50], [upload, stored]).grade == "proven"
+
+    page = ("<html><body><h1>Upload complete</h1><p>Saved " + svg + "</p>"
+            + "<div>chrome</div>" * 40 + "</body></html>")
+    verdict = proof.grade("upload", svg[:50],
+                          [upload, fetch("u3", "/done", page, "text/html")])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "it is served back with the bytes intact" in verdict.missing
+
+    # the same bytes served inert, and served as a download, are both fine
+    for ctype, disposition in (("text/plain", None),
+                               ("image/svg+xml", "attachment; filename=x.svg")):
+        assert proof.grade("upload", svg[:50], [
+            upload, fetch("u4", "/files/x.svg", svg, ctype, 200,
+                          disposition)]).grade != "proven"
+
+    # accepted but never served, and a 404 on the fetch
+    assert proof.grade("upload", '{"url":"/files/x.svg"}',
+                       [upload]).grade != "proven"
+    assert proof.grade("upload", svg[:50], [
+        upload, fetch("u5", "/files/x.svg", svg, "image/svg+xml",
+                      404)]).grade != "proven"
+
+
+def test_the_capped_set_is_exactly_what_the_docs_claim():
+    """The residuals section states counts. A count in a document that the
+    code can contradict is the defect the doc gate exists to catch, and the
+    gate cannot read prose - so the claim is asserted here instead."""
+    capped = {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
+    refused = {s.vuln_class for s in proof.MATRIX.values()
+               if s.verifier is proof.verify_refused}
+    assert capped == {"websocket", "smuggle", "xss", "ssrf"}, capped
+    assert refused == {"dos"}, refused
+    # `verify_generic` is `_discriminates` alone, which is what "no verifier
+    # written yet" looks like. ssrf shares it for a different reason: the
+    # evidence it would need is an out-of-band hit this package cannot see,
+    # so writing a verifier would not help.
+    assert {"websocket", "smuggle", "ssrf"} == {
+        s.vuln_class for s in proof.MATRIX.values()
+        if s.verifier is proof.verify_generic}
+    assert proof.spec_for("xss").verifier is not proof.verify_generic, \
+        "xss has a real verifier; its cap is the missing browser"
+    # and the five that came off the list keep real verifiers
+    for name in ("lockout", "enum", "crlf", "upload", "method", "race"):
+        spec = proof.spec_for(name)
+        assert spec.ceiling == "", f"{name} is capped again"
+        assert spec.verifier not in (proof.verify_generic,
+                                     proof.verify_refused), name
+
+
+def test_every_cap_states_its_reason_and_every_reason_has_a_cap():
+    """`cap_reason` exists because the reason lived in prose in two documents
+    and drifted from the matrix twice while classes came off the list. A
+    ceiling with no reason is undocumented; a reason with no ceiling is a
+    leftover from a class that was freed."""
+    for spec in {s.vuln_class: s for s in proof.MATRIX.values()}.values():
+        assert bool(spec.ceiling) == bool(spec.cap_reason), (
+            f"{spec.vuln_class}: ceiling={spec.ceiling!r} "
+            f"cap_reason={spec.cap_reason!r}")
+
+
+def test_the_unimplemented_caps_are_exactly_the_generic_verifier_ones():
+    """A cap marked `unimplemented` means the transcript already holds what a
+    verifier would need. That is the same thing as still being on
+    `verify_generic` - except ssrf, which is on it for a reason labour cannot
+    fix and is therefore NOT marked unimplemented."""
+    specs = {s.vuln_class: s for s in proof.MATRIX.values()}.values()
+    unimplemented = {s.vuln_class for s in specs
+                     if s.cap_reason == proof.CAP_UNIMPLEMENTED}
+    assert unimplemented == {"websocket", "smuggle"}, unimplemented
+    generic = {s.vuln_class for s in specs
+               if s.verifier is proof.verify_generic}
+    assert unimplemented < generic
+    assert generic - unimplemented == {"ssrf"}
+    assert proof.spec_for("ssrf").cap_reason != proof.CAP_UNIMPLEMENTED
+
+
+def test_a_capped_class_says_so_when_printed():
+    """An operator reading `argus proof <class>` has to learn that `proven`
+    is unreachable before spending an engagement trying to reach it."""
+    import io
+    import contextlib
+    from argus.cli import main
+    for klass, expect in (("websocket", "labour, not a limit"),
+                          ("xss", "no browser ships"),
+                          ("dos", "REFUSED")):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            main(["proof", klass])
+        out = buf.getvalue()
+        assert "CAPPED AT 'candidate'" in out or "REFUSED" in out, klass
+        assert expect in out, f"{klass}: {out[-300:]}"
+    # and an uncapped class says neither
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        main(["proof", "rce"])
+    assert "CAPPED" not in buf.getvalue()
+    assert "REFUSED" not in buf.getvalue()
+
+
+def test_a_write_proves_nothing_when_only_its_url_carried_the_nonce():
+    """Found by re-reading `verify_method_effect` after writing it.
+
+    The read-back compared against `req_text`, which includes the URL. So a
+    `PUT` of inert bytes to `/up/<nonce>.txt` plus a directory listing that
+    echoes the filename graded `proven`: the effect proven was the server
+    printing a path back, not storing anything. The nonce has to come from
+    the request BODY, because that is what "the bytes it wrote" means.
+    """
+    inert = ex("m1", "http://t.local/up/argusputab12.txt", "", 201,
+               method="PUT", req_body="inert bytes")
+    listing = ex("m2", "http://t.local/up/argusputab12.txt",
+                 "<a href=argusputab12.txt>argusputab12.txt</a>")
+    verdict = proof.grade("method", "argusputab12.txt", [inert, listing])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "the method had an observable effect" in verdict.missing
+
+    # a write with no body at all cannot be read back
+    empty = ex("m3", "http://t.local/up/argusputab12.txt", "", 201,
+               method="PUT")
+    assert proof.grade("method", "argusputab12",
+                       [empty, listing]).grade != "proven"
+
+    # and the real thing still passes
+    real = ex("m4", "http://t.local/up/x.txt", "", 201, method="PUT",
+              req_body="argus method probe argusputab12")
+    read = ex("m5", "http://t.local/up/x.txt",
+              "argus method probe argusputab12")
+    assert proof.grade("method", "argus method probe argusputab12",
+                       [real, read]).grade == "proven"
+
+
+def test_a_crlf_control_must_be_the_same_endpoint():
+    """Found by re-reading `verify_header_injection` after writing it.
+
+    "A control response does not carry it" was true of any exchange that
+    happened not to carry the header - including one to a different host
+    entirely, which says nothing about whether THIS endpoint always sends it.
+    This is the same defect as `_endpoint_shape` dropping the host, which an
+    earlier audit found making two SaaS tenants one endpoint.
+    """
+    inject = ex("c1", "http://t.local/redirect?next=%2Fh%0d%0a"
+                "X-Argus-Probe%3A%20argusab12cd", "",
+                headers={"x-argus-probe": "argusab12cd"})
+    for rid, url in (("c2", "http://other.example/x"),
+                     ("c3", "http://t.local/elsewhere")):
+        control = ex(rid, url, "", headers={"server": "nginx"})
+        verdict = proof.grade("crlf", "x-argus-probe: argusab12cd",
+                              [inject, control])
+        assert verdict.grade != "proven", f"{url}: {verdict.explain()}"
+        assert "a control response does not carry it" in verdict.missing
+
+    same = ex("c4", "http://t.local/redirect?next=%2Fhome", "",
+              headers={"server": "nginx"})
+    assert proof.grade("crlf", "x-argus-probe: argusab12cd",
+                       [inject, same]).grade == "proven"

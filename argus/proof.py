@@ -1396,6 +1396,406 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+# A header name the probe put there. Deliberately narrow: an injected header
+# whose name is one the server might legitimately send proves nothing, because
+# you cannot tell who wrote it.
+_CRLF_SEQ_RE = re.compile(r"(?i)(?:%0d%0a|%0a|\\r\\n|\r\n|%5cr%5cn|\\u000d\\u000a)")
+_HEADER_SET_RE = re.compile(
+    r"(?i)(?:%0d%0a|%0a|\\r\\n|\r\n)\s*([a-z0-9][a-z0-9-]{2,40})\s*(?::|%3a)\s*"
+    r"([^\r\n&%]{1,120})")
+
+
+def verify_header_injection(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """CRLF injection: a header the REQUEST asked for, present as a header.
+
+    This class was capped at `candidate` with the note "this system compares
+    bodies, so it stops at a candidate". That was true of `verify_generic`,
+    and it was the wrong place to stop: the transcript records response
+    headers as a dict, so the actual proof - a header that exists because the
+    request asked for it - is checkable here.
+
+    Three things have to hold on ONE exchange, which is why they are scored
+    together as a witness rather than separately:
+
+    1. the request carried a CRLF sequence followed by `name: value`;
+    2. the response carries that header, with that value;
+    3. a control exchange to the same endpoint does NOT carry it.
+
+    (3) is what makes it a proof rather than a coincidence. A server that
+    always sends `X-Cache: MISS` would otherwise satisfy (2) for a payload
+    that happened to name `X-Cache`.
+    """
+    def build(pair) -> list[dict]:
+        entry, control = pair if isinstance(pair, tuple) else (pair, None)
+        out = []
+        request = req_text(entry) if entry else ""
+        rid = (entry or {}).get("id", "?")
+        asked = _HEADER_SET_RE.search(request) if entry else None
+        out.append(_check(
+            "the request asked for a header", asked is not None,
+            f"{asked.group(1)}: {asked.group(2).strip()[:40]} in {rid}"
+            if asked else
+            "no cited request carries a CRLF sequence followed by "
+            "`name: value` - a bare %0d%0a with nothing after it splits "
+            "nothing"))
+        name = (asked.group(1) if asked else "").strip()
+        want = (asked.group(2) if asked else "").strip()
+        got = header_of(entry, name) if (entry and name) else ""
+        # the value may be normalised (whitespace, case in a token), so
+        # containment is the honest test, not equality
+        landed = bool(got) and bool(want) and (
+            want.lower() in got.lower() or got.lower() in want.lower())
+        out.append(_check(
+            "the response carries it as a header", landed,
+            f"{name}: {got[:60]} in {rid}" if landed else
+            (f"the response has no {name!r} header - the payload was "
+             "reflected into the body at most" if name and not got else
+             f"{name}: {got[:40]} does not carry the injected value"
+             if name else "no header name to look for")))
+        # The control has to be the SAME endpoint. Without that check, any
+        # exchange that happens not to carry the header counts as the
+        # control - including one to a different host entirely, which says
+        # nothing about whether THIS endpoint always sends it.
+        same_endpoint = control is not None and entry is not None and \
+            _endpoint_shape(control) == _endpoint_shape(entry)
+        control_clean = None
+        if same_endpoint and name:
+            control_clean = not header_of(control, name)
+        out.append(_check(
+            "a control response does not carry it", bool(control_clean),
+            f"absent from {control.get('id')}" if control_clean else
+            ("no control exchange cited; a header that is always present is "
+             "not one the request created" if control is None else
+             f"{control.get('id')} is a different endpoint - a control has "
+             "to be the same one, or it says nothing about what this "
+             "endpoint always sends" if not same_endpoint else
+             f"{control.get('id')} carries {name!r} too - the server sends "
+             "that header regardless")))
+        return out
+
+    return _witness(_pairs(claim.exchanges) or [(None, None)], build,
+                    ("the request asked for a header",
+                     "the response carries it as a header",
+                     "a control response does not carry it"))
+
+
+# Content types a browser acts on. `text/plain` is not here on purpose: a
+# `.svg` or `.html` served as text/plain is inert, and treating a stored file
+# as dangerous because of its NAME rather than how it is served is the
+# mistake this class kept making.
+ACTIVE_CTYPE_RE = re.compile(
+    r"(?i)^\s*(?:text/html|application/xhtml\+xml|image/svg\+xml"
+    r"|application/javascript|text/javascript|application/ecmascript"
+    r"|text/xsl|application/xml\+xhtml)\b")
+MULTIPART_RE = re.compile(r'(?i)filename\s*=\s*"?([^"\r\n;]{1,200})')
+
+
+_PART_RE = re.compile(
+    r"(?is)filename\s*=[^\r\n]*\r?\n(?:[^\r\n]+\r?\n)*\r?\n(.*?)\r?\n--")
+
+
+def _uploaded_part(entry: dict) -> str:
+    """The file content inside a multipart upload request, if there is one.
+
+    Needed because "the nonce came back" does not distinguish the stored file
+    from a page that names it - only comparing against what was actually sent
+    does.
+    """
+    body = str(((entry or {}).get("request") or {}).get("body") or "")
+    match = _PART_RE.search(body)
+    return match.group(1).strip() if match else ""
+
+
+def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """An uploaded file served back as something a browser will act on.
+
+    The note said "serving is not executing", which is true and was being
+    used to cap a class whose own requirement sentence already handles the
+    execution case: code execution IS an rce finding and is graded as one.
+    What is left is the thing this evidence can settle - a file the tester
+    uploaded, served back with its bytes intact and a content-type that makes
+    those bytes script.
+
+    The content-type is the whole discriminator, and it is the part nothing
+    was checking. A `.svg` served as `text/plain` is inert; the same bytes as
+    `image/svg+xml` run in the uploader's origin. A `Content-Disposition:
+    attachment` neutralises it again, so a response carrying one does not
+    pass.
+    """
+    def build(pair) -> list[dict]:
+        up, fetch = pair if isinstance(pair, tuple) else (pair, None)
+        out: list[dict] = []
+        request = req_text(up) if up else ""
+        named = MULTIPART_RE.search(request) if up else None
+        nonces = {m.group(0) for m in NONCE_RE.finditer(request)}
+        uploaded = bool(named and nonces)
+        out.append(_check(
+            "a file was uploaded with a probe nonce in it", uploaded,
+            f"{named.group(1)[:60]} in {(up or {}).get('id', '?')}"
+            if uploaded else
+            ("the cited request carries a filename but no probe nonce - "
+             "without one the served bytes cannot be tied to this upload"
+             if named else
+             "no cited request is a multipart upload naming a file")))
+
+        body = resp_body(fetch) if fetch else ""
+        back = sorted(n for n in nonces if n in body)
+        # The response has to BE the file, not a page that mentions it. An
+        # "Upload complete - saved <your svg>" confirmation page carries the
+        # nonce too, and served as text/html it satisfied every other check
+        # here: this graded `proven` against an app that stored nothing.
+        content = _uploaded_part(up) if up else ""
+        stripped = body.strip()
+        dominant = bool(content) and content in stripped and \
+            len(content) >= 0.5 * max(len(stripped), 1)
+        served = bool(uploaded and fetch is not None and back and dominant
+                      and 200 <= status_of(fetch) < 300)
+        out.append(_check(
+            "it is served back with the bytes intact", served,
+            f"{back[0]} returned by {fetch.get('id')}, {len(content)} of "
+            f"{len(stripped)} bytes" if served else
+            ("no second exchange cited; the proof is the fetch, not the "
+             "upload response" if fetch is None else
+             f"{fetch.get('id')} answered {status_of(fetch)}"
+             if not 200 <= status_of(fetch) < 300 else
+             f"nothing this upload carried appears in {fetch.get('id')} - "
+             "the file was not stored, or is served from elsewhere"
+             if not back else
+             "the upload request carries no readable file part to compare "
+             "against" if not content else
+             f"the uploaded bytes are {len(content)} of {len(stripped)} in "
+             f"{fetch.get('id')} - a page that mentions the upload is not "
+             "the stored file")))
+
+        ctype = header_of(fetch, "content-type") if fetch else ""
+        disposition = header_of(fetch, "content-disposition") if fetch else ""
+        attached = "attachment" in disposition.lower()
+        active = bool(served and ACTIVE_CTYPE_RE.match(ctype) and not attached)
+        # The detail has to say what is actually wrong. It read "served as
+        # text/html - inert" whenever an EARLIER check failed, which is a
+        # false statement about an active type and sends a reader to fix the
+        # wrong thing.
+        type_is_active = bool(ACTIVE_CTYPE_RE.match(ctype)) and not attached
+        out.append(_check(
+            "served with a content-type a browser acts on", active,
+            f"{ctype.strip()[:60]}" if active else
+            (f"served as attachment ({disposition.strip()[:40]}) - the "
+             "browser downloads it rather than running it" if attached else
+             f"{ctype.strip()[:40]} would be acted on, but the check above "
+             "did not find the stored file in that response"
+             if type_is_active else
+             f"served as {ctype.strip()[:40] or '(no content-type)'} - inert, "
+             "whatever the file is called")))
+        return out
+
+    return _witness(_pairs(claim.exchanges) or [(None, None)], build,
+                    ("a file was uploaded with a probe nonce in it",
+                     "it is served back with the bytes intact",
+                     "served with a content-type a browser acts on"))
+
+
+def _window(entry: dict) -> tuple[float, float]:
+    """When this request was on the wire, as [start, end].
+
+    `ts` is stamped when the exchange is RECORDED, which is after the
+    response arrived, so it is the end of the window and `elapsed_ms` gives
+    the start. An entry missing either is a zero-width window: it overlaps
+    nothing, which is the fail-closed answer.
+    """
+    try:
+        end = float(entry.get("ts") or 0.0)
+    except (TypeError, ValueError):
+        return (0.0, 0.0)
+    resp = entry.get("response") if isinstance(entry, dict) else None
+    try:
+        elapsed = float((resp or {}).get("elapsed_ms") or 0.0) / 1000.0
+    except (TypeError, ValueError):
+        elapsed = 0.0
+    if not end or elapsed <= 0:
+        return (0.0, 0.0)
+    return (end - elapsed, end)
+
+
+def _overlaps(a: dict, b: dict) -> bool:
+    (s1, e1), (s2, e2) = _window(a), _window(b)
+    if not e1 or not e2:
+        return False
+    return s1 < e2 and s2 < e1
+
+
+def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A limited action crossed under concurrency, with the limit shown.
+
+    The note said "no serial control is measured", which was true of the
+    verifier and false of the probe: `probe_race` sends the serial baseline
+    and the transcript stamps every exchange with `ts` and `elapsed_ms`, so
+    the overlap is reconstructable from the record rather than taken on the
+    probe's word.
+
+    Three things, and the third is the one that makes it a race rather than a
+    repeatable action:
+
+    1. two attempts at the same action were **on the wire at the same time**
+       - windows that intersect, not merely adjacent request ids;
+    2. more than one of them succeeded;
+    3. a **serial** attempt, after the burst, did not. Without that, "two
+       requests succeeded" says the action is repeatable, which is not a bug.
+    """
+    checks: list[dict] = []
+    groups: dict[str, list[dict]] = {}
+    for entry in claim.exchanges:
+        key = f"{_method_of(entry)} {_endpoint_shape(entry)}"
+        groups.setdefault(key, []).append(entry)
+
+    best: tuple[int, list[dict], list[dict], str] = (0, [], [], "")
+    for key, entries in groups.items():
+        ordered = sorted(entries, key=lambda e: _window(e)[0])
+        for i, first in enumerate(ordered):
+            burst = [first] + [o for o in ordered[i + 1:]
+                               if _overlaps(first, o)]
+            if len(burst) < 2:
+                continue
+            won = [e for e in burst if 200 <= status_of(e) < 300]
+            burst_end = max(_window(e)[1] for e in burst)
+            after = [e for e in ordered
+                     if _window(e)[0] >= burst_end
+                     and not any(_overlaps(e, o) for o in ordered
+                                 if o is not e)]
+            refused = [e for e in after if not 200 <= status_of(e) < 300]
+            score = (len(burst) >= 2) + (len(won) >= 2) + bool(refused)
+            if score > best[0]:
+                best = (score, burst, refused, key)
+    _, burst, refused, key = best
+    won = [e for e in burst if 200 <= status_of(e) < 300]
+
+    checks.append(_check(
+        "two attempts were on the wire at once", len(burst) >= 2,
+        f"{len(burst)} overlapping requests to {key}" if len(burst) >= 2 else
+        "no two cited exchanges to one endpoint have intersecting "
+        "[start, end] windows - adjacent request ids are not concurrency, "
+        "and a burst the server serialized cannot evidence a race"))
+    checks.append(_check(
+        "more than one of them succeeded", len(won) >= 2,
+        f"{len(won)} of {len(burst)} answered 2xx" if len(won) >= 2 else
+        f"{len(won)} of {len(burst) or 0} succeeded - one success in a burst "
+        "is the action working once, as designed"))
+    checks.append(_check(
+        "a serial attempt afterwards was refused", bool(refused),
+        f"{refused[0].get('id')} answered {status_of(refused[0])} after the "
+        f"burst" if refused else
+        "no non-overlapping attempt after the burst was refused - without "
+        "one, repeating the action simply works and there is no limit to "
+        "have crossed"))
+    return checks
+
+
+_WRITE_METHODS = ("PUT", "DELETE", "PATCH")
+
+
+def _method_of(entry: dict) -> str:
+    req = entry.get("request") if isinstance(entry, dict) else None
+    return str((req or {}).get("method") or "").upper()
+
+
+def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """A method that should be refused, honoured, with the effect observed.
+
+    The note said "a status difference is not an effect", which was right
+    about `verify_generic` and wrong about the evidence: `probe_method`
+    already records both shapes of effect this class can have, and both are
+    pairs.
+
+    **A write that landed.** `PUT /x` answered 2xx, and a later `GET /x`
+    returned the bytes the PUT carried. The status alone proves nothing - an
+    endpoint can answer 201 and discard the body - so the read-back is the
+    check that matters.
+
+    **TRACE enabled.** `TRACE` answered, and the response body contains a
+    value that was only ever in the request's HEADERS. That is cross-site
+    tracing: it hands HttpOnly cookies and auth headers to a reading XSS. The
+    echo IS the finding here, as with xss and crlf, which is why the class
+    sets `reflection_is_the_finding`.
+
+    Both paths emit the same two check names, so the floor means the same
+    thing either way: an effect was observed, not merely a status.
+    """
+    def build(pair) -> list[dict]:
+        a, b = pair if isinstance(pair, tuple) else (pair, None)
+        out: list[dict] = []
+        method = _method_of(a) if a else ""
+        status = status_of(a) if a else 0
+        honoured = bool(a) and (
+            (method in _WRITE_METHODS and 200 <= status < 300)
+            or (method == "TRACE" and 200 <= status < 300))
+        out.append(_check(
+            "a method the endpoint should refuse was honoured", honoured,
+            f"{method} answered {status} on {(a or {}).get('id', '?')}"
+            if honoured else
+            (f"{method or 'no'} {status or ''} - the cited request is not a "
+             f"write or a TRACE that was answered; "
+             f"{', '.join(_WRITE_METHODS)} or TRACE with a 2xx is what this "
+             "class needs".strip())))
+
+        effect, detail = False, "no effect observed"
+        if honoured and method == "TRACE":
+            # a value that was in the REQUEST HEADERS and came back in the body
+            headers = " ".join(f"{k}: {v}" for k, v in
+                               _req_headers(a).items())
+            echoed = [m.group(0) for m in NONCE_RE.finditer(resp_body(a))
+                      if m.group(0) in headers]
+            effect = bool(echoed)
+            detail = (f"{echoed[0]} was sent as a request header and came "
+                      f"back in the body of {a.get('id')}" if effect else
+                      "the TRACE response echoes no probe nonce that was "
+                      "sent as a request header - without one, the echo "
+                      "cannot be tied to this probe")
+        elif honoured and b is not None:
+            # the read-back: a GET to the same path returning written bytes
+            same = _path_of(a) == _path_of(b) and _endpoint_shape(a) == \
+                _endpoint_shape(b)
+            # The nonce has to come from the request BODY, not from
+            # `req_text`, which includes the URL. With the URL in scope, a
+            # PUT of inert bytes to /up/<nonce>.txt plus a directory listing
+            # that echoes the filename graded `proven` - the effect proven
+            # was the server printing a name back, not storing anything.
+            wrote = str(((a or {}).get("request") or {}).get("body") or "")
+            read = resp_body(b)
+            carried = [m.group(0) for m in NONCE_RE.finditer(wrote)
+                       if m.group(0) in read]
+            effect = bool(same and _method_of(b) == "GET"
+                          and 200 <= status_of(b) < 300 and carried)
+            if effect:
+                detail = (f"{carried[0]} was written by {a.get('id')} and "
+                          f"read back by {b.get('id')}")
+            elif not same:
+                detail = (f"{b.get('id')} is a different path - the read-back "
+                          "has to be of what was written")
+            elif _method_of(b) != "GET":
+                detail = f"{b.get('id')} is {_method_of(b)}, not a GET read"
+            elif not 200 <= status_of(b) < 300:
+                detail = (f"{b.get('id')} answered {status_of(b)} - the "
+                          "written object is not readable")
+            elif not wrote:
+                detail = (f"{a.get('id')} carries no request body - a write "
+                          "with nothing in it has no bytes to read back, and "
+                          "a nonce in the URL only proves the server can "
+                          "print a path")
+            else:
+                detail = (f"nothing the write BODY carried appears in "
+                          f"{b.get('id')} - a 2xx on a write that discarded "
+                          "the body is not an effect")
+        elif honoured:
+            detail = ("no second exchange cited; a write needs the read that "
+                      "shows it landed")
+        out.append(_check("the method had an observable effect", effect,
+                          detail))
+        return out
+
+    return _witness(_pairs(claim.exchanges) or [(None, None)], build,
+                    ("a method the endpoint should refuse was honoured",
+                     "the method had an observable effect"))
+
+
 def verify_generic(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Classes whose artifact this system measures as a difference and nothing
     more.
@@ -1427,6 +1827,12 @@ class ProofSpec:
     refusal: str = ""
     notes: str = ""
     ceiling: str = ""
+    # WHY the ceiling is there. "unimplemented" means a verifier nobody has
+    # written yet and the transcript already holds what it would need; any
+    # other value is a reason labour will not fix. This was prose in two
+    # documents and drifted from the matrix twice while classes came off the
+    # list, so it is a field now and the doc gate counts it.
+    cap_reason: str = ""
     declares: str = "command"
     advisories: tuple[str, ...] = ()
     # xss, prototype pollution and crlf are proven BY the reflection, so the
@@ -1540,6 +1946,10 @@ DOCUMENT_REQUIRED = ("the query named its target",
 EXTRACTION_FLOOR = ("rows returned, not an error message",)
 DOCUMENT_FLOOR = ("documents came back, not the payload",
                   "rows returned, not an error message")
+
+#: Classes whose cap is a verifier nobody has written. The transcript already
+#: records what each would need, so these are labour.
+CAP_UNIMPLEMENTED = "unimplemented"
 
 MATRIX: dict[str, ProofSpec] = {}
 
@@ -1663,6 +2073,7 @@ for _s in [
               "reads the difference, which is a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
               ceiling="candidate",
+              cap_reason="unimplemented",
               aliases=("request-smuggling", "requestsmuggling", "desync",
                        "cl-te", "te-cl")),
     ProofSpec("xfh", "restricted content returned when an ACL-relevant header "
@@ -1686,7 +2097,10 @@ for _s in [
               ("payload reflected unencoded into HTML",
                "a real browser executed it"),
               verify_browser_execution, ceiling="candidate",
-              aliases=("reflected-xss", "stored-xss", "dom-xss", "reflection"), reflection_is_the_finding=True),
+              cap_reason="no browser ships with this package",
+              aliases=("reflected-xss", "stored-xss", "dom-xss",
+                       "reflection"),
+              reflection_is_the_finding=True),
     ProofSpec("ppoll", "a property only the polluting request sent, observed "
               "in a later read that did not send it - which is what the "
               "server-side half of prototype pollution looks like. A browser "
@@ -1705,12 +2119,17 @@ for _s in [
               verify_state_change,
               floor=("the state-changing request succeeded",),
               aliases=("logic-flaw", "logicflaw", "business-logic")),
-    ProofSpec("race", "an outcome impossible under serial execution, with the "
-              "serial control on record - which this system measures as a "
-              "difference only",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate", aliases=("race-condition", "racecondition",
-                                            "toctou", "limit-overrun")),
+    ProofSpec("race", "two attempts at one limited action overlapping on the "
+              "wire, both succeeding, and a serial attempt afterwards "
+              "refused - the refusal is what shows there was a limit",
+              ("two attempts were on the wire at once",
+               "more than one of them succeeded",
+               "a serial attempt afterwards was refused"),
+              verify_concurrent_crossing,
+              floor=("more than one of them succeeded",
+                     "a serial attempt afterwards was refused"),
+              aliases=("race-condition", "racecondition",
+                       "toctou", "limit-overrun")),
     ProofSpec("disclosure", "the credential or source observed in a response, "
               "quoted as the bytes that leaked",
               ("a credential-shaped secret was observed",
@@ -1725,6 +2144,7 @@ for _s in [
               "at a candidate",
               ("the excerpt discriminates against a control",), verify_generic,
               ceiling="candidate",
+              cap_reason="no out-of-band collector the target can reach",
               aliases=("server-side-request-forgery", "blind-ssrf")),
     ProofSpec("enum", "the same request giving two different answers for a "
               "known and an unknown account, each observed more than once",
@@ -1734,24 +2154,38 @@ for _s in [
               floor=("the same request gave two different answers",),
               aliases=("user-enumeration", "enumeration", "username-enum",
                        "account-oracle")),
-    ProofSpec("crlf", "an injected header observed as a HEADER in the response, "
-              "not as body text, with the clean control. This system compares "
-              "bodies, so it stops at a candidate",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              aliases=("header-injection", "response-splitting"), reflection_is_the_finding=True),
-    ProofSpec("upload", "the uploaded file served back with an active "
-              "content-type, or executed - which is then an rce finding and "
-              "graded as one. On its own this measures a difference",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              aliases=("file-upload", "unrestricted-file-upload")),
-    ProofSpec("method", "a method the endpoint should refuse being honoured AND "
-              "having an effect - a PUT that lands, a TRACE that echoes a "
-              "header. A status difference alone is a candidate",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              aliases=("http-method", "verb-tampering", "trace")),
+    ProofSpec("crlf", "a header the request asked for, present as a HEADER in "
+              "the response and absent from a control to the same endpoint - "
+              "not the payload reflected into the body",
+              ("the request asked for a header",
+               "the response carries it as a header",
+               "a control response does not carry it"),
+              verify_header_injection,
+              floor=("the response carries it as a header",
+                     "a control response does not carry it"),
+              aliases=("header-injection", "response-splitting"),
+              reflection_is_the_finding=True),
+    ProofSpec("upload", "the uploaded file served back with its bytes intact "
+              "AND a content-type a browser acts on - or executed, which is "
+              "then an rce finding and graded as one",
+              ("a file was uploaded with a probe nonce in it",
+               "it is served back with the bytes intact",
+               "served with a content-type a browser acts on"),
+              verify_served_upload,
+              floor=("it is served back with the bytes intact",
+                     "served with a content-type a browser acts on"),
+              aliases=("file-upload", "unrestricted-file-upload"),
+              reflection_is_the_finding=True),
+    ProofSpec("method", "a method the endpoint should refuse being honoured "
+              "AND having an effect: a PUT whose bytes a later GET returns, "
+              "or a TRACE that echoes a header the probe sent. A status "
+              "difference alone is not an effect",
+              ("a method the endpoint should refuse was honoured",
+               "the method had an observable effect"),
+              verify_method_effect,
+              floor=("the method had an observable effect",),
+              aliases=("http-method", "verb-tampering", "trace"),
+              reflection_is_the_finding=True),
     ProofSpec("lockout", "a counted series of failed attempts on one "
               "endpoint, none of them refused - the count is the evidence",
               ("a counted series of attempts is on record",
@@ -1763,7 +2197,8 @@ for _s in [
               "answered - which needs a real WebSocket client. This system "
               "compares the handshake only",
               ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate", aliases=("cswsh", "ws")),
+              ceiling="candidate",
+              cap_reason="unimplemented", aliases=("cswsh", "ws")),
     ProofSpec("dos", "this system does not prove availability impact",
               (), verify_refused,
               refusal="Denial of service is out of scope by construction: the proof "

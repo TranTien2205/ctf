@@ -288,9 +288,14 @@ def main() -> int:
           any(h["op"] == "urlencoded[$ne]" and h["differs"]
               for h in out["results"]))
     out = probes.probe_upload(ctx, base + "/upload")
-    check("upload probe serves active file", "upload candidate" in out["verdict"])
+    check("upload probe serves active file",
+          "unrestricted upload" in out["verdict"])
     out = probes.probe_race(ctx, base + "/redeem", n=8)
-    check("race probe multi-redeems", "race candidate" in out["verdict"])
+    check("race probe multi-redeems",
+          out["verdict"].startswith("race:") and out["overlapped"])
+    check("race probe records the serial refusal",
+          bool(out["serial_statuses"])
+          and all(s >= 400 for s in out["serial_statuses"]))
     out = probes.probe_race(ctx, base + "/hello", n=6)
     check("race probe rejects repeatable", "repeatable" in out["verdict"])
     out = probes.probe_deserialize(ctx, base + "/import?data=x", "data")
@@ -323,7 +328,9 @@ def main() -> int:
           "no desync signal" in out["verdict"])
     out = probes.probe_crlf(ctx, base + "/redirect?next=/", "next")
     check("crlf probe injects header",
-          "crlf injection candidate" in out["verdict"])
+          out["injected_header"] and "crlf injection" in out["verdict"])
+    check("crlf probe cites a control for the comparison",
+          bool(out.get("control_id")))
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
@@ -774,6 +781,66 @@ def _doc_consistency() -> None:
     invented = sorted(doc_env - real_env)
     check(f"docs name only real ARGUS_* variables ({len(real_env)})",
           not invented, f"{invented} not read anywhere in argus/")
+
+    # 4b. the residuals section states how many classes are capped for want
+    #     of a verifier. That number lived only in prose and drifted from the
+    #     matrix twice while classes came off the list, in both ARCHITECTURE
+    #     and CHANGELOG, so `cap_reason` makes it derivable and this check
+    #     holds the sentence to it.
+    _WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+              "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+    unimplemented = sorted(
+        spec.vuln_class
+        for spec in {s.vuln_class: s for s in proof.MATRIX.values()}.values()
+        if spec.cap_reason == proof.CAP_UNIMPLEMENTED)
+    stated = set()
+    for text in texts.values():
+        for word in _re.findall(
+                r"(?i)\*\*([A-Za-z]+) classes? (?:are|is) capped at "
+                r"`candidate`", text):
+            if word.lower() in _WORDS:
+                stated.add(_WORDS[word.lower()])
+            elif word.isdigit():
+                stated.add(int(word))
+    check(f"docs state the capped count correctly ({len(unimplemented)}: "
+          f"{', '.join(unimplemented)})",
+          bool(stated) and stated == {len(unimplemented)},
+          f"docs say {sorted(stated) or 'nothing'}, the matrix caps "
+          f"{len(unimplemented)} for want of a verifier")
+    # Which names in that paragraph are the capped ones cannot be read out of
+    # prose - it also names the classes that CAME OFF the list, in the same
+    # sentence. What is unambiguous, and is the risk worth covering, is the
+    # other direction: a cap added to the matrix and never written down.
+    capped_doc = "\n".join(texts.values())
+    undocumented = sorted(k for k in unimplemented
+                          if f"`{k}`" not in capped_doc)
+    check("every capped class is named somewhere in the docs",
+          not undocumented,
+          f"{undocumented} capped for want of a verifier and named in no doc")
+    # and the real-reason caps, which are a different promise to the reader
+    real = sorted(spec.vuln_class
+                  for spec in {s.vuln_class: s
+                               for s in proof.MATRIX.values()}.values()
+                  if spec.ceiling and spec.cap_reason != proof.CAP_UNIMPLEMENTED)
+    missing_real = sorted(k for k in real if f"`{k}`" not in capped_doc)
+    check(f"every real-reason cap is named too ({', '.join(real)})",
+          not missing_real, f"{missing_real} capped and named in no doc")
+    # This sentence IS parseable, unlike the other paragraph: the backticked
+    # names come immediately before the claim. It listed `ppoll` as capped for
+    # a real reason when ppoll is not capped at all.
+    claimed_real = set()
+    for text in texts.values():
+        for head in _re.findall(
+                r"(?i)\*\*((?:`[a-z]{3,12}`[^*]{0,40}){1,5})are capped for a "
+                r"real reason", text):
+            claimed_real |= set(_re.findall(r"`([a-z]{3,12})`", head))
+    not_capped = sorted(n for n in claimed_real
+                        if proof.spec_for(n) is not None
+                        and not proof.spec_for(n).ceiling)
+    check("the real-reason sentence names only capped classes",
+          not not_capped,
+          f"{not_capped} claimed capped for a real reason, but the matrix "
+          f"does not cap them at all")
 
     # 5. every proof class named in a doc exists, and every class the docs
     #    claim is refused really is

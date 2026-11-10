@@ -492,6 +492,21 @@ def main(argv: list[str] | None = None) -> int:
             print("  disqualifies the evidence entirely:")
             for name in spec.veto:
                 print(f"    - {name}")
+        if spec.ceiling:
+            # an operator reading this needs to know `proven` is unreachable
+            # BEFORE spending an engagement trying to reach it
+            from .proof import CAP_UNIMPLEMENTED
+            print(f"\n  CAPPED AT '{spec.ceiling}': this system will not "
+                  f"grade this class higher.")
+            if spec.cap_reason == CAP_UNIMPLEMENTED:
+                print("    Reason: the verifier is unwritten. The transcript "
+                      "already records what it\n            would need, so "
+                      "this is labour, not a limit.")
+            elif spec.cap_reason:
+                print(f"    Reason: {spec.cap_reason}. Not something more "
+                      f"work here would fix.")
+        if spec.verifier.__name__ == "verify_refused":
+            print(f"\n  REFUSED: {spec.refusal or spec.requirement}")
         if spec.notes:
             print(f"\n  {spec.notes}")
         if spec.aliases:

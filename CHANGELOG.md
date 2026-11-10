@@ -140,6 +140,151 @@ system. All notable milestones on `agent-v2`.
   hallucinated excerpts and malformed calls; no code path needed the
   model's word over the transcript's bytes.
 
+### upload comes off the "cannot be proven here" list
+- The note read "serving is not executing" — true, and the requirement
+  sentence already dealt with execution by saying it is an rce finding graded
+  as one. What was left unproven was what this evidence settles: a file served
+  back with its bytes intact **and** a content-type that makes those bytes
+  script.
+- The content-type is the entire discriminator, and it was the one thing
+  nothing checked. The same `.svg` is inert as `text/plain` and runs in the
+  uploader's origin as `image/svg+xml`; a `Content-Disposition: attachment`
+  neutralises it again, so a response carrying one does not pass.
+- `probe_upload` was calling a `.svg` served as `text/plain` an upload
+  candidate — conflating "an active file type was stored" with "it is served
+  as something a browser runs". It now records `served_ctype`,
+  `served_disposition` and `served_active`, and no longer counts the
+  `control-txt` upload (which exists to show storage works at all) as a
+  finding. Its canary prefix now matches `NONCE_RE` so the gate can tie the
+  served bytes back to the upload that wrote them.
+- Directions asserted: inert content-types (`text/plain`,
+  `application/octet-stream`, `image/png`, none at all), an active type served
+  as an attachment, a 404 on the stored path, a fetch of somebody else's file,
+  and an ordinary HTML page with no upload in evidence.
+- **The count, stated once.** `websocket` and `smuggle` remain capped at
+  `candidate` for want of a verifier - two, down from six: `lockout`, `enum`,
+  `crlf`, `upload`, `method` and `race` came off that list. `xss` (no browser
+  ships here) and `ssrf` (no out-of-band collector) are capped for reasons
+  that are not labour, and `dos` is refused by construction; those three will
+  not move. The count used to be restated in three places written at three
+  moments, two of which were stale by the time the third was written, so
+  `test_the_capped_set_is_exactly_what_the_docs_claim` now asserts the set
+  against the matrix - a doc gate cannot read prose, but a test can hold the
+  claim it makes.
+
+### The reason a class is capped is data now, not prose
+- `ProofSpec.cap_reason` holds why a ceiling is there: `"unimplemented"` means
+  a verifier nobody wrote and the transcript already records what it would
+  need; any other value is a reason labour will not fix. It was prose in
+  `ARCHITECTURE.md` and `CHANGELOG.md` and drifted from the matrix in both -
+  at one point the count was stated in three places written at three moments,
+  two of them stale, and `ARCHITECTURE.md` also listed `ppoll` as capped for a
+  real reason when `ppoll` is not capped at all.
+- `argus proof <class>` now prints the cap and its reason, because an operator
+  needs to know `proven` is unreachable *before* spending an engagement
+  reaching for it. A refused class prints its refusal the same way.
+- The selftest holds the prose to the matrix: the stated "N classes are capped
+  at `candidate`" must equal the count, every unimplemented cap must be named
+  in some doc, every real-reason cap too, and the "`x` and `y` are capped for
+  a real reason" sentence may name only classes that really are capped - that
+  last check would have caught the `ppoll` claim. What it does not try is
+  reading *which* names in the first paragraph are the capped ones: the same
+  sentence also names the classes that came off the list, so that is prose,
+  and a gate that guesses at prose is worse than one that says what it cannot
+  check.
+- Two tests hold the code side: a ceiling without a reason is undocumented, a
+  reason without a ceiling is a leftover from a freed class, and the
+  `unimplemented` set is exactly the `verify_generic` set minus `ssrf`.
+- Standing: `websocket` and `smuggle` capped for want of a verifier; `ssrf`
+  (no out-of-band collector) and `xss` (no browser) capped for real reasons;
+  `dos` refused by construction. `lockout`, `enum`, `crlf`, `upload`, `method`
+  and `race` have come off.
+
+- Re-reading `verify_header_injection` found the same shape of hole in it: "a
+  control response does not carry it" was satisfied by any exchange that
+  happened not to carry the header, including one to a different host. The
+  control must be the same endpoint - this is the defect an earlier audit
+  found when `_endpoint_shape` dropped the host and made two SaaS tenants one
+  endpoint.
+- Re-reading `verify_method_effect` after writing it found one more hole: the
+  read-back compared against `req_text`, which includes the URL, so a `PUT` of
+  inert bytes to `/up/<nonce>.txt` plus a directory listing echoing the
+  filename graded `proven`. The effect proven was the server printing a path
+  back. The nonce must come from the request **body** - that is what "the
+  bytes it wrote" means.
+
+### Probes and the matrix are now checked against each other
+- `tests/test_probe_matrix_agreement.py`: drive each probe against the lab and
+  grade the exchanges it recorded under its own class. Every verifier written
+  here exposed a defect in the probe that feeds it, always the same shape - a
+  probe reporting a signal it could not prove, because nobody read the
+  requirement while writing it. Those were found one at a time by hand; this
+  finds the class of them, and keeps finding it.
+- Two directions, and no reading of the probe's English: on an endpoint the
+  lab really is vulnerable at, some honest quote must reach `proven` (or the
+  ceiling); on a clean endpoint, nothing may. The second is the direction that
+  fails when a verifier is too loose rather than when a probe is too thin.
+- It found two live defects immediately. `probe_redirect` sent no in-origin
+  control, so its evidence could never satisfy "control recorded for the
+  expected outcome" and stopped at `candidate` against a real open redirect;
+  `probe_crlf` had the same gap. Both now send the control first and report
+  its request id, because the requirement cannot be answered without it.
+- It also corrected its author twice: `/hello` and `/safedirect` went in as
+  clean endpoints and neither is - the lab reflects any `Origin` with
+  credentials from its shared response helper, and `/safedirect` is the
+  deliberate "filter that allows //host" bypass.
+- Six stale assertions came out with it, three in `selftest.py` and three in
+  `tests/test_lab.py`: the `crlf`, `upload` and `race` checks matched verdict
+  strings containing the word "candidate", which those probes stopped saying
+  when their classes stopped being capped at it. The tests were right about
+  the behaviour and wrong about how they read it, so they now assert the
+  structured output - `injected_header` and `control_id`, `served_active` and
+  `served_ctype`, `overlapped` and `serial_statuses`. `AGENTS.md` carries the
+  rule: assert a probe's fields, never its English.
+
+### method comes off the "cannot be proven here" list
+- The note read "a status difference is not an effect". True of the verifier
+  it had; `probe_method` was already recording both effects this class can
+  have, and both are pairs.
+- `verify_method_effect` takes either path and emits the same two check names,
+  so the floor means the same thing both ways. **A write that landed:** `PUT`
+  answered 2xx plus a later `GET` of the same path returning the bytes the PUT
+  carried — the status alone proves nothing, because an endpoint can answer
+  201 and discard the body. **TRACE enabled:** `TRACE` answered with a value
+  in the body that was only ever in the request's headers, which is
+  cross-site tracing.
+- Found while writing it: `probe_method`'s `put_verified` looked for the
+  canary *filename* in the GET response body, while the body it wrote was the
+  fixed string "argus method probe" — so a server that stored the file
+  correctly returned bytes the check could not recognise, and a PUT that
+  really landed read as unverified. The canary now goes in the bytes written,
+  and its prefix matches `NONCE_RE` so the verifier can tie it back.
+- Also fixed: `canary` was only assigned inside the PUT and TRACE branches,
+  so an endpoint advertising `Allow: GET, DELETE` raised `NameError`.
+- Six directions asserted, including a 201 whose body was discarded, a
+  read-back of a different path, a TRACE echoing nothing the probe sent, and
+  a plain 200-vs-405 status difference.
+
+### crlf comes off the "cannot be proven here" list
+- The note read "this system compares bodies, so it stops at a candidate".
+  That was true of the verifier it had and the wrong place to stop: the
+  transcript records response headers as a dict, so the real artifact was
+  checkable all along.
+- `verify_header_injection` requires three things on ONE exchange: the request
+  carried a CRLF sequence followed by `name: value`, the response carries that
+  header with that value, and **a control to the same endpoint does not**. The
+  third is what makes it a proof — a server that always sends `X-Cache: MISS`
+  would otherwise satisfy the second for a payload that happened to name
+  `X-Cache`.
+- `probe_crlf` now sends the control first, because the requirement cannot be
+  answered without one. It also reports `control_id` and tells the agent to
+  cite both.
+- Four directions are asserted: the real split proves, a body-only reflection
+  does not, a header the server always sends does not, and a bare `%0d%0a`
+  with nothing after it does not. Two stray pages now grade `unproven` for
+  crlf rather than `candidate` — there is no header in evidence to have been
+  injected.
+
 ### Cross-family verification (`argus judge`)
 - Ported from the orchestrator plane, with one rule the original did not need
   and this tree does: **a judge can dispute a finding or lower its severity,
@@ -299,12 +444,12 @@ system. All notable milestones on `agent-v2`.
   per-server errors instead of crashing startup.
 
 ### Verification & packaging
-- `python selftest.py`: 131 offline checks, including a documentation
+- `python selftest.py`: 137 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 439 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 476 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +
