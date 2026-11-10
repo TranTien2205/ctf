@@ -88,6 +88,15 @@ family — if you change a probe, update the lab and its test together.
   a directory listing graded `proven`; `verify_served_upload` accepted a
   confirmation page that merely mentioned the upload. If a check names a
   second exchange, say what makes it comparable.
+- **Never compute the same fact twice.** `probe_race` decided "the burst
+  overlapped" from wall-clock duration versus the sum of per-request
+  latencies, while `verify_concurrent_crossing` reconstructs each window as
+  `[ts - elapsed_ms, ts]` and tests intersection. Two computations of one
+  fact disagree eventually, and they did: on Windows runners `ts` is coarser
+  than `elapsed_ms`, so the probe announced a race the gate then refused.
+  A probe must not claim what the gate will deny, so the probe now reports
+  the gate's own reconstruction and keeps the wall-clock figure beside it as
+  a measurement rather than a verdict.
 - **A live assertion must not require the clock to cooperate.** Three `race`
   assertions demanded that an 8-request burst actually overlapped on the wire;
   all three Windows CI jobs failed while every Ubuntu job passed. The gate was

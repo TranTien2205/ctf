@@ -327,6 +327,7 @@ _CMDI_SEPARATORS = [
 # signatures, imported rather than re-spelled: the earlier copies drifted, and
 # the Windows one matched a JSON `\r` escape on any JSON-returning target.
 from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
+from ..proof import _overlaps                        # noqa: E402
 from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
 from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
 from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
@@ -1471,7 +1472,18 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
     # If the burst took ~as long as the requests would serially, nothing
     # actually overlapped and a multi-success cannot evidence a race.
     serial_est = sum(r.get("elapsed_ms", 0) for r in rs) / 1000
-    overlapped = not serial_est or burst_s < serial_est * 0.85
+    wall_overlap = not serial_est or burst_s < serial_est * 0.85
+    # ...but the GATE does not take this probe's word for it: it reconstructs
+    # each window as [ts - elapsed_ms, ts] from the recorded entries and
+    # tests intersection. Two computations of one fact will disagree, and
+    # they did: on Windows runners `ts` is coarser than `elapsed_ms`, so the
+    # probe reported `overlapped` while the gate found no intersection and
+    # refused - a probe claiming something the gate denies. So the authority
+    # is the gate's reconstruction, computed here from the same bytes.
+    recorded = [ctx.session._transcript.get(r["request_id"]) for r in rs]
+    recorded = [e for e in recorded if isinstance(e, dict)]
+    overlapped = any(_overlaps(a, b) for a in recorded for b in recorded
+                     if a is not b)
     serial: list[dict] = []
     if len(ok) > 1:
         serial = [_fire("serial baseline"), _fire("serial baseline")]
@@ -1482,9 +1494,13 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                    f"{len(serial)} serial probes also succeeded - the "
                    "action is repeatable, not a one-time race")
     elif len(ok) > 1 and not overlapped:
-        verdict = ("inconclusive: burst requests were serialized "
-                   f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
-                   "raise --rate or increase n and retry")
+        verdict = ("inconclusive: the recorded windows do not intersect, so "
+                   "nothing was on the wire at once "
+                   f"(burst {burst_s}s vs serial estimate {serial_est:.1f}s"
+                   + ("; wall-clock says they did overlap, but the gate "
+                      "reconstructs from ts and elapsed_ms and that is what "
+                      "a verifier can check" if wall_overlap else "")
+                   + ") - raise --rate or increase n and retry")
     elif len(ok) > 1:
         verdict = (f"race: {len(ok)}/{n} concurrent requests succeeded but "
                    f"serial probes now return "
@@ -1502,6 +1518,8 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                    f"{statuses} - endpoint may not be one-time")
     return {"verdict": verdict, "statuses": statuses,
             "burst_seconds": burst_s, "overlapped": overlapped,
+            "wall_clock_overlap": wall_overlap,
+            "serial_estimate_s": round(serial_est, 2),
             "serial_statuses": [r["status"] for r in serial],
             "results": [{"status": r["status"],
                          "request_id": r["request_id"]} for r in rs]}

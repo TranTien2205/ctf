@@ -278,6 +278,17 @@ read as a verifier regression until the counter was printed. The lab grew an
 explicit `/redeem/reset` so the dependency is visible in the tests that need
 it.
 
+CI then found a third, and it was the better one: **`probe_race` and
+`verify_concurrent_crossing` computed "the burst overlapped" two different
+ways.** The probe compared wall-clock duration against the sum of per-request
+latencies; the gate reconstructs each window as `[ts - elapsed_ms, ts]` and
+tests intersection. On Windows runners `ts` is coarser than `elapsed_ms`, so
+the probe announced a race the gate then refused - a probe claiming what the
+gate denies, which is the exact failure the agreement layer exists to catch,
+caught on a platform this machine cannot run. The probe now reports the
+gate's own reconstruction and keeps the wall-clock figure beside it as
+`wall_clock_overlap`, a measurement rather than a verdict.
+
 The second one CI found: three live `race` assertions required the burst to
 have actually overlapped on the wire, and all three Windows jobs failed while
 every Ubuntu job passed. The verifier was right to refuse - a burst the server
