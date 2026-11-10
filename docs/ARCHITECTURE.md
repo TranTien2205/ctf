@@ -291,6 +291,40 @@ rather than of the target: re-grading recorded transcripts found that `nosqli`
 graded `proven` on a page that merely echoed `{"$ne": null}` back. See
 `CHANGELOG.md`.
 
+## Cross-family verification (`argus judge`)
+
+```
+findings.json + the cited records ──► judge (a family the author is NOT in)
+                                          │
+                                          ▼
+                             {agrees, reason, severity, class, missing}
+                                          │
+                                   apply_verdict()
+                                          │
+              ┌───────────────────────────┼───────────────────────┐
+              ▼                           ▼                       ▼
+       disputed = true          severity may go DOWN         grade: untouched
+       (never cleared)          (original kept)              (the matrix owns it)
+```
+
+The one-way doors are the design. The matrix is deterministic and auditable; a
+model's opinion is neither. If an opinion could raise a `candidate` to
+`proven`, the strongest claim this system makes would rest on its weakest
+check — so the judge writes to its own fields and the report prints them next
+to the grade they dispute.
+
+That leaves the judge doing the thing the matrix cannot: the matrix grades
+whether the cited bytes meet a class's requirement, and has no view on whether
+the finding is filed under the right class, whether the title claims more than
+the bytes support, or whether the severity is defensible.
+
+Three replies are recorded as *no verdict* rather than assent — prose with no
+JSON object carrying `agrees`, two objects that contradict each other, and a
+transport failure. And if no model outside the author's family is
+credentialed, the command exits saying so: the author's own family reviewing
+itself is not cross-verification, which is why `--judge-model` is refused on
+those grounds too.
+
 ## Known residuals
 
 Two adversarial audits - the second against a frozen tree, with every finding
@@ -298,6 +332,13 @@ put to three independent skeptics - produced the fixes recorded in
 `CHANGELOG.md`. What follows is what they found and this system does NOT fix,
 written down so it is a decision rather than an omission. `argus proof <class>`
 prints each class's own version of this.
+
+**A judge is one call and one opinion.** There is no panel, no majority, and
+no second round: a single model from one other family reads each finding once.
+That is enough to catch a misfiled class or an indefensible severity and not
+enough to call anything settled. It also costs one call per finding on a
+second provider, which is why it is a separate command rather than a step in
+every run.
 
 **The decision controller reads the transcript, not the target.** It can only
 recommend surface that some recorded request already reached, so an endpoint

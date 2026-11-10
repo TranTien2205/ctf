@@ -120,6 +120,31 @@ def _proof_block(f: dict) -> list[str]:
     if not verdict:
         return []
     out = [f"**Proof grade: {f.get('grade', '?')}**  ", ""]
+    # A second model read the evidence. It cannot change the grade - that
+    # belongs to the matrix - so the only way its disagreement reaches a
+    # reader is by being printed here, next to the grade it disputes.
+    judged = f.get("judge") if isinstance(f.get("judge"), dict) else {}
+    if judged:
+        model = str(judged.get("judge_model") or "a second model")
+        if judged.get("error"):
+            out += [f"> **Cross-verification: no verdict** ({model}) - "
+                    f"{judged['error']}", ""]
+        elif judged.get("agrees"):
+            out += [f"> **Cross-verification: agreed** ({model}) - "
+                    f"{judged.get('reason', '')}", ""]
+        else:
+            out += [f"> **DISPUTED by cross-verification** ({model}) - "
+                    f"{judged.get('reason', '')}", ""]
+            if judged.get("missing"):
+                out += ["> Would settle it: "
+                        + "; ".join(str(m) for m in judged["missing"]), ""]
+        if f.get("class_disputed"):
+            out += [f"> The judge reads this evidence as "
+                    f"`{f['class_disputed']}`, not `"
+                    f"{(f.get('proof') or {}).get('vuln_class', '?')}`.", ""]
+        if f.get("severity_claimed"):
+            out += [f"> Severity lowered from `{f['severity_claimed']}` on "
+                    f"the judge's reading.", ""]
     if verdict.get("requirement"):
         out += [f"_Requirement for {verdict.get('vuln_class', '')}:_ "
                 f"{verdict['requirement']}", ""]

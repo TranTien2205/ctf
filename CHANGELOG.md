@@ -140,6 +140,33 @@ system. All notable milestones on `agent-v2`.
   hallucinated excerpts and malformed calls; no code path needed the
   model's word over the transcript's bytes.
 
+### Cross-family verification (`argus judge`)
+- Ported from the orchestrator plane, with one rule the original did not need
+  and this tree does: **a judge can dispute a finding or lower its severity,
+  never promote one.** `grade` belongs to the deterministic matrix; letting a
+  model's opinion raise one would put the strongest claim this system makes
+  behind the weakest check it has.
+- What it is for is the gap the matrix cannot see: whether the finding is
+  filed under the right class, whether the title claims more than the bytes
+  support, whether the severity is defensible. The judge reads the finding,
+  the class requirement and the cited records — never the first model's
+  reasoning, because the disagreement worth having is the one that reasoning
+  would not produce. `--dry-run` prints the case file and makes no call.
+- The judge comes from a family the author does not belong to, via
+  `models.for_role("judge", exclude_family=...)`. If none is credentialed the
+  command says so and exits: running the author's own family as its own
+  reviewer would not be cross-verification, and `--judge-model` is refused on
+  the same grounds.
+- Three non-answers are recorded as *no verdict* rather than assent: prose
+  with no JSON object carrying `agrees`, two objects that contradict each
+  other, and a transport failure (which carries no `reason`, so it cannot
+  read as a substantive dispute). Verdicts land in the transcript as a
+  `cross_verification` event, inside the hash chain, and the session is
+  re-sealed.
+- Fixed while building it: a reopened session had no `secret_values`, so any
+  command recording an event into an existing session died with an
+  `AttributeError` instead of writing its entry.
+
 ### The decision controller (`argus next`, `next_action`)
 - Ported from the ledger plane of the four-plane tree, rebuilt on this tree's
   own artifacts rather than a second state file. Seven ordered rules computed
@@ -277,9 +304,10 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 412 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 439 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
-  the decision controller + CLI + external-tool subprocess path +
+  the decision controller + the cross-family judge + CLI +
+  external-tool subprocess path +
   hardening regressions).
 - nosqli graded `proven` on a page that only echoed the operator back.
   `verify_data_extraction` asked the *request* whether the query named its

@@ -151,6 +151,24 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--json", action="store_true",
                          help="machine-readable verdict (ok/degraded/error)")
 
+    p_judge = sub.add_parser(
+        "judge", help="have a model from a different family read the evidence "
+                      "behind each finding. It can dispute or lower, never "
+                      "promote - the grade belongs to the proof matrix")
+    p_judge.add_argument("session_dir")
+    p_judge.add_argument("--judge-model", default=None,
+                         help="override the table's pick; refused if it is "
+                              "the same family as the model that ran")
+    p_judge.add_argument("--policy", default="strong",
+                         choices=["cheap", "strong"])
+    p_judge.add_argument("--only", default="",
+                         help="comma-separated finding ids (default: all)")
+    p_judge.add_argument("--seal-key", default=None)
+    p_judge.add_argument("--json", action="store_true")
+    p_judge.add_argument("--dry-run", action="store_true",
+                         help="print the case file a judge would be sent and "
+                              "make no call")
+
     p_next = sub.add_parser(
         "next", help="what the recorded evidence says to do next, computed "
                      "from a session directory rather than from the "
@@ -389,6 +407,9 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"[{sev:8}]{grade} {f.get('id', '?')} {f.get('title', '?')}"
                       f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
         return 0
+
+    if args.cmd == "judge":
+        return _cmd_judge(args)
 
     if args.cmd == "next":
         from . import decide as decide_mod
@@ -1363,6 +1384,135 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                    n_recon=1, n_exploit=1, n_report=0).run()
 
 
+def _cmd_judge(args) -> int:
+    """Cross-family verification over a recorded session.
+
+    Deliberately a separate command rather than a step in the run: it costs
+    one call per finding on a second provider, and it reads a session that is
+    already sealed. Re-sealing afterwards is the same trade `argus report`
+    makes - the chain still covers the new state, and `argus verify` says so.
+    """
+    from . import judge as judge_mod
+    from . import models as models_mod
+    from .config import _seal_key, resolve_auth, API_URL, DEFAULT_MODEL
+    from .session import _atomic_write, findings_bad, verify_transcript
+
+    sdir = Path(args.session_dir)
+    if not (sdir / "transcript.jsonl").exists():
+        print(f"no transcript.jsonl in {sdir} - not a session dir")
+        return 1
+    session = _reopen(sdir, _seal_key(args))
+    if not session._transcript:
+        print(f"{sdir} has an empty transcript - nothing to judge")
+        return 1
+
+    author = ""
+    try:
+        author = str(json.loads((sdir / "meta.json").read_text(
+            encoding="utf-8")).get("model") or "")
+    except Exception:
+        pass
+
+    v = verify_transcript(sdir)
+    if not v.get("chained") or v.get("tail_truncated") or v.get("bad_lines"):
+        print("warning: transcript chain check failed - judging an edited "
+              "transcript (run 'argus verify')", file=sys.stderr)
+    bad = findings_bad(session._transcript, session.findings)
+
+    wanted = {x.strip() for x in str(args.only or "").split(",") if x.strip()}
+    rows = [f for f in session.findings if isinstance(f, dict)
+            and (not wanted or f.get("id") in wanted)
+            and f.get("id") not in bad]
+    if not rows:
+        print("no findings to judge"
+              + (f" (excluded by evidence re-validation: {sorted(bad)})"
+                 if bad else ""))
+        return 0
+
+    def cited(finding):
+        return [session._transcript[i] for i in (finding.get("evidence_ids")
+                                                 or [])
+                if i in session._transcript]
+
+    if args.dry_run:
+        for finding in rows:
+            print(f"===== case file for {finding.get('id')} =====")
+            print(judge_mod.render_case(finding, cited(finding)))
+        return 0
+
+    if args.judge_model:
+        spec = models_mod.get(args.judge_model)
+        if spec is None:
+            print(f"{args.judge_model} is not in models.json; "
+                  f"`argus models` lists what is")
+            return 2
+        if author and models_mod.family(args.judge_model) == \
+                models_mod.family(author):
+            print(f"{args.judge_model} is the same family as {author}, which "
+                  "the run already used - two models that agree because they "
+                  "share a prior are not a check. Name another, or let the "
+                  "table pick.")
+            return 2
+        pick = spec
+    else:
+        pick = judge_mod.pick_judge(author or DEFAULT_MODEL, args.policy)
+    if pick is None:
+        print(f"no judge available: every model listed for the judge role "
+              f"outside {models_mod.family(author or DEFAULT_MODEL)!r} needs "
+              f"a credential that is not set. `argus models` shows which. "
+              f"Running the author's own family as its own reviewer would "
+              f"not be cross-verification.")
+        return 2
+
+    key, tok = resolve_auth(args)
+    cfg = Config(target="http://x", model=pick.key, api_key=key or "",
+                 auth_token=tok or "", api_base=API_URL)
+    if pick.provider == "anthropic" and not (key or tok):
+        print("no Anthropic credential found for the judge - set "
+              "ANTHROPIC_API_KEY or sign in to Claude Code")
+        return 1
+    from .llm import make_client
+    llm = make_client(cfg)
+    print(f"judge: {pick.key} ({pick.provider}); author: {author or '?'}; "
+          f"{len(rows)} finding(s)", file=sys.stderr)
+
+    verdicts, updated = [], []
+    for finding in session.findings:
+        if not isinstance(finding, dict) or finding not in rows:
+            updated.append(finding)
+            continue
+        verdict = judge_mod.judge_finding(llm, finding, cited(finding),
+                                          pick.key)
+        verdicts.append(verdict)
+        updated.append(judge_mod.apply_verdict(finding, verdict))
+    session.findings = updated
+
+    session.record_event("cross_verification", {
+        "judge_model": pick.key, "author_model": author,
+        "verdicts": [x.to_dict() for x in verdicts]})
+    _atomic_write(session.findings_path,
+                  json.dumps(session.findings, indent=2, ensure_ascii=False))
+
+    if args.json:
+        print(json.dumps([x.to_dict() for x in verdicts], indent=2,
+                         ensure_ascii=False))
+    else:
+        for x in verdicts:
+            mark = "AGREES " if x.agrees else "DISPUTES"
+            print(f"{mark} {x.finding_id}: {x.reason or x.error}")
+            if x.missing:
+                print(f"         would settle it: {'; '.join(x.missing)}")
+    try:
+        session.seal_artifacts()
+    except OSError as exc:
+        print(f"warning: re-seal failed: {exc}", file=sys.stderr)
+    disputed = sum(1 for x in verdicts if not x.agrees)
+    print(f"\n{len(verdicts) - disputed} agreed, {disputed} disputed. "
+          f"Grades are unchanged: a judge cannot promote a finding.",
+          file=sys.stderr)
+    return 0
+
+
 def _reopen(sdir: Path, seal_key: str = "") -> Session:
     """Rebuild a Session view over an existing session directory.
 
@@ -1382,6 +1532,12 @@ def _reopen(sdir: Path, seal_key: str = "") -> Session:
     sess.resumed = False
     sess.require_proof = False
     sess.seal_key = str(seal_key or "")
+    # `record_event` redacts against this, and a reopened session had no such
+    # attribute: any command that recorded into an existing session died with
+    # an AttributeError instead of writing its entry. There are no live
+    # credentials to redact on a reopen - the run that held them is over, and
+    # anything they touched was already redacted on the way in.
+    sess.secret_values = set()
     mpath = sdir / "meta.json"
     if mpath.is_file():
         try:

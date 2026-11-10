@@ -326,6 +326,57 @@ proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
 working directory. If a run is refused, pick the in-scope equivalent —
 e.g. `-b name=value` instead of a cookie-jar path.
 
+## A second model on the evidence (`argus judge`)
+
+```bash
+python -m argus judge <session>                  # the table picks the judge
+python -m argus judge <session> --dry-run        # print the case file, no call
+python -m argus judge <session> --judge-model gpt-4.1 --only F01,F03
+```
+
+One rule governs everything this command does:
+
+> **a judge can dispute a finding or lower its severity. It can never promote
+> one.**
+
+The proof matrix is deterministic and auditable. A model's opinion is neither.
+If an opinion could raise a `candidate` to `proven`, the strongest claim this
+system makes would rest on its weakest check — so `grade` is never touched
+here, and a disagreement lands in a separate `judge` field the report prints
+next to the grade it disputes.
+
+What a judge is *for*, then, is the gap the matrix cannot see. The matrix
+grades whether the cited bytes meet a class's requirement. It cannot tell you
+the finding is filed under the wrong class, that the title claims more than
+the bytes support, or that the severity is indefensible. Those are judgements,
+and a model from a different family is a real second opinion on them.
+
+The judge is shown the finding, its class's requirement, and the cited records
+— never the first model's reasoning, because the disagreement worth having is
+the one that reasoning would not produce. `--dry-run` prints exactly what it
+would be sent.
+
+Four refusals worth knowing:
+
+* **No independent judge is an answer.** If every model listed for the `judge`
+  role outside the author's family needs a credential that is not set, the
+  command says so and exits. Running the author's own family as its own
+  reviewer and calling it cross-verification would be the kind of claim this
+  system exists not to make — `--judge-model` is refused for the same reason.
+* **Prose is not a verdict.** A reply with no JSON object carrying `agrees` is
+  recorded as *no verdict*, not as assent.
+* **Two contradicting objects are not a verdict either.** A model that
+  illustrated the format and then answered, and one that answered and then
+  hedged, emit the same two objects in the same order; picking one would be a
+  guess, and a guess landing on "agrees" manufactures the assent the command
+  exists to avoid.
+* **A transport failure is not a dispute.** It is recorded as an error with no
+  `reason`, so it cannot read as a substantive disagreement in the report.
+
+The verdicts are recorded into the transcript as a `cross_verification` event,
+so they are inside the hash chain, and the session is re-sealed afterwards —
+the same trade `argus report` makes.
+
 ## Asking the evidence what is next (`argus next`)
 
 ```bash

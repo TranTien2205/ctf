@@ -47,6 +47,8 @@ python -m argus proof rce           # what a class must produce to be a finding
 python -m argus proof               # all 29 requirements
 python -m argus next docs/sample-session
                                     # what the recorded evidence says to do next
+python -m argus judge docs/sample-session --dry-run
+                                    # the case file a second-family model reads
 python -m argus models              # providers, prices, and what each is for
 python -m argus mcp-serve http://127.0.0.1:8777 --allow-private
                                     # serve the tools to your own LLM
