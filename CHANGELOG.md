@@ -161,9 +161,11 @@ system. All notable milestones on `agent-v2`.
   `application/octet-stream`, `image/png`, none at all), an active type served
   as an attachment, a 404 on the stored path, a fetch of somebody else's file,
   and an ordinary HTML page with no upload in evidence.
-- **The count, stated once.** `smuggle` alone remains capped at `candidate`
-  for want of a verifier - one, down from six: `lockout`, `enum`, `crlf`,
-  `upload`, `method`, `race` and `websocket` came off that list. `xss` (no browser
+- **The count, stated once.** No class is capped at `candidate` for want of a
+  verifier any more - zero, down from six: `crlf`, `method`, `upload`,
+  `race`, `websocket` and `smuggle` all came off, after `lockout` and `enum`
+  before them. The selftest's word map took "no"/"none" so the docs can state
+  zero *explicitly*; a deleted sentence must not read as agreement. `xss` (no browser
   ships here) and `ssrf` (no out-of-band collector) are capped for reasons
   that are not labour, and `dos` is refused by construction; those three will
   not move. The count used to be restated in three places written at three
@@ -171,6 +173,33 @@ system. All notable milestones on `agent-v2`.
   `test_the_capped_set_is_exactly_what_the_docs_claim` now asserts the set
   against the matrix - a doc gate cannot read prose, but a test can hold the
   claim it makes.
+
+### smuggle: the last class capped for want of a verifier
+- The note read "this system sends the desync pair and reads the difference,
+  which is a candidate". The difference was never the evidence, and the real
+  artefact had been recorded all along: `send_raw` keeps `request_text`, so a
+  request declaring both `Content-Length` and `Transfer-Encoding` is visible
+  rather than collapsed into a headers dict, and it keeps responses from an
+  extra read, so a reply that arrived with no request of its own is visible
+  too - which is the requirement sentence almost word for word.
+- `verify_desync` takes two shapes, both of which `probe_smuggle` already
+  sends: **TE.CL**, where the smuggled request line is complete so the
+  poisoned answer arrives on its own (an entry whose request method is `-`),
+  and **CL.TE**, where the stray byte prefixes the probe's own next request
+  line. Either way the check that carries the weight is a bogus method named
+  back - `GGET`, `GPOST` - because a 4xx naming no method is a server
+  disliking an ambiguous request, which is what it should do.
+- Five directions asserted, plus the live pair in the agreement layer against
+  `/desync` and `/desync-none`: the two real shapes prove, a polite 400 does
+  not, a bogus method with no ambiguity does not, a desync response recorded
+  *before* the ambiguity does not, and one on another endpoint does not.
+- **The verifier raised instead of refusing**, which `grade()` reports as
+  "evidence is readable" failing and so hides the real answer. It ordered
+  exchanges by parsing `r<n>` out of the id and called `min()` on the empty
+  result when no id matched that shape. Ids belong to the recorder; a
+  verifier reasons about position and content. `test_no_verifier_raises_on_an
+  _id_it_cannot_parse` now runs all 29 classes against entries whose ids are
+  a string, an int and `None`.
 
 ### websocket: the package has a WebSocket client now
 - The cap read "needs a real WebSocket client. This system compares the
@@ -229,7 +258,7 @@ system. All notable milestones on `agent-v2`.
 - Two tests hold the code side: a ceiling without a reason is undocumented, a
   reason without a ceiling is a leftover from a freed class, and the
   `unimplemented` set is exactly the `verify_generic` set minus `ssrf`.
-- Standing: `smuggle` capped for want of a verifier; `ssrf`
+- Standing: nothing capped for want of a verifier; `ssrf`
   (no out-of-band collector) and `xss` (no browser) capped for real reasons;
   `dos` refused by construction. `lockout`, `enum`, `crlf`, `upload`, `method`
   and `race` have come off.
@@ -483,7 +512,7 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 484 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 491 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +

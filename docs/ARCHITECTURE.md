@@ -356,15 +356,21 @@ as the budget unit, so five probes spread over five endpoints never trigger
 `park_and_switch`. Neither is a soundness problem - it never claims a proof -
 but both are reasons the ladder is advice and not a plan.
 
-**One class is capped at `candidate` and the cap is a missing
-implementation, not a law of nature.** `smuggle` would be settled by the
-desync response on the wire. It is checkable from what the transcript already
-records, and it needs a verifier written. `lockout`, `enum`, `crlf`, `method`,
-`upload`, `race` and `websocket` were in this list and came out of it - the
-pattern works, the rest is labour.
-Until then the requirement sentence says what would settle the class, and
-`tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code so
-the list cannot grow in silence.
+**No class is capped at `candidate` for want of a verifier any more.** That
+list held six - `crlf`, `method`, `upload`, `race`, `websocket`, `smuggle` -
+plus `lockout` and `enum` before them, and it is empty.
+`tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code, so
+a new entry cannot appear in silence: adding one needs its own positive test
+and a line here, and the selftest holds this paragraph's count to the matrix.
+
+Every one of the six followed the same shape, which is the thing worth
+carrying forward: **the note described the verifier, not the evidence.** The
+transcript already recorded what each class needed - response headers as a
+dict, `ts` plus `elapsed_ms` for concurrency, the wire text of a request with
+two framings, unsolicited responses from an extra read. `websocket` was the
+only one that genuinely needed a new capability rather than a re-reading, and
+in every case fixing the verifier exposed a defect in the probe, because a
+class nobody could prove is a class whose probe nobody had to get right.
 
 `websocket` is the one that needed a real capability rather than a reading:
 `GuardedClient.send_ws` is a third socket-owning path in the package, because
@@ -380,6 +386,20 @@ challenge is not a WebSocket endpoint and the record is the only place to tell
 from. The lab grew a `/ws-strict` route - the same endpoint with the Origin
 check in place - so the refusing direction is exercised against a real server
 rather than only a fixture.
+
+`smuggle` was the last off, and its evidence had been in the transcript the
+whole time. The note read "this system sends the desync pair and reads the
+difference, which is a candidate" - but the difference was never the
+evidence. `send_raw` keeps `request_text`, so a request declaring both
+`Content-Length` and `Transfer-Encoding` is visible rather than collapsed into
+a headers dict; and it keeps responses from an extra read, so a reply that
+arrived with no request of its own is visible too. That second thing is the
+requirement sentence almost word for word. Two shapes count: TE.CL, where the
+smuggled request line is complete and the poisoned answer arrives on its own
+(an entry whose request method is `-`), and CL.TE, where the stray byte
+prefixes the probe's own next request line. Either way the check that matters
+is a **bogus method named back** - a 4xx naming no method is a server
+disliking an ambiguous request, which is what it should do.
 
 `crlf`, `method`, `upload` and `race` are the worked examples of what coming
 off that list costs, and all four followed the same shape: the note described the

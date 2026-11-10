@@ -316,10 +316,12 @@ def main() -> int:
           "constructor.prototype" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync")
     check("smuggle probe sees cl.te desync",
-          "cl.te desync candidate" in out["verdict"])
+          "cl.te desync" in out["verdict"]
+          and bool(out.get("ambiguous_id")) and bool(out.get("check_id")))
     out = probes.probe_smuggle(ctx, base + "/desync-cl")
     check("smuggle probe sees te.cl desync",
-          "te.cl desync candidate" in out["verdict"])
+          "te.cl desync" in out["verdict"]
+          and bool(out.get("ambiguous_id")) and bool(out.get("check_id")))
     out = probes.probe_smuggle(ctx, base + "/desync-obf")
     check("smuggle probe sees obfuscated-te desync",
           "obfuscated TE" in out["verdict"])
@@ -793,7 +795,10 @@ def _doc_consistency() -> None:
     #     matrix twice while classes came off the list, in both ARCHITECTURE
     #     and CHANGELOG, so `cap_reason` makes it derivable and this check
     #     holds the sentence to it.
-    _WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+    # "no"/"none" so the docs can state a count of ZERO explicitly rather
+    # than by saying nothing - a deleted sentence must not read as agreement
+    _WORDS = {"no": 0, "none": 0,
+              "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
               "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
     unimplemented = sorted(
         spec.vuln_class

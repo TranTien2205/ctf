@@ -58,6 +58,8 @@ VULNERABLE = [
     ("probe_cors", "cors", lambda c, b: probes.probe_cors(c, b + "/api/data")),
     ("probe_websocket", "websocket",
      lambda c, b: probes.probe_websocket(c, b + "/ws")),
+    ("probe_smuggle", "smuggle",
+     lambda c, b: probes.probe_smuggle(c, b + "/desync")),
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -83,6 +85,10 @@ CLEAN = [
     # defence working and must not grade
     ("probe_websocket", "websocket",
      lambda c, b: probes.probe_websocket(c, b + "/ws-strict")),
+    # `/desync-none` agrees with itself about framing: the ambiguous request
+    # gets a clean follow-up, which is the defence working
+    ("probe_smuggle", "smuggle",
+     lambda c, b: probes.probe_smuggle(c, b + "/desync-none")),
 ]
 # `cors` has no clean case here: the lab reflects any `Origin` with
 # credentials from the shared response helper, so every endpoint is
@@ -181,5 +187,5 @@ def test_both_directions_are_exercised_for_the_classes_that_have_both():
     clean = {k for _, k, _ in CLEAN}
     both = vulnerable & clean
     assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect",
-            "websocket"} <= both, (
+            "websocket", "smuggle"} <= both, (
         f"classes exercised in both directions: {sorted(both)}")

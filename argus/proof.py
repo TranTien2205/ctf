@@ -1689,6 +1689,102 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return checks
 
 
+# A method name no client sends: the stray byte left in the stream prefixes
+# the next request line, so a desynced back end answers about `GPOST`, `GGET`
+# and friends. A generic "400 Bad Request" names nothing and proves nothing.
+BOGUS_METHOD_RE = re.compile(
+    r"(?:\bG(?:GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)\b"
+    r"|['\"( ]G[A-Z]{2,}['\")]"
+    r"|method '?G[A-Z]{2,})")
+# Both framings declared on one request is the ambiguity itself.
+_CL_RE = re.compile(r"(?im)^\s*content-length\s*:", re.M)
+_TE_RE = re.compile(r"(?im)^\s*transfer-encoding\s*:", re.M)
+
+
+def _wire_text(entry: dict) -> str:
+    """The request as it went on the wire, if the recorder kept it.
+
+    `send_raw` keeps `request_text` precisely because a headers dict
+    collapses duplicates - and a duplicated or conflicting framing header
+    pair IS the evidence for this class.
+    """
+    req = (entry or {}).get("request") or {}
+    text = str(req.get("request_text") or "")
+    if text:
+        return text
+    headers = req.get("headers") if isinstance(req.get("headers"), dict) else {}
+    return "\n".join(f"{k}: {v}" for k, v in headers.items())
+
+
+def verify_desync(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """Request smuggling: two framings declared, and the connection confused.
+
+    The note said this system "sends the desync pair and reads the
+    difference, which is a candidate". The difference was never the
+    evidence; the recorded artefact is, and `probe_smuggle` has been
+    recording it all along - `send_raw` keeps the wire text, so a request
+    carrying both `Content-Length` and `Transfer-Encoding` is visible, and
+    it keeps unsolicited responses from an extra read, so a response that
+    arrived with no request of its own is visible too.
+
+    Two shapes count, and they are the two the probe sends:
+
+    * **TE.CL** - the smuggled request line is complete, so the poisoned
+      response arrives on its own. In the transcript that is an entry whose
+      request method is `-`: a response nothing asked for, which is the
+      requirement sentence almost word for word.
+    * **CL.TE** - the stray byte prefixes OUR next request line, so the
+      answer comes back naming a method no client sends. The response was
+      solicited, but the method it complains about was not sent by anyone.
+
+    Either way the second check is the one that matters: a bogus method
+    named back. A 4xx with no method in it is a server disliking the request,
+    which is what an ambiguous request deserves and not a desync.
+    """
+    exchanges = claim.exchanges
+    checks: list[dict] = []
+
+    ambiguous = [e for e in exchanges
+                 if _CL_RE.search(_wire_text(e)) and _TE_RE.search(_wire_text(e))]
+    checks.append(_check(
+        "the request declared two conflicting framings", bool(ambiguous),
+        f"Content-Length and Transfer-Encoding both on "
+        f"{ambiguous[0].get('id')}" if ambiguous else
+        "no cited request carries both Content-Length and Transfer-Encoding "
+        "- without the ambiguity there is nothing for a front end and a back "
+        "end to disagree about"))
+
+    desync, detail = None, "no response names a method the probe never sent"
+    if ambiguous:
+        # Order by position in the cited list, not by parsing `r<n>` out of
+        # the id. The ids are the recorder's business, and an id this
+        # verifier cannot parse made it raise rather than refuse - which
+        # `grade()` reports as "evidence is readable", hiding the real answer.
+        first = min(exchanges.index(e) for e in ambiguous)
+        shapes = {_endpoint_shape(e) for e in ambiguous}
+        for position, entry in enumerate(exchanges):
+            if position <= first:
+                continue              # before the ambiguity: not its effect
+            if _endpoint_shape(entry) not in shapes:
+                continue
+            hit = BOGUS_METHOD_RE.search(resp_body(entry))
+            if not hit:
+                continue
+            unsolicited = _method_of(entry) == "-"
+            desync = (entry, hit.group(0).strip(), unsolicited)
+            break
+    if desync is not None:
+        entry, named, unsolicited = desync
+        detail = (f"{entry.get('id')} answered about {named!r} "
+                  + ("with no request of its own - the back end was "
+                     "answering a request the front end never sent"
+                     if unsolicited else
+                     "- the stray bytes prefixed the next request line"))
+    checks.append(_check("the connection's framing was desynchronised",
+                         desync is not None, detail))
+    return checks
+
+
 _WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
@@ -2176,13 +2272,14 @@ for _s in [
               floor=("the value reached a requester that did not send it",),
               aliases=("cache-poisoning", "cachepoisoning", "web-cache-deception",
                        "cache-deception")),
-    ProofSpec("smuggle", "a request boundary the front end and the back end "
-              "disagreed about, shown by a response arriving on a connection "
-              "that did not ask for it. This system sends the desync pair and "
-              "reads the difference, which is a candidate",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              cap_reason="unimplemented",
+    ProofSpec("smuggle", "a request declaring two framings, and the back end "
+              "answering about a method no client sends - either on a "
+              "response nothing asked for (TE.CL) or on the probe's own next "
+              "request line (CL.TE)",
+              ("the request declared two conflicting framings",
+               "the connection's framing was desynchronised"),
+              verify_desync,
+              floor=("the connection's framing was desynchronised",),
               aliases=("request-smuggling", "requestsmuggling", "desync",
                        "cl-te", "te-cl")),
     ProofSpec("xfh", "restricted content returned when an ACL-relevant header "

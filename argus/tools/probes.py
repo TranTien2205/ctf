@@ -1705,7 +1705,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
                            "dropped connection; retry manually",
                 "ambiguous_id": s1["request_id"], "sends": sends}
     if s2["status"] >= 400 and _SMUGGLE_G.search(s2.get("body") or ""):
-        return {"verdict": "cl.te desync candidate: the stray 'G' poisoned "
+        return {"verdict": "cl.te desync: the stray 'G' poisoned "
                            "the next request's method line - back-end parsed "
                            "chunked framing while the front-end forwarded "
                            "Content-Length bytes",
@@ -1732,7 +1732,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
                            "response", "sends": sends + sends2}
     t1, t2 = sends2[0], sends2[1]
     if t2["status"] >= 400 and _SMUGGLE_G.search(t2.get("body") or ""):
-        return {"verdict": "te.cl desync candidate: the smuggled 'GPOST' "
+        return {"verdict": "te.cl desync: the smuggled 'GPOST' "
                            "request answered on its own - back-end honored "
                            "Content-Length while the front-end forwarded "
                            "chunked framing",
@@ -1757,7 +1757,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
             continue
         o1, o2 = sends3
         if o2["status"] >= 400 and _SMUGGLE_G.search(o2.get("body") or ""):
-            return {"verdict": "cl.te desync candidate (obfuscated TE "
+            return {"verdict": "cl.te desync (obfuscated TE "
                                f"{obf!r}): the stray 'G' poisoned the next "
                                "request's method line - front-end did not "
                                "honor the non-canonical TE while the "

@@ -97,6 +97,15 @@ family — if you change a probe, update the lab and its test together.
   `served_ctype`, `overlapped` and `serial_statuses`. If a probe has no field
   for the thing a test needs, add the field - that is also what the verifier
   will need.
+- **A new cap needs a reason that is not labour.** The "capped for want of a
+  verifier" list is empty: `lockout`, `enum`, `crlf`, `method`, `upload`,
+  `race`, `websocket` and `smuggle` all came off it, and every one of them
+  came off the same way - the note described the verifier, not the evidence,
+  and the transcript already recorded what the class needed. So a new
+  `cap_reason=CAP_UNIMPLEMENTED` is a claim that this tree's recorder does
+  not hold the artefact, and it should be checked before it is written.
+  `tests/test_proof.py::CANNOT_BE_PROVEN_HERE` and the selftest's count
+  check both fail if one appears undocumented.
 - A capped class states `cap_reason` as well as `ceiling`:
   `proof.CAP_UNIMPLEMENTED` when the transcript already records what a
   verifier would need, otherwise the real reason. `argus proof <class>`

@@ -739,11 +739,14 @@ def test_difference_only_classes_cannot_reach_proven():
     # missing client rather than a missing verifier: `GuardedClient.send_ws`
     # frames now, so the handshake AND the answered message are both on
     # record and both checkable.
-    for name in ("ssrf", "smuggle"):
+    # ssrf is the only one left on `verify_generic`, and its cap is the
+    # missing out-of-band collector rather than a missing verifier
+    for name in ("ssrf",):
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
         assert proof.spec_for(name).ceiling == "candidate"
-    for left in ("crlf", "method", "upload", "race", "websocket"):
+    for left in ("crlf", "method", "upload", "race", "websocket",
+                 "smuggle"):
         v = proof.grade(left, "Page A unique", [a, b])
         assert v.grade == "unproven", \
             f"{left} graded {v.grade} on two stray pages"
@@ -977,7 +980,6 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 CANNOT_BE_PROVEN_HERE = {
     "xss": "no browser",
     "ssrf": "no collector",
-    "smuggle": "the desync pair is read as a difference",
     "dos": "refused by construction",
 }
 
@@ -1803,20 +1805,20 @@ def test_the_capped_set_is_exactly_what_the_docs_claim():
     capped = {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
     refused = {s.vuln_class for s in proof.MATRIX.values()
                if s.verifier is proof.verify_refused}
-    assert capped == {"smuggle", "xss", "ssrf"}, capped
+    assert capped == {"xss", "ssrf"}, capped
     assert refused == {"dos"}, refused
     # `verify_generic` is `_discriminates` alone, which is what "no verifier
     # written yet" looks like. ssrf shares it for a different reason: the
     # evidence it would need is an out-of-band hit this package cannot see,
     # so writing a verifier would not help.
-    assert {"smuggle", "ssrf"} == {
+    assert {"ssrf"} == {
         s.vuln_class for s in proof.MATRIX.values()
         if s.verifier is proof.verify_generic}
     assert proof.spec_for("xss").verifier is not proof.verify_generic, \
         "xss has a real verifier; its cap is the missing browser"
     # and the five that came off the list keep real verifiers
     for name in ("lockout", "enum", "crlf", "upload", "method", "race",
-                 "websocket"):
+                 "websocket", "smuggle"):
         spec = proof.spec_for(name)
         assert spec.ceiling == "", f"{name} is capped again"
         assert spec.verifier not in (proof.verify_generic,
@@ -1842,10 +1844,12 @@ def test_the_unimplemented_caps_are_exactly_the_generic_verifier_ones():
     specs = {s.vuln_class: s for s in proof.MATRIX.values()}.values()
     unimplemented = {s.vuln_class for s in specs
                      if s.cap_reason == proof.CAP_UNIMPLEMENTED}
-    assert unimplemented == {"smuggle"}, unimplemented
+    assert unimplemented == set(), (
+        f"{sorted(unimplemented)} capped for want of a verifier - the list is "
+        "empty now, so a new entry needs its own positive test and a doc line")
     generic = {s.vuln_class for s in specs
                if s.verifier is proof.verify_generic}
-    assert unimplemented < generic
+    assert unimplemented <= generic
     assert generic - unimplemented == {"ssrf"}
     assert proof.spec_for("ssrf").cap_reason != proof.CAP_UNIMPLEMENTED
 
@@ -1856,8 +1860,8 @@ def test_a_capped_class_says_so_when_printed():
     import io
     import contextlib
     from argus.cli import main
-    for klass, expect in (("smuggle", "labour, not a limit"),
-                          ("xss", "no browser ships"),
+    for klass, expect in (("xss", "no browser ships"),
+                          ("ssrf", "out-of-band collector"),
                           ("dos", "REFUSED")):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
@@ -2026,3 +2030,129 @@ def test_a_refused_upgrade_proves_nothing():
                           "https://argus-probe.invalid", status=403)
     assert proof.grade("websocket", "origin not allowed",
                        [shake]).grade != "proven"
+
+
+def _ambiguous(rid, url, body, status=200, method="POST"):
+    """A request declaring BOTH framings, as send_raw records it."""
+    text = (f"{method} /x HTTP/1.1\r\nHost: t.local\r\n"
+            "Content-Length: 6\r\nTransfer-Encoding: chunked\r\n\r\n")
+    return {"id": rid,
+            "request": {"method": method, "url": url,
+                        "headers": {"Content-Length": "6",
+                                    "Transfer-Encoding": "chunked"},
+                        "request_text": text, "body": "0\r\n\r\nG"},
+            "response": {"status": status, "headers": {}, "body": body}}
+
+
+def _followup(rid, url, body, status=501, method="GET"):
+    return {"id": rid,
+            "request": {"method": method, "url": url, "headers": {},
+                        "request_text": f"{method} /x HTTP/1.1", "body": None},
+            "response": {"status": status, "headers": {}, "body": body}}
+
+
+def test_smuggle_is_proven_by_a_bogus_method_named_back():
+    """`smuggle` came off the CANNOT_BE_PROVEN_HERE list - the last one that
+    was capped for want of a verifier.
+
+    The note said this system "sends the desync pair and reads the
+    difference, which is a candidate". The difference was never the
+    evidence: `send_raw` keeps the wire text, so the ambiguous framing is
+    visible, and it keeps unsolicited responses, so a response nothing asked
+    for is visible too.
+    """
+    url = "http://t.local/x"
+    # CL.TE: our own next request line was poisoned
+    clte = [_ambiguous("s1", url, "ok"),
+            _followup("s2", url, "Unsupported method ('GGET')")]
+    assert proof.grade("smuggle", "Unsupported method ('GGET')",
+                       clte).grade == "proven"
+
+    # TE.CL: the response arrived with no request of its own (method "-")
+    tecl = [_ambiguous("s3", url, "ok"),
+            _followup("s4", url, "Unsupported method ('GPOST')",
+                      method="-")]
+    verdict = proof.grade("smuggle", "Unsupported method ('GPOST')", tecl)
+    assert verdict.grade == "proven", verdict.explain()
+    assert "with no request of its own" in " ".join(
+        str(c.get("detail", "")) for c in verdict.checks)
+
+
+def test_an_ambiguous_request_a_server_merely_dislikes_is_not_a_desync():
+    url = "http://t.local/x"
+    # a 400 that names no method is a server refusing an ambiguous request,
+    # which is what it should do
+    polite = [_ambiguous("s5", url, "ok"),
+              _followup("s6", url, "Bad Request", status=400)]
+    verdict = proof.grade("smuggle", "Bad Request", polite)
+    assert verdict.grade != "proven"
+    assert "the connection's framing was desynchronised" in verdict.missing
+
+
+def test_a_bogus_method_without_the_ambiguity_proves_nothing():
+    url = "http://t.local/x"
+    plain = {"id": "s7",
+             "request": {"method": "GET", "url": url, "headers": {},
+                         "request_text": "GET /x HTTP/1.1", "body": None},
+             "response": {"status": 501, "headers": {},
+                          "body": "Unsupported method ('GGET')"}}
+    verdict = proof.grade("smuggle", "Unsupported method ('GGET')", [plain])
+    assert verdict.grade != "proven"
+    assert "the request declared two conflicting framings" in verdict.missing
+
+
+def test_a_desync_response_before_the_ambiguity_is_not_its_effect():
+    url = "http://t.local/x"
+    before = _followup("s8", url, "Unsupported method ('GGET')")
+    after = _ambiguous("s9", url, "ok")
+    assert proof.grade("smuggle", "Unsupported method ('GGET')",
+                       [before, after]).grade != "proven"
+
+
+def test_a_desync_on_another_endpoint_does_not_count():
+    amb = _ambiguous("sa", "http://t.local/x", "ok")
+    other = _followup("sb", "http://t.local/elsewhere",
+                      "Unsupported method ('GGET')")
+    assert proof.grade("smuggle", "Unsupported method ('GGET')",
+                       [amb, other]).grade != "proven"
+
+
+def test_no_verifier_raises_on_an_id_it_cannot_parse():
+    """A verifier that raises is reported as "evidence is readable" failing,
+    which hides whatever the real answer was.
+
+    `verify_desync` ordered exchanges by parsing `r<n>` out of the id and
+    called `min()` on the empty result when no id matched - so a claim it
+    should have refused for a substantive reason came back as unreadable
+    instead. The ids belong to the recorder; a verifier reasons about
+    position and content.
+    """
+    odd = [
+        {"id": "weird-id-1",
+         "request": {"method": "POST", "url": "http://t.local/x",
+                     "headers": {"Content-Length": "6",
+                                 "Transfer-Encoding": "chunked"},
+                     "request_text": "POST /x HTTP/1.1\r\n"
+                                     "Content-Length: 6\r\n"
+                                     "Transfer-Encoding: chunked\r\n\r\n",
+                     "body": "0\r\n\r\nG"},
+         "response": {"status": 200, "headers": {"content-type": "text/html"},
+                      "body": "<html>hello</html>", "elapsed_ms": 5.0}},
+        {"id": 42,
+         "request": {"method": "GET", "url": "http://t.local/y",
+                     "headers": {}, "body": None},
+         "response": {"status": 200, "headers": {}, "body": "ok",
+                      "elapsed_ms": 5.0}},
+        {"id": None,
+         "request": {"method": "-", "url": "http://t.local/x",
+                     "headers": {}, "body": None},
+         "response": {"status": 501, "headers": {}, "body": "nope",
+                      "elapsed_ms": 5.0}},
+    ]
+    for name in proof.classes():
+        verdict = proof.grade(name, "<html>hello</html>", odd)
+        unreadable = [c for c in verdict.checks
+                      if c["check"] == "evidence is readable" and not c["ok"]]
+        assert not unreadable, (
+            f"{name} raised instead of refusing: "
+            f"{unreadable[0].get('detail')}")
