@@ -746,6 +746,100 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return checks
 
 
+def verify_operator_injection(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """NoSQL operator injection: the operator CHANGED what the store answered.
+
+    This used to share `verify_data_extraction` with sqli, and inherited its
+    shape: "a document came back" plus "the request carried an operator".
+    Both are true of any JSON API that was merely probed - `/api/posts`
+    returns `[{"_id": ...}]` whether or not the `$ne` in the query did
+    anything - so a PUBLIC listing graded `proven` the moment somebody
+    pointed a probe at it. Found by an adversarial audit.
+
+    A document store has no FROM clause, so the request can only ever show an
+    attempt. The evidence has to be a DIFFERENCE against a control to the
+    same endpoint without the operator, and it comes in two shapes, both of
+    which `probe_nosqli` records:
+
+    * **access** - the control was refused and the operator request was not.
+      That is the authentication bypass, and it is the common real one.
+    * **extraction** - the operator response carries documents the control's
+      does not.
+
+    Either way a control is required. Without one there is no way to tell an
+    injection from an endpoint doing its job.
+    """
+    checks: list[dict] = []
+    withop = [e for e in claim.exchanges if NOSQL_OP_RE.search(req_text(e))]
+    checks.append(_check(
+        "the request carried an operator query", bool(withop),
+        f"{NOSQL_OP_RE.search(req_text(withop[0])).group(0)[:40]} in "
+        f"{withop[0].get('id')}" if withop else
+        "no cited request carries an operator query ($ne, $gt, $regex, "
+        "$where) - without one nothing was injected"))
+
+    def build(entry: dict | None) -> list[dict]:
+        out = []
+        rid = (entry or {}).get("id", "?")
+        body = resp_body(entry) if entry else ""
+        controls = [e for e in claim.exchanges
+                    if entry is not None and e is not entry
+                    and _endpoint_shape(e) == _endpoint_shape(entry)
+                    and not NOSQL_OP_RE.search(req_text(e))] if entry else []
+        refused_control = next(
+            (c for c in controls if status_of(c) >= 400), None)
+        answered = bool(entry) and 200 <= status_of(entry) < 300
+        access = bool(refused_control and answered)
+        records = RECORD_RE.search(body) if entry else None
+        if records is not None and entry is not None and \
+                records.group(0) in req_text(entry):
+            records = None
+        extraction = bool(records) and any(
+            not RECORD_RE.search(resp_body(c)) for c in controls)
+        changed = access or extraction
+        if changed:
+            detail = (f"{refused_control.get('id')} was refused "
+                      f"{status_of(refused_control)} and {rid} answered "
+                      f"{status_of(entry)}" if access else
+                      f"{records.group(0)[:40]} in {rid} and in no control")
+        elif not controls:
+            detail = ("no control cited: a request to the same endpoint "
+                      "WITHOUT the operator is what separates an injection "
+                      "from an endpoint doing its job")
+        elif records is not None:
+            detail = (f"{controls[0].get('id')} returns documents too - that "
+                      "is what this endpoint answers anyway")
+        else:
+            detail = (f"{rid} answered {status_of(entry)} and no control was "
+                      "refused, and no document shape came back that a "
+                      "control lacks - the operator changed nothing")
+        out.append(_check("the operator changed what the store answered",
+                          changed, detail))
+        quoted = bool(claim.excerpt) and claim.excerpt in body
+        is_error = bool(claim.excerpt) and (
+            bool(DBMS_RE.search(claim.excerpt))
+            or bool(REFUSAL_RE.search(claim.excerpt)))
+        ok = changed and quoted and not is_error
+        out.append(_check(
+            "the quoted bytes are the access, not an error", ok,
+            f"quoted from {rid}" if ok else
+            ("the excerpt is an error or a refusal, not the access gained"
+             if is_error else f"the quoted bytes are not in {rid}"
+             if changed and not quoted else
+             "nothing changed to quote")))
+        return out
+
+    checks += _witness(claim.exchanges or [None], build,
+                       ("the operator changed what the store answered",
+                        "the quoted bytes are the access, not an error"))
+    rows = claim.excerpt.count("\n") + 1 if claim.excerpt else 0
+    checks.append(_check("extraction stayed minimal", rows <= 20,
+                         "" if rows <= 20 else
+                         f"{rows} lines quoted - five rows is a proof, a dump "
+                         "is an incident"))
+    return checks
+
+
 def verify_file_read(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Arbitrary read: a sentinel out of a file, from a request that asked for
     one, plus a control path that does not exist.
@@ -1360,6 +1454,30 @@ def verify_oracle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+# A credential field, which is what makes a request an authentication
+# ATTEMPT rather than a page view. Checked on the request, because a lockout
+# policy is about what the caller tried, not about what the page looks like.
+_CREDENTIAL_FIELD_RE = re.compile(
+    r"(?i)(?:^|[?&{\"'\s,])(?:password|passwd|pwd|pass|otp|passcode|"
+    r"secret|pin|mfa|totp)(?:[\"']?\s*[=:])")
+_AUTH_FAIL_RE = re.compile(
+    r"(?i)invalid|incorrect|failed|denied|unauthori[sz]ed|bad credentials|"
+    r"wrong (?:password|user)|\"ok\"\s*:\s*false")
+
+
+def _is_auth_attempt(entry: dict) -> bool:
+    return bool(_CREDENTIAL_FIELD_RE.search(req_text(entry)))
+
+
+def _auth_failed(entry: dict) -> bool:
+    """Did this attempt fail? A lockout policy governs failures."""
+    if status_of(entry) in (401, 403):
+        return True
+    if 200 <= status_of(entry) < 300:
+        return bool(_AUTH_FAIL_RE.search(resp_body(entry)))
+    return status_of(entry) in (400, 422)
+
+
 def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """No lockout: a counted series of failed attempts, none of them refused.
 
@@ -1372,6 +1490,8 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """
     by_endpoint: dict[str, list[dict]] = {}
     for entry in claim.exchanges:
+        if not _is_auth_attempt(entry):
+            continue
         by_endpoint.setdefault(_endpoint_shape(entry), []).append(entry)
     series, shape = [], ""
     for key, rows in by_endpoint.items():
@@ -1381,12 +1501,25 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
                  if status_of(e) == 429
                  or re.search(r"(?i)too many|rate limit|locked|try again later|"
                               r"temporarily (?:blocked|disabled)", resp_body(e))]
-    enough = len(series) >= 5
+    failed = [e for e in series if _auth_failed(e)]
+    enough = len(series) >= 5 and len(failed) >= 5
+    if enough:
+        why = f"{len(failed)} failed authentication attempts on {shape}"
+    elif not series:
+        why = ("no cited request carries a credential field (password, pass, "
+               "pwd, otp, passcode) - five page views are not five "
+               "authentication attempts, and this check used to accept them")
+    elif len(series) < 5:
+        why = (f"only {len(series)} authentication attempt(s) on one "
+               "endpoint - send at least five, so 'never refused' means "
+               "something")
+    else:
+        why = (f"{len(series)} attempts but only {len(failed)} failed - a "
+               "lockout policy applies to FAILURES, so a series that "
+               "succeeded says nothing about one")
     return [
-        _check("a counted series of attempts is on record", enough,
-               f"{len(series)} attempts on {shape}" if enough else
-               f"only {len(series)} attempt(s) on one endpoint - send at least "
-               "five, so 'never refused' means something"),
+        _check("a counted series of failed authentication attempts is on "
+               "record", enough, why),
         _check("none of them was refused", enough and not throttled,
                f"all {len(series)} answered without a throttle" if enough
                and not throttled else
@@ -1548,7 +1681,22 @@ def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
         stripped = body.strip()
         dominant = bool(content) and content in stripped and \
             len(content) >= 0.5 * max(len(stripped), 1)
-        served = bool(uploaded and fetch is not None and back and dominant
+        # Three things this was not checking, each of which let a benign
+        # pair through: the upload has to have been ACCEPTED (a refused
+        # upload plus any page serving the same bytes graded proven), the
+        # fetch has to be on the SAME HOST (a foreign host serving a copy
+        # says nothing about this target), and it has to come AFTER the
+        # upload (a page recorded earlier cannot be the stored file). Found
+        # by an adversarial audit of this session's own code.
+        up_ok = bool(up) and 200 <= status_of(up) < 400
+        same_host = (fetch is not None and up is not None
+                     and _endpoint_shape(fetch).split("/")[0]
+                     == _endpoint_shape(up).split("/")[0])
+        after = (fetch is not None and up is not None
+                 and claim.exchanges.index(fetch)
+                 > claim.exchanges.index(up))
+        served = bool(uploaded and up_ok and fetch is not None and back
+                      and dominant and same_host and after
                       and 200 <= status_of(fetch) < 300)
         out.append(_check(
             "it is served back with the bytes intact", served,
@@ -1556,6 +1704,14 @@ def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
             f"{len(stripped)} bytes" if served else
             ("no second exchange cited; the proof is the fetch, not the "
              "upload response" if fetch is None else
+             f"{(up or {}).get('id', '?')} answered {status_of(up)} - the "
+             "upload was refused, so nothing of ours was stored"
+             if not up_ok else
+             f"{fetch.get('id')} is on a different host than the upload - a "
+             "copy served elsewhere says nothing about this target"
+             if not same_host else
+             f"{fetch.get('id')} was recorded before the upload, so it "
+             "cannot be the stored file" if not after else
              f"{fetch.get('id')} answered {status_of(fetch)}"
              if not 200 <= status_of(fetch) < 300 else
              f"nothing this upload carried appears in {fetch.get('id')} - "
@@ -1623,6 +1779,31 @@ def _overlaps(a: dict, b: dict) -> bool:
     return s1 < e2 and s2 < e1
 
 
+# Statuses that say "this action cannot be done again", as distinct from
+# missing (404), moved (3xx), broken (5xx) or throttled (429).
+_SPENT_STATUS = (400, 403, 409, 410, 423)
+_THROTTLE_RE = re.compile(r"(?i)too many requests|rate.?limit|slow down")
+
+
+def _spent_refusal(entry: dict, won: list[dict]) -> bool:
+    """Does this exchange say the action was already spent?
+
+    Any non-2xx used to count, which made a 404 after three cacheable GETs
+    into a race. The refusal is the ONLY thing in this class's evidence that
+    establishes there was a limit, so it has to actually say so - and it has
+    to be a different answer than the one the burst got, or it is not a
+    refusal of anything.
+    """
+    status = status_of(entry)
+    if status not in _SPENT_STATUS:
+        return False
+    text = resp_text(entry)
+    if header_of(entry, "retry-after") or _THROTTLE_RE.search(text):
+        return False                      # throttling is not a limit crossed
+    body = resp_body(entry).strip()
+    return all(body != resp_body(w).strip() for w in won)
+
+
 def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """A limited action crossed under concurrency, with the limit shown.
 
@@ -1661,7 +1842,7 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
                      if _window(e)[0] >= burst_end
                      and not any(_overlaps(e, o) for o in ordered
                                  if o is not e)]
-            refused = [e for e in after if not 200 <= status_of(e) < 300]
+            refused = [e for e in after if _spent_refusal(e, won)]
             score = (len(burst) >= 2) + (len(won) >= 2) + bool(refused)
             if score > best[0]:
                 best = (score, burst, refused, key)
@@ -1683,19 +1864,27 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
         "a serial attempt afterwards was refused", bool(refused),
         f"{refused[0].get('id')} answered {status_of(refused[0])} after the "
         f"burst" if refused else
-        "no non-overlapping attempt after the burst was refused - without "
-        "one, repeating the action simply works and there is no limit to "
-        "have crossed"))
+        "no non-overlapping attempt after the burst was refused AS SPENT - "
+        "any non-2xx used to count here, so three read-only GETs and a later "
+        "404 graded proven. A 404 says the thing is missing, a 3xx says it "
+        "moved, a 5xx says the server broke and a 429 says you were too "
+        "fast; none of them says the action had a limit that was crossed"))
     return checks
 
 
 # A method name no client sends: the stray byte left in the stream prefixes
 # the next request line, so a desynced back end answers about `GPOST`, `GGET`
 # and friends. A generic "400 Bad Request" names nothing and proves nothing.
+# `G` PREFIXED to a real verb, which is what the stray byte produces. The
+# second and third alternatives used to be `G[A-Z]{2,}`, which matches `GET`
+# itself - so any response body containing `"method": "GET"`, `(GET)` or
+# `method GET not allowed` satisfied the desync check. Found by an
+# adversarial audit of this session's own code.
+_VERBS = "GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH|TRACE|CONNECT"
 BOGUS_METHOD_RE = re.compile(
-    r"(?:\bG(?:GET|POST|PUT|HEAD|DELETE|OPTIONS|PATCH)\b"
-    r"|['\"( ]G[A-Z]{2,}['\")]"
-    r"|method '?G[A-Z]{2,})")
+    r"(?:\bG(?:" + _VERBS + r")\b"
+    r"|['\"(\s]G(?:" + _VERBS + r")['\")\s]"
+    r"|method\s+'?G(?:" + _VERBS + r")\b)")
 # Both framings declared on one request is the ambiguity itself.
 _CL_RE = re.compile(r"(?im)^\s*content-length\s*:", re.M)
 _TE_RE = re.compile(r"(?im)^\s*transfer-encoding\s*:", re.M)
@@ -1769,6 +1958,16 @@ def verify_desync(claim: Claim, spec: "ProofSpec") -> list[dict]:
                 continue
             hit = BOGUS_METHOD_RE.search(resp_body(entry))
             if not hit:
+                continue
+            # the effect exchange must not have asked about that method
+            # itself: a server naming back a verb the request carried is an
+            # echo, and in a real desync the poisoned name arrives from the
+            # OTHER request's leftover bytes
+            if BOGUS_METHOD_RE.search(req_text(entry)):
+                detail = (f"{entry.get('id')} names "
+                          f"{hit.group(0).strip()!r} back, but its own "
+                          "request carries it - that is an echo, not a "
+                          "desync")
                 continue
             unsolicited = _method_of(entry) == "-"
             desync = (entry, hit.group(0).strip(), unsolicited)
@@ -1929,17 +2128,61 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
         out: list[dict] = []
         method = _method_of(a) if a else ""
         status = status_of(a) if a else 0
-        honoured = bool(a) and (
-            (method in _WRITE_METHODS and 200 <= status < 300)
-            or (method == "TRACE" and 200 <= status < 300))
+        answered = bool(a) and 200 <= status < 300
+        # "the endpoint SHOULD refuse it" is the half this check was missing:
+        # a REST API that honours PUT on its own resource is doing its job,
+        # and grading that as verb tampering called every correct API a
+        # finding. Evidence that the method is not meant to be available:
+        #   * TRACE - no application needs it reachable, and an echo of a
+        #     request header is cross-site tracing on its own;
+        #   * an OPTIONS/Allow list that does NOT advertise the method;
+        #   * the same method refused somewhere else on the same host, so the
+        #     one that was honoured is the exception.
+        # Found by an adversarial audit of this session's own code.
+        advertised, refused_elsewhere = None, None
+        if a is not None and method in _WRITE_METHODS:
+            # _endpoint_shape is "host/path-shape", so the host is the first
+            # segment - slicing [0:3] took two path segments with it and made
+            # "the same host" mean "the same first two path segments"
+            host = _endpoint_shape(a).split("/")[0]
+            for other in (claim.exchanges or []):
+                if other is a:
+                    continue
+                allow = header_of(other, "allow") or header_of(
+                    other, "access-control-allow-methods")
+                if allow and _endpoint_shape(other) == _endpoint_shape(a):
+                    advertised = allow
+                if (_method_of(other) == method
+                        and status_of(other) in (403, 405, 501)
+                        and _endpoint_shape(other).split("/")[0] == host):
+                    refused_elsewhere = other
+        unadvertised = advertised is not None and \
+            method not in str(advertised).upper()
+        should_refuse = (method == "TRACE" or unadvertised
+                         or refused_elsewhere is not None)
+        honoured = answered and bool(method) and should_refuse
+        if honoured:
+            why = (f"{method} answered {status} on {(a or {}).get('id', '?')}"
+                   + (" and no application needs TRACE reachable"
+                      if method == "TRACE" else
+                      f", and Allow says {advertised!r}" if unadvertised else
+                      f", and {refused_elsewhere.get('id')} was refused "
+                      f"{status_of(refused_elsewhere)} for the same method"))
+        elif not answered:
+            why = (f"{method or 'no'} {status or ''} - the cited request is "
+                   "not a write or a TRACE that was answered".strip())
+        elif method not in _WRITE_METHODS and method != "TRACE":
+            why = (f"{method} is not a method this class is about; "
+                   f"{', '.join(_WRITE_METHODS)} or TRACE")
+        else:
+            why = (f"{method} answered {status}, but nothing on record says "
+                   "this endpoint should have refused it - a REST API that "
+                   "honours PUT on its own resource is doing its job. Cite "
+                   "an OPTIONS whose Allow omits it, or the same method "
+                   "refused elsewhere on the host")
         out.append(_check(
             "a method the endpoint should refuse was honoured", honoured,
-            f"{method} answered {status} on {(a or {}).get('id', '?')}"
-            if honoured else
-            (f"{method or 'no'} {status or ''} - the cited request is not a "
-             f"write or a TRACE that was answered; "
-             f"{', '.join(_WRITE_METHODS)} or TRACE with a 2xx is what this "
-             "class needs".strip())))
+            why))
 
         effect, detail = False, "no effect observed"
         if honoured and method == "TRACE":
@@ -2192,10 +2435,17 @@ for _s in [
               aliases=("sql-injection", "sqlinjection", "blind-sqli",
                        "second-order-sqli"),
               notes="Five rows is a proof. A full dump is an incident."),
-    ProofSpec("nosqli", "documents returned from a named collection the query "
-              "should not have reached",
-              DOCUMENT_REQUIRED, verify_data_extraction, fingerprint=False,
-              advisories=EXTRACTION_ADVISORY, floor=DOCUMENT_FLOOR,
+    ProofSpec("nosqli", "an operator query that CHANGED what the store "
+              "answered, against a control to the same endpoint without it - "
+              "either a refusal turned into access, or documents a control "
+              "does not return",
+              ("the request carried an operator query",
+               "the operator changed what the store answered",
+               "the quoted bytes are the access, not an error"),
+              verify_operator_injection, fingerprint=False,
+              advisories=EXTRACTION_ADVISORY,
+              floor=("the operator changed what the store answered",
+                     "the quoted bytes are the access, not an error"),
               aliases=("nosql-injection", "mongo-injection")),
     ProofSpec("graphql", "a GraphQL query the endpoint answered with its "
               "schema or with records the caller should not reach",
@@ -2392,12 +2642,16 @@ for _s in [
               floor=("the method had an observable effect",),
               aliases=("http-method", "verb-tampering", "trace"),
               reflection_is_the_finding=True),
-    ProofSpec("lockout", "a counted series of failed attempts on one "
-              "endpoint, none of them refused - the count is the evidence",
-              ("a counted series of attempts is on record",
+    ProofSpec("lockout", "a counted series of at least five FAILED "
+              "authentication attempts on one endpoint - each carrying a "
+              "credential field - none of them refused. The count is the "
+              "evidence and the absence of a throttle is the bug",
+              ("a counted series of failed authentication attempts is on "
+               "record",
                "none of them was refused"),
               verify_no_throttle,
-              floor=("a counted series of attempts is on record",),
+              floor=("a counted series of failed authentication attempts is "
+                     "on record",),
               aliases=("no-rate-limit", "bruteforce", "no-lockout")),
     ProofSpec("websocket", "a 101 whose accept token answers the key this "
               "request sent, from an Origin the target does not own, and a "

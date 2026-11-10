@@ -174,6 +174,110 @@ system. All notable milestones on `agent-v2`.
   against the matrix - a doc gate cannot read prose, but a test can hold the
   claim it makes.
 
+### An adversarial audit of this session's own code, and what it found
+Nine lenses read everything written in this session and reported 80 candidate
+findings. The ones below were reproduced directly before being fixed. The
+dominant shape was the one two earlier audits had already found twice: **a
+check that passes without the claimant doing anything class-specific.** Five
+classes graded `proven` on evidence containing no vulnerability.
+
+**Credentials leaving the machine (the most serious).**
+- `make_client` fell back to `cfg.api_key` when the picked model's own
+  variable was unset - and that is the ANTHROPIC key, which
+  `OpenAICompatClient` sends as a Bearer token to whatever host the table
+  names. So `--model gpt-4.1` with no `OPENAI_API_KEY` shipped the operator's
+  Anthropic credential to `api.openai.com`, and `--model local` shipped it to
+  a loopback server. A missing credential is now an error naming the variable
+  to set, and the error does not contain the key.
+- `allow_insecure_base` is a statement about the model's OWN endpoint (a
+  loopback server). It was applied to a base URL the operator supplied
+  through `ANTHROPIC_BASE_URL` too, turning the plaintext-credential refusal
+  off for any host.
+- `GuardedClient.send_ws` recorded the handshake's response headers
+  unredacted, so the target's `Set-Cookie` persisted verbatim into
+  `transcript.jsonl` - and from there into a judge prompt bound for another
+  vendor. It also stored `request_text` unredacted, leaving operator
+  credential headers in cleartext one field over from the redacted dict.
+  `send` and `send_raw` both redact; this third socket path did not.
+- `judge.render_case` ships recorded bytes to a DIFFERENT vendor than the one
+  that ran the engagement, and trusted that the recorder had already
+  redacted. A demonstration leaked five shapes at once: an `api_key=` in a
+  body, a password, a JWT, a `Set-Cookie` and a URL's userinfo. It now
+  re-redacts everything it assembles - `argus report` re-redacts old
+  transcripts at render for exactly this reason.
+- `for_role` ignored credentials, and `local` is priced at zero, so cost
+  ordering put it ahead of every paid model: `--role breadth` resolved to a
+  loopback server that is almost never running. It now skips models whose
+  credential is unset, with `usable_only=False` to ask what the table says.
+
+**Five classes graded `proven` on benign evidence.**
+- `nosqli`: any JSON API answering normally satisfied "documents came back",
+  because `/api/posts` returns `[{"_id": ...}]` whether or not the `$ne` in
+  the query did anything. A PUBLIC listing graded `proven` the moment somebody
+  probed it. nosqli now has its own verifier: the operator must have CHANGED
+  what the store answered, against a control to the same endpoint without it -
+  either a refusal turned into access (the common real one, and what the lab
+  has) or documents a control does not return.
+- `method`: `verify_method_effect` checked that a write was answered and its
+  bytes came back, and never that the endpoint SHOULD have refused it. So
+  `PUT /api/note/7` returning 200 plus a `GET` of the same resource graded
+  `proven` - which is every correctly working REST API. It now needs TRACE, an
+  `Allow` list that omits the method, or the same method refused elsewhere on
+  the same host.
+- `race`: ANY non-2xx after the burst counted as "the limit refused it", so
+  three read-only GETs and a later 404 graded `proven`. A 404 says the thing
+  is missing, a 3xx that it moved, a 5xx that the server broke, a 429 that you
+  were too fast; none of them says a limit was crossed. The refusal must now
+  be a spent-action status with a body that differs from what the burst got.
+- `lockout`: five requests to one endpoint counted, with no requirement that
+  they carry a credential or that they FAILED. Five views of `/about` graded
+  `proven`, and so did five successful logins - a lockout policy governs
+  failures.
+- `upload`: the fetch was not required to be on the same host, to come after
+  the upload, or to follow an upload the server ACCEPTED. A copy on a CDN, a
+  page recorded earlier, or a 403'd upload all graded `proven`.
+- `smuggle`: `BOGUS_METHOD_RE`'s `G[A-Z]{2,}` matched `GET` itself, so any
+  response containing `"method": "GET"`, `(GET)` or `method GET not allowed`
+  satisfied the desync check. It now needs `G` prefixed to a real verb, and
+  the effect exchange must not carry that verb in its own request - a server
+  naming back what the request sent is an echo.
+
+**The judge could be made to agree with itself.**
+- `parse_verdict` coerced `agrees` with `bool()`, so a judge answering
+  `"agrees": "false"` was recorded as AGREEING - any non-empty string is
+  truthy. Of all the ways to be wrong there that is the worst, because it
+  manufactures the assent the module exists to avoid. Only a real boolean or
+  the words for one count now; anything else is no verdict.
+- A scalar `missing` was iterated into characters, so `"missing": "a control"`
+  became `['a', ' ', 'c', 'o', ...]` in the report.
+- `pick_judge` returned a Claude judge when the author's model was not a
+  table key, because `family()` answers `"unknown"` and excluding `"unknown"`
+  excludes nothing. A family that cannot be named cannot be excluded, so it
+  refuses and says so.
+
+**The ledger invented work and starved itself.**
+- Rule 1 tried line after line of a response until one graded `proven`, which
+  is shopping for a verdict. It now cites the candidate plus its NEIGHBOURS on
+  the same endpoint - where a control lives - and takes the first honest quote.
+- One `next_action` call was measured at **over five minutes**: the cap
+  bounded how many exchanges rule 1 examined, but each was graded against the
+  whole transcript and `_pairs` makes that quadratic. Cost is now flat in the
+  length of the run (~6s worst case at 2000 or 4000 exchanges, asserted in
+  `test_the_ledger_cost_is_bounded_by_the_window_not_the_run`).
+- Rule 2 never consulted the class ceiling, so a `candidate` in a capped
+  class was a permanent fixed point: `close_proof_gap` forever, and every rule
+  below it never ran.
+- `_params` treated any body containing `=` as a form, so the ledger
+  recommended probing parameters called `<?xml version` and
+  `SELECT 1 FROM t WHERE a`.
+
+**And one defect in the test corpus itself.** `/redeem` holds one coupon in a
+class variable on a session-scoped server, so whichever test drained it first
+left every later one looking at an endpoint with nothing to race for - which
+read as a verifier regression until the counter was printed. The lab grew an
+explicit `/redeem/reset` so the dependency is visible in the tests that need
+it.
+
 ### smuggle: the last class capped for want of a verifier
 - The note read "this system sends the desync pair and reads the difference,
   which is a candidate". The difference was never the evidence, and the real
@@ -512,7 +616,7 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 491 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 510 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +

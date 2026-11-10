@@ -290,6 +290,8 @@ def main() -> int:
     out = probes.probe_upload(ctx, base + "/upload")
     check("upload probe serves active file",
           "unrestricted upload" in out["verdict"])
+    client.send("GET", base + "/redeem/reset", tool="http_request",
+                note="reset the coupon")  # shared process state
     out = probes.probe_race(ctx, base + "/redeem", n=8)
     check("race probe multi-redeems",
           out["verdict"].startswith("race:") and out["overlapped"])

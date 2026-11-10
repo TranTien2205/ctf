@@ -133,15 +133,33 @@ def test_the_recommendation_names_a_real_requirement(tmp_path):
 def test_a_candidate_finding_turns_into_the_missing_check(tmp_path):
     sdir = _session(
         tmp_path,
+        [_exchange("r1", "http://t/item?id=1")],
+        [{"id": "F01", "vuln_class": "sqli", "grade": "candidate",
+          "url": "http://t/item?id=1", "evidence_ids": ["r1"],
+          "proof": {"missing": ["rows returned, not an error message"]}}])
+    action = decide.next_action(sdir)
+    assert action.action == "close_proof_gap"
+    assert action.finding_id == "F01"
+    assert action.detail["missing"] == ["rows returned, not an error message"]
+    assert action.tool == "probe_sqli"
+
+
+def test_a_candidate_in_a_capped_class_does_not_starve_the_ledger(tmp_path):
+    """Found by an adversarial audit. `xss` is capped at `candidate`, so no
+    amount of probing closes its gap - and rule 2 recommended closing it
+    forever, which meant every rule below it never ran."""
+    sdir = _session(
+        tmp_path,
         [_exchange("r1", "http://t/search?q=cat")],
         [{"id": "F01", "vuln_class": "xss", "grade": "candidate",
           "url": "http://t/search?q=cat", "evidence_ids": ["r1"],
           "proof": {"missing": ["a real browser executed it"]}}])
     action = decide.next_action(sdir)
-    assert action.action == "close_proof_gap"
-    assert action.finding_id == "F01"
-    assert action.detail["missing"] == ["a real browser executed it"]
-    assert action.tool == "probe_reflection"
+    assert action.action != "close_proof_gap", action.render()
+    # and an UNcapped candidate still does produce the gap
+    from argus import proof
+    assert proof.spec_for("xss").ceiling == "candidate"
+    assert proof.spec_for("sqli").ceiling == ""
 
 
 def test_a_proven_finding_is_not_a_gap(tmp_path):
@@ -169,11 +187,11 @@ def test_the_gap_rule_outranks_the_surface_rule(tmp_path):
     # closing a proof you nearly hold beats opening a new one
     sdir = _session(
         tmp_path,
-        [_exchange("r1", "http://t/search?q=cat"),
+        [_exchange("r1", "http://t/item?id=1"),
          _exchange("r2", "http://t/other?z=9")],
-        [{"id": "F01", "vuln_class": "xss", "grade": "candidate",
-          "url": "http://t/search?q=cat", "evidence_ids": ["r1"],
-          "proof": {"missing": ["a real browser executed it"]}}])
+        [{"id": "F01", "vuln_class": "sqli", "grade": "candidate",
+          "url": "http://t/item?id=1", "evidence_ids": ["r1"],
+          "proof": {"missing": ["rows returned, not an error message"]}}])
     assert decide.next_action(sdir).action == "close_proof_gap"
 
 
@@ -378,3 +396,73 @@ def test_the_tool_handler_survives_a_broken_controller(tmp_path, monkeypatch):
         session=types.SimpleNamespace(dir=tmp_path))
     out = analysis.next_action(ctx)
     assert "error" in out and "ledger exploded" in out["error"]
+
+
+# --- what the adversarial audit found in this module -----------------------
+
+def test_the_ledger_cost_is_bounded_by_the_window_not_the_run():
+    """Rule 1 re-grades transcript exchanges, and an audit measured one call
+    at over five minutes: the cap bounded how many exchanges it looked at,
+    but each one was graded line by line against the WHOLE transcript, and
+    `_pairs` makes that quadratic. It now cites a local window, so the cost
+    is flat in the length of the run."""
+    import json
+    import pathlib
+    import tempfile
+    import time
+
+    def session(n):
+        d = pathlib.Path(tempfile.mkdtemp())
+        rows = [json.dumps({
+            "id": f"r{i}", "tool": "probe_sqli",
+            "request": {"method": "GET", "url": f"http://t/item?id={i}",
+                        "headers": {}, "body": None},
+            "response": {"status": 200, "headers": {},
+                         "body": "\n".join(f"line {j} of some text"
+                                           for j in range(30))}})
+                for i in range(n)]
+        d.joinpath("transcript.jsonl").write_text("\n".join(rows),
+                                                  encoding="utf-8")
+        d.joinpath("findings.json").write_text("[]", encoding="utf-8")
+        return d
+
+    timings = {}
+    for n in (200, 2000):
+        sdir = session(n)
+        start = time.monotonic()
+        decide.next_action(sdir)
+        timings[n] = time.monotonic() - start
+    # ten times the transcript must not cost appreciably more
+    assert timings[2000] < timings[200] * 3 + 1.0, timings
+
+
+def test_the_ledger_does_not_invent_parameter_names():
+    """`'=' in body` admitted XML prologs, SQL and multipart preambles, so
+    `_params` produced names like `<?xml version` and
+    `SELECT 1 FROM t WHERE a`, and the ledger recommended probing them."""
+    def req(body):
+        return {"id": "r1",
+                "request": {"method": "POST", "url": "http://t/x",
+                            "headers": {}, "body": body},
+                "response": {"status": 200, "headers": {}, "body": ""}}
+    for body in ('<?xml version="1.0"?><a>1</a>',
+                 '{"a":"b=c"}',
+                 "SELECT 1 FROM t WHERE a=1",
+                 '--b\r\nContent-Disposition: form-data; name="f"'):
+        assert decide._params(req(body)) == set(), body
+    assert decide._params(req("user=admin&pass=x")) == {"user", "pass"}
+    assert decide._params(req("q=hello+world&page=2")) == {"q", "page"}
+
+
+def test_rule_one_does_not_shop_for_a_verdict(tmp_path):
+    """It tried every line of a response until one graded `proven`. A page
+    that returns no rows must not become a recommended sqli finding however
+    many lines it has."""
+    body = "\n".join([
+        "<html><body><h1>Search</h1>",
+        "No results for: ' UNION SELECT username, password FROM users --",
+        "<p>Try a different term</p></body></html>"])
+    sdir = _session(tmp_path, [
+        _exchange("r1", "http://t/search?q=x", body=body, tool="probe_sqli")])
+    action = decide.next_action(sdir)
+    assert action.action != "record_finding", action.render()

@@ -175,15 +175,33 @@ def make_client(cfg):
                             auth_token=cfg.auth_token)
     if spec.provider == "openai":
         from .providers import OpenAICompatClient
+        # NEVER fall back to cfg.api_key here. That is the ANTHROPIC
+        # credential, and this client sends it as a Bearer token to whatever
+        # host the table or ANTHROPIC_BASE_URL names - so the fallback sent
+        # operator's Anthropic key to api.openai.com, or to a loopback server,
+        # the moment the model's own variable was unset. A missing credential
+        # is an error that names the variable to set.
+        key = spec.credential()
+        if not key:
+            raise LLMError(
+                f"no credential for {cfg.model}: set "
+                f"{' or '.join(spec.api_key_env) or 'the provider variable'}. "
+                f"The Anthropic key is not used for {spec.provider} models - "
+                "it would be sent to that provider as a bearer token.")
+        base = (cfg.api_base if cfg.api_base != API_URL else spec.api_base)
+        # (cfg.api_base differs from API_URL only when ANTHROPIC_BASE_URL was
+        # set, which config.py already treats as untrusted ambient input)
+        # `allow_insecure_base` is a statement about the model's OWN endpoint
+        # (a loopback server), not a blanket permission. A base URL the
+        # operator supplied through `ANTHROPIC_BASE_URL` is a different host,
+        # so the plaintext refusal applies to it whatever the table says.
+        insecure_ok = spec.allow_insecure_base and base == spec.api_base
         return OpenAICompatClient(
-            api_key=spec.credential() or cfg.api_key,
-            # an explicit --api-base wins (a gateway, a self-hosted
-            # endpoint); otherwise the table's
-            api_base=(cfg.api_base if cfg.api_base != API_URL
-                      else spec.api_base),
+            api_key=key,
+            api_base=base,
             model=cfg.model,
             max_tokens=min(cfg.llm_max_tokens, spec.max_output_tokens),
-            allow_insecure_base=spec.allow_insecure_base)
+            allow_insecure_base=insecure_ok)
     raise LLMError(
         f"model {cfg.model!r} names provider {spec.provider!r}, which this "
         "build has no adapter for - see argus/providers.py")

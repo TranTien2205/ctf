@@ -60,6 +60,19 @@ VULNERABLE = [
      lambda c, b: probes.probe_websocket(c, b + "/ws")),
     ("probe_smuggle", "smuggle",
      lambda c, b: probes.probe_smuggle(c, b + "/desync")),
+    ("probe_nosqli", "nosqli",
+     lambda c, b: probes.probe_nosqli(
+         c, b + "/api/login", '{"username":"admin","password":"x"}',
+         "password")),
+    ("probe_lockout", "lockout",
+     lambda c, b: probes.probe_lockout(c, b + "/login2",
+                                       "username=x&password=x")),
+    # `/redeem` holds ONE coupon in a class variable shared by every test on
+    # the session-scoped server, so reset it first or there is nothing to race
+    ("probe_race", "race",
+     lambda c, b: (c.client.send("GET", b + "/redeem/reset",
+                                 tool="http_request", note="reset the coupon")
+                   and probes.probe_race(c, b + "/redeem", n=8))),
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -89,6 +102,14 @@ CLEAN = [
     # gets a clean follow-up, which is the defence working
     ("probe_smuggle", "smuggle",
      lambda c, b: probes.probe_smuggle(c, b + "/desync-none")),
+    # `/login3` throttles after a few tries - the lockout working
+    ("probe_lockout", "lockout",
+     lambda c, b: probes.probe_lockout(c, b + "/login3",
+                                       "username=x&password=x")),
+    # `/hello` is repeatable: a burst succeeding there is the action working,
+    # not a limited one crossed
+    ("probe_race", "race",
+     lambda c, b: probes.probe_race(c, b + "/hello", n=6)),
 ]
 # `cors` has no clean case here: the lab reflects any `Origin` with
 # credentials from the shared response helper, so every endpoint is
@@ -187,5 +208,5 @@ def test_both_directions_are_exercised_for_the_classes_that_have_both():
     clean = {k for _, k, _ in CLEAN}
     both = vulnerable & clean
     assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect",
-            "websocket", "smuggle"} <= both, (
+            "websocket", "smuggle", "nosqli", "lockout", "race"} <= both, (
         f"classes exercised in both directions: {sorted(both)}")

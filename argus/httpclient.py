@@ -517,6 +517,10 @@ class GuardedClient:
             out["status"] = resp.status
             lower = {k.lower(): v for k, v in headers.items()}
             accept = str(lower.get("sec-websocket-accept") or "")
+            # Sec-WebSocket-Accept is not a credential and _redact_headers
+            # leaves it alone, but read it from the live response rather than
+            # the recorded copy so a future redaction rule cannot break the
+            # challenge check silently
             out["accept_ok"] = (resp.status == 101
                                 and "websocket" in str(
                                     lower.get("upgrade") or "").lower()
@@ -527,8 +531,19 @@ class GuardedClient:
                          "headers": _redact_headers(
                              {l.split(": ", 1)[0]: l.split(": ", 1)[1]
                               for l in lines[1:]}, self._secret_values),
-                         "request_text": "\r\n".join(lines)},
-                response={"status": resp.status, "headers": headers,
+                         # the wire text carries the same header values, so
+                         # redacting only the dict left operator credentials
+                         # in cleartext one field over
+                         "request_text": _redact_request_text(
+                             "\r\n".join(lines), self._secret_values)},
+                # the target's Set-Cookie is a credential too: `send` and
+                # `send_raw` both redact response headers and this path did
+                # not, so a session cookie persisted verbatim into
+                # transcript.jsonl - and from there into a judge prompt sent
+                # to a third-party provider
+                response={"status": resp.status,
+                          "headers": _redact_headers(headers,
+                                                     self._secret_values),
                           "body": "",
                           "elapsed_ms": round(
                               (time.monotonic() - started) * 1000, 1)},

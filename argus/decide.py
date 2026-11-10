@@ -159,9 +159,33 @@ def _params(entry: dict) -> set[str]:
     url = str(req.get("url") or "")
     names = {k for k, _ in parse_qsl(urlparse(url).query, keep_blank_values=True)}
     body = req.get("body")
-    if isinstance(body, str) and body and "=" in body and "{" not in body[:2]:
+    if isinstance(body, str) and _looks_like_a_form(body):
         names |= {k for k, _ in parse_qsl(body, keep_blank_values=True)}
-    return {n for n in names if n}
+    return {n for n in names if _PARAM_NAME_RE.fullmatch(n)}
+
+
+# A form field name, as opposed to whatever `parse_qsl` makes of arbitrary
+# text containing "=". `'=' in body` admitted XML prologs, SQL and multipart
+# preambles, so the ledger recommended probing parameters called
+# `<?xml version` and `SELECT 1 FROM t WHERE a`. Found by an audit.
+_PARAM_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_.\[\]-]{0,63}")
+
+
+def _looks_like_a_form(body: str) -> bool:
+    """Is this a urlencoded form body, rather than text that has an "=" in it?
+
+    Cheap and strict: no markup, no JSON, no multipart preamble, and every
+    pair has to be `name=value` with a plausible name.
+    """
+    head = body.lstrip()[:1]
+    if not body or "=" not in body or head in ("<", "{", "[", "-"):
+        return False
+    if "\r\n" in body or "\n" in body:
+        return False                      # a form body is one line
+    pairs = parse_qsl(body, keep_blank_values=True)
+    if not pairs:
+        return False
+    return all(_PARAM_NAME_RE.fullmatch(k) for k, _ in pairs)
 
 
 def _tool_of(entry: dict) -> str:
@@ -207,12 +231,17 @@ def _surface(entries: list[dict]) -> dict[str, set[str]]:
 
 # --- the rules --------------------------------------------------------------
 
-def next_action(sdir: Path | str, *, max_scan: int = 400) -> Action:
+def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
     """What the recorded evidence says to do next.
 
     `max_scan` bounds rule 1, which re-grades transcript exchanges against the
     matrix: that is the one rule whose cost grows with the run, and a ledger
-    that takes a minute to answer is a ledger nobody consults.
+    that takes a minute to answer is a ledger nobody consults. An audit
+    measured a single call at over five minutes on a long run, with the cap
+    at 400 and every line of every candidate response graded against the whole
+    transcript. Rule 1 asks "do you already hold a proof you never recorded",
+    which is a question about recent work, so the window is the honest bound
+    rather than a reluctant one. Raise it to re-examine an old run.
     """
     sdir = Path(sdir)
     if not sdir.exists():
@@ -241,7 +270,11 @@ def next_action(sdir: Path | str, *, max_scan: int = 400) -> Action:
     # Rule 1 - evidence already on disk that meets a proof requirement, with
     # no finding recorded for it. This is the expensive-but-important case: the
     # probe worked and the run moved on without recording it.
-    unrecorded = _unrecorded_proof(exchanges, recorded, claimed_ids, max_scan)
+    by_shape: dict[str, list[dict]] = {}
+    for entry in exchanges:
+        by_shape.setdefault(proof._endpoint_shape(entry), []).append(entry)
+    unrecorded = _unrecorded_proof(exchanges, recorded, claimed_ids, max_scan,
+                                   by_shape)
     if unrecorded is not None:
         klass, entry, verdict = unrecorded
         return Action(
@@ -264,6 +297,12 @@ def next_action(sdir: Path | str, *, max_scan: int = 400) -> Action:
                    if isinstance(m, str)]
         klass = proof.normalize(str(finding.get("vuln_class") or ""))
         if not missing:
+            continue
+        # A class capped at `candidate` cannot be closed by more probing, so
+        # recommending it forever starves every rule below this one. `argus
+        # proof <class>` says why the cap is there; the ledger should move on.
+        spec = proof.spec_for(klass)
+        if spec is not None and spec.ceiling and grade == spec.ceiling:
             continue
         return Action(
             "close_proof_gap",
@@ -347,7 +386,8 @@ def next_action(sdir: Path | str, *, max_scan: int = 400) -> Action:
 
 
 def _unrecorded_proof(exchanges: list[dict], recorded: set[str],
-                      claimed_ids: set[str], max_scan: int):
+                      claimed_ids: set[str], max_scan: int,
+                      by_shape: dict | None = None):
     """An exchange that would grade proven for a class nothing recorded.
 
     Deliberately narrow. It only considers exchanges a class-bearing probe
@@ -356,20 +396,50 @@ def _unrecorded_proof(exchanges: list[dict], recorded: set[str],
     recommendation to record sqli, which is the exact failure the proof matrix
     exists to prevent.
     """
+    by_shape = by_shape if by_shape is not None else {}
     for entry in reversed(exchanges[-max_scan:]):
         klass = PROBE_CLASS.get(_tool_of(entry))
         if not klass or klass in recorded:
             continue
         if str(entry.get("id")) in claimed_ids:
             continue
+        # Cite the entry plus its NEIGHBOURS on the same endpoint, which is
+        # where a control lives. Two bounds matter and they pull against
+        # each other: a single-entry claim can only ever pass the classes
+        # that need no pair, while citing the whole transcript makes every
+        # grade quadratic in the run - an audit measured one call at over
+        # five minutes. The local window is the honest middle: it is what a
+        # tester would cite, and it is O(1) per candidate.
+        cited = _neighbours(entry, by_shape)
         for excerpt in _excerpts(proof.resp_body(entry)):
-            verdict = proof.grade(klass, excerpt, [entry])
+            verdict = proof.grade(klass, excerpt, cited)
             if verdict.proven:
                 return klass, entry, verdict
     return None
 
 
-def _excerpts(body: str, limit: int = 40) -> list[str]:
+def _neighbours(entry: dict, by_shape: dict) -> list[dict]:
+    """The candidate plus the nearest exchanges on the same endpoint."""
+    group = by_shape.get(proof._endpoint_shape(entry)) or [entry]
+    try:
+        at = group.index(entry)
+    except ValueError:
+        return [entry]
+    lo = max(0, at - _NEIGHBOURS)
+    window = group[lo:at + _NEIGHBOURS + 1]
+    return window if entry in window else [entry, *window[:_NEIGHBOURS]]
+
+
+# Exchanges on either side of a candidate that rule 1 cites with it. Rule 1
+# is the only rule whose work grows with the run, and it is the one an audit
+# measured at over five minutes: each grade runs `_pairs` over the cited set,
+# which is quadratic. A local window keeps it O(1) per candidate and is also
+# what a tester would cite - the control for a probe is the request next to
+# it, not something four hundred requests away.
+_NEIGHBOURS = 3
+
+
+def _excerpts(body: str, limit: int = 8) -> list[str]:
     """Candidate quotes from a response, as a tester would cut them.
 
     Handing the whole body to the matrix defeats its own echo veto: a body

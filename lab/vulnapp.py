@@ -29,6 +29,7 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     POST /api/login            NoSQLi ($ne/$gt operator password bypass)
     POST /upload, GET /uploads file upload served back with active content-type
     GET  /redeem               race condition (unlocked check-then-act)
+    GET  /redeem/reset         test support: puts one coupon back
     GET  /import?data=         deserialization (magic bytes -> parser error)
     GET  /cached               cache poisoning (X-Forwarded-Host unkeyed)
     GET  /profile[/x.css]      cache deception (path confusion)
@@ -593,6 +594,17 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                      else "text/html" if target.endswith((".html", ".htm"))
                      else "application/octet-stream")
             self._send(body=data, ctype=ctype)
+
+        elif path == "/redeem/reset":
+            # Test support, not part of the vulnerable surface. `/redeem` is
+            # a one-time coupon held in a CLASS variable, so one test draining
+            # it leaves every later test on the same server looking at an
+            # endpoint with nothing to race for - which read as a verifier
+            # regression until the counter was printed. Resetting is explicit
+            # so the dependency is visible in the test that needs it.
+            type(self)._coupons = 1
+            self._send(body=json.dumps({"coupons": type(self)._coupons}),
+                       ctype="application/json")
 
         elif path == "/redeem":
             # TOCTOU: check-then-act with no lock - concurrent requests all

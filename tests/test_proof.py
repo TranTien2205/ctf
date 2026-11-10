@@ -161,10 +161,19 @@ def test_sqli_quoting_the_error_fails_the_row_check():
 
 
 def test_nosqli_needs_no_fingerprint():
+    """No @@version read is required - but a control IS, because a JSON API
+    returning documents is doing its job. The operator has to have changed
+    the answer."""
     dump = ex("r8", "http://t.local/api/login",
               '[{"user":"admin"}]', method="POST",
               req_body='{"username":{"$ne":null},"password":{"$ne":null}}')
-    assert proof.grade("nosqli", '{"user":"admin"}', [dump]).grade == "proven"
+    control = ex("r8b", "http://t.local/api/login",
+                 '{"error":"invalid credentials"}', 401, method="POST",
+                 req_body='{"username":"admin","password":"x"}')
+    assert proof.grade("nosqli", '{"user":"admin"}',
+                       [dump, control]).grade == "proven"
+    # without the control it stops short, whatever the documents look like
+    assert proof.grade("nosqli", '{"user":"admin"}', [dump]).grade != "proven"
 
 
 def test_nosqli_refuses_a_page_that_only_echoed_the_operator():
@@ -186,15 +195,19 @@ def test_nosqli_refuses_a_page_that_only_echoed_the_operator():
               f'<html><p>No results for: {payload}</p></html>')
     verdict = proof.grade("nosqli", "No results for", [echo])
     assert verdict.grade != "proven", verdict.explain()
-    assert "documents came back, not the payload" in verdict.missing
+    assert "the operator changed what the store answered" in verdict.missing
 
     # and the real thing still passes: documents, with ids, from a login
-    # bypass that returned records the caller should not reach
+    # bypass that returned records the caller should not reach - with the
+    # control that shows the operator is what changed the answer
     rows = ('[{"_id":"6512ab9f3c1d4e0012ab34cd","user":"alice","role":"admin"},'
             '{"_id":"6512ab9f3c1d4e0012ab34ce","user":"bob","role":"user"}]')
     dump = ex("r2", "http://t.local/api/login", rows, method="POST",
               req_body='{"username":{"$ne":null},"password":{"$ne":null}}')
-    assert proof.grade("nosqli", rows[:80], [dump]).grade == "proven"
+    control = ex("r2b", "http://t.local/api/login",
+                 '{"error":"invalid credentials"}', 401, method="POST",
+                 req_body='{"username":"admin","password":"x"}')
+    assert proof.grade("nosqli", rows[:80], [dump, control]).grade == "proven"
 
 
 def test_nosqli_refuses_a_document_shape_the_store_refused():
@@ -1048,29 +1061,41 @@ def test_method_is_proven_by_an_effect_not_by_a_status():
     verifier it had, wrong about the evidence: `probe_method` already records
     both shapes of effect this class can have, and both are pairs.
     """
+    # the OPTIONS is not decoration: without something on record saying this
+    # endpoint should refuse PUT, a REST API honouring PUT on its own
+    # resource would grade as verb tampering
+    opts = ex("r0", "http://t.local/up/argusputab12.txt", "", 200,
+              method="OPTIONS", headers={"allow": "GET, HEAD, POST"})
     put = ex("r1", "http://t.local/up/argusputab12.txt", "", 201,
              method="PUT", req_body="argus method probe argusputab12")
     get = ex("r2", "http://t.local/up/argusputab12.txt",
              "argus method probe argusputab12")
     assert proof.grade("method", "argus method probe argusputab12",
-                       [put, get]).grade == "proven"
+                       [opts, put, get]).grade == "proven"
+
+    # and the same pair WITHOUT that evidence does not grade
+    verdict = proof.grade("method", "argus method probe argusputab12",
+                          [put, get])
+    assert verdict.grade != "proven"
+    assert ("a method the endpoint should refuse was honoured"
+            in verdict.missing)
 
     # a 201 on a write whose body was discarded is not an effect
     gone = ex("r3", "http://t.local/up/argusputab12.txt",
               "<h1>404 not found</h1>", 404)
     verdict = proof.grade("method", "argus method probe argusputab12",
-                          [put, gone])
+                          [opts, put, gone])
     assert verdict.grade != "proven"
     assert "the method had an observable effect" in verdict.missing
 
     # the status alone, with no read-back cited
-    assert proof.grade("method", "201 Created", [put]).grade != "proven"
+    assert proof.grade("method", "201 Created", [opts, put]).grade != "proven"
 
     # a read-back of a DIFFERENT path proves nothing about what was written
     other = ex("r4", "http://t.local/up/other.txt",
                "argus method probe argusputab12")
     assert proof.grade("method", "argus method probe argusputab12",
-                       [put, other]).grade != "proven"
+                       [opts, put, other]).grade != "proven"
 
 
 def test_trace_is_proven_by_echoing_a_header_the_probe_sent():
@@ -1620,13 +1645,17 @@ def test_lockout_is_the_absence_of_a_difference():
     this bug is characterised by not having one. The real bug graded
     `unproven` while the defence working graded `candidate`, and the
     `candidate` cap made the inversion look like a limit."""
+    # a real login body: `u=a&p=b` was not recognised as an authentication
+    # attempt at all once the check started requiring a credential field,
+    # which is the point - five page views are not five login attempts
     series = [ex(f"L{i}", "http://t.local/login", "Invalid credentials", 401,
-                 method="POST", req_body="u=a&p=b") for i in range(6)]
+                 method="POST", req_body="username=a&password=b")
+              for i in range(6)]
     assert proof.grade("lockout", "Invalid credentials",
                        series).grade == "proven"
     throttled = series[:5] + [
         ex("L9", "http://t.local/login", "Too many attempts", 429,
-           method="POST", req_body="u=a&p=b")]
+           method="POST", req_body="username=a&password=b")]
     v = proof.grade("lockout", "Invalid credentials", throttled)
     assert v.grade == "candidate"
     assert "none of them was refused" in v.missing
@@ -1901,12 +1930,14 @@ def test_a_write_proves_nothing_when_only_its_url_carried_the_nonce():
                        [empty, listing]).grade != "proven"
 
     # and the real thing still passes
+    opts = ex("m0", "http://t.local/up/x.txt", "", 200, method="OPTIONS",
+              headers={"allow": "GET, HEAD, POST"})
     real = ex("m4", "http://t.local/up/x.txt", "", 201, method="PUT",
               req_body="argus method probe argusputab12")
     read = ex("m5", "http://t.local/up/x.txt",
               "argus method probe argusputab12")
     assert proof.grade("method", "argus method probe argusputab12",
-                       [real, read]).grade == "proven"
+                       [opts, real, read]).grade == "proven"
 
 
 def test_a_crlf_control_must_be_the_same_endpoint():
@@ -2156,3 +2187,182 @@ def test_no_verifier_raises_on_an_id_it_cannot_parse():
         assert not unreadable, (
             f"{name} raised instead of refusing: "
             f"{unreadable[0].get('detail')}")
+
+
+def test_a_public_json_api_is_not_nosqli_however_it_is_probed():
+    """Found by an adversarial audit of this session's own code.
+
+    "Documents came back" is satisfied by any JSON API answering normally:
+    `/api/posts` returns `[{"_id": ...}]` whether or not the `$ne` in the
+    query changed anything. So a PUBLIC listing graded `proven` the moment
+    somebody probed it. The operator has to have changed the answer, and that
+    needs a control to the same endpoint without it.
+    """
+    rows = '[{"_id":"6512ab9f3c1d4e0012ab34cd","title":"public post"}]'
+    probed = ex("p1", 'http://t.local/api/posts?f={"$ne":null}', rows)
+    assert proof.grade("nosqli", rows[:50], [probed]).grade != "proven"
+
+    # a control that answers identically says the documents are what this
+    # endpoint returns anyway
+    control = ex("p2", "http://t.local/api/posts", rows)
+    verdict = proof.grade("nosqli", rows[:50], [probed, control])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "the operator changed what the store answered" in verdict.missing
+
+    # a control on a DIFFERENT endpoint is not a control for this one
+    elsewhere = ex("p3", "http://t.local/api/other", '{"ok":true}')
+    assert proof.grade("nosqli", rows[:50],
+                       [probed, elsewhere]).grade != "proven"
+
+
+def test_a_rest_api_that_honours_put_is_not_verb_tampering():
+    """Found by an adversarial audit of this session's own code.
+
+    `verify_method_effect` checked that a write was answered and that its
+    bytes came back, and never that the endpoint SHOULD have refused it. So
+    `PUT /api/note/7` returning 200, plus a `GET` of the same resource,
+    graded `proven` - which is every correctly working REST API.
+    """
+    put = ex("v1", "http://t.local/api/note/7", "", 200, method="PUT",
+             req_body="argusput1234 hello")
+    get = ex("v2", "http://t.local/api/note/7", "argusput1234 hello")
+    verdict = proof.grade("method", "argusput1234 hello", [put, get])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "a method the endpoint should refuse was honoured" in verdict.missing
+
+    # an Allow list that omits the method makes it a finding
+    opts = ex("v3", "http://t.local/api/note/7", "", 200, method="OPTIONS",
+              headers={"allow": "GET, HEAD"})
+    assert proof.grade("method", "argusput1234 hello",
+                       [opts, put, get]).grade == "proven"
+
+    # so does the same method refused elsewhere on the SAME host
+    refused = ex("v4", "http://t.local/api/other", "no", 405, method="PUT")
+    assert proof.grade("method", "argusput1234 hello",
+                       [refused, put, get]).grade == "proven"
+
+    # but not on a different host - that says nothing about this one
+    far = ex("v5", "http://other.example/api/x", "no", 405, method="PUT")
+    assert proof.grade("method", "argusput1234 hello",
+                       [far, put, get]).grade != "proven"
+
+    # TRACE needs no such evidence: no application needs it reachable
+    trace = {"id": "v6",
+             "request": {"method": "TRACE", "url": "http://t.local/",
+                         "headers": {"x-argus-trace": "argustrzz99"},
+                         "body": None},
+             "response": {"status": 200, "headers": {},
+                          "body": "TRACE / HTTP/1.1\nX-Argus-Trace: argustrzz99"}}
+    assert proof.grade("method", "X-Argus-Trace: argustrzz99",
+                       [trace]).grade == "proven"
+
+
+# --- what the adversarial audit of this session's own code found ------------
+#
+# Nine lenses read the code written in this session and the dominant finding
+# was the one two earlier audits had already found twice: a check that passes
+# without the claimant doing anything class-specific. Five classes graded
+# `proven` on evidence containing no vulnerability. Each case below is the
+# demonstration from that audit, reproduced before the fix and asserted after.
+
+def test_three_read_only_gets_and_a_404_are_not_a_race():
+    """`verify_concurrent_crossing` read ANY non-2xx after the burst as "the
+    limit refused it". A 404 says the thing is missing, a 3xx says it moved,
+    a 5xx says the server broke and a 429 says you were too fast - none of
+    them says the action had a limit that was crossed."""
+    def hit(rid, body="granted", status=200, ts=1000.0, ms=50.0):
+        return {"id": rid, "ts": ts,
+                "request": {"method": "GET", "url": "http://t.local/redeem",
+                            "headers": {}, "body": None},
+                "response": {"status": status, "headers": {}, "body": body,
+                             "elapsed_ms": ms}}
+    burst = [hit(f"b{i}", ts=1000.0 + i * 0.01) for i in range(3)]
+    for status, body in ((404, "not found"), (302, ""), (500, "oops"),
+                         (429, "too many requests")):
+        after = hit("x", body=body, status=status, ts=1002.0, ms=10.0)
+        verdict = proof.grade("race", "granted", burst + [after])
+        assert verdict.grade != "proven", f"{status}: {verdict.explain()}"
+        assert "a serial attempt afterwards was refused" in verdict.missing
+
+    # a 409 whose body is the SAME as the burst's is not a refusal of anything
+    same = hit("y", body="granted", status=409, ts=1002.0, ms=10.0)
+    assert proof.grade("race", "granted", burst + [same]).grade != "proven"
+
+    # the real thing: three wins, then the action reports itself spent
+    spent = hit("z", body="already redeemed", status=409, ts=1002.0, ms=10.0)
+    assert proof.grade("race", "granted",
+                       burst + [spent]).grade == "proven"
+
+
+def test_five_page_views_are_not_five_authentication_attempts():
+    """`verify_no_throttle` counted any five requests to one endpoint, and
+    never asked whether they carried a credential or whether they failed. So
+    five views of `/about` graded `proven`, and so did five SUCCESSFUL
+    logins - a lockout policy governs failures."""
+    views = [ex(f"v{i}", "http://t.local/about", "welcome") for i in range(6)]
+    verdict = proof.grade("lockout", "welcome", views)
+    assert verdict.grade != "proven", verdict.explain()
+    assert ("a counted series of failed authentication attempts is on record"
+            in verdict.missing)
+
+    good = [ex(f"g{i}", "http://t.local/login", '{"ok": true}', method="POST",
+               req_body="username=admin&password=right") for i in range(6)]
+    assert proof.grade("lockout", '{"ok": true}', good).grade != "proven"
+
+    bad = [ex(f"b{i}", "http://t.local/login", '{"ok": false}', 401,
+              method="POST", req_body=f"username=admin&password=guess{i}")
+           for i in range(6)]
+    assert proof.grade("lockout", '{"ok": false}', bad).grade == "proven"
+
+
+def test_an_upload_fetched_from_another_host_is_not_this_targets_problem():
+    """`verify_served_upload` accepted any cited exchange as the fetch: a
+    different host, a page recorded before the upload, or a fetch following
+    an upload the server REFUSED."""
+    boundary = "----argusupl1"
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg">'
+           "<script>/*argusupl1234*/alert(1)</script></svg>")
+    body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
+            f'filename="x.svg"\r\nContent-Type: image/svg+xml\r\n\r\n'
+            f"{svg}\r\n--{boundary}--\r\n")
+
+    def upload(rid, status=200):
+        return {"id": rid,
+                "request": {"method": "POST", "url": "http://t.local/upload",
+                            "headers": {}, "body": body},
+                "response": {"status": status, "headers": {},
+                             "body": '{"url":"/files/x.svg"}'}}
+
+    def fetch(rid, host="t.local"):
+        return {"id": rid,
+                "request": {"method": "GET",
+                            "url": f"http://{host}/files/x.svg",
+                            "headers": {}, "body": None},
+                "response": {"status": 200,
+                             "headers": {"content-type": "image/svg+xml"},
+                             "body": svg}}
+
+    assert proof.grade("upload", svg[:50],
+                       [upload("u1"), fetch("u2")]).grade == "proven"
+    # a copy served by somebody else
+    assert proof.grade("upload", svg[:50],
+                       [upload("u3"),
+                        fetch("u4", host="cdn.other.example")]
+                       ).grade != "proven"
+    # an upload the server refused
+    assert proof.grade("upload", svg[:50],
+                       [upload("u5", 403), fetch("u6")]).grade != "proven"
+    # a fetch recorded BEFORE the upload cannot be the stored file
+    assert proof.grade("upload", svg[:50],
+                       [fetch("u7"), upload("u8")]).grade != "proven"
+
+
+def test_a_benign_body_naming_get_is_not_a_desync():
+    """`BOGUS_METHOD_RE`'s `G[A-Z]{2,}` matched `GET` itself, so any response
+    containing `"method": "GET"`, `(GET)` or `method GET not allowed`
+    satisfied the desync check."""
+    for text in ('{"method": "GET"}', "Allowed: (GET)",
+                 "method GET not allowed", "Allow: GET, POST"):
+        assert not proof.BOGUS_METHOD_RE.search(text), text
+    for text in ("Unsupported method ('GGET')", "method GPOST", "501 GPUT"):
+        assert proof.BOGUS_METHOD_RE.search(text), text

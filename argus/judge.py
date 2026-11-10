@@ -19,16 +19,52 @@ and a model from a different family is a real second opinion on them - two
 models that agree because they share a prior are not a check.
 
 What the judge is shown: the finding, its class's proof requirement, and the
-cited evidence records, redacted. Never the first model's reasoning, because
-the disagreement worth having is the one that reasoning would not produce.
+cited evidence records. Never the first model's reasoning, because the
+disagreement worth having is the one that reasoning would not produce.
+
+**This case file leaves the machine.** It goes to a different vendor than the
+one that ran the engagement, so `render_case` re-redacts everything it
+assembles rather than trusting that the recorder already did. Transcript
+entries are redacted on the way in - but "already redacted" is a property of
+the write path, and a function that ships bytes to a third party should not
+rest on a promise made somewhere else. `argus report` re-redacts old
+transcripts at render for exactly this reason. Before this, a target's
+`Set-Cookie`, an `api_key=` in a body, a JWT and a URL's userinfo all reached
+the other vendor verbatim.
 """
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from . import models as models_mod
 from . import proof
+from .httpclient import _redact_headers
+from .session import _redact_url
+
+# Credential shapes that must not leave the machine even if no recorder rule
+# caught them: a key pasted into a BODY is not a header, and no header rule
+# redacts it.
+_REDACTED = "\u2022\u2022\u2022redacted\u2022\u2022\u2022"
+_SCRUB = (
+    re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/-]{16,}"),
+    re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd|pwd)"
+               r"(\s*[=:]\s*)[\'\"]?[^\s\'\",;&]{8,}"),
+    re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+"),
+    re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{16,}"
+               r"|AKIA[0-9A-Z]{12,})"),
+)
+
+
+def _scrub(text: str) -> str:
+    """Re-redact credential shapes before the text leaves the machine."""
+    out = _redact_url(str(text or ""))
+    for pattern in _SCRUB:
+        out = pattern.sub(
+            lambda m: "".join(g for g in m.groups() if g) + _REDACTED
+            if m.groups() and any(m.groups()) else _REDACTED, out)
+    return out
 
 PROMPT = """\
 You are reviewing another model's finding from an authorised penetration test.
@@ -66,6 +102,27 @@ missing control>",
  "missing": ["<what would settle it, if anything>"]}"""
 
 _SEVERITIES = ("critical", "high", "medium", "low", "info")
+_TRUE = {"true", "yes", "1"}
+_FALSE = {"false", "no", "0"}
+
+
+def _as_bool(value) -> bool | None:
+    """A real boolean, or the words for one. Anything else is no answer.
+
+    `bool("false")` is True, which is how a judge that disagreed was recorded
+    as agreeing.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        word = value.strip().lower()
+        if word in _TRUE:
+            return True
+        if word in _FALSE:
+            return False
+    return None
 _RANK = {s: n for n, s in enumerate(_SEVERITIES)}
 
 
@@ -101,6 +158,11 @@ def pick_judge(author_model: str, policy: str = "strong"):
     the kind of claim this system exists not to make.
     """
     family = models_mod.family(author_model)
+    if family == "unknown":
+        # We cannot exclude a family we cannot name, so "cross-family" would
+        # be a claim with nothing behind it. Refusing is the honest answer:
+        # the operator can name a judge explicitly if they know better.
+        return None
     pick = models_mod.for_role("judge", policy, exclude_family=family)
     if pick is None:
         return None
@@ -121,7 +183,7 @@ def render_case(finding: dict, entries: list[dict]) -> str:
         f"- title: {finding.get('title')}",
         f"- class: {klass}",
         f"- severity claimed: {finding.get('severity')}",
-        f"- url: {finding.get('url')}",
+        f"- url: {_scrub(str(finding.get('url') or ''))}",
         f"- grade from the proof matrix: {finding.get('grade')}",
     ]
     if verdict.get("missing"):
@@ -134,7 +196,7 @@ def render_case(finding: dict, entries: list[dict]) -> str:
         "",
         "## The quoted evidence",
         "```",
-        str(finding.get("evidence_excerpt") or "")[:4000],
+        _scrub(str(finding.get("evidence_excerpt") or ""))[:4000],
         "```",
         "",
         "## The cited records",
@@ -146,27 +208,38 @@ def render_case(finding: dict, entries: list[dict]) -> str:
             entry.get("request"), dict) else {}
         resp = entry.get("response") if isinstance(
             entry.get("response"), dict) else {}
+        req_headers = req.get("headers") if isinstance(
+            req.get("headers"), dict) else {}
         lines += [
             "",
             f"### {entry.get('id')} ({entry.get('kind', 'event')})",
-            f"{req.get('method', '')} {req.get('url', '')}".strip()
+            _scrub(f"{req.get('method', '')} {req.get('url', '')}".strip())
             or "(no request recorded)",
         ]
+        if req_headers:
+            shown = _redact_headers(
+                {str(k): str(v) for k, v in list(req_headers.items())[:12]},
+                set())
+            lines.append(
+                f"request headers: {json.dumps(shown, default=str)[:600]}")
         body = req.get("body")
         if body:
-            lines += ["request body:", "```", str(body)[:1200], "```"]
+            lines += ["request body:", "```", _scrub(str(body))[:1200], "```"]
         if resp:
             lines.append(f"-> HTTP {resp.get('status')}")
             headers = resp.get("headers") if isinstance(
                 resp.get("headers"), dict) else {}
             if headers:
-                shown = {k: v for k, v in list(headers.items())[:12]}
+                shown = _redact_headers(
+                    {str(k): str(v) for k, v in list(headers.items())[:12]},
+                    set())
                 lines.append(f"headers: {json.dumps(shown, default=str)[:600]}")
-            lines += ["body:", "```", str(resp.get("body") or "")[:3000], "```"]
+            lines += ["body:", "```",
+                      _scrub(str(resp.get("body") or ""))[:3000], "```"]
         else:
-            lines.append(json.dumps(
+            lines.append(_scrub(json.dumps(
                 {k: v for k, v in entry.items()
-                 if k not in ("chain", "id", "ts")}, default=str)[:1200])
+                 if k not in ("chain", "id", "ts")}, default=str))[:1200])
     return "\n".join(lines)
 
 
@@ -216,11 +289,30 @@ def parse_verdict(text: str, finding_id: str, judge_model: str) -> Verdict:
     # they agree on the answer, so the last one carries the fullest detail
     data = found[-1]
     severity = str(data.get("severity") or "").strip().lower()
-    missing = [str(m)[:300] for m in (data.get("missing") or [])
+    # A scalar `missing` was iterated into characters, so a judge answering
+    # `"missing": "a control"` produced ['a', ' ', 'c', 'o', ...] in the
+    # report. A string is one item, not eight.
+    raw_missing = data.get("missing")
+    if isinstance(raw_missing, (str, int, float)):
+        raw_missing = [raw_missing]
+    elif not isinstance(raw_missing, (list, tuple)):
+        raw_missing = []
+    missing = [str(m)[:300] for m in raw_missing
                if isinstance(m, (str, int, float))][:8]
+    # `bool()` on the reply made a judge answering `"agrees": "false"` read as
+    # AGREEING - any non-empty string is truthy. Of all the ways to be wrong
+    # here that is the worst one, because it manufactures the assent this
+    # whole module exists to avoid. Only a real boolean, or the words, count.
+    agrees = _as_bool(data.get("agrees"))
+    if agrees is None:
+        return Verdict(finding_id, judge_model, agrees=False,
+                       error=f"the judge's `agrees` was "
+                             f"{data.get('agrees')!r}, which is neither true "
+                             "nor false; recorded as no verdict",
+                       reason=str(data.get("reason") or "")[:300])
     return Verdict(
         finding_id, judge_model,
-        agrees=bool(data.get("agrees")),
+        agrees=agrees,
         reason=str(data.get("reason") or "")[:1000],
         severity=severity if severity in _SEVERITIES else "",
         vuln_class=proof.normalize(str(data.get("class") or "")),

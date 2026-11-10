@@ -201,6 +201,10 @@ def test_graphql_introspect(lab_url, ctx):
 
 
 def test_race_probe(lab_url, ctx):
+    # the coupon is a class variable on a session-scoped server: whoever
+    # drained it first leaves nothing to race for
+    ctx.client.send("GET", lab_url + "/redeem/reset", tool="http_request",
+                    note="reset the coupon")
     out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
     assert out["verdict"].startswith("race:"), out
     assert out["statuses"].get(200, 0) > 1, out

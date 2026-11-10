@@ -113,8 +113,8 @@ def get(key: str) -> Model | None:
     return known().get(str(key or "").strip())
 
 
-def for_role(role: str, policy: str = "cheap",
-             exclude_family: str = "") -> Model | None:
+def for_role(role: str, policy: str = "cheap", exclude_family: str = "",
+             usable_only: bool = True) -> Model | None:
     """The model to use for a role.
 
     `cheap` takes the least expensive candidate that the table says can do the
@@ -125,13 +125,30 @@ def for_role(role: str, policy: str = "cheap",
 
     `exclude_family` is how a review stays cross-family: two models that agree
     because they share a prior are not a check.
+
+    `usable_only` drops candidates whose credential is not set, and defaults
+    to on because the alternative is worse than it looks: `local` is priced at
+    zero, so cost ordering puts it ahead of every paid model, and `--role
+    breadth` resolved to a loopback server that is almost never running. A
+    role that resolves to a model the operator cannot call is not a cheap
+    answer, it is a run that dies on its first request. Pass False to ask what
+    the table *says*, independent of this machine.
     """
     role = str(role or "").strip()
     cands = [m for m in known().values() if role in m.roles]
     if exclude_family:
         cands = [m for m in cands if family(m.key) != exclude_family]
+    if usable_only:
+        usable = [m for m in cands if m.credential()]
+        # Anthropic models resolve their credential through the config chain
+        # (OAuth store, OpenCode) rather than only an env var, so a missing
+        # variable does not mean unusable for them.
+        usable += [m for m in cands
+                   if m.provider == "anthropic" and not m.credential()]
+        cands = usable
     if not cands:
         return None
+
     def price(m: Model) -> float:
         return m.usd_per_mtok_in + m.usd_per_mtok_out
     return (min(cands, key=price) if policy != "strong"

@@ -68,7 +68,8 @@ def test_cheap_is_not_more_expensive_than_strong():
 def test_for_role_can_exclude_a_family_so_a_judge_is_independent():
     # a judge from the family that produced the finding is not a second
     # opinion, it is the same prior answering twice
-    pick = models.for_role("judge", "strong", exclude_family="claude")
+    pick = models.for_role("judge", "strong", exclude_family="claude",
+                           usable_only=False)
     assert pick is not None
     assert models.family(pick.key) != "claude"
 
@@ -280,7 +281,8 @@ def _cfg(model: str, **kw):
     return types.SimpleNamespace(**base)
 
 
-def test_the_factory_sends_each_model_to_its_own_provider():
+def test_the_factory_sends_each_model_to_its_own_provider(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
     assert isinstance(make_client(_cfg("claude-sonnet-4-5")), ClaudeClient)
     assert isinstance(make_client(_cfg("gpt-4.1")), OpenAICompatClient)
 
@@ -291,13 +293,15 @@ def test_an_unknown_model_goes_to_anthropic_not_to_an_error():
     assert isinstance(make_client(_cfg("claude-sonnet-9-9")), ClaudeClient)
 
 
-def test_an_explicit_api_base_wins_over_the_table():
+def test_an_explicit_api_base_wins_over_the_table(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
     client = make_client(_cfg(
         "gpt-4.1", api_base="https://gateway.internal/v1/chat/completions"))
     assert client.api_base == "https://gateway.internal/v1/chat/completions"
 
 
-def test_both_clients_expose_the_counters_the_loop_reports():
+def test_both_clients_expose_the_counters_the_loop_reports(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai")
     for client in (make_client(_cfg("claude-sonnet-4-5")),
                    make_client(_cfg("gpt-4.1"))):
         for attr in ("calls", "input_tokens", "output_tokens",
@@ -543,3 +547,63 @@ def test_an_agent_that_reported_nothing_does_not_break_the_breakdown():
     out = team._cost_breakdown()
     assert out["usd"] == 0.0
     assert out["per_agent"]["recon-1"]["model"] == "claude-sonnet-4-5"
+
+
+# --- the credential must never be the wrong provider's -------------------
+
+def test_the_anthropic_key_is_never_sent_to_another_provider(monkeypatch):
+    """`make_client` fell back to `cfg.api_key` when the picked model's own
+    variable was unset — and `cfg.api_key` is the ANTHROPIC key, which this
+    client sends as a Bearer token to whatever host the table names. So
+    `--model gpt-4.1` with no OPENAI_API_KEY shipped the operator's Anthropic
+    credential to api.openai.com. Found by an adversarial audit of this
+    session's own code."""
+    for name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY",
+                 "ARGUS_LOCAL_API_KEY", "OLLAMA_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    for model in ("gpt-4.1", "gpt-4.1-mini", "deepseek-chat", "local"):
+        with pytest.raises(LLMError) as exc:
+            make_client(_cfg(model, api_key="sk-ANTHROPIC-SECRET"))
+        message = str(exc.value)
+        assert "sk-ANTHROPIC-SECRET" not in message
+        assert "no credential for" in message
+        spec = models.get(model)
+        assert any(v in message for v in spec.api_key_env), message
+
+
+def test_a_model_with_its_own_credential_uses_exactly_that(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-openai-only")
+    client = make_client(_cfg("gpt-4.1", api_key="sk-ANTHROPIC-SECRET"))
+    assert client.api_key == "sk-openai-only"
+
+
+def test_an_operator_api_base_does_not_inherit_the_insecure_opt_in(monkeypatch):
+    """`allow_insecure_base` is a statement about the model's OWN endpoint — a
+    loopback server. Applying it to a base URL from `ANTHROPIC_BASE_URL` turned
+    the plaintext-credential refusal off for any host."""
+    monkeypatch.setenv("ARGUS_LOCAL_API_KEY", "x")
+    with pytest.raises(LLMError) as exc:
+        make_client(_cfg("local",
+                         api_base="http://evil.example/v1/chat/completions"))
+    assert "http" in str(exc.value).lower()
+    # the table's own loopback base still works
+    assert make_client(_cfg("local")).api_base.startswith("http://127.0.0.1")
+
+
+def test_for_role_skips_a_model_whose_credential_is_not_set(monkeypatch):
+    """`local` is priced at zero, so cost ordering put it ahead of every paid
+    model and `--role breadth` resolved to a loopback server that is almost
+    never running. A role that resolves to a model the operator cannot call
+    is not a cheap answer; it is a run that dies on its first request."""
+    for name in ("OPENAI_API_KEY", "DEEPSEEK_API_KEY",
+                 "ARGUS_LOCAL_API_KEY", "OLLAMA_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    for role in models.roles():
+        pick = models.for_role(role, "cheap")
+        assert pick is not None, role
+        assert pick.provider == "anthropic", (
+            f"{role} resolved to {pick.key}, whose credential is unset")
+    # and the table's own answer is still askable
+    assert models.for_role("breadth", "cheap", usable_only=False).key == "local"
+    monkeypatch.setenv("ARGUS_LOCAL_API_KEY", "1")
+    assert models.for_role("breadth", "cheap").key == "local"
