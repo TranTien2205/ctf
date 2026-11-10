@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "note": "Model table. Tuning a model, adding one, or changing a price is a data change, not a code change. Prices are USD per million tokens as published; they move, and a stale price is a wrong cost report - `argus models` prints what this file says so the number in a report can always be traced to a line here.",
+  "defaults": {
+    "provider": "anthropic",
+    "context_window": 200000,
+    "max_output_tokens": 4096
+  },
+  "models": {
+    "claude-sonnet-4-5": {
+      "provider": "anthropic",
+      "display": "Sonnet 4.5",
+      "usd_per_mtok_in": 3.0,
+      "usd_per_mtok_out": 15.0,
+      "roles": [
+        "planner",
+        "depth",
+        "judge",
+        "writer",
+        "breadth"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ]
+    },
+    "claude-opus-4-5": {
+      "provider": "anthropic",
+      "display": "Opus 4.5",
+      "usd_per_mtok_in": 15.0,
+      "usd_per_mtok_out": 75.0,
+      "roles": [
+        "planner",
+        "depth",
+        "judge"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ]
+    },
+    "claude-haiku-4-5": {
+      "provider": "anthropic",
+      "display": "Haiku 4.5",
+      "usd_per_mtok_in": 1.0,
+      "usd_per_mtok_out": 5.0,
+      "roles": [
+        "breadth",
+        "writer"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ]
+    },
+    "gpt-4.1": {
+      "provider": "openai",
+      "display": "GPT-4.1",
+      "api_base": "https://api.openai.com/v1/chat/completions",
+      "api_key_env": [
+        "OPENAI_API_KEY"
+      ],
+      "usd_per_mtok_in": 2.0,
+      "usd_per_mtok_out": 8.0,
+      "roles": [
+        "planner",
+        "depth",
+        "judge",
+        "writer"
+      ]
+    },
+    "gpt-4.1-mini": {
+      "provider": "openai",
+      "display": "GPT-4.1 mini",
+      "api_base": "https://api.openai.com/v1/chat/completions",
+      "api_key_env": [
+        "OPENAI_API_KEY"
+      ],
+      "usd_per_mtok_in": 0.4,
+      "usd_per_mtok_out": 1.6,
+      "roles": [
+        "breadth",
+        "writer"
+      ]
+    },
+    "deepseek-chat": {
+      "provider": "openai",
+      "display": "DeepSeek V3",
+      "api_base": "https://api.deepseek.com/chat/completions",
+      "api_key_env": [
+        "DEEPSEEK_API_KEY"
+      ],
+      "context_window": 64000,
+      "usd_per_mtok_in": 0.27,
+      "usd_per_mtok_out": 1.1,
+      "roles": [
+        "breadth",
+        "depth",
+        "writer"
+      ]
+    },
+    "local": {
+      "provider": "openai",
+      "display": "local OpenAI-compatible server",
+      "api_base": "http://127.0.0.1:11434/v1/chat/completions",
+      "api_key_env": [
+        "ARGUS_LOCAL_API_KEY",
+        "OLLAMA_API_KEY"
+      ],
+      "allow_insecure_base": true,
+      "context_window": 32000,
+      "usd_per_mtok_in": 0.0,
+      "usd_per_mtok_out": 0.0,
+      "roles": [
+        "breadth",
+        "writer"
+      ],
+      "note": "A loopback OpenAI-compatible server (Ollama, llama.cpp, vLLM). Never chosen by --role unless ARGUS_LOCAL_API_KEY or OLLAMA_API_KEY is set: the price is zero, so cost ordering would otherwise pick it over every paid model, and an OPENAI_API_KEY is not evidence that a server is listening on this machine. Set the variable to any non-empty value when one is."
+    }
+  },
+  "roles": {
+    "planner": "picks what to probe next from recorded evidence - a wrong call here costs the engagement, not money",
+    "breadth": "recon and enumeration: many cheap calls over a wide surface",
+    "depth": "exploitation and verification: must hold a long chain of reasoning about one target",
+    "judge": "reviews a finding. Must not be the family that produced it - two models that agree because they share a prior are not a check",
+    "writer": "report prose from recorded findings; invents nothing"
+  }
+}

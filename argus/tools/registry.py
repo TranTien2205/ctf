@@ -77,6 +77,7 @@ def _impl(name: str) -> Callable:
         "load_skill": analysis.load_skill,
         "read_response": analysis.read_response,
         "note": analysis.note,
+        "next_action": analysis.next_action,
         "read_notes": analysis.read_notes,
         "record_finding": analysis.record_finding,
         "run_external": analysis.run_external,
@@ -580,6 +581,20 @@ TOOL_SCHEMAS: list[dict] = [
         "reasoning.",
         {"text": {**_STR, "description": "Markdown text to append"}},
         ["text"],
+    ),
+    _schema(
+        "next_action",
+        "Ask the evidence what to do next. The answer is computed from this "
+        "session's recorded transcript and findings - not from this "
+        "conversation - so it is the same answer a fresh reader of the "
+        "evidence would give: the unrecorded proof you already hold, the "
+        "exact check a candidate finding is missing, the endpoint nothing has "
+        "probed, or that it is time to report. Call it when you are unsure "
+        "what is worth doing, when a class has stopped producing new signal, "
+        "or before you decide the engagement is finished. Departing from it "
+        "is fine; say in one line why.",
+        {},
+        [],
     ),
     _schema(
         "read_notes",

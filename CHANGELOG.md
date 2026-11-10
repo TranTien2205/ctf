@@ -73,7 +73,7 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 45 of the 55 tools served over
+- `user -> LLM -> MCP -> tool`: 46 of the 56 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
@@ -139,6 +139,63 @@ system. All notable milestones on `agent-v2`.
 - Real-LLM e2e verified over Claude Code OAuth: the evidence gate rejected
   hallucinated excerpts and malformed calls; no code path needed the
   model's word over the transcript's bytes.
+
+### The decision controller (`argus next`, `next_action`)
+- Ported from the ledger plane of the four-plane tree, rebuilt on this tree's
+  own artifacts rather than a second state file. Seven ordered rules computed
+  from `transcript.jsonl` and `findings.json`: an unrecorded proof already on
+  disk, a candidate finding's exact missing check, untouched parameterised
+  surface, a first-pass class never tried, a spent probe budget, a
+  single-endpoint engagement, and report as the only exit.
+- Available to the operator as `argus next <session>` and to the agent as the
+  `next_action` tool, so "what does the evidence say to do" is a question it
+  can ask instead of a thing it must remember across a context rollover.
+- It invents nothing: an endpoint with no named input is never recommended,
+  static assets are not surface, and a probe's output is graded only under
+  that probe's own class. `probe_time` is deliberately unmapped — a latency
+  measurement is consistent with sqli, with rce and with a slow database, so
+  counting it as "this class was tested" would let a timing run stand in for
+  a proof it cannot produce.
+- Found a live defect in the proof matrix on its first run against the test
+  corpus (below).
+
+### Model table & providers (`argus models`)
+- `argus/models.json`: provider, endpoint, credential variables, published
+  USD/Mtok and the roles each model is listed for — data, so adding a model
+  is a line, not a patch.
+- `OpenAICompatClient`: an OpenAI chat-completions adapter behind the *same*
+  `chat(messages, tools, system)` the loop already called, so a non-Anthropic
+  model runs the identical loop, evidence gate and proof matrix. Tool calls,
+  tool results and multi-block system prompts translate both ways;
+  malformed tool arguments survive as a reportable call rather than
+  vanishing.
+- `make_client(cfg)` resolves the provider from the table; a model the table
+  does not know goes to Anthropic (an unknown name is likelier a new Claude
+  release than a typo for a local server).
+- `--role planner|breadth|depth|judge|writer` with `--policy cheap|strong`
+  picks a model by what the task needs; `--model` always wins. `for_role`
+  can exclude a family, because a judge from the family that produced the
+  finding is the same prior answering twice.
+- Cost in `summary.json` and the report: recorded tokens × the rates in
+  `models.json`, cache reads at a tenth of input, carrying the table
+  version. A model with no line reports `usd: null` and the reason — a
+  price that cannot be traced to something checkable is an invented number.
+- OpenAI counts cached tokens *inside* `prompt_tokens` and Anthropic counts
+  them separately; the adapter subtracts them, so a cached token is billed
+  once, not twice.
+- A credential is refused over plaintext `http://` unless the model's line
+  opts in (`local`, for a loopback server).
+- `--role-models` (team mode): lead=planner, recon=breadth, exploit=depth,
+  report=writer, each resolved through the table under `--policy`. Off by
+  default — four agents silently on four models is harder to explain than it
+  is worth, and an operator with one credential would watch three of them
+  fail. A pick whose credential is unset falls back to `--model` and names
+  the variable. `summary.json` then carries USD per agent with the model each
+  one used, because one rate cannot describe a run that spanned providers.
+- `local` lists its own credential variables (`ARGUS_LOCAL_API_KEY`,
+  `OLLAMA_API_KEY`) rather than `OPENAI_API_KEY`. It costs nothing, so cost
+  ordering put it ahead of every paid model — and an OpenAI key is not
+  evidence that a server is listening on this machine.
 
 ### Reports & artifacts
 - `argus diff <before> <after>`: retest comparison at finding level —
@@ -220,9 +277,25 @@ system. All notable milestones on `agent-v2`.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 334 tests (unit + live-lab + loop +
-  team + MCP client + MCP server + proof matrix + CLI + external-tool
-  subprocess path + hardening regressions).
+- `python -m pytest tests/ -q`: 412 tests (unit + live-lab + loop +
+  team + MCP client + MCP server + proof matrix + provider adapters +
+  the decision controller + CLI + external-tool subprocess path +
+  hardening regressions).
+- nosqli graded `proven` on a page that only echoed the operator back.
+  `verify_data_extraction` asked the *request* whether the query named its
+  target — for a document store the only place it could ask, since a Mongo
+  query has no FROM clause — but that answers "a payload was sent", never "a
+  store answered". So `{"$ne": null}` reflected into a search page's "no
+  results" line passed every check: operator in the request, status 200, body
+  not a DBMS error. Now the *response* must carry a document shape (`_id`,
+  `ObjectId`, `$oid`, or a JSON array of objects) that the request does not,
+  which is response-side evidence of a read rather than request-side evidence
+  of an attempt. Found by the decision controller re-grading its own
+  transcript, which is the use it was built for.
+- The selftest printed its results before the documentation gate appended
+  its own, so a doc failure was counted but never printed: the gate said
+  `130/131` and named nothing, in the one subsystem whose entire claim is
+  that it names what is wrong.
 - The proof matrix is tested in both directions per class: an evidence set
   that must grade `proven`, and one that must not. The second is the one that
   matters, and `test_every_class_refuses_a_benign_page` runs all 29 against a

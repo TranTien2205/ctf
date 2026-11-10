@@ -13,7 +13,7 @@ python lab/vulnapp.py 8777            # deterministic vulnerable app
 ```
 
 Auth note: subscription OAuth bills to the account's "extra usage" pool
-and caps per-request size — the full 55-tool schema (~32KB) may be
+and caps per-request size — the full 56-tool schema (~32KB) may be
 rejected there. For constrained auth, run `run` with
 `--tools fingerprint,crawl,http_request,probe_sqli,probe_cmdi,probe_ssti,probe_lfi,probe_idor,probe_reflection,probe_disclosure,record_finding,note,load_skill,read_response`
 

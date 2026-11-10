@@ -45,6 +45,9 @@ python -m argus demo                # scripted full run on the lab - no API key
 python selftest.py                  # offline check, no API key needed
 python -m argus proof rce           # what a class must produce to be a finding
 python -m argus proof               # all 29 requirements
+python -m argus next docs/sample-session
+                                    # what the recorded evidence says to do next
+python -m argus models              # providers, prices, and what each is for
 python -m argus mcp-serve http://127.0.0.1:8777 --allow-private
                                     # serve the tools to your own LLM
 ```
@@ -302,7 +305,7 @@ the assessment, over MCP:
 python -m argus mcp-serve https://app.example --scope api.example     --require-proof
 ```
 
-45 of the 55 tools are served over newline-delimited stdio JSON-RPC. Register
+46 of the 56 tools are served over newline-delimited stdio JSON-RPC. Register
 it with any MCP host — Claude Code, an MCP-speaking IDE, an agent runtime:
 
 ```json

@@ -2,7 +2,7 @@
 
 `argus run` owns the loop: it talks to Claude itself and calls its own tools.
 That is one shape of the chain and not the only one. This module is the other:
-argus exposes its 55 tools over stdio JSON-RPC, and whichever LLM the operator
+argus exposes its 56 tools over stdio JSON-RPC, and whichever LLM the operator
 already has - Claude Code, an MCP-speaking IDE, an agent host - drives the
 assessment through them.
 

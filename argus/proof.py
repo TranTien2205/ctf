@@ -133,6 +133,19 @@ DESTRUCTIVE_RE = re.compile(
 # `{"$ref": ...}` are ordinary JSON and used to prove nosqli, while the
 # bracketed urlencoded carrier `?user[$ne]=x` - which is how the carrier
 # actually arrives - proved nothing.
+# What a returned document looks like in a response, as opposed to a page that
+# merely echoed the operator back. Any one of: a Mongo object id (the field or
+# the 24-hex value), a BSON type marker, or a JSON array of objects. A page's
+# own prose satisfies none of them, which is the whole point: `$ne` in the
+# REQUEST proves a payload was sent, never that a store answered it.
+RECORD_RE = re.compile(
+    r"(?i)(\"_id\"\s*:"
+    r"|ObjectId\(\s*[\"']?[0-9a-f]{24}"
+    r"|\"\$oid\"\s*:"
+    r"|\"\$numberLong\"\s*:"
+    r"|\"\$date\"\s*:"
+    r"|\[\s*\{[^{}]*\"[^\"]+\"\s*:)")
+
 NOSQL_OP_RE = re.compile(
     r"(?i)("
     r"[\"']?\$(?:ne|gt|gte|lt|lte|regex|where|in|nin|exists|expr|function|or|and|not)"
@@ -681,26 +694,50 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
              "or names a collection" if not spec.fingerprint else
              "no cited request carries SQL that names a table - a boolean "
              "differential proves the channel, not the read")))
+        # A document store has no FROM clause, so the request cannot carry
+        # evidence of a read - only of an attempt. The response has to. A
+        # search box that reflects `{"$ne": null}` into its "no results"
+        # message satisfied every check here before this: the operator was in
+        # the request, the status was 200, and the body was not a DBMS error.
+        # That graded `proven` on a page with no database behind it at all.
+        records = RECORD_RE.search(body) if entry else None
+        # a document shape the REQUEST also carries is the payload coming
+        # back, not a record going out
+        if records is not None and records.group(0) in request:
+            records = None
+        if not spec.fingerprint:
+            out.append(_check(
+                "documents came back, not the payload", records is not None,
+                f"{records.group(0)[:60]} in {rid}" if records else
+                "no cited response carries a document shape (_id, ObjectId, "
+                "$oid, or a JSON array of objects) - an operator in the "
+                "request proves a payload was sent, not that a store "
+                "answered it"))
         quoted = bool(claim.excerpt) and claim.excerpt in body
         is_error = bool(claim.excerpt) and (
             bool(DBMS_RE.search(claim.excerpt))
             or bool(REFUSAL_RE.search(claim.excerpt)))
         answered = bool(entry) and status_of(entry) < 400
+        enough = bool(named) and (spec.fingerprint or records is not None)
         out.append(_check(
             "rows returned, not an error message",
-            bool(named) and quoted and not is_error and answered,
-            f"quoted from {rid}" if named and quoted and not is_error
+            enough and quoted and not is_error and answered,
+            f"quoted from {rid}" if enough and quoted and not is_error
             and answered else
             ("the excerpt is an error or a refusal, not data" if is_error else
              f"{rid} answered {status_of(entry)} - the store refused the query"
-             if named and quoted and not answered else
-             f"the quoted bytes are not in {rid}" if named and not quoted else
+             if enough and quoted and not answered else
+             f"the quoted bytes are not in {rid}" if enough and not quoted else
+             "the exchange the rows are quoted from returned no document "
+             "shape" if named else
              "the exchange the rows are quoted from never named a table")))
         return out
 
-    checks += _witness(claim.exchanges or [None], build,
-                       ("the query named its target",
-                        "rows returned, not an error message"))
+    required = ["the query named its target",
+                "rows returned, not an error message"]
+    if not spec.fingerprint:
+        required.insert(1, "documents came back, not the payload")
+    checks += _witness(claim.exchanges or [None], build, tuple(required))
     rows = claim.excerpt.count("\n") + 1 if claim.excerpt else 0
     checks.append(_check("extraction stayed minimal", rows <= 20,
                          "" if rows <= 20 else
@@ -1490,9 +1527,19 @@ DESERIALIZE_REQUIRED = ("a serialized payload was sent",
                         "the probe nonce came back in the output")
 EXTRACTION_REQUIRED = ("the query named its target",
                        "rows returned, not an error message")
+# A document store has no FROM clause, so there is no request-side evidence of
+# a READ - only of an attempt. nosqli therefore carries one more required
+# check than sqli: the response has to show a document shape. Without it, a
+# search box reflecting `{"$ne": null}` into its "no results" line satisfied
+# every check and graded `proven` on a page with no database behind it.
+DOCUMENT_REQUIRED = ("the query named its target",
+                     "documents came back, not the payload",
+                     "rows returned, not an error message")
 # nosqli had no floor at all, so one exchange that merely carried an operator
 # query graded `proven` - including one whose response refused it.
 EXTRACTION_FLOOR = ("rows returned, not an error message",)
+DOCUMENT_FLOOR = ("documents came back, not the payload",
+                  "rows returned, not an error message")
 
 MATRIX: dict[str, ProofSpec] = {}
 
@@ -1532,8 +1579,8 @@ for _s in [
               notes="Five rows is a proof. A full dump is an incident."),
     ProofSpec("nosqli", "documents returned from a named collection the query "
               "should not have reached",
-              EXTRACTION_REQUIRED, verify_data_extraction, fingerprint=False,
-              advisories=EXTRACTION_ADVISORY, floor=EXTRACTION_FLOOR,
+              DOCUMENT_REQUIRED, verify_data_extraction, fingerprint=False,
+              advisories=EXTRACTION_ADVISORY, floor=DOCUMENT_FLOOR,
               aliases=("nosql-injection", "mongo-injection")),
     ProofSpec("graphql", "a GraphQL query the endpoint answered with its "
               "schema or with records the caller should not reach",

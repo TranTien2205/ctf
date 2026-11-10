@@ -547,11 +547,17 @@ def main() -> int:
     client.close()
     srv.shutdown()
 
+    # the doc gate appends its own results, so it must run BEFORE the print
+    # loop. It used to run after, which meant a documentation failure was
+    # counted but never printed: the gate reported 130/131 and said nothing
+    # about which check failed, in the one subsystem whose entire claim is
+    # that it names what is wrong.
+    _doc_consistency()
+    _doc_selftest_count()
+
     print("\n=== argus selftest ===")
     for status, line in results:
         print(f"[{status}] {line}")
-    _doc_consistency()
-    _doc_selftest_count()
 
     failed = [r for r in results if r[0] == FAIL]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
@@ -690,7 +696,7 @@ def _doc_consistency() -> None:
     served = len(tool_manifest())
     for label, actual, found in claims:
         nums = {int(n) for n in found}
-        # `49 of the 55 tools` contributes both numbers legitimately
+        # `46 of the 56 tools` contributes both numbers legitimately
         allowed = {actual, served} if label == "tool" else {actual}
         wrong = sorted(nums - allowed)
         # A regex that stops matching would make this check pass forever on
@@ -757,6 +763,12 @@ def _doc_consistency() -> None:
     code = ""
     for src in (ROOT / "argus").rglob("*.py"):
         code += src.read_text(encoding="utf-8")
+    # A variable named in `models.json` under `api_key_env` is read for real:
+    # `models.Model.credential()` walks that list through os.environ. Grepping
+    # only the .py files called ARGUS_LOCAL_API_KEY invented when it is the
+    # one thing a local server needs set.
+    for data in (ROOT / "argus").rglob("*.json"):
+        code += data.read_text(encoding="utf-8", errors="replace")
     real_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", code))
     doc_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", joined))
     invented = sorted(doc_env - real_env)

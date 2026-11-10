@@ -229,6 +229,31 @@ def read_notes(ctx: Context) -> dict:
             "truncated": len(text) > 50_000}
 
 
+def next_action(ctx: Context) -> dict:
+    """What this session's own recorded evidence says to do next.
+
+    The point of this tool is that its answer does not come from the
+    conversation. It is computed from `transcript.jsonl` and `findings.json`,
+    so a context that has rolled over, or a turn that has started repeating
+    itself, gets the same answer a fresh reader would get. Departing from it
+    is allowed and often right - the contract is only that the departure is
+    stated, not that the ledger is obeyed.
+    """
+    from .. import decide as decide_mod
+    try:
+        action = decide_mod.next_action(ctx.session.dir)
+    except Exception as exc:                                  # pragma: no cover
+        # a controller that crashes must not take the run with it: the agent
+        # can still probe, it just loses the second opinion
+        return {"error": f"the ledger could not be computed: "
+                         f"{type(exc).__name__}: {exc}"}
+    out = action.to_dict()
+    out["note"] = ("computed from recorded evidence, not from this "
+                   "conversation. Depart from it when you have a reason, and "
+                   "say the reason in one line.")
+    return out
+
+
 # ---------------------------------------------------------------- findings
 
 def record_finding(ctx: Context, title: str, severity: str, category: str,

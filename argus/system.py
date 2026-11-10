@@ -85,6 +85,12 @@ methodology. Read it before probing, not after recording.
 - Matched pairs: true/false, benign/payload, yours/someone-else's object id.
 - After ~5 probes against one hypothesis with no new signal, change the
   mechanism, not the payload. Park it in note() and move on.
+- When you are unsure what is worth doing, or a class has stopped
+  producing signal, or you think the engagement is finished: call
+  next_action(). It computes the next move from the recorded transcript
+  and findings, not from this conversation, so it is the answer a fresh
+  reader of the evidence would give - including "you already hold a proof
+  you never recorded". Departing from it is fine; say in one line why.
 - Login/auth flows first when credentials are provided in the brief.
 - IDOR checks need two identities or a predictable id - never enumerate
   real user data further than needed to prove access control is missing.

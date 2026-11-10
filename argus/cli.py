@@ -13,6 +13,18 @@ from .session import Session
 
 def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("target", help="Base URL of the in-scope target")
+    p.add_argument("--role", default=None,
+                   help="pick the model by what the task needs rather than by "
+                        "name (planner|breadth|depth|judge|writer); "
+                        "`argus models` lists them. --model wins over this")
+    p.add_argument("--policy", default="cheap", choices=["cheap", "strong"],
+                   help="with --role: the cheapest model the table says can "
+                        "do the job, or the strongest (default cheap)")
+    p.add_argument("--role-models", action="store_true",
+                   help="team mode only: give each role the model the table "
+                        "lists for its job (lead=planner, recon=breadth, "
+                        "exploit=depth, report=writer) under --policy. A pick "
+                        "whose credential is not set falls back to --model")
     p.add_argument("--seal-key", default=None,
                    help="HMAC key (or a path to a file holding one) for the "
                         "transcript chain. Unkeyed, the chain proves the file "
@@ -43,7 +55,10 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--operator",
                    help="Tester/org attribution recorded in meta.json and "
                         "rendered in the report header")
-    p.add_argument("--model", help="Claude model id (default claude-sonnet-4-5)")
+    p.add_argument("--model",
+                   help="model id (default claude-sonnet-4-5). `argus models` "
+                        "lists the table; a name it does not know is sent to "
+                        "Anthropic")
     p.add_argument("--api-key", help="Anthropic API key (else ANTHROPIC_API_KEY)")
     p.add_argument("--auth-token",
                    help="OAuth bearer token (Pro/Max; else ANTHROPIC_AUTH_TOKEN, "
@@ -135,6 +150,18 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--model")
     p_check.add_argument("--json", action="store_true",
                          help="machine-readable verdict (ok/degraded/error)")
+
+    p_next = sub.add_parser(
+        "next", help="what the recorded evidence says to do next, computed "
+                     "from a session directory rather than from the "
+                     "conversation")
+    p_next.add_argument("session", help="path to a session directory")
+    p_next.add_argument("--json", action="store_true")
+
+    p_models = sub.add_parser(
+        "models", help="the model table: provider, price, and which roles "
+                       "each model is listed for")
+    p_models.add_argument("--json", action="store_true")
 
     p_proof = sub.add_parser(
         "proof", help="print the proof requirement for a bug class, or list "
@@ -361,6 +388,47 @@ def main(argv: list[str] | None = None) -> int:
                     if f.get("grade") else ""
                 print(f"[{sev:8}]{grade} {f.get('id', '?')} {f.get('title', '?')}"
                       f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
+        return 0
+
+    if args.cmd == "next":
+        from . import decide as decide_mod
+        action = decide_mod.next_action(args.session)
+        print(json.dumps(action.to_dict(), indent=2, ensure_ascii=False)
+              if args.json else action.render())
+        return 0
+
+    if args.cmd == "models":
+        from . import models as models_mod
+        table = models_mod.known()
+        if args.json:
+            print(json.dumps(
+                {"version": models_mod.table_version(),
+                 "roles": models_mod.roles(),
+                 "models": {k: {"provider": m.provider, "display": m.display,
+                                "api_base": m.api_base,
+                                "api_key_env": m.api_key_env,
+                                "context_window": m.context_window,
+                                "usd_per_mtok_in": m.usd_per_mtok_in,
+                                "usd_per_mtok_out": m.usd_per_mtok_out,
+                                "roles": m.roles,
+                                "credential_present": bool(m.credential())}
+                           for k, m in table.items()}}, indent=2))
+            return 0
+        print(f"model table v{models_mod.table_version()} - prices are USD per "
+              "million tokens as published, and they move: a cost in a report "
+              "traces to a line here\n")
+        print(f"{'model':20} {'provider':10} {'in':>7} {'out':>7} {'cred':5} roles")
+        for key, m in sorted(table.items()):
+            cred = "yes" if m.credential() else "-"
+            print(f"{key:20} {m.provider:10} {m.usd_per_mtok_in:7.2f} "
+                  f"{m.usd_per_mtok_out:7.2f} {cred:5} {','.join(m.roles)}")
+        print("\nroles:")
+        for role, why in models_mod.roles().items():
+            cheap = models_mod.for_role(role, "cheap")
+            strong = models_mod.for_role(role, "strong")
+            print(f"  {role:9} cheap={cheap.key if cheap else '-':20} "
+                  f"strong={strong.key if strong else '-'}")
+            print(f"            {why}")
         return 0
 
     if args.cmd == "proof":

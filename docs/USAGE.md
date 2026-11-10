@@ -25,7 +25,7 @@ source resolved, then retries with the full tool schema. Exit codes:
 auth rejected; 2 = auth works but the tool surface was rejected
 (degraded - constrain it). Note: OAuth (subscription) auth bills calls
 to your account's "extra usage" budget, not plan limits - on a
-constrained account the full ~55-tool schema may be rejected
+constrained account the full ~56-tool schema may be rejected
 (`--tools` shrinks it; team mode splits tools across role cards and
 fits under the cap).
 
@@ -115,6 +115,25 @@ Team-only flags:
 The session dir gains `agent-<name>.log` per member plus the shared
 `transcript.jsonl` (each entry tagged with its agent), `findings.json`,
 and `report.md`.
+
+### A model per role
+
+```bash
+python -m argus team <target> --role-models            # cheapest per job
+python -m argus team <target> --role-models --policy strong
+```
+
+Off by default. The four cards want different things - the lead holds the
+plan, recon makes many cheap calls over a wide surface, exploit holds one long
+chain of reasoning about one target, the writer turns recorded findings into
+prose - so `--role-models` gives each the model `argus models` lists for that
+job. A pick whose credential is not set falls back to `--model` and says which
+variable to set, rather than letting that agent die on its first call.
+
+`summary.json` then carries `llm_cost.per_agent`, each line naming the model
+that agent ran on: one rate cannot describe a run that spanned providers, and
+an agent on a model with no line in the table reports `null` rather than a
+zero that would read as free.
 
 ## Probe coverage
 
@@ -307,6 +326,90 @@ proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
 working directory. If a run is refused, pick the in-scope equivalent —
 e.g. `-b name=value` instead of a cookie-jar path.
 
+## Asking the evidence what is next (`argus next`)
+
+```bash
+python -m argus next engagements/2026-11-09-120000-target
+python -m argus next <session> --json      # for a harness
+```
+
+The answer is computed from `transcript.jsonl` and `findings.json` and from
+nothing else. It never saw the conversation, which is the point: a model whose
+context has rolled over, or whose last four turns were the same payload with a
+new separator, gets the same answer a fresh reader of the evidence would give.
+
+Seven ordered rules, each naming the observation that fired it:
+
+| action | fires when |
+|---|---|
+| `record_finding` | an exchange on disk already meets a proof requirement and no finding cites it |
+| `close_proof_gap` | a recorded finding is `candidate`, and the matrix names the exact missing check |
+| `probe` | a parameterised endpoint carries named inputs that no class-bearing probe touched |
+| `park_and_switch` | one class has spent its probe budget on one endpoint with nothing recorded |
+| `widen_surface` | findings exist but only one endpoint was ever reached |
+| `report` | every endpoint is probed for the first-pass classes and every finding is graded |
+| `open_session` / `recon` | there is no session, or no request/response pair yet |
+
+The agent can ask the same question mid-run with the `next_action` tool. It is
+advice, not a rail: departing from it is normal and often right, and the
+contract is only that the departure is stated.
+
+What it will not do is invent work. An endpoint with no named input is not
+recommended for probing, because there is nowhere to put a payload; a static
+asset is not surface; and rule 1 grades a probe's output **only under that
+probe's own class**, because re-grading every exchange against all 29 would
+turn any page that echoes its query into a recommendation to record `sqli` -
+the exact failure the proof matrix exists to prevent.
+
+## Choosing a model (`argus models`)
+
+The provider is a fact about the model, not about the code. `argus/models.json`
+says which provider each model belongs to, what it costs, and which jobs it is
+listed for; `argus models` prints it.
+
+```bash
+python -m argus models          # the table, with which credentials are set
+python -m argus models --json   # the same, for a script
+```
+
+Four columns matter. `provider` picks the adapter (`anthropic` speaks the
+Messages API, `openai` speaks chat-completions - the loop itself is unchanged
+either way). `in`/`out` are USD per million tokens **as published when the
+line was written**, which is why a cost in a report names the table version:
+a price that moved makes a stale report wrong, and you can check the line.
+`cred` says whether an environment variable named for that model is actually
+set right now - it is not a claim that the key works, only that one exists.
+
+Name a model directly, or say what the task needs:
+
+```bash
+python -m argus run <target> --model deepseek-chat   # by name
+python -m argus run <target> --role depth            # cheapest that can do it
+python -m argus run <target> --role depth --policy strong
+```
+
+`--model` always wins over `--role`, because an operator naming a model has a
+reason the table does not know. A model the table has never heard of is sent
+to Anthropic rather than refused: an unknown name is far more likely a new
+Claude release than a typo. The five roles are described in the table itself
+(`planner`, `breadth`, `depth`, `judge`, `writer`) - `judge` is the one worth
+reading, because a reviewer from the family that produced the finding is the
+same prior answering twice, not a second opinion.
+
+A non-Anthropic credential is refused over plaintext `http://` unless the
+model's line opts in (`local` does, for a loopback server). That is not
+paranoia about the lab; it is that an API key in cleartext on the wire is
+spent.
+
+### What the cost number is and is not
+
+`summary.json` carries `llm_cost`, and the report prints it. It is the token
+counts this run recorded, multiplied by the rates in `models.json`, with cache
+reads at a tenth of input. It is **not** a bill: it ignores request overhead,
+it uses the rate in the file rather than the rate you were charged, and a
+model that is not in the table reports `usd: null` with the reason rather than
+a guessed number - the same rule as every other figure here.
+
 ## Proof requirements
 
 ```
@@ -342,7 +445,7 @@ python -m argus mcp-serve http://127.0.0.1:8777 --allow-private \
     --require-proof --session-dir sessions
 ```
 
-Speaks newline-delimited stdio JSON-RPC and serves 45 of the 55 tools.
+Speaks newline-delimited stdio JSON-RPC and serves 46 of the 56 tools.
 Takes the same flags as `run`. Register it with any MCP host:
 
 ```json

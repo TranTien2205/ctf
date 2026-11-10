@@ -194,6 +194,22 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             meta = {}
     if meta.get("operator"):
         lines.insert(6, f"- **Operator:** {meta['operator']}")
+    _cost = extra.get("llm_cost") if isinstance(
+        extra.get("llm_cost"), dict) else {}
+    if _cost:
+        _usd = _cost.get("usd")
+        if _usd is None:
+            # naming the reason beats printing 0.00, which reads as free
+            _line = (f"- **Model cost:** not priced - "
+                     f"{_cost.get('basis', 'no price available')}")
+        else:
+            _tok = extra.get("llm_tokens") or {}
+            _line = (
+                f"- **Model cost:** ${_usd:.4f} USD "
+                f"({_tok.get('in', 0)} in / {_tok.get('out', 0)} out / "
+                f"{_tok.get('cache_read', 0)} cache-read tokens, "
+                f"model table v{_cost.get('table_version', 0)})")
+        lines.insert(7 if meta.get("operator") else 6, _line)
     lines += [
         "| Severity | Count |",
         "|---|---|",

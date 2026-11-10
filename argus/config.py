@@ -20,6 +20,10 @@ OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e"
 class Config:
     target: str
     model: str = DEFAULT_MODEL
+    # `--policy` is recorded even when `--role` was not used, because team
+    # mode reads it to pick a model per role
+    policy: str = "cheap"
+    role_models: bool = False
     api_key: str = ""
     auth_token: str = ""
     api_base: str = API_URL
@@ -223,6 +227,30 @@ def _validate_session_dir(p: Path) -> Path:
     return p
 
 
+def _resolve_model(args) -> str:
+    """The model to run: an explicit name, or the table's pick for a role.
+
+    `--role depth --policy cheap` is the point of the table: the operator says
+    what the task needs and the cheapest model the table says can do it is
+    chosen. An explicit `--model` always wins, because an operator naming a
+    model has a reason the table does not know.
+    """
+    named = getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", "")
+    if named:
+        return named
+    role = str(getattr(args, "role", "") or "")
+    if role:
+        from . import models as models_mod
+        pick = models_mod.for_role(
+            role, str(getattr(args, "policy", "") or "cheap"))
+        if pick is None:
+            raise SystemExit(
+                f"no model in models.json serves role {role!r}; roles are: "
+                f"{', '.join(sorted(models_mod.roles()))}")
+        return pick.key
+    return DEFAULT_MODEL
+
+
 def _seal_key(args) -> str:
     """The chain key, from --seal-key or ARGUS_SEAL_KEY. A path is read as a
     key file so the key need not appear in a process listing."""
@@ -330,7 +358,9 @@ def load_config(args) -> Config:
         raise SystemExit(f"MCP config not found: {mc}")
     return Config(
         target=args.target,
-        model=getattr(args, "model", None) or os.environ.get("ARGUS_MODEL", DEFAULT_MODEL),
+        model=_resolve_model(args),
+        policy=str(getattr(args, "policy", "") or "cheap"),
+        role_models=bool(getattr(args, "role_models", False)),
         api_key=api_key,
         auth_token=auth_token,
         api_base=api_base,

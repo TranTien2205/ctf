@@ -10,7 +10,7 @@ from typing import Callable
 
 import httpx
 
-from .config import API_VERSION
+from .config import API_URL, API_VERSION
 
 RETRYABLE = (429, 500, 502, 503, 529)
 
@@ -155,6 +155,38 @@ class ClaudeClient:
             time.sleep(delay)
             delay = min(delay * 2, 30)
         raise LLMError(f"Anthropic API unreachable after retries: {last_error}")
+
+
+def make_client(cfg):
+    """The client for `cfg.model`, chosen from the model table.
+
+    `AgentLoop` used to construct `ClaudeClient` directly, which made the
+    provider a fact about the code rather than a fact about the model. Now the
+    table says which provider a model belongs to, so adding a provider is an
+    adapter plus a line of data, and a model this table does not know still
+    goes to Anthropic - an unknown name is far more likely a new Claude
+    release than a typo for a local server.
+    """
+    from . import models as models_mod
+    spec = models_mod.get(cfg.model)
+    if spec is None or spec.provider == "anthropic":
+        return ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
+                            max_tokens=cfg.llm_max_tokens,
+                            auth_token=cfg.auth_token)
+    if spec.provider == "openai":
+        from .providers import OpenAICompatClient
+        return OpenAICompatClient(
+            api_key=spec.credential() or cfg.api_key,
+            # an explicit --api-base wins (a gateway, a self-hosted
+            # endpoint); otherwise the table's
+            api_base=(cfg.api_base if cfg.api_base != API_URL
+                      else spec.api_base),
+            model=cfg.model,
+            max_tokens=min(cfg.llm_max_tokens, spec.max_output_tokens),
+            allow_insecure_base=spec.allow_insecure_base)
+    raise LLMError(
+        f"model {cfg.model!r} names provider {spec.provider!r}, which this "
+        "build has no adapter for - see argus/providers.py")
 
 
 class ScriptedClient:

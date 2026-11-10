@@ -94,10 +94,15 @@ def test_windows_semantics():
 
     # --- 6. docs/sample-session digests are LF-stable -------------------------
     import hashlib, json, pathlib
-    d = pathlib.Path("/home/kali/ctf/docs/sample-session")
+    # The repo root, derived from this file. It was hard-coded to the author's
+    # own checkout, so this test passed on exactly one machine and failed on
+    # every CI runner with a FileNotFoundError naming that path - which is why
+    # it was not reproducible in a clean clone *here*.
+    root = pathlib.Path(__file__).resolve().parent.parent
+    d = root / "docs" / "sample-session"
     crlf = [p.name for p in d.iterdir() if b"\r\n" in p.read_bytes()]
     assert_ok("no CRLF in the sealed sample session", not crlf, f"{crlf}")
-    ga = pathlib.Path("/home/kali/ctf/.gitattributes").read_text()
+    ga = (root / ".gitattributes").read_text()
     assert_ok(".gitattributes pins the sample to LF",
           "docs/sample-session/** eol=lf" in ga)
 

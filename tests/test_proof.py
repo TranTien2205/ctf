@@ -167,6 +167,51 @@ def test_nosqli_needs_no_fingerprint():
     assert proof.grade("nosqli", '{"user":"admin"}', [dump]).grade == "proven"
 
 
+def test_nosqli_refuses_a_page_that_only_echoed_the_operator():
+    """Found by the decision controller re-grading its own transcript.
+
+    `verify_data_extraction` asked the REQUEST whether the query named its
+    target, which for a document store is the only place it could ask - a
+    Mongo query has no FROM clause. But that check answers "a payload was
+    sent", never "a store answered". So `{"$ne": null}` reflected into a
+    search page's own "no results" line satisfied every check: the operator
+    was in the request, the status was 200, and the body was not a DBMS
+    error. nosqli graded `proven` against a page with no database behind it.
+
+    The fix is response-side: a document shape has to come back. Both
+    directions are asserted here, and the second one is the one that matters.
+    """
+    payload = '{"$ne": null}'
+    echo = ex("r1", "http://t.local/search?q=" + payload,
+              f'<html><p>No results for: {payload}</p></html>')
+    verdict = proof.grade("nosqli", "No results for", [echo])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "documents came back, not the payload" in verdict.missing
+
+    # and the real thing still passes: documents, with ids, from a login
+    # bypass that returned records the caller should not reach
+    rows = ('[{"_id":"6512ab9f3c1d4e0012ab34cd","user":"alice","role":"admin"},'
+            '{"_id":"6512ab9f3c1d4e0012ab34ce","user":"bob","role":"user"}]')
+    dump = ex("r2", "http://t.local/api/login", rows, method="POST",
+              req_body='{"username":{"$ne":null},"password":{"$ne":null}}')
+    assert proof.grade("nosqli", rows[:80], [dump]).grade == "proven"
+
+
+def test_nosqli_refuses_a_document_shape_the_store_refused():
+    rows = '[{"_id":"6512ab9f3c1d4e0012ab34cd","user":"alice"}]'
+    refused = ex("r3", "http://t.local/api/login", rows, status=403,
+                 method="POST", req_body='{"username":{"$ne":null}}')
+    assert proof.grade("nosqli", rows[:40], [refused]).grade != "proven"
+
+
+def test_a_json_api_returning_its_own_records_is_not_nosqli():
+    # an endpoint that legitimately answers with documents, probed with an
+    # operator that changed nothing, must not read as an injection
+    rows = '[{"_id":"6512ab9f3c1d4e0012ab34cd","title":"public post"}]'
+    normal = ex("r4", "http://t.local/api/posts", rows)
+    assert proof.grade("nosqli", rows[:40], [normal]).grade != "proven"
+
+
 def test_sqli_flags_an_oversized_dump():
     rows = "\n".join(f"<li>user{i} - pw{i}</li>" for i in range(40))
     big = ex("r9", "http://t.local/item?id=1%27%20UNION%20SELECT%20a,b%20FROM%20users",

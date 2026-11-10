@@ -60,12 +60,16 @@ jobs:
           print(f"::error title=pytest::{msg}")
           PY
       - name: selftest
+        id: selftest
         shell: bash
         run: |
           set -o pipefail
           python selftest.py 2>&1 | tee selftest.out
+      # `if: failure()` fired when PYTEST was the failing step, so the run
+      # carried a second annotation reading `selftest: (no selftest.out)` -
+      # a failure report for a step that never ran, next to the real one.
       - name: selftest failure annotation
-        if: failure()
+        if: always() && steps.selftest.conclusion == 'failure'
         shell: bash
         run: |
           python - <<'PY'
@@ -100,6 +104,7 @@ jobs:
           import glob, zipfile
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
           for need in ("argus/skills/sqli.md", "argus/team/roles/lead.md",
+                       "argus/models.json",
                        "argus/resources/wordlists/dirs-small.txt",
                        "argus/resources/exploits/lab-jwt-forge/manifest.json"):
               assert need in names, f"wheel missing {need}"
@@ -109,6 +114,7 @@ jobs:
         run: |
           pip install dist/*.whl
           argus skills | grep -q sqli   # bundled data resolvable post-install
+          argus models --json | python -c "import json,sys; d=json.load(sys.stdin); assert d['models'], 'model table empty after install'"
           argus sessions --session-dir /tmp/none --json | grep -q '\[\]'
       - name: checked-in sample session still verifies (LF-stable digests)
         run: python -m argus verify docs/sample-session

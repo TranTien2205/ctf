@@ -162,7 +162,7 @@ waste budget inside scope.
 
 A third plane, and the one that spells out the chain the project is built
 against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 45 of
-the 55 tools over newline-delimited stdio JSON-RPC, symmetric with the client
+the 56 tools over newline-delimited stdio JSON-RPC, symmetric with the client
 in `argus/mcp.py`, so the two halves of the protocol are testable against
 each other rather than against a mock.
 
@@ -250,6 +250,47 @@ role-specialized **workers** through a shared blackboard.
   `time_to_first_finding_s` — the measurement surface for comparing
   single-agent `run` against the streaming `team` pipeline.
 
+## The decision controller (`argus next`)
+
+```
+transcript.jsonl ─┐
+                  ├─► argus/decide.py ─► Action{action, why, target, class, tool, detail}
+findings.json ────┘        (7 ordered rules, fail-closed)
+                                │
+                     ┌──────────┴──────────┐
+                     ▼                     ▼
+             `argus next <session>`   next_action tool
+             (operator)               (the agent, mid-run)
+```
+
+The loop chooses the *content* of the next move. This module computes its
+*shape*, and it reads only what was recorded. That split is the point: a model
+given a transcript and an open question usually picks a sensible next probe,
+but one whose context has rolled over instead re-sends the last payload with a
+new separator, or writes a confident paragraph about a bug it never showed.
+From the outside those two are indistinguishable — unless the next action is
+derived from the bytes on disk.
+
+It is advice, not a rail. Nothing refuses a tool call because the controller
+suggested something else; the contract in `argus/system.py` is only that a
+departure is stated in one line. Three properties keep it from inventing work:
+
+* an endpoint with **no named input** is never recommended for probing, because
+  there is nowhere to put a payload;
+* rule 1 re-grades a probe's output **only under that probe's own class** —
+  re-grading every exchange against all 29 would turn any page that echoes its
+  query into a recommendation to record `sqli`, which is exactly what the proof
+  matrix exists to prevent;
+* `probe_time` is deliberately unmapped. A latency measurement is consistent
+  with `sqli`, with `rce` and with a slow database, so counting it as "this
+  class was tested" would let a timing run stand in for a proof it cannot
+  produce.
+
+Rule 1 is also how the controller earns its keep as a reviewer of this system
+rather than of the target: re-grading recorded transcripts found that `nosqli`
+graded `proven` on a page that merely echoed `{"$ne": null}` back. See
+`CHANGELOG.md`.
+
 ## Known residuals
 
 Two adversarial audits - the second against a frozen tree, with every finding
@@ -257,6 +298,14 @@ put to three independent skeptics - produced the fixes recorded in
 `CHANGELOG.md`. What follows is what they found and this system does NOT fix,
 written down so it is a decision rather than an omission. `argus proof <class>`
 prints each class's own version of this.
+
+**The decision controller reads the transcript, not the target.** It can only
+recommend surface that some recorded request already reached, so an endpoint
+nothing ever requested is invisible to it - it will say `report` on a run whose
+crawl missed half the application. It also treats one `(endpoint, class)` pair
+as the budget unit, so five probes spread over five endpoints never trigger
+`park_and_switch`. Neither is a soundness problem - it never claims a proof -
+but both are reasons the ladder is advice and not a plan.
 
 **Six classes are capped at `candidate` and the cap is a missing
 implementation, not a law of nature.** `crlf` is decided on bodies while the
