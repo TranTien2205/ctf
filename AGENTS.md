@@ -88,6 +88,12 @@ family — if you change a probe, update the lab and its test together.
   a directory listing graded `proven`; `verify_served_upload` accepted a
   confirmation page that merely mentioned the upload. If a check names a
   second exchange, say what makes it comparable.
+- **A live assertion must not require the clock to cooperate.** Three `race`
+  assertions demanded that an 8-request burst actually overlapped on the wire;
+  all three Windows CI jobs failed while every Ubuntu job passed. The gate was
+  right - a burst the server serialised cannot evidence a race - and the probe
+  reports which happened. Assert that it reported honestly, and put the
+  unconditional version in `tests/test_proof.py` where no clock is involved.
 - **Assert a probe's structured output, never its verdict prose.** Six
   assertions broke at once when three classes came off the capped list,
   because they matched the word "candidate" in a verdict sentence - and a

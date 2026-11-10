@@ -206,13 +206,19 @@ def test_race_probe(lab_url, ctx):
     ctx.client.send("GET", lab_url + "/redeem/reset", tool="http_request",
                     note="reset the coupon")
     out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
-    assert out["verdict"].startswith("race:"), out
     assert out["statuses"].get(200, 0) > 1, out
-    # the gate reconstructs the overlap from ts + elapsed_ms, so the probe
-    # must actually have overlapped and must have recorded the refusal
-    assert out["overlapped"] is True, out
-    assert out["serial_statuses"] and all(
-        s >= 400 for s in out["serial_statuses"]), out
+    # Concurrency depends on wall clock: a loaded runner serialises the burst,
+    # which is what made all three Windows CI jobs fail once. The probe
+    # reports which happened, so assert that it reported honestly rather than
+    # that the machine cooperated. The gate reconstructs the overlap from
+    # ts + elapsed_ms either way.
+    if out["overlapped"]:
+        assert out["verdict"].startswith("race:"), out
+        assert out["serial_statuses"] and all(
+            s >= 400 for s in out["serial_statuses"]), out
+    else:
+        assert "inconclusive" in out["verdict"], out
+    assert isinstance(out["burst_seconds"], (int, float)), out
     # serial baseline disambiguates: a repeatable endpoint is not a race
     out2 = probes.probe_race(ctx, lab_url + "/hello", n=6)
     assert "repeatable" in out2["verdict"], out2

@@ -271,12 +271,22 @@ classes graded `proven` on evidence containing no vulnerability.
   recommended probing parameters called `<?xml version` and
   `SELECT 1 FROM t WHERE a`.
 
-**And one defect in the test corpus itself.** `/redeem` holds one coupon in a
+**And two defects in the test corpus itself.** `/redeem` holds one coupon in a
 class variable on a session-scoped server, so whichever test drained it first
 left every later one looking at an endpoint with nothing to race for - which
 read as a verifier regression until the counter was printed. The lab grew an
 explicit `/redeem/reset` so the dependency is visible in the tests that need
 it.
+
+The second one CI found: three live `race` assertions required the burst to
+have actually overlapped on the wire, and all three Windows jobs failed while
+every Ubuntu job passed. The verifier was right to refuse - a burst the server
+serialised cannot evidence a race, and `probe_race` says so itself with
+`overlapped: false` and an "inconclusive" verdict. Asserting that a
+timing-dependent probe always proves is asserting something the probe does not
+claim, so those three now check that it reported honestly rather than that the
+machine cooperated. The unconditional assertions for the class are synthetic
+and live in `tests/test_proof.py`, where no clock is involved.
 
 ### smuggle: the last class capped for want of a verifier
 - The note read "this system sends the desync pair and reads the difference,

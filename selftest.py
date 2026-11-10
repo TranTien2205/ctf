@@ -293,11 +293,21 @@ def main() -> int:
     client.send("GET", base + "/redeem/reset", tool="http_request",
                 note="reset the coupon")  # shared process state
     out = probes.probe_race(ctx, base + "/redeem", n=8)
-    check("race probe multi-redeems",
-          out["verdict"].startswith("race:") and out["overlapped"])
-    check("race probe records the serial refusal",
-          bool(out["serial_statuses"])
-          and all(s >= 400 for s in out["serial_statuses"]))
+    # Concurrency is the one thing here that depends on wall clock, and a
+    # loaded runner serialises the burst - all three Windows CI jobs failed
+    # this way once. The probe reports which happened, so check that it
+    # reported honestly rather than that the machine cooperated.
+    if out["overlapped"]:
+        check("race probe multi-redeems", out["verdict"].startswith("race:"))
+        check("race probe records the serial refusal",
+              bool(out["serial_statuses"])
+              and all(s >= 400 for s in out["serial_statuses"]))
+    else:
+        check("race probe says so when the burst was serialized",
+              "inconclusive" in out["verdict"] or "no race" in out["verdict"],
+              out["verdict"][:90])
+        check("race probe reports the burst timing either way",
+              isinstance(out.get("burst_seconds"), (int, float)))
     out = probes.probe_race(ctx, base + "/hello", n=6)
     check("race probe rejects repeatable", "repeatable" in out["verdict"])
     out = probes.probe_deserialize(ctx, base + "/import?data=x", "data")
