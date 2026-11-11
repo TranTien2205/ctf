@@ -52,12 +52,22 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    the freed cluster chain - the FAT16-deleted-file shape end to end.
    On a whole-disk image pass `--offset` from part_table's `offset`
    field so the volume header lands at byte 0.
+   For Linux volumes: `python3 tools/forensics/ext_read.py fs.img ls /`
+   walks ext2/3/4 (superblock → GDT → inode tables; both direct-block
+   i_block and ext4 extent trees) and `... get /path` reads a file —
+   same `--offset` convention. It lists live entries only; deleted
+   ext entries need the journal, which is out of scope.
 4. `photorec`/`foremost` on unallocated space when `fls` shows nothing —
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
    `$Extend/$UsnJrnl`, swap.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
+   If a `-wal` file sits beside the db, DO NOT open the db — sqlite
+   checkpoints the WAL on open and destroys un-checkpointed rows.
+   `python3 tools/forensics/sqlite_wal.py db-wal frames` lists frames
+   with commit/stale marks, `... strings` scans each page image with
+   frame provenance, `... page N` dumps the newest live image.
    `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
    (`source=freeblock|unallocated|freelist`); add `--live` to diff against
    live cells. `python3 tools/forensics/browser_hist.py <db>` reads the
