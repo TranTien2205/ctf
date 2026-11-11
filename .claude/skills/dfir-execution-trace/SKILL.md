@@ -156,8 +156,10 @@ to the right ControlSet and decodes the Win10/11 `10ts` entries (the emitted mti
 `$STANDARD_INFORMATION` mtime, not a run time), `... Amcache.hve amcache` lists `InventoryApplicationFile`
 rows as path + `FileId` SHA-1, and `... NTUSER.DAT mru` decodes `RunMRU` in `MRUList` order (newest first,
 values `a`..`z` ending `\1`) plus `RecentDocs` UTF-16LE filenames in `MRUListEx` DWORD order, per extension
-key when present. It reads the hive as written - replay `.LOG1`/`.LOG2` with regipy first when
-the bundle ships transaction logs.
+key when present, and `... SYSTEM bam` lists BAM/DAM `UserSettings` rows
+(device path + last-run FILETIME per SID - execution proof, unlike
+Shimcache). It reads the hive as written - replay `.LOG1`/`.LOG2` with
+regipy first when the bundle ships transaction logs.
 
 ## Per-user execution: UserAssist, RunMRU, RecentDocs, history, transcripts
 

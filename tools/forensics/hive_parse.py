@@ -301,6 +301,48 @@ def mru(hv):
     return out
 
 
+def bam(hv):
+    """BAM/DAM execution trace: value name is the device path,
+    data is the last-run FILETIME (Win10 1709+ 8 bytes; the DAM
+    variant predates it). Proves execution, unlike Shimcache."""
+    rows = []
+    cur = 1
+    sel, _ = hv.find("Select")
+    if sel:
+        for v in hv.values(sel):
+            if v["name"].lower() == "current" and len(v["raw"]) >= 4:
+                cur = struct.unpack("<I", v["raw"][:4])[0]
+    root = None
+    for cand in (f"ControlSet{cur:03d}", "CurrentControlSet",
+                 "ControlSet001"):
+        node, _ = hv.find(cand)
+        if node:
+            root = cand
+            break
+    if not root:
+        return {"error": "no ControlSet"}
+    for svc in ("bam", "dam"):
+        node, path = hv.find(
+            f"{root}/Services/{svc}/State/UserSettings")
+        if not node:
+            continue
+        for off in hv.sub_offsets(node["sublist"]):
+            sid = hv.nk(off)
+            if not sid:
+                continue
+            for v in hv.values(sid):
+                if v["name"] in ("Version", "SequenceNumber",
+                                 "LastSequenceNumber"):
+                    continue
+                ts = _ft(v["raw"][:8]) if len(v["raw"]) >= 8 \
+                    else None
+                rows.append({"service": svc,
+                             "sid": sid["name"],
+                             "path": v["name"],
+                             "executed": ts})
+    return {"key": root, "entries": rows}
+
+
 def _cell(content):
     """content -> full cell: negative size header + pad to 8."""
     size = 4 + len(content)
@@ -399,9 +441,15 @@ def _selftest():
     hive = _mkhive("Root", {
         "Select": {"vals": [("Current", 4,
                             struct.pack("<I", 2))]},
-        "ControlSet002": {"sub": {"Control": {"sub": {
-            "Session Manager": {"sub": {"AppCompatCache": {
-                "vals": [("AppCompatCache", 3, blob)]}}}}}}},
+        "ControlSet002": {"sub": {
+            "Control": {"sub": {
+                "Session Manager": {"sub": {"AppCompatCache": {
+                    "vals": [("AppCompatCache", 3, blob)]}}}}},
+            "Services": {"sub": {"bam": {"sub": {"State": {"sub": {
+                "UserSettings": {"sub": {"S-1-5-21": {"vals": [
+                    ("\\Device\\HarddiskVolume3\\evil.exe", 3,
+                     struct.pack("<Q", 133000000000000000))]}
+                    }}}}}}}}}},
         "InventoryApplicationFile": {"sub": {
             "file1": {"vals": [
                 ("FileId", 1, "0000aabbccdd".encode("utf-16-le")),
@@ -426,6 +474,9 @@ def _selftest():
     assert m["run_mru"][0]["command"] == "notepad", m
     assert m["run_mru"][1]["command"] == "cmd /c flag", m
     assert m["recent_docs"][0]["file"] == "secret.txt", m
+    b = bam(hv)
+    assert b["entries"][0]["path"].endswith("evil.exe") and \
+        b["entries"][0]["executed"], b
     print("hive_parse selftest: ok")
 
 
@@ -435,7 +486,7 @@ def main():
     ap.add_argument("hive", nargs="?")
     ap.add_argument("cmd", nargs="?", default="tree",
                     choices=["tree", "get", "userassist",
-                             "shimcache", "amcache", "mru"])
+                             "shimcache", "amcache", "mru", "bam"])
     ap.add_argument("key", nargs="?")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -466,6 +517,8 @@ def main():
         print(json.dumps(amcache(hv), indent=1))
     elif a.cmd == "mru":
         print(json.dumps(mru(hv), indent=1))
+    elif a.cmd == "bam":
+        print(json.dumps(bam(hv), indent=1))
 
 
 if __name__ == "__main__":
