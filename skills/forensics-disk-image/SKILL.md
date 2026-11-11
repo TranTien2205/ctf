@@ -42,6 +42,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
 2. `fls -r <img>` — live files, including deleted-but-listed entries
    (sleuthkit marks them `*`).
 3. `icat <img> <inode>` — pull the deleted entry's bytes before carving.
+   No sleuthkit? `python3 tools/forensics/fat_read.py image.img list
+   --deleted` walks FAT12/16/32 directories (BPB-derived layout, LFN
+   reassembly, `0xE5`-clobbered first char) and `... get /PATH` reads
+   the freed cluster chain - the FAT16-deleted-file shape end to end.
 4. `photorec`/`foremost` on unallocated space when `fls` shows nothing —
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
