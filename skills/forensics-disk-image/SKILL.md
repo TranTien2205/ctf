@@ -61,6 +61,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
    `$Extend/$UsnJrnl`, swap.
+   Archives inside the image (initramfs cpio, `.a` libraries):
+   `python3 tools/forensics/cpio_read.py file list` handles newc cpio
+   (070701/070702) and `!<arch>` ar members including `/0` extended
+   names; `... get NAME` writes the member to stdout.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
    If a `-wal` file sits beside the db, DO NOT open the db — sqlite
