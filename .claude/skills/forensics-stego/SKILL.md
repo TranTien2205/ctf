@@ -81,8 +81,13 @@ python3 tools/forensics/lsb_scan.py challenge.png --planes 1 # the common one
 It walks the same matrix `zsteg -a` reports (b1-3, r/g/b/a/rgb/bgr,
 xy/yx, lsb/msb) and prints every stream that decodes printable, with the
 flag-format pass on top. For `.wav` it runs the same matrix over PCM
-sample bytes (8-bit raw, 16-bit lo/hi split). JPEG stego, MP3 channels
-and deeper planes still need the external tools below.
+sample bytes (8-bit raw, 16-bit lo/hi split). When the WAV is a phone
+dial / tone sequence instead of hidden bits,
+`python3 tools/dtmf_decode.py dial.wav` decodes the touch-tone grid
+(Goertzel power estimate over the eight DTMF frequencies, 8/16-bit PCM,
+stereo mixed down) into the digit string; `--frames` shows each
+window's chosen low/high pair for boundary cases. JPEG stego, MP3
+channels and deeper planes still need the external tools below.
 
 ## Routing
 
