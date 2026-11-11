@@ -43,6 +43,7 @@ address holds your four marker bytes.
 | canary | a smashing write trips `__stack_chk_fail` before the return |
 | PIE | no absolute gadget or data address until a leak lands |
 | NX | the payload is code reuse — `../pwn-code-reuse/` — not shellcode |
+| NX off | `python3 tools/sc_gen.py execve64|execve86|cat64|rev64` emits tested shellcode stubs (`--raw` for hex only; output reports any `\x00\x0a\x0d\x20` bytes present) |
 | full RELRO | closes GOT as a write target |
 
 ## Traps
