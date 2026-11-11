@@ -66,6 +66,8 @@ archive), and the `main`-shaped payloads feed `tools/pyc_dis.py`.
 
 For the deciding-check hunt without `nm`/`readelf`/`objdump`:
 `python3 tools/elf_info.py ./bin` lists sections, dynamic + static
+symbols, DT_NEEDED, relocations and `got_write_targets` (`.rela.plt`
+entries — the GOT slots a format-string or overwrite exploit aims at)
 symbols, DT_NEEDED libs, and flags the imports that name the check
 (`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). PE binary instead?
 `python3 tools/pe_info.py ./bin.exe` does the same read: import table

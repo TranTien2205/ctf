@@ -71,6 +71,14 @@ zsteg -a challenge.png 2>/dev/null | head -20
 data trailing a container's real end — the common CTF hide — plus a
 flag-format pass over printable runs.
 
+`python3 tools/forensics/img_struct.py photo.png` is the finer-grained
+first look for image containers specifically: the PNG chunk list with a
+per-chunk CRC check (a bad CRC is itself a tamper signal), the JPEG
+marker walk to SOS and EOI, the GIF trailer, byte count after the real
+end-of-image, and embedded-format signatures (zip/rar/pdf/png/jpeg)
+with offsets. Run it before `lsb_scan` — a polyglot or appended blob is
+cheaper to rule out than a bit-plane sweep.
+
 For the LSB half there is now a stdlib option too:
 
 ```bash
