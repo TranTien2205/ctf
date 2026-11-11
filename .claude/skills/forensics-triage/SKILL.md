@@ -50,6 +50,7 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 - Log files → class `forensics-log-analysis` (`../forensics-log-analysis/`), depth `references/log-analysis.md`
 - Suspicious binary → `references/malware-analysis.md`
 - Document/PE analysis → `references/document-analysis.md`
+- PDF (puzzle or maldoc) → `python3 tools/forensics/pdf_objs.py doc.pdf` — object inventory, FlateDecode streams decoded, `/JS` `/OpenAction` `/EmbeddedFile` keys surfaced, `--extract N` dumps one stream
 
 ## References
 - `references/network-forensics.md` - Network capture analysis
