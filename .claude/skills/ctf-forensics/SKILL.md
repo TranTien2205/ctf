@@ -32,6 +32,12 @@ file ./challenge              # what the container claims to be
 binwalk ./challenge           # what else is embedded in it
 xxd ./challenge | head -20    # the real magic bytes when file says "data"
 strings -n 8 ./challenge | head -50
+# no `strings`/`grep -a` on the box? this is the stdlib path:
+python3 tools/forensics/ioc_scan.py ./challenge --min 8 --utf16
+#  ASCII+UTF-16 strings with byte offsets, plus ipv4/url/email/
+#  winpath/nixpath/flag-format/base64 IOC buckets as JSON;
+#  --pattern 'flag\{[^}]+\}' adds a custom hunt regex,
+#  --strings-only prints offset+string lines like `strings -t x`
 ```
 
 ## Large artifact handling
