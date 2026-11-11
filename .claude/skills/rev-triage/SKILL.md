@@ -50,7 +50,12 @@ the same identify pass with stdlib: magic → format + route (ELF→
 pwn_triage, PE-with-CLR→rev-managed-code, pyc/class/dex→rev-bytecode-vm,
 squashfs→firmware), windowed entropy for the packed call, and
 ASCII+UTF-16 string hits grepped for flag-format and packer names — then
-it names which class skill and which tool opens the artifact.
+it names which class skill and which tool opens the artifact. A squashfs
+image itself opens without `unsquashfs`:
+`python3 tools/forensics/squashfs_read.py fs.sqsh list` walks the dir
+table and `... get /path/file` extracts the file blocks plus its
+fragment tail (zlib only; other compressors report their id instead
+of guessing).
 
 Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
 with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.
