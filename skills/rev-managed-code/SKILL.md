@@ -38,7 +38,7 @@ what exists:
 | Artifact | Tool family |
 |---|---|
 | PE + CLR directory | dnSpy / ILSpy / `ilspycmd` — and the binary often still carries unobfuscated metadata |
-| `.class` / `.jar` | cfr / procyon / `javap -c` as the always-available floor |
+| `.class` / `.jar` | cfr / procyon / `javap -c` as the always-available floor. No JDK? `python3 tools/jclass_info.py Main.class` reads the constant pool directly - class/super names, methods with descriptors, every called `Methodref`, and `--strings` dumps the Utf8 pool where embedded flag-check literals live. A `.jar` is a zip: `tools/zip_crack.py` or `unzip -l` lists the classes to run it on |
 | `.dex` / `.apk` | jadx |
 | PyInstaller / py2exe bundle | extract the `.pyc`, then `../rev-bytecode-vm/` |
 
