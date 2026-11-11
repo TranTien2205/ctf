@@ -78,6 +78,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    dangling` lists loose objects unreachable from refs — the
    flag-in-a-deleted-commit shape — and `... cat <sha>` dumps any
    object body (blob = file content) without the git binary.
+   Tarballs: `python3 tools/forensics/tar_tail.py a.tar` lists ustar
+   members AND reports bytes appended after the two 512-byte
+   end-of-archive blocks — `tar tf` never shows them; `--tail` dumps
+   the trailer itself.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
    If a `-wal` file sits beside the db, DO NOT open the db — sqlite

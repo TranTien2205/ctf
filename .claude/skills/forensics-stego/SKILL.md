@@ -101,8 +101,13 @@ dial / tone sequence instead of hidden bits,
 `python3 tools/dtmf_decode.py dial.wav` decodes the touch-tone grid
 (Goertzel power estimate over the eight DTMF frequencies, 8/16-bit PCM,
 stereo mixed down) into the digit string; `--frames` shows each
-window's chosen low/high pair for boundary cases. JPEG stego, MP3
-channels and deeper planes still need the external tools below.
+window's chosen low/high pair for boundary cases. When the audio lives
+inside a capture instead of a file,
+`python3 tools/forensics/rtp_extract.py call.pcap` lists the RTP
+streams by SSRC (codec, packet count, seq loss) and
+`... --ssrc 0xNNN --out call.wav` decodes PCMU/PCMA through stdlib
+audioop+wave — the output feeds `dtmf_decode` directly. JPEG stego,
+MP3 channels and deeper planes still need the external tools below.
 
 ## Routing
 
