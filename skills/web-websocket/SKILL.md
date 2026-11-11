@@ -69,6 +69,10 @@ message. After the channel is open, test:
   handshake carries credentials; read them before claiming hijacking.
 - Socket.IO wraps messages in a framing envelope (`40`, `42["event",...]`).
   Read the framing before assuming a plain JSON protocol.
+- A binary frame that is not JSON may be protobuf wire format —
+  `python3 tools/proto_decode.py blob.bin` (or `--hex`) walks field
+  keys without needing the `.proto`; the flag then usually sits in a
+  numbered field, not a named one.
 - One channel at a time: two concurrent payloads make the reply unattributable.
 - Do not use the channel for a destructive broadcast; it affects every client.
 

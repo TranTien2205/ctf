@@ -55,6 +55,7 @@ Open one. Never browse the directory.
 | Long or multi-stage decoding chain, esolang, BCD, UTF-16 tricks | `encodings.md` |
 | Verilog, Gray code, SMS PDU, UTF-9, MaxiCode, exotic formats | `encodings-advanced.md` |
 | Data hidden in an image, audio, signal, capture or column of numbers | `data-hiding.md` |
+| A binary TLV-shaped blob (protobuf, gRPC payload) | `python3 tools/proto_decode.py blob.bin` decodes field structure without the `.proto` |
 | QAM, IQ samples, carrier recovery, timing sync | `rf-sdr.md` |
 | A search problem, an oracle, a protocol to drive, a constraint system | `solvers.md` (socket speed puzzles: class `misc-constraint-puzzle`, `../misc-constraint-puzzle/`) |
 | A Python prompt with the way out removed | `pyjails.md` |

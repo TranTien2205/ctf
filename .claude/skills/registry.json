@@ -149,7 +149,7 @@
       "categories": [
         "misc"
       ],
-      "skill_tokens": 2311,
+      "skill_tokens": 2347,
       "depth_files": 18,
       "depth_tokens": 51148,
       "use_when": [
@@ -2289,7 +2289,7 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 926,
+      "skill_tokens": 986,
       "depth_files": 3,
       "depth_tokens": 861,
       "use_when": [
