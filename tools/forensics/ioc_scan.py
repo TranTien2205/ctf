@@ -35,6 +35,19 @@ IOC = {
                r"/[\w./-]+",
     "flag": r"\b[A-Za-z0-9_]{2,20}\{[^\x00-\x20}]{4,80}\}",
     "b64blob": r"(?<![\w/+=])[A-Za-z0-9+/]{20,}={0,2}(?![\w/+=])",
+    "privkey": r"-----BEGIN [A-Z0-9 ]{3,40}PRIVATE KEY-----",
+    "aws_akid": r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b",
+    "api_token": r"\b(?:ghp_|github_pat_|glpat-|xox[baprs]-|sk-[A-Za-z0-9]|hf_)"
+                r"[A-Za-z0-9_-]{16,80}\b",
+    "jwt": r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"
+           r"\.[A-Za-z0-9_-]{8,}\b",
+    "passwd_kv": r"(?i)\b(?:passw(?:or)?d|secret|api[_-]?key|token)"
+                 r"[\"'\s]{0,4}[:=][\"'\s]{0,4}[^\s\"',;\\]{5,60}",
+    "shadow_hash": r"\$[156ay]\$[./A-Za-z0-9$,]{10,80}"
+                   r"|\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}",
+    "cred_in_url": r"https?://[\w.~-]{2,40}:[^@\s]{3,50}@[\w.-]+",
+    "eth_privkey": r"\b0x[0-9a-fA-F]{64}\b",
+    "eth_addr": r"\b0x[0-9a-fA-F]{40}\b",
 }
 
 
@@ -108,6 +121,12 @@ def _selftest():
             + b"mail a.b-c@sub.example.co flag{n0t_r34l} "
             + b"see C:\\Users\\x\\Desktop\\loot.zip "
             + b"%APPDATA%\\Roaming\\k "
+            + b"-----BEGIN RSA PRIVATE KEY----- "
+            + b"aws AKIAIOSFODNN7EXAMPLE "
+            + b"tok ghp_abcdefghij0123456789ABCDEF "
+            + b"cfg password:Sup3rS3cret! "
+            + b"hash $6$rounds$saltstring$abcdEFGH "
+            + b"basic https://admin:hunter22@10.0.0.9/ "
             + "wide string here".encode("utf-16-le")
             + b"\x00" * 8)
     r = scan(blob, minlen=5, utf16=True,
@@ -121,6 +140,12 @@ def _selftest():
     assert "flag{n0t_r34l}" in vals.get("custom", set())
     assert any(v.startswith("C:\\Users")
                for v in vals.get("winpath", set())), vals
+    assert any("PRIVATE KEY" in v for v in vals.get("privkey", set())), vals
+    assert "AKIAIOSFODNN7EXAMPLE" in vals.get("aws_akid", set()), vals
+    assert any(v.startswith("ghp_") for v in vals.get("api_token", set())), vals
+    assert any("Sup3rS3cret" in v for v in vals.get("passwd_kv", set())), vals
+    assert any(v.startswith("$6$") for v in vals.get("shadow_hash", set())), vals
+    assert any("admin:hunter22@" in v for v in vals.get("cred_in_url", set())), vals
     assert any("wide string here" in s["text"]
                for s in r["strings"]), r["strings"]
     print("ioc_scan selftest: ok")

@@ -81,7 +81,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    Tarballs: `python3 tools/forensics/tar_tail.py a.tar` lists ustar
    members AND reports bytes appended after the two 512-byte
    end-of-archive blocks — `tar tf` never shows them; `--tail` dumps
-   the trailer itself.
+   the trailer itself. RAR: `python3 tools/forensics/rar_list.py
+   a.rar` walks both header formats (RAR4 fixed fields, RAR5 vint
+   headers) — names, packed/unpacked sizes, encrypted flags; it
+   reports RAR5-encrypted metadata honestly and never guesses member
+   contents.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
    If a `-wal` file sits beside the db, DO NOT open the db — sqlite
