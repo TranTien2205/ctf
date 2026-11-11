@@ -41,6 +41,7 @@ object is the floor that always works.
 |---|---|
 | `.pyc` matching your interpreter | `python3 tools/pyc_dis.py file.pyc` (marshal past the 12/16-byte header, `dis` per nested code object, flag-shaped constants named) |
 | `.pyc` for another version | a version-matched decompiler, or read the magic and fetch that interpreter |
+| `.wasm` module | `python3 tools/wasm_info.py mod.wasm --names` (sections, import/export tables, name-section function names — locate the check before disassembly) |
 | custom VM | recover the opcode table from the dispatch loop, then trace |
 
 Confirmation is the accepted input produced from the disassembly — a table you
