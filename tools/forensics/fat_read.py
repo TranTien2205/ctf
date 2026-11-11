@@ -26,8 +26,8 @@ FREE, EOC = 0x000, 0xFF8
 
 
 class FAT:
-    def __init__(self, path):
-        d = Path(path).read_bytes()
+    def __init__(self, path, offset=0):
+        d = Path(path).read_bytes()[offset:]
         if len(d) < 512:
             raise ValueError("image too small")
         self.d = d
@@ -178,6 +178,11 @@ def _selftest():
     img[data0 + bps:data0 + bps + 10] = b"deleted123"
     tmp = Path(tempfile.mkdtemp()) / "t.img"
     tmp.write_bytes(bytes(img))
+    # same volume inside a disk image behind an MBR sector
+    tmp2 = tmp.parent / "disk.dd"
+    tmp2.write_bytes(b"\x00" * 512 + bytes(img))
+    f = FAT(tmp2, offset=512)
+    assert [e["name83"] for e in f.tree()] == ["FLAG.TXT", "?LD.BIN"]
     f = FAT(tmp)
     t = f.tree()
     names = {e["name83"] for e in t}
@@ -200,13 +205,15 @@ def main():
     ap.add_argument("path", nargs="?")
     ap.add_argument("--deleted", action="store_true",
                     help="list only deleted entries")
+    ap.add_argument("--offset", type=int, default=0,
+                    help="byte offset of the volume inside a disk image")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if a.selftest:
         return _selftest()
     if not a.file:
         ap.error("file required")
-    f = FAT(a.file)
+    f = FAT(a.file, a.offset)
     if a.cmd == "list":
         t = f.tree()
         if a.deleted:

@@ -39,6 +39,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
 
 1. `mmls`/`fdisk -l` — the partition table says where data lives and whether
    unallocated space is hiding something.
+   No sleuthkit? `python3 tools/forensics/part_table.py image.dd` decodes
+   MBR (+EBR logical-chain) or GPT headers itself and emits each
+   partition's `first_lba`, `offset` and type as JSON - feed `offset`
+   straight into the volume readers below.
 2. `fls -r <img>` — live files, including deleted-but-listed entries
    (sleuthkit marks them `*`).
 3. `icat <img> <inode>` — pull the deleted entry's bytes before carving.
@@ -46,6 +50,8 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    --deleted` walks FAT12/16/32 directories (BPB-derived layout, LFN
    reassembly, `0xE5`-clobbered first char) and `... get /PATH` reads
    the freed cluster chain - the FAT16-deleted-file shape end to end.
+   On a whole-disk image pass `--offset` from part_table's `offset`
+   field so the volume header lands at byte 0.
 4. `photorec`/`foremost` on unallocated space when `fls` shows nothing —
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
