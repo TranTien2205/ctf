@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 977,000 tokens across 494 files. Opening
+The depth corpus is roughly 978,000 tokens across 494 files. Opening
 `skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -65,7 +65,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-geolocation`, `osint-identity-pivot`, `osint-infra-records` … |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
-| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.6k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
+| binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.7k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.1k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last

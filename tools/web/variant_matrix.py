@@ -1042,7 +1042,10 @@ class _Mock(BaseHTTPRequestHandler):
             return self._send(INERT)
         if path == "/slow":
             if "$(id)" in value:
-                time.sleep(0.9)
+                # 2s, not less: on a loaded box the baseline request itself can
+                # take ~1s, and a 0.9s sleep inside a 3x-ratio rule then fails to
+                # clear the bar. The check passes an absolute floor anyway.
+                time.sleep(2.0)
             return self._send(INERT)
         if path == "/bool":
             # only the TRUE members of the three boolean pairs carry " OR "
@@ -1221,7 +1224,8 @@ def selftest():
         # and a family whose remaining shapes were withheld is NOT a closed layer
         code, part = _run_cli(["--url", base_url + "/inert", "--param", "q",
                                "--base", "ctfv2", "--families", "traversal",
-                               "--max-cases", "2", "--compact"])
+                               "--max-cases", "2", "--timing-floor", "99",
+                               "--compact"])
         check("a truncated family is reported as partially sent, never as fully "
               "negative",
               code == 0 and part.get("cases_sent") == 2
@@ -1232,11 +1236,14 @@ def selftest():
               % (part.get("cases_sent"), part.get("families_fully_negative"),
                  part.get("families_partially_sent")), part)
 
-        # (b) live: one family reacts, the rest are countable negatives
+        # (b) live: one family reacts, the rest are countable negatives.
+        # --timing-floor 99 takes elapsed out of scoring: loopback jitter on a
+        # loaded host was flagging inert cases as timing outliers and turning 1
+        # real divergence into 9. Content divergences are unaffected.
         code, live = _run_cli(["--url", base_url + "/inert", "--param", "q",
                                "--base", "ctfv2", "--challenge",
                                "selftest-not-written", "--hypothesis-id", "h1",
-                               "--compact"])
+                               "--timing-floor", "99", "--compact"])
         top = (live.get("ranked") or [{}])[0]
         check("live: exactly 1 of 48 cases diverges, 47 negatives proved",
               code == 0 and live.get("diverged_count") == 1
@@ -1284,7 +1291,8 @@ def selftest():
               "exit=%s reason=%s" % (code, refused.get("reason")), refused)
         code, allowed = _run_cli(["--url", base_url + "/inert", "--json-field",
                                   "user.name", "--base", "ctfv2", "--write-ack",
-                                  "--families", "nosql-operator", "--compact"])
+                                  "--families", "nosql-operator",
+                                  "--timing-floor", "99", "--compact"])
         check("the same run with --write-ack proceeds and sends the 4 operator shapes",
               code == 0 and allowed.get("cases_sent") == 4
               and allowed.get("refused") is None,
@@ -1293,7 +1301,7 @@ def selftest():
         # (d) a transport failure is a transport result, never a divergence
         code, dropped = _run_cli(["--url", base_url + "/drop", "--param", "q",
                                   "--base", "ctfv2", "--families", "traversal",
-                                  "--compact"])
+                                  "--timing-floor", "99", "--compact"])
         dead = [c for c in dropped.get("cases", []) if c.get("transport")]
         check("a dropped connection is recorded as transport and scores no divergence",
               code == 0 and dropped.get("transport_failures") == 1
@@ -1312,10 +1320,14 @@ def selftest():
               and "0 of 6" in dropped.get("post_probe", {}).get("note", ""),
               dropped.get("post_probe", {}).get("note"), dropped.get("post_probe"))
 
-        # a blind sleep leaves the body untouched: timing has to carry it alone
+        # a blind sleep leaves the body untouched: timing has to carry it alone.
+        # --timing-factor 1.0 because a loaded host makes the BASELINE slow too,
+        # and the default 3x ratio then vetoes a real sleep; the absolute floor
+        # is the margin this check actually verifies.
         code, slow = _run_cli(["--url", base_url + "/slow", "--param", "q",
                                "--base", "ctfv2", "--families", "cmdi",
-                               "--timing-floor", "0.4", "--compact"])
+                               "--timing-floor", "1.5", "--timing-factor", "1.0",
+                               "--compact"])
         slow_top = (slow.get("ranked") or [{}])[0]
         check("a sleeping response is flagged as a timing outlier and nothing else is",
               code == 0 and slow.get("diverged_count") == 1
@@ -1374,11 +1386,11 @@ def selftest():
                                           slow_post.get("command", "")[:120]),
               slow_post)
         # the absolute floor, not the ratio, is what keeps loopback jitter out: the
-        # same 0.9s sleep must NOT be a finding once the floor is above it
+        # same 2s sleep must NOT be a finding once the floor is above it
         code, slow_hi = _run_cli(["--url", base_url + "/slow", "--param", "q",
                                   "--base", "ctfv2", "--families", "cmdi",
                                   "--timing-floor", "5.0", "--compact"])
-        check("--timing-floor is an absolute gate: a 0.9s sleep is no outlier when "
+        check("--timing-floor is an absolute gate: a 2s sleep is no outlier when "
               "the floor is 5.0s, even though the ratio is huge",
               code == 0 and slow_hi.get("diverged_count") == 0
               and slow_hi.get("negatives_proved") == 6
@@ -1392,7 +1404,8 @@ def selftest():
         code, tarpit = _run_cli(["--url", base_url + "/tarpit", "--param", "q",
                                  "--base", "ctfv2", "--families", "cmdi",
                                  "--challenge", "selftest-not-written",
-                                 "--hypothesis-id", "h3", "--compact"])
+                                 "--hypothesis-id", "h3", "--timing-floor", "99",
+                                 "--compact"])
         tpost = tarpit.get("post_probe", {})
         ttop = (tarpit.get("ranked") or [{}])[0]
         check("a marker wrapped in dead-connection text is downgraded from confirms "
@@ -1410,7 +1423,7 @@ def selftest():
         # comparison has to be able to come out BOTH ways
         code, boolt = _run_cli(["--url", base_url + "/bool", "--param", "q",
                                 "--base", "ctfv2", "--families", "sql-boolean",
-                                "--compact"])
+                                "--timing-floor", "99", "--compact"])
         bpairs = boolt.get("boolean_pairs") or []
         check("boolean_pairs: all three TRUE members differ from their FALSE member "
               "when the app is boolean-sensitive",
@@ -1433,7 +1446,8 @@ def selftest():
         code, redir = _run_cli(["--url", base_url + "/redir?q=/home", "--param", "q",
                                "--base", "/home", "--challenge",
                                "selftest-not-written", "--hypothesis-id", "h2",
-                               "--families", "redirect", "--compact"])
+                               "--families", "redirect", "--timing-floor", "99",
+                               "--compact"])
         rtop = [c for c in redir.get("cases", []) if c["shape"] == "absolute-external"]
         rpost = redir.get("post_probe", {})
         check("a header-only marker is quoted from the header, not from the body",

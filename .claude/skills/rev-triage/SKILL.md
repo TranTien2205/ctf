@@ -67,14 +67,21 @@ archive), and the `main`-shaped payloads feed `tools/pyc_dis.py`.
 For the deciding-check hunt without `nm`/`readelf`/`objdump`:
 `python3 tools/elf_info.py ./bin` lists sections, dynamic + static
 symbols, DT_NEEDED, relocations and `got_write_targets` (`.rela.plt`
-entries — the GOT slots a format-string or overwrite exploit aims at)
-symbols, DT_NEEDED libs, and flags the imports that name the check
+entries — the GOT slots a format-string or overwrite exploit aims at),
+and flags the imports that name the check
 (`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). PE binary instead?
 `python3 tools/pe_info.py ./bin.exe` does the same read: import table
 per DLL, exports, per-section flags, and packer-named sections
-(UPX/VMP/Themida) in `packed_suspects`. Stripped binaries report
-`no symtab` honestly — dynamic symbols still answer "what does it
-call". Static read only; disassembly still needs a real tool.
+(UPX/VMP/Themida) in `packed_suspects`. Mach-O?
+`python3 tools/macho_info.py ./bin` walks the load commands:
+sections with address/offset, `LC_LOAD_DYLIB` dependencies, the
+`LC_MAIN` entry offset, and the symbol table. Android `classes.dex`
+or an APK member? `python3 tools/dex_info.py classes.dex` lists every
+string (flag-format hits separated), every class descriptor with its
+superclass and source file — enough to name the deciding check
+before decompiling. Stripped binaries report `no symtab` honestly —
+dynamic symbols still answer "what does it call". Static read only;
+disassembly still needs a real tool.
 
 ## Dynamic before static
 
