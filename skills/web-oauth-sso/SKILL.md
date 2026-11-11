@@ -31,7 +31,12 @@ walk the whole flow once and record every redirect, parameter and cookie set, be
 
 An authorisation flow across two parties: an identity provider and the
 application, joined by redirects, a code and a state parameter. Multiple session
-cookies usually appear — one per party.
+cookies usually appear — one per party. A `SAMLResponse`/`SAMLRequest`
+parameter in that transcript is the SAML shape:
+`python3 tools/web/saml_decode.py resp.txt` decodes the base64
+(optionally DEFLATE'd) XML and lists Issuer, NameID, attributes and
+whether the assertion is signed — signature-removal, comment-injection
+and attribute-edit tests start from that inventory.
 
 ## Confirm
 

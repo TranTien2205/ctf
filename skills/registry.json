@@ -982,7 +982,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1682,
+      "skill_tokens": 1809,
       "depth_files": 3,
       "depth_tokens": 617,
       "use_when": [
@@ -1955,7 +1955,7 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 936,
+      "skill_tokens": 1022,
       "depth_files": 3,
       "depth_tokens": 2205,
       "use_when": [

@@ -119,7 +119,9 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/sqlite_wal.py tools/forensics/cpio_read.py \
          tools/forensics/iso_read.py tools/forensics/git_obj.py \
          tools/wasm_info.py tools/forensics/png_fix.py \
-         tools/forensics/mozlz4.py tools/forensics/eml_parse.py; do
+         tools/forensics/mozlz4.py tools/forensics/eml_parse.py \
+         tools/forensics/zip_struct.py tools/forensics/plist_dump.py \
+         tools/web/saml_decode.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

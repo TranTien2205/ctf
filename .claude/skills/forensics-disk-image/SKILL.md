@@ -65,6 +65,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/cpio_read.py file list` handles newc cpio
    (070701/070702) and `!<arch>` ar members including `/0` extended
    names; `... get NAME` writes the member to stdout.
+   Zips: `python3 tools/forensics/zip_struct.py a.zip list` walks LOCAL
+   headers and diffs them against the central directory —
+   `local_only` names are files present but unregistered (a standard
+   hide); `... get NAME` extracts by local header, handling the
+   data-descriptor size-in-CD shape.
    `.iso` images: `python3 tools/forensics/iso_read.py cd.iso ls / -r`
    walks the PVD's variable-length directory records recursively and
    `... get /NAME;1` reads the file extent (keep the `;1` version
@@ -83,6 +88,9 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    Firefox's `*.jsonlz4`/`*.mozlz4` (sessionstore, bookmark backups):
    `python3 tools/forensics/mozlz4.py file` decompresses the
    `mozLz40` block without the lz4 package.
+   macOS/iOS property lists (Info.plist, prefs, .mobileconfig):
+   `python3 tools/forensics/plist_dump.py file.plist` decodes XML and
+   binary plists to JSON; `--key a.b.0` drills one key path.
    `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
    (`source=freeblock|unallocated|freelist`); add `--live` to diff against
    live cells. `python3 tools/forensics/browser_hist.py <db>` reads the
