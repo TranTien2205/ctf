@@ -67,6 +67,13 @@ zero = the literal-format falsifier); `offset --max N` sweeps AAAA%N$p
 until 0x41414141 returns — that N is the buffer offset every %n write
 depends on.
 
+Once N and a target are known, `python3 tools/fmt_write.py --offset N
+--addr 0xGOT --value 0xFUNC` emits the write payload: ascending-order
+`%c` pads + positional `%hhn` writes with the addresses in aligned
+slots behind the directives (the `fmtstr_payload` shape, computed for
+you; `--width hn` does 16-bit chunks, `--hex` prints the `\xNN` string
+for pwntools `p.send`).
+
 ## Routing
 
 Shares signals with: `../pwn-stack-overflow/`. Check those before committing to this one.
