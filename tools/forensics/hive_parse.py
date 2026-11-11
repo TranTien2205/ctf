@@ -7,6 +7,7 @@ Usage:
   python3 tools/forensics/hive_parse.py NTUSER.DAT userassist
   python3 tools/forensics/hive_parse.py SYSTEM shimcache
   python3 tools/forensics/hive_parse.py Amcache.hve amcache
+  python3 tools/forensics/hive_parse.py NTUSER.DAT mru
   python3 tools/forensics/hive_parse.py --selftest
 
 regf: 4096-byte header ("regf", root-cell offset at 0x24), then hbins
@@ -265,6 +266,41 @@ def amcache(hv):
     return rows
 
 
+def mru(hv):
+    """RunMRU letter-order and RecentDocs per-extension MRUListEx."""
+    out = {}
+    base = "Software/Microsoft/Windows/CurrentVersion/Explorer"
+    node, _ = hv.find(f"{base}/RunMRU")
+    if node:
+        vals = {v["name"]: _val_text(v) for v in hv.values(node)}
+        order = str(vals.pop("MRUList", ""))
+        out["run_mru"] = [
+            {"order": i + 1, "command": str(vals[k]).rstrip("\\1")}
+            for i, k in enumerate(order) if k in vals]
+    node, _ = hv.find(f"{base}/RecentDocs")
+    if node:
+        docs = []
+        for off in hv.sub_offsets(node["sublist"]) + [node["off"]]:
+            k = hv.nk(off)
+            if not k:
+                continue
+            vals = {v["name"]: v["raw"] for v in hv.values(k)}
+            ex = vals.get("MRUListEx", b"")
+            for i in range(0, len(ex) - 4, 4):
+                idx = struct.unpack("<I", ex[i:i + 4])[0]
+                if idx == 0xFFFFFFFF:
+                    break
+                # values are decimal-numbered names, data is the
+                # UTF-16LE filename
+                nm = vals.get(str(idx), b"")
+                docs.append({"ext": k["name"], "order": i // 4,
+                             "file": nm.decode("utf-16-le",
+                                               "replace")
+                             .rstrip("\x00")})
+        out["recent_docs"] = docs
+    return out
+
+
 def _cell(content):
     """content -> full cell: negative size header + pad to 8."""
     size = 4 + len(content)
@@ -351,6 +387,15 @@ def _selftest():
              + struct.pack("<Q", 133000000000000000)
              + struct.pack("<I", 0))
     blob = struct.pack("<I", 0x30) + b"\x00" * (0x30 - 4) + entry
+    explorer = {"sub": {
+        "RunMRU": {"vals": [
+            ("a", 1, "cmd /c flag\\1".encode("utf-16-le")),
+            ("b", 1, "notepad\\1".encode("utf-16-le")),
+            ("MRUList", 1, "ba".encode("utf-16-le"))]},
+        "RecentDocs": {"sub": {".txt": {"vals": [
+            ("0", 3, "secret.txt".encode("utf-16-le")),
+            ("MRUListEx", 3,
+             struct.pack("<II", 0, 0xFFFFFFFF))]}}}}}
     hive = _mkhive("Root", {
         "Select": {"vals": [("Current", 4,
                             struct.pack("<I", 2))]},
@@ -361,7 +406,9 @@ def _selftest():
             "file1": {"vals": [
                 ("FileId", 1, "0000aabbccdd".encode("utf-16-le")),
                 ("LowerCaseLongPath", 1,
-                 "c:\\flag\\drop.exe".encode("utf-16-le"))]}}}})
+                 "c:\\flag\\drop.exe".encode("utf-16-le"))]}}},
+        "Software": {"sub": {"Microsoft": {"sub": {"Windows": {
+            "sub": {"CurrentVersion": {"sub": {"Explorer": explorer}}}}}}}}})
     tmp = Path(tempfile.mkdtemp()) / "t.dat"
     tmp.write_bytes(hive)
     hv = Hive(tmp)
@@ -375,6 +422,10 @@ def _selftest():
     assert sc["parsed"] == 1 and "run.exe" in sc["entries"][0]["path"], sc
     ac = amcache(hv)
     assert ac[0]["sha1"] == "aabbccdd" and "drop.exe" in ac[0]["path"], ac
+    m = mru(hv)
+    assert m["run_mru"][0]["command"] == "notepad", m
+    assert m["run_mru"][1]["command"] == "cmd /c flag", m
+    assert m["recent_docs"][0]["file"] == "secret.txt", m
     print("hive_parse selftest: ok")
 
 
@@ -384,7 +435,7 @@ def main():
     ap.add_argument("hive", nargs="?")
     ap.add_argument("cmd", nargs="?", default="tree",
                     choices=["tree", "get", "userassist",
-                             "shimcache", "amcache"])
+                             "shimcache", "amcache", "mru"])
     ap.add_argument("key", nargs="?")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
@@ -413,6 +464,8 @@ def main():
         print(json.dumps(shimcache(hv), indent=1))
     elif a.cmd == "amcache":
         print(json.dumps(amcache(hv), indent=1))
+    elif a.cmd == "mru":
+        print(json.dumps(mru(hv), indent=1))
 
 
 if __name__ == "__main__":

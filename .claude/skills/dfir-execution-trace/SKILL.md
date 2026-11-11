@@ -153,8 +153,10 @@ subkey/value counts); `... get 'Control/Session Manager/AppCompatCache'` prints 
 decoding, `... NTUSER.DAT userassist` emits every UserAssist row (ROT13-decoded path, run count, focus ms,
 FILETIME) for the v5 16-byte and v7 68/72-byte blob layouts, `... SYSTEM shimcache` resolves `Select\Current`
 to the right ControlSet and decodes the Win10/11 `10ts` entries (the emitted mtime is the file's
-`$STANDARD_INFORMATION` mtime, not a run time), and `... Amcache.hve amcache` lists `InventoryApplicationFile`
-rows as path + `FileId` SHA-1. It reads the hive as written - replay `.LOG1`/`.LOG2` with regipy first when
+`$STANDARD_INFORMATION` mtime, not a run time), `... Amcache.hve amcache` lists `InventoryApplicationFile`
+rows as path + `FileId` SHA-1, and `... NTUSER.DAT mru` decodes `RunMRU` in `MRUList` order (newest first,
+values `a`..`z` ending `\1`) plus `RecentDocs` UTF-16LE filenames in `MRUListEx` DWORD order, per extension
+key when present. It reads the hive as written - replay `.LOG1`/`.LOG2` with regipy first when
 the bundle ships transaction logs.
 
 ## Per-user execution: UserAssist, RunMRU, RecentDocs, history, transcripts
