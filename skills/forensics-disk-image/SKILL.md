@@ -65,6 +65,14 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/cpio_read.py file list` handles newc cpio
    (070701/070702) and `!<arch>` ar members including `/0` extended
    names; `... get NAME` writes the member to stdout.
+   `.iso` images: `python3 tools/forensics/iso_read.py cd.iso ls / -r`
+   walks the PVD's variable-length directory records recursively and
+   `... get /NAME;1` reads the file extent (keep the `;1` version
+   suffix — it is part of the on-disc name).
+   A `.git` directory: `python3 tools/forensics/git_obj.py ./.git
+   dangling` lists loose objects unreachable from refs — the
+   flag-in-a-deleted-commit shape — and `... cat <sha>` dumps any
+   object body (blob = file content) without the git binary.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
    If a `-wal` file sits beside the db, DO NOT open the db — sqlite
