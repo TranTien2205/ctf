@@ -201,7 +201,7 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 794,
+      "skill_tokens": 849,
       "depth_files": 7,
       "depth_tokens": 4971,
       "use_when": [
@@ -982,7 +982,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1638,
+      "skill_tokens": 1682,
       "depth_files": 3,
       "depth_tokens": 617,
       "use_when": [
@@ -1090,7 +1090,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1318,
+      "skill_tokens": 1414,
       "depth_files": 3,
       "depth_tokens": 701,
       "use_when": [

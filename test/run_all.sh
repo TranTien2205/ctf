@@ -118,7 +118,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/pdf_objs.py tools/forensics/ext_read.py \
          tools/forensics/sqlite_wal.py tools/forensics/cpio_read.py \
          tools/forensics/iso_read.py tools/forensics/git_obj.py \
-         tools/wasm_info.py; do
+         tools/wasm_info.py tools/forensics/png_fix.py \
+         tools/forensics/mozlz4.py tools/forensics/eml_parse.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

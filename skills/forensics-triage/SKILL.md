@@ -51,6 +51,7 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 - Suspicious binary → `references/malware-analysis.md`
 - Document/PE analysis → `references/document-analysis.md`
 - PDF (puzzle or maldoc) → `python3 tools/forensics/pdf_objs.py doc.pdf` — object inventory, FlateDecode streams decoded, `/JS` `/OpenAction` `/EmbeddedFile` keys surfaced, `--extract N` dumps one stream
+- `.eml`/`.mbox` (phishing analysis) → `python3 tools/forensics/eml_parse.py mail.eml` — headers + Received chain + auth results, MIME part inventory, `--attach N` dumps an attachment; `--mbox` for a whole mailbox
 
 ## References
 - `references/network-forensics.md` - Network capture analysis

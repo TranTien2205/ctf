@@ -79,6 +79,13 @@ end-of-image, and embedded-format signatures (zip/rar/pdf/png/jpeg)
 with offsets. Run it before `lsb_scan` — a polyglot or appended blob is
 cheaper to rule out than a bit-plane sweep.
 
+When the PNG itself is corrupted (bad CRCs, garbage between chunks,
+missing IEND), `python3 tools/forensics/png_fix.py broken.png
+--fix out.png` rewrites chunk CRCs, drops non-chunk bytes and appends
+the missing terminator, reporting each repair — a tampered chunk is a
+signal, not just damage. It refuses to invent pixel data: a damaged
+IDAT stream is reported, not faked.
+
 For the LSB half there is now a stdlib option too:
 
 ```bash

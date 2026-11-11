@@ -80,6 +80,9 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/sqlite_wal.py db-wal frames` lists frames
    with commit/stale marks, `... strings` scans each page image with
    frame provenance, `... page N` dumps the newest live image.
+   Firefox's `*.jsonlz4`/`*.mozlz4` (sessionstore, bookmark backups):
+   `python3 tools/forensics/mozlz4.py file` decompresses the
+   `mozLz40` block without the lz4 package.
    `python3 tools/forensics/sqlite_carve.py db.sqlite` emits them as JSON
    (`source=freeblock|unallocated|freelist`); add `--live` to diff against
    live cells. `python3 tools/forensics/browser_hist.py <db>` reads the
