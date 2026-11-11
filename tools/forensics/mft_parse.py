@@ -95,6 +95,9 @@ def _record(raw, recn):
     out = {"record": recn, "sequence": seq,
            "in_use": bool(flags & 1), "is_dir": bool(flags & 2)}
     for atype, abuf, nonres in _attrs(rec, first):
+        nlen, noff = abuf[9], struct.unpack("<H", abuf[10:12])[0]
+        aname = abuf[noff:noff + nlen * 2].decode(
+            "utf-16-le", "replace") if nlen else ""
         if atype == 0x10 and not nonres:  # $STANDARD_INFORMATION
             clen, coff = struct.unpack("<IH", abuf[16:22])
             c = abuf[coff:coff + clen]
@@ -114,20 +117,29 @@ def _record(raw, recn):
                     "size": struct.unpack("<Q", c[48:56])[0],
                     "created": _ft(c[8:16]),
                      "mft_changed": _ft(c[24:32])})
-        elif atype == 0x80:  # $DATA
+        elif atype == 0x80:  # $DATA - named streams are ADS payloads
             if nonres:
                 roff = struct.unpack("<H", abuf[32:34])[0]
-                out["data"] = {"resident": False,
-                               "size": struct.unpack("<Q", abuf[48:56])[0],
-                               "runs": _runlist(abuf[roff:])}
+                stream = {"name": aname, "resident": False,
+                          "size": struct.unpack("<Q", abuf[48:56])[0],
+                          "runs": _runlist(abuf[roff:])}
+                if not aname:
+                    out["data"] = {k: v for k, v in stream.items()
+                                   if k != "name"}
             else:
                 clen, coff = struct.unpack("<IH", abuf[16:22])
                 body = bytes(abuf[coff:coff + clen])
-                out["data"] = {"resident": True, "size": clen,
-                               "preview": body[:64].decode(
-                                   "utf-8", "replace"),
-                               "preview_hex": body[:64].hex()}
-                out["_data_bytes"] = body
+                stream = {"name": aname, "resident": True,
+                          "size": clen,
+                          "preview": body[:64].decode("utf-8",
+                                                      "replace"),
+                          "preview_hex": body[:64].hex()}
+                if not aname:
+                    out["data"] = {k: v for k, v in stream.items()
+                                   if k != "name"}
+                    out["_data_bytes"] = body
+            if aname:
+                out.setdefault("streams", []).append(stream)
     return out
 
 
@@ -158,12 +170,20 @@ def _mkrec(flags, attrs, usn=0xAAAA):
     struct.pack_into("<H", rec, 20, first)
     struct.pack_into("<H", rec, 22, flags)
     off = first
-    for atype, content in attrs:
-        alen = 24 + len(content)
+    for item in attrs:
+        atype, content = item[0], item[1]
+        name = item[2] if len(item) > 2 else None
+        nenc = name.encode("utf-16-le") if name else b""
+        alen = 24 + len(nenc) + len(content)
         struct.pack_into("<II", rec, off, atype, alen)
         rec[off + 8] = 0
-        struct.pack_into("<IH", rec, off + 16, len(content), 24)
-        rec[off + 24:off + 24 + len(content)] = content
+        rec[off + 9] = len(name or "")
+        struct.pack_into("<H", rec, off + 10, 24 if name else 0)
+        rec[off + 24:off + 24 + len(nenc)] = nenc
+        struct.pack_into("<IH", rec, off + 16, len(content),
+                         24 + len(nenc))
+        rec[off + 24 + len(nenc):
+            off + 24 + len(nenc) + len(content)] = content
         off += alen
     struct.pack_into("<I", rec, off, 0xFFFFFFFF)
     return bytes(rec)
@@ -179,7 +199,9 @@ def _selftest():
         struct.pack("<IIBB", 0x20, 0, len(nm), 1) + nm
     body = b"flag{mft_deleted_record}"
     r0 = _mkrec(3, [(0x10, si)])                       # dir, in use
-    r5 = _mkrec(0, [(0x10, si), (0x30, fn), (0x80, body)])
+    ads = b"flag{ads_hidden_stream}"
+    r5 = _mkrec(0, [(0x10, si), (0x30, fn), (0x80, body),
+                    (0x80, ads, "hidden")])
     tmp = Path(tempfile.mkdtemp()) / "MFT"
     tmp.write_bytes(r0 + b"\x00" * 1024 * 4 + r5)
     rows, bad = parse(tmp)
@@ -187,8 +209,11 @@ def _selftest():
     d = rows[1]
     assert not d["in_use"] and not d["is_dir"]
     assert d["names"][0]["name"] == "flag.txt", d["names"]
-    assert d["data"]["resident"] and "flag{mft_deleted_record}" in \
-        d["data"]["preview"], d["data"]
+    assert "flag{mft_deleted_record}" in d["data"]["preview"], \
+        d["data"]
+    assert "flag{ads_hidden_stream}" in \
+        d["streams"][0]["preview"], d["streams"]
+    assert d["streams"][0]["name"] == "hidden", d["streams"]
     print("mft_parse selftest: ok")
 
 
