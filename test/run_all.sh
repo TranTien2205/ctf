@@ -111,7 +111,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/pyc_dis.py tools/pyinst_extract.py tools/zip_crack.py \
          tools/forensics/vba_extract.py tools/forensics/browser_hist.py \
          tools/forensics/squashfs_read.py tools/forensics/fat_read.py \
-         tools/forensics/part_table.py; do
+         tools/forensics/part_table.py tools/forensics/wtmp_parse.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

@@ -163,13 +163,10 @@ from %.200s port %d ssh2%s%s"` with authmsg in `{Accepted, Failed, Postponed, Pa
 
 `utmp` = who is on now (`/run/utmp`), `wtmp` = login history (`/var/log/wtmp`), `btmp` = failed logins (`/var/log/btmp`), `lastlog` =
 `/var/log/lastlog`. Measured today: `last`, `lastb`, `lastlog` and `utmpdump` are all **absent** here, so the struct is the day-zero path.
+`python3 tools/forensics/wtmp_parse.py /var/log/wtmp` decodes every 384-byte utmp record to JSON (type name, line,
+user, host, UTC time, IPv4) and `--type USER_PROCESS,DEAD_PROCESS` filters to login/logout rows; `... --lastlog`
+reads the 292-byte uid-indexed format instead.
 
-```python
-FMT = "<hxxi32s4s32s256shhiii4i20s"   # 384 bytes, confirmed by struct.calcsize; fields in order:
-# ut_type ut_pid ut_line[32] ut_id[4] ut_user[32] ut_host[256] e_termination e_exit ut_session
-# tv_sec tv_usec ut_addr_v6[4] unused[20]
-
-```
 Measured: `/var/log/wtmp` here is 160128 bytes = 417 records exactly and `/var/log/btmp` 7296 = 19; that format produced real
 `BOOT_TIME`/`USER_PROCESS`/`DEAD_PROCESS` rows with usernames and `tv_sec` decoding to sane UTC. `ut_type`: 0 EMPTY, 1 RUN_LVL, 2 BOOT_TIME,
 3 NEW_TIME, 4 OLD_TIME, 5 INIT_PROCESS, 6 LOGIN_PROCESS, **7 USER_PROCESS** (a login), 8 DEAD_PROCESS (its logout), 9 ACCOUNTING;

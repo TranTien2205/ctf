@@ -790,7 +790,7 @@
       "verified_by": [
         "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
       ],
-      "skill_tokens": 4966,
+      "skill_tokens": 4972,
       "depth_files": 1,
       "depth_tokens": 1108,
       "use_when": [
