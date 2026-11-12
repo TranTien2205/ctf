@@ -45,7 +45,12 @@ each `REDUCE` counted, `data-only stream` vs `code-execution opcodes
 present` — never unpickle to inspect. For PHP streams,
 `python3 tools/php_ser_parse.py blob.ser` (or `--str 'O:8:"User":...'`)
 decodes the `a:N:{...}` grammar to JSON and lists every serialized
-class name — the object-injection surface to hunt in source.
+class name — the object-injection surface to hunt in source. Java
+streams too: `python3 tools/java_ser.py payload.ser` (or `--b64
+rO0AB...`) walks the `aced 0005` TC_* tokens into a classdesc
+inventory (names, serialVersionUIDs, fields) plus every TC_STRING,
+and names classes on the known-gadget list when they appear —
+analysis only, it never deserialises.
 
 **Falsifier** — the observation that closes this class: malformed objects are
 rejected with the same response and the same timing as well-formed ones, and

@@ -126,7 +126,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/tar_tail.py tools/forensics/rar_list.py \
          tools/rop_chain.py tools/forensics/qr_decode.py \
          tools/cbc_bitflip.py tools/pickle_dis.py \
-         tools/php_ser_parse.py; do
+         tools/php_ser_parse.py tools/java_ser.py \
+         tools/cert_info.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
