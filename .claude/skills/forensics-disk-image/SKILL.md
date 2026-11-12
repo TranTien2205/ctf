@@ -115,6 +115,15 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    file` reads WriteBatch `.log` records (deletions listed, not skipped)
    and `.ldb` block tables including raw-snappy blocks — the `snappy`
    module is absent and the decompressor is inline.
+   Chromium SimpleCache (`Cache_Data/data_1..3`): `python3
+   tools/forensics/chrome_cache.py data_1` walks entries by magic,
+   locates bodies through their EOF records, and recovers the URL key
+   that the format stores last; `--stream N` dumps one body.
+   qcow2 virtual disks (`qemu-img` absent): `python3
+   tools/forensics/qcow2_read.py disk.qcow2 dump guest.img` walks the
+   L1/L2 tables into a flat image for part_table/fat_read/ext_read;
+   `read OFF N` reads guest bytes directly, and compressed clusters
+   are counted and named rather than guessed.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and
