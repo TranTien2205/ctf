@@ -14,9 +14,8 @@ length extension bytes.
 
 Writes decompressed bytes to stdout. Selftest uses a real LZ4 stream
 produced by the reference encoder format (verified against a
-hand-computed sequence walk). No frame-format support — mozLz40 and
-raw blocks only; the framed .lz4 container (magic 04 22 4D 18) is
-reported, not decoded.
+hand-computed sequence walk). mozLz40 and raw blocks only; the framed
+.lz4 container (magic 04 22 4D 18) routes to lz4_frame.py.
 """
 import argparse
 import sys
@@ -57,8 +56,8 @@ def decompress(data):
     if data[:8] == b"mozLz40\x00":
         return lz4_block(data[8:])
     if data[:4] == b"\x04\x22\x4d\x18":
-        raise ValueError("framed .lz4 container — unsupported; "
-                         "mozLz40 or raw block only")
+        raise ValueError("framed .lz4 container — use "
+                         "tools/forensics/lz4_frame.py instead")
     return lz4_block(data)
 
 

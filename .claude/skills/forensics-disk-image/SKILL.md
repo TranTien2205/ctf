@@ -95,7 +95,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    frame provenance, `... page N` dumps the newest live image.
    Firefox's `*.jsonlz4`/`*.mozlz4` (sessionstore, bookmark backups):
    `python3 tools/forensics/mozlz4.py file` decompresses the
-   `mozLz40` block without the lz4 package.
+   `mozLz40` block without the lz4 package. A standard framed `.lz4`
+   file (magic `04 22 4D 18` — `lz4`-CLI output, firmware blobs):
+   `python3 tools/forensics/lz4_frame.py file.lz4 -o out` decodes the
+   frame to bytes; `--info` reports the FLG fields it could not
+   checksum-verify.
    macOS/iOS property lists (Info.plist, prefs, .mobileconfig):
    `python3 tools/forensics/plist_dump.py file.plist` decodes XML and
    binary plists to JSON; `--key a.b.0` drills one key path.

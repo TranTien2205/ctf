@@ -130,7 +130,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/cert_info.py tools/forensics/bson_dump.py \
          tools/msgpack_read.py tools/forensics/ab_extract.py \
          tools/forensics/leveldb_dump.py tools/forensics/chrome_cache.py \
-         tools/forensics/qcow2_read.py tools/pgp_parse.py; do
+         tools/forensics/qcow2_read.py tools/pgp_parse.py \
+         tools/forensics/lz4_frame.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
