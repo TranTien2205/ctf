@@ -92,6 +92,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | An encrypted `.zip` ("extract the flag", password unknown) | ZipCrypto dictionary attack — flag bit 0 set, 12-byte check header | flag bit 3 check byte or AES entries | `python3 tools/zip_crack.py secret.zip words.txt` (12-byte check rejects a wrong password before any decompress) |
 | A `.crt`/`.pem` certificate or public-key file | field mining first (flag in subject/SAN/serial), then key analysis | all fields ordinary AND the key is strong — the file is a carrier, not the puzzle | `python3 tools/cert_info.py cert.pem` — names, SANs, validity, key kind/bits, sig algorithm, weak-key notes; an RSA key under 1024 bits routes to `fermat`/`batch-gcd` rows |
 || A binary ciphertext blob, no key, XOR-looking (high-byte or key-period hints) | Repeating-key XOR crack (hamming key-length, per-column single-byte) | no key length decodes to language — it is a cipher, not XOR | `python3 tools/xor_solve.py crack --hex HEX` (`single` for one-byte pads; `cipher_id` if it is letters) |
+|| A `.pgp`/`.gpg`/`.asc` blob (OpenPGP packet data, `gpg --list-packets` absent) | packet inventory first — public key? signature? encrypted message? | packets all encrypted AND no weak-alg or short-key named | `python3 tools/pgp_parse.py file.pgp` (`--armor` for ASCII armor) — packet types, key alg/bits, user IDs, issuer keyids; an RSA key under 1024 bits routes to `fermat`, a known keyid to `search_facts`/writeup |
 
 ## Route to depth — attack family to the one file
 

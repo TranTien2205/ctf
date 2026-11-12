@@ -4,7 +4,10 @@
 rev-triage's deciding-check hunt starts from imports and symbol names
 (strcmp, memcmp, crypto calls name the check for you). This is the
 bounded stdlib read: ELF header, section table, .dynsym + .symtab name
-lists, DT_NEEDED shared libraries, program headers for entry/segments.
+lists, DT_NEEDED shared libraries, program headers, and — for ET_CORE
+files — the PT_NOTE payload: NT_PRSTATUS registers and pid, NT_PRPSINFO
+argv, and the NT_FILE memory-to-path map that names where the flag
+lived in the dead process.
 
   python3 tools/elf_info.py ./bin
   python3 tools/elf_info.py ./bin --symbols-only
@@ -41,6 +44,19 @@ def parse_elf(data):
         (etype, mach, _ver, entry, phoff, shoff, _fl, _eh, phentsz,
          phnum, shentsz, shnum, shstr) = struct.unpack(
             e + "HHIIIIIHHHHHH", data[16:52])
+    phdrs = []
+    for i in range(phnum):
+        o = phoff + i * phentsz
+        if o + phentsz > len(data):
+            break
+        if cls == 64:
+            pt, fl, po, va, _pa, fsz, _msz, _al = struct.unpack(
+                e + "IIQQQQQQ", data[o:o + 56])
+        else:
+            pt, po, va, _pa, fsz, _msz, fl, _al = struct.unpack(
+                e + "IIIIIIII", data[o:o + 32])
+        phdrs.append({"type": pt, "off": po, "vaddr": va,
+                      "filesz": fsz, "flags": fl})
     secs = []
     for i in range(shnum):
         o = shoff + i * shentsz
@@ -112,6 +128,61 @@ def parse_elf(data):
                            "symbol": dynsym_all[si]
                            if si < len(dynsym_all) else None,
                            "type": typ})
+    notes = {}
+    if etype == 4:                                   # ET_CORE
+        for p in phdrs:
+            if p["type"] != 4:                       # PT_NOTE
+                continue
+            blob = data[p["off"]:p["off"] + p["filesz"]]
+            q = 0
+            while q + 12 <= len(blob):
+                nsz, dsz, ntyp = struct.unpack(e + "III", blob[q:q + 12])
+                name = blob[q + 12:q + 12 + nsz].rstrip(b"\x00")
+                desc_off = (q + 12 + nsz + 3) & ~3
+                desc = blob[desc_off:desc_off + dsz]
+                q = (desc_off + dsz + 3) & ~3
+                if ntyp == 1:                        # NT_PRSTATUS
+                    if len(desc) >= 112 + 27 * 8:
+                        r = struct.unpack(e + "27Q",
+                                          desc[112:112 + 216])
+                        names = ["r15", "r14", "r13", "r12", "rbp",
+                                 "rbx", "r11", "r10", "r9", "r8",
+                                 "rax", "rcx", "rdx", "rsi", "rdi",
+                                 "orig_rax", "rip", "cs", "eflags",
+                                 "rsp", "ss", "fs_base", "gs_base",
+                                 "ds", "es", "fs", "gs"]
+                        notes["prstatus_regs"] = {
+                            n: hex(v) for n, v in zip(names, r)}
+                    if len(desc) >= 48:
+                        notes["prstatus_pid"] = struct.unpack(
+                            e + "i", desc[32:36])[0]
+                elif ntyp == 2:                      # NT_FPREGSET
+                    notes.setdefault("fpregset_sizes", []).append(len(desc))
+                elif ntyp == 3:                      # NT_PRPSINFO
+                    if len(desc) >= 124:
+                        notes["prpsinfo"] = {
+                            "fname": desc[28:44].rstrip(b"\x00").decode(
+                                "utf-8", "replace"),
+                            "psargs": desc[44:124].rstrip(b"\x00").decode(
+                                "utf-8", "replace")}
+                elif ntyp == 0x46494C45:             # NT_FILE
+                    if len(desc) >= 16:
+                        cnt, _pgsz = struct.unpack(e + "QQ", desc[:16])
+                        moff = 16
+                        maps = []
+                        for _ in range(cnt):
+                            if moff + 24 > len(desc):
+                                break
+                            st, en, fo = struct.unpack(
+                                e + "QQQ", desc[moff:moff + 24])
+                            maps.append({"start": hex(st),
+                                         "end": hex(en),
+                                         "file_ofs": fo})
+                            moff += 24
+                        fnames = desc[moff:].split(b"\x00")
+                        for m, fn in zip(maps, fnames):
+                            m["file"] = fn.decode("utf-8", "replace")
+                        notes["mapped_files"] = maps
     needed = []
     s, dyn = secdata(".dynamic")
     strs = b""
@@ -135,10 +206,11 @@ def parse_elf(data):
                    if any(k in s.lower() for k in
                           ("cmp", "str", "mem", "crypt", "aes", "rc4",
                            "md5", "sha", "xor", "chk", "verif", "pass"))]
-    return {"class": cls, "type": ETYPE.get(etype, etype),
-            "machine": EMACHINE.get(mach, mach),
-            "entry": hex(entry),
-            "needed_libs": needed,
+    out = {"class": cls, "type": ETYPE.get(etype, etype),
+           "machine": EMACHINE.get(mach, mach),
+           "entry": hex(entry),
+           "program_headers": phdrs,
+           "needed_libs": needed,
             "sections": [{"name": s["name"], "addr": hex(s["addr"]),
                           "size": s["size"]} for s in secs if s["name"]],
             "dynamic_symbols": dynsym,
@@ -150,6 +222,9 @@ def parse_elf(data):
             "deciding_check_hints": interesting,
             "note": "static read only — no disassembly; interesting "
                     "imports name the check, they do not prove it"}
+    if notes:
+        out["core_notes"] = notes
+    return out
 
 
 def _selftest() -> int:
@@ -201,6 +276,41 @@ def _selftest() -> int:
     got = d["got_write_targets"]
     assert got and got[0]["symbol"] == "strcmp" \
         and got[0]["offset"] == "0x404018", got
+
+    # ET_CORE with one PT_NOTE: NT_PRSTATUS + NT_FILE
+    pr = bytearray(112 + 27 * 8)
+    struct.pack_into(e + "i", pr, 32, 4242)          # pid
+    struct.pack_into(e + "27Q", pr, 112,
+                     *range(27))                     # regs r15..gs
+    ps = bytearray(124)
+    ps[28:44] = b"flagd\x00".ljust(16, b"\x00")
+    ps[44:124] = b"./flagd --secret\x00".ljust(80, b"\x00")
+    nf = struct.pack(e + "QQ", 1, 0x1000)
+    nf += struct.pack(e + "QQQ", 0x7F0000, 0x7F1000, 0)
+    nf += b"/home/u/flag.txt\x00"
+    def note(nm, typ, desc):
+        nb = nm + b"\x00"
+        out = struct.pack(e + "III", len(nb), len(desc), typ) + nb
+        out += b"\x00" * ((4 - len(out) % 4) % 4) + desc
+        out += b"\x00" * ((4 - len(out) % 4) % 4)
+        return out
+    nblob = (note(b"CORE", 1, bytes(pr)) + note(b"CORE", 3, bytes(ps))
+             + note(b"LINUX", 0x46494C45, nf))
+    c = bytearray(64 + 56 + len(nblob))
+    c[:4] = b"\x7fELF"
+    c[4], c[5] = 2, 1
+    struct.pack_into(e + "HHIQQQIHHHHHH", c, 16, 4, 62, 1, 0,
+                     64, 0, 0, 64, 56, 1, 0, 0, 0)
+    struct.pack_into(e + "IIQQQQQQ", c, 64, 4, 0, 120, 0, 0,
+                     len(nblob), len(nblob), 4)
+    c[120:120 + len(nblob)] = nblob
+    cd = parse_elf(bytes(c))
+    assert cd["type"] == "CORE", cd["type"]
+    regs = cd["core_notes"]["prstatus_regs"]
+    assert regs["rip"] == hex(16), regs
+    assert cd["core_notes"]["prstatus_pid"] == 4242
+    maps = cd["core_notes"]["mapped_files"]
+    assert maps[0]["file"] == "/home/u/flag.txt", maps
     print("elf_info selftest: ok")
     return 0
 

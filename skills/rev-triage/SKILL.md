@@ -69,7 +69,11 @@ For the deciding-check hunt without `nm`/`readelf`/`objdump`:
 symbols, DT_NEEDED, relocations and `got_write_targets` (`.rela.plt`
 entries — the GOT slots a format-string or overwrite exploit aims at),
 and flags the imports that name the check
-(`*cmp*`, `*crypt*`, `*verif*`, `*pass*`). PE binary instead?
+(`*cmp*`, `*crypt*`, `*verif*`, `*pass*`).
+An ET_CORE file (handouts `core`, `core.<pid>`) goes to the same tool —
+it reads PT_NOTE into `core_notes`: NT_PRSTATUS registers + pid,
+NT_PRPSINFO argv, and NT_FILE's memory-to-path map that names where the
+flag lived in the dead process. PE binary instead?
 `python3 tools/pe_info.py ./bin.exe` does the same read: import table
 per DLL, exports, per-section flags, and packer-named sections
 (UPX/VMP/Themida) in `packed_suspects`. Mach-O?
