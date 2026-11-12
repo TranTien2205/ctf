@@ -55,7 +55,11 @@ image itself opens without `unsquashfs`:
 `python3 tools/forensics/squashfs_read.py fs.sqsh list` walks the dir
 table and `... get /path/file` extracts the file blocks plus its
 fragment tail (zlib only; other compressors report their id instead
-of guessing).
+of guessing). A `.dtb`/`fdt` blob beside the kernel answers "what
+device/peripherals" without `dtc`:
+`python3 tools/forensics/dtb_dump.py board.dtb` walks the FDT token
+stream into a node/property tree and flag-greps every string —
+vendor props and `chosen`/`bootargs` are where handouts hide things.
 
 Packed? `strings ./bin | grep -iE "upx|themida|vmprotect|aspack"`. UPX unpacks
 with `upx -d ./bin`; anything else goes to `references/packer-analysis.md`.

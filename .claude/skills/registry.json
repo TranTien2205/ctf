@@ -306,7 +306,7 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 1725,
+      "skill_tokens": 1798,
       "depth_files": 6,
       "depth_tokens": 4210,
       "use_when": [
@@ -982,7 +982,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 2288,
+      "skill_tokens": 2350,
       "depth_files": 3,
       "depth_tokens": 617,
       "use_when": [

@@ -65,6 +65,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/cpio_read.py file list` handles newc cpio
    (070701/070702) and `!<arch>` ar members including `/0` extended
    names; `... get NAME` writes the member to stdout.
+   Microsoft `.cab`/`.msu` packages: `python3
+   tools/forensics/cab_list.py pack.cab` lists members and folder
+   compression; `--extract NAME` recovers uncompressed and MSZIP
+   (raw-deflate) folders while LZX/Quantum are named, not guessed.
    Zips: `python3 tools/forensics/zip_struct.py a.zip list` walks LOCAL
    headers and diffs them against the central directory —
    `local_only` names are files present but unregistered (a standard
