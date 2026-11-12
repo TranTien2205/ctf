@@ -128,7 +128,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/cbc_bitflip.py tools/pickle_dis.py \
          tools/php_ser_parse.py tools/java_ser.py \
          tools/cert_info.py tools/forensics/bson_dump.py \
-         tools/msgpack_read.py; do
+         tools/msgpack_read.py tools/forensics/ab_extract.py \
+         tools/forensics/leveldb_dump.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

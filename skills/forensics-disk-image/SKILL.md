@@ -106,6 +106,15 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    (WebKit-microsecond times) and Firefox `places.sqlite`/`moz_cookies`
    (unix microseconds) detected by schema, visits + downloads + cookies
    as JSON.
+   Android `backup.ab` files: `python3 tools/forensics/ab_extract.py b.ab`
+   parses the header, inflates the DEFLATE payload, and lists/extracts
+   the tar members (`--extract NAME`); AES-256 backups are reported with
+   their KDF header rather than guessed at.
+   LevelDB stores (Chrome/Chromium IndexedDB `*.log`/`*.ldb`, CTF
+   "database dump" handouts): `python3 tools/forensics/leveldb_dump.py
+   file` reads WriteBatch `.log` records (deletions listed, not skipped)
+   and `.ldb` block tables including raw-snappy blocks — the `snappy`
+   module is absent and the decompressor is inline.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and
