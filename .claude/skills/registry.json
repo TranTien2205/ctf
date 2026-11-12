@@ -1707,7 +1707,7 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1393,
+      "skill_tokens": 1522,
       "depth_files": 7,
       "depth_tokens": 5186,
       "use_when": [
