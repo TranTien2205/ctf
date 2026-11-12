@@ -207,6 +207,12 @@ divergence a timestomp question asks about), `in_use`/`is_dir` flags, resident
 is clear; `--dump N` writes a record's resident `$DATA` bytes (a small
 deleted file's whole body) to stdout as hex.
 
+For names a wiped file left behind: `python3 tools/forensics/ntfs_indx.py
+<image-or-carve>` scans for INDX pages, walks live entries AND the
+slack region after the last entry — deleted filenames survive there
+with their `mft_ref`, timestamps and `slack: true` marker. Pair the
+recovered `mft_ref` with `mft_parse --dump` if the record still exists.
+
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
 which is the answer to a timestomp question. Confirmed = a timeline row quoted
