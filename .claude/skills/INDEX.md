@@ -58,8 +58,8 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 |---|---|---|---|
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
 | LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
-| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.5k | `crypto-classical`, `crypto-ecc-dlog`, `crypto-prng` … |
-| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.3k | `misc-constraint-puzzle`, `misc-encoding-carrier`, `misc-interpreter-escape` |
+| ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~3.6k | `crypto-classical`, `crypto-ecc-dlog`, `crypto-prng` … |
+| jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~2.4k | `misc-constraint-puzzle`, `misc-encoding-carrier`, `misc-interpreter-escape` |
 | artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `dfir-antiforensics-trace`, `dfir-authentication-trace`, `dfir-cloud-audit-trace` … |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.8k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |

@@ -124,7 +124,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/web/saml_decode.py tools/macho_info.py \
          tools/dex_info.py tools/forensics/rtp_extract.py \
          tools/forensics/tar_tail.py tools/forensics/rar_list.py \
-         tools/rop_chain.py; do
+         tools/rop_chain.py tools/forensics/qr_decode.py \
+         tools/cbc_bitflip.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
