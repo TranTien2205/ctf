@@ -57,6 +57,7 @@ Open one. Never browse the directory.
 | Data hidden in an image, audio, signal, capture or column of numbers | `data-hiding.md` |
 | A binary TLV-shaped blob (protobuf, gRPC payload) | `python3 tools/proto_decode.py blob.bin` decodes field structure without the `.proto` |
 | A `.bson` file (mongodb export, app data) | `python3 tools/forensics/bson_dump.py dump.bson` decodes documents to JSON (`bsondump` absent), flag-format-greps every field, reports trailing bytes honestly |
+| A MessagePack blob (ws binary frame, Redis cache, flask session cache) | `python3 tools/msgpack_read.py blob.msgpack` or `--hex` — decodes every tag type to JSON without the `msgpack` module, flag-format-greps decoded strings, reports where a malformed blob stopped |
 | A QR / barcode image to read | `python3 tools/forensics/qr_decode.py code.png` — cv2 `QRCodeDetector` then pyzbar (which also does Code128/EAN/DataMatrix); says which backend decoded it, and reports honestly when neither is installed |
 | QAM, IQ samples, carrier recovery, timing sync | `rf-sdr.md` |
 | A search problem, an oracle, a protocol to drive, a constraint system | `solvers.md` (socket speed puzzles: class `misc-constraint-puzzle`, `../misc-constraint-puzzle/`) |
