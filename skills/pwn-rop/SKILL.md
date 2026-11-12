@@ -49,6 +49,21 @@ Inside radare2, `/R pop rdi` searches for ROP sequences. Build payloads with
 `struct.pack` and deliver them with `socat` or a stdlib socket, never with
 `pwntools`.
 
+Once the goal is named, assemble from the binary's own gadgets:
+
+```bash
+python3 tools/rop_chain.py ./chal ret2func --func 0x401160 --arg 0x404060
+python3 tools/rop_chain.py ./chal syscall --num 59 --arg 0x404030
+python3 tools/rop_chain.py ./chal ret2plt --plt puts --arg 0x404018
+```
+
+`ret2func` packs `pop rdi/rsi/rdx` chains in argument order and inserts a
+bare `ret` when the count leaves rsp misaligned. `ret2plt` resolves the
+stub itself: it walks `.rela.plt` to the symbol's GOT slot, then decodes
+the `ff 25` stubs in `.plt` until one references that slot — the packed
+qwords are the chain, and a missing gadget or undecodable stub is
+reported, never faked.
+
 ## First probe
 
 **This class presupposes control of the instruction pointer.** Confirm that
