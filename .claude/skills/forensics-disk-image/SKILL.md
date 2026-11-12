@@ -132,6 +132,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    L1/L2 tables into a flat image for part_table/fat_read/ext_read;
    `read OFF N` reads guest bytes directly, and compressed clusters
    are counted and named rather than guessed.
+   EnCase `.E01`/EWF1 images (`ewfmount` absent): `python3
+   tools/forensics/e01_read.py disk.E01 dump guest.img` reads through
+   the chunk table (bit-31 zlib chunks) into a flat image for the
+   same downstream chain; `info` names sections and geometry, and
+   multi-segment sets are reported honestly.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and

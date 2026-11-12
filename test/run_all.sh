@@ -132,7 +132,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/leveldb_dump.py tools/forensics/chrome_cache.py \
          tools/forensics/qcow2_read.py tools/pgp_parse.py \
          tools/forensics/lz4_frame.py tools/forensics/dtb_dump.py \
-         tools/forensics/cab_list.py tools/forensics/ntfs_indx.py; do
+         tools/forensics/cab_list.py tools/forensics/ntfs_indx.py \
+         tools/forensics/e01_read.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
