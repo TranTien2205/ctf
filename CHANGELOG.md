@@ -185,6 +185,12 @@ system. All notable milestones on `agent-v2`.
   `/graphql-strict` and `/hello2`; `probe_method` gets its first
   coverage. Selftest exercises all four new paths (bad-header notes,
   schema+GET transport, suggestion leak, eval-and-reflect SSTI).
+- Recon extraction quality: `js_recon` recovers endpoints from generic
+  HTTP-client call shapes (`this.http.get`, axios instances,
+  superagent `.request`) with a path-like restriction so `map.get('k')`
+  can't flood leads; `fingerprint` cookie→framework matching resolves
+  exact names before prefixes (`sessionid` no longer reads as
+  rails/django-style).
 - Evidence gate covers header-class findings: `record_finding` excerpts
   resolve against recorded response headers as well as the body/event
   output (CRLF-injected headers, bad security-header values and server
@@ -210,7 +216,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 121 offline checks.
-- `python -m pytest tests/ -q`: 188 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 190 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
