@@ -17,6 +17,24 @@ Record the real request (from crawl forms or your session), then check:
 5. Content-Type bypass: endpoint accepts `text/plain`/form-encoded while
    the SPA sends JSON -> a plain HTML form can forge the write.
 
+## Proving it, not just flagging it
+
+The class needs four things in the record, and `probe_csrf` collects all
+four when you give it the write and the resource the write changes:
+
+```
+probe_csrf(url, method="POST", data="<the real body>", read_url="<what it changes>")
+```
+
+It reads `read_url` before the write, sends the write with a foreign
+`Origin`/`Referer` under both preflight-free content types (`text/plain`
+and `application/x-www-form-urlencoded` - an endpoint that parses form
+bodies reads `text/plain` JSON as empty), then reads `read_url` again.
+Quote bytes that appear **only in the read after**: the gate orders the two
+reads against the write and requires the same resource, so quoting the
+pre-write state or a different page proves nothing. Without `read_url` the
+class stops at a candidate, however unprotected the form is.
+
 ## GET endpoints
 
 State changes on GET are CSRF by default (img tag = request). Record any

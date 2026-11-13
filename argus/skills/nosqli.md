@@ -4,6 +4,8 @@
 MongoDB is the classic: `req.body` passed straight into `findOne`/`find`.
 Signals: 24-hex ids (`ObjectId`), JSON APIs, `$`-operator behavior.
 
+`probe_nosqli(url, data, param)` replaces the parameter with `$ne`/`$gt`/`$regex` operator documents and compares against the baseline. The operator must have CHANGED the answer - an access path or an extraction path - because a public JSON listing satisfies everything else.
+
 ## Detection
 
 Send the same request with the value replaced by an object:

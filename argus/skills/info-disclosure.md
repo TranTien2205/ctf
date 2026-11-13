@@ -3,6 +3,8 @@
 **When:** verbose errors, debug routes, backup files, `.git`, comments,
 directory listings, stack traces, version banners, API keys in JS.
 
+`probe_disclosure(base)` requests the usual leak paths (`.git/HEAD`, `.env`, source maps, debug endpoints) in one pass. A placeholder is not a credential: `password=changeme` does not grade.
+
 ## High-yield checks (few requests, read the content)
 
 - `robots.txt` + `sitemap.xml` (fingerprint already pulls these)

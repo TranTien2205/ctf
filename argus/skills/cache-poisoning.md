@@ -4,6 +4,18 @@
 Cloudflare). Signals: `Age`, `X-Cache`, `CF-RAY`, `Via` headers, static
 caching of dynamic-ish pages.
 
+`probe_cache` runs this sequence for you: a poisoning attempt with one
+canary, a clean fetch, a reflection check with a second canary, then the
+path-confusion suffix test.
+
+Read its answer carefully, because two different outcomes used to look
+alike. "reflected but not cached" means the header is keyed or there is no
+shared cache - a defence. **"undecided" means the resource was already
+served from an entry that predates the probe**, so nothing it sent could
+reach the cache and the header was never given a chance. That is the common
+case on a live target. Do not read it as keyed: try a resource nobody has
+fetched yet, or wait for the entry to expire.
+
 ## Unkeyed input -> reflected poison
 
 1. Baseline: GET the page, note a unique marker (`argus<rand>`).

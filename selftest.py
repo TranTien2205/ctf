@@ -1052,6 +1052,46 @@ def _doc_consistency() -> None:
           f"{sorted(oversized)[:6]} - an archive or a megabyte of binary in "
           "the history can only be removed by rewriting it")
 
+    # 8. a methodology module that teaches a class names the tool that
+    #    drives it.
+    #
+    #    `load_skill` puts these in front of the model when the signal points
+    #    at a class, and INDEX.md says the module name resolves to a matrix
+    #    class directly or through an alias - so the mapping is computable
+    #    and the denominator is the class -> tool table, not whatever the
+    #    module happens to mention. Ten of the twenty-four class modules
+    #    named no tool of their class at all: an agent reading `ssrf.md` on
+    #    an SSRF signal was taught the methodology and never told
+    #    `probe_ssrf` exists. Nothing noticed, because the only check here
+    #    was that a named tool is real - never that the right one is named.
+    from argus.decide import CLASS_TOOL_CHAIN, PROBE_CLASS
+
+    drivers: dict[str, set] = {}
+    for tool, klass in PROBE_CLASS.items():
+        drivers.setdefault(klass, set()).add(tool)
+    for klass, chain in CLASS_TOOL_CHAIN.items():
+        drivers.setdefault(klass, set()).update(chain)
+    silent, module_count = [], 0
+    for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
+        if fp.name == "INDEX.md":
+            continue
+        spec = proof.spec_for(fp.stem)
+        if spec is None:          # methodology only, by design
+            continue
+        module_count += 1
+        wanted = drivers.get(spec.vuln_class, set())
+        if not wanted:            # a class no tool drives, e.g. dos
+            continue
+        body = fp.read_text(encoding="utf-8")
+        if not any(tool in body for tool in wanted):
+            silent.append(f"{fp.name} ({spec.vuln_class}: "
+                          f"{sorted(wanted)[0]})")
+    check(f"every class module names its own tool ({module_count} modules)",
+          not silent,
+          f"{silent} - the module teaches the class and never names the tool "
+          "that drives it, so the agent reading it does not learn the tool "
+          "exists")
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "

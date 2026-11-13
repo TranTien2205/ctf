@@ -915,6 +915,32 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The modules the model reads were out of step with the probes
+- `load_skill` puts a methodology module in front of the model when the
+  signal points at a class, so stale guidance there costs findings directly.
+  Four probes changed contract in this session - `probe_csrf` and
+  `probe_massassign` gained the `read_url` read-back, `probe_enum` repeats
+  its differential, `probe_xfh` records the control - and six modules still
+  taught the old shape. An agent following `csrf.md` would have stopped at a
+  candidate on a class that is now provable, because nothing told it to pass
+  `read_url` or that the probe sends the foreign Origin for it. All six say
+  what the requirement turns on now, including `probe_cache`'s new
+  `undecided` answer, which must not be read as "the header is keyed".
+- Then the general case, measured rather than assumed: **ten of the
+  twenty-four class modules named no tool of their class at all.** An agent
+  reading `ssrf.md` on an SSRF signal was taught the methodology and never
+  told `probe_ssrf` exists; the same for `idor`, `nosqli`, `race-condition`,
+  `websocket`, `file-upload`, `prototype-pollution`, `info-disclosure`,
+  `deserialization` and `logic-flaw`. Nothing noticed because the only check
+  here was that a named tool is real - never that the right one is named.
+  Each now carries one line: the tool, and the thing about the requirement
+  it turns on.
+- The gate holds it, with the denominator taken from the class -> tool table
+  rather than from what a module happens to mention. `INDEX.md` already
+  states that a module name resolves to a matrix class directly or through
+  an alias, so the mapping was computable all along; the three
+  methodology-only modules it names carry no class and are skipped.
+
 - `deserialize` is excluded from the live agreement table for a stated
   reason, and `race` sets the precedent for what that obliges: assert both
   directions where no lab is involved. It already had both - the existing
@@ -1024,7 +1050,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 150 offline checks, including a documentation
+- `python selftest.py`: 151 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

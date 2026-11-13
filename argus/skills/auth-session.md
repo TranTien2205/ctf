@@ -53,8 +53,15 @@ formats.
 
 `probe_massassign` POSTs the JSON template plus privilege fields the form
 never sends (`role`, `is_admin`, `admin`, `verified`). An injected field
-appearing in the response means the server binds untrusted input - then
-read the object back: persisting IS the proof (see `logic-flaw`).
+appearing in the response means the server binds untrusted input - and that
+is only a candidate, because a write echoing its own input proves it was
+accepted, not that it was stored.
+
+Pass `read_url` (the base the created object is served from; the id in the
+write's response is appended) and the probe does the read-back for you.
+Quote the privileged field **and its value** as that read returns it - e.g.
+`"role": "admin"` - not the response at large: the gate matches the pair the
+write sent and requires that value absent from the read's own request.
 
 ## Severity guide
 

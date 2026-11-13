@@ -4,6 +4,8 @@
 JSON. Signals: `Object.assign`, `_.merge`, `deepmerge`, `qs` parsing into
 nested objects, settings/preferences update endpoints.
 
+`probe_ppoll(pollute_url, check_url)` merges a marker under `__proto__` (and `constructor.prototype`, the classic filter bypass) then reads a different object back. Quote the MARKER, not the line around it: the gate asks that the excerpt appear verbatim in the polluting request, where the surrounding markup is not.
+
 ## Detect (harmless first)
 
 Pollute a harmless property, then READ it back somewhere it surfaces:

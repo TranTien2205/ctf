@@ -3,6 +3,8 @@
 **When:** a cookie, param, body or uploaded file is deserialized server-side.
 Recognize the formats BEFORE attacking:
 
+`probe_deserialize(url, param)` sends gadget payloads for each ecosystem and reports the parser errors they raise. A parser error is a SURFACE, not execution: the class is proven the way rce is, so the gadget must carry `id; echo <nonce>` and the response must return the identity line AND that nonce.
+
 | Bytes | Format |
 |---|---|
 | `rO0AB` (base64) / `\xAC\xED\x00\x05` | Java serialization |

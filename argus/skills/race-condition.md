@@ -4,6 +4,8 @@
 redeem, balance transfer, one-time token, vote/like limits, withdraw/spend,
 seat/quota allocation, file upload uniqueness.
 
+`probe_race(url, method, data, n)` fires a burst and records `ts` plus `elapsed_ms` per request. The refusal is what shows there was a limit: two overlapping wins AND a serial attempt afterwards refused with a spent-style status, not a throttle.
+
 ## The measurement that matters
 
 A race is proven by OVERLAP, not by count. Send N near-simultaneous

@@ -9,6 +9,14 @@ attacker's host.
 `probe_xfh` sends a canary `X-Forwarded-Host` and reports where it lands;
 with `restricted` it also tests the X-Original-URL/X-Rewrite-URL bypass.
 
+Reflection alone is a candidate. `restricted` is the only route to `proven`,
+because the class wants the PAIR - the restricted resource served with the
+header and refused without it - and that branch also records the control the
+gate needs (the same request, no ACL header). Pass a path or a full URL,
+either works. For the rewrite variant the two paths necessarily differ: you
+ask an allowed path and the header names the forbidden one, so cite the
+refusal of the resource the bypass served, not of the path you asked for.
+
 ## First probes
 
 1. `X-Forwarded-Host: canary.invalid` - reflected into body/Location?

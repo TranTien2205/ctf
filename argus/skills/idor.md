@@ -4,6 +4,8 @@
 check that the caller owns it. Params: `/users/123`, `?doc_id=`, `account`,
 `order`, `invoice`, `file`, numeric ids, uuids, hashes of ids.
 
+`probe_idor(url)` varies the object reference and compares what comes back. The proof is another subject's data, so quote a field that belongs to the other object - not a shared page that both ids render.
+
 ## The only honest test
 
 You need TWO identities (or one identity plus an unauthenticated request):

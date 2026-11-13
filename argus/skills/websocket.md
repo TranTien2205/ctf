@@ -4,6 +4,8 @@
 live features (chat, feeds, games, collab). HTTP tools can't speak the
 channel directly - map the handshake first, then reason about the protocol.
 
+`probe_websocket(url)` opens a real RFC 6455 handshake with a foreign `Origin` and reads one frame back. Three things have to hold: the upgrade succeeded, the Origin was foreign and unchecked, and the socket answered - a refused upgrade is the defence working.
+
 ## Handshake checks (http_request CAN do this)
 
 1. GET the ws endpoint with `Upgrade: websocket`, `Connection: Upgrade`,

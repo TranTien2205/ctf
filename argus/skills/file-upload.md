@@ -3,6 +3,8 @@
 **When:** any upload input. The two questions: (1) can you store a file the
 server will execute or serve dangerously? (2) where is it served from?
 
+`probe_upload(url)` walks the type/extension ladder and, when the upload is accepted, fetches the stored file back. The read-back is the proof: the class needs the same host, the upload accepted, and the fetch after it showing the file served as something a browser runs.
+
 ## Map the checks first
 
 Upload a benign canary (`argus<rand>.txt`, content `argus<rand>`) and find

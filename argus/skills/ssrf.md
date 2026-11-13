@@ -4,6 +4,8 @@
 `callback=`, `webhook`, "import from URL", PDF/image renderers, admin bots,
 avatar-by-URL, RSS importers, file-upload-from-link.
 
+`probe_ssrf(url, param)` walks the internal-target ladder (loopback, link-local metadata, decimal/IPv6 encodings, redirect chains). The class is capped at `candidate` here on purpose - proving it needs an out-of-band collector the target can reach, and none ships with this package.
+
 ## Detect
 
 1. Point the parameter at a controlled endpoint you can observe. In-scope

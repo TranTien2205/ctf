@@ -4,6 +4,8 @@
 or lets steps be skipped/replayed. No signature pattern - this is why
 scanners miss it and agents find it.
 
+This module resolves to the `csrf` class (it is one of its aliases), so `probe_csrf(url, method, data, read_url)` is the tool, and the requirement is the same four things: the write succeeded, carried no token, was sent cross-origin, and changed what a read of the SAME resource returns - bracketed before and after.
+
 ## The five durable patterns
 
 1. **Client-side enforcement** - price, quantity, role, `hidden` fields

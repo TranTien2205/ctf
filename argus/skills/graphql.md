@@ -3,6 +3,11 @@
 **When:** a single endpoint taking a query document - `/graphql`, `/gql`,
 `/api/graphql`, or any POST with `{"query": "..."}`.
 
+`graphql_introspect(url)` sends the standard introspection document and
+falls back to `GET ?query=` - many servers accept either - and summarises
+the schema it gets back. A disabled endpoint or an error body is reported as
+negative evidence, which is the answer you want recorded too.
+
 ## Recon: introspection
 
 ```graphql

@@ -10,9 +10,14 @@ usernames. Any response delta — "unknown user" vs "wrong password",
 different status/length/timing, a captcha that only appears for real
 accounts — lets an attacker harvest a valid-user list.
 
-`probe_enum(url, data, param)` automates the differential. It is a lead:
-confirm a hit is a real account (password-reset response, profile fetch)
-before recording.
+`probe_enum(url, data, param)` automates the differential and then repeats
+it, because the class requires each answer to be observed more than once -
+one difference is a coincidence, a repeated one is a channel. It says so
+when an answer does not reproduce; treat that as noise, not an oracle.
+
+Still confirm a hit is a real account (password-reset response, profile
+fetch) before recording. Cite the first and the repeat of BOTH answers: the
+requirement is a repeated difference, not a single one.
 
 Other enumeration channels worth one request each:
 
