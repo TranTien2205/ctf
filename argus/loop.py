@@ -335,7 +335,19 @@ class AgentLoop:
                            else "single",
                            "llm_calls": self.llm.calls,
                            "llm_tokens": self._token_stats(),
-                           "llm_cost": self._cost_stats()}))
+                           "llm_cost": self._cost_stats(),
+                           # The terminal error belonged in the artifact and
+                           # only ever reached agent.log and this function's
+                           # return value. A run that died on its first API
+                           # call produced a SEALED session that `verify`
+                           # calls OK, with findings: [], grades: {},
+                           # requests: 0 and cost 0.0 - indistinguishable
+                           # from a clean run that found nothing unless the
+                           # reader opens the log. Measured: an
+                           # `Anthropic API error 400` run wrote exactly
+                           # that. `compare` reads summary.json, so such a
+                           # run folded into an arm's median as a trial.
+                           "error": self._last_error or None}))
             except Exception as exc:
                 # a render failure must not swallow the run result or the
                 # seal below - the transcript is still intact evidence

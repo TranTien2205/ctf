@@ -451,3 +451,50 @@ def test_compare_does_not_crash_on_a_dir_with_no_summary(tmp_path, capsys):
     capsys.readouterr()
     assert main(["compare", str(a), str(b)]) == 0
     assert "findings" in capsys.readouterr().out
+
+
+def test_by_arm_excludes_a_trial_that_ended_in_an_error(tmp_path, capsys):
+    """A run that died is not a measurement.
+
+    Measured on a real failed run: an `Anthropic API error 400` on the first
+    call produced a SEALED session that `argus verify` calls OK, carrying
+    `findings: []`, `grades: {}`, `requests: 0` and `cost: 0.0` - and the
+    terminal error reached only `agent.log`. `compare` reads summary.json,
+    so that run folded into its arm as a trial with zero proven: paired with
+    one real trial that found four, `median_low([0, 4])` reported **0**.
+
+    It is excluded and NAMED now. Dropping it silently would be the same
+    defect one level up.
+    """
+    dead = _fake_session(tmp_path, "single", 1, proven=0, requests=0)
+    live = _fake_session(tmp_path, "single", 2, proven=4, requests=61)
+    payload = json.loads((dead / "summary.json").read_text(encoding="utf-8"))
+    payload["error"] = "Anthropic API error 400: invalid_request_error"
+    (dead / "summary.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", str(dead), str(live)]) == 0
+    cap = capsys.readouterr()
+    assert "ended in an error" in cap.err
+    assert "Anthropic API error 400" in cap.err
+    # the label must say a trial was dropped, not just report a smaller n
+    assert "1 failed" in cap.out, cap.out
+    line = next(ln for ln in cap.out.splitlines()
+                if ln.startswith("proven findings"))
+    assert "4" in line and not line.split()[2:3] == ["0"], line
+
+
+def test_a_run_that_dies_records_the_error_in_its_summary():
+    """The artifact said nothing was wrong.
+
+    `_last_error` reached `agent.log` and the loop's return value, and never
+    `summary.json` - so a run that never completed one API call was
+    indistinguishable from a clean run that found nothing, for any reader
+    who did not open the log. `compare`, `sessions` and the report all read
+    summary.json.
+    """
+    import inspect
+    from argus import loop as loop_mod
+    src = inspect.getsource(loop_mod)
+    assert '"error": self._last_error or None}))' in src, (
+        "the summary extra must carry the terminal error")

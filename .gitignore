@@ -36,3 +36,8 @@ cache/
 solved/
 tools/
 /*.tar.gz
+
+# Baseline experiment output (docs/EXPERIMENTS.md writes exp/single-$i,
+# exp/team-$i). Session dirs are runtime output, same as sessions/ above -
+# the numbers go in the write-up, the transcripts stay local.
+exp/

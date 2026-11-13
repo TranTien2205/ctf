@@ -925,6 +925,27 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### A run that died looked exactly like a run that found nothing
+- Running the baselines produced the finding, and it is the thesis's own
+  claim turned on itself. The first trial stopped on
+  `Anthropic API error 400` before a single successful call, and the session
+  it left behind was **sealed, verifying** (`argus verify` prints OK) and
+  carried `findings: []`, `grades: {}`, `requests: 0`, `llm_calls: 0` and
+  `cost: 0.0`. The terminal error reached `agent.log` and the loop's return
+  value - **never `summary.json`**. For any reader who did not open the log,
+  a run that never started was indistinguishable from a clean run that found
+  nothing. The artifact did not overstate; it understated by omission, which
+  the promise does not cover and should.
+- `compare`, `sessions` and the report all read `summary.json`, so such a
+  run folded into an arm as a legitimate trial with zero proven. Measured:
+  paired with one real trial that found four, `median_low([0, 4])` reported
+  **0** - the failed run halved the arm. The summary records the error now,
+  `compare --by-arm` excludes those trials from every median, and it NAMES
+  them on stderr with the error text and marks the arm `(n=1, 1 failed)`.
+  Dropping a trial silently would be the same defect one level up.
+- The error survives a re-render: it is not in the renderer's recomputed-key
+  set, so `argus report` on a failed session carries it forward.
+
 ### Two promises about dependencies that nothing kept
 - `AGENTS.md` says "No new runtime dependencies without strong cause" and
   `CLAUDE.md` says an engagement should not fail on a pip install. Both were
@@ -1202,7 +1223,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 605 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 607 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

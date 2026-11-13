@@ -904,6 +904,11 @@ def main(argv: list[str] | None = None) -> int:
                 "tokens": _tok if isinstance(_tok, dict) else {},
                 "cost": s.get("llm_cost")
                         if isinstance(s.get("llm_cost"), dict) else {},
+                # A run that died on its first API call used to look like a
+                # clean run that found nothing: findings 0, grades {},
+                # requests 0, cost 0.0. It is not a trial, and averaging it
+                # drags an arm's median toward a run that never happened.
+                "error": str(s.get("error") or ""),
                 "workers": len(agents),
                 "version": s.get("argus_version") or "",
                 "host": _host_of(d),
@@ -1586,8 +1591,18 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
         return out
 
     arms: dict[str, list[dict]] = {}
+    failed: dict[str, list[str]] = {}
     for d in dirs:
-        arms.setdefault(_arm_of(d), []).append(_flatten(summarise(d)))
+        row = _flatten(summarise(d))
+        if row.get("error"):
+            # Excluded from the medians and NAMED - dropping a trial
+            # silently would be the same defect one level up.
+            failed.setdefault(_arm_of(d), []).append(
+                f"{row.get('dir')}: {row['error'][:60]}")
+            continue
+        arms.setdefault(_arm_of(d), []).append(row)
+    for arm in failed:
+        arms.setdefault(arm, [])
     if not arms:
         print("compare --by-arm needs at least one session dir")
         return 2
@@ -1624,6 +1639,14 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
               "They count toward N but contribute no metric, which skews "
               "every median in that arm", file=sys.stderr)
 
+    if failed:
+        for arm, rows in sorted(failed.items()):
+            print(f"warning: {arm}: {len(rows)} trial(s) ended in an error "
+                  f"and are excluded from the medians - a run that died is "
+                  f"not a measurement", file=sys.stderr)
+            for row in rows[:3]:
+                print(f"           {row}", file=sys.stderr)
+
     names = sorted(arms)
     if csv:
         print("arm,n,metric,median,min,max")
@@ -1636,9 +1659,14 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
                       f"{statistics.median_low(vals)},{min(vals)},{max(vals)}")
         return 0
 
-    width = max(26, max(len(a) for a in names) + 12)
+    width = max(26, max(len(a) for a in names) + 18)
+    def _label(arm: str) -> str:
+        bad = len(failed.get(arm, ()))
+        return (f"{arm} (n={len(arms[arm])}"
+                + (f", {bad} failed" if bad else "") + ")")
+
     print(f"{'metric':<26}" + "".join(
-        f"{a + ' (n=' + str(len(arms[a])) + ')':<{width}}" for a in names))
+        f"{_label(a):<{width}}" for a in names))
     print("-" * (26 + width * len(names)))
     for key, label, higher in _ARM_METRICS:
         cells = []
