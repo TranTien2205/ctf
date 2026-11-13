@@ -363,3 +363,64 @@ def test_raw_wire_redaction_is_not_defeated_by_the_header_name():
     assert line_of("Transfer-Encoding: chunked") == "Transfer-Encoding: chunked"
     assert line_of("Content-Length: 6") == "Content-Length: 6"
     assert line_of("X-Request-Id: abc-123") == "X-Request-Id: abc-123"
+
+
+def test_header_name_whitespace_does_not_defeat_redaction():
+    """The sibling of the fix above, which that fix did not check.
+
+    `_redact_headers` tested `ks.lower() in _SENSITIVE_REQ_HEADERS`, and
+    these names are model-supplied: `"Authorization "` lowercases to
+    `"authorization "`, which is not in the set, so a live Bearer token
+    persisted into the transcript verbatim. The recorded dict is what gets
+    persisted whether or not httpx normalises the wire.
+
+    This is the same class as the `": "` split one function above - found
+    only because the question was asked a second time, one function over,
+    after the first fix shipped. That is the seventh half-fix in this
+    stretch and the second in my own work.
+    """
+    from argus.httpclient import _REDACTED, _redact_headers
+
+    for name in ("Authorization", " Authorization", "Authorization ",
+                 "Authorization\t", "AUTHORIZATION", "\tCookie "):
+        out = _redact_headers({name: "Bearer live-tok-9"}, set())
+        rendered = str(out)
+        assert "live-tok-9" not in rendered, (name, out)
+        assert _REDACTED in rendered, (name, out)
+        # the KEY keeps its original spelling: an audit must show exactly
+        # what was sent, a malformed name included
+        assert name in out, (name, out)
+
+    # a benign header is untouched, or the redaction eats the evidence
+    assert _redact_headers({"X-Request-Id": "abc-123"}, set()) == {
+        "X-Request-Id": "abc-123"}
+    assert _redact_headers({"Content-Length": "6"}, set()) == {
+        "Content-Length": "6"}
+
+
+def test_a_cookie_part_with_no_equals_is_redacted_whole():
+    """Found by the case above being more adversarial than its own fix.
+
+    The cookie branch kept any part without `=` as-is, on the reasoning
+    that a bare part is a Set-Cookie attribute (`Secure`, `HttpOnly`) worth
+    preserving. True for those, and false for the case that matters:
+    `Cookie: live-session-token` carries no `=`, so nothing was dropped and
+    the credential persisted verbatim.
+    """
+    from argus.httpclient import _REDACTED, _redact_header_value
+
+    for value, secret in (("live-session-token", "live-session-token"),
+                          ("sid=abc9; live-bare-token", "live-bare-token"),
+                          ("sid=abc9", "abc9")):
+        out = _redact_header_value("Cookie", value)
+        assert secret not in out, (value, out)
+        assert _REDACTED in out, (value, out)
+
+    # the pair NAMES stay visible - the audit still shows the request was
+    # authenticated and with which cookie
+    assert _redact_header_value("Cookie", "sid=abc9").startswith("sid=")
+
+    # ...and Set-Cookie attributes survive, because they are the evidence
+    # for the cookie-hygiene class the lab plants
+    attrs = _redact_header_value("Set-Cookie", "sid=abc9; HttpOnly; Secure")
+    assert "HttpOnly" in attrs and "Secure" in attrs and "abc9" not in attrs

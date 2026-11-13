@@ -76,9 +76,25 @@ def _redact_header_value(name: str, value: str) -> str:
         scheme = value.split(" ", 1)[0]
         return f"{scheme} {_REDACTED}" if " " in value else _REDACTED
     if ln in ("cookie", "set-cookie"):
-        return "; ".join(
-            p if "=" not in p else p.split("=", 1)[0] + "=" + _REDACTED
-            for p in value.split("; "))
+        # A part with no `=` is redacted WHOLE. The old form kept it as-is
+        # on the reasoning that a bare part is a Set-Cookie attribute
+        # (`Secure`, `HttpOnly`) worth preserving - true for those, and
+        # false for the case that matters: `Cookie: live-session-token`
+        # carries no `=`, so nothing was dropped and the credential
+        # persisted verbatim. An attribute is a short known word; anything
+        # else opaque in that position is treated as the secret it may be.
+        # Found by a test case that was more adversarial than the fix it
+        # was written for.
+        _ATTRS = {"secure", "httponly", "partitioned"}
+        parts = []
+        for p in value.split("; "):
+            if "=" in p:
+                parts.append(p.split("=", 1)[0] + "=" + _REDACTED)
+            elif p.strip().lower() in _ATTRS:
+                parts.append(p)
+            else:
+                parts.append(_REDACTED)
+        return "; ".join(parts)
     return _REDACTED
 
 
@@ -90,10 +106,23 @@ def _redact_headers(headers: dict, secret_values: set[str]) -> dict:
         # record path and mask the real httpx error
         ks = k if isinstance(k, str) else str(k)
         vs = v if isinstance(v, str) else str(v)
-        if ks.lower() in _SENSITIVE_REQ_HEADERS \
-                or ks.lower() in _SENSITIVE_RESP_HEADERS \
+        # `.strip()` before the membership test, because these names are
+        # model-supplied and whitespace defeated it: `"Authorization "`
+        # lowercases to `"authorization "`, which is not in the set, so a
+        # live Bearer token persisted into the transcript verbatim. Same
+        # class as the `": "` split one function above, which was fixed
+        # first without checking this one - the recorded dict is what gets
+        # persisted whether or not httpx normalises the wire.
+        #
+        # The KEY keeps its original spelling in the artifact: the audit
+        # should show exactly what was sent, including a malformed name.
+        # Only the value is replaced.
+        name = ks.strip()
+        low = name.lower()
+        if low in _SENSITIVE_REQ_HEADERS \
+                or low in _SENSITIVE_RESP_HEADERS \
                 or vs in secret_values:
-            out[ks] = _redact_header_value(ks, vs)
+            out[ks] = _redact_header_value(name, vs)
         else:
             out[ks] = vs
     return out
