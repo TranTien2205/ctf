@@ -384,3 +384,22 @@ def test_worker_crash_does_not_kill_team(tmp_path, lab_url):
     agent = result["agents"]["recon-1"]
     assert agent["status"] == "done"
     assert "exploded" in (agent.get("error") or "")
+
+
+def test_max_workers_counts_workers_not_lead(tmp_path, lab_url):
+    """--max-workers caps *worker* concurrency; the lead is the
+    coordinator and must not consume a worker slot. With cap=1 a worker
+    still spawns alongside the lead; the second worker is refused."""
+    cfg = Config(target=lab_url, allow_private=True,
+                 session_dir=tmp_path, max_turns=5, max_requests=50,
+                 max_time_s=60, rate_rps=0)
+    team = TeamRun(cfg, llm_factory=lambda role, name: ScriptedClient([]),
+                   quiet=True, n_recon=0, n_exploit=0, max_workers=1)
+    # register-only start: keeps agents "running" so the tally is exact
+    team._start_worker = (
+        lambda name, card, task: team.board.register(name, card.name, task))
+    team.board.register("lead", "lead", "coordinate")
+    first = team._spawn_guarded("recon", "t")
+    assert "spawned" in first                       # lead not counted
+    second = team._spawn_guarded("exploit", "t")
+    assert "max_workers" in second.get("error", "")

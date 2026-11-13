@@ -54,7 +54,6 @@ class TeamRun:
                  max_workers: int = 6):
         self.cfg = cfg
         self.quiet = quiet
-        self.n_report = n_report
         self.max_workers = max_workers
         self.scope = ScopeGuard(
             cfg.target, extra_hosts=cfg.scope_hosts,
@@ -80,7 +79,8 @@ class TeamRun:
         self._results: dict[str, dict] = {}
         self._lock = threading.Lock()
         self._counts = {"recon": 0, "exploit": 0, "report": 0}
-        self._initial = {"recon": max(0, n_recon), "exploit": max(0, n_exploit)}
+        self._initial = {"recon": max(0, n_recon), "exploit": max(0, n_exploit),
+                         "report": max(0, n_report)}
 
     def _resume_note(self) -> str:
         """When resuming, workers must know prior findings exist - the
@@ -110,8 +110,11 @@ class TeamRun:
             return {"error": f"role must be one of "
                              f"{[n for n, c in CARDS.items() if c.worker]}"}
         with self._lock:
+            # the cap counts workers only - the lead is the coordinator and
+            # must not starve the pool it manages
             if len([n for n, a in self.board.agents().items()
-                    if a.get("status") == "running"]) >= self.max_workers:
+                    if a.get("status") == "running"
+                    and a.get("role") != "lead"]) >= self.max_workers:
                 return {"error": f"max_workers ({self.max_workers}) reached"}
             self._counts[role] += 1
             name = f"{role}-{self._counts[role]}"
@@ -214,12 +217,15 @@ class TeamRun:
         cfg = self.cfg
         started = time.monotonic()
         self._start_lead()
-        for _ in range(self._initial["recon"]):
-            self._spawn_guarded("recon", _DEFAULT_TASKS["recon"])
-        for _ in range(self._initial["exploit"]):
-            self._spawn_guarded("exploit", _DEFAULT_TASKS["exploit"])
-        for _ in range(max(0, self.n_report)):
-            self._spawn_guarded("report", _DEFAULT_TASKS["report"])
+        for role in ("recon", "exploit", "report"):
+            for _ in range(self._initial.get(role, 0)):
+                res = self._spawn_guarded(role, _DEFAULT_TASKS[role])
+                if "error" in res:
+                    # a dropped initial spawn ran silently before - the
+                    # operator sized --max-workers and deserves to know the
+                    # team came up short
+                    print(f"[argus] initial {role} worker not started: "
+                          f"{res['error']}", file=sys.stderr)
 
         deadline = started + cfg.max_time_s
         total_req_cap = cfg.max_requests * max(2, self.max_workers)

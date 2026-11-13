@@ -177,6 +177,10 @@ def main(argv: list[str] | None = None) -> int:
                           ("--max-workers", args.max_workers)):
             if val < 0:
                 raise SystemExit(f"{flag} must be >= 0")
+        if args.max_workers < 1:
+            # zero workers = no probe tools, no record_finding anywhere -
+            # the lead alone structurally cannot produce a finding
+            raise SystemExit("--max-workers must be >= 1")
         if args.exploit <= 0:
             # the lead card holds no record_finding - unless it spawns an
             # exploit worker itself, the run structurally records nothing
