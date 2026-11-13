@@ -325,6 +325,16 @@ _COOKIE_FRAMEWORKS = {
 }
 
 
+def _cookie_framework(name: str) -> str | None:
+    """Cookie name -> framework hint. Exact match wins over prefix:
+    'sessionid' must hit its own row, not the earlier '_session' entry."""
+    name = str(name or "").lower()
+    return _COOKIE_FRAMEWORKS.get(name) or next(
+        (fw for tok, fw in _COOKIE_FRAMEWORKS.items()
+         if name != tok and name.startswith(tok.rstrip("_"))),
+        None)
+
+
 def fingerprint(ctx: Context, url: str) -> dict:
     res = ctx.client.send("GET", url, tool="fingerprint", note="baseline GET")
     headers = {k.lower(): v for k, v in (res.get("headers") or {}).items()}
@@ -368,10 +378,7 @@ def fingerprint(ctx: Context, url: str) -> dict:
     if "x-nextjs-cache" in headers or "_next/" in res.get("body", ""):
         stack_hints.append("framework: next.js (hint)")
     for c in cookies:
-        name = c["name"].lower()
-        hint = next((fw for tok, fw in _COOKIE_FRAMEWORKS.items()
-                     if name == tok or name.startswith(tok.rstrip("_"))),
-                    None)
+        hint = _cookie_framework(c["name"])
         if hint:
             stack_hints.append(f"framework: {hint} (cookie '{c['name']}')")
     # passive WAF/CDN read from the SAME response - no extra requests

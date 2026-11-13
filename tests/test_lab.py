@@ -64,6 +64,15 @@ def test_js_endpoint_regex_generic_clients():
         assert got == want, (src, got)
 
 
+def test_cookie_framework_exact_match_wins():
+    """'sessionid' must resolve to its own row, not the earlier
+    '_session' prefix entry (dict order made the prefix shadow it)."""
+    assert web._cookie_framework("sessionid") == "django/flask-style"
+    assert web._cookie_framework("PHPSESSID") == "php"
+    assert web._cookie_framework("remember_web_ab12") == "rails/devise"
+    assert web._cookie_framework("random") is None
+
+
 def test_reflection_probe(lab_url, ctx):
     out = probes.probe_reflection(ctx, lab_url + "/search?q=x", "q")
     assert out["reflected"]
