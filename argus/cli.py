@@ -485,6 +485,23 @@ def main(argv: list[str] | None = None) -> int:
                 raise SystemExit(f"{fp} is not a findings list")
             return {_dkey(f): f for f in rows if isinstance(f, dict)}
         before, after = _load(args.before), _load(args.after)
+        # a diff across DIFFERENT base hosts is meaningless by
+        # construction - every finding reads as fixed+new. Retest diffs
+        # are deliberately port-insensitive, but a host mismatch is
+        # operator error, not a retest.
+        def _meta_host(d):
+            try:
+                m = json.loads((Path(d) / "meta.json")
+                               .read_text(encoding="utf-8"))
+                t = m.get("target") if isinstance(m, dict) else None
+                return _up.urlparse(str(t or "")).hostname
+            except Exception:
+                return None
+        hb, ha = _meta_host(args.before), _meta_host(args.after)
+        if hb and ha and hb.lower() != ha.lower():
+            print(f"warning: targets differ ({hb} vs {ha}) - a diff "
+                  "across hosts reads every finding as fixed+new; "
+                  "compare retests on the same host", file=sys.stderr)
         # a diff over tampered findings is misleading - flag sessions whose
         # stored claims fail evidence re-validation (same check as
         # `findings`/`report`)
