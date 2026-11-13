@@ -77,6 +77,7 @@ parameter names. A `—` means no tool covers it yet — go to the depth file.
 | A discrete log in a **small** group or with a bounded exponent | Baby-step giant-step | the order is huge and unfactored — out of reach above ~2**44 | `bsgs --g G --h H --p P` |
 | Two signatures sharing the same `r` | Nonce reuse → direct `d` | all `r` values are distinct | `ecdsa-nonce-reuse --in file.json` |
 | Many signatures, nonce stated or inferred **short** (128-bit `k`, 256-bit order) | Hidden Number Problem lattice | bias under ~4 bits, or fewer than about `2 * order_bits / bias_bits` signatures | `hnp-ecdsa --sigs sigs.json` |
+| An EC discrete log (Q = k·P) where **#E(F_p) == p** ("anomalous", or count is stated) | Smart / Semaev-Araki-Satoh — p-adic lift, dlog in seconds | `#E != p` — route to pohlig-hellman/bsgs instead | `python3 tools/crypto/smart_attack.py --p P --a A --b B --gx X --gy Y --qx X --qy Y --order N` |
 | Consecutive outputs of a linear generator, possibly truncated | LCG recovery (lattice when truncated) | the outputs break the LCG relation on the stated modulus — try MT or LFSR | `lcg-recover --in file.json`, `lcg-unknown-modulus`, `lcg-truncated` |
 | A raw bit keystream, a stated register width, or stated taps | LFSR reconstruction | `2*width` consecutive bits do not predict the next bit | `berlekamp-massey --in file.json`, then `lfsr-recover` / `lfsr-predict --bits ...` |
 | >=624 consecutive 32-bit outputs, or Python `random` | MT19937 state clone | fewer than 624 full words and no float or GF(2) route | `mt19937-clone --in file.json` |

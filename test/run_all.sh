@@ -102,7 +102,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/pad_oracle.py tools/ecb_oracle.py tools/gcm_nonce.py \
          tools/parity_oracle.py tools/crypto/shamir.py \
          tools/crypto/subsetsum.py tools/crypto/franklin_reiter.py \
-         tools/bleichenbacher.py \
+         tools/bleichenbacher.py tools/crypto/smart_attack.py \
          tools/forensics/usb_hid.py tools/classical_solve.py \
          tools/web/ssti_gen.py tools/meta_read.py tools/dns_query.py \
          tools/elf_info.py tools/pe_info.py tools/web/sqli_union.py \
