@@ -470,3 +470,12 @@ def test_lab_survives_garbage_content_length(lab_url):
     finally:
         s.close()
     assert b"HTTP/1.1" in resp and b" 5" not in resp.split(b"\r\n")[0]
+
+
+def test_csrf_samesite_none_is_weak():
+    """SameSite=None is as CSRF-weak as absent - browsers send it
+    cross-site by design."""
+    assert probes._weak_samesite("sess=x; SameSite=None; Secure")
+    assert probes._weak_samesite("sess=x; Path=/")
+    assert not probes._weak_samesite("sess=x; SameSite=Lax")
+    assert not probes._weak_samesite("sess=x; SameSite=Strict")

@@ -761,6 +761,13 @@ _GETSTATE_RE = re.compile(
     r"transfer|pay|order|grant|revok|reset|confirm|approve", re.I)
 
 
+def _weak_samesite(set_cookie: str) -> bool:
+    """Cookie CSRF-relevant SameSite weakness: no SameSite attribute, or
+    SameSite=None (explicitly sent cross-site). Lax/Strict protect."""
+    c = set_cookie.lower()
+    return "samesite" not in c or re.search(r"samesite=none\b", c) is not None
+
+
 def probe_csrf(ctx: Context, url: str, method: str = "GET",
                data: str | None = None) -> dict:
     """CSRF surface check: POST forms without anti-CSRF tokens plus
@@ -782,8 +789,7 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
     sc = (r.get("headers") or {}).get("set-cookie") or []
     if isinstance(sc, str):
         sc = [sc]
-    weak_cookies = [c.split("=", 1)[0] for c in sc
-                    if "samesite" not in c.lower()]
+    weak_cookies = [c.split("=", 1)[0] for c in sc if _weak_samesite(c)]
     ct_bypass = None
     if data is not None:
         p = ctx.client.send(
