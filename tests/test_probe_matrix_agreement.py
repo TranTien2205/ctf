@@ -50,6 +50,14 @@ its own two reads, so quoting the pre-write state and citing a later read
 that no longer carried it satisfied "the state changed between two reads" -
 which any site whose two reads differ can satisfy.
 
+The clean direction had the same asymmetry the proving one did - 11 entries
+against 24 - and driving the nine new classes against a measured-clean
+endpoint found the fifth defect, also in the loose direction:
+`verify_mass_assignment` accepted ANY response body as the read-back, so a
+write that merely mentioned `role` and got a 200, paired with any later
+read, proved the class. `/api/order` drops every injected field and its own
+probe says so; it graded `proven` on that endpoint's ordinary answer.
+
 Two classes are still not driven in the proving direction, each for a stated
 reason: `race` (below) and `deserialize` (the lab's `/import` returns a
 parser error and never executes, so "identity output plus the probe nonce"
@@ -123,9 +131,12 @@ VULNERABLE = [
     ("probe_ssrf", "ssrf",
      lambda c, b: probes.probe_ssrf(c, b + "/fetch?url=x", "url")),
     ("probe_xxe", "xxe", lambda c, b: probes.probe_xxe(c, b + "/xml")),
+    # the read-back the class requires: /api/register/<id> serves what the
+    # write stored, so the field is shown set rather than merely echoed
     ("probe_massassign", "massassign",
      lambda c, b: probes.probe_massassign(c, b + "/api/register",
-                                          '{"username":"newguy"}')),
+                                          '{"username":"newguy"}',
+                                          read_url=b + "/api/register")),
     ("probe_method", "method", lambda c, b: probes.probe_method(c, b + "/")),
     # `/reset` builds its form action from X-Forwarded-Host, and the edge
     # honours X-Original-URL while 403ing /admin directly - the pair the
@@ -203,7 +214,47 @@ CLEAN = [
     # not a limited one crossed
     ("probe_race", "race",
      lambda c, b: probes.probe_race(c, b + "/hello", n=6)),
+    # The clean side of the nine classes added to the proving table. Each
+    # endpoint was MEASURED clean, not assumed: this module has twice
+    # asserted a lab endpoint was clean and been wrong, so the rule is to
+    # drive it first and keep only what grades below its ceiling.
+    # `/internal/status` serves a fixed JSON body and reflects nothing
+    ("probe_reflection", "xss",
+     lambda c, b: probes.probe_reflection(c, b + "/internal/status?x=y",
+                                          "x")),
+    # `/search` echoes its term and makes no server-side fetch
+    ("probe_ssrf", "ssrf",
+     lambda c, b: probes.probe_ssrf(c, b + "/search?q=x", "q")),
+    # ...and parses no XML
+    ("probe_xxe", "xxe", lambda c, b: probes.probe_xxe(c, b + "/search")),
+    # `/api/order` echoes order/owner/total and drops every other field -
+    # a whitelist, and the direction that caught the massassign verifier
+    # accepting that endpoint's own ordinary answer as the proof
+    ("probe_massassign", "massassign",
+     lambda c, b: probes.probe_massassign(c, b + "/api/order",
+                                          '{"order":1}')),
+    # `/login2` answers every attempt with the same text; the only channel
+    # is timing, which is a lead and must not grade
+    ("probe_enum", "enum",
+     lambda c, b: probes.probe_enum(c, b + "/login2",
+                                    "username=x&password=x")),
+    # `/api/order` merges nothing into shared state
+    ("probe_ppoll", "ppoll",
+     lambda c, b: probes.probe_ppoll(c, b + "/api/order", b + "/api/order")),
+    # `/search` is not cached, so no canary can persist into a clean read
+    ("probe_cache", "cache",
+     lambda c, b: probes.probe_cache(c, b + "/search?q=x")),
+    # a write that changes nothing the read returns is not a csrf finding,
+    # however unprotected the form is
+    ("probe_csrf", "csrf",
+     lambda c, b: probes.probe_csrf(c, b + "/search", method="POST",
+                                    data="q=x",
+                                    read_url=b + "/internal/status")),
 ]
+# `method` and `xfh` have no clean case either, for the same reason as `cors`
+# below: the lab answers TRACE on every path and honours X-Original-URL
+# before it routes, so both are properties of the server rather than of an
+# endpoint. Their refusal cases are synthetic in `tests/test_proof.py`.
 # `cors` has no clean case here: the lab reflects any `Origin` with
 # credentials from the shared response helper, so every endpoint is
 # vulnerable - including `/hello`, which this module was asserting as clean
@@ -211,6 +262,13 @@ CLEAN = [
 # "filter that allows //host" bypass. Both were my guesses and both were
 # wrong, which is the layer working on its author. The synthetic refusal
 # cases for those classes live in `tests/test_proof.py`.
+
+# The coverage these tables claim, asserted below against the tables
+# themselves and against every document that states it. The first version of
+# that sentence said 23 and the tables held 24, which is the kind of number
+# this repository's doc gate exists to refuse - it just did not reach here.
+PROVING_COVERAGE = 24
+PROBED_CLASSES = 26
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
@@ -318,3 +376,42 @@ def test_both_directions_are_exercised_for_the_classes_that_have_both():
     assert {"sqli", "rce", "ssti", "lfi", "crlf", "redirect",
             "websocket", "smuggle", "nosqli", "lockout"} <= both, (
         f"classes exercised in both directions: {sorted(both)}")
+
+
+def test_the_stated_coverage_matches_the_tables_and_the_docs():
+    """The coverage sentence is a count, so something has to count it.
+
+    `docs/VERIFICATION.md`, `CHANGELOG.md`, `AGENTS.md` and this module's own
+    docstring all state "N of the M probed classes". The first draft said 23
+    while the table held 24. A number in prose that nothing checks is exactly
+    what this repository's documentation gate exists to refuse; that gate
+    counts tools, classes, flags and test totals, and does not reach a count
+    stated about a test module, so this does.
+    """
+    import re
+    from pathlib import Path
+
+    driven = {k for _, k, _ in VULNERABLE}
+    probed = set(PROBE_CLASS.values())
+    assert len(driven) == PROVING_COVERAGE, sorted(driven)
+    assert len(probed) == PROBED_CLASSES, sorted(probed)
+    # the two left out are named with a reason in the docstring above
+    assert probed - driven == {"race", "deserialize"}, probed - driven
+    for name in driven:
+        assert proof.spec_for(name) is not None, name
+
+    root = Path(__file__).resolve().parent.parent
+    pattern = re.compile(r"(\d+) of the (\d+) probed classes")
+    seen = 0
+    for rel in ("docs/VERIFICATION.md", "CHANGELOG.md", "AGENTS.md",
+                "tests/test_probe_matrix_agreement.py"):
+        path = root / rel
+        if not path.is_file():
+            continue
+        for stated, total in pattern.findall(
+                path.read_text(encoding="utf-8")):
+            seen += 1
+            assert int(stated) == PROVING_COVERAGE, f"{rel} says {stated}"
+            assert int(total) == PROBED_CLASSES, f"{rel} says of {total}"
+    # a regex that stops matching would make this pass forever on nothing
+    assert seen >= 2, "no document states the coverage any more"

@@ -798,7 +798,48 @@ somebody reading only the list.
   `probe_cache` sent its marker into an already-warm cache and recorded
   nothing carrying it - which reads as a probe regression and is a shared
   fixture. The lab has a `/cached/reset` now, and the case clears it first.
-- The proving direction now covers 23 of the 26 probed classes.
+- Then the clean direction, which the module calls the one that matters,
+  had the same asymmetry: 11 entries against the proving table's 24. Driving
+  the nine new classes against a measured-clean endpoint found a fifth
+  defect, and in the loose direction: **`verify_mass_assignment` accepted
+  any response body as the read-back.** The check "a later read shows it
+  set" asked only that the excerpt appear in some read and not in that
+  read's request - true of any ordinary answer - so a write that merely
+  *mentioned* `role` in its request and got a 200, paired with any later
+  read, proved the class. Measured: `/api/order` drops every injected field
+  and its probe says so, and massassign graded `proven` on the quote
+  `{"order": 1, "owner": "user-1", "total": 11}`. The read-back must now
+  carry the privileged field **and the value the write sent**, and that
+  value must be absent from the read's own request.
+- Closing that showed the plant had no read path at all: `_registered` was
+  written by `POST /api/register` and never served, so the only evidence the
+  field took effect was the write echoing its own input - exactly what the
+  requirement refuses. The lab serves `GET /api/register/<id>` now, on its
+  own path so the planted IDOR endpoint's 404s are unchanged, and
+  `probe_massassign` takes `read_url` to do the read-back its own note has
+  always told the reader to do by hand.
+- One more in the same area, and a reminder that a gate's history is part of
+  its design: `req_text` joins method, url, headers and body with spaces, so
+  a form body whose FIRST pair is the privileged one (`role=admin&...`) is
+  preceded by whitespace rather than `&` - and `PRIVILEGED_FIELD_RE`'s
+  boundary was `[?&]`, so form-encoded APIs were unprovable for this class.
+  Widening that boundary to whitespace makes `role=` match every ARIA
+  attribute on every HTML page, which re-opened a real bypass once and has a
+  test asserting it never happens again. So the form branch reads the request
+  BODY alone, and only when the body looks like a form rather than markup.
+- Every clean endpoint in the new entries was measured, not assumed. This
+  module has twice asserted a lab endpoint was clean and been wrong, so the
+  rule is to drive it first and keep only what grades below its ceiling.
+  `method` and `xfh` get no clean entry: the lab answers TRACE on every path
+  and honours `X-Original-URL` before it routes, so both are properties of
+  the server rather than of an endpoint, and their refusals are synthetic.
+- The coverage sentence is itself a count, and the first draft of it said 23
+  while the table held 24 - the kind of unchecked number the documentation
+  gate exists to refuse, except that gate counts tools, classes, flags and
+  test totals and does not reach a count stated about a test module. A test
+  does: it reads "N of the M probed classes" out of every document that
+  states it and asserts both numbers against the tables.
+- The proving direction now covers 24 of the 26 probed classes.
   `race` and `deserialize` are excluded with a stated reason in the module
   docstring - `/import` returns a parser error and never executes, so
   "identity output plus the probe nonce" is unobtainable against this lab,
@@ -890,7 +931,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 580 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 592 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

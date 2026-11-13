@@ -544,11 +544,19 @@ TOOL_SCHEMAS: list[dict] = [
         "Mass-assignment check on a JSON API: POSTs the template plus "
         "privilege-shaped fields (role, is_admin, admin, verified); the "
         "injected key+value appearing in the response means the server "
-        "binds untrusted fields - follow up by reading the object back.",
+        "binds untrusted fields. Pass read_url to do the read-back the "
+        "class requires: a write echoing its own input proves only that it "
+        "was accepted, and the class needs the field shown SET by a later "
+        "read. Without read_url it stops at a candidate.",
         {"url": {**_STR, "description": URL_DESC},
          "data": {**_STR, "description": "JSON POST body template"},
          "extra": {**_STR, "description": "JSON object of extra fields to "
-                                         "inject (default privilege set)"}},
+                                         "inject (default privilege set)"},
+         "read_url": {**_STR, "description": URL_DESC +
+                      " The base the created object is served from (the id "
+                      "from the write's response is appended), or a "
+                      "complete URL to read as given. Quote the privileged "
+                      "field AND its value as that read returns it"}},
         ["url", "data"],
     ),
     _schema(

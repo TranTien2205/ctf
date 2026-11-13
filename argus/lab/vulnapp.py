@@ -595,6 +595,23 @@ class Handler(BaseHTTPRequestHandler):
                     self._send(502, f"fetch error for {u}: {exc}",
                                ctype="text/plain")
 
+        elif path.startswith("/api/register/"):
+            # Reads back what POST /api/register stored. The mass-assignment
+            # plant had no read path at all: `_registered` was written and
+            # never served, so the only "evidence" the field took effect was
+            # the write echoing its own input - which is exactly what the
+            # massassign requirement refuses ("shown set by a later read").
+            # It lives on its own path rather than extending /api/user/<id>
+            # so the planted IDOR endpoint's 404s stay as they were.
+            rid = path.rsplit("/", 1)[-1]
+            rec = next((r for r in type(self)._registered
+                        if str(r.get("id")) == rid), None)
+            if rec is None:
+                self._send(404, json.dumps({"error": "no such record"}),
+                           ctype="application/json")
+            else:
+                self._send(body=json.dumps(rec), ctype="application/json")
+
         elif path.startswith("/api/user/"):
             uid = path.rsplit("/", 1)[-1]
             row = self.db.execute(

@@ -210,6 +210,10 @@ PRIVILEGED_FIELD_RE = re.compile(
     r"(?i)(?:\"(?:is_?admin|isadmin|admin|role|roles|permissions?|scopes?|"
     r"is_?staff|is_?superuser|verified|email_?verified|balance|credit|"
     r"price|discount|owner_?id|account_?type|plan|tier)\"\s*:"
+    # The boundary stays `?`/`&`: widening it to whitespace makes `role=`
+    # match every ARIA attribute on every HTML page, which re-opened a real
+    # bypass once and has a test of its own. The form-body case is handled
+    # in `_privileged_sent`, against the body alone.
     r"|[?&](?:is_admin|isAdmin|admin|role|permissions|scope|verified|"
     r"balance|price|discount|owner_id|account_type|plan|tier)=)")
 
@@ -1486,6 +1490,57 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+_PRIV_JSON_RE = re.compile(
+    r'(?i)"((?:is_?admin|isadmin|admin|role|roles|permissions?|scopes?|'
+    r'is_?staff|is_?superuser|verified|email_?verified|balance|credit|'
+    r'price|discount|owner_?id|account_?type|plan|tier))"\s*:\s*'
+    r'(?:"([^"]{1,64})"|(true|false|-?\d+(?:\.\d+)?))')
+_PRIV_FORM_RE = re.compile(
+    r'(?i)(?:^|[?&;\s])((?:is_admin|isAdmin|admin|role|permissions|scope|'
+    r'verified|balance|price|discount|owner_id|account_type|plan|tier))='
+    r'([^&;\s"]{1,64})')
+
+
+def _is_form_body(body: str) -> bool:
+    """Does this request body look like `a=1&b=2` rather than markup?
+
+    The form branch runs against the body alone and only when it looks like
+    a form, because `role=` preceded by whitespace is an ARIA attribute on
+    every HTML page - matching that re-opened a real bypass once.
+    """
+    text = (body or "").strip()
+    return bool(text) and "=" in text and "<" not in text[:400]
+
+
+def _privileged_sent(entry: dict | None) -> list[tuple[str, str]]:
+    """The privileged (field, value) pairs a request actually carried.
+
+    `PRIVILEGED_FIELD_RE` finds the field NAME and stops there, which is
+    enough to say a write attempted the escalation and not enough to say it
+    landed. Proving it landed needs the value, so the read-back can be asked
+    for that exact pair rather than for any bytes at all.
+
+    The JSON branch reads the whole request text; the form branch reads only
+    the body, and only when it looks like a form. `req_text` joins method,
+    url, headers and body with spaces, so a form body whose first pair is
+    the privileged one is preceded by whitespace - and widening the shared
+    pattern to accept that would match markup.
+    """
+    request = req_text(entry) if entry else ""
+    out = []
+    for name, quoted, bare in _PRIV_JSON_RE.findall(request):
+        value = quoted or bare
+        if name and value:
+            out.append((name, value))
+    body = str(_req(entry).get("body") or "") if entry else ""
+    if _is_form_body(body):
+        for name, value in _PRIV_FORM_RE.findall(
+                urllib.parse.unquote_plus(body)):
+            if name and value:
+                out.append((name, value))
+    return out
+
+
 def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """A privileged field the caller sent, set on the server and read back.
 
@@ -1498,14 +1553,35 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
         field = PRIVILEGED_FIELD_RE.search(request) if wrote else None
         method = str(_req(wrote).get("method") or "GET").upper() \
             if wrote else "GET"
-        sent = bool(field) and method in ("POST", "PUT", "PATCH") \
+        # one pass, not three: `_witness` runs this build on every candidate
+        # pair and the pairing is quadratic, which has already cost this
+        # module once
+        pairs = _privileged_sent(wrote)
+        sent = bool(field or pairs) \
+            and method in ("POST", "PUT", "PATCH") \
             and 200 <= status_of(wrote) < 400
-        back = bool(read) and bool(claim.excerpt) \
-            and claim.excerpt in resp_body(read) \
-            and claim.excerpt not in req_text(read)
+        # The quoted read-back has to carry the FIELD AND THE VALUE the write
+        # sent. It used to ask only that the excerpt appear in some read and
+        # not in that read's request, which any normal response body
+        # satisfies - so a write that merely MENTIONED `role` in its request
+        # and got a 200, paired with any later read, proved the class.
+        # Measured on the lab: `/api/order` drops every injected field and
+        # says so, and massassign graded `proven` on the quote
+        # `{"order": 1, "owner": "user-1", "total": 11}` - the endpoint's own
+        # ordinary answer.
+        excerpt = claim.excerpt or ""
+        low = excerpt.lower()
+        landed = next(((name, value) for name, value in pairs
+                       if name.lower() in low and value.lower() in low), None)
+        back = bool(read) and bool(excerpt) \
+            and bool(landed) \
+            and excerpt in resp_body(read) \
+            and excerpt not in req_text(read) \
+            and landed[1].lower() not in req_text(read).lower()
         return [
             _check("a privileged field was sent and accepted", sent,
-                   f"{field.group(0)} in {wrote.get('id')}, "
+                   f"{field.group(0) if field else pairs[0][0]}"
+                   f" in {wrote.get('id')}, "
                    f"{status_of(wrote)}" if sent else
                    (f"the write was refused with {status_of(wrote)}"
                     if wrote is not None and field else
@@ -1513,9 +1589,15 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
                     "able to set (role, is_admin, isAdmin, balance, verified, "
                     "owner, permissions)")),
             _check("a later read shows it set", back,
-                   f"read back in {read.get('id')}" if back else
-                   "cite the read that shows the field took effect - the write "
-                   "echoing its own input proves only that it was accepted"),
+                   f"{landed[0]}={landed[1]} read back in {read.get('id')}"
+                   if back else
+                   ("the quoted bytes carry no privileged field and value that "
+                    "the write sent - quote the field as the read returns it, "
+                    "e.g. `\"role\": \"admin\"`, not the response at large"
+                    if read is not None and pairs and not landed else
+                    "cite the read that shows the field took effect - the "
+                    "write echoing its own input proves only that it was "
+                    "accepted")),
         ]
 
     return _witness(_pairs(claim.exchanges) or [None], build, spec.required)

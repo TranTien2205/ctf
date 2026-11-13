@@ -2585,3 +2585,75 @@ def test_csrf_ordering_falls_back_to_position_without_timestamps():
     # and the reverse claim is still refused without timestamps
     v = proof.grade("csrf", "email: old@x", no_ts)
     assert v.grade != "proven", v.checks
+
+
+def test_massassign_refuses_a_read_that_does_not_carry_the_field():
+    """"A later read shows it set" asked only that SOME bytes came back.
+
+    The check required the excerpt to appear in a read and not in that
+    read's request - which any ordinary response body satisfies. Paired with
+    a write that merely MENTIONED a privileged field in its request and got
+    a 200, that proved the class. Measured on the lab: `/api/order` drops
+    every injected field and says so, and massassign graded `proven` on the
+    quote `{"order": 1, "owner": "user-1", "total": 11}` - the endpoint's
+    own ordinary answer.
+    """
+    sent = '{"order":1,"role":"admin","is_admin":true}'
+    whitelisted = [
+        _ex("r1", "POST", "http://lab/api/order",
+            '{"order": 1, "owner": "user-1", "total": 11}', ts=1),
+        _ex("r2", "GET", "http://lab/api/order/1",
+            '{"order": 1, "owner": "user-1", "total": 11}', ts=2),
+    ]
+    whitelisted[0]["request"]["body"] = sent
+    v = proof.grade("massassign", '{"order": 1, "owner": "user-1", '
+                                  '"total": 11}', whitelisted)
+    assert v.grade != "proven", v.checks
+    assert any("later read shows it set" in str(c.get("check"))
+               and not c.get("ok") for c in v.checks)
+
+    # the honest claim: the read returns the field AND the value the write
+    # sent, and the read's own request never carried them
+    bound = [
+        _ex("r1", "POST", "http://lab/api/register",
+            '{"created": {"username": "x", "role": "admin", "id": 10}}',
+            ts=1),
+        _ex("r2", "GET", "http://lab/api/register/10",
+            '{"username": "x", "role": "admin", "id": 10}', ts=2),
+    ]
+    bound[0]["request"]["body"] = '{"username":"x","role":"admin"}'
+    v = proof.grade("massassign", '"role": "admin"', bound)
+    assert v.grade == "proven", v.missing
+
+
+def test_massassign_sees_a_form_body_whose_first_pair_is_privileged():
+    """`req_text` joins the parts with spaces, so `role=admin&...` as the
+    first pair in a form body is preceded by whitespace, not by `&`.
+
+    The boundary was `[?&]`, so form-encoded APIs were unprovable for this
+    class: the write's privileged field was never found at all.
+    """
+    bound = [
+        _ex("r1", "POST", "http://lab/register", "created id=10", ts=1),
+        _ex("r2", "GET", "http://lab/register/10",
+            "username=x role=admin id=10", ts=2),
+    ]
+    bound[0]["request"]["body"] = "role=admin&username=x"
+    v = proof.grade("massassign", "role=admin id=10", bound)
+    assert v.grade == "proven", v.missing
+
+
+def test_massassign_does_not_read_an_html_role_attribute_as_a_field():
+    """The form branch reads the body, so markup posted as a body must not
+    register - `role=` after whitespace is an ARIA attribute on any page,
+    and widening the shared pattern to accept it re-opened a real bypass
+    once. See test_the_aria_role_attribute_is_not_a_subject_field.
+    """
+    html = [
+        _ex("r1", "POST", "http://lab/preview", "rendered", ts=1),
+        _ex("r2", "GET", "http://lab/preview/1",
+            '<li role=menuitem>home</li>', ts=2),
+    ]
+    html[0]["request"]["body"] = '<li role=menuitem>home</li>'
+    v = proof.grade("massassign", "<li role=menuitem>home</li>", html)
+    assert v.grade != "proven", v.checks

@@ -1371,12 +1371,22 @@ def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
 
 def probe_massassign(ctx: Context, url: str, data: str,
                      extra: str = '{"role":"admin","is_admin":true,'
-                                  '"admin":true,"verified":true}') -> dict:
+                                  '"admin":true,"verified":true}',
+                     read_url: str | None = None) -> dict:
     """Mass-assignment check: POST the body template as-is, then again with
     privilege-shaped fields the form never sends (role, is_admin, admin,
     verified). If the server echoes or stores any injected field, the
     endpoint binds untrusted input to the object model - a standard
-    privilege-escalation primitive."""
+    privilege-escalation primitive.
+
+    `read_url` is the read-back this probe's own note has always told the
+    reader to do by hand, and nothing did: a write echoing its own input
+    proves it was accepted, not that it was stored, and the massassign
+    requirement asks for "a later read shows it set". Pass the base the
+    created object is served from (e.g. /api/register) and the id seen in
+    the write's response is appended; pass a complete URL and it is read as
+    given. Without it the class stops at a candidate.
+    """
     try:
         extra_obj = _json.loads(extra or "{}")
         if not isinstance(extra_obj, dict):
@@ -1406,16 +1416,54 @@ def probe_massassign(ctx: Context, url: str, data: str,
         # it was bound/stored - not merely ignored
         if f'"{k}"' in body and _json.dumps(v) in body:
             accepted.append(k)
+    read_back = None
+    if read_url:
+        target = read_url
+        try:
+            created = _json.loads(body)
+        except (ValueError, TypeError):
+            created = None
+        # the id can sit at the top level or under a wrapper the API chose
+        oid = None
+        if isinstance(created, dict):
+            for candidate in (created, *(v for v in created.values()
+                                         if isinstance(v, dict))):
+                if candidate.get("id") is not None:
+                    oid = candidate["id"]
+                    break
+        if oid is not None and not read_url.rstrip("/").endswith(str(oid)):
+            target = read_url.rstrip("/") + "/" + str(oid)
+        g = ctx.client.send("GET", target, tool="probe_massassign",
+                            note="read-back of the created object")
+        g_body = g.get("body") or ""
+        persisted = [k for k in accepted
+                     if f'"{k}"' in g_body and _json.dumps(extra_obj[k])
+                     in g_body]
+        read_back = {"url": target, "status": g["status"],
+                     "request_id": g["request_id"],
+                     "persisted_fields": persisted}
     verdict = (
         "mass-assignment candidate: injected fields " +
         ", ".join(accepted) +
         " appear in the response - server binds untrusted fields"
         if accepted else
         "injected fields not reflected or stored - whitelist likely")
+    if accepted and read_back is not None:
+        verdict += (
+            "; the read-back shows "
+            + ", ".join(read_back["persisted_fields"])
+            + " stored - quote the field as that read returns it"
+            if read_back["persisted_fields"] else
+            f"; the read-back at {read_back['url']} "
+            f"({read_back['status']}) does NOT carry them, so they were "
+            "echoed and not stored")
     return {"verdict": verdict, "baseline_id": base["request_id"],
             "injected_id": r["request_id"], "accepted_fields": accepted,
-            "note": "confirm with a read-back (GET the created object) "
-                    "that the field persisted, not just echoed"}
+            "read_back": read_back,
+            "note": "the class needs the read-back: a write echoing its own "
+                    "input proves only that it was accepted. Pass read_url "
+                    "and quote the privileged field AND its value as the "
+                    "read returns it"}
 
 
 def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:

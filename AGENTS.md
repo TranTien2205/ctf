@@ -91,6 +91,13 @@ probe, update the lab and its test together.
   defects, including the only loose-direction hole of the lot
   (`verify_state_change` accepted the reverse of what it asked for: the
   state BEFORE the write, quoted, with a later read that no longer had it).
+  The clean table had the same asymmetry - 11 entries against 24 - and
+  closing it found a second loose-direction hole: `verify_mass_assignment`
+  accepted ANY response body as the read-back, so a write that merely
+  mentioned `role` and got a 200 proved the class on an endpoint whose own
+  probe reported a whitelist. And **measure each clean endpoint, never
+  assume it**: this module has twice asserted a lab endpoint was clean and
+  been wrong, so drive it first and keep only what grades below its ceiling.
 - **Then re-read the verifier as an attacker of it.** Five holes were found
   that way, all in freshly written code, and most were the same mistake: a
   "control" or "read-back" exchange that is not required to be the *same
