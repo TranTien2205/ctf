@@ -58,9 +58,17 @@ def _compact_history(messages: list) -> None:
             c = b.get("content")
             if not isinstance(c, str) or len(c) < 400:
                 continue
-            rids = re.findall(r'"request_id"\s*:\s*"(r\d+)"', c)
+            # every id shape a tool can emit: request_id (http), run_id
+            # (exploit), call_id (mcp), rid (lead/fuzz hits)
+            rids = re.findall(
+                r'"(?:request_id|run_id|call_id|rid)"\s*:\s*"(r\d+)"', c)
+            seen, uniq = set(), []
+            for r in rids:
+                if r not in seen:
+                    seen.add(r)
+                    uniq.append(r)
             b["content"] = (f"[prior tool result cleared "
-                            f"({len(c)} chars; rids: {', '.join(rids[:8]) or 'none'})"
+                            f"({len(c)} chars; rids: {', '.join(uniq[:8]) or 'none'})"
                             " - call read_response(rid) to re-inspect]")
 
 

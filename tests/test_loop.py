@@ -53,6 +53,27 @@ def test_compact_history_bounds_context():
     assert "r0" in compacted[0]["content"][0]["content"]
 
 
+def test_compact_history_keeps_all_id_shapes():
+    """run_id/call_id/rid keys carry the same evidence ids request_id does -
+    compacting an exploit or mcp result must not strand the citation."""
+    from argus.loop import _compact_history, _KEEP_FULL_RESULTS
+    msgs = [{"role": "user", "content": "seed"}]
+    n = _KEEP_FULL_RESULTS + 1
+    for i in range(n):
+        msgs.append({"role": "assistant", "content": [
+            {"type": "tool_use", "id": f"c{i}", "name": "run_exploit",
+             "input": {}}]})
+        msgs.append({"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": f"c{i}",
+             "content": json.dumps(
+                 {"result": {"run_id": "r41", "call_id": "r42",
+                             "rid": "r42", "out": "x" * 600}})}]})
+    _compact_history(msgs)
+    stub = msgs[2]["content"][0]["content"]
+    assert "r41" in stub and "r42" in stub
+    assert stub.count("r42") == 1  # deduped across key names
+
+
 def test_loop_records_finding_and_reports(lab_url, tmp_path):
     # probe_sqli sends: r1 baseline, r2 quote (error body), r3 true, r4 false.
     script = [
