@@ -167,10 +167,14 @@ system. All notable milestones on `agent-v2`.
   the verbatim `Location` before `urljoin` parses it; `run_exploit`
   children lose declared `--secret` values from their environment the
   same way `run_external` children always did.
+- Semantic-safety warnings on comparison commands: `argus diff` and
+  `argus compare` warn when session targets resolve to different base
+  hosts (a cross-host diff silently reads as all-fixed + all-new);
+  same-host retests on a different port stay quiet and keep matching.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 175 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 179 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
