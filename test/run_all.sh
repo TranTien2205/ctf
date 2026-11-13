@@ -104,7 +104,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/crypto/subsetsum.py tools/crypto/franklin_reiter.py \
          tools/bleichenbacher.py tools/crypto/smart_attack.py \
          tools/crypto/singular_ec.py tools/seccomp_dump.py \
-         tools/spectrogram.py \
+         tools/spectrogram.py tools/esolang_run.py \
          tools/forensics/usb_hid.py tools/classical_solve.py \
          tools/web/ssti_gen.py tools/meta_read.py tools/dns_query.py \
          tools/elf_info.py tools/pe_info.py tools/web/sqli_union.py \

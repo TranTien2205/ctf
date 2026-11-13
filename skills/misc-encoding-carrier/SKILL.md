@@ -59,11 +59,16 @@ polyalphabetic or layered.
 
 ```bash
 python3 tools/enc_detect.py --file blob.txt   # peels hex/base64/base32/url/gzip/zip/binary/decimal/octal/base85/morse layers, reports the chain
+python3 tools/esolang_run.py blob.txt          # detects and RUNS brainfuck / Ook! / Deadfish / Whitespace / JSFuck (via node) -- the flag is what the program prints
 strings blob.txt | grep -i "flag{"
 ```
 
 `enc_detect` reports only layers that decode cleanly — a "no layer recognised"
 result is the signal to stop decoding and open `../ctf-crypto/classic-ciphers.md`.
+`esolang_run` is the sibling: when the blob is not an encoding but a program
+(punctuation soup, `Ook. Ook!` tokens, only whitespace, only `idso`), it names
+the language and executes it bounded, so the flag falls out of stdout instead of
+a decode chain.
 
 ## Routing
 
