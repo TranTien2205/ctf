@@ -137,6 +137,12 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    the chunk table (bit-31 zlib chunks) into a flat image for the
    same downstream chain; `info` names sections and geometry, and
    multi-segment sets are reported honestly.
+   `.vhd` disks: `python3 tools/forensics/vhd_read.py disk.vhd dump
+   guest.img` walks footer -> cxsparse header -> BAT (fixed, dynamic,
+   and differencing with its parent locator named).
+   cramfs firmware images: `python3 tools/forensics/cramfs_read.py
+   fs.cramfs list` walks the packed 12-byte inode tree and `get
+   NAME` inflates its per-block zlib pointers.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and
