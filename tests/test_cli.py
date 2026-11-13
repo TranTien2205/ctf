@@ -181,3 +181,61 @@ def test_dotenv_whitelists_keys(tmp_path, monkeypatch):
     assert "ARGUS_MCP_CONFIG" not in os.environ
     assert os.environ["ANTHROPIC_API_KEY"] == "sk-test-ok"
     assert os.environ["ARGUS_MODEL"] == "m1"
+
+
+def _synth_session(tmp_path, name, target, findings=None):
+    """Minimal session dir: meta.json + findings.json + summary.json."""
+    d = tmp_path / name
+    d.mkdir()
+    (d / "meta.json").write_text(
+        json.dumps({"target": target}), encoding="utf-8")
+    (d / "findings.json").write_text(
+        json.dumps(findings or []), encoding="utf-8")
+    (d / "summary.json").write_text(json.dumps({
+        "mode": "single", "counts": {"findings": len(findings or [])},
+        "requests_total": 1}), encoding="utf-8")
+    return d
+
+
+def _finding(url):
+    return {"category": "xss", "title": "t", "endpoint": url,
+            "url": url, "severity": "medium", "evidence": "e",
+            "evidence_excerpt": "e"}
+
+
+def test_diff_warns_on_different_hosts(tmp_path, capsys):
+    a = _synth_session(tmp_path, "a", "http://a.example",
+                       [_finding("http://a.example/x?p=1")])
+    b = _synth_session(tmp_path, "b", "http://b.example",
+                       [_finding("http://b.example/x?p=1")])
+    rc = main(["diff", str(a), str(b)])
+    err = capsys.readouterr().err
+    assert rc == 0 and "targets differ" in err
+
+
+def test_diff_same_host_new_port_matches(tmp_path, capsys):
+    """Retest scenario: same host, port changed -> keying still matches."""
+    a = _synth_session(tmp_path, "a", "http://a.example",
+                       [_finding("http://a.example/x?p=1")])
+    b = _synth_session(tmp_path, "b", "http://a.example:8443",
+                       [_finding("http://a.example:8443/x?p=1")])
+    rc = main(["diff", str(a), str(b)])
+    cap = capsys.readouterr()
+    assert rc == 0
+    assert "targets differ" not in cap.err and "STILL" in cap.out
+
+
+def test_compare_warns_on_different_hosts(tmp_path, capsys):
+    a = _synth_session(tmp_path, "a", "http://a.example")
+    b = _synth_session(tmp_path, "b", "http://b.example")
+    rc = main(["compare", str(a), str(b)])
+    err = capsys.readouterr().err
+    assert rc == 0 and "targets differ" in err
+
+
+def test_compare_same_target_no_warning(tmp_path, capsys):
+    a = _synth_session(tmp_path, "a", "http://a.example")
+    b = _synth_session(tmp_path, "b", "http://a.example:8443")
+    rc = main(["compare", str(a), str(b)])
+    err = capsys.readouterr().err
+    assert rc == 0 and "targets differ" not in err
