@@ -185,6 +185,15 @@ system. All notable milestones on `agent-v2`.
   `/graphql-strict` and `/hello2`; `probe_method` gets its first
   coverage. Selftest exercises all four new paths (bad-header notes,
   schema+GET transport, suggestion leak, eval-and-reflect SSTI).
+- Evidence gate covers header-class findings: `record_finding` excerpts
+  resolve against recorded response headers as well as the body/event
+  output (CRLF-injected headers, bad security-header values and server
+  disclosure can now be quoted verbatim; headers are redacted at record
+  time so nothing secret becomes citable). `Session._evidence_text_of`
+  shares one implementation with the verifier so gate and check cannot
+  drift, and history compaction preserves `run_id`/`call_id`/`rid`
+  keys alongside `request_id` so compacted exploit/MCP results keep
+  their citable evidence ids.
 - Team sizing is honest: `--max-workers` caps workers only (the lead no
   longer consumes a slot, so `--max-workers 1` still staffs the team),
   a rejected initial spawn surfaces on stderr instead of vanishing, and
@@ -201,7 +210,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 121 offline checks.
-- `python -m pytest tests/ -q`: 187 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 188 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
