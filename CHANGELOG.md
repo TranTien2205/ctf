@@ -961,6 +961,49 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### Three refusals arriving as one, and the wrong one
+- `LeadQueue.push` returned `False` for three unrelated reasons - the
+  pipeline is closed, the lead is a duplicate, the 10000-unique-lead bound
+  is spent - and `emit_lead` reported all three to the model as
+  **"duplicate of an existing lead"**. The queue's own docstring said only
+  "Returns False when it duplicates an existing one", which is where the
+  caller got the wrong label.
+- The reason a worker is shown decides what it does next, so this is not
+  cosmetic. Told "duplicate", a recon worker correctly goes looking for
+  DIFFERENT surface. Against a closed pipeline that burns its remaining
+  turns producing leads nobody will ever pull; against a spent bound it
+  reports the surface as covered when nothing about that lead was wrong.
+  And an operator reading the transcript saw "duplicate" in all three
+  cases and concluded recon had been thorough. Same defect class as the
+  MCP reader two entries up: different causes, one indistinguishable
+  signal, different actions needed.
+- `push` is now `offer(lead) -> str`, returning `""` or which refusal
+  applied. **Renamed on purpose**: a reason-returning `push` would have
+  left `if not leads.push(lead)` reading a non-empty reason as success, so
+  a missed caller had to fail loudly rather than silently invert. It
+  immediately did - `selftest.py` had its own `q.push` call that my grep
+  over `argus/` and `tests/` never saw. A bool return would have passed
+  that site and quietly stopped checking anything.
+- The model-facing half mattered as much as the return value.
+  `registry.py`'s tool description still told the model "Duplicates are
+  dropped automatically", i.e. the same half-truth in the one place it is
+  read *before* the tool is ever called. It now names all three refusals
+  and what each one means for the next move.
+- Pinned at both levels and proved it can fail: collapsing the three back
+  to `"duplicate"` reports `assert 'duplicate' == 'closed'` and
+  `assert 'duplicate' == 'capacity'` from the queue tests, and the two new
+  tool-level tests assert the prose the model actually reads - that it does
+  NOT say "duplicate", and that a spent bound says the surface is not
+  covered.
+- Audited the rest of `leads.py` while in there and found nothing else:
+  the heap's `(priority, counter, lead)` tuple never compares two `Lead`s
+  because the counter is unique, `pull` polls at 1s so `close()` is always
+  noticed, and the unguarded `pending`/`closed`/`drained` property reads
+  are single atomic operations feeding a display. Model-supplied `params`
+  and `priority` reach `Lead` only through `emit_lead`, which coerces both
+  - so the frozen dataclass cannot be handed an unhashable `params` list
+  that would raise inside `offer`.
+
 ### An invariant two readers depend on, held only at a distance
 - Audited `argus/team/board.py` and `argus/ratelimit.py`, both of which I
   had named as unexamined. **Both are clean, and that is the finding** -
@@ -1543,7 +1586,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 624 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 626 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

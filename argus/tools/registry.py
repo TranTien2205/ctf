@@ -706,7 +706,11 @@ TOOL_SCHEMAS: list[dict] = [
         "emit_lead",
         "Publish a typed lead to the team queue: an endpoint/parameter set "
         "worth attacking. Emit immediately on discovery - exploit workers are "
-        "blocked waiting for these. Duplicates are dropped automatically.",
+        "blocked waiting for these. A refused lead comes back with "
+        "`refusal`: `duplicate` (already queued - find different surface), "
+        "`closed` (the pipeline is shut - stop emitting), or `capacity` (the "
+        "queue is full - nothing is wrong with the lead and the surface is "
+        "NOT covered). Read it: the three need different next moves.",
         {
             "kind": {**_STR, "description": "endpoint | param | credential | note"},
             "url": {**_STR, "description": "In-scope URL (include the real query string)"},

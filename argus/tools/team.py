@@ -35,6 +35,16 @@ def _board(ctx: Context):
 
 # ------------------------------------------------------------- pipeline
 
+_LEAD_REFUSALS = {
+    "closed": "the lead pipeline is closed - the engagement is wrapping up, "
+              "so stop emitting leads; they will not be pulled",
+    "duplicate": "duplicate of an existing lead - go find different surface",
+    "capacity": "the lead queue is full (10000 unique leads) - nothing is "
+                "wrong with this lead and the surface is NOT covered; the "
+                "queue stopped accepting",
+}
+
+
 def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
               method: str = "GET", tech: str = "", note: str = "",
               source: str = "", priority: int = 5) -> dict:
@@ -62,8 +72,12 @@ def emit_lead(ctx: Context, kind: str, url: str, params: list | None = None,
                 tech=str(tech or "")[:500], note=str(note or "")[:2000],
                 source=str(source or ctx.agent_name),
                 priority=max(0, min(prio, 9)))
-    if not board.leads.push(lead):
-        return {"queued": False, "reason": "duplicate of an existing lead"}
+    refusal = board.leads.offer(lead)
+    if refusal:
+        # the reason decides what the worker should do next, so report the
+        # one that actually applied instead of calling all three "duplicate"
+        return {"queued": False, "reason": _LEAD_REFUSALS[refusal],
+                "refusal": refusal}
     return {"queued": True, "pending": board.leads.pending}
 
 

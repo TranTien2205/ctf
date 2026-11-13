@@ -490,9 +490,12 @@ def main() -> int:
     from argus.tools import team as teamtools
 
     q = LeadQueue()
-    check("lead queue dedups",
-          q.push(Lead(kind="endpoint", url=base + "/a")) is True
-          and q.push(Lead(kind="endpoint", url=base + "/a")) is False)
+    check("lead queue dedups and says which refusal applied",
+          q.offer(Lead(kind="endpoint", url=base + "/a")) == ""
+          and q.offer(Lead(kind="endpoint", url=base + "/a")) == "duplicate",
+          "a closed pipeline and a spent bound are refusals too, and a "
+          "producer told 'duplicate' for either one goes looking for "
+          "different surface instead of stopping")
     q.close()
     leads, closed = q.pull(wait_s=0)
     check("lead queue drains on close", len(leads) == 1)

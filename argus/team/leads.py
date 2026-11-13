@@ -62,19 +62,45 @@ class LeadQueue:
         self._cond = threading.Condition()
         self._counter = itertools.count()
 
-    def push(self, lead: Lead) -> bool:
-        """Add a lead. Returns False when it duplicates an existing one."""
+    def offer(self, lead: Lead) -> str:
+        """Add a lead. Returns "" when queued, else WHICH refusal applied.
+
+        Named `offer`, not `push`, because it reports a reason rather than a
+        bool: a caller still written against the bool would read a non-empty
+        reason as success, and a rename fails loudly instead.
+
+        The three refusals need three different actions from the producer,
+        which is the whole point of distinguishing them:
+
+          "closed"    - the pipeline is shut; every further lead is wasted
+                        work, so stop producing, do not go looking for
+                        different surface.
+          "duplicate" - this exact lead is already queued or worked; go find
+                        different surface.
+          "capacity"  - the unique-lead bound is spent. Nothing is wrong with
+                        THIS lead, and the surface is not covered; the queue
+                        simply stopped accepting.
+
+        Collapsing them into one `False` told a recon worker "duplicate" when
+        the pipeline had closed, so it burned its remaining turns producing
+        leads nobody would ever pull - and left an operator reading
+        "duplicate of an existing lead" in the transcript to conclude recon
+        had been thorough.
+        """
         with self._cond:
+            if self._closed:
+                return "closed"
+            if lead.key() in self._seen:
+                return "duplicate"
             # bound total unique leads - a runaway producer must not grow
             # the heap/seen-set without limit
-            if self._closed or lead.key() in self._seen \
-                    or len(self._seen) >= 10_000:
-                return False
+            if len(self._seen) >= 10_000:
+                return "capacity"
             self._seen.add(lead.key())
             heapq.heappush(self._heap,
                            (lead.priority, next(self._counter), lead))
             self._cond.notify()
-            return True
+            return ""
 
     def pull(self, max_n: int = 5, wait_s: float = 20.0) -> tuple[list[Lead], bool]:
         """Return up to max_n leads. Blocks up to wait_s for the first one.

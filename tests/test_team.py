@@ -23,9 +23,9 @@ def test_queue_dedup_and_priority():
     q = LeadQueue()
     a = Lead(kind="endpoint", url="http://t/a?x=1", params=("x",), priority=9)
     b = Lead(kind="endpoint", url="http://t/b", priority=1)
-    assert q.push(a) is True
-    assert q.push(a) is False                    # duplicate dropped
-    assert q.push(b) is True
+    assert q.offer(a) == ""
+    assert q.offer(a) == "duplicate"             # and it says WHICH refusal
+    assert q.offer(b) == ""
     leads, closed = q.pull(max_n=5, wait_s=0)
     assert closed is False
     assert [l.url for l in leads] == ["http://t/b", "http://t/a?x=1"]  # prio first
@@ -33,9 +33,11 @@ def test_queue_dedup_and_priority():
 
 def test_queue_close_drains():
     q = LeadQueue()
-    q.push(Lead(kind="endpoint", url="http://t/a"))
+    q.offer(Lead(kind="endpoint", url="http://t/a"))
     q.close()
-    assert q.push(Lead(kind="endpoint", url="http://t/b")) is False  # closed: reject
+    # a closed pipeline is NOT a duplicate: the producer must stop, not
+    # go looking for different surface
+    assert q.offer(Lead(kind="endpoint", url="http://t/b")) == "closed"
     leads, closed = q.pull(wait_s=0)
     assert len(leads) == 1 and closed is False   # still has items
     leads, closed = q.pull(wait_s=0)
@@ -53,7 +55,7 @@ def test_pull_blocks_then_wakes():
     t = threading.Thread(target=consumer)
     t.start()
     time.sleep(0.3)
-    q.push(Lead(kind="endpoint", url="http://t/x"))
+    q.offer(Lead(kind="endpoint", url="http://t/x"))
     t.join(timeout=3)
     assert got == [(1, False)]
 
@@ -115,8 +117,11 @@ def test_lead_queue_saturates(ctx):
     from argus.team.leads import Lead, LeadQueue
     q = LeadQueue()
     for i in range(10_000):
-        assert q.push(Lead(kind="endpoint", url=ctx.cfg.target + f"/{i}"))
-    assert not q.push(Lead(kind="endpoint", url=ctx.cfg.target + "/overflow"))
+        assert q.offer(Lead(kind="endpoint", url=ctx.cfg.target + f"/{i}")) == ""
+    # the bound being spent says nothing about this lead, and the surface
+    # is not covered - reporting "duplicate" here claimed both
+    assert q.offer(
+        Lead(kind="endpoint", url=ctx.cfg.target + "/overflow")) == "capacity"
     assert q.pending == 10_000
 
 
@@ -142,10 +147,53 @@ def test_emit_and_pull_lead(ctx):
     r2 = teamtools.emit_lead(ctx, kind="endpoint",
                              url=ctx.cfg.target + "/item?id=1", params=["id"])
     assert r2["queued"] is False                   # dedup
+    assert r2["refusal"] == "duplicate"            # and this one really is
     ctx.agent_name = "exploit-1"
     out = teamtools.pull_leads(ctx, max_n=5, wait_s=0)
     assert out["leads"][0]["url"].endswith("/item?id=1")
     assert out["leads"][0]["params"] == ["id"]
+
+
+def test_a_closed_pipeline_is_not_reported_as_a_duplicate(ctx):
+    """The refusal a worker is shown decides what it does next.
+
+    `LeadQueue` refuses a lead for three unrelated reasons - the pipeline is
+    closed, the lead is a duplicate, the unique-lead bound is spent - and all
+    three used to arrive at the model as "duplicate of an existing lead".
+
+    Told "duplicate", a recon worker correctly goes looking for DIFFERENT
+    surface. That is the right move for one of the three and wrong for the
+    other two: against a closed pipeline it burns the worker's remaining
+    turns producing leads nobody will pull, and against a spent bound it
+    reports the surface as already covered when nothing about that lead was
+    wrong. An operator reading the transcript saw "duplicate" either way and
+    concluded recon had been thorough.
+    """
+    ctx.board = Board(ctx.session)
+    ctx.agent_name = "recon-1"
+    ctx.board.leads.close()
+    out = teamtools.emit_lead(ctx, kind="endpoint",
+                              url=ctx.cfg.target + "/never-pulled")
+    assert out["queued"] is False
+    assert out["refusal"] == "closed"
+    # the prose the model actually reads must name the action, not the wrong
+    # cause - "duplicate" would send it hunting for more surface instead
+    assert "duplicate" not in out["reason"]
+    assert "stop emitting leads" in out["reason"]
+
+
+def test_a_spent_lead_bound_does_not_claim_the_surface_is_covered(ctx):
+    from argus.team.leads import Lead
+    ctx.board = Board(ctx.session)
+    ctx.agent_name = "recon-1"
+    for i in range(10_000):
+        ctx.board.leads.offer(
+            Lead(kind="endpoint", url=ctx.cfg.target + f"/seen/{i}"))
+    out = teamtools.emit_lead(ctx, kind="endpoint",
+                              url=ctx.cfg.target + "/brand-new")
+    assert out["queued"] is False and out["refusal"] == "capacity"
+    assert "duplicate" not in out["reason"]
+    assert "NOT covered" in out["reason"]
 
 
 def test_emit_lead_scope_checked(ctx):
