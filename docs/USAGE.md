@@ -66,6 +66,7 @@ python -m argus run https://app.example \
 | `--no-external` | off | disable sqlmap/nmap/nuclei/ffuf/curl |
 | `--session-dir` | `sessions` | where run artifacts land |
 | `--quiet` | off | suppress console trace |
+| `--version` | — | print the argus build and exit |
 
 ## Offline demo
 
