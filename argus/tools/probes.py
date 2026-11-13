@@ -1038,14 +1038,23 @@ def _weak_samesite(set_cookie: str) -> bool:
 
 
 def probe_csrf(ctx: Context, url: str, method: str = "GET",
-               data: str | None = None) -> dict:
+               data: str | None = None, read_url: str | None = None) -> dict:
     """CSRF surface check: POST forms without anti-CSRF tokens plus
     session cookies missing SameSite=Lax/Strict. When `data` is given,
     also replays the action with Content-Type: text/plain - a "simple"
     content type browsers may send cross-origin without a preflight;
     an endpoint that still processes it is CSRFable. GET forms whose
     action looks state-changing are flagged as leads too - a browser
-    fires a cross-origin GET with a bare <img> tag, no form needed."""
+    fires a cross-origin GET with a bare <img> tag, no form needed.
+
+    The csrf requirement is four things, and this probe used to collect two.
+    The replay now carries a foreign `Origin` and `Referer` - which is what
+    a third-party page sending this request would carry, and without it
+    nothing on record shows the write was reachable cross-origin - and
+    `read_url` brackets the write with a read before and a read after, so
+    the state change is observable instead of asserted. Quote a byte
+    sequence that appears only in the second read.
+    """
     r = ctx.client.send("GET", url, tool="probe_csrf", note="form inventory")
     body = r.get("body") or ""
     forms = _forms(body)
@@ -1060,17 +1069,64 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
         sc = [sc]
     weak_cookies = [c.split("=", 1)[0] for c in sc if _weak_samesite(c)]
     ct_bypass = None
+    foreign = f"https://{_marker('csrf')}.argus.invalid"
+    reads = {}
+    attempts = []
     if data is not None:
-        p = ctx.client.send(
-            "POST" if method.upper() == "GET" else method.upper(), url,
-            headers={"Content-Type": "text/plain"}, body=data,
-            tool="probe_csrf", note="text/plain content-type replay")
-        ct_bypass = {"status": p["status"], "request_id": p["request_id"],
-                     "processed": p["status"] < 400}
-    if ct_bypass and ct_bypass["processed"]:
+        target = read_url or url
+        verb = "POST" if method.upper() == "GET" else method.upper()
+        last = ctx.client.send("GET", target, tool="probe_csrf",
+                               note="state read BEFORE the write")
+        # Both of these are "simple" content types a browser sends
+        # cross-origin with no preflight. The probe tried only text/plain,
+        # which an endpoint parsing form bodies reads as empty - so the
+        # write was accepted, changed nothing, and the class could not be
+        # proven. x-www-form-urlencoded is what an HTML form actually
+        # sends, and is the shape most real CSRF takes.
+        for ctype in ("text/plain", "application/x-www-form-urlencoded"):
+            p = ctx.client.send(
+                verb, url,
+                headers={"Content-Type": ctype, "Origin": foreign,
+                         "Referer": foreign + "/attack.html"}, body=data,
+                tool="probe_csrf", note=f"cross-origin {ctype} replay")
+            after = ctx.client.send("GET", target, tool="probe_csrf",
+                                    note=f"state read AFTER {ctype}")
+            changed = (last.get("body") or "") != (after.get("body") or "")
+            attempts.append({"content_type": ctype, "status": p["status"],
+                             "request_id": p["request_id"],
+                             "processed": p["status"] < 400,
+                             "changed_state": changed,
+                             "before_id": last["request_id"],
+                             "after_id": after["request_id"]})
+            last = after
+            if changed and p["status"] < 400:
+                break
+        hit = next((a for a in attempts
+                    if a["processed"] and a["changed_state"]), None)
+        chosen = hit or attempts[0]
+        ct_bypass = {"status": chosen["status"],
+                     "request_id": chosen["request_id"],
+                     "processed": any(a["processed"] for a in attempts),
+                     "content_type": chosen["content_type"],
+                     "origin_sent": foreign}
+        reads = {"read_url": target, "changed": bool(hit),
+                 "before_id": chosen["before_id"],
+                 "after_id": chosen["after_id"]}
+    if ct_bypass and ct_bypass["processed"] and reads.get("changed"):
+        verdict = (f"csrf candidate: a cross-origin "
+                   f"{ct_bypass['content_type']} write was processed "
+                   f"(HTTP {ct_bypass['status']}) and the state read at "
+                   f"{reads['read_url']} changed between "
+                   f"{reads['before_id']} and {reads['after_id']} - quote "
+                   "bytes present only in the second read")
+    elif ct_bypass and ct_bypass["processed"]:
         verdict = ("csrf candidate: endpoint processed a text/plain body "
                    f"(HTTP {ct_bypass['status']}) - no content-type "
-                   "enforcement, submittable cross-origin without preflight")
+                   "enforcement, submittable cross-origin without preflight"
+                   + ("; no content type changed the state read, so nothing "
+                      "shows the write had an effect - point `read_url` at "
+                      "the resource this write modifies, and check `data` is "
+                      "the shape the endpoint parses" if reads else ""))
     elif not post_forms and stateful_gets:
         verdict = ("csrf lead: GET form(s) with state-changing-looking "
                    "actions - a GET state change needs no token and is "
@@ -1091,7 +1147,13 @@ def probe_csrf(ctx: Context, url: str, method: str = "GET",
             "post_forms": post_forms, "unprotected": unprotected,
             "stateful_get_forms": stateful_gets,
             "weak_cookies": weak_cookies,
-            "content_type_replay": ct_bypass}
+            "content_type_replay": ct_bypass,
+            "replay_attempts": attempts or None,
+            "state_reads": reads or None,
+            "note": "the csrf class needs all four: the write succeeded, it "
+                    "carried no token, it carried a foreign Origin/Referer, "
+                    "and the quoted bytes appear in the read AFTER and not "
+                    "the read BEFORE"}
 
 
 def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
@@ -1106,10 +1168,11 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                  "probe_enum", "bogus user")
     base_body = base.get("body") or ""
     tests = [u.strip() for u in str(users or "").split(",") if u.strip()][:8]
-    results = []
+    results, bodies = [], {}
     for u in tests:
         r = _send(ctx, url, param, u, "POST", data, "probe_enum",
                   f"user {u}")
+        bodies[u] = r.get("body") or ""
         results.append({
             "user": u, "status": r["status"],
             "request_id": r["request_id"],
@@ -1128,6 +1191,33 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
     slow = [t for t in results
             if t["elapsed_ms"] > base_ms * 2.5 + 100 and t not in hits]
     hits = hits + slow
+    # The enum requirement wants each answer observed more than once: one
+    # difference is a coincidence, a repeated one is a channel. This probe
+    # sent each username exactly once, so the series the verifier looks for
+    # was never in the transcript and the class could not be proven against
+    # any target - while `verify_oracle`'s own docstring asserted the probe
+    # sends each account "more than once". It does now, for the hits, which
+    # is also what the probe's verdict has always told the reader to do.
+    confirm = []
+    if hits:
+        again = _send(ctx, url, param, bogus, "POST", data,
+                      "probe_enum", "bogus user (repeat)")
+        confirm.append({"user": "(the unknown-user answer)",
+                        "status": again["status"],
+                        "request_id": again["request_id"],
+                        "reproduced": _similarity(again.get("body") or "",
+                                                  base_body) >= 0.9})
+        for t in hits[:2]:
+            rr = _send(ctx, url, param, t["user"], "POST", data,
+                       "probe_enum", f"user {t['user']} (repeat)")
+            confirm.append({
+                "user": t["user"], "status": rr["status"],
+                "request_id": rr["request_id"],
+                "elapsed_ms": rr["elapsed_ms"],
+                "reproduced": (
+                    _similarity(rr.get("body") or "",
+                                bodies.get(t["user"], "")) >= 0.9
+                    and rr["status"] == t["status"])})
     if hits and not slow:
         verdict = ("user-enumeration candidate: response differs between an "
                    "unknown user and likely-real usernames ("
@@ -1147,11 +1237,18 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                    + " - confirm a hit is really a valid user")
     else:
         verdict = "uniform error response - no enumeration signal"
+    unstable = [str(c["user"]) for c in confirm if not c["reproduced"]]
+    if unstable:
+        verdict += ("; the answer did NOT reproduce for "
+                    + ", ".join(unstable)
+                    + " - treat it as noise, not an oracle")
     return {"verdict": verdict, "bogus_id": base["request_id"],
-            "results": results,
+            "results": results, "confirmations": confirm,
             "note": "a differing error only proves enumeration when the "
                     "endpoint really checks credentials - verify one hit "
-                    "is a real account (e.g. via password-reset)"}
+                    "is a real account (e.g. via password-reset). Cite the "
+                    "first and the repeat of BOTH answers: the requirement "
+                    "is a repeated difference, not a single one"}
 
 
 _LOCK_RE = re.compile(
@@ -1226,28 +1323,47 @@ def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
                     "cite both request_ids")}
     if restricted:
         p = urllib.parse.urlparse(url)
+        # `restricted` reads naturally as either a path or a full URL - the
+        # agent works in URLs - and a URL went into `path=`, producing
+        # `http://host/http://host/admin`. That 404s, so the probe's second
+        # half ran against a page that was never restricted and the class
+        # could not be proven. Normalise, and keep the host from `url` so
+        # the scope check still governs where this goes.
+        r_path = urllib.parse.urlparse(restricted).path or restricted
+        if not r_path.startswith("/"):
+            r_path = "/" + r_path
         direct = ctx.client.send(
             "GET", urllib.parse.urlunparse(p._replace(
-                path=restricted, query="")),
+                path=r_path, query="")),
             tool="probe_xfh", note="restricted direct")
+        # The control the xfh requirement needs: the bypass path with NO ACL
+        # header. Without it a reader cannot tell the header did the work,
+        # and the first request above is not it - it carries the
+        # X-Forwarded-Host canary.
+        plain = ctx.client.send("GET", url, tool="probe_xfh",
+                                note="bypass path, no ACL header")
         bypasses = []
         for hdr in ("X-Original-URL", "X-Rewrite-URL"):
-            b = ctx.client.send("GET", url, headers={hdr: restricted},
+            b = ctx.client.send("GET", url, headers={hdr: r_path},
                                 tool="probe_xfh", note=f"{hdr} bypass")
-            differs = (_similarity(b.get("body") or "", body) < 0.8
-                       or b["status"] != r["status"])
+            differs = (_similarity(b.get("body") or "",
+                                   plain.get("body") or "") < 0.8
+                       or b["status"] != plain["status"])
             bypasses.append({"header": hdr, "status": b["status"],
                              "request_id": b["request_id"],
                              "differs": differs})
         out["restricted_direct"] = {"status": direct["status"],
                                     "request_id": direct["request_id"]}
+        out["restricted_path"] = r_path
+        out["control"] = {"status": plain["status"],
+                          "request_id": plain["request_id"]}
         out["bypasses"] = bypasses
         hit = next((b for b in bypasses
                     if b["differs"] and b["status"] == 200), None)
         if hit and direct["status"] in (401, 403):
             signals.append(
                 f"acl-bypass candidate: {hit['header']} served "
-                f"{restricted} content (200) that direct access "
+                f"{r_path} content (200) that direct access "
                 f"denies ({direct['status']})")
     out["verdict"] = "; ".join(signals) if signals else "no host-header signal"
     return out
@@ -1609,12 +1725,45 @@ def probe_cache(ctx: Context, url: str) -> dict:
     clean_body = clean.get("body") or ""
     refl_body = refl.get("body") or ""
     signals = []
+    # Three requests, two of them carrying DIFFERENT canaries, all answering
+    # byte-identically, AND a cache announcing itself in the headers: the
+    # resource is being served from an entry populated before this probe
+    # ran, so nothing it sent could reach the cache. That is not the same
+    # answer as "the header is keyed", and returning the same "no signal"
+    # for both read as a defence that was never tested. It is the common
+    # case on a live target, and it is what a shared fixture does to this
+    # probe the moment any earlier reader warms the page.
+    #
+    # The cache indicator is required, not inferred from the bodies being
+    # equal: a static page that simply does not reflect the header answers
+    # identically three times too, and calling that a warm cache would be a
+    # claim about infrastructure nothing here observed.
+    def _cache_marks(resp) -> list[str]:
+        out = []
+        for key, value in (resp.get("headers") or {}).items():
+            k = str(key).lower()
+            if k in ("x-cache", "x-cache-status", "cf-cache-status", "age",
+                     "x-varnish", "x-drupal-cache", "x-proxy-cache"):
+                out.append(f"{key}: {value}")
+        return out
+
+    marks = _cache_marks(clean) + _cache_marks(refl)
+    warm = (bool(clean_body) and c1 not in clean_body and c2 not in refl_body
+            and clean_body == refl_body and bool(marks))
     if c1 in clean_body:
         signals.append("cache-poisoning candidate: unkeyed X-Forwarded-Host "
                        "persisted into a response served to a clean request")
     elif c2 in refl_body:
         signals.append("X-Forwarded-Host reflected but not cached - header "
                        "is likely keyed or no shared cache")
+    elif warm:
+        signals.append("undecided: three requests with two different canaries "
+                       "answered byte-identically, so this resource is being "
+                       "served from an entry that predates the probe - the "
+                       "header was never given a chance to reach the cache "
+                       f"({'; '.join(marks[:2])}). Try a resource nobody has "
+                       "fetched yet, or wait for the entry to expire; do NOT "
+                       "read this as keyed")
 
     # cache deception: the same page resolving under a static-extension
     # suffix is path confusion - behind an extension-keyed CDN the

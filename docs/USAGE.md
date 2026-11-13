@@ -157,7 +157,7 @@ verbatim evidence from a cited response.
 | IDOR | `probe_idor` | id +/-1 and id=0 in path/query/JSON body |
 | SSRF | `probe_ssrf` | self-fetch + short/decimal/hex/octal/ipv6 encodings + metadata |
 | XXE | `probe_xxe` | external entity file/http resolution |
-| CSRF | `probe_csrf` | token/SameSite audit + `text/plain` replay + GET state-change leads |
+| CSRF | `probe_csrf` | token/SameSite audit + cross-origin replay under both preflight-free content types, bracketed by a `read_url` read before/after + GET state-change leads |
 | Host-header | `probe_xfh` | XFH canary + X-Original-URL/X-Rewrite-URL ACL bypass |
 | File upload | `probe_upload` | php/phtml/jsp/aspx/svg/htaccess/double-ext/spoof/traversal, served check |
 | Race condition | `probe_race` | concurrent burst + serial baseline + overlap check |

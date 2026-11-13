@@ -82,10 +82,26 @@ probe, update the lab and its test together.
   `tests/test_probe_matrix_agreement.py` in both directions: against a lab
   endpoint that really has the bug, some honest quote must reach `proven`
   (or the ceiling); against a clean endpoint, nothing may.
-- **Then re-read the verifier as an attacker of it.** Three holes were found
-  that way, all in freshly written code, and two were the same mistake: a
+- **Count the agreement table against what the lab plants, not against the
+  verifiers that exist.** The proving table covered fourteen classes and
+  looked complete; the lab plants nine more and nothing drove them. A table
+  that grows one entry per verifier written always looks finished, which is
+  why it has to be counted the other way round - start from the lab's
+  planted set and ask which entries are missing. Extending it found four
+  defects, including the only loose-direction hole of the lot
+  (`verify_state_change` accepted the reverse of what it asked for: the
+  state BEFORE the write, quoted, with a later read that no longer had it).
+- **Then re-read the verifier as an attacker of it.** Five holes were found
+  that way, all in freshly written code, and most were the same mistake: a
   "control" or "read-back" exchange that is not required to be the *same
-  endpoint* or the *same bytes*. `verify_header_injection` accepted a
+  endpoint*, the *same request* or the *same bytes*. The two newest were
+  mine, found an hour after writing them: an ACL-bypass control matched on
+  the request path and only required to *differ*, so `/search?q=a` with the
+  header against `/search?q=b` without it "proved" the class on a server
+  that ignores it; and a csrf before/after pair not required to be the same
+  resource, so reading `/home`, writing, then reading `/about` and quoting
+  `/about` proved it. Ask of every control: is this the same request, and
+  does it lack the thing being claimed? `verify_header_injection` accepted a
   control from another host; `verify_method_effect` matched the nonce
   against `req_text`, which includes the URL, so a `PUT` of inert bytes plus
   a directory listing graded `proven`; `verify_served_upload` accepted a

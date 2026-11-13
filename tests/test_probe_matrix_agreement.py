@@ -16,6 +16,46 @@ Those were found one at a time, by hand, while writing each verifier. This
 module finds the whole class at once and keeps finding it: drive each probe
 against the lab and grade the exchanges it recorded under its own class.
 
+It also had the defect it exists to find. The proving table covered fourteen
+classes - every class whose verifier had been written here - and the lab
+plants nine more that nothing drove. Extending it found two real defects and
+one in this module:
+
+* `verify_restricted_access` could not prove the variant its own alias is
+  named after. It required the refusal to be on the SAME path as the bypass,
+  which is true of IP spoofing and false of `X-Original-URL`, where the
+  request line asks an allowed path and the header names the forbidden one.
+  Those paths cannot be equal, so the shape the lab plants was unprovable.
+* `probe_xfh` built the restricted URL by putting `restricted` into the path
+  component, so a caller passing a URL - which an agent naturally does - got
+  `http://host/http://host/admin`, a 404. The probe's whole second half ran
+  against a page that was never restricted. It also sent no control without
+  the header, which the requirement needs.
+* `probe_enum` sent each username exactly once while `verify_oracle` asks
+  that each answer be observed more than once - and its docstring asserted
+  the probe "sends a known and an unknown account, more than once". It did
+  not. One difference is a coincidence; the probe repeats it now.
+* `_best_grade` offered only whole lines, and `ppoll` and `cache` are proven
+  by quoting the marker alone - the verifier asks that the excerpt appear
+  verbatim in the poisoning REQUEST, where the surrounding markup is not.
+  Both read as probe failures while probe and matrix actually agreed.
+
+`csrf` was the fourth defect, and the only one in the loose direction. The
+probe collected two of the four checks - no foreign Origin, no before/after
+pair - so it got a foreign `Origin`/`Referer`, a `read_url` to bracket the
+write with, and the form content type a cross-origin form actually sends.
+It then graded `proven` on the quote `{"theme": "dark", "lang": "en"}`:
+the body BEFORE the write. `verify_state_change` never checked the order of
+its own two reads, so quoting the pre-write state and citing a later read
+that no longer carried it satisfied "the state changed between two reads" -
+which any site whose two reads differ can satisfy.
+
+Two classes are still not driven in the proving direction, each for a stated
+reason: `race` (below) and `deserialize` (the lab's `/import` returns a
+parser error and never executes, so "identity output plus the probe nonce"
+is unobtainable here - a limit of this lab, not of the class). `dos`,
+`graphql` and `jwt` have no probe at all.
+
 Two directions, and no reading of the probe's prose - a verdict is English and
 this asserts against evidence:
 
@@ -33,6 +73,8 @@ the host's scheduler; see the note on the tables below. Its unconditional
 assertions are synthetic.
 """
 from __future__ import annotations
+
+import re
 
 import pytest
 
@@ -72,6 +114,43 @@ VULNERABLE = [
     ("probe_lockout", "lockout",
      lambda c, b: probes.probe_lockout(c, b + "/login2",
                                        "username=x&password=x")),
+    # Nine classes the lab plants that this table never drove. The gap was
+    # invisible because the table looked complete: it covered every class
+    # whose verifier had been WRITTEN here, not every class the lab plants.
+    # Two of the nine were real defects - see the module docstring.
+    ("probe_reflection", "xss",
+     lambda c, b: probes.probe_reflection(c, b + "/hello?name=x", "name")),
+    ("probe_ssrf", "ssrf",
+     lambda c, b: probes.probe_ssrf(c, b + "/fetch?url=x", "url")),
+    ("probe_xxe", "xxe", lambda c, b: probes.probe_xxe(c, b + "/xml")),
+    ("probe_massassign", "massassign",
+     lambda c, b: probes.probe_massassign(c, b + "/api/register",
+                                          '{"username":"newguy"}')),
+    ("probe_method", "method", lambda c, b: probes.probe_method(c, b + "/")),
+    # `/reset` builds its form action from X-Forwarded-Host, and the edge
+    # honours X-Original-URL while 403ing /admin directly - the pair the
+    # xfh requirement names
+    ("probe_xfh", "xfh",
+     lambda c, b: probes.probe_xfh(c, b + "/reset", restricted="/admin")),
+    ("probe_enum", "enum",
+     lambda c, b: probes.probe_enum(c, b + "/login",
+                                    "username=x&password=x")),
+    ("probe_ppoll", "ppoll",
+     lambda c, b: probes.probe_ppoll(c, b + "/api/config",
+                                     b + "/api/config")),
+    # the cache is a class variable keyed on path, so whoever reads /cached
+    # first decides what everyone else is served - clear it, or this case
+    # grades an earlier test's canary
+    ("probe_cache", "cache",
+     lambda c, b: (c.client.send("GET", b + "/cached/reset",
+                                 tool="probe_cache", note="clear the cache"),
+                   probes.probe_cache(c, b + "/cached"))[1]),
+    # /api/config merges whatever a write sends into state a GET reads back,
+    # so the before/after pair the csrf requirement needs is collectable
+    ("probe_csrf", "csrf",
+     lambda c, b: probes.probe_csrf(c, b + "/api/config", method="POST",
+                                    data="csrfmark=landed",
+                                    read_url=b + "/api/config")),
     # `race` is deliberately NOT here in the proving direction. Its evidence
     # is wall-clock concurrency, and whether eight threads actually overlap
     # on a loaded runner is a property of the host, not of the probe or the
@@ -135,6 +214,10 @@ CLEAN = [
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
+# A single distinctive value, which is what a tester quotes when the proof is
+# "this marker crossed from there to here".
+_TOKEN_RE = re.compile(r"[A-Za-z0-9_.@-]{8,200}")
+
 
 def _exchanges(session) -> list[dict]:
     return [e for e in session._transcript.values()
@@ -148,6 +231,15 @@ def _best_grade(klass: str, entries: list[dict]) -> tuple[str, list[str]]:
     whether *some* quote a tester would take satisfies the requirement. Lines
     are what a tester takes, which is also why a whole body is not offered:
     handing the matrix an entire response defeats its own echo veto.
+
+    A tester also quotes ONE distinctive value, and for the classes whose
+    proof is a marker crossing from one request to another response that is
+    the only quote that works: `ppoll` and `cache` both reach `proven` on
+    `<marker>` and `unproven` on the line containing it, because the
+    verifier asks that the excerpt appear verbatim in the poisoning
+    *request* - where the surrounding markup is not. Offering only lines
+    read both classes as probe failures when the probe and the matrix
+    actually agreed.
     """
     best, missing = "unproven", ["no evidence"]
     for entry in entries:
@@ -157,7 +249,9 @@ def _best_grade(klass: str, entries: list[dict]) -> tuple[str, list[str]]:
         whole = body.strip()
         if whole and len(whole) <= 400:
             quotes.append(whole)
-        for quote in quotes[:25]:
+        quotes += [t for t in dict.fromkeys(_TOKEN_RE.findall(body))
+                   if t not in quotes]
+        for quote in quotes[:60]:
             verdict = proof.grade(klass, quote, entries)
             if _ORDER.get(verdict.grade, 0) > _ORDER.get(best, 0):
                 best, missing = verdict.grade, verdict.missing

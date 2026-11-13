@@ -724,6 +724,19 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                      else "application/octet-stream")
             self._send(body=data, ctype=ctype)
 
+        elif path == "/cached/reset":
+            # Test support, not part of the vulnerable surface - the same
+            # shape as /redeem/reset below and for the same reason. The
+            # cache lives in a CLASS variable keyed on path only, so the
+            # FIRST request to /cached decides what every later one is
+            # served. One test poisoning it leaves every later test on the
+            # same server reading that test's canary, which read as a probe
+            # regression: `probe_cache` sent its marker, the cache was
+            # already warm, and nothing it recorded carried the marker.
+            type(self)._cache = {}
+            self._send(body=json.dumps({"cleared": True}),
+                       ctype="application/json")
+
         elif path == "/redeem/reset":
             # Test support, not part of the vulnerable surface. `/redeem` is
             # a one-time coupon held in a CLASS variable, so one test draining

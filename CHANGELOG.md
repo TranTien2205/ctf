@@ -718,6 +718,92 @@ somebody reading only the list.
   numbers out of the document and runs both paths against the bundled lab, so
   the two cannot drift apart silently. Both match today.
 
+### The agreement layer had the defect it exists to find
+- `tests/test_probe_matrix_agreement.py` drives each probe against the lab
+  and grades the evidence it recorded, in both directions. Its proving table
+  covered **fourteen** classes - every class whose verifier had been written
+  here - and the lab plants **nine more that nothing drove**. The table
+  looked complete, which is why nobody counted it against the lab.
+- Extending it to those nine, and then to `csrf`, found four real defects.
+- **`verify_restricted_access` could not prove the variant its own alias is
+  named after.** It required the refusal to be on the same path as the
+  bypass. That holds for IP spoofing and is false for `X-Original-URL`,
+  where the request line asks an allowed path and the header names the
+  forbidden one - those paths cannot be equal. The shape the lab plants, and
+  the one the class is called `x-original-url` for, was unprovable. It now
+  accepts the rewrite variant when the header names exactly the path a cited
+  exchange shows refused AND a control on the bypass path without the header
+  answers differently - without that control a server that ignores the
+  header proves the class.
+- **`probe_xfh` never reached the restricted endpoint.** It put `restricted`
+  into the URL's path component, so a caller passing a URL - which an agent
+  naturally does - produced `http://host/http://host/admin` and got a 404.
+  The probe's entire second half ran against a page that was never
+  restricted, and the acl-bypass signal was silently lost. It normalises a
+  path or a URL now, and records the no-header control the requirement needs.
+- **`probe_enum` sent each username exactly once** while `verify_oracle`
+  requires each answer to be observed more than once - and that verifier's
+  docstring asserted the probe "sends a known and an unknown account, more
+  than once". It did not, so `enum` could not be proven against any target.
+  The probe repeats the bogus answer and its hits now, and says so when the
+  difference does not reproduce.
+- **`verify_state_change` accepted the reverse of what it asked for.** It
+  gathered "reads carrying the excerpt" and "reads not carrying it" without
+  comparing when either happened, so quoting the state BEFORE the write and
+  citing a later read that no longer had it satisfied "the state changed
+  between two reads". Any site whose two reads differ - a timestamp, a
+  counter, a rotating banner - proved csrf. Measured: a real cross-origin
+  write to the lab's `/api/config` graded `proven` on the quote
+  `{"theme": "dark", "lang": "en"}`, the pre-write body. Both reads are now
+  ordered against the write by recorded `ts`, with position as the fallback.
+  This is the only one of the four in the loose direction, and the one that
+  mattered.
+- `probe_csrf` collected two of that class's four checks. It sends a foreign
+  `Origin`/`Referer` now, takes a `read_url` to bracket the write with, and
+  replays under both preflight-free content types - it tried only
+  `text/plain`, which an endpoint parsing form bodies reads as empty, so the
+  write was accepted and changed nothing.
+- `_best_grade` offered only whole lines as quotes, and `ppoll` and `cache`
+  are proven by quoting the marker alone: the verifier asks that the excerpt
+  appear verbatim in the poisoning *request*, where the surrounding markup
+  is not. Both read as probe failures while probe and matrix agreed. It
+  offers marker-sized tokens too.
+- Then two more, found by auditing the above an hour after writing it - the
+  same lens, asked of my own fresh code:
+  - The rewrite variant's control was matched on the request **path** and
+    only had to **differ**. On any site with a 404 page that is free: send
+    `X-Original-URL: /nope` to `/search?q=a`, cite `/search?q=b` as the
+    control - it differs because the queries do - and cite the 404 as the
+    refusal. The control must be the same request without the header, and
+    must lack the quoted content.
+  - `verify_state_change`'s two reads were not required to be of the same
+    resource, so read `/home`, send the write, read `/about`, and quote text
+    `/about` has always carried. `verify_unkeyed_input` already required the
+    same resource because "a value appearing elsewhere on the site is not a
+    cache entry"; the same reasoning applies here and was missing.
+- `probe_cache` returned the same "no signal" for two different answers:
+  the header is keyed (the defence working) and the cache was already warm
+  (the probe could not decide, because nothing it sent ever reached the
+  cache). The second is the common case on a live target - and is what any
+  earlier reader of the page does to it. It says `undecided` now, naming the
+  cache header it saw, and requires that header rather than inferring a
+  cache from three identical bodies: a static page that does not reflect the
+  header answers identically too, and calling that a warm cache would be a
+  claim about infrastructure nothing observed. `tests/test_probes_unit.py`
+  asserts both directions with a stub, because the lab serves no cache
+  header and cannot reach the branch.
+- And one in the lab, of the kind its own `/redeem/reset` comment already
+  describes: `/cached` keys on path only and lives in a class variable, so
+  whichever test reads it first decides what every later test is served.
+  `probe_cache` sent its marker into an already-warm cache and recorded
+  nothing carrying it - which reads as a probe regression and is a shared
+  fixture. The lab has a `/cached/reset` now, and the case clears it first.
+- The proving direction now covers 23 of the 26 probed classes.
+  `race` and `deserialize` are excluded with a stated reason in the module
+  docstring - `/import` returns a parser error and never executes, so
+  "identity output plus the probe nonce" is unobtainable against this lab,
+  which is a limit of the lab and not of the class.
+
 ### The evaluation asked for medians and nothing computed one
 - `docs/EXPERIMENTS.md` says "report median" and "Report medians per
   configuration" - and no code computed a median. Every evaluation of this
@@ -804,7 +890,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 561 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 580 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

@@ -669,6 +669,9 @@ _NOT_TOOLS = {
     "proof_requirement",     # transcript ids that survive history compaction - `run_id` shares the
     # `run_*` family with run_external/run_exploit and is not a tool
     "run_id", "call_id",
+    # a probe PARAMETER, not a tool: probe_csrf takes `read_url` to bracket
+    # the write with a read before and after
+    "read_url",
 }
 
 

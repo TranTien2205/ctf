@@ -506,9 +506,86 @@ ACL_HEADER_RE = re.compile(
     r"x-real-ip|x-originating-ip|x-client-ip")
 
 
+# The two ACL headers that name a DIFFERENT resource than the request line.
+# Spoofing X-Real-IP asks the same path and hopes the edge trusts you;
+# X-Original-URL asks an allowed path and names the forbidden one, so for
+# that variant the bypass path and the refused path cannot be equal.
+REWRITE_HEADER_RE = re.compile(r"(?i)^\s*x-(?:original|rewrite)-url\s*$")
+
+
+def _rewrite_target(entry: dict | None) -> str:
+    """The path an ACL rewrite header on this request names, or ""."""
+    for key, value in _req_headers(entry).items() if entry else ():
+        if REWRITE_HEADER_RE.match(str(key)):
+            text = str(value).strip()
+            return urllib.parse.urlparse(text).path or text
+    return ""
+
+
+def _acl_header_changed_the_answer(served: dict | None, exchanges: list,
+                                   excerpt: str) -> bool:
+    """Is there a cited control proving the header did the work?
+
+    The SAME request - identical URL - with no ACL header, whose response
+    does not carry the quoted restricted content. Without this a server that
+    ignores `X-Original-URL` proves the class: send `X-Original-URL: /nope`
+    to a public page, quote the page, and cite the 404 on `/nope` as the
+    refusal. The header did nothing and nothing was bypassed.
+
+    Two weaker versions of this check were wrong, both in the same way the
+    rest of this module has been wrong before - a "control" that was not
+    required to be the same request. Matching on the path alone let a
+    different query string be the control, so `/search?q=a` with the header
+    against `/search?q=b` without it "differed" because the queries did, on
+    a site that ignores the header entirely. And "differs from the served
+    body" is weaker than "lacks the restricted content": a nonce, a
+    timestamp or a cache-buster differs on every read.
+    """
+    if not served or not excerpt:
+        return False
+    url = str(_req(served).get("url") or "")
+    for entry in exchanges or ():
+        if entry is served or not isinstance(entry, dict):
+            continue
+        if str(_req(entry).get("url") or "") != url:
+            continue
+        hdrs = " ".join(f"{k}: {v}" for k, v in _req_headers(entry).items())
+        if ACL_HEADER_RE.search(hdrs):
+            continue
+        if excerpt not in resp_body(entry):
+            return True
+    return False
+
+
 def _req_headers(entry: dict) -> dict:
     headers = _req(entry).get("headers")
     return headers if isinstance(headers, dict) else {}
+
+
+def _ordering(exchanges: list) -> dict:
+    """When each cited exchange happened, for checks that need before/after.
+
+    `ts` is what the recorder wrote at the time; the cited order is a
+    claimant-supplied list and must not be the only thing a "before" rests
+    on. Position is the fallback for an old session that has no `ts`.
+
+    The two scales must not be mixed. Ordering each entry independently -
+    `ts` when it has one, position otherwise - puts every position-ordered
+    entry (1, 2, 3) before every timestamped one (1.79e9), which is not a
+    fallback but a wrong answer. So it is `ts` only when EVERY cited
+    exchange has one, and position for all of them otherwise.
+    """
+    stamps = []
+    for entry in exchanges or ():
+        value = (entry or {}).get("ts")
+        try:
+            stamps.append(float(value))
+        except (TypeError, ValueError):
+            stamps = None
+            break
+    if stamps is None:
+        return {id(e): (float(i), i) for i, e in enumerate(exchanges or ())}
+    return {id(e): (stamps[i], i) for i, e in enumerate(exchanges or ())}
 
 
 def _path_of(entry: dict) -> str:
@@ -1154,10 +1231,17 @@ def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
 def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Header-based access-control bypass: restricted content returned when an
-    ACL-relevant header is added, refused on the same path without it.
+    ACL-relevant header is added, and the resource it served refused without
+    it.
 
     The refusal has to be a refusal. The first version accepted an ordinary
     2xx as the control, so any in-scope page could stand in for the denial.
+
+    "The resource it served", not "the same path": spoofing X-Real-IP asks
+    the same path and hopes the edge trusts you, while X-Original-URL asks
+    an allowed path and names the forbidden one. Requiring the same path
+    made the second shape - the one this verifier's own `x-original-url`
+    alias is named after - unprovable.
     """
     def build(pair) -> list[dict]:
         served, refused = (pair if pair else (None, None))
@@ -1173,6 +1257,19 @@ def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
             and not ACL_HEADER_RE.search(r_hdrs)
         same = bool(served) and bool(refused) and \
             _path_of(served) == _path_of(refused)
+        # The rewrite variant: the request line asks an allowed path and the
+        # header names the restricted one, so the two paths MUST differ and
+        # the same-path rule refused the only shape this verifier is named
+        # after (`x-original-url` is one of its own aliases, and it is what
+        # the lab plants). Still strict: the header has to name exactly the
+        # path some cited exchange shows refused, and a control has to show
+        # the header changed the answer.
+        rewritten = _rewrite_target(served)
+        by_rewrite = (bool(rewritten) and bool(refused)
+                      and rewritten == _path_of(refused)
+                      and _acl_header_changed_the_answer(
+                          served, claim.exchanges, claim.excerpt or ""))
+        paired = same or by_rewrite
         return [
             _check("restricted content returned with the header", got,
                    f"{status_of(served)} on {_path_of(served)} in "
@@ -1180,11 +1277,19 @@ def verify_restricted_access(claim: Claim, spec: "ProofSpec") -> list[dict]:
                    "no cited exchange adds an ACL-relevant header "
                    "(X-Original-URL, X-Forwarded-Host, X-Real-IP, ...), gets a "
                    "2xx, and carries the quoted bytes"),
-            _check("the same request is refused without it", denied and same,
-                   f"{_path_of(refused)} answered {status_of(refused)} in "
-                   f"{refused.get('id')}" if denied and same else
-                   ("the refusal is on a different path than the bypass - cite "
-                    "the refusal of this path itself" if denied else
+            _check("the same request is refused without it",
+                   denied and paired,
+                   (f"{_path_of(refused)} answered {status_of(refused)} in "
+                    f"{refused.get('id')}"
+                    + (f", named by the rewrite header on "
+                       f"{served.get('id')}" if by_rewrite and not same
+                       else ""))
+                   if denied and paired else
+                   ("the refusal is on a different path than the bypass, and "
+                    "no rewrite header on the bypass names it - cite the "
+                    "refusal of the resource the bypass actually served, and "
+                    "a control on the bypass path without the header"
+                    if denied else
                     "cite the control: the same path without the header must "
                     "answer 401/403/404, or the resource was never restricted")),
         ]
@@ -1236,6 +1341,14 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
     reads = [e for e in claim.exchanges
              if str(_req(e).get("method") or "GET").upper()
              == "GET"]
+    # When each cited exchange happened. Without this the check accepted the
+    # reverse of what it asked for: quoting the state BEFORE the write and
+    # citing a later read that no longer carries it satisfied "the state
+    # changed between two reads", so any site whose two reads differ - a
+    # timestamp, a counter, a rotating banner - proved csrf. Measured on the
+    # lab: a cross-origin write to /api/config graded `proven` on the quote
+    # `{"theme": "dark", "lang": "en"}`, which is the pre-write body.
+    when = _ordering(claim.exchanges)
 
     def build(entry: dict | None) -> list[dict]:
         method = str(_req(entry).get("method") or "GET").upper() \
@@ -1252,10 +1365,24 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
             if entry else ""
         o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
         cross = bool(o_host) and o_host.lower() != host.lower()
+        write_at = when.get(id(entry)) if entry else None
         after = [e for e in reads
-                 if bool(claim.excerpt) and claim.excerpt in resp_body(e)]
+                 if bool(claim.excerpt) and claim.excerpt in resp_body(e)
+                 and write_at is not None
+                 and when.get(id(e), write_at) > write_at]
         before = [e for e in reads
-                  if not claim.excerpt or claim.excerpt not in resp_body(e)]
+                  if (not claim.excerpt or claim.excerpt not in resp_body(e))
+                  and write_at is not None
+                  and when.get(id(e), write_at) < write_at]
+        # ...and the two reads have to be of the SAME resource. "State
+        # changed" means one resource's content changed; without this, any
+        # page fetched after the write whose text was not on some page
+        # fetched before it was the proof - read /home, write, read /about,
+        # quote /about. `verify_unkeyed_input` already required the same
+        # resource for exactly this reason.
+        pair = next(((b, a) for a in after for b in before
+                     if _endpoint_shape(b) == _endpoint_shape(a)), None)
+        before, after = ([pair[0]], [pair[1]]) if pair else ([], [])
         landed = bool(entry) and 200 <= status_of(entry) < 400
         return [
             _check("the state-changing request succeeded", write and landed,
@@ -1275,10 +1402,14 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
                    "shows a third-party site could have sent it"),
             _check("the state changed between two reads",
                    bool(after) and bool(before),
-                   f"absent in {before[0].get('id')}, present in "
-                   f"{after[0].get('id')}" if after and before else
-                   "cite the read before and the read after; the quoted bytes "
-                   "must appear only in the second"),
+                   f"absent in {before[0].get('id')} before the write, "
+                   f"present in {after[0].get('id')} after it"
+                   if after and before else
+                   "cite a read BEFORE the write that lacks the quoted bytes "
+                   "and a read AFTER it that carries them - the same "
+                   "resource, in that order. Quoting the pre-write state and "
+                   "citing a later read without it is the reverse of this "
+                   "requirement, and two different pages are not a change"),
         ]
 
     return _witness(claim.exchanges or [None], build, spec.required)
@@ -2547,8 +2678,9 @@ for _s in [
               aliases=("request-smuggling", "requestsmuggling", "desync",
                        "cl-te", "te-cl")),
     ProofSpec("xfh", "restricted content returned when an ACL-relevant header "
-              "is added, with the control showing the same request refused "
-              "without it",
+              "is added, with the control showing the resource it served "
+              "refused without the header - the same path for a spoofed IP "
+              "or host, the path the header names for X-Original-URL",
               ("restricted content returned with the header",
                "the same request is refused without it"),
               verify_restricted_access,

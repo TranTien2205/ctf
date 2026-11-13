@@ -2409,3 +2409,179 @@ def test_no_verifier_raises_on_a_malformed_request_or_response():
         verdict = proof.grade(klass, "x", ["not an entry", 42, None])
         assert not [c for c in verdict.checks
                     if c["check"] == "evidence is readable" and not c["ok"]]
+
+
+def _ex(eid, method, url, body, *, ts, headers=None, status=200):
+    return {"id": eid, "ts": ts,
+            "request": {"method": method, "url": url,
+                        "headers": headers or {}},
+            "response": {"status": status, "body": body}}
+
+
+def test_csrf_refuses_the_pre_write_state_as_the_proof():
+    """Quoting the state BEFORE the write is the reverse of the requirement.
+
+    `verify_state_change` collected "reads carrying the excerpt" and "reads
+    not carrying it" without comparing when either happened, so a claim
+    could quote the pre-write body and cite a later read that no longer had
+    it. Any site whose two reads differ - a timestamp, a counter, a rotating
+    banner - satisfied "the state changed between two reads". Measured on
+    the lab: a real cross-origin write to /api/config graded `proven` on the
+    quote `{"theme": "dark", "lang": "en"}`, which is what the resource said
+    before the write landed.
+    """
+    foreign = {"Origin": "https://evil.example"}
+    exchanges = [
+        _ex("r1", "GET", "http://lab/api/config", '{"theme": "dark"}', ts=1),
+        _ex("r2", "POST", "http://lab/api/config", '{"merged": true}',
+            ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/api/config",
+            '{"theme": "dark", "mark": "landed"}', ts=3),
+    ]
+    # the honest claim: the quote is in the read AFTER the write only
+    good = proof.grade("csrf", '"mark": "landed"', exchanges)
+    assert good.grade == "proven", good.missing
+    # the reversed claim: the quote is the pre-write body, which the later
+    # read no longer carries
+    bad = proof.grade("csrf", '{"theme": "dark"}', exchanges)
+    assert bad.grade != "proven", [c for c in bad.checks if c.get("ok")]
+    assert any("state changed between two reads" in str(c.get("check"))
+               and not c.get("ok") for c in bad.checks)
+
+
+def test_csrf_refuses_reads_that_both_precede_the_write():
+    """Two reads before the write cannot show the write changed anything."""
+    exchanges = [
+        _ex("r1", "GET", "http://lab/x", "before", ts=1),
+        _ex("r2", "GET", "http://lab/x", "nonce-abc123", ts=2),
+        _ex("r3", "POST", "http://lab/x", "ok", ts=3,
+            headers={"Origin": "https://evil.example"}),
+    ]
+    v = proof.grade("csrf", "nonce-abc123", exchanges)
+    assert v.grade != "proven", v.checks
+
+
+def test_xfh_proves_the_rewrite_variant_but_not_an_ignored_header():
+    """X-Original-URL: the bypass path and the refused path cannot be equal.
+
+    And the header has to have done something: a server that ignores it
+    serves the same page either way, which must not prove the class.
+    """
+    # the header named /admin, /admin is refused, and the control on the
+    # bypass path without the header answers differently
+    real = [
+        _ex("r1", "GET", "http://lab/reset", "reset form", ts=1),
+        _ex("r2", "GET", "http://lab/admin", "Forbidden", ts=2, status=403),
+        _ex("r3", "GET", "http://lab/reset", "admin panel: users=3",
+            ts=3, headers={"X-Original-URL": "/admin"}),
+    ]
+    v = proof.grade("xfh", "admin panel: users=3", real)
+    assert v.grade == "proven", v.missing
+
+    # the same shape against a server that ignores the header: the bypass
+    # response is byte-identical to the control, so nothing was bypassed
+    ignored = [
+        _ex("r1", "GET", "http://lab/hello", "hello page", ts=1),
+        _ex("r2", "GET", "http://lab/nope", "not found", ts=2, status=404),
+        _ex("r3", "GET", "http://lab/hello", "hello page", ts=3,
+            headers={"X-Original-URL": "/nope"}),
+    ]
+    v = proof.grade("xfh", "hello page", ignored)
+    assert v.grade != "proven", v.checks
+
+    # and a refusal somewhere unrelated, with no rewrite header naming it,
+    # is still not the control
+    unrelated = [
+        _ex("r1", "GET", "http://lab/hello", "hello page", ts=1),
+        _ex("r2", "GET", "http://lab/admin", "Forbidden", ts=2, status=403),
+        _ex("r3", "GET", "http://lab/hello", "hello page with extra",
+            ts=3, headers={"X-Real-IP": "127.0.0.1"}),
+    ]
+    v = proof.grade("xfh", "hello page with extra", unrelated)
+    assert v.grade != "proven", v.checks
+
+
+def test_xfh_rewrite_control_must_be_the_same_request():
+    """The attack my own first version of this check allowed.
+
+    `by_rewrite` asked for a control on the same PATH whose body merely
+    DIFFERED. On any site with a 404 page that is free: send
+    `X-Original-URL: /nope` to `/search?q=a`, cite `/search?q=b` as the
+    control - it differs because the queries do - and cite the 404 on
+    `/nope` as the refusal. The header was ignored and nothing was
+    bypassed. The control has to be the same request without the header,
+    and it has to lack the quoted content.
+    """
+    exchanges = [
+        _ex("r1", "GET", "http://lab/search?q=a", "results for a",
+            ts=1, headers={"X-Original-URL": "/nope"}),
+        _ex("r2", "GET", "http://lab/search?q=b", "results for b", ts=2),
+        _ex("r3", "GET", "http://lab/nope", "not found", ts=3, status=404),
+    ]
+    v = proof.grade("xfh", "results for a", exchanges)
+    assert v.grade != "proven", v.checks
+
+    # the same shape with a real control - identical URL, no header, and the
+    # restricted content absent from it - does prove
+    honest = [
+        _ex("r1", "GET", "http://lab/search?q=a", "admin panel: users=3",
+            ts=1, headers={"X-Original-URL": "/nope"}),
+        _ex("r2", "GET", "http://lab/search?q=a", "results for a", ts=2),
+        _ex("r3", "GET", "http://lab/nope", "not found", ts=3, status=404),
+    ]
+    v = proof.grade("xfh", "admin panel: users=3", honest)
+    assert v.grade == "proven", v.missing
+
+
+def test_csrf_refuses_two_different_pages_as_the_change():
+    """"State changed" means one resource's content changed.
+
+    `before` and `after` were not required to be the same resource, so on
+    any site: read /home, send the write, read /about, and quote text that
+    /about has always carried. `verify_unkeyed_input` already required the
+    same resource because a value "appearing elsewhere on the site is not a
+    cache entry"; the same reasoning applies here and was missing.
+    """
+    foreign = {"Origin": "https://evil.example"}
+    exchanges = [
+        _ex("r1", "GET", "http://lab/home", "welcome home", ts=1),
+        _ex("r2", "POST", "http://lab/comment", "ok", ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/about", "about-page-text", ts=3),
+    ]
+    v = proof.grade("csrf", "about-page-text", exchanges)
+    assert v.grade != "proven", v.checks
+
+    # the same resource before and after does prove
+    same = [
+        _ex("r1", "GET", "http://lab/profile", "email: old@x", ts=1),
+        _ex("r2", "POST", "http://lab/profile", "ok", ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/profile", "email: evil@attacker", ts=3),
+    ]
+    v = proof.grade("csrf", "email: evil@attacker", same)
+    assert v.grade == "proven", v.missing
+
+
+def test_csrf_ordering_falls_back_to_position_without_timestamps():
+    """An old session with no `ts` must still order before/after correctly.
+
+    Ordering each entry on its own - `ts` when present, position otherwise -
+    mixes two scales: every position-ordered entry (1, 2, 3) sorts before
+    every timestamped one (1.79e9). So the fallback is all-or-nothing.
+    """
+    foreign = {"Origin": "https://evil.example"}
+    no_ts = [
+        {"id": "r1", "request": {"method": "GET", "url": "http://lab/p",
+                                 "headers": {}},
+         "response": {"status": 200, "body": "email: old@x"}},
+        {"id": "r2", "request": {"method": "POST", "url": "http://lab/p",
+                                 "headers": foreign},
+         "response": {"status": 200, "body": "ok"}},
+        {"id": "r3", "request": {"method": "GET", "url": "http://lab/p",
+                                 "headers": {}},
+         "response": {"status": 200, "body": "email: evil@attacker"}},
+    ]
+    v = proof.grade("csrf", "email: evil@attacker", no_ts)
+    assert v.grade == "proven", v.missing
+    # and the reverse claim is still refused without timestamps
+    v = proof.grade("csrf", "email: old@x", no_ts)
+    assert v.grade != "proven", v.checks

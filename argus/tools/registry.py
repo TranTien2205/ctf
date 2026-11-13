@@ -350,11 +350,20 @@ TOOL_SCHEMAS: list[dict] = [
         "CSRF surface check: inventories forms on the page, flags POST "
         "forms without anti-CSRF hidden tokens, and checks session cookies "
         "for missing SameSite=Lax/Strict. Pass data to replay the action "
-        "with a CORS-simple content type and test enforcement.",
+        "cross-origin under both preflight-free content types, and "
+        "read_url to bracket the write with a read before and after - the "
+        "csrf class needs all four: the write succeeded, it carried no "
+        "token, it carried a foreign Origin/Referer, and the quoted bytes "
+        "are in the read AFTER and not the read BEFORE. Without read_url "
+        "the class stops at a candidate.",
         {"url": {**_STR, "description": URL_DESC +
                  " Point it at a page containing the state-changing form."},
          "method": {**_STR, "description": "POST|PUT|DELETE|PATCH for the replay (default: POST when data given)"},
-         "data": {**_STR, "description": "Body to replay with Content-Type: text/plain"}},
+         "data": {**_STR, "description": "Body to replay. Sent as both text/plain and application/x-www-form-urlencoded, so use the shape the endpoint parses"},
+         "read_url": {**_STR, "description": URL_DESC +
+                      " The resource this write modifies, read once before "
+                      "and once after it. Both reads must be of the SAME "
+                      "resource - two different pages are not a change"}},
         ["url"],
     ),
     _schema(
@@ -363,11 +372,14 @@ TOOL_SCHEMAS: list[dict] = [
         "reports whether it is reflected into the response body or the "
         "Location header (password-reset poisoning, cache poisoning). "
         "Pass `restricted` (a path that 403s directly) to also test "
-        "X-Original-URL / X-Rewrite-URL middleware ACL bypass.",
+        "X-Original-URL / X-Rewrite-URL middleware ACL bypass - that branch "
+        "also records the control the xfh class needs, the same request "
+        "with no ACL header, so the pair can reach proven.",
         {
             "url": {**_STR, "description": URL_DESC},
-            "restricted": {**_STR, "description": "Optional path that 403s "
-                           "directly, e.g. /admin - enables the header "
+            "restricted": {**_STR, "description": "Optional resource that "
+                           "403s directly, e.g. /admin - a path or a full "
+                           "URL, either works. Enables the header "
                            "ACL-bypass check"},
         },
         ["url"],
@@ -500,7 +512,9 @@ TOOL_SCHEMAS: list[dict] = [
         "User-enumeration differential on a login/registration/recovery "
         "form: submits a guaranteed-bogus identifier, then likely-real "
         "usernames. A differing error/status means the endpoint reveals "
-        "which accounts exist.",
+        "which accounts exist. The difference is then repeated, because the "
+        "enum class requires each answer to be observed more than once - "
+        "one difference is a coincidence.",
         {"url": {**_STR, "description": URL_DESC},
          "data": {**_STR, "description": "POST body template; param value "
                                          "is replaced"},
