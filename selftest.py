@@ -1189,6 +1189,42 @@ def _doc_consistency() -> None:
           f"{unlisted} are read by argus/ and absent from the file an "
           "operator copies to configure it")
 
+    # 12. the default model is priced and not deprecated.
+    #
+    #     `DEFAULT_MODEL` was `claude-sonnet-4-5`, deprecated and retiring
+    #     2026-11-30 - a value that was right when written and that nothing
+    #     checked. Every run without `--model` or `ARGUS_MODEL` pointed at a
+    #     model that stops answering this month, and `.env.example` offered
+    #     it as the example. A retirement date cannot be checked offline, so
+    #     the table carries the deprecation as DATA - the same move as
+    #     `cap_reason` in the proof matrix - and this refuses a default that
+    #     is unpriced or marked deprecated. It also refuses a model named in
+    #     a document that the table does not price, because an unpriced
+    #     model reports no cost at all.
+    from argus import models as _models
+    from argus.config import DEFAULT_MODEL
+
+    spec = _models.get(DEFAULT_MODEL)
+    note = (getattr(spec, "note", "") or "") if spec else ""
+    check(f"the default model is priced and current ({DEFAULT_MODEL})",
+          spec is not None and "DEPRECATED" not in note.upper(),
+          f"{DEFAULT_MODEL} is not in models.json - every run without "
+          "--model would report no cost" if spec is None else
+          f"{DEFAULT_MODEL}: {note}")
+    priced = set(_models.keys()) if hasattr(_models, "keys") else set()
+    if not priced:
+        import json as _json
+        priced = set(_json.loads(
+            (ROOT / "argus" / "models.json").read_text(
+                encoding="utf-8"))["models"])
+    doc_models = set(_re.findall(r"`(claude-[a-z0-9-]+|gpt-[0-9.a-z-]+)`",
+                                 "\n".join(texts.values())))
+    unpriced = sorted(m for m in doc_models if m not in priced)
+    check(f"docs name only models this build prices ({len(priced)} priced)",
+          not unpriced,
+          f"{unpriced} are named in a document and absent from models.json, "
+          "so a run on one reports no cost")
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "

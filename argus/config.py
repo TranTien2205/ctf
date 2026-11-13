@@ -8,7 +8,12 @@ import urllib.parse
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL = "claude-sonnet-4-5"
+# The default every run without --model or ARGUS_MODEL uses. It was
+# claude-sonnet-4-5, which is deprecated and retires 2026-11-30: a
+# value that was right when written and that nothing checked against
+# reality. `models.json` carries the deprecation as data now and
+# selftest refuses a deprecated default.
+DEFAULT_MODEL = "claude-sonnet-5-5"
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
 OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/token"

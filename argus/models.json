@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "note": "Model table. Tuning a model, adding one, or changing a price is a data change, not a code change. Prices are USD per million tokens as published; they move, and a stale price is a wrong cost report - `argus models` prints what this file says so the number in a report can always be traced to a line here.",
   "defaults": {
     "provider": "anthropic",
@@ -7,6 +7,63 @@
     "max_output_tokens": 4096
   },
   "models": {
+    "claude-opus-5-5": {
+      "provider": "anthropic",
+      "display": "Opus 5.5",
+      "usd_per_mtok_in": 4.0,
+      "usd_per_mtok_out": 20.0,
+      "context_window": 1000000,
+      "roles": [
+        "planner",
+        "depth",
+        "judge",
+        "writer",
+        "breadth"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ],
+      "note": "current Opus. Published 2026-11-03 at 4.00/20.00 per MTok"
+    },
+    "claude-sonnet-5-5": {
+      "provider": "anthropic",
+      "display": "Sonnet 5.5",
+      "usd_per_mtok_in": 2.0,
+      "usd_per_mtok_out": 10.0,
+      "context_window": 1000000,
+      "roles": [
+        "planner",
+        "depth",
+        "judge",
+        "writer",
+        "breadth"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ],
+      "note": "current Sonnet. Published 2026-11-03 at 2.00/10.00 per MTok"
+    },
+    "claude-haiku-5-5": {
+      "provider": "anthropic",
+      "display": "Haiku 5.5",
+      "usd_per_mtok_in": 0.1,
+      "usd_per_mtok_out": 0.5,
+      "context_window": 1000000,
+      "roles": [
+        "breadth",
+        "writer"
+      ],
+      "api_key_env": [
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "CLAUDE_CODE_OAUTH_TOKEN"
+      ],
+      "note": "current Haiku. 0.10/0.50 per MTok for prompts up to 100K tokens and 0.50/2.50 above it - this table holds one pair, so a long-prompt run under-reports by 5x. Published 2026-11-03"
+    },
     "claude-sonnet-4-5": {
       "provider": "anthropic",
       "display": "Sonnet 4.5",
@@ -23,7 +80,8 @@
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
-      ]
+      ],
+      "note": "DEPRECATED - retires 2026-11-30. Use claude-sonnet-5-5. Its price is left as recorded because no current published figure covers it"
     },
     "claude-opus-4-5": {
       "provider": "anthropic",
@@ -39,7 +97,8 @@
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
-      ]
+      ],
+      "note": "previous generation, still served. 15.00/75.00 is what this table has always said and no current published figure covers this model, so it is left alone rather than guessed at - every current Opus is cheaper"
     },
     "claude-haiku-4-5": {
       "provider": "anthropic",
@@ -54,7 +113,8 @@
         "ANTHROPIC_API_KEY",
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
-      ]
+      ],
+      "note": "previous generation, still served. 1.00/5.00 matches the published figure as of 2026-11-03"
     },
     "gpt-4.1": {
       "provider": "openai",
@@ -127,5 +187,6 @@
     "depth": "exploitation and verification: must hold a long chain of reasoning about one target",
     "judge": "reviews a finding. Must not be the family that produced it - two models that agree because they share a prior are not a check",
     "writer": "report prose from recorded findings; invents nothing"
-  }
+  },
+  "priced_as_of": "2026-11-03"
 }

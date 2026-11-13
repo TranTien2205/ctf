@@ -925,6 +925,34 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The default model retires this month
+- `DEFAULT_MODEL` was `claude-sonnet-4-5`. It is **deprecated and retires
+  2026-11-30** - seventeen days from the day this was found - so every run
+  without `--model` or `ARGUS_MODEL` pointed at a model that stops answering
+  this month, and `.env.example` offered it as the example to copy. The
+  value was right when written and nothing checked it against anything.
+- `models.json` carried no Claude 5 entry at all, so a run on the current
+  generation reported **no cost** - the honest fallback working, and still a
+  thesis chapter with an empty cost column. It now prices
+  `claude-opus-5-5` (4.00/20.00), `claude-sonnet-5-5` (2.00/10.00) and
+  `claude-haiku-5-5` (0.10/0.50), each from the published figures, with
+  `priced_as_of` on the table so staleness is visible rather than implied.
+  Haiku 5.5's note records what this schema cannot hold: 0.10/0.50 applies
+  to prompts up to 100K tokens and 0.50/2.50 above, so one price pair
+  under-reports a long-prompt run fivefold.
+- The two previous-generation rows were checked rather than assumed.
+  `claude-haiku-4-5` at 1.00/5.00 **matches** the published figure and is
+  untouched. `claude-opus-4-5` is still served, and its 15.00/75.00 is left
+  exactly as recorded with a note saying why: no current published figure
+  covers that model, and every current Opus is cheaper, so changing the
+  number would be a guess dressed as a correction.
+- A retirement date cannot be checked offline, so the deprecation is DATA in
+  the table - the same move `cap_reason` makes in the proof matrix - and the
+  gate refuses a default that is unpriced or marked deprecated. A second
+  check refuses a model named in a document that the table does not price,
+  since a run on one reports no cost at all. Both were tried against the
+  shapes they must catch before being trusted.
+
 ### A green suite that failed on correct output
 - Widening the CI matrix to 3.13/3.14 doubled the Windows jobs, and the next
   run failed - the first CI failure in this stretch, and not a regression.
@@ -1132,7 +1160,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 154 offline checks, including a documentation
+- `python selftest.py`: 156 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

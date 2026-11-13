@@ -57,7 +57,7 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
                    help="Tester/org attribution recorded in meta.json and "
                         "rendered in the report header")
     p.add_argument("--model",
-                   help="model id (default claude-sonnet-4-5). `argus models` "
+                   help="model id (default claude-sonnet-5-5). `argus models` "
                         "lists the table; a name it does not know is sent to "
                         "Anthropic")
     p.add_argument("--api-key", help="Anthropic API key (else ANTHROPIC_API_KEY)")
