@@ -961,6 +961,40 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The probe-attribution denominator came from the mapping it checked
+- `PROBE_CLASS` maps a probe tool to the class it tests, and the ledger
+  reads it for three separate things: the per-class budget, rule 6's offer
+  of evidence for grading, and `_tool_for_class`. It was checked in one
+  direction only - every entry names a real tool. That direction cannot rot
+  on its own, because you only add an entry on purpose.
+- The direction that rots is a probe landing in the registry attributed to
+  nothing, and the ledger then reporting its class as never tried however
+  many times the run called it. Not hypothetical: `graphql_introspect` was
+  exactly this, and `decide.py` already records the three things it cost.
+  The entry was added. **Nothing was added that would catch the next one** -
+  the old check's denominator came from the mapping being checked, not from
+  the registry, which is the same shape as the count-checking gate's own
+  blind spot earlier in this log.
+- Measured: 27 registered `probe_*` tools, 26 attributed. The one gap is
+  `probe_time`, and it is *correctly* excluded - a latency measurement is
+  consistent with sqli, with rce, and with a slow database, so attributing
+  it would let a timing run stand in for a proof it cannot produce. So
+  there was no defect to fix, only a reason held by a comment.
+- The comment is now `UNATTRIBUTED_PROBES`, data with a stated reason, and
+  the pair is a partition a test holds: every registered `probe_*` tool is
+  either attributed to a class or named as excluded with the reason. Both
+  options are one line; being in neither is the bug.
+- Proved each of its three assertions can fail on its own. Dropping
+  `probe_time`'s exclusion: *"['probe_time'] send requests but are
+  attributed to no class"*. Attributing a tool in both places: the
+  disjointness assertion names the overlap. Shortening the reason to
+  "too noisy": *"probe_time is excluded without a stated reason"*.
+- Audited the rest of `decide.py` and found nothing. `counts` is keyed
+  `(endpoint, class)` and `recorded` `(class, endpoint)` - opposite orders
+  in one function, which is a readability hazard - but all five use sites
+  swap correctly, so I left them alone rather than churn a module whose
+  every branch cites a past failure.
+
 ### Three refusals arriving as one, and the wrong one
 - `LeadQueue.push` returned `False` for three unrelated reasons - the
   pipeline is closed, the lead is a duplicate, the 10000-unique-lead bound
@@ -1586,7 +1620,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 626 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 627 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

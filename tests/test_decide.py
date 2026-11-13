@@ -362,6 +362,51 @@ def test_every_mapped_probe_tool_exists():
         assert tool in known, f"{tool} is mapped but is not a tool"
 
 
+def test_every_probe_tool_is_attributed_or_explicitly_excluded():
+    """The direction that can fail by neglect.
+
+    `test_every_mapped_probe_tool_exists` checks that every entry in
+    PROBE_CLASS names a real tool. That direction cannot rot on its own:
+    you only add an entry on purpose. The direction that rots is a new
+    probe landing in the registry attributed to nothing, and the ledger
+    then reporting that its class was never tried however many times the
+    run called it.
+
+    That is not hypothetical - `graphql_introspect` was exactly this, and
+    `decide.py` records the three things it cost: the per-class budget
+    never counted its requests, rule 6 never offered its evidence for
+    grading, and `_tool_for_class` fell through to `http_request`. The
+    entry was added afterwards. Nothing was added that would catch the
+    next one, because the denominator here comes from the registry and the
+    old check's denominator came from the mapping being checked.
+
+    So: every registered `probe_*` tool is either attributed to a class or
+    named in UNATTRIBUTED_PROBES with the reason it must not be. Both
+    options are one line; being in neither is the bug.
+    """
+    from argus.tools import registry
+    probes = {t["name"] for t in registry.TOOL_SCHEMAS
+              if t["name"].startswith("probe_")}
+    attributed = probes & set(decide.PROBE_CLASS)
+    excluded = probes & set(decide.UNATTRIBUTED_PROBES)
+    orphans = probes - attributed - excluded
+    assert not orphans, (
+        f"{sorted(orphans)} send requests but are attributed to no class. "
+        "Either map the tool in PROBE_CLASS, or name it in "
+        "UNATTRIBUTED_PROBES with the reason attributing it would be wrong "
+        "- a probe in neither is invisible to the ledger: its class reads "
+        "as never tried however often it is called.")
+    # the two must stay disjoint, or the exclusion is a dead comment again
+    assert not (set(decide.PROBE_CLASS) & set(decide.UNATTRIBUTED_PROBES))
+    # and every exclusion must name a real tool, or it silently covers
+    # nothing - the same hole one level up
+    assert set(decide.UNATTRIBUTED_PROBES) <= {
+        t["name"] for t in registry.TOOL_SCHEMAS}
+    # every exclusion carries a reason worth reading
+    for tool, why in decide.UNATTRIBUTED_PROBES.items():
+        assert len(why) > 40, f"{tool} is excluded without a stated reason"
+
+
 def test_every_mapped_class_is_in_the_proof_matrix():
     from argus import proof
     for tool, klass in decide.PROBE_CLASS.items():

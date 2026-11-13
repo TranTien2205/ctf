@@ -71,11 +71,25 @@ PROBE_CLASS = {
 CLASS_TOOL_CHAIN = {
     "jwt": ("jwt_decode", "jwt_forge", "http_request"),
 }
-# `probe_time` is deliberately absent: a latency measurement is consistent
-# with sqli, with rce, and with a slow database, so recording it as "this
-# class was tested" would let a timing run stand in for a proof it cannot
-# produce. The same reasoning excludes the recon tools - mapping
-# `fingerprint` to a class would make reading a banner count as probing.
+# Probe tools that must NOT be attributed to a class, and why. This is the
+# other half of PROBE_CLASS, and it is data rather than a comment because
+# the pair is a partition: every registered `probe_*` tool belongs to
+# exactly one of the two, and a test holds that. PROBE_CLASS was only ever
+# checked in the direction "every mapping names a real tool", which is the
+# direction that cannot fail by neglect. The one that can is a new probe
+# landing in the registry and being attributed to nothing - which is what
+# happened to `graphql_introspect`, and the comment above records the three
+# things it cost. Adding the entry fixed that instance; this partition is
+# what makes the next one fail loudly instead.
+UNATTRIBUTED_PROBES = {
+    "probe_time": "a latency measurement is consistent with sqli, with rce, "
+                  "and with a slow database. Recording it as 'this class was "
+                  "tested' would let a timing run stand in for a proof it "
+                  "cannot produce.",
+}
+# The same reasoning excludes the recon tools - mapping `fingerprint` to a
+# class would make reading a banner count as probing - but they are not
+# named `probe_*`, so the partition does not reach them.
 
 # Probes worth reaching for on a parameterised endpoint nothing has tested.
 # Ordered cheapest-and-most-likely first; this is a reading order, not a
