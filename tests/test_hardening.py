@@ -424,3 +424,64 @@ def test_a_cookie_part_with_no_equals_is_redacted_whole():
     # for the cookie-hygiene class the lab plants
     attrs = _redact_header_value("Set-Cookie", "sid=abc9; HttpOnly; Secure")
     assert "HttpOnly" in attrs and "Secure" in attrs and "abc9" not in attrs
+
+
+def test_no_operator_credential_reaches_any_artifact(lab_url, tmp_path):
+    """End-to-end sweep: no operator credential in any artifact.
+
+    What this actually covers, measured by reverting each fix and watching
+    the test - because the first draft of this docstring claimed it would
+    have caught all four redaction leaks and that is false:
+
+    * the target's userinfo - **caught**: reverting it fails here with
+      `{"meta.json": ["userinfo"]}`.
+    * the unstripped header name, the `": "` split and the cookie part with
+      no `=` - **not caught here**. A malformed header name never reaches
+      the recorder: httpx drops `"Authorization "` before the request is
+      built, so the recorded header dict is empty and the planted shape
+      cannot arrive through this path. Those three are covered by the
+      unit-level tests above, which hand the redactors the shapes directly.
+
+    So this is the artifact-surface guard, not a replacement for those.
+    Scope, stated so a later reader does not widen it wrongly: response
+    bodies and WebSocket frame payloads are target data - evidence, not
+    scrubbed unless declared with `--secret`. What must never persist is a
+    credential the OPERATOR supplied.
+    """
+    import json as _json
+
+    from argus.httpclient import GuardedClient
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    planted = {
+        "userinfo": "TARGETPW9",
+        "bearer": "HDRTOKEN9",
+        "cookie": "COOKIEVAL9",
+    }
+    host = lab_url.split("//", 1)[1]
+    target = f"http://admin:{planted['userinfo']}@{host}/"
+    session = Session(tmp_path, target, meta={"operator": "audit"})
+    scope = ScopeGuard(target, allow_private=True)
+    client = GuardedClient(
+        scope, session, RateLimiter(0), tls_verify=False, max_requests=40,
+        # the shapes that defeated redaction before: a name with trailing
+        # whitespace, and a cookie value carrying no `=`
+        default_headers={"Authorization ": f"Bearer {planted['bearer']}",
+                         "Cookie": planted["cookie"]})
+    try:
+        client.send("GET", lab_url + "/", tool="http_request", note="audit")
+        client.send_raw(lab_url + "/", [{"method": "GET", "headers": []}])
+    finally:
+        client.close()
+
+    leaked = {}
+    for path in sorted(session.dir.iterdir()):
+        if not path.is_file():
+            continue
+        text = path.read_text(errors="replace")
+        hits = sorted(k for k, v in planted.items() if v in text)
+        if hits:
+            leaked[path.name] = hits
+    assert not leaked, _json.dumps(leaked, indent=2)

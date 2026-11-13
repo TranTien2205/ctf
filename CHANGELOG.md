@@ -925,6 +925,29 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### A sweep test that claimed four fixes and covered one
+- The four redaction leaks were each found alone, so the obvious follow-up
+  was one end-to-end guard: plant a distinct secret in every
+  operator-controlled channel, drive the real client against the lab, sweep
+  every file in the session dir. Its docstring said it would have caught all
+  four together.
+- Then the rule this stretch had adopted - revert the fix and watch the test
+  - and it **passed with the fix reverted**. Measured one by one: it catches
+  the target's userinfo (reverting that fails with
+  `{"meta.json": ["userinfo"]}`) and catches **none** of the other three,
+  because httpx drops a header named `"Authorization "` before the request
+  is built, so the recorded header dict is empty and the planted shape never
+  reaches the recorder. The test ran on a path where the condition it checks
+  cannot occur.
+- A test whose docstring overstates its reach is worse than no test: it
+  stops the next reader writing the one that is needed. The docstring now
+  states what is covered, what is not, and why, and points at the
+  unit-level tests that hand the redactors those shapes directly - each of
+  which was checked for failure when it was written.
+- This was the eighth time in this stretch that my own instrument or claim
+  was the defect, and the first time I caught it **before** committing,
+  using the habit the earlier seven paid for.
+
 ### The target's basic-auth credentials persisted in two artifacts
 - `session.py`'s own docstring said basic-auth in a URL "persists nowhere;
   the scope guard only ever needed the host". It was true of the request
@@ -1379,7 +1402,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 617 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 618 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
