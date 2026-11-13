@@ -497,3 +497,55 @@ def test_the_class_budget_is_counted_in_the_unit_it_is_documented_in():
                                        * decide.PROBE_CALLS_PER_CLASS)
     assert decide.PROBE_CALLS_PER_CLASS >= 5
     assert decide.REQUESTS_PER_PROBE >= 10
+
+
+def test_a_malformed_findings_file_is_a_fact_not_a_crash():
+    """The contract says a malformed file is a fact about the run. It held
+    only for bad JSON: `findings.json` containing `42` raised
+    `TypeError: 'int' object is not iterable`, and a well-formed document of
+    the wrong shape is as malformed as a broken one."""
+    import json
+    import pathlib
+    import tempfile
+    exchange = {"id": "r1", "tool": "probe_sqli",
+                "request": {"method": "GET", "url": "http://t/i?id=1",
+                            "headers": {}, "body": None},
+                "response": {"status": 200, "headers": {}, "body": "x"}}
+    for content in ("42", '"hello"', "null", '{"x": 1}', "[1, 2, 3]", "{{{"):
+        sdir = pathlib.Path(tempfile.mkdtemp())
+        sdir.joinpath("transcript.jsonl").write_text(
+            json.dumps(exchange) + "\n", encoding="utf-8")
+        sdir.joinpath("findings.json").write_text(content, encoding="utf-8")
+        action = decide.next_action(sdir)        # must not raise
+        assert action.action, content
+
+
+def test_a_proof_on_a_second_endpoint_is_still_recommended(tmp_path):
+    """Suppression was per CLASS, so an `rce` recorded on /a hid an
+    unrecorded `rce` proof on /b for the rest of the run. Two endpoints are
+    two findings."""
+    body = "uid=0(root) gid=0(root)\nargusabcd1234\n"
+
+    def cmdi(rid, path):
+        return {"id": rid, "tool": "probe_cmdi",
+                "request": {"method": "GET",
+                            "url": f"http://t{path}?h=1;id;echo argusabcd1234",
+                            "headers": {}, "body": None},
+                "response": {"status": 200, "headers": {}, "body": body}}
+
+    def found(fid, path, rid):
+        return {"id": fid, "vuln_class": "rce", "grade": "proven",
+                "url": f"http://t{path}", "evidence_ids": [rid],
+                "proof": {"missing": []}}
+
+    sdir = _session(tmp_path, [cmdi("r1", "/a"), cmdi("r2", "/b")],
+                    [found("F01", "/a", "r1")])
+    action = decide.next_action(sdir)
+    assert action.action == "record_finding", action.render()
+    assert action.target == "http://t/b"
+    assert action.vuln_class == "rce"
+
+    # with both recorded, it stops recommending either
+    sdir2 = _session(tmp_path / "both", [cmdi("r1", "/a"), cmdi("r2", "/b")],
+                     [found("F01", "/a", "r1"), found("F02", "/b", "r2")])
+    assert decide.next_action(sdir2).action != "record_finding"

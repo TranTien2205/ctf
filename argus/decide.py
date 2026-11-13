@@ -141,11 +141,25 @@ def _load_findings(sdir: Path) -> list[dict]:
         return []
     if isinstance(data, dict):
         data = data.get("findings")
-    return [f for f in (data or []) if isinstance(f, dict)]
+    if not isinstance(data, (list, tuple)):
+        # `findings.json` holding `42` raised TypeError: not iterable. The
+        # contract is that a malformed file is a FACT about the run, not a
+        # crash in the reader, and "malformed" covers a well-formed JSON
+        # document of the wrong shape as much as a bad one.
+        return []
+    return [f for f in data if isinstance(f, dict)]
 
 
 def _exchanges(entries: list[dict]) -> list[dict]:
     return [e for e in entries if isinstance(e.get("response"), dict)]
+
+
+def _shape_of_url(url: str) -> str:
+    """The endpoint key for a URL string, as `_endpoint` makes one."""
+    parts = urlparse(str(url or ""))
+    if not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}{parts.path or '/'}"
 
 
 def _endpoint(entry: dict) -> str:
@@ -269,7 +283,11 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
     index = _by_id(entries)
     claimed_ids = {str(i) for f in findings
                    for i in (f.get("evidence_ids") or [])}
-    recorded = {proof.normalize(str(f.get("vuln_class") or ""))
+    # Per (class, endpoint), not per class: an `rce` recorded on /a used to
+    # hide an unrecorded `rce` proof on /b for the rest of the run, because
+    # the class was "already recorded". Two endpoints are two findings.
+    recorded = {(proof.normalize(str(f.get("vuln_class") or "")),
+                 _endpoint(f) or _shape_of_url(str(f.get("url") or "")))
                 for f in findings}
 
     # Rule 1 - evidence already on disk that meets a proof requirement, with
@@ -354,7 +372,7 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
     # Rule 5 - a class that has spent its budget on one endpoint with nothing
     # recorded. Park it by name and move, rather than sending payload six.
     spent = [(ep, klass, n) for (ep, klass), n in sorted(counts.items())
-             if n >= BUDGET_PER_CLASS and klass not in recorded]
+             if n >= BUDGET_PER_CLASS and (klass, ep) not in recorded]
     if spent:
         endpoint, klass, n = spent[0]
         return Action(
@@ -424,7 +442,7 @@ def _unrecorded_proof(exchanges: list[dict], recorded: set[str],
     by_shape = by_shape if by_shape is not None else {}
     for entry in reversed(exchanges[-max_scan:]):
         klass = PROBE_CLASS.get(_tool_of(entry))
-        if not klass or klass in recorded:
+        if not klass or (klass, _endpoint(entry)) in recorded:
             continue
         if str(entry.get("id")) in claimed_ids:
             continue

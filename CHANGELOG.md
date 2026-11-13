@@ -691,6 +691,17 @@ somebody reading only the list.
   `argus compare` both warns on cross-build metric sets and prints
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
+### The ledger hid a finding and crashed on a well-formed file
+- Rule 1's suppression was per CLASS, so an `rce` recorded on `/a` hid an
+  unrecorded `rce` proof on `/b` for the rest of the run - and the probe
+  budget was spent per class too, so the second endpoint was parked as well.
+  Two endpoints are two findings; both are keyed on (class, endpoint) now.
+- `_load_findings` failed soft on bad JSON and not on a well-formed document
+  of the wrong shape: `findings.json` containing `42` raised
+  `TypeError: 'int' object is not iterable`. The contract says a malformed
+  file is a fact about the run, and that covers `42`, `"hello"`, `null`, an
+  object with no `findings` key, and a list of ints - all six are asserted.
+
 ### `argus judge` left the report contradicting the record
 - Writing a verdict into `findings.json` and then re-sealing left `report.md`,
   `report.html`, `report.sarif` and `summary.json` describing findings that no
@@ -733,7 +744,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 550 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 552 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
