@@ -59,6 +59,11 @@ METHOD_NOT_FOUND = -32601
 INTERNAL_ERROR = -32603
 
 
+# One JSON-RPC frame. Generous for any real tool call and far below what a
+# host could send without a newline.
+_MAX_FRAME = 4 * 1024 * 1024
+
+
 def tool_manifest(allowed: frozenset[str] | None = None) -> list[dict]:
     """TOOL_SCHEMAS in MCP shape. Anthropic calls it `input_schema`, MCP calls
     it `inputSchema`; the schema itself is identical."""
@@ -244,12 +249,28 @@ class ArgusMCPServer:
     def serve(self) -> int:
         """Read frames until stdin closes. Returns a process exit code."""
         for line in self._in:
+            # A frame is bounded. `for line in stdin` reads until a newline,
+            # so a host that sends megabytes without one buffers all of it -
+            # the same reasoning that bounds a planted wordlist elsewhere in
+            # this package, applied to the one input another process writes.
+            if len(line) > _MAX_FRAME:
+                self._error(None, INVALID_REQUEST,
+                            f"frame exceeds {_MAX_FRAME} bytes")
+                continue
             line = line.strip()
             if not line:
                 continue
             try:
                 msg = json.loads(line)
-            except ValueError:
+            except Exception:
+                # NOT just ValueError. Deeply nested JSON raises
+                # RecursionError - measured: `"[" * 100000` does - which is
+                # not a ValueError, so it escaped this handler, left the
+                # `for` loop, and killed the server. Worse, `_finalize()`
+                # runs AFTER this loop, so the escape skipped the seal
+                # entirely: one malformed frame ended the engagement with
+                # the session unsealed and unrendered, which is the exact
+                # failure the disconnect path below exists to prevent.
                 self._error(None, PARSE_ERROR, "invalid JSON frame")
                 continue
             try:

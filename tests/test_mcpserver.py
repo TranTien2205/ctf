@@ -379,3 +379,54 @@ def test_a_finalize_failure_reaches_the_host_not_only_stderr(served, monkeypatch
     entries = [e for e in server.session._transcript.values()
                if e.get("kind") == "finalize_failed"]
     assert entries and "disk full" in entries[0]["error"]
+
+
+def test_a_malformed_frame_does_not_kill_the_server(tmp_path):
+    """One hostile frame ended the engagement and skipped the seal.
+
+    `json.loads` was wrapped in `except ValueError`, and deeply nested JSON
+    raises **RecursionError** - measured: `"[" * 100000` does. That is not a
+    ValueError, so it escaped the handler, left the `for line in stdin`
+    loop, and killed the process. Worse, `_finalize()` runs AFTER that loop,
+    so the escape skipped the seal entirely: the session was left unsealed
+    and unrendered, which is the exact failure the disconnect path below it
+    exists to prevent.
+
+    Checked by reverting the catch and watching the server die with
+    RecursionError before trusting the fix.
+    """
+    import io
+    import json as _json
+
+    from argus.config import Config
+    from argus.mcpserver import _MAX_FRAME, ArgusMCPServer
+
+    init = _json.dumps({"jsonrpc": "2.0", "id": 1,
+                        "method": "initialize", "params": {}}) + "\n"
+
+    def drive(frame):
+        cfg = Config(target="http://127.0.0.1:1/", allow_private=True,
+                     session_dir=tmp_path)
+        out = io.StringIO()
+        srv = ArgusMCPServer(cfg, stdin=io.StringIO(init + frame),
+                             stdout=out)
+        rc = srv.serve()           # must not raise
+        replies = [_json.loads(l) for l in out.getvalue().splitlines()
+                   if l.strip()]
+        return rc, replies
+
+    for frame, expect in (
+            ("[" * 100000 + "]" * 100000 + "\n", "invalid JSON frame"),
+            ("not json at all\n", "invalid JSON frame"),
+            ("x" * (_MAX_FRAME + 1) + "\n", "frame exceeds"),
+    ):
+        rc, replies = drive(frame)
+        assert rc == 0
+        errors = [r["error"]["message"] for r in replies if "error" in r]
+        assert any(expect in e for e in errors), (expect, errors)
+
+    # ...and an ordinary call still works, or the hardening ate the server
+    rc, replies = drive(_json.dumps({"jsonrpc": "2.0", "id": 2,
+                                     "method": "tools/list"}) + "\n")
+    assert rc == 0
+    assert any("result" in r for r in replies), replies

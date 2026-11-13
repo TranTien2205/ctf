@@ -936,6 +936,27 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### One malformed frame killed the MCP server and skipped the seal
+- `argus mcp-serve` is the `user → LLM → MCP → tool` path the project is
+  graded on, and its read loop wrapped `json.loads` in `except ValueError`.
+  Deeply nested JSON raises **RecursionError** - measured: `"[" * 100000`
+  does - which is not a ValueError. It escaped the handler, left the
+  `for line in stdin` loop, and killed the process.
+- The second half is worse than the crash. `_finalize()` runs **after** that
+  loop, so the escape skipped the seal entirely: one malformed frame ended
+  the engagement with the session unsealed and unrendered - the exact
+  failure the disconnect path immediately below it was written to prevent.
+  A guard placed after a loop protects nothing on the paths that leave the
+  loop sideways.
+- Every parse failure is now a `PARSE_ERROR` reply, and a frame is bounded
+  at 4 MiB: `for line in stdin` reads until a newline, so a host sending
+  megabytes without one buffered all of it - the same reasoning this package
+  already applies to a planted wordlist, applied to the one input another
+  process writes.
+- Checked by reverting the catch and watching the server die with
+  RecursionError, and the test asserts an ordinary `tools/list` still
+  answers - hardening that eats the server is not hardening.
+
 ### A defence on the vendor-egress path that could not fire
 - `argus judge` sends a case file to a **second model vendor**, and `_scrub`
   is the last thing between that text and the wire. It called `_redact_url`
@@ -1464,7 +1485,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 620 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 621 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
