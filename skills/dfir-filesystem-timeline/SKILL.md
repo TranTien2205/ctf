@@ -244,6 +244,13 @@ regf cells into a path index; `get <path>` reads values and the named
 extractors (`userassist`, `shimcache`, `amcache`, `mru`) decode the
 rot13 counts, AppCompat entries and recent-lists directly.
 
+Shellbags — folder-browse history that survives the folder's deletion:
+`python3 tools/forensics/shellbags.py NTUSER.DAT` (or `UsrClass.dat`)
+walks `Shell\BagMRU`, decodes each numbered child's ITEMIDLIST (drive
+0x2F, CLSID 0x1F, file-system 0x31/0x74 DOS+long names with size and
+FAT mtime) and rebuilds the absolute path per node — "did the user
+open X" and "which folders existed".
+
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
 which is the answer to a timestomp question. Confirmed = a timeline row quoted
