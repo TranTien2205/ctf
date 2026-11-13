@@ -349,6 +349,18 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "verify":
         from .session import verify_transcript
         res = verify_transcript(Path(args.session_dir))
+        # provenance: which build wrote this evidence - matters when the
+        # verifier's rules differ from the producer's
+        try:
+            _m = json.loads((Path(args.session_dir) / "meta.json")
+                            .read_text(encoding="utf-8"))
+            if isinstance(_m, dict):
+                if _m.get("argus_version"):
+                    res["produced_by"] = _m["argus_version"]
+                if _m.get("resumed_by"):
+                    res["resumed_by"] = _m["resumed_by"]
+        except Exception:
+            pass
         if args.json:
             # machine-readable verdict for CI: ok mirrors the exit code
             res["ok"] = not (res.get("error") or not res.get("chained")
@@ -397,8 +409,13 @@ def main(argv: list[str] | None = None) -> int:
         sealed = ", artifacts sealed" if res.get("sealed") \
             else " (unsealed: predates artifact digests - only transcript " \
                  "and findings integrity verified)"
+        prod = ""
+        if res.get("produced_by"):
+            prod = f" [produced by argus {res['produced_by']}"
+            prod += f", resumed by {res['resumed_by']}]" \
+                if res.get("resumed_by") else "]"
         print(f"OK: {res['entries']} chained entries verified{anchored}"
-              f"{fchk}{sealed}")
+              f"{fchk}{sealed}{prod}")
         return 0
 
     if args.cmd == "check":
