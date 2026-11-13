@@ -652,10 +652,8 @@ def _demo(args) -> int:
     """Offline demo for presentations/defense: spins up the lab and runs a
     scripted agent sequence through the real loop - scope guard, probes,
     evidence gate, findings and report all live. No API key needed."""
-    import sys as _sys
     import threading
-    _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lab"))
-    import vulnapp  # noqa: E402
+    from .lab import vulnapp  # packaged, so demo works from a wheel too
 
     from .llm import ScriptedClient
     from .config import Config

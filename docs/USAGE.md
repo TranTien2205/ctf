@@ -297,7 +297,7 @@ fetch-type server cannot be used to reach out-of-scope targets.
 
 ## The lab
 
-`lab/vulnapp.py` is a stdlib-only vulnerable app planting one bug per probe
+`argus/lab/vulnapp.py` is a stdlib-only vulnerable app planting one bug per probe
 family (XSS, SQLi error+bool, auth bypass, cmd injection, SSTI, LFI, open
 redirect, IDOR, bad CORS, weak JWT, .git disclosure). It's the fastest way
 to evaluate whether the agent finds what it should:

@@ -11,8 +11,9 @@ python selftest.py          # offline end-to-end, no API key needed
 python -m pytest tests/ -q  # unit + live-lab + loop tests
 ```
 
-Both must stay green. The lab (`lab/vulnapp.py`) plants one bug per probe
-family — if you change a probe, update the lab and its test together.
+Both must stay green. The lab (`argus/lab/vulnapp.py`, shimmed at
+`lab/vulnapp.py`) plants one bug per probe family — if you change a
+probe, update the lab and its test together.
 
 ## Layout
 
@@ -34,7 +35,9 @@ family — if you change a probe, update the lab and its test together.
 - `argus/resources/exploits/<id>/` — bundled `run_exploit` manifests;
   `<cwd>/resources/exploits/<id>/` extends/overrides
 - `argus/report/` — report.md + report.html + summary.json renderers
-- `lab/`, `tests/`, `selftest.py`
+- `argus/lab/vulnapp.py` — deterministic vulnerable lab (shim at
+  `lab/vulnapp.py` keeps `python lab/vulnapp.py` + `import vulnapp`
+  working); `tests/`, `selftest.py`
 
 ## Rules for changes
 
