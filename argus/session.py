@@ -575,10 +575,14 @@ class Session:
             if note:
                 entry["note"] = note
             entry["chain"] = _chain(self._last_chain, entry)
+            # serialize BEFORE committing in-memory state: a non-JSON leaf
+            # in a caller-built request dict must fail without leaving
+            # _transcript/_last_chain ahead of the file (chain gap)
+            line = json.dumps(entry, ensure_ascii=False) + "\n"
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
-                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                fh.write(line)
             return rid
 
     def record_event(self, kind: str, detail: dict, agent: str = "") -> str:
@@ -592,10 +596,11 @@ class Session:
             if agent:
                 entry["agent"] = agent
             entry["chain"] = _chain(self._last_chain, entry)
+            line = json.dumps(entry, ensure_ascii=False) + "\n"
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
-                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                fh.write(line)
             return rid
 
     def seal_artifacts(self) -> str | None:
@@ -641,10 +646,11 @@ class Session:
             entry = {"id": "seal", "ts": round(time.time(), 3),
                      "kind": "artifacts_digest", "files": files}
             entry["chain"] = _chain(self._last_chain, entry)
+            line = json.dumps(entry, ensure_ascii=False) + "\n"
             self._last_chain = entry["chain"]
             self._transcript["seal"] = entry
             with self.transcript_path.open("a", encoding="utf-8", newline="") as fh:
-                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+                fh.write(line)
         rid = "seal"
         if sp.exists():
             try:
