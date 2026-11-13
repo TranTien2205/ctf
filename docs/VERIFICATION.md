@@ -37,7 +37,7 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 
 | Property | Enforced in | Proven by |
 |---|---|---|
-| Findings cite verbatim bytes from a recorded response | `Session.add_finding` excerpt-substring gate against the transcript | `test_finding_requires_verbatim_evidence`, `test_finding_requires_some_evidence` |
+| Findings cite verbatim bytes from a recorded response (body, recorded headers, or event output) | `Session.add_finding` excerpt-substring gate → `_evidence_text_of_entry` | `test_finding_requires_verbatim_evidence`, `test_finding_requires_some_evidence` |
 | Cited request ids must exist | `add_finding` unknown-id check | `test_finding_requires_known_ids` |
 | Findings without ids auto-resolve or are rejected | excerpt-driven id resolution | `test_finding_autoresolves_evidence_id` |
 | Findings must be in scope | `record_finding` scope gate | `test_record_finding_rejects_out_of_scope` |
@@ -83,7 +83,8 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Leads are scope-checked at emission | `emit_lead` scope gate | `test_emit_lead_scope_checked` |
 | Worker crash cannot kill the team | coordinator `_run` wraps `loop.run` | `test_team_e2e` |
 | Engagement drains: lead exit → workers drain → bounded join | watchdog in `TeamRun.run` | `test_queue_close_drains` + coordinator review |
-| Context compaction bounded | `_compact_history` | `test_compact_history_bounds_context`, `test_loop_warns_before_budget_exhaustion` |
+| Context compaction bounded; stubs keep every evidence-id shape | `_compact_history` (`request_id`/`run_id`/`call_id`/`rid`) | `test_compact_history_bounds_context`, `test_compact_history_keeps_all_id_shapes`, `test_loop_warns_before_budget_exhaustion` |
+| `--max-workers` caps workers, not the lead; 0 is refused | `_spawn_guarded` role filter + CLI floor | `test_max_workers_counts_workers_not_lead` |
 | Ctrl-C stops cleanly and still seals | `stop_event` + `finally` seal path | `test_loop_survives_keyboard_interrupt`, `test_loop_interrupt_during_dispatch_stops` |
 
 ## Runtime and packaging
