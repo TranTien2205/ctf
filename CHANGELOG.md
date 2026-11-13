@@ -925,6 +925,23 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### Two promises about dependencies that nothing kept
+- `AGENTS.md` says "No new runtime dependencies without strong cause" and
+  `CLAUDE.md` says an engagement should not fail on a pip install. Both were
+  prose, enforced only by a reviewer noticing. One `import requests` in a
+  probe keeps the suite green on a developer machine that happens to have it,
+  ships a wheel that cannot run, and surfaces mid-engagement - the worst
+  possible moment for an import error.
+- Every import in the 39 shipped modules is now checked against the standard
+  library plus the dependencies **declared in `pyproject.toml`**. The
+  allowlist is derived rather than hard-coded to `httpx`, because declaring a
+  dependency is a deliberate act that should pass and importing one nobody
+  declared is what must fail.
+- The claim was true when checked - no third-party import beyond `httpx` -
+  so this is a guard rather than a repair, and it was proved by planting
+  `import requests` in `argus/scope.py`, watching the check name the module,
+  and restoring the file.
+
 ### The default model retires this month
 - `DEFAULT_MODEL` was `claude-sonnet-4-5`. It is **deprecated and retires
   2026-11-30** - seventeen days from the day this was found - so every run
@@ -1192,7 +1209,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 156 offline checks, including a documentation
+- `python selftest.py`: 157 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

@@ -1225,6 +1225,58 @@ def _doc_consistency() -> None:
           f"{unpriced} are named in a document and absent from models.json, "
           "so a run on one reports no cost")
 
+    # 13. every import the shipped package makes is stdlib or a DECLARED
+    #     dependency.
+    #
+    #     `AGENTS.md` says "No new runtime dependencies without strong
+    #     cause" and `CLAUDE.md` says an engagement should not fail on a pip
+    #     install. Both were prose. One `import requests` in a probe keeps
+    #     the suite green on a developer machine that happens to have it,
+    #     ships a wheel that cannot run, and surfaces mid-engagement - the
+    #     worst possible moment for an import error.
+    #
+    #     The allowlist is derived from `pyproject.toml`, not hard-coded to
+    #     `httpx`: declaring a dependency is a deliberate act that should
+    #     pass, and importing one nobody declared is what must fail.
+    import ast as _ast
+    import sys as _sys
+
+    declared = set()
+    pyproject = (ROOT / "pyproject.toml")
+    if pyproject.is_file():
+        block = _re.search(r"(?s)^dependencies\s*=\s*\[(.*?)\]",
+                           pyproject.read_text(encoding="utf-8"), _re.M)
+        if block:
+            for spec in _re.findall(r'"([^"]+)"', block.group(1)):
+                declared.add(_re.split(r"[<>=!\[ ]", spec, 1)[0]
+                             .strip().replace("-", "_").lower())
+    ok_names = set(_sys.stdlib_module_names) | declared | {"argus"}
+    undeclared: dict[str, set] = {}
+    scanned = 0
+    for fp in sorted((ROOT / "argus").rglob("*.py")):
+        scanned += 1
+        try:
+            tree = _ast.parse(fp.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in _ast.walk(tree):
+            names = []
+            if isinstance(node, _ast.Import):
+                names = [a.name.split(".")[0] for a in node.names]
+            elif (isinstance(node, _ast.ImportFrom) and node.level == 0
+                  and node.module):
+                names = [node.module.split(".")[0]]
+            for name in names:
+                if name and name.lower() not in ok_names:
+                    undeclared.setdefault(name, set()).add(
+                        fp.relative_to(ROOT).as_posix())
+    check(f"the package imports only stdlib and declared deps "
+          f"({scanned} modules, declared: {sorted(declared) or 'none'})",
+          bool(scanned) and not undeclared,
+          "; ".join(f"{k} in {sorted(v)[:2]}" for k, v in undeclared.items())
+          + " - undeclared, so `pip install -e .` does not install it and "
+            "the failure lands mid-engagement")
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "
