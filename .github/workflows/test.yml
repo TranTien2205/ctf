@@ -40,6 +40,7 @@ jobs:
           import glob, zipfile
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
           for need in ("argus/skills/sqli.md", "argus/team/roles/lead.md",
+                       "argus/lab/vulnapp.py",
                        "argus/resources/wordlists/dirs-small.txt",
                        "argus/resources/exploits/lab-jwt-forge/manifest.json"):
               assert need in names, f"wheel missing {need}"
@@ -50,5 +51,9 @@ jobs:
           pip install dist/*.whl
           argus skills | grep -q sqli   # bundled data resolvable post-install
           argus sessions --session-dir /tmp/none --json | grep -q '\[\]'
+          # demo must run from site-packages too - it once sys.path'ed to
+          # the repo-only lab/ dir and died ModuleNotFoundError on wheels
+          argus demo --session-dir /tmp/d --quiet >/dev/null
+          test -n "$(find /tmp/d -name summary.json)"
       - name: checked-in sample session still verifies (LF-stable digests)
         run: python -m argus verify docs/sample-session
