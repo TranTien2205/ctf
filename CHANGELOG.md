@@ -171,6 +171,16 @@ system. All notable milestones on `agent-v2`.
   `argus compare` warn when session targets resolve to different base
   hosts (a cross-host diff silently reads as all-fixed + all-new);
   same-host retests on a different port stay quiet and keep matching.
+- Detection-quality pass on the tool surface: `fingerprint` now flags
+  present-but-broken security headers (invalid XFO/XCTO, HSTS
+  `max-age=0`, `unsafe-url` referrer-policy, wildcard/unsafe CSP) via
+  `header_notes`; `graphql_introspect` flags the CSRF-able GET
+  transport and runs a field-suggestion probe when introspection is
+  refused (blind schema enumeration); `probe_csrf` counts
+  `SameSite=None` cookies as weak; `probe_method` sends its TRACE
+  canary regardless of `Allow:` advertisement (XST is frequently
+  enabled without being advertised). Lab gains `/bad-headers` and
+  `/graphql-strict`; `probe_method` gets its first coverage.
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
@@ -182,7 +192,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 181 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 185 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
