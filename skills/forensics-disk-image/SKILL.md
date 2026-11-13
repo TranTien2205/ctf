@@ -139,7 +139,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    multi-segment sets are reported honestly.
    `.vhd` disks: `python3 tools/forensics/vhd_read.py disk.vhd dump
    guest.img` walks footer -> cxsparse header -> BAT (fixed, dynamic,
-   and differencing with its parent locator named).
+   and differencing with its parent locator named). `.vmdk`:
+   `python3 tools/forensics/vmdk_info.py disk.vmdk` parses the text
+   descriptor (extents, geometry, parent chain) and inventories a
+   self-contained KDMV sparse; FLAT extents then open directly with
+   part_table.
    cramfs firmware images: `python3 tools/forensics/cramfs_read.py
    fs.cramfs list` walks the packed 12-byte inode tree and `get
    NAME` inflates its per-block zlib pointers; `jffs2_read.py` does

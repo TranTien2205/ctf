@@ -212,6 +212,9 @@ For names a wiped file left behind: `python3 tools/forensics/ntfs_indx.py
 slack region after the last entry — deleted filenames survive there
 with their `mft_ref`, timestamps and `slack: true` marker. Pair the
 recovered `mft_ref` with `mft_parse --dump` if the record still exists.
+For deleted IMAGES, `python3 tools/forensics/thumbcache.py
+thumbcache_256.db` walks the `CMMM` entries — previews persist after
+the original is gone; `--extract N` writes the embedded JPEG/PNG.
 
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
