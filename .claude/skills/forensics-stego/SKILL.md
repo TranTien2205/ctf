@@ -106,7 +106,13 @@ inside a capture instead of a file,
 `python3 tools/forensics/rtp_extract.py call.pcap` lists the RTP
 streams by SSRC (codec, packet count, seq loss) and
 `... --ssrc 0xNNN --out call.wav` decodes PCMU/PCMA through stdlib
-audioop+wave — the output feeds `dtmf_decode` directly. JPEG stego,
+audioop+wave — the output feeds `dtmf_decode` directly. If the
+question hints "something hidden in the audio" but no bit-plane or
+tone decodes, the classic answer is a flag drawn in the frequency
+domain: `python3 tools/spectrogram.py mystery.wav` renders the
+STFT as ASCII you can read right in the terminal (numpy FFT,
+mono-mixdown, `--png out.png` for a pixel copy). A flat-noise
+picture closes that channel. JPEG stego,
 MP3 channels and deeper planes still need the external tools below.
 
 ## Routing

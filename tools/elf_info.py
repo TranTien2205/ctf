@@ -202,6 +202,10 @@ def parse_elf(data):
             if tag == 1:
                 needed.append(_cstr(strs, val))
     imports = [s for s in dynsym if not s.startswith("_")]
+    packer_names = ("UPX", ".MPRESS", "ASPACK", ".NSP", ".PETITE",
+                    ".THEMIDA", ".VMP", ".ENIGMA", ".OBSIDIAN")
+    packed = [s["name"] for s in secs
+              if s["name"].upper().startswith(packer_names)]
     interesting = [s for s in imports
                    if any(k in s.lower() for k in
                           ("cmp", "str", "mem", "crypt", "aes", "rc4",
@@ -220,8 +224,16 @@ def parse_elf(data):
                                   if r["section"].endswith(".plt")
                                   and r["symbol"]],
             "deciding_check_hints": interesting,
+            "packed_suspects": packed,
             "note": "static read only — no disassembly; interesting "
-                    "imports name the check, they do not prove it"}
+                    "imports name the check, they do not prove it. "
+                    "packed_suspects names sections, not a decision: "
+                    "a UPX-named section means `upx -d` first"}
+    if not secs:
+        out["no_section_table"] = ("shoff==0 — UPX and other packers "
+                                   "strip section headers; read program "
+                                   "headers and run strings for the "
+                                   "packer name")
     if notes:
         out["core_notes"] = notes
     return out
