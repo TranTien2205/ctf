@@ -185,6 +185,11 @@ system. All notable milestones on `agent-v2`.
   `/graphql-strict` and `/hello2`; `probe_method` gets its first
   coverage. Selftest exercises all four new paths (bad-header notes,
   schema+GET transport, suggestion leak, eval-and-reflect SSTI).
+- Team sizing is honest: `--max-workers` caps workers only (the lead no
+  longer consumes a slot, so `--max-workers 1` still staffs the team),
+  a rejected initial spawn surfaces on stderr instead of vanishing, and
+  `--max-workers 0` is refused outright (zero workers means no probe
+  tools and no `record_finding` anywhere).
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
@@ -196,7 +201,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 121 offline checks.
-- `python -m pytest tests/ -q`: 186 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 187 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
