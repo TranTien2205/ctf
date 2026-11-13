@@ -58,6 +58,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.parse
 import urllib.request
@@ -762,16 +763,56 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             # regression until the counter was printed. Resetting is explicit
             # so the dependency is visible in the test that needs it.
             type(self)._coupons = 1
-            self._send(body=json.dumps({"coupons": type(self)._coupons}),
-                       ctype="application/json")
+            # Optional `parties=N`: hold every request inside the TOCTOU
+            # window on a barrier until N of them are in it, instead of
+            # hoping a 0.15s sleep overlaps. The sleep made provability a
+            # fact about the HOST's scheduler - three rounds of Windows CI
+            # failures, the second of which was precisely "the windows
+            # intersected but only ONE request got past the guard". A
+            # barrier AFTER the check and BEFORE the commit forces all N
+            # past the guard, so the overlap is a certainty and the only
+            # thing left to the host is whether N requests arrive inside
+            # the timeout - a far weaker requirement than interleaving
+            # microsecond-wide critical sections.
+            #
+            # 8s is deliberately BELOW the client's 15s read timeout: an
+            # under-filled barrier must resolve server-side so the probe
+            # reads a real status and grades `unproven`, rather than every
+            # request dying at status 0 and the failure looking like a
+            # network fault instead of a burst that never assembled.
+            try:
+                parties = int(p.get("parties") or 0)
+            except (TypeError, ValueError):
+                parties = 0
+            type(self)._redeem_barrier = (
+                threading.Barrier(parties, timeout=8.0)
+                if 2 <= parties <= 32 else None)
+            self._send(body=json.dumps(
+                {"coupons": type(self)._coupons, "parties": parties}),
+                ctype="application/json")
 
 
         elif path == "/redeem":
             # TOCTOU: check-then-act with no lock - concurrent requests all
             # pass the guard before the first commits the decrement
             if self._coupons > 0:
-                time.sleep(0.15)      # race window: wide enough that an
-                # 8-request burst overlaps even under test-suite load
+                # the window. Armed barrier: deterministic overlap. No
+                # barrier: the original sleep, which is what the demo and
+                # any manual run get - unchanged.
+                barrier = getattr(type(self), "_redeem_barrier", None)
+                if barrier is not None:
+                    try:
+                        barrier.wait()
+                    except threading.BrokenBarrierError:
+                        # fewer than N arrived within the timeout. Fall
+                        # through rather than hang: the probe then sees one
+                        # success and the class does not grade, which is a
+                        # clean failure naming the real cause instead of a
+                        # flake.
+                        pass
+                else:
+                    time.sleep(0.15)  # race window: wide enough that an
+                    # 8-request burst overlaps even under test-suite load
                 type(self)._coupons -= 1
                 self._send(body=json.dumps(
                     {"ok": True, "left": type(self)._coupons}))
@@ -1201,6 +1242,7 @@ def make_server(port: int = 0, workdir: str = ""):
     FAKEFS = os.path.join(root, "fakefs")
     Handler.db = _init_db()
     Handler._coupons = 1
+    Handler._redeem_barrier = None
     Handler._cache = {}
     Handler._lockout = {}
     Handler._registered = []

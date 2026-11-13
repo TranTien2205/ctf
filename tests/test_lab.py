@@ -262,6 +262,63 @@ def test_graphql_suggestion_leak(lab_url, ctx):
     assert "suggestions" in out["verdict"], out
 
 
+def test_the_race_window_can_be_made_deterministic(lab_url, ctx):
+    """`/redeem` proved only if the host happened to overlap the burst.
+
+    The window was `time.sleep(0.15)` and the hope that eight requests
+    land inside it. That made provability a fact about the scheduler, not
+    about the probe or the gate: three rounds of Windows CI failures, the
+    second of which was exactly "the windows intersected but only ONE
+    request got past the guard" - i.e. the overlap happened and the
+    decrement still beat the other checks.
+
+    `/redeem/reset?parties=N` arms a barrier INSIDE the window, after the
+    `coupons > 0` check and before the commit. Every request that reaches
+    it has already passed the guard, so when the barrier releases they all
+    commit: the overlap is a certainty rather than a wager. What is left to
+    the host is only whether N requests get in flight within the timeout,
+    which is a far weaker requirement than interleaving microsecond-wide
+    critical sections - and even an under-filled barrier releases its
+    waiters together on timeout, so >= 2 in flight still proves.
+
+    So this test asserts unconditionally where `test_race_probe` below has
+    to branch on what the machine did.
+    """
+    import json as _json
+
+    r = ctx.client.send("GET", lab_url + "/redeem/reset?parties=6",
+                        tool="http_request", note="arm a 6-party window")
+    assert _json.loads(r["body"])["parties"] == 6, r["body"]
+
+    out = probes.probe_race(ctx, lab_url + "/redeem", n=6)
+    # one coupon existed; every request in the burst was served
+    assert out["statuses"].get(200, 0) == 6, out
+    assert out["verdict"].startswith("race:"), out
+    assert out["overlapped"] is True, out
+    # and the limit was real: the serial baseline is refused afterwards
+    assert out["serial_statuses"] and all(
+        s >= 400 for s in out["serial_statuses"]), out
+
+
+def test_arming_the_window_is_opt_in(lab_url, ctx):
+    """No `parties`, no barrier - the demo and any manual run are unchanged.
+
+    If this fails, the barrier has become the default and `/redeem` holds
+    every request for the barrier timeout on a run that sends one.
+    """
+    import json as _json
+
+    r = ctx.client.send("GET", lab_url + "/redeem/reset",
+                        tool="http_request", note="disarm")
+    body = _json.loads(r["body"])
+    assert body["parties"] == 0 and body["coupons"] == 1, body
+    one = ctx.client.send("GET", lab_url + "/redeem",
+                          tool="http_request", note="single redeem")
+    assert one["status"] == 200, one
+    # a single request must not have waited on anything
+    assert one["elapsed_ms"] < 4000, one["elapsed_ms"]
+
+
 def test_race_probe(lab_url, ctx):
     # the coupon is a class variable on a session-scoped server: whoever
     # drained it first leaves nothing to race for

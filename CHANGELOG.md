@@ -961,6 +961,44 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The race window was a wager on the host's scheduler
+- `/redeem` is the lab's TOCTOU endpoint, and its window was
+  `time.sleep(0.15)` plus the hope that a burst lands inside it. That made
+  the class provable or not according to the scheduler, not according to
+  the probe or the gate - three rounds of Windows CI failures, and the
+  recorded diagnosis of the second one is exact: *the windows intersected
+  while only ONE request got past the guard*. The overlap happened; the
+  decrement still beat the other checks. Two conditional skips later the
+  case was testing the machine, so `race` was dropped from the proving
+  direction with that reason written down.
+- The reason was right and the requirement was wrong. `/redeem/reset`
+  now accepts `parties=N`, which arms a barrier **inside** the window -
+  after the `coupons > 0` check, before the commit. Every request that
+  reaches the barrier has already passed the guard, so when it releases
+  they all commit. The overlap stops being a wager.
+- What is left to the host is only whether N requests get in flight inside
+  the barrier timeout, which is far weaker than interleaving
+  microsecond-wide critical sections. And an under-filled barrier releases
+  its waiters *together* on timeout, so two in flight still proves - the
+  degraded case degrades into the thing being measured rather than into a
+  flake.
+- The timeout is 8s, deliberately below the client's 15s read timeout.
+  Measured at 20s first: every request died at status 0 and the failure
+  read as a network fault rather than as a burst that never assembled.
+- Opt-in. No `parties`, no barrier, and the sleep path the demo and any
+  manual run take is untouched - asserted, because a barrier that became
+  the default would hold a single redeem for the whole timeout.
+- Measured 6/6 proven across repeated trials with the barrier armed, and
+  the plant that matters reproduces the Windows failure locally: remove the
+  `barrier.wait()` and the test reports `assert 1 == 6` - one winner out of
+  six, which is the CI diagnosis word for word. Arming it by default trips
+  the opt-in test on elapsed time.
+- `race` is still out of the proving table. The cause is addressed and
+  measured here, but the evidence that mattered was Windows CI behaviour
+  and this host cannot produce it; flipping the table on a local 6/6 would
+  be the fourth round of the same mistake. The barrier is the precondition,
+  recorded as such.
+
 ### The same shape a third time: BOARD_TOOLS
 - `mcpserver.py` states the principle plainly - *"A manifest entry a host
   can never call successfully is a lie in the catalogue"* - and withholds
@@ -1705,7 +1743,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 631 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 633 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
