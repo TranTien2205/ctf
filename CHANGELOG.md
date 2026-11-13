@@ -174,8 +174,11 @@ system. All notable milestones on `agent-v2`.
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
-  (text + `--json` `produced_by`/`resumed_by`), and `argus compare`
-  warns when metric sets come from different builds.
+  (text + `--json` `produced_by`/`resumed_by`), `argus findings` prints
+  it as a context header, `report.md`/`report.html` carry it in the
+  header, `argus diff --json` emits before/after context, and
+  `argus compare` both warns on cross-build metric sets and prints
+  `target_host`/`argus_version` as table rows + trailing CSV columns.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
