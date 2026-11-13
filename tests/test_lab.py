@@ -46,6 +46,24 @@ def test_js_recon_finds_endpoints_and_secret(lab_url, ctx):
     assert any(".map#" in s for s in sm_srcs)
 
 
+def test_js_endpoint_regex_generic_clients():
+    """Angular http.get / axios instances / superagent .get calls carry
+    endpoints the fetch-only pattern missed; plain map.get('key') must
+    not become a junk endpoint lead."""
+    cases = [
+        ("this.http.get('/items')", "/items"),
+        ("api.post('/submit', body)", "/submit"),
+        ("http.request('/v2/ping')", "/v2/ping"),
+        ("axios.delete('/users/1')", "/users/1"),
+        ("map.get('key')", None),
+        ("dict.post('name')", None),
+    ]
+    for src, want in cases:
+        m = web._JS_ENDPOINT.search(src)
+        got = next((g for g in m.groups() if g), None) if m else None
+        assert got == want, (src, got)
+
+
 def test_reflection_probe(lab_url, ctx):
     out = probes.probe_reflection(ctx, lab_url + "/search?q=x", "q")
     assert out["reflected"]

@@ -170,6 +170,10 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
 
 _JS_ENDPOINT = re.compile(
     r"""(?:fetch|axios(?:\.\w+)?|\.open|\$\.ajax|\$\.get|\$\.post)\s*\(\s*['"`]([^'"`]{1,200})['"`]"""
+    # generic HTTP-client methods (Angular this.http.get, axios instances,
+    # superagent .get) - path-like strings only, or map.get('key')
+    # floods the lead list with junk "endpoints"
+    r"""|\.(?:get|post|put|patch|delete|head|request)\s*\(\s*['"`]((?:https?:)?//[^'"`\s]{1,200}|/[^'"`\s]{0,200})['"`]"""
     r"""|['"](/(?:api|rest|v\d+|graphql|auth|user|admin|internal)[^'"`\s]{0,150})['"`]"""
     r"""|url\s*[:=]\s*['"`]([^'"`]{1,200})['"`]""",
     re.I,
