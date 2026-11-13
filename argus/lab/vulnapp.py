@@ -780,11 +780,36 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                            ctype="application/json")
 
         elif path == "/import":
-            # simulated vulnerable deserializer: magic-bytes payloads reach
-            # the parser and produce framework error strings
+            # Vulnerable deserializer. A magic-bytes payload reaches the
+            # parser; a gadget that names a command in it REACHES THE SAME
+            # bounded executor /ping uses - `_lab_exec`, seven commands, no
+            # shell, no path component, `cat` confined to the fake tree.
+            #
+            # That is deliberate and it adds no capability: this lab already
+            # runs those seven commands through /ping. Without it the
+            # deserialize class was unprovable here, because the matrix asks
+            # for code execution proven the way rce is - the identity line
+            # AND the probe nonce - and a parser error is a SURFACE. A
+            # gadget carrying no runnable command still gets the parser
+            # error, so "surface, not execution" stays a measurable
+            # distinction rather than a sentence.
             v = p.get("data", "")
-            if v.startswith(("rO0AB", "O:", "a:", "c__builtin__",
-                            "{", "!!", "\xac")):
+            gadget = v.startswith(("rO0AB", "O:", "a:", "c__builtin__",
+                                   "{", "!!", "\xac"))
+            quoted = re.findall(r"""['"]([^'"]{1,200})['"]""", v)
+            ran = []
+            if gadget:
+                for candidate in quoted:
+                    for cmd in _injected_commands(";" + candidate):
+                        out = _lab_exec(cmd)
+                        if out and "command not found" not in out:
+                            ran.append(out)
+                    if ran:
+                        break
+            if gadget and ran:
+                self._send(body="deserialized; gadget output:\n"
+                                + "\n".join(ran), ctype="text/plain")
+            elif gadget:
                 self._send(500, "java.io.InvalidClassException: filter "
                                 "status - REJECTED", ctype="text/plain")
             else:

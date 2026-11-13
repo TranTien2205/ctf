@@ -79,11 +79,21 @@ requests. Driving them found two more things:
   grades `unproven` on the exchanges and `proven` on the full set. Grading
   now sees the events; quotes still come from responses only.
 
-Three classes are still not driven in the proving direction, each for a
-stated reason: `dos` (refused by construction - its proof is the damage),
-`race` (below) and `deserialize` (the lab's `/import` returns a parser error
-and never executes, so "identity output plus the probe nonce" is
-unobtainable here - a limit of this lab, not of the class).
+`deserialize` was on that list and came off it. The claim was that
+`/import` returns a parser error and never executes, so the class was
+unprovable here - which was true of the lab and not of the class, and the
+fix needed no new capability: `/import` routes a gadget's command into the
+SAME bounded executor `/ping` already uses (seven commands, no shell, no
+path component, `cat` confined to the fake tree). A gadget carrying no
+runnable command still gets the parser error, so "a surface is not
+execution" stays a measurable distinction. The probe's gadget also had to
+carry a nonce - it sent `['id']` - because the class is proven the way rce
+is, and the first attempt used `_marker("deser")` while `NONCE_RE` is
+`\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as this probe's
+own and the class sat at a candidate with its nonce in plain sight.
+
+Two classes are still not driven in the proving direction: `dos` (refused by
+construction - its proof is the damage) and `race` (below).
 
 Two directions, and no reading of the probe's prose - a verdict is English and
 this asserts against evidence:
@@ -223,6 +233,13 @@ VULNERABLE = [
     ("graphql_introspect", "graphql",
      lambda c, b: web.graphql_introspect(c, b + "/graphql")),
     ("jwt_forge", "jwt", lambda c, b: _drive_jwt(c, b, forge=True)),
+    # `/import` routes a gadget's command into the SAME bounded executor
+    # `/ping` uses - seven commands, no shell - so the class is proven the
+    # way rce is, with the identity line and the probe's own nonce. A gadget
+    # carrying no runnable command still gets the parser error, which is the
+    # clean case below.
+    ("probe_deserialize", "deserialize",
+     lambda c, b: probes.probe_deserialize(c, b + "/import?data=x", "data")),
     # `race` is deliberately NOT here in the proving direction. Its evidence
     # is wall-clock concurrency, and whether eight threads actually overlap
     # on a loaded runner is a property of the host, not of the probe or the
@@ -318,6 +335,10 @@ CLEAN = [
     # system working - without the mint it must not grade, which is the
     # distinction `verify_token_forgery` exists to make
     ("jwt_forge", "jwt", lambda c, b: _drive_jwt(c, b, forge=False)),
+    # `/search` parses nothing, so a gadget gets no parser error and no
+    # execution - the distinction `deserialize` rests on
+    ("probe_deserialize", "deserialize",
+     lambda c, b: probes.probe_deserialize(c, b + "/search?q=x", "q")),
 ]
 # `method` and `xfh` have no clean case either, for the same reason as `cors`
 # below: the lab answers TRACE on every path and honours X-Original-URL
@@ -340,10 +361,10 @@ CLEAN = [
 # `probe_*` tool. Counting against the tooling is how `graphql` and `jwt` sat
 # outside this module without anyone noticing: neither is driven by a probe,
 # so neither appeared in a coverage figure derived from the probe table.
-PROVING_COVERAGE = 26
+PROVING_COVERAGE = 27
 MATRIX_CLASSES = 29
 # Each with a reason stated in the module docstring above.
-NOT_DRIVEN = {"dos", "race", "deserialize"}
+NOT_DRIVEN = {"dos", "race"}
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
