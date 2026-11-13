@@ -163,9 +163,12 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 165 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 167 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions).
+- `docs/VERIFICATION.md`: property → enforcement → test matrix — every
+  safety claim names the code that enforces it and the test that proves
+  it, with a reading order for a first-pass review.
 - Fault-tolerance pass: every forensic reader (`verify`, `findings`,
   `diff`, `sessions`, `_reopen`, renderers) degrades malformed session
   artifacts to flags/warnings instead of tracebacks — fuzzed across
