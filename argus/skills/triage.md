@@ -10,7 +10,14 @@ most promising hypotheses with the cheapest discriminating test for each.
 2. `crawl(url, depth=2)` - pages, forms, query params. Forms and parameters
    are the attack surface; static pages are not.
 3. `js_recon(url)` - endpoints the front-end actually calls, plus secret
-   candidates. For SPAs this beats every wordlist.
+   candidates. For SPAs this beats every wordlist; otherwise
+   `wordlist_fuzz(base_url)` recovers unlinked routes (admin, backup,
+   .well-known).
+4. `probe_method(url)` - two cheap requests: OPTIONS plus a TRACE canary.
+   A TRACE echo is XST (request headers, incl. credentials, replayed to
+   a script context); advertised PUT/DELETE on user paths is writable
+   surface. GraphQL endpoints merit `graphql_introspect(url)` here too -
+   an open schema is free recon, and GET transport accepted = CSRF-able.
 
 ## What to record as surface
 
