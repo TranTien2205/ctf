@@ -691,6 +691,18 @@ somebody reading only the list.
   `argus compare` both warns on cross-build metric sets and prints
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
+### An exemption list that no longer described anything
+- `_NOT_TOOLS` exempts identifiers that LOOK like tools because they share a
+  prefix with a tool family - `run_id` against `run_external`, `mcp_tools`
+  against `mcp_list`. It had grown to thirty entries and a third of them were
+  for words no doc contained any more, so the list had stopped describing the
+  problem and become somewhere to add things. Ten are gone, and a check now
+  fails when an exemption is named in no doc - the pressure is to prune at the
+  moment an entry goes dead rather than to accumulate.
+- The check cannot tell `probe_sqli` from `run_id` by syntax, so the list is
+  the mechanism and not a workaround; that is written down next to it now, to
+  save the next reader the detour I just took.
+
 ### The evaluation doc said nine, and the matrix said three
 - `docs/EXPERIMENTS.md` stated that **nine** classes cannot reach `proven`.
   Three can't: `xss` (no browser), `ssrf` (no out-of-band collector) and `dos`
@@ -766,7 +778,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 145 offline checks, including a documentation
+- `python selftest.py`: 146 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

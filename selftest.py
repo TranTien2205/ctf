@@ -652,18 +652,21 @@ _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
               ".env.example")
 
 # words that look like a tool name but are not one
+# Identifiers that LOOK like tools - they share a prefix with a tool family -
+# and are not: module names, transcript fields, helper functions. The check
+# cannot tell `probe_sqli` from `run_id` by syntax, so this list is the
+# mechanism rather than a workaround; what keeps it honest is the check below
+# that every entry is still named in a doc. Ten entries had gone dead.
 _NOT_TOOLS = {
-    "probe_", "probe_x", "probe_name", "record_exchange", "record_event",
-    "add_finding", "load_config", "render_report", "verify_transcript",
-    "findings_bad", "findings_overgraded", "seal_artifacts", "make_server",
-    "serve_forever", "proof_marker", "input_schema", "tool_manifest",
-    "build_system", "build_seed", "sanitized_findings", "time_to_first",
+    "probe_", "probe_x", "record_exchange", "record_event",
+    "add_finding", "render_report", "verify_transcript",
+    "findings_overgraded", "seal_artifacts", "make_server",
+    "proof_marker",     "build_system", "time_to_first",
     # module and field names that share a prefix with a tool family:
     # `mcp_tools` is the module behind mcp_list/mcp_call, and `request_id(s)`
     # is the transcript field every probe returns
     "mcp_tools", "request_id", "request_ids", "request_text",
-    "proof_requirement", "proof_checks", "proof_notes",
-    # transcript ids that survive history compaction - `run_id` shares the
+    "proof_requirement",     # transcript ids that survive history compaction - `run_id` shares the
     # `run_*` family with run_external/run_exploit and is not a tool
     "run_id", "call_id",
 }
@@ -707,6 +710,17 @@ def _doc_consistency() -> None:
                 unknown.setdefault(name, set()).add(ident)
     check(f"docs name only registered tools ({len(tool_names)})", not unknown,
           "; ".join(f"{k}: {sorted(v)}" for k, v in unknown.items()))
+    # An exemption nothing needs is an invitation to add rather than check.
+    # `_NOT_TOOLS` had grown to thirty entries, a third of them for words no
+    # doc contained any more, so the list no longer described anything.
+    _prefix_guards = {"probe_", "probe_x"}
+    _all_doc_text = "\n".join(texts.values())
+    stale = sorted(x for x in _NOT_TOOLS - _prefix_guards
+                   if x not in _all_doc_text)
+    check(f"every tool-name exemption is still needed "
+          f"({len(_NOT_TOOLS)})", not stale,
+          f"{stale} are exempted and named in no doc - delete them, so the "
+          f"list says what it is for")
 
     # 2. every `argus <subcommand>` in the docs is a real subcommand
     # the add_parser calls wrap across lines, so read the file whole
