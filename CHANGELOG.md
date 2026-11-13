@@ -179,8 +179,11 @@ system. All notable milestones on `agent-v2`.
   refused (blind schema enumeration); `probe_csrf` counts
   `SameSite=None` cookies as weak; `probe_method` sends its TRACE
   canary regardless of `Allow:` advertisement (XST is frequently
-  enabled without being advertised). Lab gains `/bad-headers` and
-  `/graphql-strict`; `probe_method` gets its first coverage.
+  enabled without being advertised); `probe_ssti` counts engines that
+  evaluate AND echo the raw payload (error-page style) instead of
+  requiring the payload to vanish. Lab gains `/bad-headers`,
+  `/graphql-strict` and `/hello2`; `probe_method` gets its first
+  coverage.
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
@@ -192,7 +195,7 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 185 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 186 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test
   (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
