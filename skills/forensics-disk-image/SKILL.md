@@ -95,7 +95,12 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    a.rar` walks both header formats (RAR4 fixed fields, RAR5 vint
    headers) — names, packed/unpacked sizes, encrypted flags; it
    reports RAR5-encrypted metadata honestly and never guesses member
-   contents.
+   contents. 7z: `python3 tools/forensics/sevenz_list.py a.7z`
+   handles the real shape — the next-header is usually ENCODED so
+   this decompresses it first, then lists FilesInfo names and
+   extracts members through the coder chain (`--get name`):
+   Copy/LZMA1/LZMA2/Deflate/BZip2 decode via stdlib, AES and unknown
+   codecs are named and left alone.
 6. SQLite artifacts (browser history, app dbs, `*.sqlite`): deleted rows
    survive in freeblocks and freelist pages until VACUUM.
    If a `-wal` file sits beside the db, DO NOT open the db — sqlite
@@ -151,6 +156,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    the chunk table (bit-31 zlib chunks) into a flat image for the
    same downstream chain; `info` names sections and geometry, and
    multi-segment sets are reported honestly.
+   An image whose first sector opens `LUKS` is encrypted, not
+   corrupt: `python3 tools/forensics/luks_info.py vol.img` names the
+   cipher/mode/hash, payload offset, which key slots are live and
+   their KDF cost — LUKS2 emits its full JSON metadata.
    `.vhd` disks: `python3 tools/forensics/vhd_read.py disk.vhd dump
    guest.img` walks footer -> cxsparse header -> BAT (fixed, dynamic,
    and differencing with its parent locator named). `.vmdk`:

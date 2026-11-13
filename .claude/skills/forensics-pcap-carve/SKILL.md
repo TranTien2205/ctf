@@ -86,6 +86,12 @@ network flow at all — decode interrupt-in reports with
 or `mouse` for pen-stroke points; `--raw hexlines.txt` works on
 exported report hex too.
 
+"Traffic" can also arrive as a `.har` (browser devtools export, not
+a pcap): `python3 tools/forensics/har_dump.py cap.har` inventories
+hosts and every request's method/url/status, lifts secrets out of
+headers/cookies/postData, and greps response bodies for flag-shaped
+tokens — `--bodies` prints the body text itself.
+
 ## Routing
 
 Shares signals with: `../dfir-network-exfil-trace/`, `../misc-encoding-carrier/`. Check those before committing to this one.
