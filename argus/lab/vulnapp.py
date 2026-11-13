@@ -805,14 +805,28 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                         barrier.wait()
                     except threading.BrokenBarrierError:
                         # fewer than N arrived within the timeout. Fall
-                        # through rather than hang: the probe then sees one
-                        # success and the class does not grade, which is a
-                        # clean failure naming the real cause instead of a
-                        # flake.
+                        # through rather than hang: the waiters are released
+                        # together, which is still a genuine overlap for
+                        # however many got here.
                         pass
-                else:
-                    time.sleep(0.15)  # race window: wide enough that an
-                    # 8-request burst overlaps even under test-suite load
+                # The sleep stays, barrier or not, and that is the point of
+                # this line. The barrier guarantees every request passed the
+                # guard before any commits - but it also releases them all
+                # at once, so each one returns almost immediately and its
+                # RECORDED window collapses to nothing. `probe_race` decides
+                # overlap by comparing the burst's wall time against a
+                # serial estimate, and the gate reconstructs it from
+                # ts + elapsed_ms; both need the windows to be wide enough
+                # to intersect measurably.
+                #
+                # Removing it proved the race and destroyed the evidence for
+                # it: on a fast runner the burst finished in 0.01s and the
+                # probe reported "the recorded windows do not intersect, so
+                # nothing was on the wire at once" while all six requests
+                # had in fact succeeded against one coupon. It survived
+                # local measurement only because requests here take ~45ms
+                # anyway, which kept the ratio alive by accident.
+                time.sleep(0.15)
                 type(self)._coupons -= 1
                 self._send(body=json.dumps(
                     {"ok": True, "left": type(self)._coupons}))

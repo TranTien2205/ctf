@@ -961,6 +961,41 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The barrier proved the race and destroyed the evidence for it
+- CI also failed the test I had just added for the barrier -
+  `test_the_race_window_can_be_made_deterministic`, Windows 3.12 - and the
+  verdict names the defect exactly: *"inconclusive: the recorded windows do
+  not intersect, so nothing was on the wire at once (burst 0.01s ...)"*.
+  Its first assertion PASSED: all six requests returned 200 against one
+  coupon. The race happened. The evidence that it was concurrent did not
+  survive.
+- I had replaced `time.sleep(0.15)` with the barrier, reading the sleep as
+  the unreliable part. The sleep was doing a second job. A barrier releases
+  its waiters together, so once released each request returns almost
+  immediately and its **recorded** window collapses - and `probe_race`
+  decides overlap by comparing the burst's wall time against a serial
+  estimate, while the gate reconstructs it from `ts` + `elapsed_ms`. Both
+  lose the signal. The barrier decides WHO is inside the window; the delay
+  is what makes the window wide enough to be seen.
+- So the sleep is back, barrier or not, and the comment at that line says
+  why so the next reader does not make the same trade.
+- The instructive part is my first attempt at guarding it. I asserted the
+  burst/serial ratio - and the plant walked straight through it. Measured:
+  without the delay the ratio is still **2.1x** on this host, because ~45ms
+  of client-side overhead per request props it up; my threshold was `> 2`.
+  The same accident is why the broken version passed locally in the first
+  place.
+- The assertion now reads the quantity the GATE reads, `response.elapsed_ms`,
+  with a floor of 100ms. Measured both ways: the narrowest recorded window
+  is ~161ms with the delay and ~11ms without it - a 15x collapse that is
+  server-side, so the floor holds on a slow sandbox and a fast runner
+  alike. The plant now fails here, naming the narrow windows, instead of
+  failing in CI.
+- Two lessons worth keeping. A fix measured only where the measurement is
+  generous is not measured. And when a derived quantity and a recorded one
+  both describe the property, assert the recorded one - the derivation is
+  where the host's noise hides.
+
 ### CI was red for two pushes, and both failures were mine
 - I reported CI as green. It was not. Querying it before flipping the race
   table showed `1e0b5ee` and `4869825` both **failed**, each with two jobs

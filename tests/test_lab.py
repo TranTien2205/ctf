@@ -262,6 +262,13 @@ def test_graphql_suggestion_leak(lab_url, ctx):
     assert "suggestions" in out["verdict"], out
 
 
+def _burst_exchanges(session) -> list[dict]:
+    """The recorded concurrent-burst exchanges of the last probe_race."""
+    return [e for e in (session.get_exchange(i) for i in session._transcript)
+            if e and e.get("tool") == "probe_race"
+            and "burst" in (e.get("note") or "")]
+
+
 def test_the_race_window_can_be_made_deterministic(lab_url, ctx):
     """`/redeem` proved only if the host happened to overlap the burst.
 
@@ -295,6 +302,40 @@ def test_the_race_window_can_be_made_deterministic(lab_url, ctx):
     assert out["statuses"].get(200, 0) == 6, out
     assert out["verdict"].startswith("race:"), out
     assert out["overlapped"] is True, out
+
+    # The window has to stay WIDE as well as shared, and this is the
+    # assertion that earns its place. A barrier releases its waiters at
+    # once, so if the endpoint then returned immediately every recorded
+    # window would collapse to nothing - and `probe_race` decides overlap
+    # by comparing the burst's wall time against a serial estimate, while
+    # the gate reconstructs it from ts + elapsed_ms. Both lose the signal.
+    #
+    # That is not hypothetical: with the post-barrier sleep removed, CI
+    # reported "the recorded windows do not intersect, so nothing was on
+    # the wire at once (burst 0.01s ...)" while all six requests had in
+    # fact succeeded against one coupon - the race proved and its evidence
+    # destroyed. It passed locally anyway, because requests on this host
+    # take ~45ms and that kept the ratio alive by accident. So the ratio is
+    # asserted directly, where the endpoint's own sleep makes it
+    # host-independent rather than a property of the runner.
+    # Assert the quantity the GATE reads - `response.elapsed_ms`, which
+    # `proof.py` uses to reconstruct each window - not a derived ratio.
+    # Measured both ways on this host: with the endpoint's delay the
+    # narrowest recorded window is ~161ms; without it, ~11ms. The delay is
+    # server-side, so that floor holds on a slow sandbox and a fast runner
+    # alike, which is the whole reason to assert it here.
+    #
+    # The ratio was the first thing I asserted and it was the wrong
+    # instrument: without the delay it still measured 2.1x on this host,
+    # because ~45ms of client-side overhead per request propped it up. The
+    # plant slipped straight through a `> 2` threshold while CI, where that
+    # overhead does not exist, reported the burst at 0.01s and no overlap.
+    windows = [(e.get("response") or {}).get("elapsed_ms")
+               for e in _burst_exchanges(ctx.session)]
+    assert windows and all(w and w >= 100 for w in windows), (
+        "a burst request's recorded window is too narrow for any two of "
+        "them to be shown overlapping - the race may still have happened, "
+        "but nothing on record proves it was concurrent", windows)
     # and the limit was real: the serial baseline is refused afterwards
     assert out["serial_statuses"] and all(
         s >= 400 for s in out["serial_statuses"]), out
