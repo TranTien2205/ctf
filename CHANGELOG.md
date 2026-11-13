@@ -885,8 +885,18 @@ somebody reading only the list.
 - The doc set was a hand-maintained tuple, which is the same error as
   counting a test table against the features that already have rows: a list
   that grows per document added by hand cannot reveal a document nobody
-  added. The glob over `docs/*.md` is the ground truth now, and a new
-  document either joins the gated set or fails the gate.
+  added. The gated set is derived from globs now - `docs/*.md`, the
+  top-level documents, `lab/*.md`, the four `argus/team/roles/*.md` worker
+  prompts and the `argus/resources/*/README.md` data guides - so a new
+  document either joins it or fails the gate.
+- The role prompts are the part of that worth saying out loud: a worker is
+  handed one the same way a probe class hands over a methodology module, so
+  a new role prompt escaping the gate is guidance put in front of a model
+  that nothing checks. `docs/` was derived first and the rest of the tuple
+  stayed hand-listed, which is the same half-fix this session kept finding.
+  Proved by planting a file under `lab/` and watching the check name it,
+  then removing it and watching the gate come back green - a check's wiring
+  and a check's logic are different claims.
 - And the gate never checked the third column. 89 test names are cited
   across the live documents, and a renamed or deleted test silently unbacked
   whatever claim named it - in the one document whose entire value is that

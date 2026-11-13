@@ -705,9 +705,20 @@ def _doc_consistency() -> None:
     # added to it - the same error as counting a test table against the
     # features that have rows. `docs/VERIFICATION.md` escaped this gate
     # entirely that way, so the glob is the ground truth now.
-    on_disk = {f"docs/{p.name}" for p in sorted((ROOT / "docs").glob("*.md"))}
+    #     `docs/` was the first family to be derived this way; the rest of
+    #     the tuple was still hand-listed, so a new role prompt - which
+    #     `load_skill`'s sibling puts in front of a worker exactly as a
+    #     skill module is - or a new top-level document would escape the
+    #     gate the same way VERIFICATION.md did. `argus/skills/*.md` is
+    #     already globbed into `texts` above and is not listed here.
+    on_disk = set()
+    for pattern in ("docs/*.md", "*.md", "lab/*.md",
+                    "argus/team/roles/*.md", "argus/resources/*/README.md"):
+        on_disk |= {p.relative_to(ROOT).as_posix()
+                    for p in sorted(ROOT.glob(pattern)) if p.is_file()}
     ungated = sorted(on_disk - set(_DOC_FILES))
-    check(f"every docs/*.md is in the gated set ({len(on_disk)} on disk)",
+    check(f"every shipped document is in the gated set "
+          f"({len(on_disk)} on disk)",
           not ungated,
           f"{ungated} exist but no check reads them - add them to "
           "_DOC_FILES or delete them")
