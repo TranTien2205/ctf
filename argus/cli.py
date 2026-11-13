@@ -584,6 +584,22 @@ def main(argv: list[str] | None = None) -> int:
         if len(args.dirs) < 2:
             print("compare needs at least two session dirs")
             return 2
+        # A/B comparisons assume the same target - different hosts make
+        # the metric deltas meaningless, so flag it like `diff` does
+        import urllib.parse as _up
+        def _host_of(d):
+            try:
+                m = json.loads((Path(d) / "meta.json")
+                               .read_text(encoding="utf-8"))
+                t = m.get("target") if isinstance(m, dict) else None
+                return (_up.urlparse(str(t or "")).hostname or "").lower()
+            except Exception:
+                return ""
+        hosts = {_host_of(d) for d in args.dirs} - {""}
+        if len(hosts) > 1:
+            print(f"warning: targets differ ({', '.join(sorted(hosts))}) "
+                  "- metrics only compare like-for-like on the same "
+                  "target", file=sys.stderr)
         sums = [_summ(d) for d in args.dirs]
         if args.csv:
             hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
