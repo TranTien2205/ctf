@@ -2657,3 +2657,72 @@ def test_massassign_does_not_read_an_html_role_attribute_as_a_field():
     html[0]["request"]["body"] = '<li role=menuitem>home</li>'
     v = proof.grade("massassign", "<li role=menuitem>home</li>", html)
     assert v.grade != "proven", v.checks
+
+
+def _deser(req_body, resp_body, *, ctype="text/plain", status=200):
+    return {"id": "r1", "ts": 1,
+            "request": {"method": "POST", "url": "http://lab/import",
+                        "headers": {"Content-Type": "application/json"},
+                        "body": req_body},
+            "response": {"status": status,
+                         "headers": {"Content-Type": ctype},
+                         "body": resp_body}}
+
+
+def test_a_gadget_that_only_raises_a_parser_error_is_not_deserialize():
+    """The lab's `/import`, written down as a measurement.
+
+    `deserialize` is excluded from the live agreement table for a stated
+    reason: `/import` accepts magic-bytes payloads and answers with
+    `java.io.InvalidClassException: filter status - REJECTED`, never
+    executing, so "identity output plus the probe nonce" is unobtainable
+    against it. That exclusion was prose. The class already had both
+    synthetic directions - see
+    test_deserialize_declares_a_gadget_not_a_shell_separator - but not this
+    shape: a deserialization *surface*, worth a candidate, which is not
+    execution. Asserting it is what makes the stated exclusion a
+    measurement.
+    """
+    v = proof.grade(
+        "deserialize",
+        "java.io.InvalidClassException: filter status - REJECTED",
+        [_deser('{"data": "rO0ABXNyABFqYXZhLnV0aWwu"}',
+                "java.io.InvalidClassException: filter status - REJECTED",
+                status=500)])
+    assert v.grade != "proven", v.checks
+    missing = {c["check"] for c in v.checks if not c.get("ok")}
+    assert "identity output returned by the target" in missing, v.checks
+    assert "the probe nonce came back in the output" in missing, v.checks
+
+
+def test_a_gadget_and_an_identity_line_without_the_nonce_is_not_deserialize():
+    """Without the nonce the output is not tied to this probe.
+
+    A target that happens to serve a page containing `uid=0(root)` would
+    otherwise complete the proof for anyone who sent a gadget at it. The
+    existing proving case carries a nonce, so nothing had asked what
+    happens when it is absent.
+    """
+    gadget = '{"data": "!!python/object/apply:os.system [\\"id\\"]"}'
+    v = proof.grade("deserialize", "uid=0(root) gid=0(root)",
+                    [_deser(gadget, "uid=0(root) gid=0(root) groups=0(root)")])
+    assert v.grade != "proven", v.checks
+    assert any("nonce came back" in str(c.get("check"))
+               and not c.get("ok") for c in v.checks)
+
+
+def test_a_destructive_deserialize_payload_voids_the_evidence():
+    """The veto applies here exactly as it does to rce.
+
+    A gadget whose command is not a read makes the demonstration the
+    damage, which this system refuses whatever it proves. The veto was
+    asserted for rce and never for this class, which shares the verifier.
+    """
+    gadget = ('{"data": "!!python/object/apply:os.system '
+              '[\\"rm -rf /; echo argusd3adb33f\\"]"}')
+    out = "uid=0(root) gid=0(root)\nargusd3adb33f\n"
+    v = proof.grade("deserialize", "uid=0(root) gid=0(root)",
+                    [_deser(gadget, out)])
+    assert v.grade != "proven", v.checks
+    assert any("stayed benign" in str(c.get("check"))
+               and not c.get("ok") for c in v.checks)

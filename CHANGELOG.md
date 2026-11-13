@@ -904,6 +904,28 @@ somebody reading only the list.
   mebibyte; it does not decide what may be committed, only which shapes
   cannot be taken back. The examined count is in the label, so a checkout
   with no git reads as "0 examined" rather than as agreement.
+- And the other half of that hazard, resolved on evidence rather than on a
+  guess about what the author wants committed. `challenges/`, `cache/`,
+  `solved/` and `tools/` have **zero commits on any branch** of this
+  repository, so nothing in them has ever been intended as content - while
+  `git add -A` would have committed all of it: the 19 MB archive, two 4 MB
+  binaries, a tarball of this repo, and challenge `flag.txt` files. They are
+  ignored now, which took the untracked set from about four hundred files to
+  thirty-seven and left nothing matching "flag" in it. `knowledge/` is
+  deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
+  does keep it. Each line is one line to delete if a directory becomes
+  content.
+- `deserialize` is excluded from the live agreement table for a stated
+  reason, and `race` sets the precedent for what that obliges: assert both
+  directions where no lab is involved. It already had both - the existing
+  declaration test proves a gadget whose output returns and refuses the rce
+  proof that sent none - but not the three shapes that matter for the
+  exclusion itself: the lab's own `/import` answer (a gadget that raises
+  `java.io.InvalidClassException` and never executes, which is a surface and
+  not execution), a gadget plus an identity line with the nonce absent, and
+  a destructive gadget hitting the veto that was asserted for `rce` and
+  never for the class sharing its verifier. The stated exclusion is a
+  measurement now.
   `race` and `deserialize` are excluded with a stated reason in the module
   docstring - `/import` returns a parser error and never executes, so
   "identity output plus the probe nonce" is unobtainable against this lab,
@@ -995,7 +1017,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 599 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 602 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

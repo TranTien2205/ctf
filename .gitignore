@@ -20,3 +20,19 @@ lab/fakefs/
 
 # MCP server configs may carry API keys in env blocks
 mcp.json
+
+# Local CTF working material. Each of these has ZERO commits on any branch
+# of this repository, so nothing here has ever been intended as content -
+# while `git add -A` would commit all of it, including a 19 MB
+# tools/ghidra-dist/ghidra.zip, two 4 MB binaries, a tarball of this repo,
+# and challenge flag.txt files. An archive in the history can only be
+# removed by rewriting it, so the default is to leave it out; delete the
+# line if a directory becomes content.
+#
+# `knowledge/` is deliberately NOT here: it is committed on branch ctf-v3,
+# so the author does keep it.
+challenges/
+cache/
+solved/
+tools/
+/*.tar.gz
