@@ -337,3 +337,59 @@ def test_the_target_password_is_scrubbed_from_free_text_too(tmp_path):
     # innocent bytes across every artifact
     short = Session(tmp_path, "http://u:abc@10.0.0.6/", meta={})
     assert "abc" not in short.secret_values
+
+
+def test_a_hand_edited_findings_file_cannot_reach_dedup_as_a_scalar(tmp_path):
+    """`findings.json` is operator-editable, so a stray scalar is a real
+    input shape - and the only thing standing between it and the two
+    readers that call `.get()` on a row without checking its type
+    (`record_finding`'s dedup loop, the team coordinator's final
+    per-agent metrics pass) is the filter `_resume` applies on load.
+
+    That invariant is held at a distance: neither reader guards itself,
+    and nothing failed if the filter went away. Pin it here, in both
+    directions, because the two halves are deliberately opposite:
+
+      - resume FILTERS, or dedup raises AttributeError on a scalar;
+      - `_reopen` PRESERVES, because `argus judge` rewrites
+        findings.json from the list it loads, and dropping the operator's
+        malformed row there would delete their data instead of leaving
+        it for `argus verify` to flag.
+    """
+    import json
+    from argus.cli import _reopen
+    from argus.session import sanitized_findings
+
+    s = Session(tmp_path, "http://t.local", meta={})
+    rid = s.record_exchange("t", {}, {"status": 200, "body": "proof"})
+    s.add_finding("x", "low", "sqli", "http://t/item?id=1",
+                  [rid], "proof", "d", "r")
+
+    # the operator hand-edits the file and leaves junk rows behind
+    rows = json.loads(s.findings_path.read_text(encoding="utf-8"))
+    rows += ["oops", None, 42, ["nested"]]
+    s.findings_path.write_text(json.dumps(rows), encoding="utf-8")
+
+    # 1. resume drops them, so the unguarded readers never see one
+    s2 = Session(tmp_path, "http://t.local", meta={}, resume=s.dir)
+    assert len(s2.findings) == 1
+    assert all(isinstance(f, dict) for f in s2.findings)
+
+    # the dedup loop - the reader that would crash - runs clean, and still
+    # dedups against the one real row that survived
+    with pytest.raises(ValueError, match="duplicate"):
+        rid2 = s2.record_exchange("t", {}, {"status": 200, "body": "proof"})
+        s2.add_finding("x2", "low", "sqli", "http://t/item?id=9",
+                       [rid2], "proof", "d", "r")
+
+    # the coordinator's metrics expression is the other unguarded reader
+    assert sum(1 for f in s2.findings if f.get("agent") == "recon-1") == 0
+
+    # 2. `_reopen` keeps every row, junk included - judge rewrites the file
+    #    from this list, so filtering here would erase operator data
+    s3 = _reopen(s.dir)
+    assert len(s3.findings) == 5
+    assert "oops" in s3.findings and None in s3.findings
+
+    # 3. and the renderers stay safe by sanitizing, not by trusting the load
+    assert len(sanitized_findings(s3.findings)) == 1

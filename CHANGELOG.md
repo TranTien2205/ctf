@@ -961,6 +961,39 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### An invariant two readers depend on, held only at a distance
+- Audited `argus/team/board.py` and `argus/ratelimit.py`, both of which I
+  had named as unexamined. **Both are clean, and that is the finding** -
+  `board.py`'s lock discipline holds, `del lst[:-N]` really does keep a
+  tail, and `RateLimiter.wait` holds the lock *across* its `time.sleep` on
+  purpose: that is what makes the limiter global instead of per-thread.
+- What the audit did turn up is not a bug but a shape. `board.py` reads
+  `session.findings` behind `isinstance(f, dict)`; two sibling readers do
+  not - the dedup loop in `record_finding` and the team coordinator's final
+  per-agent metrics pass both call `.get()` on a row without checking it.
+  That asymmetry is the half-fix shape this log has recorded nine times, so
+  I went looking for the live crash.
+- There is none, and the reason is worth writing down: `findings.json` is
+  operator-editable, so a stray scalar is a real input, but `_resume`
+  filters non-dict rows on load and every live session goes through it. The
+  invariant protecting those two readers lives in a *third* function, and
+  nothing failed if it went away.
+- The tempting fix - filter in `_reopen` too - is wrong, and measuring it
+  is what showed why. `argus judge` rewrites `findings.json` from the list
+  `_reopen` loads, so filtering there would silently **delete** an
+  operator's malformed row instead of preserving it for `argus verify` to
+  flag. The two halves are deliberately opposite. So the right change is
+  not code at all: it is a check, because an invariant held by distance is
+  one nobody is told they broke.
+- Pinned in both directions, and proved it can fail. Removing `_resume`'s
+  filter: the test reports `assert 5 == 1`, and the dedup loop it protects
+  raises `AttributeError: 'str' object has no attribute 'get'` - measured,
+  not assumed, because the docstring claims that consequence. Adding a
+  filter to `_reopen`: `assert 1 == 5`. Four other readers of the same list
+  (`sanitized_findings`, `findings_bad`, `findings_overgraded`, and the
+  `findings` subcommand, which prints `<malformed entry> UNVERIFIED`)
+  already honour the contract, each deliberately.
+
 ### One malformed frame killed the MCP server and skipped the seal
 - `argus mcp-serve` is the `user → LLM → MCP → tool` path the project is
   graded on, and its read loop wrapped `json.loads` in `except ValueError`.
@@ -1510,7 +1543,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 623 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 624 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
