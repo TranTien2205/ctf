@@ -522,8 +522,14 @@ class GuardedClient:
                     send_error = f"{type(exc).__name__}: {exc}"
                 # reads>1 collects pipelined/unsolicited responses: a
                 # desynced back-end answers a poisoned queued request
-                # without us sending anything more
-                n_reads = max(1, int(spec.get("reads") or 1))
+                # without us sending anything more. Cap hard: each extra
+                # read holds a 3s socket timeout, so an unbounded value
+                # would pin the tool for reads*3 seconds
+                try:
+                    n_reads = max(1, min(8,
+                                         int(spec.get("reads") or 1)))
+                except (TypeError, ValueError):
+                    n_reads = 1
                 for ri in range(n_reads):
                     status, rheaders, rbody, error = 0, {}, "", send_error
                     try:
