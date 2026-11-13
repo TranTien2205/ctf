@@ -62,7 +62,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             f"{_esc((session.get_exchange(rid) or {}).get('request', {}).get('method'))} "
             f"{_esc((session.get_exchange(rid) or {}).get('request', {}).get('url'))} -> "
             f"{_esc(((session.get_exchange(rid) or {}).get('response') or {}).get('status'))}"
-            f"</summary><pre>{_esc((session.get_exchange(rid) or {}).get('response', {}).get('body', '')[:4000])}</pre></details>"
+            f"</summary><pre>{_esc(((session.get_exchange(rid) or {}).get('response') or {}).get('body', '')[:4000])}</pre></details>"
             for rid in f["evidence_ids"])
         cards.append(
             f"<div class='finding' style='border-left-color:"
