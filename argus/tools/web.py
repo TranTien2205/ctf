@@ -402,6 +402,40 @@ def fingerprint(ctx: Context, url: str) -> dict:
     # session-shaped cookie is a standard report line - phrased as hygiene
     is_https = urllib.parse.urlparse(url).scheme == "https"
     cookie_notes = []
+    # presence is not protection: a security header whose value is invalid
+    # or self-disabling reads as "set" in every checkbox audit while doing
+    # nothing. Only flag clear-cut cases - phrased as hygiene, not findings
+    header_notes = []
+    def _bad(hdr, pred, note):
+        v = headers.get(hdr)
+        if v is not None and pred(str(v).strip().lower()):
+            header_notes.append(f"{hdr}: invalid value {v!r} - {note}")
+    _bad("x-frame-options",
+         lambda v: v not in ("deny", "sameorigin"),
+         "clickjacking protection off")
+    _bad("x-content-type-options", lambda v: v != "nosniff",
+         "only 'nosniff' is a valid value")
+    _bad("strict-transport-security",
+         lambda v: "max-age" not in v or re.search(r"max-age\s*=\s*0\b", v),
+         "HSTS disabled/ineffective")
+    _bad("referrer-policy", lambda v: v == "unsafe-url",
+         "leaks the full URL incl. query to third parties")
+    _csp = headers.get("content-security-policy")
+    if _csp is not None:
+        _cl = str(_csp).lower()
+        if re.search(r"(?:default-src|script-src)\s+['\"]?\*", _cl):
+            header_notes.append(
+                "content-security-policy: wildcard source - no XSS "
+                "mitigation value")
+        elif "unsafe-eval" in _cl:
+            header_notes.append(
+                "content-security-policy: unsafe-eval allowed - XSS sinks "
+                "remain usable")
+        elif "'unsafe-inline'" in _cl and "nonce-" not in _cl \
+                and "strict-dynamic" not in _cl:
+            header_notes.append(
+                "content-security-policy: unsafe-inline without nonce/"
+                "strict-dynamic - no script-injection mitigation")
     for c in cookies:
         if not re.search(r"sess|session|sid|auth|token|jwt|login",
                          c["name"], re.I):
@@ -422,6 +456,7 @@ def fingerprint(ctx: Context, url: str) -> dict:
         "version_notes": version_notes,
         "cookies": cookies,
         "cookie_notes": cookie_notes,
+        "header_notes": header_notes,
         "missing_security_headers": missing,
         "robots": robots,
         "sitemap": sitemap,

@@ -15,6 +15,19 @@ def test_fingerprint_sees_stack(lab_url, ctx):
     assert "/debug" in out["robots"]["disallow"]
 
 
+def test_fingerprint_flags_bad_header_values(lab_url, ctx):
+    """Headers PRESENT but invalid/self-disabling - the audit miss a
+    presence-only check cannot see."""
+    out = web.fingerprint(ctx, lab_url + "/bad-headers")
+    notes = " ".join(out["header_notes"])
+    for token in ("x-frame-options", "x-content-type-options",
+                  "strict-transport-security", "referrer-policy",
+                  "content-security-policy"):
+        assert token in notes, notes
+    # and none of them counts as missing - they were sent, just broken
+    assert "x-frame-options" not in out["missing_security_headers"]
+
+
 def test_crawl_maps_surface(lab_url, ctx):
     out = web.crawl(ctx, lab_url, depth=1, max_pages=20)
     assert "/search" in out["endpoints"] or "/item" in out["endpoints"]

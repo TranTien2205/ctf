@@ -226,6 +226,18 @@ class Handler(BaseHTTPRequestHandler):
 <script src="/static/app.js"></script>
 </body></html>""")
 
+        elif path == "/bad-headers":
+            # planted hygiene case: headers PRESENT but values invalid /
+            # self-disabling - checkbox audits that only test presence
+            # miss every one of these
+            self._send(body="<html><body>ok</body></html>", headers={
+                "X-Frame-Options": "ALLOWALL",
+                "X-Content-Type-Options": "false",
+                "Strict-Transport-Security": "max-age=0",
+                "Referrer-Policy": "unsafe-url",
+                "Content-Security-Policy": "default-src *",
+            })
+
         elif path == "/graphql":
             # accepts GET ?query= too - many real graphql servers do
             q = p.get("query", "")
