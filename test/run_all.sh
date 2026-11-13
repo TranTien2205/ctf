@@ -136,7 +136,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/e01_read.py tools/forensics/vhd_read.py \
          tools/forensics/cramfs_read.py tools/forensics/kdbx_info.py \
          tools/forensics/jffs2_read.py tools/forensics/thumbcache.py \
-         tools/forensics/vmdk_info.py; do
+         tools/forensics/vmdk_info.py tools/forensics/fsevents.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

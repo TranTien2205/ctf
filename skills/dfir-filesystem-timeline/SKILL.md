@@ -216,6 +216,12 @@ For deleted IMAGES, `python3 tools/forensics/thumbcache.py
 thumbcache_256.db` walks the `CMMM` entries — previews persist after
 the original is gone; `--extract N` writes the embedded JPEG/PNG.
 
+On macOS, `/.fseventsd/00000000*` pages (gzipped, `1SLD`/`2SLD`) are
+the timeline journal: `python3 tools/forensics/fsevents.py events.gz`
+(or a directory with `--all`) emits each record's id, decoded flag
+names (Created/Removed/Renamed/Modified/File/Folder), and path — the
+equivalent of `$UsnJrnl` on a macOS image.
+
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
 which is the answer to a timestomp question. Confirmed = a timeline row quoted
