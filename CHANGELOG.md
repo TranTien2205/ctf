@@ -869,6 +869,31 @@ somebody reading only the list.
   happen to have a `probe_*` tool. Counting against the tooling is precisely
   how `graphql` and `jwt` sat outside the module unnoticed.
 - The proving direction now covers 26 of the 29 proof classes.
+
+### The one document nothing checked was the claims table
+- `docs/VERIFICATION.md` is the claim -> mechanism -> test table, the
+  document a reviewer reads to check a claim rather than take it. It was the
+  only `docs/*.md` missing from `selftest.py`'s `_DOC_FILES`, so **no check
+  reached it** - not the tool names, not the flags, not the subcommands, not
+  the stated counts. Bringing it in found two staleness bugs in it
+  immediately: it put the dispatch test's coverage at 54 where the registry
+  has 56 - and the sentence you are reading could not quote that stale
+  figure with its unit attached, because the gate counts exactly that
+  phrase - and it named `load_config` where a
+  tool name was expected (it is the config loader, now an explicit
+  exemption).
+- The doc set was a hand-maintained tuple, which is the same error as
+  counting a test table against the features that already have rows: a list
+  that grows per document added by hand cannot reveal a document nobody
+  added. The glob over `docs/*.md` is the ground truth now, and a new
+  document either joins the gated set or fails the gate.
+- And the gate never checked the third column. 89 test names are cited
+  across the live documents, and a renamed or deleted test silently unbacked
+  whatever claim named it - in the one document whose entire value is that
+  third column. Every cited name must now be a defined test or an existing
+  test module, with a second check that the column has not quietly emptied.
+  `CHANGELOG.md` stays out of scope on purpose: it is a historical record,
+  so an entry saying a test was deleted names it correctly by its old name.
   `race` and `deserialize` are excluded with a stated reason in the module
   docstring - `/import` returns a parser error and never executes, so
   "identity output plus the probe nonce" is unobtainable against this lab,
@@ -967,7 +992,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 146 offline checks, including a documentation
+- `python selftest.py`: 149 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

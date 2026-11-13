@@ -82,7 +82,7 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 
 | Property | Enforced in | Proven by |
 |---|---|---|
-| Dispatch never raises — malformed model output is data | `registry.dispatch` try-all + impl-level coercion | `test_dispatch_total_on_malformed_args` (54 tools × bad types) |
+| Dispatch never raises — malformed model output is data | `registry.dispatch` try-all + impl-level coercion | `test_dispatch_total_on_malformed_args` (56 tools × bad types) |
 | Role restrictions enforced in code | `Context.allowed` checked in `dispatch`; role cards in `cards.py` | `test_role_tool_gate`, `test_role_cards_reference_real_tools` |
 | Typed lead queue: dedup, priority, bounded, closeable | `argus/team/leads.py` under one condition var | `test_queue_dedup_and_priority`, `test_lead_queue_saturates`, `test_queue_close_drains`, `test_pull_blocks_then_wakes` |
 | Board writes bounded and synchronized | `board.py` lock + field caps | `test_board_text_fields_bounded`, `test_board_counts_bounded`, `test_board_requests_consumed_only_by_lead` |

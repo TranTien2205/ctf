@@ -644,6 +644,12 @@ def _doc_selftest_count() -> None:
 # is worse than a stale one in the README - it goes straight into a prompt.
 _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
               "docs/ARCHITECTURE.md", "docs/USAGE.md", "docs/EXPERIMENTS.md",
+              # It was the one docs/*.md outside this list, so NONE of the
+              # checks below reached it - not the tool names, not the flags,
+              # not the subcommands, not the counts. The document whose
+              # whole purpose is to let a reader check a claim rather than
+              # take it was the one document nothing checked.
+              "docs/VERIFICATION.md",
               "lab/README.md", "argus/skills/INDEX.md",
               "argus/resources/exploits/README.md",
               "argus/resources/wordlists/README.md",
@@ -672,6 +678,10 @@ _NOT_TOOLS = {
     # a probe PARAMETER, not a tool: probe_csrf takes `read_url` to bracket
     # the write with a read before and after
     "read_url",
+    # a config loader, named in VERIFICATION.md as the mechanism that
+    # rejects a non-finite budget. It shares the `load_*` family with
+    # load_skill and is not a tool.
+    "load_config",
 }
 
 
@@ -690,6 +700,17 @@ def _doc_consistency() -> None:
     # model, so a tool it names has to exist
     for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
         texts[f"argus/skills/{fp.name}"] = fp.read_text(encoding="utf-8")
+    # A hand-maintained list of documents cannot reveal a document nobody
+    # added to it - the same error as counting a test table against the
+    # features that have rows. `docs/VERIFICATION.md` escaped this gate
+    # entirely that way, so the glob is the ground truth now.
+    on_disk = {f"docs/{p.name}" for p in sorted((ROOT / "docs").glob("*.md"))}
+    ungated = sorted(on_disk - set(_DOC_FILES))
+    check(f"every docs/*.md is in the gated set ({len(on_disk)} on disk)",
+          not ungated,
+          f"{ungated} exist but no check reads them - add them to "
+          "_DOC_FILES or delete them")
+
     absent = sorted(n for n in _DOC_FILES if n not in texts)
     check(f"doc set is present ({len(_DOC_FILES)} named + "
           f"{len(texts) - len(_DOC_FILES) + len(absent)} skills)",
@@ -943,6 +964,57 @@ def _doc_consistency() -> None:
           and proof.spec_for("dos").verifier is proof.verify_refused)
     check("every proof class has a requirement sentence",
           all(proof.requirement_of(c) for c in classes))
+
+    # 6. every test name a LIVE document cites is a test that exists.
+    #
+    #    `docs/VERIFICATION.md` is a table of claim -> mechanism -> the test
+    #    that holds it, and that is the document a reviewer reads to check a
+    #    claim rather than take it. Its whole value is the third column, so a
+    #    renamed or deleted test silently unbacks a claim and nothing said
+    #    so: this gate checked tools, subcommands, flags, proof classes,
+    #    ARGUS_* variables and stated counts, and not the 82 test names in
+    #    the one document whose purpose is to name them.
+    #
+    #    CHANGELOG.md is deliberately out of scope. It is a historical
+    #    record, so an entry that says a test was deleted names it correctly
+    #    by its old name, and failing on that would punish an accurate
+    #    sentence.
+    defined = set()
+    for path in sorted((ROOT / "tests").glob("test_*.py")):
+        defined |= set(_re.findall(r"(?m)^def (test_[A-Za-z0-9_]+)",
+                                   path.read_text(encoding="utf-8")))
+    defined |= set(_re.findall(r"(?m)^def (test_[A-Za-z0-9_]+)",
+                               (ROOT / "selftest.py")
+                               .read_text(encoding="utf-8")))
+    modules = {p.name for p in (ROOT / "tests").glob("test_*.py")}
+    unknown, cited_total = {}, 0
+    for name in ("docs/VERIFICATION.md", "docs/ARCHITECTURE.md", "AGENTS.md"):
+        text = texts.get(name)
+        if not text:
+            continue
+        # an identifier wrapped across two lines inside its backticks is one
+        # name, not a truncated one - join before matching
+        flat = _re.sub(r"`([^`]*)`",
+                       lambda m: "`" + _re.sub(r"\s*\n\s*", "",
+                                               m.group(1)) + "`",
+                       text, flags=_re.S)
+        for ident, ext in _re.findall(r"`(test_[A-Za-z0-9_]+)(\.py)?", flat):
+            cited_total += 1
+            ok = (ident + ext) in modules if ext else ident in defined
+            if not ok:
+                unknown.setdefault(name, set()).add(ident + ext)
+    check(f"live docs name only tests that exist ({cited_total} cited)",
+          not unknown,
+          "; ".join(f"{k}: {sorted(v)}" for k, v in unknown.items())
+          + " - named in a live document and defined nowhere")
+    # A regex that stops matching would make the check above pass forever on
+    # nothing, and the claims table without its third column is just
+    # assertions.
+    check("the claims table still names the tests that hold it",
+          cited_total >= 50,
+          f"only {cited_total} test names cited across the live docs - "
+          "docs/VERIFICATION.md is a claim -> mechanism -> test table and "
+          "the third column is the only thing that makes it checkable")
 
 
 def _ok(fn) -> bool:
