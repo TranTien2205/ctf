@@ -1887,10 +1887,16 @@ def probe_websocket(ctx: Context, url: str, message: str = "") -> dict:
     """
     canary = _marker("argusws")
     probe_origin = "https://argus-probe.invalid"
-    out = ctx.client.send_ws(url, message or f"{canary} argus-probe",
+    # The canary is PREPENDED, never replaced: with `message` supplied it
+    # used to be dropped and then still required in the reply, so a real
+    # cross-origin echo channel graded `unproven` because the probe had not
+    # sent the thing it was looking for.
+    payload = f"{canary} {message}" if message else f"{canary} argus-probe"
+    out = ctx.client.send_ws(url, payload,
                              origin=probe_origin, tool="probe_websocket",
                              note="cross-origin ws handshake + one frame")
-    res = {"verdict": "", "canary": canary, "origin_sent": probe_origin,
+    res = {"verdict": "", "canary": canary, "sent": payload,
+           "origin_sent": probe_origin,
            "handshake_id": out.get("handshake_id", ""),
            "message_id": out.get("message_id", ""),
            "status": out.get("status", 0),

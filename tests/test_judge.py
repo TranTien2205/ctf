@@ -296,3 +296,43 @@ def test_sanitized_findings_keeps_the_judge_fields():
     row = sanitized_findings([judge.apply_verdict(FINDING, verdict)])[0]
     assert row["disputed"] is True
     assert row["judge"]["judge_model"] == "gpt-4.1"
+
+
+# --- what the audit's unverified findings turned out to be -----------------
+
+def test_a_transport_failure_is_not_recorded_as_a_dispute():
+    """The docstring said a transport failure is not a dispute and
+    `apply_verdict` marked one anyway, because it only looked at `agrees`. A
+    judge that could not be reached has not disagreed with anything."""
+    class _Boom:
+        def chat(self, **kw):
+            raise RuntimeError("502 from provider")
+    verdict = judge.judge_finding(_Boom(), FINDING, [ENTRY], "gpt-4.1")
+    out = judge.apply_verdict(FINDING, verdict)
+    assert "disputed" not in out, out
+    assert out["judge"]["error"]
+
+    # an unparseable reply is the same: no verdict, not a dispute
+    out = judge.apply_verdict(
+        FINDING, judge.judge_finding(_LLM("looks fine"), FINDING, [ENTRY],
+                                     "gpt-4.1"))
+    assert "disputed" not in out, out
+
+
+def test_a_later_judge_cannot_present_itself_as_the_whole_story():
+    """A second judge overwrote `finding["judge"]`, so a report read
+    "Cross-verification: agreed" over a finding whose `disputed` flag was
+    still set - telling the reader the opposite of the record."""
+    from argus.report.markdown import _proof_block
+    disputed = judge.apply_verdict(
+        FINDING, judge.Verdict("F01", "gpt-4.1", agrees=False,
+                               reason="no control"))
+    agreed = judge.apply_verdict(
+        disputed, judge.Verdict("F01", "claude-opus-4-5", agrees=True,
+                                reason="fine"))
+    assert agreed["disputed"] is True
+    assert len(agreed["judges"]) == 2
+    block = "\n".join(_proof_block(agreed))
+    assert "DISPUTED by cross-verification" in block, block
+    assert "2 judges read this evidence" in block
+    assert "gpt-4.1 disputed" in block and "claude-opus-4-5 agreed" in block

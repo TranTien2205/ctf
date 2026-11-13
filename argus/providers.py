@@ -96,6 +96,15 @@ def _openai_to_anthropic(data: dict) -> dict:
     message = message if isinstance(message, dict) else {}
     content: list[dict] = []
     text = message.get("content")
+    if isinstance(text, list):
+        # Some OpenAI-compatible servers answer with content PARTS rather
+        # than a string. Reading only `str` turned that into an empty turn,
+        # and an empty turn makes the agent stop calling tools without
+        # saying why.
+        text = "".join(
+            str(part.get("text") or "") for part in text
+            if isinstance(part, dict) and part.get("type") in
+            ("text", "output_text", None))
     if isinstance(text, str) and text.strip():
         content.append({"type": "text", "text": text})
     for call in message.get("tool_calls") or []:
@@ -129,11 +138,22 @@ def _openai_to_anthropic(data: dict) -> dict:
     # through would bill every cached token twice - once at full input price
     # and again at the cache rate - so the cost report would be wrong in the
     # direction that flatters caching's cost, not its benefit.
-    prompt = max(int(usage.get("prompt_tokens") or 0), 0)
-    cached = max(min(int(cached), prompt), 0)
+    # A server that answers `"prompt_tokens": "many"` used to end the run with
+    # a ValueError, and `completion_tokens` was passed through unclamped - a
+    # string there breaks the cost arithmetic downstream instead. A token
+    # count this client cannot read is zero and the run continues: it is a
+    # number for a report, not evidence.
+    def _count(value) -> int:
+        try:
+            return max(int(value or 0), 0)
+        except (TypeError, ValueError):
+            return 0
+
+    prompt = _count(usage.get("prompt_tokens"))
+    cached = max(min(_count(cached), prompt), 0)
     return {"stop_reason": stop, "content": content,
             "usage": {"input_tokens": prompt - cached,
-                      "output_tokens": usage.get("completion_tokens") or 0,
+                      "output_tokens": _count(usage.get("completion_tokens")),
                       "cache_read_input_tokens": cached}}
 
 

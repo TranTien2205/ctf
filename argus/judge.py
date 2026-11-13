@@ -327,8 +327,22 @@ def apply_verdict(finding: dict, verdict: Verdict) -> dict:
     field belongs to the proof matrix.
     """
     out = dict(finding)
+    # Every verdict is KEPT, not overwritten. A second judge that agrees used
+    # to replace the first one's block, so a report read "Cross-verification:
+    # agreed" over a finding whose `disputed` flag was still set - telling the
+    # reader the opposite of the record. A dispute is a one-way door; later
+    # agreement is additional information, not a correction.
+    history = finding.get("judges")
+    history = list(history) if isinstance(history, list) else (
+        [finding["judge"]] if isinstance(finding.get("judge"), dict) else [])
+    history.append(verdict.to_dict())
+    out["judges"] = history
     out["judge"] = verdict.to_dict()
-    if not verdict.agrees:
+    # A transport failure or an unparseable reply is NO VERDICT, which this
+    # module's own docstring says is not a dispute - and `apply_verdict`
+    # marked it disputed anyway, because it only looked at `agrees`. A judge
+    # that could not be reached has not disagreed with anything.
+    if not verdict.agrees and not verdict.error:
         out["disputed"] = True
     if verdict.severity:
         current = _RANK.get(str(out.get("severity") or "").lower(), 99)

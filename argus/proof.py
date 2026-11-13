@@ -281,10 +281,25 @@ class Claim:
                 if isinstance(e, dict) and not isinstance(e.get("response"), dict)]
 
 
+def _req(entry) -> dict:
+    """This entry's request as a dict, or an empty one.
+
+    `_req(entry)` reads as a guard and is not one: a LIST is
+    truthy, so `.get` on it raises, and twelve classes' verifiers died that
+    way on a malformed entry - reported by `grade()` as "evidence is
+    readable" failing, which hides whatever the real answer was.
+    """
+    req = entry.get("request") if isinstance(entry, dict) else None
+    return req if isinstance(req, dict) else {}
+
+
+def _resp(entry) -> dict:
+    resp = entry.get("response") if isinstance(entry, dict) else None
+    return resp if isinstance(resp, dict) else {}
+
+
 def req_text(entry: dict) -> str:
-    req = entry.get("request") or {}
-    if not isinstance(req, dict):
-        return ""
+    req = _req(entry)
     parts = [str(req.get("method") or ""), str(req.get("url") or ""),
              str(req.get("headers") or ""), str(req.get("body") or ""),
              str(req.get("request_text") or "")]
@@ -492,12 +507,12 @@ ACL_HEADER_RE = re.compile(
 
 
 def _req_headers(entry: dict) -> dict:
-    headers = (entry.get("request") or {}).get("headers") if entry else None
+    headers = _req(entry).get("headers")
     return headers if isinstance(headers, dict) else {}
 
 
 def _path_of(entry: dict) -> str:
-    url = str((entry.get("request") or {}).get("url") or "") if entry else ""
+    url = str(_req(entry).get("url") or "") if entry else ""
     return urllib.parse.urlparse(url).path or "/"
 
 
@@ -537,7 +552,7 @@ def _endpoint_shape(entry: dict) -> str:
     `/articles/2` are not, and comparing them as a pair is how pagination
     graded as broken access control.
     """
-    url = str((entry.get("request") or {}).get("url") or "")
+    url = str(_req(entry).get("url") or "")
     parsed = urllib.parse.urlparse(url)
     # The HOST is part of the endpoint. Dropping it made two tenants of a
     # multi-tenant app - alice.saas.test and bob.saas.test, each reading their
@@ -565,7 +580,7 @@ def _credential(entry: dict) -> str:
 
 
 def _object_refs(entry: dict) -> set[str]:
-    url = str((entry.get("request") or {}).get("url") or "")
+    url = str(_req(entry).get("url") or "")
     refs = set()
     for m in OBJECT_REF_RE.finditer(url):
         refs.add(m.group(1) or m.group(2))
@@ -617,7 +632,7 @@ def verify_command_output(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
         html = bool(entry) and bool(re.search(
             r"(?i)text/html|application/xhtml",
-            str(((entry.get("response") or {}).get("headers")) or "")))
+            str((_resp(entry).get("headers")) or "")))
         hit = None
         if entry:
             hit = IDENTITY_RE.search(body) or WINIDENT_RE.search(body)
@@ -1075,7 +1090,7 @@ def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
         loc = header_of(off, "Location") if off else ""
         host = _redirect_host(loc)
         req_host = (urllib.parse.urlparse(
-            str((off.get("request") or {}).get("url") or "")).hostname or "") \
+            str(_req(off).get("url") or "")).hostname or "") \
             if off else ""
         foreign = bool(host) and host.lower() != req_host.lower()
         supplied = foreign and host.lower() in req_text(off).lower()
@@ -1083,7 +1098,7 @@ def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
         c_host = _redirect_host(c_loc)
         in_origin = bool(control) and bool(c_loc) and (
             not c_host or c_host.lower() == (urllib.parse.urlparse(
-                str((control.get("request") or {}).get("url") or "")
+                str(_req(control).get("url") or "")
             ).hostname or "").lower())
         return [
             _check("the Location points off origin, to a host we supplied",
@@ -1189,7 +1204,7 @@ def verify_cors(claim: Claim, spec: "ProofSpec") -> list[dict]:
             if str(k).lower() == "origin":
                 origin = str(v)
         host = (urllib.parse.urlparse(
-            str((entry.get("request") or {}).get("url") or "")).hostname or "") \
+            str(_req(entry).get("url") or "")).hostname or "") \
             if entry else ""
         o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
         foreign = bool(o_host) and o_host.lower() != host.lower()
@@ -1219,11 +1234,11 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
     The write has to carry no anti-CSRF token and a foreign Origin/Referer.
     """
     reads = [e for e in claim.exchanges
-             if str((e.get("request") or {}).get("method") or "GET").upper()
+             if str(_req(e).get("method") or "GET").upper()
              == "GET"]
 
     def build(entry: dict | None) -> list[dict]:
-        method = str((entry.get("request") or {}).get("method") or "GET").upper() \
+        method = str(_req(entry).get("method") or "GET").upper() \
             if entry else "GET"
         write = method in ("POST", "PUT", "PATCH", "DELETE")
         request = req_text(entry) if entry else ""
@@ -1233,7 +1248,7 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
             if str(k).lower() in ("origin", "referer"):
                 origin = str(v)
         host = (urllib.parse.urlparse(
-            str((entry.get("request") or {}).get("url") or "")).hostname or "") \
+            str(_req(entry).get("url") or "")).hostname or "") \
             if entry else ""
         o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
         cross = bool(o_host) and o_host.lower() != host.lower()
@@ -1318,7 +1333,7 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
         if not claim.excerpt or claim.excerpt not in body:
             continue
         if not re.search(r"(?i)text/html|application/xhtml",
-                         str(((entry.get("response") or {}).get("headers")) or "")):
+                         str((_resp(entry).get("headers")) or "")):
             continue
         if raw:
             reflected = (entry, "".join(raw))
@@ -1350,7 +1365,7 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
         wrote, read = (pair if pair else (None, None))
         request = req_text(wrote) if wrote else ""
         field = PRIVILEGED_FIELD_RE.search(request) if wrote else None
-        method = str((wrote.get("request") or {}).get("method") or "GET").upper() \
+        method = str(_req(wrote).get("method") or "GET").upper() \
             if wrote else "GET"
         sent = bool(field) and method in ("POST", "PUT", "PATCH") \
             and 200 <= status_of(wrote) < 400
@@ -1634,7 +1649,7 @@ def _uploaded_part(entry: dict) -> str:
     from a page that names it - only comparing against what was actually sent
     does.
     """
-    body = str(((entry or {}).get("request") or {}).get("body") or "")
+    body = str(_req(entry).get("body") or "")
     match = _PART_RE.search(body)
     return match.group(1).strip() if match else ""
 
@@ -1897,7 +1912,7 @@ def _wire_text(entry: dict) -> str:
     collapses duplicates - and a duplicated or conflicting framing header
     pair IS the evidence for this class.
     """
-    req = (entry or {}).get("request") or {}
+    req = _req(entry)
     text = str(req.get("request_text") or "")
     if text:
         return text
@@ -2053,7 +2068,7 @@ def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
             continue
         o_host = (urllib.parse.urlparse(str(origin)).hostname or "").lower()
         t_host = (urllib.parse.urlparse(
-            str((entry.get("request") or {}).get("url") or "")).hostname
+            str(_req(entry).get("url") or "")).hostname
             or "").lower()
         if o_host and t_host and o_host != t_host:
             foreign = (entry, origin)
@@ -2076,7 +2091,7 @@ def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
                 detail = (f"{entry.get('id')} is a frame on a different "
                           "endpoint than the handshake")
                 continue
-            sent = str(((entry.get("request") or {}).get("body") or ""))
+            sent = str((_req(entry).get("body") or ""))
             got = resp_body(entry)
             back = [m.group(0) for m in NONCE_RE.finditer(sent)
                     if m.group(0) in got]
@@ -2097,8 +2112,7 @@ _WRITE_METHODS = ("PUT", "DELETE", "PATCH")
 
 
 def _method_of(entry: dict) -> str:
-    req = entry.get("request") if isinstance(entry, dict) else None
-    return str((req or {}).get("method") or "").upper()
+    return str(_req(entry).get("method") or "").upper()
 
 
 def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
@@ -2206,7 +2220,7 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             # PUT of inert bytes to /up/<nonce>.txt plus a directory listing
             # that echoes the filename graded `proven` - the effect proven
             # was the server printing a name back, not storing anything.
-            wrote = str(((a or {}).get("request") or {}).get("body") or "")
+            wrote = str(_req(a).get("body") or "")
             read = resp_body(b)
             carried = [m.group(0) for m in NONCE_RE.finditer(wrote)
                        if m.group(0) in read]

@@ -1416,7 +1416,8 @@ def _cmd_judge(args) -> int:
     if not (sdir / "transcript.jsonl").exists():
         print(f"no transcript.jsonl in {sdir} - not a session dir")
         return 1
-    session = _reopen(sdir, _seal_key(args))
+    seal = _seal_key(args)
+    session = _reopen(sdir, seal)
     if not session._transcript:
         print(f"{sdir} has an empty transcript - nothing to judge")
         return 1
@@ -1428,16 +1429,29 @@ def _cmd_judge(args) -> int:
     except Exception:
         pass
 
-    v = verify_transcript(sdir)
+    # The chain check must use the SAME key the session was sealed with, or
+    # every keyed session is accused of having been edited. `_seal_key(args)`
+    # is already resolved above for `_reopen`; pass it on.
+    v = verify_transcript(sdir, seal_key=seal)
     if not v.get("chained") or v.get("tail_truncated") or v.get("bad_lines"):
         print("warning: transcript chain check failed - judging an edited "
-              "transcript (run 'argus verify')", file=sys.stderr)
+              "transcript (run 'argus verify')"
+              + ("" if seal else "; if this session was sealed with a key, "
+                 "pass --seal-key"), file=sys.stderr)
     bad = findings_bad(session._transcript, session.findings)
 
     wanted = {x.strip() for x in str(args.only or "").split(",") if x.strip()}
     rows = [f for f in session.findings if isinstance(f, dict)
             and (not wanted or f.get("id") in wanted)
             and f.get("id") not in bad]
+    if wanted:
+        known_ids = {str(f.get("id")) for f in session.findings
+                     if isinstance(f, dict)}
+        unknown = sorted(wanted - known_ids)
+        if unknown:
+            print(f"--only names {unknown}, which this session has no "
+                  f"finding for. It has: {sorted(known_ids) or 'none'}")
+            return 2
     if not rows:
         print("no findings to judge"
               + (f" (excluded by evidence re-validation: {sorted(bad)})"
@@ -1467,6 +1481,16 @@ def _cmd_judge(args) -> int:
                   "the run already used - two models that agree because they "
                   "share a prior are not a check. Name another, or let the "
                   "table pick.")
+            return 2
+        # The role gate applies to a named model too. Without this, --judge-model
+        # accepted anything in the table - including a model the table lists
+        # only for `breadth` or `writer`, which is not an opinion worth having
+        # about a proof.
+        if "judge" not in spec.roles:
+            print(f"{args.judge_model} is not listed for the judge role "
+                  f"(it serves: {', '.join(spec.roles) or 'nothing'}). "
+                  f"`argus models` shows which models are. Reviewing a proof "
+                  f"is not a job every model is listed for.")
             return 2
         pick = spec
     else:

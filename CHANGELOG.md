@@ -642,7 +642,7 @@ somebody reading only the list.
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
   in `docs/USAGE.md` on its first run, left behind by an earlier version.
-- `python -m pytest tests/ -q`: 509 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 517 tests (unit + live-lab + loop +
   team + MCP client + MCP server + proof matrix + provider adapters +
   the decision controller + the cross-family judge + CLI +
   external-tool subprocess path +

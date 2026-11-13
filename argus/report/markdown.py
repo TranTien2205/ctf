@@ -123,7 +123,20 @@ def _proof_block(f: dict) -> list[str]:
     # A second model read the evidence. It cannot change the grade - that
     # belongs to the matrix - so the only way its disagreement reaches a
     # reader is by being printed here, next to the grade it disputes.
-    judged = f.get("judge") if isinstance(f.get("judge"), dict) else {}
+    # Read the HISTORY, so a later agreement cannot present itself as the
+    # whole story over a finding an earlier judge disputed.
+    history = [v for v in (f.get("judges") or []) if isinstance(v, dict)]
+    if not history and isinstance(f.get("judge"), dict):
+        history = [f["judge"]]
+    disputes = [v for v in history if not v.get("agrees") and not v.get("error")]
+    judged = disputes[0] if disputes else (history[-1] if history else {})
+    if judged and len(history) > 1:
+        out += [f"> ({len(history)} judges read this evidence: "
+                + ", ".join(
+                    f"{v.get('judge_model', '?')} "
+                    + ("no verdict" if v.get("error") else
+                       "agreed" if v.get("agrees") else "disputed")
+                    for v in history) + ")", ""]
     if judged:
         model = str(judged.get("judge_model") or "a second model")
         if judged.get("error"):

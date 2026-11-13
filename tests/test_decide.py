@@ -284,7 +284,7 @@ def test_a_class_that_spent_its_budget_is_parked_by_name(tmp_path):
         e["id"] = f"r{n}"
     action = decide.next_action(_session(tmp_path, entries))
     assert action.action == "park_and_switch"
-    assert action.detail["probes_sent"] >= decide.BUDGET_PER_CLASS
+    assert action.detail["requests_sent"] >= decide.BUDGET_PER_CLASS
     assert action.vuln_class in decide.PROBE_CLASS.values()
 
 
@@ -466,3 +466,34 @@ def test_rule_one_does_not_shop_for_a_verdict(tmp_path):
         _exchange("r1", "http://t/search?q=x", body=body, tool="probe_sqli")])
     action = decide.next_action(sdir)
     assert action.action != "record_finding", action.render()
+
+
+def test_the_ledger_does_not_say_report_about_a_run_that_probed_nothing():
+    """Rule 7 is the only exit and it was reachable from a single fetch of a
+    root page: no parameterised surface so rules 3-5 pass, no findings so
+    rule 6 passes, and the ledger said "write the report" about a run that
+    had tested nothing."""
+    import json
+    import pathlib
+    import tempfile
+    sdir = pathlib.Path(tempfile.mkdtemp())
+    sdir.joinpath("transcript.jsonl").write_text(json.dumps({
+        "id": "r1", "tool": "http_request",
+        "request": {"method": "GET", "url": "http://t/", "headers": {},
+                    "body": None},
+        "response": {"status": 200, "headers": {},
+                     "body": "<html>home</html>"}}) + "\n", encoding="utf-8")
+    sdir.joinpath("findings.json").write_text("[]", encoding="utf-8")
+    action = decide.next_action(sdir)
+    assert action.action == "recon", action.render()
+    assert "probed" in action.why
+
+
+def test_the_class_budget_is_counted_in_the_unit_it_is_documented_in():
+    """It counted recorded REQUESTS while being documented as probes, and one
+    `probe_sqli` call records about eleven - so a single call spent 220% of
+    the budget and rule 5 recommended parking a class nobody had finished."""
+    assert decide.BUDGET_PER_CLASS == (decide.REQUESTS_PER_PROBE
+                                       * decide.PROBE_CALLS_PER_CLASS)
+    assert decide.PROBE_CALLS_PER_CLASS >= 5
+    assert decide.REQUESTS_PER_PROBE >= 10

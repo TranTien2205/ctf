@@ -62,10 +62,15 @@ PROBE_CLASS = {
 _FIRST_PASS = ("probe_sqli", "probe_reflection", "probe_cmdi", "probe_ssti",
                "probe_lfi", "probe_redirect", "probe_ssrf")
 
-# How many probes against one class on one endpoint before the ledger says
-# park it. Chosen to match the system prompt's own guidance (~5) so the two
-# do not contradict each other.
-BUDGET_PER_CLASS = 5
+# How many recorded REQUESTS against one class on one endpoint before the
+# ledger says park it. The unit matters and was wrong: this counted requests
+# while being documented as probes, and one `probe_sqli` call records about
+# eleven - so a single call spent 220% of the budget and rule 5 recommended
+# parking a class nobody had finished trying. The system prompt's guidance is
+# ~5 probe calls, so the budget is that many calls' worth of requests.
+REQUESTS_PER_PROBE = 12
+PROBE_CALLS_PER_CLASS = 5
+BUDGET_PER_CLASS = REQUESTS_PER_PROBE * PROBE_CALLS_PER_CLASS
 
 _STATIC_RE = re.compile(
     r"\.(?:css|js|mjs|map|png|jpe?g|gif|svg|ico|woff2?|ttf|eot|webp|avif|"
@@ -354,11 +359,13 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
         endpoint, klass, n = spent[0]
         return Action(
             "park_and_switch",
-            f"{klass} on {endpoint} has taken {n} probe requests and recorded "
-            "no finding. Say in notes.md what was ruled out and what would "
+            f"{klass} on {endpoint} has taken {n} requests - about "
+            f"{n // REQUESTS_PER_PROBE} probe calls - and recorded no "
+            "finding. Say in notes.md what was ruled out and what would "
             "revive it, then open a different class.",
             target=endpoint, vuln_class=klass,
-            detail={"probes_sent": n, "budget": BUDGET_PER_CLASS,
+            detail={"requests_sent": n, "budget_requests": BUDGET_PER_CLASS,
+                    "probe_calls_allowed": PROBE_CALLS_PER_CLASS,
                     "classes_untried": _untried(surface, counts, endpoint)})
 
     # Rule 6 - findings exist and are proven, but nothing has widened the
@@ -372,6 +379,24 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
             "segments, uploaded file names.",
             detail={"endpoints_known": sorted(surface),
                     "findings": [f.get("id") for f in findings]})
+
+    # Rule 6b - nothing was probed at all. Rule 7 is the only exit and it
+    # used to be reachable from a single fetch of a root page with no
+    # parameters anywhere: no surface, so rules 3-5 pass, no findings, so
+    # rule 6 passes, and the ledger said "write the report" about a run that
+    # had tested nothing.
+    if not counts:
+        return Action(
+            "recon",
+            "nothing on record has been probed for any class, and no "
+            "parameterised endpoint was reached. Map more surface before "
+            "concluding anything: follow the links and forms this response "
+            "names, and look at headers, cookies and path segments as inputs "
+            "too.",
+            detail={"exchanges": len(exchanges),
+                    "endpoints_seen": sorted(
+                        {_endpoint(e) for e in exchanges if _endpoint(e)})[:20],
+                    "parameterised": sorted(surface)})
 
     # Rule 7 - the only exit.
     return Action(

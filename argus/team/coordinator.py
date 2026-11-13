@@ -152,7 +152,12 @@ class TeamRun:
                 continue
             tok = res.get("llm_tokens") if isinstance(
                 res.get("llm_tokens"), dict) else {}
-            model = str(res.get("model") or self.cfg.model)
+            # a crashed worker has no result dict to name its model, so fall
+            # back to what the role WOULD have used rather than to the team's
+            model = str(res.get("model") or "")
+            if not model:
+                role = name.rsplit("-", 1)[0] if "-" in name else name
+                model = self.model_for(role)
             spec = models_mod.get(model)
             if spec is None:
                 unpriced.append(f"{name} ({model})")
@@ -209,8 +214,13 @@ class TeamRun:
     def _start_worker(self, name: str, card, task: str) -> None:
         self.board.register(name, card.name, task)
         import dataclasses
+        # `model` goes in too, or the loop reports the TEAM's model while its
+        # client talks to the role's one - which priced every worker at the
+        # wrong rate in `summary.json`, defeating the whole point of
+        # --role-models. The cfg a loop holds must name the model it uses.
         wcfg = dataclasses.replace(
             self.cfg,
+            model=self.model_for(card.name),
             max_turns=card.turns or self.cfg.max_turns,
             max_requests=card.requests or self.cfg.max_requests)
         system = build_system(wcfg, self.scope) + "\n\n" + card.prompt()
@@ -258,7 +268,8 @@ class TeamRun:
                   "it technically for every worker's requests too.")
         seed += self._resume_note()
         loop = AgentLoop(
-            self.cfg, llm=self._llm_factory("lead", name),
+            replace(self.cfg, model=self.model_for("lead")),
+            llm=self._llm_factory("lead", name),
             quiet=self.quiet, scope=self.scope, session=self.session,
             client=self._mk_client(name), board=self.board, mcp=self.mcp,
             agent_name=name, role="lead", allowed=LEAD.tools, system=system,

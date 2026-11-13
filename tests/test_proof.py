@@ -2366,3 +2366,46 @@ def test_a_benign_body_naming_get_is_not_a_desync():
         assert not proof.BOGUS_METHOD_RE.search(text), text
     for text in ("Unsupported method ('GGET')", "method GPOST", "501 GPUT"):
         assert proof.BOGUS_METHOD_RE.search(text), text
+
+
+def test_no_verifier_raises_on_a_malformed_request_or_response():
+    """`(entry.get("request") or {})` reads as a guard and is not one: a list
+    is truthy, so `.get` on it raises. Twelve classes died that way, reported
+    by `grade()` as "evidence is readable" failing - which hides whatever the
+    real answer was. Found by an adversarial audit."""
+    shapes = {
+        "request is a list": {"request": ["GET", "http://t/"],
+                              "response": {"status": 200, "headers": {},
+                                           "body": "hello world here",
+                                           "elapsed_ms": 5}},
+        "request is a string": {"request": "GET /",
+                                "response": {"status": 200, "headers": {},
+                                             "body": "hello world here"}},
+        "response is a list": {"request": {"method": "GET",
+                                           "url": "http://t/",
+                                           "headers": {}, "body": None},
+                               "response": ["200", "ok"]},
+        "headers are strings": {"request": {"method": "GET",
+                                            "url": "http://t/",
+                                            "headers": "a: b", "body": None},
+                                "response": {"status": "x", "headers": "y",
+                                             "body": "hello world here",
+                                             "elapsed_ms": "z"}},
+        "both are None": {"request": None, "response": None},
+    }
+    for name, shape in shapes.items():
+        entries = [{"id": "r1", "ts": 1.0, **shape}]
+        for klass in proof.classes():
+            verdict = proof.grade(klass, "hello world here", entries)
+            unreadable = [c for c in verdict.checks
+                          if c["check"] == "evidence is readable"
+                          and not c["ok"]]
+            assert not unreadable, (
+                f"{klass} raised on {name}: "
+                f"{unreadable[0].get('detail')}")
+
+    # and entries that are not dicts at all
+    for klass in proof.classes():
+        verdict = proof.grade(klass, "x", ["not an entry", 42, None])
+        assert not [c for c in verdict.checks
+                    if c["check"] == "evidence is readable" and not c["ok"]]

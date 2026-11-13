@@ -607,3 +607,56 @@ def test_for_role_skips_a_model_whose_credential_is_not_set(monkeypatch):
     assert models.for_role("breadth", "cheap", usable_only=False).key == "local"
     monkeypatch.setenv("ARGUS_LOCAL_API_KEY", "1")
     assert models.for_role("breadth", "cheap").key == "local"
+
+
+def test_a_malformed_usage_number_does_not_end_the_run():
+    """A server answering `"prompt_tokens": "many"` raised ValueError and
+    killed the run; `completion_tokens` was passed through unclamped, so a
+    string reached the cost arithmetic instead. A token count this client
+    cannot read is zero: it is a number for a report, not evidence."""
+    out = _openai_to_anthropic({
+        "choices": [{"message": {"content": "ok"}}],
+        "usage": {"prompt_tokens": "many", "completion_tokens": "x",
+                  "prompt_tokens_details": {"cached_tokens": "lots"}}})
+    usage = out["usage"]
+    assert usage == {"input_tokens": 0, "output_tokens": 0,
+                     "cache_read_input_tokens": 0}
+    for value in usage.values():
+        assert isinstance(value, int)
+
+
+def test_a_content_part_list_is_not_an_empty_turn():
+    """Some OpenAI-compatible servers answer with content PARTS. Reading only
+    `str` made that an empty turn, and an empty turn makes the agent stop
+    calling tools without saying why."""
+    out = _openai_to_anthropic({"choices": [{"message": {"content": [
+        {"type": "text", "text": "first "},
+        {"type": "text", "text": "second"}]}}]})
+    assert out["content"] == [{"type": "text", "text": "first second"}]
+
+
+def test_a_team_run_prices_each_worker_at_the_model_it_used(monkeypatch):
+    """`loop.run()` reports `cfg.model`, and a worker's loop was built with
+    the TEAM's cfg while its client talked to the role's model - so every
+    worker was priced at the wrong rate, defeating --role-models."""
+    import dataclasses
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-x")
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-y")
+    team = _team(_role_cfg())
+    picks = {r: team.model_for(r) for r in ("lead", "recon", "exploit")}
+    assert len(set(picks.values())) > 1, picks
+    team._results = {
+        "lead": {"model": picks["lead"],
+                 "llm_tokens": {"in": 100_000, "out": 10_000,
+                                "cache_read": 0}},
+        "recon-1": {"model": picks["recon"],
+                    "llm_tokens": {"in": 50_000, "out": 5_000,
+                                   "cache_read": 0}},
+        # a crashed worker has no result dict to name its model
+        "exploit-1": {"error": "RuntimeError: boom", "turns": 0},
+    }
+    out = team._cost_breakdown()
+    assert out["per_agent"]["lead"]["model"] == picks["lead"]
+    assert out["per_agent"]["recon-1"]["model"] == picks["recon"]
+    assert out["per_agent"]["exploit-1"]["model"] == picks["exploit"]
+    assert dataclasses.is_dataclass or True
