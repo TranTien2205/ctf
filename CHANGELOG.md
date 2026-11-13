@@ -160,6 +160,13 @@ system. All notable milestones on `agent-v2`.
   clear socks5-needs-socksio message), `--resume` session-dir check,
   `--session-dir` not-a-file check, malformed `--mcp-config` lands
   per-server errors instead of crashing startup.
+- Ordering/consistency hardening in the deepest paths: transcript lines
+  serialize before `_last_chain`/`_transcript` mutate (a non-JSON leaf
+  can no longer open a chain gap); `send_raw` pipelined `reads` bounded
+  to 8 (each holds a 3 s socket timeout); blocked-redirect events record
+  the verbatim `Location` before `urljoin` parses it; `run_exploit`
+  children lose declared `--secret` values from their environment the
+  same way `run_external` children always did.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
