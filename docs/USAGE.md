@@ -201,8 +201,9 @@ both), plus verbatim
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
 `python -m argus sessions` lists every session dir with mode, finding and
-request counts (`--json` for scripts); `python -m argus compare <dirA> <dirB>`
-prints a side-by-side metrics table (mode, findings, requests,
+request counts plus the producing argus version (`--json` for scripts);
+`python -m argus compare <dirA> <dirB>` prints a side-by-side metrics
+table (mode, findings, requests,
 time-to-first-finding, endpoints touched, llm calls, workers, tokens
 incl. cache read/write) for run-vs-team experiments; `--csv` emits one
 row per session for spreadsheets/pandas.
@@ -210,7 +211,11 @@ row per session for spreadsheets/pandas.
 matched across the two sessions by bug class + host + path + params
 (ports ignored, so a fresh lab instance still lines up) and printed as
 `FIXED`, `STILL PRESENT` (with severity drift), or `NEW`; `--json` for
-scripts.
+scripts. Both commands warn on stderr when the compared sessions were
+run against different base hosts (a cross-host diff would silently read
+as all-fixed + all-new); `compare` also warns when the sessions were
+produced by different argus builds, since metric deltas are only
+like-for-like on the same version.
 `python -m argus skills` lists the bundled methodology modules;
 `python -m argus skills <name>` prints one, which is useful when auditing
 exactly what guidance the model loads.
@@ -231,7 +236,12 @@ to ANY session artifact, even a byte, surface as `TAMPERED: [...] edited
 since the run was sealed`. `argus report` re-renders re-seal the fresh
 artifacts, skip failing findings and warn when the chain itself is
 broken; `argus findings` marks failing rows `UNVERIFIED`. `verify --json`
-emits the raw result (`ok` mirrors the exit code) for CI pipelines.
+emits the raw result (`ok` mirrors the exit code) for CI pipelines. Every
+session also records which argus build produced it - `meta.json` /
+`summary.json` carry `argus_version` (a resumed session keeps the
+original and adds `resumed_by`), `argus sessions` shows it in the
+listing and `argus verify` reports it as `produced_by`, so a reviewer
+re-validating old artifacts knows which evidence rules applied.
 
 Secret header **values** (`Authorization`, `Cookie`, `Set-Cookie`,
 `X-*-Token` and any header carrying a `--header`-configured secret) are
