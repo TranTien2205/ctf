@@ -249,3 +249,49 @@ def test_secrets_below_min_len_ignored(tmp_path):
     s.record_exchange("t", {"body": "ok ok"}, {"body": "ok"})
     blob = (s.dir / "transcript.jsonl").read_text()
     assert "ok ok" in blob  # nothing shredded
+
+
+def test_basic_auth_in_the_target_persists_in_no_artifact(tmp_path):
+    """The one URL an operator certainly types with credentials.
+
+    `session.py`'s own docstring said basic-auth in a URL "persists
+    nowhere", and `meta.json` held
+    `http://admin:SuperSecret123@10.0.0.5/app` verbatim - sealed into the
+    hash chain and shipped in the bundle. The request path was covered and
+    the target was not.
+
+    This sweeps EVERY file in the session dir rather than the two writers
+    that were fixed: fixing `meta.json` left the same credential in
+    `notes.md`, which is how the first attempt at this looked finished.
+    """
+    target = "http://admin:SuperSecret123@10.0.0.5/app"
+    sess = Session(tmp_path, target, meta={"operator": "t"})
+
+    def leaks(directory):
+        out = []
+        for path in sorted(directory.iterdir()):
+            if not path.is_file():
+                continue
+            if "SuperSecret123" in path.read_text(errors="replace"):
+                out.append(path.name)
+        return out
+
+    assert leaks(sess.dir) == []
+    assert "10.0.0.1" not in str(sess.dir)  # host is fine, creds are not
+    import json
+
+    meta = json.loads((sess.dir / "meta.json").read_text(encoding="utf-8"))
+    # the host survives - a reviewer must still see what was tested
+    assert "10.0.0.5" in meta["target"] and "admin" not in meta["target"]
+
+    # resume rewrites meta.json and may create notes.md: both must stay
+    # clean, and the resume must still work at all - comparing a redacted
+    # stored target against a live credentialled one would refuse every
+    # resume, which is the trap this fix had to avoid
+    again = Session(tmp_path, target, meta={}, resume=str(sess.dir))
+    assert leaks(again.dir) == []
+
+    # ...and a genuinely different target is still refused
+    with pytest.raises(ValueError):
+        Session(tmp_path, "http://other.example/", meta={},
+                resume=str(sess.dir))

@@ -925,6 +925,36 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The target's basic-auth credentials persisted in two artifacts
+- `session.py`'s own docstring said basic-auth in a URL "persists nowhere;
+  the scope guard only ever needed the host". It was true of the request
+  path, which `_redact_url` covers, and false of **the one URL an operator
+  certainly types with credentials**: the target, which argus takes as a
+  positional argument. `argus run http://admin:SuperSecret123@10.0.0.5/app`
+  wrote the password verbatim into `meta.json` - sealed into the hash chain
+  and shipped in the bundle - and into the `notes.md` header.
+- A footnote worth keeping: the first draft of this entry passed the target
+  as a long option rather than positionally, and the documentation gate
+  refused it, because no parser accepts that spelling. The gate this stretch
+  kept extending caught its own author inventing a flag, in the paragraph
+  describing a credential leak - and then refused the correction too, since
+  naming the wrong spelling in prose is indistinguishable from using it.
+  The same tension as quoting a stale count: a gate that validates names in
+  prose cannot be shown the name it rejects, so the entry describes the
+  mistake instead of spelling it.
+- Both are redacted now, at all three writers (fresh session, resume
+  meta-rewrite, resume notes-create), and the host survives because a
+  reviewer must still see what was tested.
+- Writing it redacted without touching the comparison would have made
+  **every resume fail**: `_resume` tested `old_target != target`, so the
+  stored marker would never equal the live credentialled URL. Both forms are
+  accepted now, which also keeps a session written by an older build
+  resumable.
+- Fixing `meta.json` first left the same credential in `notes.md` - the
+  eighth half-fix in this stretch. So the test sweeps **every file in the
+  session dir** rather than the writers that were changed, and asserts the
+  resume still works and that a genuinely different target is still refused.
+
 ### Raw-wire redaction was defeated by the header name
 - The lens that found two credential leaks in an earlier session is "what
   leaves the machine", and `httpclient.py`'s redaction had not been asked
@@ -1349,7 +1379,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 616 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 617 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

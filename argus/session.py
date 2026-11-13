@@ -544,7 +544,13 @@ class Session:
         self.secret_values: set[str] = secrets
         _atomic_write(
             self.dir / "meta.json",
-            json.dumps({"id": self.id, "target": target,
+            # `_redact_url`, because the ONE url an operator certainly types
+            # with credentials is the target - and this module's own
+            # docstring claimed basic-auth in a url "persists nowhere" while
+            # meta.json held `http://admin:SuperSecret123@host/app`
+            # verbatim, sealed into the chain and shipped in the bundle. The
+            # request path was covered and the target was not.
+            json.dumps({"id": self.id, "target": _redact_url(target),
                         "started": self.started,
                         # which build produced this session - a reviewer
                         # re-validating artifacts needs to know which
@@ -554,7 +560,7 @@ class Session:
                        indent=2, ensure_ascii=False))
         with (self.dir / "notes.md").open("w", encoding="utf-8",
                                           newline="") as fh:
-            fh.write(f"# Working notes - {target}\n\n")
+            fh.write(f"# Working notes - {_redact_url(target)}\n\n")
 
     def _resume(self, sdir: Path, target: str, meta: dict) -> None:
         """Continue an existing session dir: transcript, findings and request
@@ -591,10 +597,17 @@ class Session:
             old_target = old.get("target")
             # resuming against a different target would conflate two
             # engagements' evidence and findings - refuse loudly
-            if old_target and old_target != target:
+            # Compare against the redacted form too. Writing the target
+            # redacted without this would make EVERY resume fail: the
+            # stored value carries the marker and the live one carries the
+            # credential. Both forms are accepted so a session written by
+            # an older build, with the raw target on disk, still resumes.
+            if old_target and old_target not in (target,
+                                                 _redact_url(target)):
                 raise ValueError(
                     f"cannot resume {sdir.name}: session target "
-                    f"{old_target!r} != current target {target!r}")
+                    f"{old_target!r} != current target "
+                    f"{_redact_url(target)!r}")
         tpath = sdir / "transcript.jsonl"
         if tpath.is_file():
             try:
@@ -651,7 +664,7 @@ class Session:
         if not (sdir / "notes.md").exists():
             with (sdir / "notes.md").open("w", encoding="utf-8",
                                           newline="") as fh:
-                fh.write(f"# Working notes - {target}\n\n")
+                fh.write(f"# Working notes - {_redact_url(target)}\n\n")
         # the resumed run may carry different budgets/flags - meta.json must
         # reflect the CURRENT engagement constraints, marked as resumed
         try:
@@ -663,7 +676,8 @@ class Session:
             if merged.get("argus_version") != __version__:
                 merged["resumed_by"] = __version__
             _atomic_write(mpath, json.dumps(
-                {"id": self.id, "target": target, "started": self.started,
+                {"id": self.id, "target": _redact_url(target),
+                 "started": self.started,
                  **merged}, indent=2, ensure_ascii=False))
         except OSError:
             pass
