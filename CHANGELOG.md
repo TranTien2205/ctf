@@ -915,6 +915,22 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The package claimed a Python range CI did not prove
+- `requires-python = ">=3.10"` is open-ended: pip installs on every version
+  from the floor up, so each one is a support claim. The matrix tested
+  3.10-3.12 while the development interpreter here is 3.14 - so **3.13 was
+  claimed by the package metadata and tested by nobody**, and 3.14 only ever
+  locally. A claim exceeding its evidence is the one thing this gate exists
+  to refuse, and it was sitting in the packaging metadata where the gate
+  never looked.
+- The matrix runs 3.10 through 3.14 on both OSes now, and `selftest.py`
+  holds the claim to it with two conditions: the `requires-python` floor
+  must be one of the tested versions, and the matrix must have no gap - so
+  adding a new top version without the one below it fails the gate. Both
+  halves were checked against the shapes they are meant to catch (a skipped
+  3.13, an untested floor, a missing matrix, a floor that is not a `>=`
+  bound) before being trusted.
+
 ### The modules the model reads were out of step with the probes
 - `load_skill` puts a methodology module in front of the model when the
   signal points at a class, so stale guidance there costs findings directly.
@@ -1050,7 +1066,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 151 offline checks, including a documentation
+- `python selftest.py`: 152 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
@@ -1098,5 +1114,5 @@ the documentation gate exists to catch - and it caught it.
   the lab's fake filesystem, bound to loopback. A destructive payload returns
   `command not found`.
 - Wheel ships skills + role prompts + wordlists + exploit manifests;
-  CI (Ubuntu+Windows × Py3.10/3.11/3.12) runs pytest + selftest + a
+  CI (Ubuntu+Windows × Py3.10-3.14) runs pytest + selftest + a
   wheel-contents check.

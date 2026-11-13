@@ -1092,6 +1092,45 @@ def _doc_consistency() -> None:
           "that drives it, so the agent reading it does not learn the tool "
           "exists")
 
+    # 9. the Python range the package CLAIMS is the range CI proves.
+    #
+    #    `requires-python = ">=3.10"` is open-ended: pip installs on every
+    #    version from the floor up, so each one is a support claim. The
+    #    matrix tested 3.10-3.12 while the development interpreter was 3.14,
+    #    which left 3.13 claimed by the metadata and tested by nobody - a
+    #    claim exceeding its evidence, which is the one thing this gate
+    #    exists to refuse. Two conditions make the claim checkable: the floor
+    #    must be in the matrix, and the matrix must have no gap, so adding a
+    #    new top version without the one below it fails here.
+    wf = (ROOT / ".github" / "workflows" / "test.yml")
+    pyproject = (ROOT / "pyproject.toml")
+    if wf.is_file() and pyproject.is_file():
+        wf_text = wf.read_text(encoding="utf-8")
+        floor_m = _re.search(r'requires-python\s*=\s*">=\s*(\d+)\.(\d+)"',
+                             pyproject.read_text(encoding="utf-8"))
+        row = _re.search(r"(?m)^\s*python:\s*\[([^\]]*)\]", wf_text)
+        versions = []
+        if row:
+            for part in _re.findall(r'"(\d+)\.(\d+)"', row.group(1)):
+                versions.append((int(part[0]), int(part[1])))
+        floor = ((int(floor_m.group(1)), int(floor_m.group(2)))
+                 if floor_m else None)
+        gaps = []
+        if versions:
+            lo, hi = min(versions), max(versions)
+            if lo[0] == hi[0]:
+                gaps = [f"3.{m}" for m in range(lo[1], hi[1] + 1)
+                        if (lo[0], m) not in versions]
+        check(f"CI proves the Python range the package claims "
+              f"({len(versions)} tested)",
+              bool(versions) and floor is not None
+              and floor in versions and not gaps,
+              (f"requires-python floor {floor} is not in the CI matrix "
+               f"{sorted(versions)}" if floor and floor not in versions else
+               f"the matrix skips {gaps}" if gaps else
+               "no python matrix or no requires-python floor found - the "
+               "support claim became uncheckable"))
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "
