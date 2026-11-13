@@ -288,6 +288,10 @@ class GuardedClient:
                 loc = resp.headers.get("location", "")
                 if not loc:
                     break
+                # record the verbatim header BEFORE urljoin: a malformed
+                # Location raises there, and the blocked-redirect event
+                # must still show where the app tried to send us
+                blocked_to = loc
                 nxt = urllib.parse.urljoin(str(resp.url), loc)
                 blocked_to = nxt
                 self.scope.check(nxt)  # ScopeError -> recorded then raised
