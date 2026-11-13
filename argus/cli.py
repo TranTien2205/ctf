@@ -400,7 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "check":
-        from .config import resolve_auth, API_URL, DEFAULT_MODEL
+        from .config import resolve_auth, api_base_url, DEFAULT_MODEL
         from .llm import ClaudeClient
         key, tok = resolve_auth(args)
         src = ("api-key" if key else "oauth (Claude Code/OpenCode)"
@@ -421,8 +421,10 @@ def main(argv: list[str] | None = None) -> int:
                   "to Claude Code")
             return 1
         model = getattr(args, "model", None) or DEFAULT_MODEL
+        # same endpoint a real run would hit: ANTHROPIC_BASE_URL gateway
+        # included, or 'check' would certify a path 'run' never uses
         c = ClaudeClient(api_key=key or "", auth_token=tok or "",
-                         api_base=API_URL, model=model, max_tokens=8)
+                         api_base=api_base_url(), model=model, max_tokens=8)
         try:
             c.chat(messages=[{"role": "user", "content": "say OK"}],
                    tools=[], system="one word")

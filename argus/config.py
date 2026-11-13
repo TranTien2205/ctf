@@ -214,12 +214,19 @@ def _validate_session_dir(p: Path) -> Path:
     return p
 
 
+def api_base_url() -> str:
+    """The endpoint runs AND `argus check` both target: ANTHROPIC_BASE_URL
+    (operator env only - never .env) with /messages appended, else the
+    default Anthropic API."""
+    base = os.environ.get("ANTHROPIC_BASE_URL", "")
+    return base.rstrip("/") + "/messages" if base else API_URL
+
+
 def load_config(args) -> Config:
     """Build a Config from argparse args + environment."""
     _load_dotenv()
     api_key, auth_token = resolve_auth(args)
-    api_base = os.environ.get("ANTHROPIC_BASE_URL", API_URL).rstrip("/") + "/messages" \
-        if os.environ.get("ANTHROPIC_BASE_URL") else API_URL
+    api_base = api_base_url()
 
     headers: dict[str, str] = {}
     header_lines: list[str] = []
