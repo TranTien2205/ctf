@@ -16,6 +16,8 @@ import time
 import urllib.parse
 from pathlib import Path
 
+from . import __version__
+
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 _CVSS_RE = re.compile(
     r"^CVSS:3\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]"
@@ -403,6 +405,10 @@ class Session:
             self.dir / "meta.json",
             json.dumps({"id": self.id, "target": target,
                         "started": self.started,
+                        # which build produced this session - a reviewer
+                        # re-validating artifacts needs to know which
+                        # evidence rules applied
+                        "argus_version": __version__,
                         **_redact_obj(meta, self.secret_values)},
                        indent=2, ensure_ascii=False))
         with (self.dir / "notes.md").open("w", encoding="utf-8",
@@ -511,6 +517,10 @@ class Session:
             merged = dict(old)
             merged.update(meta)
             merged["resumed"] = True
+            # keep the producing version; flag when a different build
+            # continued the session
+            if merged.get("argus_version") != __version__:
+                merged["resumed_by"] = __version__
             _atomic_write(mpath, json.dumps(
                 {"id": self.id, "target": target, "started": self.started,
                  **merged}, indent=2, ensure_ascii=False))

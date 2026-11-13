@@ -7,6 +7,7 @@ import time
 import urllib.parse
 from pathlib import Path
 
+from .. import __version__
 from ..config import Config
 from ..session import (SEVERITIES, Session, _cwe_of, _owasp_of,
                         sanitized_findings)
@@ -321,6 +322,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     _atomic_write(path, "\n".join(lines))
     summary_json = {
         "session": session.id,
+        "argus_version": __version__,
         "findings": findings,
         "counts": counts,
         "requests": session._seq,
