@@ -925,6 +925,43 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### A green suite that failed on correct output
+- Widening the CI matrix to 3.13/3.14 doubled the Windows jobs, and the next
+  run failed - the first CI failure in this stretch, and not a regression.
+  `test_reopen_report_findings_verify` asserted
+  `"Duration" in text and "1970" not in text`, guarding against an epoch
+  timestamp rendering as `1970-01-01`. The lab binds an ephemeral port; the
+  run drew **51970**; the finding URL read `127.0.0.1:51970/item?id=1`; and
+  `51970` contains `1970`. The report was correct and the assertion was not.
+- The epoch bug shows up in exactly one place - the rendered `Date:` line -
+  so the test looks there now. An assertion that reads like a precise claim
+  and is really a substring search over a whole document fails on correct
+  output, which is worse than not asserting: it spends a reviewer's
+  attention on a report that was right. Verified in both directions - a
+  `1970-01-01` Date line is still caught, and the ephemeral port no longer
+  trips it.
+- It was the only bare numeric substring assertion of this shape in the
+  suite.
+
+### `.env.example` named seven of the ten variables the code reads
+- It is the file an operator copies to `.env`, so completeness is its whole
+  purpose. `ARGUS_SEAL_KEY`, `ARGUS_MCP_CWD` and `ARGUS_EXPLOITS_CWD` were
+  absent, and the seal key is the one that matters: an operator setting up a
+  keyed engagement learned nothing about it from the configuration file.
+  All three are real-env-only by design - `_DOTENV_ALLOWED` is a five-name
+  list - and for the seal key that design is load-bearing: a `.env` inside
+  an untrusted directory must not be able to choose the HMAC key for the
+  transcript chain, or planted config could produce a chain that verifies.
+  Each now carries that reason.
+- The existing check ran the other way round, that a variable named in a
+  document exists. The reverse one holds the file to the code now, which is
+  the fifth time in this session that one direction of a correspondence
+  turned out to be the whole check.
+- My first measurement of this was wrong and said the file listed one
+  variable: the grep anchored on `^[A-Z]` and so skipped every commented
+  line, which is where six of the seven live. The instrument was the defect,
+  not the file.
+
 ### Two tools the model could call that no document mentioned
 - The gate asked that a tool named in a document is real. It never asked
   that a real tool is named - and two were not: **`read_findings` and
@@ -1095,7 +1132,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 153 offline checks, including a documentation
+- `python selftest.py`: 154 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

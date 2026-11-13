@@ -156,7 +156,19 @@ def test_reopen_report_findings_verify(tmp_path, capsys):
     rc = main(["report", str(sdir)])
     assert rc == 0
     text = (sdir / "report.md").read_text(encoding="utf-8")
-    assert "Duration" in text and "1970" not in text
+    assert "Duration" in text
+    # `"1970" not in text` is what this asserted, and it failed on CI
+    # (windows 3.11) against a report that was perfectly correct: the lab
+    # binds an ephemeral port, the finding URL was `127.0.0.1:51970/item`,
+    # and `51970` contains `1970`. The epoch bug this guards against shows
+    # up in ONE place - the rendered Date line - so look there. An
+    # assertion that reads like a precise claim and is really a substring
+    # search over a whole document fails on correct output, which is worse
+    # than not asserting.
+    date_line = next((l for l in text.splitlines()
+                      if l.startswith("- **Date:**")), "")
+    assert date_line, text[:200]
+    assert "1970-" not in date_line, date_line
     rc = main(["verify", str(sdir)])
     assert rc == 0
     rc = main(["findings", str(sdir)])

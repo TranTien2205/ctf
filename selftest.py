@@ -11,6 +11,7 @@ after starting `python lab/vulnapp.py 8777`.
 from __future__ import annotations
 
 import json
+import re
 import os
 import sys
 import tempfile
@@ -663,6 +664,14 @@ _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
 # cannot tell `probe_sqli` from `run_id` by syntax, so this list is the
 # mechanism rather than a workaround; what keeps it honest is the check below
 # that every entry is still named in a doc. Ten entries had gone dead.
+# The env lookups argus/ actually performs, for the `.env.example`
+# completeness check. Built here rather than inline so the character
+# class for the two quote styles stays readable.
+_ENV_READ_RE = re.compile(
+    r'(?:environ(?:\.get)?|getenv)\(\s*[\x22\x27]'
+    r'(ARGUS_[A-Z0-9_]+|ANTHROPIC_[A-Z0-9_]+|CLAUDE_[A-Z0-9_]+)')
+
+
 _NOT_TOOLS = {
     "probe_", "probe_x", "record_exchange", "record_event",
     "add_finding", "render_report", "verify_transcript",
@@ -1156,6 +1165,29 @@ def _doc_consistency() -> None:
     check(f"every registered tool is named in a document ({len(tool_names)})",
           not unnamed,
           f"{unnamed} can be called and no document says so")
+
+    # 11. .env.example names every variable the code reads.
+    #
+    #     This is the file an operator copies to .env, so completeness is
+    #     its whole purpose - and it named seven of the ten. The three
+    #     absent ones were ARGUS_SEAL_KEY, ARGUS_MCP_CWD and
+    #     ARGUS_EXPLOITS_CWD, all real-env-only switches, and the seal key
+    #     is the one that matters: an operator setting up a keyed engagement
+    #     learned nothing about it from the configuration file. The existing
+    #     check ran the other way round - that a variable named in a
+    #     document exists - which is the fifth time in this session that one
+    #     direction of a correspondence turned out to be the whole check.
+    env_example = texts.get(".env.example", "")
+    read_vars = set()
+    for fp in sorted((ROOT / "argus").rglob("*.py")):
+        read_vars |= set(_ENV_READ_RE.findall(
+            fp.read_text(encoding="utf-8")))
+    unlisted = sorted(v for v in read_vars if v not in env_example)
+    check(f"`.env.example` names every variable the code reads "
+          f"({len(read_vars)} read)",
+          bool(read_vars) and not unlisted,
+          f"{unlisted} are read by argus/ and absent from the file an "
+          "operator copies to configure it")
 
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
