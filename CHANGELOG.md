@@ -163,9 +163,11 @@ system. All notable milestones on `agent-v2`.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
-- `python -m pytest tests/ -q`: 167 tests (unit + live-lab + loop +
+- `python -m pytest tests/ -q`: 175 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
-  regressions).
+  regressions) — every hardened fix now carries a regression test
+  (UA-redaction, malformed JWT/manifest/MCP entries, atomic-write
+  litter, non-JSON tool results, worker-crash isolation).
 - `docs/VERIFICATION.md`: property → enforcement → test matrix — every
   safety claim names the code that enforces it and the test that proves
   it, with a reading order for a first-pass review.
