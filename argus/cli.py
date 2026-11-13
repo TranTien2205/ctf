@@ -947,6 +947,10 @@ def _reopen(sdir: Path) -> Session:
     sess._lock = threading.Lock()
     sess._last_chain = ""
     sess.resumed = False
+    # __init__ is bypassed - keep the attribute surface complete so a
+    # reopened session never AttributeErrors on Session.secret_values
+    # (note()/record_*/_log all read it)
+    sess.secret_values = set()
     mpath = sdir / "meta.json"
     if mpath.is_file():
         try:
