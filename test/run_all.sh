@@ -138,7 +138,9 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/jffs2_read.py tools/forensics/thumbcache.py \
          tools/forensics/vmdk_info.py tools/forensics/fsevents.py \
          tools/forensics/xpress.py tools/forensics/vhdx_read.py \
-         tools/forensics/shellbags.py tools/forensics/info2.py; do
+         tools/forensics/shellbags.py tools/forensics/info2.py \
+         tools/forensics/exfat_read.py tools/forensics/binarycookie.py \
+         tools/forensics/sqlite_journal.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }

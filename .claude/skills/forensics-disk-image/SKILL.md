@@ -57,6 +57,12 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    i_block and ext4 extent trees) and `... get /path` reads a file —
    same `--offset` convention. It lists live entries only; deleted
    ext entries need the journal, which is out of scope.
+   USB sticks and SD cards are usually exFAT, which fat_read refuses:
+   `python3 tools/forensics/exfat_read.py image.img list` walks the
+   cluster heap (VBR shifts → FAT chain or contiguous stream flag),
+   marks deleted entry sets (type byte high bit clear) so a wiped
+   file's `GONE.TXT` still lists, and `... get /PATH` reads the
+   chain — same `--offset` convention as fat_read.
 4. `photorec`/`foremost` on unallocated space when `fls` shows nothing —
    carved files keep their magic bytes.
 5. Alternate streams and slack: ADS on NTFS (`fls -m`, `icat` named streams),
@@ -97,6 +103,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    `python3 tools/forensics/sqlite_wal.py db-wal frames` lists frames
    with commit/stale marks, `... strings` scans each page image with
    frame provenance, `... page N` dumps the newest live image.
+   The OTHER side-file is `*.db-journal` (rollback journal): it holds
+   the PRE-transaction page images, which is where a deleted row
+   still lives. `python3 tools/forensics/sqlite_journal.py j.db-journal`
+   walks journal sections and decodes table-leaf page cells into rows
+   (pgno-provenanced); `--pages out/` dumps raw page images.
    Firefox's `*.jsonlz4`/`*.mozlz4` (sessionstore, bookmark backups):
    `python3 tools/forensics/mozlz4.py file` decompresses the
    `mozLz40` block without the lz4 package. A standard framed `.lz4`
@@ -113,7 +124,10 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    live browser side directly - Chrome `History`/`Cookies`/`Downloads`
    (WebKit-microsecond times) and Firefox `places.sqlite`/`moz_cookies`
    (unix microseconds) detected by schema, visits + downloads + cookies
-   as JSON.
+   as JSON. Safari keeps its own format:
+   `python3 tools/forensics/binarycookie.py Cookies.binarycookies`
+   walks the `cook` pages into url/name/path/value + flags and
+   Mac-absolute expiry — session tokens in a macOS/iOS bundle.
    Android `backup.ab` files: `python3 tools/forensics/ab_extract.py b.ab`
    parses the header, inflates the DEFLATE payload, and lists/extracts
    the tar members (`--extract NAME`); AES-256 backups are reported with
