@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "note": "Model table. Tuning a model, adding one, or changing a price is a data change, not a code change. Prices are USD per million tokens as published; they move, and a stale price is a wrong cost report - `argus models` prints what this file says so the number in a report can always be traced to a line here.",
+  "note": "Model table. Tuning a model, adding one, or changing a price is a data change, not a code change. Prices are USD per million tokens as published; they move, and a stale price is a wrong cost report - `argus models` prints what this file says so the number in a report can always be traced to a line here. `superseded_by` names the published successor: role selection drops a model whose successor this machine can call, so a cost policy cannot reach past the current generation. It is a successor relation, not a capability ranking - nothing here claims one model is smarter than another.",
   "defaults": {
     "provider": "anthropic",
     "context_window": 200000,
@@ -81,7 +81,8 @@
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
       ],
-      "note": "DEPRECATED - retires 2026-11-30. Use claude-sonnet-5-5. Its price is left as recorded because no current published figure covers it"
+      "note": "DEPRECATED - retires 2026-11-30. Use claude-sonnet-5-5. Its price is left as recorded because no current published figure covers it",
+      "superseded_by": "claude-sonnet-5-5"
     },
     "claude-opus-4-5": {
       "provider": "anthropic",
@@ -98,7 +99,8 @@
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
       ],
-      "note": "previous generation, still served. 15.00/75.00 is what this table has always said and no current published figure covers this model, so it is left alone rather than guessed at - every current Opus is cheaper"
+      "note": "previous generation, still served. 15.00/75.00 is what this table has always said and no current published figure covers this model, so it is left alone rather than guessed at - every current Opus is cheaper",
+      "superseded_by": "claude-opus-5-5"
     },
     "claude-haiku-4-5": {
       "provider": "anthropic",
@@ -114,7 +116,8 @@
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
       ],
-      "note": "previous generation, still served. 1.00/5.00 matches the published figure as of 2026-11-03"
+      "note": "previous generation, still served. 1.00/5.00 matches the published figure as of 2026-11-03",
+      "superseded_by": "claude-haiku-5-5"
     },
     "gpt-4.1": {
       "provider": "openai",

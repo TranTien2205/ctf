@@ -47,6 +47,11 @@ class Model:
     roles: list[str] = field(default_factory=list)
     allow_insecure_base: bool = False
     note: str = ""
+    #: The published successor, when this model has one. A successor
+    #: relation, not a capability ranking: role selection drops a model whose
+    #: successor this machine can call, so a cost policy cannot reach past
+    #: the current generation.
+    superseded_by: str = ""
 
     #: Cache reads bill at about a tenth of base input, cache writes at about
     #: 1.25x, on the published 5-minute-TTL rates the loop's ephemeral
@@ -116,6 +121,7 @@ def known() -> dict[str, Model]:
             roles=[str(r) for r in (merged.get("roles") or [])],
             allow_insecure_base=bool(merged.get("allow_insecure_base")),
             note=str(merged.get("note") or ""),
+            superseded_by=str(merged.get("superseded_by") or ""),
         )
     return out
 
@@ -162,6 +168,33 @@ def for_role(role: str, policy: str = "cheap", exclude_family: str = "",
         usable += [m for m in cands
                    if m.provider == "anthropic" and not m.credential()]
         cands = usable
+    # A model the table marks DEPRECATED is one that stops answering on a
+    # date, so it is never a selection - only an explicit --model.
+    live = [m for m in cands
+            if "DEPRECATED" not in (m.note or "").upper()]
+    cands = live or cands
+
+    # ...and a model whose published successor this machine can call is not a
+    # selection either. `strong` ranks by PRICE as a proxy for capability,
+    # which held while each generation cost more than the last and inverted
+    # when it stopped: with the current generation priced below the previous
+    # flagship, `strong` picked claude-opus-4-5 at 15/75 over
+    # claude-opus-5-5 at 4/20 - an older model at 3.75x the cost, for the
+    # planner role whose own description says a wrong call there costs the
+    # engagement. `superseded_by` is the published successor relation, so
+    # this fixes the inversion without inventing a capability ranking.
+    keys = {m.key for m in cands}
+    current = []
+    for model in cands:
+        successor = getattr(model, "superseded_by", "") or ""
+        if successor and successor in keys:
+            heir = get(successor)
+            if heir is not None and (not usable_only or heir.credential()
+                                     or heir.provider == "anthropic"):
+                continue
+        current.append(model)
+    cands = current or cands
+
     if not cands:
         return None
 

@@ -953,6 +953,38 @@ somebody reading only the list.
   since a run on one reports no cost at all. Both were tried against the
   shapes they must catch before being trusted.
 
+### `strong` reached past the current generation, and my own change showed it
+- Pricing the Claude 5 family made a latent assumption visible.
+  `for_role(..., "strong")` ranks by **price as a proxy for capability** - its
+  own docstring says "takes the most expensive" - and that proxy held only
+  while each generation cost more than the last. With the current generation
+  priced below the previous flagship it inverted: `strong` picked
+  `claude-opus-4-5` at 15/75 over `claude-opus-5-5` at 4/20, an older model
+  at 3.75x the cost, for `planner` - the role whose own description in
+  `models.json` says a wrong call there costs the engagement rather than
+  money.
+- Fixed without inventing a capability ranking, because nothing here is
+  entitled to claim one model is smarter than another. `superseded_by` records
+  the **published successor relation** as data, and role selection drops a
+  model whose successor this machine can call. It degrades rather than
+  stranding a role: if the heir cannot be called, the older model is still the
+  answer, the same reasoning as `usable_only`.
+- Role selection also never consulted the deprecation added in the previous
+  commit, so a fallback could have reached `claude-sonnet-4-5` - the model
+  that stops answering on 2026-11-30. It is excluded from every policy now
+  and still reachable by explicit id, because an operator may have it pinned.
+  That is the half-fix shape again: the data went in and only one reader
+  learned to use it.
+- The first attempt at this silently did nothing. `superseded_by` went into
+  the JSON and the `Model` dataclass dropped it, so the measurement after the
+  edit was identical to the measurement before - caught only because it was
+  measured rather than assumed.
+- `test_strong_policy_reaches_for_the_strong_models` asserted the literal id
+  `claude-opus-4-5`, so it was asserting the old behaviour and made a
+  legitimate table change look like a regression. It checks the property now -
+  an Opus, not superseded, not deprecated - which is the same lesson as
+  asserting a probe's structured output instead of its verdict prose.
+
 ### A green suite that failed on correct output
 - Widening the CI matrix to 3.13/3.14 doubled the Windows jobs, and the next
   run failed - the first CI failure in this stretch, and not a regression.
@@ -1153,7 +1185,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 602 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 605 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

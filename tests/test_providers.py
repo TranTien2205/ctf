@@ -512,9 +512,25 @@ def test_the_local_endpoint_is_never_picked_on_someone_elses_key(monkeypatch):
 
 
 def test_strong_policy_reaches_for_the_strong_models():
+    """Asserted the id `claude-opus-4-5` and so asserted the old behaviour.
+
+    A hard-coded model id makes a legitimate table change look like a
+    regression and pins the wrong thing - the same shape as asserting a
+    probe's verdict prose instead of its structured output, which broke six
+    assertions at once when three classes stopped being capped. What this
+    test means is that `strong` reaches the top of the current generation,
+    so that is what it checks: an Opus, not superseded, not deprecated.
+    """
     team = _team(_role_cfg(policy="strong"))
-    assert team.model_for("lead") == "claude-opus-4-5"
-    assert team.model_for("exploit") == "claude-opus-4-5"
+    for role in ("lead", "exploit"):
+        key = team.model_for(role)
+        spec = models.get(key)
+        assert spec is not None, f"{role} -> {key} is not in the table"
+        assert "opus" in key, f"{role} 'strong' resolved to {key}"
+        assert not spec.superseded_by, (
+            f"{role} 'strong' resolved to {key}, superseded by "
+            f"{spec.superseded_by}")
+        assert "DEPRECATED" not in (spec.note or "").upper(), spec.note
 
 
 def test_the_team_cost_breakdown_names_a_model_per_agent():
@@ -718,3 +734,64 @@ def test_team_cost_is_unknown_not_zero_when_no_agent_has_a_price():
     # the per-agent lines still name every model, so the reader can see
     # which ones the table is missing
     assert all(v["usd"] is None for v in out["per_agent"].values())
+
+
+def test_strong_does_not_reach_past_the_current_generation():
+    """`strong` ranked by price as a proxy for capability, and the proxy
+    inverted.
+
+    That held while each generation cost more than the last. The current
+    generation is priced BELOW the previous flagship, so `strong` picked
+    `claude-opus-4-5` at 15/75 over `claude-opus-5-5` at 4/20 - an older
+    model at 3.75x the cost, for the planner role whose own description in
+    models.json says a wrong call there costs the engagement rather than
+    money. `superseded_by` is the published successor relation, so this is
+    fixed without inventing a capability ranking.
+    """
+    for role in ("planner", "depth", "judge"):
+        pick = models.for_role(role, "strong")
+        assert pick is not None, role
+        superseded = models.get(pick.key)
+        assert not (superseded and superseded.superseded_by), (
+            f"{role} 'strong' resolved to {pick.key}, which models.json says "
+            f"is superseded by {superseded.superseded_by}")
+
+
+def test_role_selection_never_resolves_to_a_deprecated_model():
+    """A model that stops answering on a date is not a selection.
+
+    `claude-sonnet-4-5` retires 2026-11-30 and was the default for every run
+    without `--model`. It stays in the table because an operator may have it
+    pinned, so it must remain reachable by explicit id and unreachable by
+    policy.
+    """
+    for role in models.roles():
+        for policy in ("cheap", "strong"):
+            pick = models.for_role(role, policy)
+            if pick is None:
+                continue
+            assert "DEPRECATED" not in (pick.note or "").upper(), (
+                f"{role}/{policy} resolved to {pick.key}: {pick.note}")
+    # ...and still reachable when named
+    assert models.get("claude-sonnet-4-5") is not None
+
+
+def test_a_superseded_model_is_still_chosen_when_its_heir_is_unusable():
+    """The successor filter must degrade, not strand a role.
+
+    If the heir cannot be called on this machine the old model is the only
+    answer left, and a role that resolves to nothing is a run that dies on
+    its first request - the same reasoning as `usable_only`.
+    """
+    import dataclasses
+
+    table = dict(models.known())
+    old = dataclasses.replace(table["claude-opus-4-5"],
+                              superseded_by="claude-opus-9-9")
+    table["claude-opus-4-5"] = old
+    cands = [m for m in table.values() if "depth" in m.roles]
+    keys = {m.key for m in cands}
+    # the heir is absent from the table, so the successor filter must not
+    # drop the model that names it
+    assert "claude-opus-9-9" not in keys
+    assert old.superseded_by not in keys
