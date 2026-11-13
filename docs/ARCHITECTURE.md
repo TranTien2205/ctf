@@ -21,6 +21,17 @@ ClaudeClient.chat(messages, TOOL_SCHEMAS, system)   ← Anthropic tool_use API
                      result → tool_result → next turn
    │
    └─ finish(summary) or budget exhausted → report/markdown.py
+
+record_finding(...) is the one tool with a second gate behind it:
+
+    excerpt verbatim in a cited response?   → no: rejected
+                │ yes
+    proof.grade(class, excerpt, cited)      → proven / candidate /
+                │                              unproven / refused
+    refused class?                          → rejected, always
+    --require-proof and not proven?         → rejected
+                │
+    recorded, carrying vuln_class + grade + every check
 ```
 
 Design choices and why:
@@ -33,9 +44,18 @@ Design choices and why:
   desync probes that httpx cannot express go through
   `GuardedClient.send_raw`, which keeps the same scope/budget/transcript
   guarantees on a controlled raw channel.
-- **Evidence gating at write time.** `Session.add_finding` asserts the
-  excerpt is a substring of a cited response. Same idea as a flag gate,
-  generalized: the machine validates the *truth* of a claim, not its shape.
+- **Evidence gating at write time, in two layers.** `Session.add_finding`
+  asserts the excerpt is a substring of a cited response. That is necessary
+  and not sufficient: it proves the bytes were observed, not that the class
+  was demonstrated, and a benign page reading `uid=1 selected` satisfies it
+  for a claimed critical RCE. So the claim is then graded by
+  `argus/proof.py` against a requirement written per class — read from the
+  cited request *and* response, never from a probe's self-report, so a probe
+  cannot grade itself. Four grades: `proven`, `candidate`, `unproven`,
+  `refused`. The grade does not block the record; it comes back with the
+  names of the checks that did not pass, and re-recording with the missing
+  evidence upgrades the finding in place. `--require-proof` refuses anything
+  below `proven`.
 - **Baseline-diffed probes.** Each `probe_*` returns `verdict` +
   `request_ids`, never "you are vulnerable". The agent confirms and
   rates severity itself.
@@ -45,12 +65,18 @@ Design choices and why:
 - **Budget-aware autonomy.** max_turns / max_requests / max_time are real
   limits; the loop warns once near ~80% ("record now, prioritize"), nudges
   once at exhaustion, then stops. Measured on a real run: the early
-  warning turned a deferred-finding loss into a 5x recording rate.
+  warning turned a deferred-finding loss into a 5x recording rate. That
+  number is from a development run whose session was not kept, so treat it as
+  the reason the warning exists rather than as a measurement - the research
+  measurements have not been run.
 - **Cost-aware LLM calls.** `ClaudeClient` marks the static prefix
   (system + tools + conversation tail) with ephemeral cache breakpoints —
   billed input drops ~90% on cache hits. A 400 mentioning cache disables
-  it transparently. The full 54-tool schema is ~30KB/call, so constrained
-  auth paths can pass `--tools` (run) or rely on role-card subsets (team).
+  it transparently. The tool schema alone is ~32KB; a call also carries the
+  system prompt and the conversation, so the request is larger than that and
+  the figure is a floor, not the payload. Constrained auth paths can pass
+  `--tools` (run and mcp-serve) or rely on role-card subsets (team) - the
+  exploit card is the largest, so measure it rather than assuming it fits.
 - **Bounded context.** Tool results older than the last 8 result-messages
   compact to a stub naming their request_ids (re-inspect via
   `read_response`), so an 80-turn run cannot silently overrun the context
@@ -86,18 +112,22 @@ prompt wording can widen it.
 | loopback/private pivot to infra | private-address refusal over ALL resolved records (v4+v6 via `getaddrinfo` - one private answer denies) plus a **connect-time peer check**: `send()` inspects `network_stream.server_addr` and `send_raw()` inspects `sock.getpeername()`, so a DNS answer that flips between check and connect (rebinding) is refused on the real peer IP; `--allow-private` opts in, auto-allowed only when the declared target is itself private. Residual: external scanners run their own sockets and re-resolve independently - their args are vetted against scope but the wire itself is the tool's | `ScopeGuard`, `GuardedClient` |
 | flood the target | shared token bucket; redirect hops count too | `RateLimiter`, `GuardedClient` |
 | invented finding | excerpt must be a verbatim substring of a cited transcript id | `Session.add_finding` |
+| a claim stronger than its evidence | the class requirement is re-checked against the cited request/response; a shortfall grades `candidate`/`unproven` and names the missing check, and `--require-proof` refuses it | `proof.grade`, `Session.add_finding` |
+| a class this system cannot prove | `dos` is `refused` by construction and cannot be recorded at all, at any grade | `proof.verify_refused` |
+| a proof grade raised by hand after the run | `argus verify` recomputes every grade from the chained transcript; an inflated grade fails even after a legitimate `argus report` re-render has recomputed the artifact seal | `findings_overgraded` |
 | finding on an unauthorized asset | `record_finding` URL passes the same scope guard as requests | `tools/analysis.record_finding` |
 | post-run transcript tampering | sha256 hash chain per entry + chain head anchored in `summary.json` | `verify_transcript`, `argus verify` |
-| post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript (the file itself is not hashed) | `verify_transcript` findings pass |
+| a session forged from nothing | the unkeyed chain does NOT stop this: sha256(prev+entry) is computable by anyone, so it proves the file was not edited after the run and nothing more. `--seal-key` makes each link HMAC-SHA256, and then only a holder of the key can produce a chain that verifies; `argus verify` reports `key_required` rather than calling every line tampered | `_chain`, `verify_transcript` |
+| post-run findings tampering | `argus verify` re-validates every finding's evidence ids + verbatim excerpt against the chained transcript, AND recomputes its grade; `findings.json` is also in the run-end seal, so an edit is caught twice over - except after a legitimate `argus report` re-render recomputes the seal, which is why the re-grade is not redundant | `verify_transcript` findings pass, `findings_overgraded` |
 | post-run artifact tampering (meta/findings/notes/report.*/summary) | run-end `artifacts_digest` transcript entry stores per-file sha256; verify recomputes (summary digest skips mutable head/duration so legit re-renders stay clean) | `seal_artifacts`, `artifact_mismatch` |
-| scanner output treated as proof | `run_external`/`mcp_call` output is a lead until an `http_request` re-verifies or a `proof_marker` matches | tool notes + evidence gate |
-| exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` confined to bundled/cwd `resources/wordlists`; bundled shorts parsed | `run_external` arg guards |
+| scanner output treated as proof | enforced, not advised: `run_external`/`mcp_call` record events carrying `output` and no `response`, and a claim citing only those fails the wire check for every class. A `proof_marker` match is recorded as a `run_exploit` event and is subject to the same rule - what makes a lead citable is an `http_request` that reproduces it on the wire | `proof._wire_check` |
+| exfiltrate local files to target | `-d/-F/-b/-T/--data-urlencode` file forms refused; `ffuf -w` must name a stem under the bundled or cwd `resources/wordlists` tree, so an arbitrary path is refused - but any file placed in that tree is readable, and the cwd tree is operator-controlled | `run_external` arg guards |
 | smuggle options past the guards | `curl -K`, `sqlmap -c` config files refused | arg guards |
 | redirect connection out of scope | `curl --resolve/--connect-to/-x/proxies`, `nmap --proxies`, `ffuf -x`, `sqlmap --proxy/--tor` refused | arg guards |
 | foreign hosts inside arg files | `-iL`/`-r`/`-l`/`-m`/`--bulk-file`/nuclei `-l` contents scanned per host | `_file_target_check` |
 | local code execution via tool | `sqlmap --eval`, `nmap --script <path>`, `nuclei -t <file>`, `-code` refused | arg guards |
 | credential leak to subprocesses | `KEY/TOKEN/SECRET/PASSWORD/CREDENTIAL` env vars scrubbed for MCP servers and exploit PoCs | `MCPClient`, `run_exploit` |
-| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); credentials used outside headers (form bodies, tokens) are declared via `--secret VALUE`/`ARGUS_SECRETS` (>=4 chars) and scrubbed from every persisted object at write time - model sees real bytes, artifacts get `REDACTED:` markers; reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `Session._redact_obj`, `render_report` |
+| operator secrets in artifacts | auth/cookie/token request headers + `Set-Cookie` values recorded redacted (names + scheme/attrs kept); credentials used outside headers (form bodies, tokens) are declared via `--secret VALUE`/`ARGUS_SECRETS` (>=4 chars) and scrubbed from every persisted object at write time - model sees real bytes, artifacts get `REDACTED:` markers; reports re-redact old transcripts; `--proxy` gives full-fidelity wire when needed | `GuardedClient`, `session._redact_obj`, `render_report` |
 | exploit PoC escapes its dir / hits foreign host | relative manifest commands confined to the manifest dir under `resources/exploits/<id>` (cwd or bundled); `{args}` scope-scanned | `run_exploit` |
 | worker exceeds its role | card `tools` set enforced at `dispatch`; only lead holds `spawn_worker`/`finish_engagement` | `cards.py`, `dispatch` |
 | resume mixes two engagements | `--resume` refuses a session whose `meta.json` target differs | `Session._resume` |
@@ -114,12 +144,53 @@ waste budget inside scope.
 - New probe: add a function in `tools/probes.py`, register in
   `tools/registry.py` (`_impl` + `_schema`). It must send via
   `ctx.client.send` — then scope, rate limit and evidence are free.
-- New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`.
+- New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`. Name
+  it after a proof-matrix class and `load_skill` attaches the requirement to
+  it automatically.
+- New proof class: a `ProofSpec` in `argus/proof.py` — a requirement
+  sentence, the named checks, a verifier, and `floor`/`veto` where they
+  apply. It needs a test in BOTH directions: an evidence set that must grade
+  `proven`, and one that must not. The second is the one that matters. Watch
+  for a check that passes trivially — three of them shipped and had to be
+  fixed, because the verbatim gate already guarantees the excerpt exists, so
+  "the quoted bytes are in a response" carries no information.
 - New report format: `argus/report/` takes `Session` + `Config`.
 - External tool providers: drop a server into `mcp.json` — `argus/mcp.py`
   speaks stdio JSON-RPC, `mcp_list`/`mcp_call` expose it to every role.
-- Different model: `ClaudeClient` is ~40 lines of HTTP; `llm.ScriptedClient`
+- Different model: `ClaudeClient` is ~130 lines of HTTP; `llm.ScriptedClient`
   shows the duck-typed interface (`chat(messages, tools, system)`).
+
+## Served mode (`argus mcp-serve`)
+
+A third plane, and the one that spells out the chain the project is built
+against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 45 of
+the 56 tools over newline-delimited stdio JSON-RPC, symmetric with the client
+in `argus/mcp.py`, so the two halves of the protocol are testable against
+each other rather than against a mock.
+
+```
+   MCP host (Claude Code / IDE / agent runtime)
+        │  tools/list · tools/call          stdio JSON-RPC
+        ▼
+   ArgusMCPServer ── dispatch(ctx, name, args)
+        │
+        └─ the same ScopeGuard · RateLimiter · Session · proof matrix
+```
+
+The driver moves outside; the guards do not. A host LLM gets argus's hands,
+not argus's permissions: it cannot widen scope, cannot send a byte that is
+not recorded, and a finding it records is graded exactly as `argus run` would
+grade it. `initialize` hands back `build_system(cfg, scope)` as
+`instructions`, so a host that never read argus's system prompt still
+receives the scope and the evidence rules.
+
+Withheld: every board tool — `spawn_worker`, `request_worker`,
+`list_workers`, `finish_engagement`, `read_board`, `post_board_note`,
+`emit_lead`, `pull_leads`. They are team orchestration, the host LLM is the
+orchestrator here, and outside team mode there is no Board for them to reach,
+so advertising them would put entries in the catalogue that can only raise.
+Plus `mcp_list`/`mcp_call`, which would let argus call out to other servers
+while serving as one.
 
 ## Team mode (`argus team`)
 
@@ -168,17 +239,259 @@ role-specialized **workers** through a shared blackboard.
   holds `manifest.json` (command template, `affects`, `proof_marker`
   regex) + script. Target URL is scope-checked before substitution; a
   `proof=True` run id is citable as finding evidence.
-- **Findings dedup across workers.** `Session.add_finding` rejects a
-  second finding with the same normalized bug class + endpoint + params —
-  two exploit workers can't double-count the same bug.
+- **Findings dedup across workers.** `Session.add_finding` keys on the
+  canonical class + endpoint + params, so two exploit workers cannot
+  double-count the same bug and two spellings of one class are one finding.
+  A second record with evidence that grades HIGHER upgrades the finding in
+  place rather than being refused - otherwise the grading would tell a worker
+  which checks it was missing and leave it nowhere to put them. The original
+  citation is kept under `superseded_evidence_ids` and `ts` stays the first
+  record's.
 - **Per-agent metrics.** `summary.json` carries each agent's turns,
   requests, LLM calls, token usage and credited findings, plus
   `time_to_first_finding_s` — the measurement surface for comparing
   single-agent `run` against the streaming `team` pipeline.
 
+## The decision controller (`argus next`)
+
+```
+transcript.jsonl ─┐
+                  ├─► argus/decide.py ─► Action{action, why, target, class, tool, detail}
+findings.json ────┘        (7 ordered rules, fail-closed)
+                                │
+                     ┌──────────┴──────────┐
+                     ▼                     ▼
+             `argus next <session>`   next_action tool
+             (operator)               (the agent, mid-run)
+```
+
+The loop chooses the *content* of the next move. This module computes its
+*shape*, and it reads only what was recorded. That split is the point: a model
+given a transcript and an open question usually picks a sensible next probe,
+but one whose context has rolled over instead re-sends the last payload with a
+new separator, or writes a confident paragraph about a bug it never showed.
+From the outside those two are indistinguishable — unless the next action is
+derived from the bytes on disk.
+
+It is advice, not a rail. Nothing refuses a tool call because the controller
+suggested something else; the contract in `argus/system.py` is only that a
+departure is stated in one line. Three properties keep it from inventing work:
+
+* an endpoint with **no named input** is never recommended for probing, because
+  there is nowhere to put a payload;
+* rule 1 re-grades a probe's output **only under that probe's own class** —
+  re-grading every exchange against all 29 would turn any page that echoes its
+  query into a recommendation to record `sqli`, which is exactly what the proof
+  matrix exists to prevent;
+* `probe_time` is deliberately unmapped. A latency measurement is consistent
+  with `sqli`, with `rce` and with a slow database, so counting it as "this
+  class was tested" would let a timing run stand in for a proof it cannot
+  produce.
+
+Rule 1 is also how the controller earns its keep as a reviewer of this system
+rather than of the target: re-grading recorded transcripts found that `nosqli`
+graded `proven` on a page that merely echoed `{"$ne": null}` back. See
+`CHANGELOG.md`.
+
+## Cross-family verification (`argus judge`)
+
+```
+findings.json + the cited records ──► judge (a family the author is NOT in)
+                                          │
+                                          ▼
+                             {agrees, reason, severity, class, missing}
+                                          │
+                                   apply_verdict()
+                                          │
+              ┌───────────────────────────┼───────────────────────┐
+              ▼                           ▼                       ▼
+       disputed = true          severity may go DOWN         grade: untouched
+       (never cleared)          (original kept)              (the matrix owns it)
+```
+
+The one-way doors are the design. The matrix is deterministic and auditable; a
+model's opinion is neither. If an opinion could raise a `candidate` to
+`proven`, the strongest claim this system makes would rest on its weakest
+check — so the judge writes to its own fields and the report prints them next
+to the grade they dispute.
+
+That leaves the judge doing the thing the matrix cannot: the matrix grades
+whether the cited bytes meet a class's requirement, and has no view on whether
+the finding is filed under the right class, whether the title claims more than
+the bytes support, or whether the severity is defensible.
+
+Three replies are recorded as *no verdict* rather than assent — prose with no
+JSON object carrying `agrees`, two objects that contradict each other, and a
+transport failure. And if no model outside the author's family is
+credentialed, the command exits saying so: the author's own family reviewing
+itself is not cross-verification, which is why `--judge-model` is refused on
+those grounds too.
+
+## Known residuals
+
+Two adversarial audits - the second against a frozen tree, with every finding
+put to three independent skeptics - produced the fixes recorded in
+`CHANGELOG.md`. What follows is what they found and this system does NOT fix,
+written down so it is a decision rather than an omission. `argus proof <class>`
+prints each class's own version of this.
+
+**`upload` separates the file from a page about it proportionally, which is a
+heuristic.** "The nonce came back" cannot tell a stored file from an "Upload
+complete - saved `<your svg>`" page, and the only thing available is how much
+of the response the uploaded bytes actually are. A confirmation page where the
+echoed file is more than half the body still passes. The alternative - trusting
+the nonce alone - graded `proven` against apps that stored nothing, so this is
+the better of two imperfect tests, not an exact one.
+
+**A judge is one call and one opinion.** There is no panel, no majority, and
+no second round: a single model from one other family reads each finding once.
+That is enough to catch a misfiled class or an indefensible severity and not
+enough to call anything settled. It also costs one call per finding on a
+second provider, which is why it is a separate command rather than a step in
+every run.
+
+**The decision controller reads the transcript, not the target.** It can only
+recommend surface that some recorded request already reached, so an endpoint
+nothing ever requested is invisible to it - it will say `report` on a run whose
+crawl missed half the application. It also treats one `(endpoint, class)` pair
+as the budget unit, so five probes spread over five endpoints never trigger
+`park_and_switch`. Neither is a soundness problem - it never claims a proof -
+but both are reasons the ladder is advice and not a plan.
+
+**No class is capped at `candidate` for want of a verifier any more.** That
+list held six - `crlf`, `method`, `upload`, `race`, `websocket`, `smuggle` -
+plus `lockout` and `enum` before them, and it is empty.
+`tests/test_proof.py::CANNOT_BE_PROVEN_HERE` is asserted against the code, so
+a new entry cannot appear in silence: adding one needs its own positive test
+and a line here, and the selftest holds this paragraph's count to the matrix.
+
+Every one of the six followed the same shape, which is the thing worth
+carrying forward: **the note described the verifier, not the evidence.** The
+transcript already recorded what each class needed - response headers as a
+dict, `ts` plus `elapsed_ms` for concurrency, the wire text of a request with
+two framings, unsolicited responses from an extra read. `websocket` was the
+only one that genuinely needed a new capability rather than a re-reading, and
+in every case fixing the verifier exposed a defect in the probe, because a
+class nobody could prove is a class whose probe nobody had to get right.
+
+`websocket` is the one that needed a real capability rather than a reading:
+`GuardedClient.send_ws` is a third socket-owning path in the package, because
+after a 101 the connection stops speaking HTTP and `http.client.HTTPResponse`
+has no way to read a frame. It goes through the same guards as the other two -
+scope check with the connect-time rebinding re-check, rate limiter, request
+budget, two recorded exchanges - and does exactly one masked text frame out,
+one frame in, close. No fragmentation, no binary, no second message: the proof
+is "the channel accepted a cross-origin handshake and answered", and one frame
+shows that. The verifier recomputes `Sec-WebSocket-Accept` from the key the
+request sent, because a middleware that answers 101 without completing the
+challenge is not a WebSocket endpoint and the record is the only place to tell
+from. The lab grew a `/ws-strict` route - the same endpoint with the Origin
+check in place - so the refusing direction is exercised against a real server
+rather than only a fixture.
+
+`smuggle` was the last off, and its evidence had been in the transcript the
+whole time. The note read "this system sends the desync pair and reads the
+difference, which is a candidate" - but the difference was never the
+evidence. `send_raw` keeps `request_text`, so a request declaring both
+`Content-Length` and `Transfer-Encoding` is visible rather than collapsed into
+a headers dict; and it keeps responses from an extra read, so a reply that
+arrived with no request of its own is visible too. That second thing is the
+requirement sentence almost word for word. Two shapes count: TE.CL, where the
+smuggled request line is complete and the poisoned answer arrives on its own
+(an entry whose request method is `-`), and CL.TE, where the stray byte
+prefixes the probe's own next request line. Either way the check that matters
+is a **bogus method named back** - a 4xx naming no method is a server
+disliking an ambiguous request, which is what it should do.
+
+`crlf`, `method`, `upload` and `race` are the worked examples of what coming
+off that list costs, and all four followed the same shape: the note described the
+verifier, not the evidence, and the evidence was already in the transcript.
+In each case fixing the verifier also exposed a defect in the probe, which is
+the pattern worth noticing - a class nobody could prove is a class whose probe
+nobody had to get right.
+
+`method` read "a status difference is not an effect" - true, and `probe_method`
+was already recording both effects this class can have. A **write that
+landed** is a `PUT` answered 2xx plus a later `GET` of the same path returning
+the bytes the PUT carried; the status alone proves nothing, because an endpoint
+can answer 201 and discard the body. **TRACE enabled** is a `TRACE` answered
+with a value in the body that was only ever in the request's headers - that is
+cross-site tracing, and it hands HttpOnly cookies to a reading XSS. Fixing the
+verifier also exposed a defect in the probe: `put_verified` looked for the
+canary *filename* in the GET response, while the bytes written were a fixed
+string, so a server that stored the file correctly returned something the
+check could not recognise and a working PUT read as unverified.
+
+`upload` read "serving is not executing" - true, and the requirement sentence
+already dealt with execution by saying it is an rce finding graded as one.
+What was left was what this evidence does settle: a file served back with its
+bytes intact **and** a content-type that makes those bytes script. The
+content-type is the entire discriminator and it was the one thing nothing
+checked - the same `.svg` is inert as `text/plain` and runs in the uploader's
+origin as `image/svg+xml`, and a `Content-Disposition: attachment` neutralises
+it again. `probe_upload` was calling a `.svg` served as `text/plain` an upload
+candidate, which conflated "an active file type was stored" with "it is served
+as something a browser runs"; it now records the served content-type and
+disposition, because nothing downstream can recover them.
+
+`crlf` was the first of the three. The old note
+read "this system compares bodies, so it stops at a candidate" - which was
+true of the verifier it had, and the wrong place to stop, because the
+transcript records response headers as a dict. The proof is now a header the
+request asked for, present in the response and **absent from a control to the
+same endpoint**. That third check is what makes it a proof: a server that
+always sends `X-Cache: MISS` would otherwise satisfy the second one for a
+payload that happened to name `X-Cache`. `probe_crlf` now sends the control
+first, because the requirement is unanswerable without it.
+
+**`xss` and `ssrf` are capped for a real reason.** The first needs a browser to
+execute the payload and the second needs an out-of-band collector the target
+can reach; this system has neither. (`ppoll` was listed here and should not
+have been: it is **not** capped. Its server-side half - a property only the
+polluting request sent, read back by a request that did not send it - is
+provable from the transcript and `verify_unkeyed_input` proves it. Only the
+client-side variant is out of reach, and that is not a separate class.) Driving one over `mcp_call` is the path, and nothing here
+does it yet. `ssrf` sits on `verify_generic` alongside the two above, which
+makes it look like the same situation in the code and is not;
+`test_the_capped_set_is_exactly_what_the_docs_claim` holds the distinction, so
+this paragraph and the matrix cannot drift apart. `xss` has a real verifier -
+its cap is only the missing browser.
+
+**`probe_csrf` cannot produce evidence its own class accepts, by design.** The
+proof needs a state-changing write, and the probe is read-only. The agent
+reaches `proven` with `http_request`; the probe's job ends at detection.
+
+**A re-render re-seals.** `argus report` recomputes the artifact digests,
+which is what makes a legitimate re-render verify - and therefore what lets an
+edit made before the re-render come out the other side digest-valid. The grade
+is recomputed and corrected, and `--seal-key` closes the forgery case, but an
+edit to `notes.md` before a re-render is not detectable by the seal alone.
+
+**`argus compare` and `argus sessions` read `summary.json` as given.** They
+are reporting tools over a file `argus verify` is the check for; a tampered
+summary misreports there until you verify.
+
+**The doc gate checks what it can name.** Tools, subcommands, flags, proof
+classes, `ARGUS_*` variables, and the stated counts of tools, classes, skills,
+tests and selftest checks - all against the code. It does not check prose
+claims, and `_NOT_TOOLS` is a hand-maintained allowlist of identifiers that
+look like tools and are not.
+
+**Windows is checked, not run, on this host.** `tests/test_windows.py`
+exercises the path and separator logic through `ntpath` and `os.name`, which
+is the half that differs; CI runs the real thing on windows-latest.
+
+**The research measurements have not been run.** `docs/EXPERIMENTS.md` is a
+protocol. Every number in this repository is a test count, a tool count or a
+measurement of the system on its own lab - none is a result about agent
+performance.
+
 ## What it deliberately does not do
 
-- No exploit payloads that persist (no webshells, no shells period).
+- No exploit payloads that persist (no webshells, no shells period). Code
+  execution is proven with `id; echo <nonce>` and stops there: the matrix
+  vetoes an rce claim whose cited request carries a destructive payload, so
+  the evidence is void even when the command ran.
 - No authentication-agnostic scanning of foreign hosts — scope is explicit.
 - `run_external` and `run_exploit` output is a lead, not evidence:
   scanner claims are verified through `http_request` (or a manifest's

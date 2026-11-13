@@ -36,10 +36,12 @@ def test_demo_team(tmp_path):
 def test_sessions_listing(tmp_path, capsys):
     rc = main(["demo", "--session-dir", str(tmp_path), "--quiet"])
     assert rc == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    n = len(json.loads((sdir / "findings.json").read_text(encoding="utf-8")))
     rc = main(["sessions", "--session-dir", str(tmp_path)])
     assert rc == 0
     out = capsys.readouterr().out
-    assert "findings=5" in out
+    assert f"findings={n}" in out
 
 
 def test_sessions_json(tmp_path, capsys):
@@ -51,7 +53,9 @@ def test_sessions_json(tmp_path, capsys):
     rows = json.loads(capsys.readouterr().out)
     assert len(rows) == 1
     row = rows[0]
-    assert row["findings"] == 5 and row["mode"] == "single"
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+    n = len(json.loads((sdir / "findings.json").read_text(encoding="utf-8")))
+    assert row["findings"] == n and row["mode"] == "single"
     assert row["requests"] > 0 and "dir" in row and "duration" in row
 
 

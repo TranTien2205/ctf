@@ -13,6 +13,27 @@ from .session import Session
 
 def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("target", help="Base URL of the in-scope target")
+    p.add_argument("--role", default=None,
+                   help="pick the model by what the task needs rather than by "
+                        "name (planner|breadth|depth|judge|writer); "
+                        "`argus models` lists them. --model wins over this")
+    p.add_argument("--policy", default="cheap", choices=["cheap", "strong"],
+                   help="with --role: the cheapest model the table says can "
+                        "do the job, or the strongest (default cheap)")
+    p.add_argument("--role-models", action="store_true",
+                   help="team mode only: give each role the model the table "
+                        "lists for its job (lead=planner, recon=breadth, "
+                        "exploit=depth, report=writer) under --policy. A pick "
+                        "whose credential is not set falls back to --model")
+    p.add_argument("--seal-key", default=None,
+                   help="HMAC key (or a path to a file holding one) for the "
+                        "transcript chain. Unkeyed, the chain proves the file "
+                        "was not edited; keyed, only a holder of the key can "
+                        "produce a chain that verifies. Also ARGUS_SEAL_KEY")
+    p.add_argument("--require-proof", action="store_true",
+                   help="refuse findings whose evidence does not meet the "
+                        "proof requirement for their class (default: record "
+                        "them graded as candidate/unproven)")
     p.add_argument("--scope", action="append",
                    help="Extra in-scope hosts (comma-separated ok); may repeat")
     p.add_argument("--exclude", action="append",
@@ -34,7 +55,10 @@ def _add_run_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--operator",
                    help="Tester/org attribution recorded in meta.json and "
                         "rendered in the report header")
-    p.add_argument("--model", help="Claude model id (default claude-sonnet-4-5)")
+    p.add_argument("--model",
+                   help="model id (default claude-sonnet-4-5). `argus models` "
+                        "lists the table; a name it does not know is sent to "
+                        "Anthropic")
     p.add_argument("--api-key", help="Anthropic API key (else ANTHROPIC_API_KEY)")
     p.add_argument("--auth-token",
                    help="OAuth bearer token (Pro/Max; else ANTHROPIC_AUTH_TOKEN, "
@@ -97,8 +121,18 @@ def main(argv: list[str] | None = None) -> int:
     p_team.add_argument("--max-workers", type=int, default=6,
                         help="cap on concurrently running workers (default 6)")
 
+    p_serve = sub.add_parser(
+        "mcp-serve",
+        help="serve argus's tools to an MCP host over stdio - the LLM that "
+             "drives the assessment lives outside, the guards stay here")
+    _add_run_args(p_serve)
+
     p_rep = sub.add_parser("report", help="re-render report.md for a session dir")
     p_rep.add_argument("session_dir")
+    p_rep.add_argument("--seal-key", default=None,
+                       help="the key the run was sealed with, if any - a "
+                            "re-render re-seals, and chaining unkeyed over a "
+                            "keyed transcript would break it")
 
     p_find = sub.add_parser("findings", help="print findings of a session dir")
     p_find.add_argument("session_dir")
@@ -117,6 +151,42 @@ def main(argv: list[str] | None = None) -> int:
     p_check.add_argument("--json", action="store_true",
                          help="machine-readable verdict (ok/degraded/error)")
 
+    p_judge = sub.add_parser(
+        "judge", help="have a model from a different family read the evidence "
+                      "behind each finding. It can dispute or lower, never "
+                      "promote - the grade belongs to the proof matrix")
+    p_judge.add_argument("session_dir")
+    p_judge.add_argument("--judge-model", default=None,
+                         help="override the table's pick; refused if it is "
+                              "the same family as the model that ran")
+    p_judge.add_argument("--policy", default="strong",
+                         choices=["cheap", "strong"])
+    p_judge.add_argument("--only", default="",
+                         help="comma-separated finding ids (default: all)")
+    p_judge.add_argument("--seal-key", default=None)
+    p_judge.add_argument("--json", action="store_true")
+    p_judge.add_argument("--dry-run", action="store_true",
+                         help="print the case file a judge would be sent and "
+                              "make no call")
+
+    p_next = sub.add_parser(
+        "next", help="what the recorded evidence says to do next, computed "
+                     "from a session directory rather than from the "
+                     "conversation")
+    p_next.add_argument("session", help="path to a session directory")
+    p_next.add_argument("--json", action="store_true")
+
+    p_models = sub.add_parser(
+        "models", help="the model table: provider, price, and which roles "
+                       "each model is listed for")
+    p_models.add_argument("--json", action="store_true")
+
+    p_proof = sub.add_parser(
+        "proof", help="print the proof requirement for a bug class, or list "
+                      "all classes with 'proof'")
+    p_proof.add_argument("vuln_class", nargs="?", default=None)
+    p_proof.add_argument("--json", action="store_true")
+
     p_sess = sub.add_parser("sessions", help="list past session dirs")
     p_sess.add_argument("--session-dir", default="sessions")
     p_sess.add_argument("--json", action="store_true",
@@ -126,6 +196,8 @@ def main(argv: list[str] | None = None) -> int:
         "verify", help="verify a session's transcript hash chain "
                        "(tamper-evidence check)")
     p_ver.add_argument("session_dir")
+    p_ver.add_argument("--seal-key", default=None,
+                       help="the key the run was sealed with, if any")
     p_ver.add_argument("--json", action="store_true",
                        help="print the raw verification result as JSON")
 
@@ -163,6 +235,14 @@ def main(argv: list[str] | None = None) -> int:
         result = loop.run()
         print(json.dumps(result, indent=2))
         return 1 if result.get("error") else 0
+
+    if args.cmd == "mcp-serve":
+        from .mcpserver import serve
+        cfg = load_config(args)
+        # no _preflight_target: the host may connect before the target is up,
+        # and a server that exits on a cold target is a server the host cannot
+        # keep registered
+        return serve(cfg, allowed=_parse_tools(getattr(args, "tools", "") or ""))
 
     if args.cmd == "team":
         from .team.coordinator import TeamRun
@@ -204,7 +284,8 @@ def main(argv: list[str] | None = None) -> int:
             # artifacts a real run produced
             print(f"no transcript.jsonl in {sdir} - not a session dir")
             return 1
-        session = _reopen(sdir)
+        from .config import _seal_key
+        session = _reopen(sdir, _seal_key(args))
         if not session._transcript:
             # a transcript with zero entries means the run died at init -
             # rendering + sealing a zero-evidence report fabricates an
@@ -244,7 +325,39 @@ def main(argv: list[str] | None = None) -> int:
             session.findings = [f for f in session.findings
                                 if isinstance(f, dict)
                                 and f.get("id") not in bad]
-        path = render_report(session, cfg)
+        # A stored grade stronger than its evidence is the same kind of
+        # tampering, and the re-render would have re-sealed it: `argus report`
+        # computed nothing about grades, so an inflated claim came out of the
+        # other side with a fresh, valid digest over it. Correct it to what
+        # the evidence supports and say so.
+        from .session import findings_overgraded
+        inflated = findings_overgraded(session._transcript, session.findings)
+        if inflated:
+            by_id = {row["id"]: row for row in inflated}
+            for f in session.findings:
+                row = by_id.get(f.get("id")) if isinstance(f, dict) else None
+                if not row:
+                    continue
+                print(f"warning: {row['id']} claims grade "
+                      f"'{row['claimed']}' but its evidence supports "
+                      f"'{row['evidence_supports']}' - corrected in this "
+                      "report (run 'argus verify' for detail)",
+                      file=sys.stderr)
+                if row["evidence_supports"] in ("proven", "candidate",
+                                                "unproven", "refused"):
+                    f["grade"] = row["evidence_supports"]
+                    f["grade_corrected_from"] = row["claimed"]
+        # the agent's summary lives in summary.json; without it the
+        # re-rendered report says "_No agent summary was recorded._"
+        carried = ""
+        try:
+            prev = json.loads((sdir / "summary.json").read_text(
+                encoding="utf-8"))
+            if isinstance(prev, dict):
+                carried = str(prev.get("agent_summary") or "")
+        except (ValueError, OSError):
+            carried = ""
+        path = render_report(session, cfg, summary=carried)
         # a re-render is a new attested artifact state: seal again so the
         # delivered report.* files are digest-anchored too
         try:
@@ -306,8 +419,115 @@ def main(argv: list[str] | None = None) -> int:
                 ow = f" <{f['owasp']}>" if f.get("owasp") else ""
                 flag = " UNVERIFIED" if f.get("id") in bad else ""
                 sev = str(f.get("severity") or "?").upper()
-                print(f"[{sev:8}] {f.get('id', '?')} {f.get('title', '?')}"
+                grade = f" {str(f.get('grade') or '').upper()}" \
+                    if f.get("grade") else ""
+                print(f"[{sev:8}]{grade} {f.get('id', '?')} {f.get('title', '?')}"
                       f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
+        return 0
+
+    if args.cmd == "judge":
+        return _cmd_judge(args)
+
+    if args.cmd == "next":
+        from . import decide as decide_mod
+        action = decide_mod.next_action(args.session)
+        print(json.dumps(action.to_dict(), indent=2, ensure_ascii=False)
+              if args.json else action.render())
+        return 0
+
+    if args.cmd == "models":
+        from . import models as models_mod
+        table = models_mod.known()
+        if args.json:
+            print(json.dumps(
+                {"version": models_mod.table_version(),
+                 "roles": models_mod.roles(),
+                 "models": {k: {"provider": m.provider, "display": m.display,
+                                "api_base": m.api_base,
+                                "api_key_env": m.api_key_env,
+                                "context_window": m.context_window,
+                                "usd_per_mtok_in": m.usd_per_mtok_in,
+                                "usd_per_mtok_out": m.usd_per_mtok_out,
+                                "roles": m.roles,
+                                "credential_present": bool(m.credential())}
+                           for k, m in table.items()}}, indent=2))
+            return 0
+        print(f"model table v{models_mod.table_version()} - prices are USD per "
+              "million tokens as published, and they move: a cost in a report "
+              "traces to a line here\n")
+        print(f"{'model':20} {'provider':10} {'in':>7} {'out':>7} {'cred':5} roles")
+        for key, m in sorted(table.items()):
+            cred = "yes" if m.credential() else "-"
+            print(f"{key:20} {m.provider:10} {m.usd_per_mtok_in:7.2f} "
+                  f"{m.usd_per_mtok_out:7.2f} {cred:5} {','.join(m.roles)}")
+        print("\nroles:")
+        for role, why in models_mod.roles().items():
+            cheap = models_mod.for_role(role, "cheap")
+            strong = models_mod.for_role(role, "strong")
+            print(f"  {role:9} cheap={cheap.key if cheap else '-':20} "
+                  f"strong={strong.key if strong else '-'}")
+            print(f"            {why}")
+        return 0
+
+    if args.cmd == "proof":
+        from . import proof as proof_mod
+        if not args.vuln_class:
+            if args.json:
+                print(json.dumps({c: proof_mod.requirement_of(c)
+                                  for c in proof_mod.classes()}, indent=2))
+                return 0
+            print(f"{len(proof_mod.classes())} classes in the proof matrix "
+                  "- `argus proof <class>` for one:\n")
+            for name in proof_mod.classes():
+                print(f"  {name:14} {proof_mod.requirement_of(name)[:90]}")
+            return 0
+        spec = proof_mod.spec_for(args.vuln_class)
+        if spec is None:
+            print(f"no proof requirement for {args.vuln_class!r}. "
+                  f"Classes: {', '.join(proof_mod.classes())}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps({
+                "vuln_class": spec.vuln_class, "requirement": spec.requirement,
+                "required": list(spec.required), "veto": list(spec.veto),
+                "floor": list(spec.floor), "aliases": list(spec.aliases),
+                "notes": spec.notes, "refusal": spec.refusal}, indent=2))
+            return 0
+        print(f"{spec.vuln_class} - proof requirement\n")
+        print(f"  {spec.requirement}\n")
+        if spec.refusal:
+            print(f"  REFUSED: {spec.refusal}")
+            return 0
+        print("  checks that must pass:")
+        for name in spec.required:
+            print(f"    - {name}")
+        if spec.floor:
+            print("  without this one, nothing above 'unproven' is available:")
+            for name in spec.floor:
+                print(f"    - {name}")
+        if spec.veto:
+            print("  disqualifies the evidence entirely:")
+            for name in spec.veto:
+                print(f"    - {name}")
+        if spec.ceiling:
+            # an operator reading this needs to know `proven` is unreachable
+            # BEFORE spending an engagement trying to reach it
+            from .proof import CAP_UNIMPLEMENTED
+            print(f"\n  CAPPED AT '{spec.ceiling}': this system will not "
+                  f"grade this class higher.")
+            if spec.cap_reason == CAP_UNIMPLEMENTED:
+                print("    Reason: the verifier is unwritten. The transcript "
+                      "already records what it\n            would need, so "
+                      "this is labour, not a limit.")
+            elif spec.cap_reason:
+                print(f"    Reason: {spec.cap_reason}. Not something more "
+                      f"work here would fix.")
+        if spec.verifier.__name__ == "verify_refused":
+            print(f"\n  REFUSED: {spec.refusal or spec.requirement}")
+        if spec.notes:
+            print(f"\n  {spec.notes}")
+        if spec.aliases:
+            print(f"\n  also accepted as: {', '.join(spec.aliases)}")
         return 0
 
     if args.cmd == "skills":
@@ -364,8 +584,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "verify":
+        from .config import _seal_key
         from .session import verify_transcript
-        res = verify_transcript(Path(args.session_dir))
+        res = verify_transcript(Path(args.session_dir), _seal_key(args))
         # provenance: which build wrote this evidence - matters when the
         # verifier's rules differ from the producer's
         try:
@@ -385,11 +606,18 @@ def main(argv: list[str] | None = None) -> int:
                              or res.get("tail_truncated")
                              or res.get("anchor_missing")
                              or res.get("findings_bad")
+                             or res.get("findings_overgraded")
+                             or res.get("key_required")
                              or res.get("artifact_mismatch"))
             print(json.dumps(res, indent=2, ensure_ascii=False))
             return 0 if res["ok"] else 1
         if res.get("error"):
             print(res["error"])
+            return 1
+        if res.get("key_required"):
+            print("UNVERIFIABLE: this run was sealed with a key. Pass "
+                  "--seal-key (or set ARGUS_SEAL_KEY) - verifying it unkeyed "
+                  "would report every line as tampered")
             return 1
         if not res["chained"]:
             print("transcript predates hash chaining - cannot verify")
@@ -413,6 +641,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"TAMPERED: findings {res['findings_bad']} no longer "
                   "verify - evidence ids missing from the transcript or "
                   "excerpt not verbatim")
+            return 1
+        if res.get("findings_overgraded"):
+            for row in res["findings_overgraded"]:
+                print(f"TAMPERED: {row['id']} claims grade "
+                      f"'{row['claimed']}' but its cited evidence supports "
+                      f"'{row['evidence_supports']}'"
+                      + (f" - unmet: {', '.join(row['missing'])}"
+                         if row.get("missing") else ""))
             return 1
         if res.get("artifact_mismatch"):
             print(f"TAMPERED: {res['artifact_mismatch']} edited since the "
@@ -499,8 +735,11 @@ def main(argv: list[str] | None = None) -> int:
         def _dkey(f):
             # retests usually run on a fresh instance (new port) - match on
             # host + path + params + class, ignoring the port
+            # the canonical class, not the author's spelling: keying on raw
+            # category made one unfixed finding report as both FIXED and NEW
+            # when the two runs spelled the class differently
             cat, _netloc, path, params = _finding_key(
-                f.get("category"), f.get("url"))
+                f.get("vuln_class") or f.get("category"), f.get("url"))
             u = str(f.get("url") or "")
             try:
                 host = _up.urlparse(
@@ -597,6 +836,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "compare":
         import urllib.parse as _up
+
         def _host_of(d):
             try:
                 m = json.loads((Path(d) / "meta.json")
@@ -605,6 +845,20 @@ def main(argv: list[str] | None = None) -> int:
                 return (_up.urlparse(str(t or "")).hostname or "").lower()
             except Exception:
                 return ""
+
+        def _g(s, grade):
+            g = s.get("grades")
+            if isinstance(g, dict):
+                try:
+                    return int(g.get(grade, 0) or 0)
+                except (TypeError, ValueError):
+                    return 0
+            # a session rendered before grading existed: count from the rows
+            rows = s.get("findings")
+            if not isinstance(rows, list):
+                return 0
+            return sum(1 for f in rows
+                       if isinstance(f, dict) and f.get("grade") == grade)
 
         def _summ(d):
             p = Path(d) / "summary.json"
@@ -628,6 +882,13 @@ def main(argv: list[str] | None = None) -> int:
                 "dir": Path(d).name, "mode": s.get("mode", "single"),
                 "findings": len(s.get("findings"))
                             if isinstance(s.get("findings"), list) else 0,
+                # The grade split, because a total alone invites a
+                # configuration to win by recording more leads: EXPERIMENTS
+                # makes the proven count the primary measure, and this is the
+                # tool it tells the reader to use for it.
+                "proven": _g(s, "proven"),
+                "candidate": _g(s, "candidate"),
+                "unproven": _g(s, "unproven"),
                 "requests": s.get("requests", 0),
                 "ttf": s.get("time_to_first_finding_s"),
                 "duration_s": s.get("duration_s"),
@@ -658,15 +919,19 @@ def main(argv: list[str] | None = None) -> int:
                   "compare like-for-like on the same build",
                   file=sys.stderr)
         if args.csv:
-            # context columns are appended last so existing positional
+            # grade columns sit with `findings` because they decompose it;
+            # the context columns stay appended last so existing positional
             # parsers keep working
-            hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
+            hdr = ("session,mode,findings,proven,candidate,unproven,"
+                   "requests,ttf_s,duration_s,"
                    "endpoints,llm_calls,workers,tokens_in,tokens_out,"
                    "cache_read,cache_write,target_host,argus_version")
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
                 print(f"{s['dir']},{s.get('mode','?')},{s.get('findings','?')},"
+                      f"{s.get('proven',0)},{s.get('candidate',0)},"
+                      f"{s.get('unproven',0)},"
                       f"{s.get('requests','?')},{s.get('ttf') or ''},"
                       f"{s.get('duration_s') or ''},"
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
@@ -676,6 +941,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         keys = [("host", "target_host"), ("version", "argus_version"),
                 ("mode", "mode"), ("findings", "findings"),
+                ("proven", "proven"), ("candidate", "candidate"),
+                ("unproven", "unproven"),
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
                 ("duration_s", "duration_s"),
@@ -743,6 +1010,48 @@ def _preflight_target(cfg) -> None:
         raise SystemExit(f"target rejected by scope guard: {exc}")
 
 
+def _demo_scan(messages: list, key: str):
+    """The newest tool_result carrying `key`, searching back through the whole
+    conversation - the forge event is several turns behind the request that
+    used its token."""
+    for msg in reversed(messages):
+        blocks = msg.get("content")
+        if not isinstance(blocks, list):
+            continue
+        for block in reversed(blocks):
+            if not isinstance(block, dict) or block.get("type") != "tool_result":
+                continue
+            try:
+                out = json.loads(block.get("content") or "{}")
+            except ValueError:
+                continue
+            result = out.get("result") if isinstance(out, dict) else None
+            if isinstance(result, dict) and result.get(key):
+                return result[key]
+    return None
+
+
+def _demo_last(messages: list) -> dict:
+    """The most recent tool_result payload, as the model sees it.
+
+    Both demo arms thread request ids through this: a scripted turn reads the
+    previous result the same way Claude does, so the citations are built the
+    way a real run builds them rather than from hard-coded request numbers.
+    """
+    for msg in reversed(messages):
+        blocks = msg.get("content")
+        if not isinstance(blocks, list):
+            continue
+        for block in reversed(blocks):
+            if isinstance(block, dict) and block.get("type") == "tool_result":
+                try:
+                    out = json.loads(block.get("content") or "{}")
+                except ValueError:
+                    return {}
+                return out.get("result", out) if isinstance(out, dict) else {}
+    return {}
+
+
 def _demo(args) -> int:
     """Offline demo for presentations/defense: spins up the lab and runs a
     scripted agent sequence through the real loop - scope guard, probes,
@@ -771,52 +1080,149 @@ def _demo(args) -> int:
     def _t(i, name, **kw):
         return {"id": f"d{i}", "name": name, "type": "tool_use", "input": kw}
 
-    # Request numbering is deterministic: sqli=4, reflection=1, idor=3,
-    # disclosure=1+paths, xfh=1 - evidence cites excerpts, not request ids.
+    _last = _demo_last
+
+    # Ids are threaded out of each probe result, the way a real agent threads
+    # them - every probe returns the request_ids it spent. The demo used to
+    # omit evidence_ids and let the recorder resolve them from the excerpt,
+    # which is how its "forged admin token accepted" finding came to cite
+    # `GET /api/user/1`: an earlier response contained the same bytes.
+    def _sqli_finding(messages):
+        out = _last(messages)
+        ids = out.get("request_ids") or {}
+        extract = out.get("extract") or {}
+        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        return {"text": "Error channel named the engine; the bounded UNION read "
+                        "returned rows. Both go in the citation - the class "
+                        "needs the engine AND the data.",
+                "tool_calls": [_t(2, "record_finding",
+                    title="SQL injection in /item id parameter",
+                    severity="critical", category="sqli",
+                    url=base + "/item?id=1", evidence_ids=cited,
+                    evidence_excerpt="admin - $s3cr3t-admin-pw",
+                    description="id is interpolated into the query string. The "
+                                "quote probe returns a raw sqlite error; a "
+                                "UNION SELECT limited to five rows returns "
+                                "credentials from the users table.",
+                    remediation="Use parameterized queries.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _rce_finding(messages):
+        out = _last(messages)
+        rid = out.get("proof_request_id")
+        row = next((r for r in out.get("results") or []
+                    if r.get("request_id") == rid and r.get("identity")), None)
+        return {"text": "The host parameter reaches a shell: the identity line "
+                        "came back with the probe nonce.",
+                "tool_calls": [_t(4, "record_finding",
+                    title="OS command injection in /ping host parameter",
+                    severity="critical", category="rce",
+                    url=base + "/ping?host=127.0.0.1",
+                    evidence_ids=[rid] if rid else [],
+                    evidence_excerpt=(row or {}).get("identity") or "uid=",
+                    description="host is concatenated into a shell command. "
+                                "`id; echo <nonce>` returns the server's own "
+                                "identity line and the nonce, so the output is "
+                                "computed by the target and not reflected.",
+                    remediation="Never pass request data to a shell; exec with "
+                                "an argv list and validate the host as an "
+                                "address.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _idor_finding(messages):
+        out = _last(messages)
+        other = next((r for r in out.get("results") or []
+                      if r.get("accessible") and "admin" in (r.get("excerpt") or "")),
+                     None)
+        cited = [i for i in (out.get("base_id"),
+                             (other or {}).get("request_id")) if i]
+        return {"text": "Two object ids, two principals, one of them not mine.",
+                "tool_calls": [_t(7, "record_finding",
+                    title="IDOR: /api/user/<id> serves any user object",
+                    severity="high", category="idor",
+                    url=base + "/api/user/2", evidence_ids=cited,
+                    evidence_excerpt='"username": "admin"',
+                    description="Object ids are not checked against the caller. "
+                                "Reading id 2 returns alice; reading id 1 "
+                                "returns the admin record, with no credential "
+                                "distinguishing the two requests.",
+                    remediation="Enforce per-object ownership checks.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]}
+
+    def _jwt_finding(messages):
+        # the forged request is two turns back, the rejected control is last
+        ids = []
+        for msg in reversed(messages):
+            blocks = msg.get("content")
+            if not isinstance(blocks, list):
+                continue
+            for block in reversed(blocks):
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    try:
+                        out = json.loads(block.get("content") or "{}")
+                    except ValueError:
+                        continue
+                    rid = (out.get("result") or {}).get("request_id") \
+                        if isinstance(out.get("result"), dict) else None
+                    if rid:
+                        ids.append(rid)
+            if len(ids) >= 2:
+                break
+        mint = _demo_scan(messages, "event_id")
+        cited = ids[:2] + ([mint] if mint else [])
+        return {"text": "Forged token accepted, deliberately invalid token "
+                        "rejected - and the forge event is cited too, because "
+                        "a working auth check looks the same on the wire.",
+                "tool_calls": [_t(12, "record_finding",
+                    title="JWT weak secret: forged admin token accepted",
+                    severity="critical", category="jwt",
+                    url=base + "/api/me", evidence_ids=cited,
+                    evidence_excerpt='"role": "admin"',
+                    description="The session JWT verifies against the "
+                                "dictionary secret 'secret123'. A token forged "
+                                "offline with role=admin is accepted and its "
+                                "claims echoed back; the same request with a "
+                                "broken signature is refused with 401, so the "
+                                "endpoint does verify - against a guessable "
+                                "key.",
+                    remediation="Rotate to a high-entropy secret; prefer "
+                                "asymmetric signing.",
+                    cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
     script = [
-        {"text": "Baseline-diffed probes first: /item looks injectable.",
+        {"text": "Baseline-diffed probes first: /item looks injectable, and "
+                 "the class needs the engine named plus a row from a table.",
          "tool_calls": [_t(1, "probe_sqli", url=base + "/item?id=1",
-                          param="id")]},
-        {"tool_calls": [_t(2, "record_finding",
-                         title="SQL injection in /item id parameter",
-                         severity="high", category="sqli",
-                         url=base + "/item?id=1",
-                                                  evidence_excerpt="sqlite3.OperationalError",
-                         description="The quote probe produces a raw sqlite "
-                                     "error - unsanitized input reaches the "
-                                     "query.",
-                         remediation="Use parameterized queries.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
-         "text": "Error channel confirms SQLi - recording with verbatim "
-                 "evidence."},
-        {"tool_calls": [_t(3, "probe_reflection",
-                         url=base + "/search?q=x", param="q")],
-         "text": "Now the reflected-parameter family."},
-        {"tool_calls": [_t(4, "record_finding",
+                           param="id", union_cols=6, extract_table="users",
+                           extract_columns="username,password")]},
+        _sqli_finding,
+        {"text": "A diagnostic endpoint takes a host - probe for command "
+                 "OUTPUT, not for a delay.",
+         "tool_calls": [_t(3, "probe_cmdi", url=base + "/ping?host=127.0.0.1",
+                           param="host")]},
+        _rce_finding,
+        {"text": "Now the reflected-parameter family.",
+         "tool_calls": [_t(5, "probe_reflection",
+                           url=base + "/search?q=x", param="q")]},
+        {"tool_calls": [_t(6, "record_finding",
                          title="Reflected XSS in /search q parameter",
                          severity="medium", category="xss",
                          url=base + "/search?q=x",
-                                                  evidence_excerpt="<>'\"&=/",
-                         description="Canary chars < > \" ' reflect "
-                                     "unescaped in html context.",
+                         evidence_excerpt="<>'\"&=/",
+                         description="Canary chars < > \" ' reflect unescaped "
+                                     "in an html context. Execution is not "
+                                     "shown here - this engagement had no "
+                                     "browser, so the class stays a candidate.",
                          remediation="Output-encode by context; add CSP.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")],
-         "text": "Reflected with unescaped special chars - XSS lead."},
-        {"tool_calls": [_t(5, "probe_idor", url=base + "/api/user/2")],
+         "text": "Unescaped reflection. Recording it as what it is: a "
+                 "candidate, because nothing here executed it."},
+        {"tool_calls": [_t(6, "probe_idor", url=base + "/api/user/2")],
          "text": "Object-level authorization next."},
-        {"tool_calls": [_t(6, "record_finding",
-                         title="IDOR: /api/user/<id> serves any user object",
-                         severity="high", category="idor",
-                         url=base + "/api/user/2",
-                                                  evidence_excerpt="\"username\"",
-                         description="Neighboring ids return other users' "
-                                     "objects with no authorization check.",
-                         remediation="Enforce per-object ownership checks.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
-         "text": "Neighbor id returns a different principal - IDOR."},
-        {"tool_calls": [_t(7, "probe_disclosure", url=base)],
+        _idor_finding,
+        {"tool_calls": [_t(8, "probe_disclosure", url=base)],
          "text": "Sensitive-artifact sweep before finishing."},
-        {"tool_calls": [_t(8, "record_finding",
+        {"tool_calls": [_t(9, "record_finding",
                          title="Exposed /.env and /.git/HEAD at web root",
                          severity="medium", category="info-disclosure",
                          url=base + "/.env",
@@ -828,38 +1234,32 @@ def _demo(args) -> int:
                                      "server; rotate exposed secrets.",
                          cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")],
          "text": "Exposed secrets on the web root - recording."},
-        {"tool_calls": [_t(9, "jwt_decode", token=_tok)],
+        {"tool_calls": [_t(10, "jwt_decode", token=_tok)],
          "text": "The session token itself is the next surface."},
-        {"tool_calls": [_t(10, "jwt_forge", token=_tok,
+        {"tool_calls": [_t(11, "jwt_forge", token=_tok,
                            claims='{"user":"admin","role":"admin"}',
                            secret="secret123")],
-         "text": "Weak HMAC secret recovered offline - forge an admin "
-                 "token and prove acceptance."},
-        {"tool_calls": [_t(11, "http_request", method="GET",
+         "text": "Weak HMAC secret recovered offline - forge an admin token, "
+                 "then send a deliberately broken one as the control."},
+        {"tool_calls": [_t(12, "http_request", method="GET",
+                           url=base + "/api/me",
+                           headers={"Authorization": f"Bearer {_forged}"})]},
+        {"tool_calls": [_t(13, "http_request", method="GET",
                            url=base + "/api/me",
                            headers={"Authorization":
-                                    f"Bearer {_forged}"})]},
-        {"tool_calls": [_t(12, "record_finding",
-                         title="JWT weak secret: forged admin token accepted",
-                         severity="critical", category="jwt",
-                         url=base + "/api/me",
-                         evidence_excerpt='"role": "admin"',
-                         description="The lab JWT verifies against the "
-                                     "dictionary secret 'secret123'; a "
-                                     "forged admin token is accepted and "
-                                     "its claims echoed back verbatim.",
-                         remediation="Rotate to a high-entropy secret; "
-                                     "prefer asymmetric signing.",
-                         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")],
-         "text": "Forged claims returned by the server - privilege "
-                 "escalation proven end to end."},
-        {"tool_calls": [_t(13, "probe_xfh", url=base + "/reset")]},
-        {"tool_calls": [_t(14, "finish",
-                         summary="Demo run: SQLi + XSS + IDOR + info "
-                                 "disclosure + forged-JWT admin takeover "
-                                 "verified with verbatim evidence; "
-                                 "host-header reflection left as a lead "
-                                 "for manual follow-up.")]},
+                                    f"Bearer {_forged[:-4]}AAAA"})],
+         "text": "The control: same request, signature broken by four bytes."},
+        _jwt_finding,
+        {"tool_calls": [_t(14, "probe_xfh", url=base + "/reset")]},
+        {"tool_calls": [_t(15, "finish",
+                         summary="Demo run. Proven: SQL injection (engine "
+                                 "named plus five rows from users), OS command "
+                                 "injection (identity line with the probe "
+                                 "nonce), IDOR across two principals, exposed "
+                                 "secrets, and a forged JWT accepted against a "
+                                 "rejected control. Candidate: reflected XSS - "
+                                 "unescaped, but no browser executed it. "
+                                 "Host-header reflection left as a lead.")]},
     ]
     cfg = Config(target=base, allow_private=True,
                  session_dir=Path(args.session_dir),
@@ -881,7 +1281,8 @@ def _demo(args) -> int:
         for f in _flist if isinstance(_flist, list) else []:
             if isinstance(f, dict):
                 sev = str(f.get("severity") or "?").upper()
-                print(f"  [{sev}] {f.get('title', '?')}")
+                grade = f" ({f['grade']})" if f.get("grade") else ""
+                print(f"  [{sev}]{grade} {f.get('title', '?')}")
     print(f"  findings={result['findings']}  requests={result['requests']}")
     print(f"  report: {result['report']}")
     html_path = Path(result['report']).with_suffix('.html')
@@ -901,6 +1302,88 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
     excerpt, resolved to the recorded exchange automatically - deterministic
     despite workers sharing one transcript."""
     from .team.coordinator import TeamRun
+
+    # Same threading as the single-agent demo: every probe returns the
+    # request_ids it spent, and the citation is built from them. The team arm
+    # has to earn the same grades, or the run-vs-team comparison is comparing
+    # two different standards of evidence.
+    def _team_sqli_finding(messages):
+        out = _demo_last(messages)
+        ids = out.get("request_ids") or {}
+        extract = out.get("extract") or {}
+        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        return {"tool_calls": [_t("e3", "record_finding",
+            title="SQL injection in /item id parameter", severity="critical",
+            category="sqli", url=base + "/item?id=1", evidence_ids=cited,
+            evidence_excerpt="admin - $s3cr3t-admin-pw",
+            description="id is interpolated into the query; a UNION read "
+                        "limited to five rows returns users.username and "
+                        "users.password.",
+            remediation="Use parameterized queries.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _team_rce_finding(messages):
+        out = _demo_last(messages)
+        rid = out.get("proof_request_id")
+        row = next((r for r in out.get("results") or []
+                    if r.get("request_id") == rid and r.get("identity")), None)
+        return {"tool_calls": [_t("e4b", "record_finding",
+            title="OS command injection in /ping host parameter",
+            severity="critical", category="rce",
+            url=base + "/ping?host=127.0.0.1",
+            evidence_ids=[rid] if rid else [],
+            evidence_excerpt=(row or {}).get("identity") or "uid=",
+            description="`id; echo <nonce>` returns the server's identity "
+                        "line and the nonce - computed by the target.",
+            remediation="Exec with an argv list; validate the host.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
+
+    def _team_idor_finding(messages):
+        out = _demo_last(messages)
+        other = next((r for r in out.get("results") or []
+                      if r.get("accessible")
+                      and "admin" in (r.get("excerpt") or "")), None)
+        cited = [i for i in (out.get("base_id"),
+                             (other or {}).get("request_id")) if i]
+        return {"tool_calls": [_t("e7", "record_finding",
+            title="IDOR: /api/user/<id> serves any user",
+            severity="high", category="idor", url=base + "/api/user/2",
+            evidence_ids=cited, evidence_excerpt='"username": "admin"',
+            description="Reading id 2 returns alice, reading id 1 returns the "
+                        "admin record, with no credential telling the two "
+                        "requests apart.",
+            remediation="Enforce per-object ownership checks.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]}
+
+    def _team_jwt_finding(messages):
+        ids = []
+        for msg in reversed(messages):
+            blocks = msg.get("content")
+            if not isinstance(blocks, list):
+                continue
+            for block in reversed(blocks):
+                if isinstance(block, dict) and block.get("type") == "tool_result":
+                    try:
+                        payload = json.loads(block.get("content") or "{}")
+                    except ValueError:
+                        continue
+                    result = payload.get("result")
+                    if isinstance(result, dict) and result.get("request_id"):
+                        ids.append(result["request_id"])
+            if len(ids) >= 2:
+                break
+        mint = _demo_scan(messages, "event_id")
+        cited = ids[:2] + ([mint] if mint else [])
+        return {"tool_calls": [_t("e14", "record_finding",
+            title="JWT weak secret: forged admin token accepted",
+            severity="critical", category="jwt", url=base + "/api/me",
+            evidence_ids=cited, evidence_excerpt='"role": "admin"',
+            description="The secret 'secret123' is dictionary-weak: a forged "
+                        "admin token is accepted, while the same request with "
+                        "a broken signature is refused 401.",
+            remediation="Rotate to a high-entropy secret; prefer asymmetric "
+                        "signing.",
+            cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]}
 
     scripts = {
         "lead": [
@@ -939,19 +1422,18 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
         "exploit": [
             {"text": "Pulling queued surface leads.",
              "tool_calls": [_t("e1", "pull_leads", max_n=5)]},
-            {"text": "Confirming the injectable id parameter.",
+            {"text": "Confirming the injectable id parameter, and reading "
+                     "rows: the class needs the engine named plus data.",
              "tool_calls": [_t("e2", "probe_sqli", url=base + "/item?id=1",
-                              param="id")]},
-            {"tool_calls": [_t("e3", "record_finding",
-                              title="SQL injection in /item id parameter",
-                              severity="high", category="sqli",
-                              url=base + "/item?id=1",
-                              evidence_excerpt="sqlite3.OperationalError",
-                              description="Quote probe yields a raw sqlite "
-                                          "error - unsanitized input reaches "
-                                          "the query.",
-                              remediation="Use parameterized queries.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
+                              param="id", union_cols=6,
+                              extract_table="users",
+                              extract_columns="username,password")]},
+            _team_sqli_finding,
+            {"text": "A diagnostic endpoint takes a host - probe for output.",
+             "tool_calls": [_t("e3b", "probe_cmdi",
+                              url=base + "/ping?host=127.0.0.1",
+                              param="host")]},
+            _team_rce_finding,
             {"tool_calls": [_t("e4", "probe_reflection",
                               url=base + "/search?q=x", param="q")]},
             {"tool_calls": [_t("e5", "record_finding",
@@ -966,16 +1448,7 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                               cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N")]},
             {"tool_calls": [_t("e6", "probe_idor",
                               url=base + "/api/user/2")]},
-            {"tool_calls": [_t("e7", "record_finding",
-                              title="IDOR: /api/user/<id> serves any user",
-                              severity="high", category="idor",
-                              url=base + "/api/user/2",
-                              evidence_excerpt="\"username\"",
-                              description="Neighboring ids return other "
-                                          "users' objects, no authz check.",
-                              remediation="Enforce per-object ownership "
-                                          "checks.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N")]},
+            _team_idor_finding,
             {"tool_calls": [_t("e8", "probe_disclosure", url=base)]},
             {"tool_calls": [_t("e9", "record_finding",
                               title="Exposed /.env and /.git/HEAD at web "
@@ -1001,19 +1474,12 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                 _t("e13", "http_request", method="GET",
                    url=base + "/api/me",
                    headers={"Authorization": f"Bearer {forged}"})]},
-            {"tool_calls": [_t("e14", "record_finding",
-                              title="JWT weak secret: forged admin token "
-                                    "accepted",
-                              severity="critical", category="jwt",
+            {"text": "The control: same request, signature broken.",
+             "tool_calls": [_t("e13b", "http_request", method="GET",
                               url=base + "/api/me",
-                              evidence_excerpt='"role": "admin"',
-                              description="Signing secret 'secret123' is "
-                                          "dictionary-weak; a forged admin "
-                                          "token is accepted verbatim.",
-                              remediation="Rotate to a high-entropy "
-                                          "secret; prefer asymmetric "
-                                          "signing.",
-                              cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")]},
+                              headers={"Authorization":
+                                       f"Bearer {forged[:-4]}AAAA"})]},
+            _team_jwt_finding,
             {"tool_calls": [_t("e15", "finish",
                               summary="5/5 leads verified with verbatim "
                                       "evidence.")]},
@@ -1028,8 +1494,166 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
                    n_recon=1, n_exploit=1, n_report=0).run()
 
 
-def _reopen(sdir: Path) -> Session:
-    """Rebuild a Session view over an existing session directory."""
+def _cmd_judge(args) -> int:
+    """Cross-family verification over a recorded session.
+
+    Deliberately a separate command rather than a step in the run: it costs
+    one call per finding on a second provider, and it reads a session that is
+    already sealed. Re-sealing afterwards is the same trade `argus report`
+    makes - the chain still covers the new state, and `argus verify` says so.
+    """
+    from . import judge as judge_mod
+    from . import models as models_mod
+    from .config import _seal_key, resolve_auth, API_URL, DEFAULT_MODEL
+    from .session import _atomic_write, findings_bad, verify_transcript
+
+    sdir = Path(args.session_dir)
+    if not (sdir / "transcript.jsonl").exists():
+        print(f"no transcript.jsonl in {sdir} - not a session dir")
+        return 1
+    seal = _seal_key(args)
+    session = _reopen(sdir, seal)
+    if not session._transcript:
+        print(f"{sdir} has an empty transcript - nothing to judge")
+        return 1
+
+    author = ""
+    try:
+        author = str(json.loads((sdir / "meta.json").read_text(
+            encoding="utf-8")).get("model") or "")
+    except Exception:
+        pass
+
+    # The chain check must use the SAME key the session was sealed with, or
+    # every keyed session is accused of having been edited. `_seal_key(args)`
+    # is already resolved above for `_reopen`; pass it on.
+    v = verify_transcript(sdir, seal_key=seal)
+    if not v.get("chained") or v.get("tail_truncated") or v.get("bad_lines"):
+        print("warning: transcript chain check failed - judging an edited "
+              "transcript (run 'argus verify')"
+              + ("" if seal else "; if this session was sealed with a key, "
+                 "pass --seal-key"), file=sys.stderr)
+    bad = findings_bad(session._transcript, session.findings)
+
+    wanted = {x.strip() for x in str(args.only or "").split(",") if x.strip()}
+    rows = [f for f in session.findings if isinstance(f, dict)
+            and (not wanted or f.get("id") in wanted)
+            and f.get("id") not in bad]
+    if wanted:
+        known_ids = {str(f.get("id")) for f in session.findings
+                     if isinstance(f, dict)}
+        unknown = sorted(wanted - known_ids)
+        if unknown:
+            print(f"--only names {unknown}, which this session has no "
+                  f"finding for. It has: {sorted(known_ids) or 'none'}")
+            return 2
+    if not rows:
+        print("no findings to judge"
+              + (f" (excluded by evidence re-validation: {sorted(bad)})"
+                 if bad else ""))
+        return 0
+
+    def cited(finding):
+        return [session._transcript[i] for i in (finding.get("evidence_ids")
+                                                 or [])
+                if i in session._transcript]
+
+    if args.dry_run:
+        for finding in rows:
+            print(f"===== case file for {finding.get('id')} =====")
+            print(judge_mod.render_case(finding, cited(finding)))
+        return 0
+
+    if args.judge_model:
+        spec = models_mod.get(args.judge_model)
+        if spec is None:
+            print(f"{args.judge_model} is not in models.json; "
+                  f"`argus models` lists what is")
+            return 2
+        if author and models_mod.family(args.judge_model) == \
+                models_mod.family(author):
+            print(f"{args.judge_model} is the same family as {author}, which "
+                  "the run already used - two models that agree because they "
+                  "share a prior are not a check. Name another, or let the "
+                  "table pick.")
+            return 2
+        # The role gate applies to a named model too. Without this, --judge-model
+        # accepted anything in the table - including a model the table lists
+        # only for `breadth` or `writer`, which is not an opinion worth having
+        # about a proof.
+        if "judge" not in spec.roles:
+            print(f"{args.judge_model} is not listed for the judge role "
+                  f"(it serves: {', '.join(spec.roles) or 'nothing'}). "
+                  f"`argus models` shows which models are. Reviewing a proof "
+                  f"is not a job every model is listed for.")
+            return 2
+        pick = spec
+    else:
+        pick = judge_mod.pick_judge(author or DEFAULT_MODEL, args.policy)
+    if pick is None:
+        print(f"no judge available: every model listed for the judge role "
+              f"outside {models_mod.family(author or DEFAULT_MODEL)!r} needs "
+              f"a credential that is not set. `argus models` shows which. "
+              f"Running the author's own family as its own reviewer would "
+              f"not be cross-verification.")
+        return 2
+
+    key, tok = resolve_auth(args)
+    cfg = Config(target="http://x", model=pick.key, api_key=key or "",
+                 auth_token=tok or "", api_base=API_URL)
+    if pick.provider == "anthropic" and not (key or tok):
+        print("no Anthropic credential found for the judge - set "
+              "ANTHROPIC_API_KEY or sign in to Claude Code")
+        return 1
+    from .llm import make_client
+    llm = make_client(cfg)
+    print(f"judge: {pick.key} ({pick.provider}); author: {author or '?'}; "
+          f"{len(rows)} finding(s)", file=sys.stderr)
+
+    verdicts, updated = [], []
+    for finding in session.findings:
+        if not isinstance(finding, dict) or finding not in rows:
+            updated.append(finding)
+            continue
+        verdict = judge_mod.judge_finding(llm, finding, cited(finding),
+                                          pick.key)
+        verdicts.append(verdict)
+        updated.append(judge_mod.apply_verdict(finding, verdict))
+    session.findings = updated
+
+    session.record_event("cross_verification", {
+        "judge_model": pick.key, "author_model": author,
+        "verdicts": [x.to_dict() for x in verdicts]})
+    _atomic_write(session.findings_path,
+                  json.dumps(session.findings, indent=2, ensure_ascii=False))
+
+    if args.json:
+        print(json.dumps([x.to_dict() for x in verdicts], indent=2,
+                         ensure_ascii=False))
+    else:
+        for x in verdicts:
+            mark = "AGREES " if x.agrees else "DISPUTES"
+            print(f"{mark} {x.finding_id}: {x.reason or x.error}")
+            if x.missing:
+                print(f"         would settle it: {'; '.join(x.missing)}")
+    try:
+        session.seal_artifacts()
+    except OSError as exc:
+        print(f"warning: re-seal failed: {exc}", file=sys.stderr)
+    disputed = sum(1 for x in verdicts if not x.agrees)
+    print(f"\n{len(verdicts) - disputed} agreed, {disputed} disputed. "
+          f"Grades are unchanged: a judge cannot promote a finding.",
+          file=sys.stderr)
+    return 0
+
+
+def _reopen(sdir: Path, seal_key: str = "") -> Session:
+    """Rebuild a Session view over an existing session directory.
+
+    `seal_key` matters here: `argus report` re-seals, and chaining the seal
+    entry unkeyed over a keyed transcript would break the chain this command
+    exists to preserve.
+    """
     import threading
     sess = Session.__new__(Session)
     sess.dir = sdir
@@ -1040,9 +1664,14 @@ def _reopen(sdir: Path) -> Session:
     sess._lock = threading.Lock()
     sess._last_chain = ""
     sess.resumed = False
-    # __init__ is bypassed - keep the attribute surface complete so a
-    # reopened session never AttributeErrors on Session.secret_values
-    # (note()/record_*/_log all read it)
+    sess.require_proof = False
+    sess.seal_key = str(seal_key or "")
+    # __init__ is bypassed, so keep the attribute surface COMPLETE: a reopened
+    # session used to AttributeError on `secret_values` (note()/record_*/_log
+    # all read it), and `record_event` redacts against it - so any command
+    # recording into an existing session died instead of writing its entry.
+    # There are no live credentials to redact on a reopen: the run that held
+    # them is over, and anything they touched was redacted on the way in.
     sess.secret_values = set()
     mpath = sdir / "meta.json"
     if mpath.is_file():

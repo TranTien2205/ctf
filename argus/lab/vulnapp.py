@@ -51,7 +51,11 @@ import hmac
 import json
 import os
 import re
+import shlex
+import shutil
 import sqlite3
+import struct
+import subprocess
 import sys
 import tempfile
 import time
@@ -113,6 +117,94 @@ def _jwt_verify(token: str):
     return None
 
 
+_EXEC_NOARGS = {"id", "whoami", "uname", "hostname", "pwd"}
+_EXEC_WITHARGS = {"echo", "cat"}
+_EXEC_ALLOW = _EXEC_NOARGS | _EXEC_WITHARGS
+# One GET must not become thousands of fork/execs: a 64 KB value of `;id`
+# produced ~21,500 of them on one thread.
+_EXEC_MAX_SEGMENTS = 8
+
+def _injected_commands(value: str) -> list[str]:
+    """The command segments an injected parameter carries, loosely as a shell
+    would split them. Segment 0 is the host argument itself, not a command.
+
+    Bounded at _EXEC_MAX_SEGMENTS: a real shell would run them all, and this
+    is a lab that must not be a way to pin the operator's own machine.
+    """
+    text = str(value or "")[:8192].replace("%0a", "\n")
+    segments = [a or b for a, b in
+                re.findall(r"\$\(([^)]*)\)|`([^`]*)`", text)]
+    outside = re.sub(r"\$\([^)]*\)|`[^`]*`", "", text)
+    segments += re.split(r"[;&|\n]+", outside)[1:]
+    out = []
+    for segment in segments:
+        segment = segment.strip().strip('"').strip("'").split("#")[0].strip()
+        # a NUL anywhere raises ValueError out of shlex/subprocess, and the
+        # request died with no response at all
+        segment = segment.replace("\x00", "")
+        if segment:
+            out.append(segment)
+        if len(out) >= _EXEC_MAX_SEGMENTS:
+            break
+    return out
+
+def _lab_exec(command: str) -> str:
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        return f"sh: {command}: syntax error"
+    if not parts:
+        return ""
+    name = os.path.basename(parts[0])
+    if name not in _EXEC_ALLOW:
+        return f"sh: {parts[0]}: command not found"
+    # basename("/bin/rm") is "rm" and refused, but basename("./id") is "id" and
+    # shutil.which would resolve it against PATH, not against the path given -
+    # so a leading path component is simply rejected.
+    if parts[0] != name:
+        return f"sh: {parts[0]}: command not found"
+    if name in _EXEC_NOARGS and len(parts) > 1:
+        return f"{name}: extra operand '{parts[1]}'"
+    if name == "echo":
+        return " ".join(parts[1:])
+    if name == "cat":
+        if len(parts) < 2:
+            return ""
+        target = os.path.normpath(parts[1].replace("\x00", "")).lstrip("/\\")
+        path = os.path.join(FAKEFS, target)
+        # realpath, and compare against the directory WITH its separator: a
+        # prefix test lets /x/fake-other through when the root is /x/fake, and
+        # a symlink inside the tree pointed anywhere at all.
+        # normcase, because on NT the comparison is case-insensitive and a
+        # plain startswith refuses `FAKE\x` inside root `fake` - failing closed,
+        # but refusing a legitimate read the rce/lfi demo depends on. Verified
+        # against ntpath semantics rather than assumed.
+        root = os.path.normcase(os.path.realpath(FAKEFS))
+        real = os.path.normcase(os.path.realpath(path))
+        if real != root and not real.startswith(root + os.sep):
+            return f"cat: {parts[1]}: Permission denied"
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                return fh.read(4096)
+        except OSError:
+            return f"cat: {parts[1]}: No such file or directory"
+    exe = shutil.which(name)
+    if not exe:
+        return f"sh: {name}: command not found"
+    try:
+        done = subprocess.run([exe, *parts[1:]], capture_output=True,
+                              text=True, timeout=3)
+    except (OSError, subprocess.SubprocessError):
+        return f"sh: {name}: cannot execute"
+    return (done.stdout or done.stderr or "")[:4096]
+
+_FAKE_METADATA = (
+    b'{"ami-id":"ami-0lab00000000","instance-id":"i-0labfixture0000",'
+    b'"local-ipv4":"10.0.0.17","local-hostname":"ip-10-0-0-17.lab.internal",'
+    b'"iam":{"info":{"InstanceProfileArn":'
+    b'"arn:aws:iam::000000000000:instance-profile/lab-role"}}}')
+
+
 class Handler(BaseHTTPRequestHandler):
     db = None
     server_version = "LabVuln/1.0"
@@ -133,6 +225,64 @@ class Handler(BaseHTTPRequestHandler):
             super().finish()
 
     # -- helpers ---------------------------------------------------------
+    _WS_MAX_FRAME = 4096
+
+    def _ws_echo_once(self) -> None:
+        """Read one masked client frame and echo its payload back.
+
+        Enough to make the channel provable and no more: one frame, bounded,
+        then a close. A lab that only completes the handshake cannot show
+        that the channel answers, which is the half of the finding that
+        matters - an endpoint that 101s and then says nothing is not a
+        hijackable channel.
+        """
+        import struct
+        sock = self.connection
+        try:
+            sock.settimeout(3.0)
+            head = sock.recv(2)
+            if len(head) < 2:
+                return
+            opcode = head[0] & 0x0F
+            masked = bool(head[1] & 0x80)
+            length = head[1] & 0x7F
+            if length == 126:
+                length = struct.unpack(">H", sock.recv(2))[0]
+            elif length == 127:
+                length = struct.unpack(">Q", sock.recv(8))[0]
+            if length > self._WS_MAX_FRAME:
+                return
+            mask = sock.recv(4) if masked else b""
+            payload = b""
+            while len(payload) < length:
+                chunk = sock.recv(length - len(payload))
+                if not chunk:
+                    break
+                payload += chunk
+            if masked and mask:
+                payload = bytes(b ^ mask[i % 4]
+                                for i, b in enumerate(payload))
+            if opcode == 0x8:                      # client said close
+                sock.sendall(b"\x88\x00")
+                return
+            body = b"echo: " + payload[:self._WS_MAX_FRAME]
+            frame = bytearray([0x81])              # FIN + text, unmasked
+            if len(body) < 126:
+                frame.append(len(body))
+            else:
+                frame.append(126)
+                frame += struct.pack(">H", len(body))
+            frame += body
+            sock.sendall(bytes(frame))
+            sock.sendall(b"\x88\x00")             # and close politely
+        except (OSError, struct.error, IndexError):
+            return
+        finally:
+            try:
+                sock.settimeout(None)
+            except OSError:
+                pass
+
     def _send(self, status=200, body="", ctype="text/html; charset=utf-8",
               headers=None):
         data = body.encode() if isinstance(body, str) else body
@@ -320,8 +470,16 @@ class Handler(BaseHTTPRequestHandler):
                 # heavy query: iterations, not seconds - ~1s per million
                 time.sleep(min(int(bench.group(1)) // 1_000_000, 8))
                 self._send(body="<html><body>PING ok</body></html>")
-            elif re.search(r"[;&|`$(]", host):
-                self._send(500, "<html><body>sh: syntax error</body></html>")
+            elif re.search(r"[;&|`$(]", host) or "%0a" in host:
+                # real execution, allowlisted and shell-free (see _lab_exec)
+                outputs = [_lab_exec(c) for c in _injected_commands(host)]
+                outputs = [o for o in outputs if o]
+                if outputs:
+                    body = "\n".join(outputs)
+                    self._send(body="<html><body><pre>PING 127.0.0.1: 4 "
+                                    f"packets, 0% loss\n{body}</pre></body></html>")
+                else:
+                    self._send(500, "<html><body>sh: syntax error</body></html>")
             else:
                 self._send(body=f"<html><body>PING {host}: 4 packets, 0% loss"
                                 f"</body></html>")
@@ -399,14 +557,33 @@ class Handler(BaseHTTPRequestHandler):
                        f"content='0;url={nxt}'></head><body>go</body></html>")
 
         elif path == "/fetch":
+            # A real server-side fetch, bounded the same way /ping is. It used
+            # to pass the parameter straight to urlopen, so
+            # `?url=file:///etc/passwd` returned the OPERATOR'S real
+            # /etc/passwd - the same line the `cat` allowlist exists to
+            # prevent, through a different door. http(s) to loopback only;
+            # the cloud-metadata address answers from a fixture so the SSRF
+            # demonstration still works without touching a real network.
             u = p.get("url", "")
-            try:
-                with urllib.request.urlopen(u, timeout=3) as resp:
-                    data = resp.read(4096)
-                self._send(body=b"FETCHED:\n" + data)
-            except Exception as exc:
-                self._send(502, f"fetch error for {u}: {exc}",
-                           ctype="text/plain")
+            parsed = urllib.parse.urlparse(u)
+            host = (parsed.hostname or "").lower()
+            if host in ("169.254.169.254", "metadata.google.internal"):
+                self._send(body=b"FETCHED:\n" + _FAKE_METADATA)
+            elif parsed.scheme not in ("http", "https"):
+                self._send(502, f"fetch error for {u}: unsupported scheme "
+                                f"{parsed.scheme!r}", ctype="text/plain")
+            elif host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0",
+                              "[::1]"):
+                self._send(502, f"fetch error for {u}: only loopback is "
+                                "reachable from this lab", ctype="text/plain")
+            else:
+                try:
+                    with urllib.request.urlopen(u, timeout=3) as resp:
+                        data = resp.read(4096)
+                    self._send(body=b"FETCHED:\n" + data)
+                except Exception as exc:
+                    self._send(502, f"fetch error for {u}: {exc}",
+                               ctype="text/plain")
 
         elif path.startswith("/api/user/"):
             uid = path.rsplit("/", 1)[-1]
@@ -453,8 +630,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(body="DB_HOST=db.internal\nDB_PASSWORD=hunter2\n"
                             "SECRET_KEY=lab-secret-0123\n", ctype="text/plain")
 
-        elif path == "/ws":
-            # RFC 6455 handshake: a live ws endpoint answers 101 + Accept
+        elif path == "/ws-strict":
+            # the same endpoint with the check in place: a foreign Origin is
+            # refused before the upgrade. Present so the probe and the gate
+            # can both be shown refusing a channel that is not hijackable.
+            origin = self.headers.get("Origin", "")
+            host = self.headers.get("Host", "")
+            o_host = origin.split("//", 1)[-1].split("/", 1)[0] if origin \
+                else ""
+            if origin and o_host != host:
+                self._send(403, body="origin not allowed")
+                return
             key = self.headers.get("Sec-WebSocket-Key", "")
             accept = base64.b64encode(hashlib.sha1(
                 (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
@@ -464,6 +650,24 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Connection", "Upgrade")
             self.send_header("Sec-WebSocket-Accept", accept)
             self.end_headers()
+            self._ws_echo_once()
+
+
+        elif path == "/ws":
+            # RFC 6455 handshake: a live ws endpoint answers 101 + Accept
+            key = self.headers.get("Sec-WebSocket-Key", "")
+            accept = base64.b64encode(hashlib.sha1(
+                (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
+            ).digest()).decode()
+            # Deliberately broken: no Origin check at all. That is the bug -
+            # any page on the internet can open this channel in the victim's
+            # browser, with the victim's cookies, and read the answers.
+            self.send_response(101, "Switching Protocols")
+            self.send_header("Upgrade", "websocket")
+            self.send_header("Connection", "Upgrade")
+            self.send_header("Sec-WebSocket-Accept", accept)
+            self.end_headers()
+            self._ws_echo_once()
 
         elif path == "/static/app.js":
             self._send(body="""fetch('/api/user/1').then(r=>r.json());
@@ -509,6 +713,18 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                      else "text/html" if target.endswith((".html", ".htm"))
                      else "application/octet-stream")
             self._send(body=data, ctype=ctype)
+
+        elif path == "/redeem/reset":
+            # Test support, not part of the vulnerable surface. `/redeem` is
+            # a one-time coupon held in a CLASS variable, so one test draining
+            # it leaves every later test on the same server looking at an
+            # endpoint with nothing to race for - which read as a verifier
+            # regression until the counter was printed. Resetting is explicit
+            # so the dependency is visible in the test that needs it.
+            type(self)._coupons = 1
+            self._send(body=json.dumps({"coupons": type(self)._coupons}),
+                       ctype="application/json")
+
 
         elif path == "/redeem":
             # TOCTOU: check-then-act with no lock - concurrent requests all

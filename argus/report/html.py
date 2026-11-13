@@ -12,7 +12,35 @@ from ..session import (Session, SEVERITIES, _cwe_of, _owasp_of,
                         sanitized_findings)
 from .markdown import _tool_surface
 from ..config import Config
-from .markdown import _coverage, _SEV_ORDER
+from .markdown import (_coverage, _GRADE_MEANING, _GRADE_ORDER, _SEV_ORDER)
+
+_GRADE_COLOR = {"proven": "#1e7b34", "candidate": "#b8860b",
+                "unproven": "#6b7280", "refused": "#4b5563",
+                "ungraded": "#6b7280"}
+
+
+def _proof_html(f: dict) -> str:
+    """The grade, its requirement and the checks, on the card itself.
+
+    report.md carried this and report.html did not, so a reader handed the
+    styled file - which is the one meant for a presentation - saw a critical
+    finding with nothing saying it was a candidate.
+    """
+    verdict = f.get("proof") if isinstance(f.get("proof"), dict) else {}
+    if not verdict:
+        return ""
+    rows = "".join(
+        f"<li>{'&#10003;' if c.get('ok') else '&#10007;'} "
+        f"{_esc(c.get('check', ''))}"
+        + (f" &mdash; <i>{_esc(c.get('detail', ''))}</i>"
+           if c.get("detail") else "") + "</li>"
+        for c in verdict.get("checks") or [])
+    req = _esc(verdict.get("requirement") or "")
+    return ("<details><summary><b>Proof grade: "
+            f"{_esc(f.get('grade', '?'))}</b></summary>"
+            + (f"<p class='meta'>Requirement for "
+               f"{_esc(verdict.get('vuln_class') or '')}: {req}</p>" if req else "")
+            + f"<ul>{rows}</ul></details>")
 
 _SEV_COLOR = {"critical": "#7c1d1d", "high": "#c0392b", "medium": "#e67e22",
               "low": "#2980b9", "info": "#7f8c8d"}
@@ -45,10 +73,23 @@ def render_html(session: Session, cfg: Config, summary: str = "",
                 extra: dict | None = None) -> Path:
     coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
-                      key=lambda f: _SEV_ORDER.get(f["severity"], 99))
+                      key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
+                                     _SEV_ORDER.get(f["severity"], 99)))
     counts: dict[str, int] = {}
+    grades: dict[str, int] = {}
     for f in findings:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
+        # an ungraded row was counted nowhere, so it appeared as a card with no
+        # line in the table that is supposed to summarise the cards
+        key = f.get("grade") or "ungraded"
+        grades[key] = grades.get(key, 0) + 1
+
+    grade_rows = "".join(
+        f"<tr><td><span class='badge' style='background:"
+        f"{_GRADE_COLOR.get(g, '#999')}'>{g.upper()}</span></td>"
+        f"<td>{grades[g]}</td><td>{_GRADE_MEANING.get(g, '')}</td></tr>"
+        for g in ("proven", "candidate", "unproven", "refused", "ungraded")
+        if grades.get(g))
 
     sev_rows = "".join(
         f"<tr><td><span class='badge' style='background:{_SEV_COLOR[s]}'>"
@@ -71,7 +112,11 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             f"<p><span class='badge' style='background:"
             f"{_SEV_COLOR.get(f['severity'], '#999')}'>"
             f"{_esc(f['severity']).upper()}</span> "
-            f"<b>Category:</b> {_esc(f['category'])} &nbsp; "
+            + (f"<span class='badge' style='background:"
+               f"{_GRADE_COLOR.get(f.get('grade', ''), '#999')}'>"
+               f"PROOF: {_esc(f.get('grade', '')).upper()}</span> &nbsp; "
+               if f.get("grade") else "")
+            + f"<b>Category:</b> {_esc(f['category'])} &nbsp; "
             f"<b>Endpoint:</b> <code>{_esc(f['url'])}</code>"
             + (f" &nbsp; <b>CVSS:</b> <code>{_esc(f['cvss'])}</code>"
                if f.get("cvss") else "")
@@ -82,7 +127,8 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             + f"</p><p><b>Description</b><br>{_esc(f['description'])}</p>"
             f"<p><b>Proof (verbatim excerpt)</b></p>"
             f"<pre>{_esc(f['evidence_excerpt'][:1200])}</pre>"
-            f"{ex}<p><b>Remediation</b><br>{_esc(f['remediation'])}</p></div>")
+            f"{ex}<p><b>Remediation</b><br>{_esc(f['remediation'])}</p>"
+            f"{_proof_html(f)}</div>")
 
     meta = {}
     mp = session.dir / "meta.json"
@@ -132,6 +178,9 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 <table><tr><th>Severity</th><th>Count</th></tr>{sev_rows}</table>
 <h2>Engagement constraints</h2>
 {constraints}
+<h2>Proof grades</h2>
+<table><tr><th>Grade</th><th>Count</th><th>Meaning</th></tr>
+{grade_rows or '<tr><td>-</td><td>0</td><td></td></tr>'}</table>
 <h2>Findings</h2>
 {''.join(cards) or '<p><i>No findings recorded.</i></p>'}
 <h2>Test coverage</h2>

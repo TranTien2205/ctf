@@ -105,6 +105,71 @@ def _duration(session: Session) -> float:
     return round(time.time() - session.started, 1)
 
 
+_GRADE_ORDER = {"proven": 0, "candidate": 1, "unproven": 2, "refused": 3}
+_GRADE_MEANING = {
+    "proven": "the class-specific artifact and its control are on record",
+    "candidate": "a real signal; a named check is still missing",
+    "unproven": "nothing in the cited evidence meets the requirement",
+    "refused": "this system does not prove this class",
+    "ungraded": "recorded before grading existed",
+}
+
+
+def _proof_block(f: dict) -> list[str]:
+    """What this finding still needs, in the report itself."""
+    verdict = f.get("proof") or {}
+    if not verdict:
+        return []
+    out = [f"**Proof grade: {f.get('grade', '?')}**  ", ""]
+    # A second model read the evidence. It cannot change the grade - that
+    # belongs to the matrix - so the only way its disagreement reaches a
+    # reader is by being printed here, next to the grade it disputes.
+    # Read the HISTORY, so a later agreement cannot present itself as the
+    # whole story over a finding an earlier judge disputed.
+    history = [v for v in (f.get("judges") or []) if isinstance(v, dict)]
+    if not history and isinstance(f.get("judge"), dict):
+        history = [f["judge"]]
+    disputes = [v for v in history if not v.get("agrees") and not v.get("error")]
+    judged = disputes[0] if disputes else (history[-1] if history else {})
+    if judged and len(history) > 1:
+        out += [f"> ({len(history)} judges read this evidence: "
+                + ", ".join(
+                    f"{v.get('judge_model', '?')} "
+                    + ("no verdict" if v.get("error") else
+                       "agreed" if v.get("agrees") else "disputed")
+                    for v in history) + ")", ""]
+    if judged:
+        model = str(judged.get("judge_model") or "a second model")
+        if judged.get("error"):
+            out += [f"> **Cross-verification: no verdict** ({model}) - "
+                    f"{judged['error']}", ""]
+        elif judged.get("agrees"):
+            out += [f"> **Cross-verification: agreed** ({model}) - "
+                    f"{judged.get('reason', '')}", ""]
+        else:
+            out += [f"> **DISPUTED by cross-verification** ({model}) - "
+                    f"{judged.get('reason', '')}", ""]
+            if judged.get("missing"):
+                out += ["> Would settle it: "
+                        + "; ".join(str(m) for m in judged["missing"]), ""]
+        if f.get("class_disputed"):
+            out += [f"> The judge reads this evidence as "
+                    f"`{f['class_disputed']}`, not `"
+                    f"{(f.get('proof') or {}).get('vuln_class', '?')}`.", ""]
+        if f.get("severity_claimed"):
+            out += [f"> Severity lowered from `{f['severity_claimed']}` on "
+                    f"the judge's reading.", ""]
+    if verdict.get("requirement"):
+        out += [f"_Requirement for {verdict.get('vuln_class', '')}:_ "
+                f"{verdict['requirement']}", ""]
+    for check in verdict.get("checks") or []:
+        mark = "x" if check.get("ok") else " "
+        detail = f" - {check['detail']}" if check.get("detail") else ""
+        out.append(f"- [{mark}] {check.get('check', '')}{detail}")
+    out.append("")
+    return out
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
@@ -112,8 +177,13 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     # render recorded (mode, llm_calls, llm_tokens, agents) - they land as
     # top-level summary keys, so carry forward every key the canonical
     # schema does not own, under any freshly supplied ones
-    _BASE = {"session", "findings", "counts", "requests", "duration_s",
-             "time_to_first_finding_s", "coverage", "transcript_chain_head"}
+    # Every key this render RECOMPUTES. A key missing from this set is carried
+    # forward from the previous summary.json and then overwritten - or not,
+    # depending on merge order - and `grades` was missing, so a re-render after
+    # the findings changed reported the old grade counts.
+    _BASE = {"session", "findings", "counts", "grades", "requests",
+             "duration_s", "time_to_first_finding_s", "coverage",
+             "transcript_chain_head", "agent_summary"}
     _prev = session.dir / "summary.json"
     if _prev.exists():
         try:
@@ -125,7 +195,12 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                      **extra}
     coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
-                      key=lambda f: _SEV_ORDER.get(f["severity"], 99))
+                      key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
+                                     _SEV_ORDER.get(f["severity"], 99)))
+    grades: dict[str, int] = {}
+    for f in findings:
+        grades[f.get("grade") or "ungraded"] = \
+            grades.get(f.get("grade") or "ungraded", 0) + 1
     counts: dict[str, int] = {}
     for f in findings:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
@@ -161,6 +236,22 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     ]
     if meta.get("operator"):
         lines.insert(6, f"- **Operator:** {meta['operator']}")
+    _cost = extra.get("llm_cost") if isinstance(
+        extra.get("llm_cost"), dict) else {}
+    if _cost:
+        _usd = _cost.get("usd")
+        if _usd is None:
+            # naming the reason beats printing 0.00, which reads as free
+            _line = (f"- **Model cost:** not priced - "
+                     f"{_cost.get('basis', 'no price available')}")
+        else:
+            _tok = extra.get("llm_tokens") or {}
+            _line = (
+                f"- **Model cost:** ${_usd:.4f} USD "
+                f"({_tok.get('in', 0)} in / {_tok.get('out', 0)} out / "
+                f"{_tok.get('cache_read', 0)} cache-read tokens, "
+                f"model table v{_cost.get('table_version', 0)})")
+        lines.insert(7 if meta.get("operator") else 6, _line)
     lines += [
         "| Severity | Count |",
         "|---|---|",
@@ -170,6 +261,11 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             lines.append(f"| {_SEV_LABEL[sev]} | {counts[sev]} |")
     if not findings:
         lines.append("| - | 0 |")
+    if grades:
+        lines += ["", "| Proof grade | Count | Meaning |", "|---|---|---|"]
+        for g in ("proven", "candidate", "unproven", "refused", "ungraded"):
+            if grades.get(g):   # "ungraded" is counted above, not skipped
+                lines.append(f"| **{g}** | {grades[g]} | {_GRADE_MEANING[g]} |")
     def _o(f):
         return f.get("owasp") or _owasp_of(
             f.get("cwe") or _cwe_of(f.get("category")))
@@ -202,7 +298,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             "",
             f"- **Severity:** {_SEV_LABEL.get(f['severity'], f['severity'])}",
             *([f"- **CVSS:** `{f['cvss']}`"] if f.get("cvss") else []),
-            f"- **Category:** {f['category']}",
+            f"- **Category:** {f['category']}"
+            + (f" · **proof: {f['grade']}**" if f.get("grade") else ""),
             *([f"- **CWE:** `{f.get('cwe') or _cwe_of(f['category'])}`"]
               if f.get("cwe") or _cwe_of(f.get("category")) else []),
             *([f"- **OWASP:** {f.get('owasp') or _owasp_of(f.get('cwe') or _cwe_of(f['category']))}"]
@@ -221,6 +318,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             "**Remediation**  ",
             f"{f['remediation']}",
             "",
+            *_proof_block(f),
         ]
         for rid in f["evidence_ids"]:
             entry = session.get_exchange(rid)
@@ -300,6 +398,12 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "The complete request/response transcript is in `transcript.jsonl`,",
         f"({session._seq} entries). Working notes are in `notes.md`.",
         "",
+        "Every finding is graded against the proof requirement for its class",
+        "(`argus proof <class>`): **proven** means the class-specific artifact",
+        "and its control are both on record; **candidate** means a real signal",
+        "with a named check still missing. A candidate is reported because it",
+        "is worth re-testing, not because it is a result.",
+        "",
         "_All findings cite verbatim response excerpts verified against the",
         "recorded transcript at write time._",
     ]
@@ -328,6 +432,12 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "argus_version": __version__,
         "findings": findings,
         "counts": counts,
+        "grades": grades,
+        # Persisted so `argus report` can put it back. A re-render used to
+        # replace the agent's summary with "_No agent summary was recorded._"
+        # and then re-seal, so the delivered artifact was worse than the
+        # original and digest-valid.
+        "agent_summary": summary or "",
         "requests": session._seq,
         "duration_s": _duration(session),
         "time_to_first_finding_s": ttf,

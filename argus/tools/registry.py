@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from .. import proof
 from ..config import Config
 from ..httpclient import GuardedClient
 from ..scope import ScopeGuard
@@ -47,6 +48,7 @@ def _impl(name: str) -> Callable:
         "probe_reflection": probes.probe_reflection,
         "probe_sqli": probes.probe_sqli,
         "probe_time": probes.probe_time,
+        "probe_cmdi": probes.probe_cmdi,
         "probe_ssti": probes.probe_ssti,
         "probe_lfi": probes.probe_lfi,
         "probe_redirect": probes.probe_redirect,
@@ -75,6 +77,7 @@ def _impl(name: str) -> Callable:
         "load_skill": analysis.load_skill,
         "read_response": analysis.read_response,
         "note": analysis.note,
+        "next_action": analysis.next_action,
         "read_notes": analysis.read_notes,
         "record_finding": analysis.record_finding,
         "run_external": analysis.run_external,
@@ -207,6 +210,9 @@ TOOL_SCHEMAS: list[dict] = [
                                                 "enumeration up to this n to "
                                                 "bound the UNION SELECT "
                                                 "column count"},
+            "extract_table": {**_STR, "description": "Opt-in bounded read: table to UNION-select from, once the column count and context are known"},
+            "extract_columns": {**_STR, "description": "Comma-separated columns to read from extract_table"},
+            "extract_rows": {**_INT, "description": "Row cap for the read (default 5, max 20) - five rows is a proof, a dump is an incident"},
         },
         ["url", "param"],
     ),
@@ -222,6 +228,24 @@ TOOL_SCHEMAS: list[dict] = [
             "method": {**_STR, "description": "GET or POST (default GET)"},
             "data": {**_STR, "description": "POST body template; param value is replaced"},
             "delay_s": {**_INT, "description": "Requested sleep seconds (default 4)"},
+        },
+        ["url", "param"],
+    ),
+    _schema(
+        "probe_cmdi",
+        "OS command injection, probed for command OUTPUT rather than timing: "
+        "sends `id; echo <nonce>` (and the Windows pair) across separator "
+        "families and reads the response. Confirms only when an identity line "
+        "comes back that is NOT present in the request that produced it - a "
+        "reflected payload is reported as a reflection, not as execution. "
+        "Falls back to the timing oracle, which is a candidate: the rce class "
+        "requires output. Sends nothing destructive.",
+        {
+            "url": {**_STR, "description": URL_DESC + " Include the query string."},
+            "param": {**_STR, "description": "Parameter to test"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
+            "delay_s": {**_INT, "description": "Sleep seconds for the blind fallback (default 4)"},
         },
         ["url", "param"],
     ),
@@ -446,10 +470,16 @@ TOOL_SCHEMAS: list[dict] = [
     ),
     _schema(
         "probe_websocket",
-        "WebSocket discovery: RFC 6455 upgrade handshake. A 101 with "
-        "Upgrade: websocket confirms a live ws channel; further "
-        "message-level testing needs a ws client.",
-        {"url": {**_STR, "description": URL_DESC}},
+        "Cross-site WebSocket hijacking: completes an RFC 6455 handshake "
+        "carrying a FOREIGN Origin, then sends one masked text frame with a "
+        "probe nonce and reads the answer off the wire. A 101 followed by "
+        "silence is a handshake, not a hijackable channel - the frame is "
+        "what separates them, and the proof requirement needs both. Record "
+        "it citing the handshake AND the frame.",
+        {"url": {**_STR, "description": "ws:// or http:// endpoint URL"},
+         "message": {**_STR, "description": "Optional application-level "
+                                            "message; a nonce is prepended "
+                                            "either way"}},
         ["url"],
     ),
     _schema(
@@ -559,6 +589,20 @@ TOOL_SCHEMAS: list[dict] = [
         ["text"],
     ),
     _schema(
+        "next_action",
+        "Ask the evidence what to do next. The answer is computed from this "
+        "session's recorded transcript and findings - not from this "
+        "conversation - so it is the same answer a fresh reader of the "
+        "evidence would give: the unrecorded proof you already hold, the "
+        "exact check a candidate finding is missing, the endpoint nothing has "
+        "probed, or that it is time to report. Call it when you are unsure "
+        "what is worth doing, when a class has stopped producing new signal, "
+        "or before you decide the engagement is finished. Departing from it "
+        "is fine; say in one line why.",
+        {},
+        [],
+    ),
+    _schema(
         "read_notes",
         "Read back everything written to notes.md this session.",
         {},
@@ -570,11 +614,18 @@ TOOL_SCHEMAS: list[dict] = [
         "request_id whose recorded response literally contains "
         "evidence_excerpt. A finding without verbatim response evidence is "
         "rejected. Record only confirmed issues - 'looks suspicious' is a note, "
-        "not a finding.",
+        "not a finding. The result grades the claim against the proof "
+        "requirement for its class (proven / candidate / unproven) and names "
+        "the checks that did not pass - collect those and record again rather "
+        "than leaving a candidate behind.",
         {
             "title": {**_STR, "description": "Short title, e.g. 'Reflected XSS in /search q parameter'"},
             "severity": {**_STR, "description": "critical | high | medium | low | info"},
-            "category": {**_STR, "description": "Bug class, e.g. xss, sqli, ssrf, idor, cors"},
+            # An enum, not free text: the class selects the proof requirement
+            # AND the dedup key, so `SQLi` / `sql-injection` / `sqlinjection`
+            # must not be three different classes.
+            "category": {**_STR, "enum": list(proof.classes()),
+                          "description": "Bug class - selects the proof requirement checked against the evidence"},
             "url": {**_STR, "description": "Affected endpoint"},
             "evidence_ids": {**_STRARR, "description": "request_ids from tool results that prove it; optional - if omitted, the exchange containing evidence_excerpt is cited automatically"},
             "evidence_excerpt": {**_STR, "description": "Verbatim quote from a cited response that proves the bug"},

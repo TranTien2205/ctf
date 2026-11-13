@@ -2,16 +2,56 @@
   {
     "id": "F01",
     "title": "SQL injection in /item id parameter",
-    "severity": "high",
+    "severity": "critical",
     "category": "sqli",
-    "url": "http://127.0.0.1:16208/item?id=1",
+    "url": "http://127.0.0.1:40523/item?id=1",
     "evidence_ids": [
-      "r2"
+      "r2",
+      "r15"
     ],
-    "evidence_excerpt": "sqlite3.OperationalError",
-    "description": "The quote probe produces a raw sqlite error - unsanitized input reaches the query.",
+    "evidence_excerpt": "admin - $s3cr3t-admin-pw",
+    "vuln_class": "sqli",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "sqli",
+      "grade": "proven",
+      "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r15"
+        },
+        {
+          "check": "data store fingerprinted",
+          "ok": true,
+          "detail": "sqlite3.OperationalError"
+        },
+        {
+          "check": "the query named its target",
+          "ok": true,
+          "detail": "users in r15"
+        },
+        {
+          "check": "rows returned, not an error message",
+          "ok": true,
+          "detail": "quoted from r15"
+        },
+        {
+          "check": "extraction stayed minimal",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    "description": "id is interpolated into the query string. The quote probe returns a raw sqlite error; a UNION SELECT limited to five rows returns credentials from the users table.",
     "remediation": "Use parameterized queries.",
-    "ts": 1794541671.435,
+    "ts": 1794556100.573,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
     "cwe": "CWE-89",
@@ -19,71 +59,265 @@
   },
   {
     "id": "F02",
+    "title": "OS command injection in /ping host parameter",
+    "severity": "critical",
+    "category": "rce",
+    "url": "http://127.0.0.1:40523/ping?host=127.0.0.1",
+    "evidence_ids": [
+      "r18"
+    ],
+    "evidence_excerpt": "uid=1000(kali)",
+    "vuln_class": "rce",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "rce",
+      "grade": "proven",
+      "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r18"
+        },
+        {
+          "check": "a benign command was sent",
+          "ok": true,
+          "detail": "exchange r18"
+        },
+        {
+          "check": "identity output returned by the target",
+          "ok": true,
+          "detail": "'uid=1000(kali)' in r18"
+        },
+        {
+          "check": "the probe nonce came back in the output",
+          "ok": true,
+          "detail": "'argus2q9y0t5r' in r18"
+        },
+        {
+          "check": "proof command stayed benign",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    "description": "host is concatenated into a shell command. `id; echo <nonce>` returns the server's own identity line and the nonce, so the output is computed by the target and not reflected.",
+    "remediation": "Never pass request data to a shell; exec with an argv list and validate the host as an address.",
+    "ts": 1794556100.729,
+    "agent": "agent",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-78",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F03",
     "title": "Reflected XSS in /search q parameter",
     "severity": "medium",
     "category": "xss",
-    "url": "http://127.0.0.1:16208/search?q=x",
+    "url": "http://127.0.0.1:40523/search?q=x",
     "evidence_ids": [
-      "r12"
+      "r19"
     ],
     "evidence_excerpt": "<>'\"&=/",
-    "description": "Canary chars < > \" ' reflect unescaped in html context.",
+    "vuln_class": "xss",
+    "grade": "candidate",
+    "proof": {
+      "vuln_class": "xss",
+      "grade": "candidate",
+      "requirement": "a headless browser executing the payload and reporting the probe nonce",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "payload reflected unencoded into HTML",
+          "ok": true,
+          "detail": "'<>\"\\'' survived into r19"
+        },
+        {
+          "check": "a real browser executed it",
+          "ok": false,
+          "detail": "this system has no browser, so execution is not provable here. Drive one over mcp_call and cite the nonce it reports, or leave this a candidate and say so in the report"
+        }
+      ],
+      "missing": [
+        "a real browser executed it"
+      ]
+    },
+    "description": "Canary chars < > \" ' reflect unescaped in an html context. Execution is not shown here - this engagement had no browser, so the class stays a candidate.",
     "remediation": "Output-encode by context; add CSP.",
-    "ts": 1794541671.441,
+    "ts": 1794556100.78,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
     "cwe": "CWE-79",
     "owasp": "A03 Injection"
   },
   {
-    "id": "F03",
+    "id": "F04",
     "title": "IDOR: /api/user/<id> serves any user object",
     "severity": "high",
     "category": "idor",
-    "url": "http://127.0.0.1:16208/api/user/2",
+    "url": "http://127.0.0.1:40523/api/user/2",
     "evidence_ids": [
-      "r13"
+      "r20",
+      "r22"
     ],
-    "evidence_excerpt": "\"username\"",
-    "description": "Neighboring ids return other users' objects with no authorization check.",
+    "evidence_excerpt": "\"username\": \"admin\"",
+    "vuln_class": "idor",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "idor",
+      "grade": "proven",
+      "requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r22"
+        },
+        {
+          "check": "two distinct object references on one endpoint",
+          "ok": true,
+          "detail": "['2'] vs ['1'] on 127.0.0.1/api/user/{id}"
+        },
+        {
+          "check": "another subject's data returned",
+          "ok": true,
+          "detail": "present in r22, absent from r20"
+        },
+        {
+          "check": "the data identifies a subject",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the caller was not entitled to it",
+          "ok": true,
+          "detail": "no credential was presented and subject data came back"
+        }
+      ]
+    },
+    "description": "Object ids are not checked against the caller. Reading id 2 returns alice; reading id 1 returns the admin record, with no credential distinguishing the two requests.",
     "remediation": "Enforce per-object ownership checks.",
-    "ts": 1794541671.451,
+    "ts": 1794556100.973,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
     "cwe": "CWE-639",
     "owasp": "A01 Broken Access Control"
   },
   {
-    "id": "F04",
+    "id": "F05",
     "title": "Exposed /.env and /.git/HEAD at web root",
     "severity": "medium",
     "category": "info-disclosure",
-    "url": "http://127.0.0.1:16208/.env",
+    "url": "http://127.0.0.1:40523/.env",
     "evidence_ids": [
-      "r20"
+      "r27"
     ],
     "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
+    "vuln_class": "disclosure",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "disclosure",
+      "grade": "proven",
+      "requirement": "the credential or source observed in a response, quoted as the bytes that leaked",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r27"
+        },
+        {
+          "check": "a credential-shaped secret was observed",
+          "ok": true,
+          "detail": "SECRET_KEY=lab-secret-01..."
+        },
+        {
+          "check": "it came from a response, not from the request",
+          "ok": true,
+          "detail": "in r27"
+        }
+      ]
+    },
     "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
     "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
-    "ts": 1794541671.511,
+    "ts": 1794556102.734,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
     "cwe": "CWE-200",
     "owasp": "A01 Broken Access Control"
   },
   {
-    "id": "F05",
+    "id": "F06",
     "title": "JWT weak secret: forged admin token accepted",
     "severity": "critical",
     "category": "jwt",
-    "url": "http://127.0.0.1:16208/api/me",
+    "url": "http://127.0.0.1:40523/api/me",
     "evidence_ids": [
-      "r15"
+      "r64",
+      "r63",
+      "r62"
     ],
     "evidence_excerpt": "\"role\": \"admin\"",
-    "description": "The lab JWT verifies against the dictionary secret 'secret123'; a forged admin token is accepted and its claims echoed back verbatim.",
+    "vuln_class": "jwt",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "jwt",
+      "grade": "proven",
+      "requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r63"
+        },
+        {
+          "check": "this system minted the credential",
+          "ok": true,
+          "detail": "jwt_forge r62 set ['role', 'user'], echoed 'admin'"
+        },
+        {
+          "check": "a forged credential was accepted",
+          "ok": true,
+          "detail": "127.0.0.1/api/me returned 200 with a credential"
+        },
+        {
+          "check": "the same endpoint refuses another credential",
+          "ok": true,
+          "detail": "127.0.0.1/api/me answered 401 to a credentialed request"
+        }
+      ]
+    },
+    "description": "The session JWT verifies against the dictionary secret 'secret123'. A token forged offline with role=admin is accepted and its claims echoed back; the same request with a broken signature is refused with 401, so the endpoint does verify - against a guessable key.",
     "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
-    "ts": 1794541671.517,
+    "ts": 1794556102.841,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
     "cwe": "CWE-347",

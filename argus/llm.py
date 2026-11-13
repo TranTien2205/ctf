@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from .config import API_VERSION
+from .config import API_URL, API_VERSION
 
 RETRYABLE = (429, 500, 502, 503, 529)
 
@@ -156,8 +156,62 @@ class ClaudeClient:
         raise LLMError(f"Anthropic API unreachable after retries: {last_error}")
 
 
+def make_client(cfg):
+    """The client for `cfg.model`, chosen from the model table.
+
+    `AgentLoop` used to construct `ClaudeClient` directly, which made the
+    provider a fact about the code rather than a fact about the model. Now the
+    table says which provider a model belongs to, so adding a provider is an
+    adapter plus a line of data, and a model this table does not know still
+    goes to Anthropic - an unknown name is far more likely a new Claude
+    release than a typo for a local server.
+    """
+    from . import models as models_mod
+    spec = models_mod.get(cfg.model)
+    if spec is None or spec.provider == "anthropic":
+        return ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
+                            max_tokens=cfg.llm_max_tokens,
+                            auth_token=cfg.auth_token)
+    if spec.provider == "openai":
+        from .providers import OpenAICompatClient
+        # NEVER fall back to cfg.api_key here. That is the ANTHROPIC
+        # credential, and this client sends it as a Bearer token to whatever
+        # host the table or ANTHROPIC_BASE_URL names - so the fallback sent
+        # operator's Anthropic key to api.openai.com, or to a loopback server,
+        # the moment the model's own variable was unset. A missing credential
+        # is an error that names the variable to set.
+        key = spec.credential()
+        if not key:
+            raise LLMError(
+                f"no credential for {cfg.model}: set "
+                f"{' or '.join(spec.api_key_env) or 'the provider variable'}. "
+                f"The Anthropic key is not used for {spec.provider} models - "
+                "it would be sent to that provider as a bearer token.")
+        base = (cfg.api_base if cfg.api_base != API_URL else spec.api_base)
+        # (cfg.api_base differs from API_URL only when ANTHROPIC_BASE_URL was
+        # set, which config.py already treats as untrusted ambient input)
+        # `allow_insecure_base` is a statement about the model's OWN endpoint
+        # (a loopback server), not a blanket permission. A base URL the
+        # operator supplied through `ANTHROPIC_BASE_URL` is a different host,
+        # so the plaintext refusal applies to it whatever the table says.
+        insecure_ok = spec.allow_insecure_base and base == spec.api_base
+        return OpenAICompatClient(
+            api_key=key,
+            api_base=base,
+            model=cfg.model,
+            max_tokens=min(cfg.llm_max_tokens, spec.max_output_tokens),
+            allow_insecure_base=insecure_ok)
+    raise LLMError(
+        f"model {cfg.model!r} names provider {spec.provider!r}, which this "
+        "build has no adapter for - see argus/providers.py")
+
+
 class ScriptedClient:
-    """Deterministic stand-in for tests: replays canned tool_use turns."""
+    """Deterministic stand-in for tests: replays canned tool_use turns.
+
+    A turn is a dict, or a callable taking the messages so far and returning
+    one - enough to thread an id from one tool result into the next call.
+    """
 
     def __init__(self, script: list[dict]):
         self.script = list(script)
@@ -175,6 +229,13 @@ class ScriptedClient:
             return {"stop_reason": "end_turn",
                     "content": [{"type": "text", "text": "script exhausted"}]}
         step = self.script.pop(0)
+        if callable(step):
+            # A step may be a function of the conversation so far, which is
+            # what a real model is: the demo reads request_ids out of the
+            # previous tool_result exactly as Claude would, instead of
+            # hard-coding numbers that drift the moment a probe sends one
+            # more request.
+            step = step(messages) or {}
         content = []
         if step.get("text"):
             content.append({"type": "text", "text": step["text"]})

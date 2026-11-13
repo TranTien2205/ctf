@@ -16,10 +16,11 @@ used by `selftest.py`, `pytest` and `argus demo` for reproducible results.
 | `POST /login2` | user-enum via **timing** (uniform error text) |
 | `POST /login3` | rate-limited login: 429 after 5 fails/user |
 | `POST /api/register` | mass-assignment: stores every sent field |
-| `/ping?host=` | command injection (sleep separators) |
+| `/ping?host=` | OS command injection — real argv execution from a seven-command allowlist (`id`, `whoami`, `uname`, `hostname`, `pwd`, `echo`, `cat`), never a shell, plus the sleep separators for the blind case |
 | `/hello?name=` | SSTI (`{{7*7}}` → 49) |
 | `/download?file=` | path traversal (`../`, fakefs) |
-| `/redirect?next=` | open redirect incl. `javascript:` scheme |
+| `/redirect?next=` | open redirect incl. `javascript:` scheme, and CRLF header injection - the `Location` value is not sanitized |
+| any route, `TRACE`/`OPTIONS` | verb handling: `TRACE` echoes the request back (cross-site tracing), `OPTIONS` advertises the method set |
 | `/safedirect?next=` | filtered redirect (`//host` bypass) |
 | `/jsredirect` | client-side DOM redirect |
 | `/api/user/<id>`, `POST /api/order` | IDOR (path + JSON body) |
@@ -50,3 +51,20 @@ python -m argus run http://127.0.0.1:8777
 ```
 
 Do NOT expose this app beyond localhost — it is vulnerable on purpose.
+
+## Why /ping really executes
+
+The lab's whole job is to let the agent reach the evidence a finding needs,
+and `argus proof rce` asks for the output of `id; echo <nonce>`. A simulated
+`sh: syntax error` gave the probe nothing to read, so the class was
+unprovable anywhere in the project.
+
+So it executes, under two bounds. The server binds `127.0.0.1` only, and
+commands run as an argv list through the allowlist above — never through a
+shell — so a destructive or networked payload is inert and comes back
+`command not found`, which is also what a hardened target looks like. `cat`
+is confined to the lab's fake filesystem: a lab must not read the operator's
+real files to make a point. The injection is real; the blast radius is not.
+
+Do not expose this on a network interface. That was true before and it is
+more true now.

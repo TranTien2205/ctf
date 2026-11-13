@@ -97,7 +97,12 @@ def main() -> int:
 
     cfg = Config(target=base, allow_private=True, session_dir=tmp)
     scope = ScopeGuard(base, allow_private=True)
-    client = GuardedClient(scope, s, RateLimiter(0), max_requests=400)
+    # 600: the probes legitimately send more now - ssti sends a second operand
+    # pair because one product can be a coincidence, cmdi takes a second
+    # baseline and re-sends a slow family before calling it a delay, and
+    # lockout needs a counted series. The budget is the harness's, not a claim
+    # about the system.
+    client = GuardedClient(scope, s, RateLimiter(0), max_requests=600)
     ctx = Context(cfg=cfg, scope=scope, session=s, client=client,
                   skills_dir=ROOT / "argus" / "skills")
 
@@ -256,9 +261,20 @@ def main() -> int:
     check("idor probe flags neighboring object", "idor candidate" in out["verdict"])
     out = probes.probe_ssrf(ctx, base + "/fetch?url=x", "url")
     check("ssrf probe sees self-fetch", "ssrf" in out["verdict"])
-    check("ssrf probe sees file-scheme content",
+    # The lab used to pass /fetch's parameter straight to urlopen, so this
+    # check asserted that the probe could read the OPERATOR'S real
+    # /etc/passwd. That is the behaviour the `cat` allowlist exists to
+    # prevent, through a different door. The lab now refuses a non-http
+    # scheme, and what the probe must still see is the internal-only
+    # response - the metadata fixture - because that is what an SSRF proof
+    # rests on.
+    check("ssrf probe is refused the file scheme",
+          not any(h["marker"] for h in out["results"]
+                  if h["name"].startswith("file")))
+    check("ssrf probe sees an internal-only response",
           any(h["marker"] for h in out["results"]
-              if h["name"].startswith("file")))
+              if "metadata" in h["name"] or "aws" in h["name"]
+              or "169.254" in str(h.get("payload", ""))))
     out = probes.probe_xxe(ctx, base + "/xml")
     check("xxe probe resolves entity", "xxe candidate" in out["verdict"])
     out = probes.probe_csrf(ctx, base + "/login")
@@ -288,9 +304,27 @@ def main() -> int:
           any(h["op"] == "urlencoded[$ne]" and h["differs"]
               for h in out["results"]))
     out = probes.probe_upload(ctx, base + "/upload")
-    check("upload probe serves active file", "upload candidate" in out["verdict"])
+    check("upload probe serves active file",
+          "unrestricted upload" in out["verdict"])
+    client.send("GET", base + "/redeem/reset", tool="http_request",
+                note="reset the coupon")  # shared process state
     out = probes.probe_race(ctx, base + "/redeem", n=8)
-    check("race probe multi-redeems", "race candidate" in out["verdict"])
+    # Concurrency is the one thing here that depends on wall clock, and a
+    # loaded runner serialises the burst - all three Windows CI jobs failed
+    # this way once. The probe reports which happened, so check that it
+    # reported honestly rather than that the machine cooperated.
+    if out["verdict"].startswith("race:"):
+        check("race probe multi-redeems", out["overlapped"] is True)
+        check("race probe records the serial refusal",
+              bool(out["serial_statuses"])
+              and all(s >= 400 for s in out["serial_statuses"]))
+    else:
+        check("race probe says so when it saw no race",
+              "inconclusive" in out["verdict"]
+              or "no race window" in out["verdict"]
+              or "repeatable" in out["verdict"], out["verdict"][:90])
+        check("race probe reports the burst timing either way",
+              isinstance(out.get("burst_seconds"), (int, float)))
     out = probes.probe_race(ctx, base + "/hello", n=6)
     check("race probe rejects repeatable", "repeatable" in out["verdict"])
     out = probes.probe_deserialize(ctx, base + "/import?data=x", "data")
@@ -311,10 +345,12 @@ def main() -> int:
           "constructor.prototype" in out["verdict"])
     out = probes.probe_smuggle(ctx, base + "/desync")
     check("smuggle probe sees cl.te desync",
-          "cl.te desync candidate" in out["verdict"])
+          "cl.te desync" in out["verdict"]
+          and bool(out.get("ambiguous_id")) and bool(out.get("check_id")))
     out = probes.probe_smuggle(ctx, base + "/desync-cl")
     check("smuggle probe sees te.cl desync",
-          "te.cl desync candidate" in out["verdict"])
+          "te.cl desync" in out["verdict"]
+          and bool(out.get("ambiguous_id")) and bool(out.get("check_id")))
     out = probes.probe_smuggle(ctx, base + "/desync-obf")
     check("smuggle probe sees obfuscated-te desync",
           "obfuscated TE" in out["verdict"])
@@ -323,12 +359,20 @@ def main() -> int:
           "no desync signal" in out["verdict"])
     out = probes.probe_crlf(ctx, base + "/redirect?next=/", "next")
     check("crlf probe injects header",
-          "crlf injection candidate" in out["verdict"])
+          out["injected_header"] and "crlf injection" in out["verdict"])
+    check("crlf probe cites a control for the comparison",
+          bool(out.get("control_id")))
     out = probes.probe_disclosure(ctx, base)
     check("disclosure probe finds exposed paths",
           {h["path"] for h in out["exposed"]} >= {"/.git/HEAD", "/.env", "/debug"})
     out = probes.probe_websocket(ctx, base + "/ws")
-    check("websocket probe confirms upgrade", "confirmed" in out["verdict"])
+    check("websocket probe completes the cross-origin handshake",
+          out["accept_ok"] and bool(out["handshake_id"]))
+    check("websocket probe gets a frame back carrying its nonce",
+          out["answered"] and out["canary"] in out["reply"])
+    out = probes.probe_websocket(ctx, base + "/ws-strict")
+    check("websocket probe is refused where Origin is checked",
+          not out["accept_ok"] and out["status"] == 403)
     out = probes.probe_method(ctx, base + "/")
     check("method probe sees TRACE echo",
           out.get("trace_attempt", {}).get("echoes") is True)
@@ -547,12 +591,312 @@ def main() -> int:
     client.close()
     srv.shutdown()
 
+    # the doc gate appends its own results, so it must run BEFORE the print
+    # loop. It used to run after, which meant a documentation failure was
+    # counted but never printed: the gate reported 130/131 and said nothing
+    # about which check failed, in the one subsystem whose entire claim is
+    # that it names what is wrong.
+    _doc_consistency()
+    _doc_selftest_count()
+
     print("\n=== argus selftest ===")
     for status, line in results:
         print(f"[{status}] {line}")
+
     failed = [r for r in results if r[0] == FAIL]
     print(f"\n{len(results) - len(failed)}/{len(results)} passed")
     return 1 if failed else 0
+
+
+def _doc_selftest_count() -> None:
+    """The selftest count the docs state, checked against this run.
+
+    It has to be the LAST check: at that moment `len(results)` is one short of
+    the final tally, so `+1` is exact rather than a guess about how many
+    checks are still to come. An earlier draft guessed, and was right by
+    accident.
+    """
+    import re as _re
+    joined = ""
+    for name in ("CHANGELOG.md", "README.md", "AGENTS.md", "docs/USAGE.md",
+                 "docs/ARCHITECTURE.md"):
+        fp = ROOT / name
+        if fp.is_file():
+            joined += fp.read_text(encoding="utf-8")
+    stated = {int(n) for n in _re.findall(r"(\d+) offline checks", joined)}
+    total = len(results) + 1
+    check(f"doc selftest count matches this run ({total})",
+          bool(stated) and stated == {total},
+          f"docs state {sorted(stated) or 'NO COUNT AT ALL'}, this run has "
+          f"{total}")
+
+
+# --- documentation names only things that exist ---------------------------
+#
+# This project's claim is that it does not invent endpoints, versions or
+# numbers. A README naming a removed command, or a count that drifted when a
+# tool was added, is the same defect in the documentation - and it is the one
+# a reader checks first. So the docs are verified against the code, not
+# proof-read.
+
+# Nine files was 9 of the 40 tracked markdown files. The skills and the role
+# cards are read by the MODEL at runtime, so a stale tool name in one of them
+# is worse than a stale one in the README - it goes straight into a prompt.
+_DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
+              "docs/ARCHITECTURE.md", "docs/USAGE.md", "docs/EXPERIMENTS.md",
+              "lab/README.md", "argus/skills/INDEX.md",
+              "argus/resources/exploits/README.md",
+              "argus/resources/wordlists/README.md",
+              "argus/team/roles/lead.md", "argus/team/roles/recon.md",
+              "argus/team/roles/exploit.md", "argus/team/roles/report.md",
+              ".env.example")
+
+# words that look like a tool name but are not one
+_NOT_TOOLS = {
+    "probe_", "probe_x", "probe_name", "record_exchange", "record_event",
+    "add_finding", "load_config", "render_report", "verify_transcript",
+    "findings_bad", "findings_overgraded", "seal_artifacts", "make_server",
+    "serve_forever", "proof_marker", "input_schema", "tool_manifest",
+    "build_system", "build_seed", "sanitized_findings", "time_to_first",
+    # module and field names that share a prefix with a tool family:
+    # `mcp_tools` is the module behind mcp_list/mcp_call, and `request_id(s)`
+    # is the transcript field every probe returns
+    "mcp_tools", "request_id", "request_ids", "request_text",
+    "proof_requirement", "proof_checks", "proof_notes",
+    # transcript ids that survive history compaction - `run_id` shares the
+    # `run_*` family with run_external/run_exploit and is not a tool
+    "run_id", "call_id",
+}
+
+
+def _doc_consistency() -> None:
+    import re as _re
+    from argus.tools.registry import TOOL_SCHEMAS
+    from argus.mcpserver import tool_manifest
+    from argus import proof
+
+    texts = {}
+    for name in _DOC_FILES:
+        fp = ROOT / name
+        if fp.is_file():
+            texts[name] = fp.read_text(encoding="utf-8")
+    # every methodology module as well: load_skill puts these in front of the
+    # model, so a tool it names has to exist
+    for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
+        texts[f"argus/skills/{fp.name}"] = fp.read_text(encoding="utf-8")
+    absent = sorted(n for n in _DOC_FILES if n not in texts)
+    check(f"doc set is present ({len(_DOC_FILES)} named + "
+          f"{len(texts) - len(_DOC_FILES) + len(absent)} skills)",
+          not absent, f"missing {absent}")
+
+    tool_names = {t["name"] for t in TOOL_SCHEMAS}
+
+    # 1. every tool-shaped identifier in the docs is a registered tool.
+    #    The names come from TOOL_SCHEMAS, not from a hand-written regex: the
+    #    first version listed 43 of the 55 by hand, so a doc naming one of the
+    #    other 12 was never checked at all.
+    families = sorted({n.split("_", 1)[0] for n in tool_names if "_" in n}
+                      | {n for n in tool_names if "_" not in n})
+    ident_re = _re.compile(
+        r"\b((?:" + "|".join(_re.escape(f) for f in families)
+        + r")_[a-z0-9_]+)\b")
+    unknown = {}
+    for name, text in texts.items():
+        for ident in set(ident_re.findall(text)):
+            if ident not in tool_names and ident not in _NOT_TOOLS:
+                unknown.setdefault(name, set()).add(ident)
+    check(f"docs name only registered tools ({len(tool_names)})", not unknown,
+          "; ".join(f"{k}: {sorted(v)}" for k, v in unknown.items()))
+
+    # 2. every `argus <subcommand>` in the docs is a real subcommand
+    # the add_parser calls wrap across lines, so read the file whole
+    cli_src = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+    real = set(_re.findall(r'sub\.add_parser\(\s*\n?\s*"([a-z-]+)"', cli_src))
+    # only COMMAND-shaped mentions: `python -m argus <cmd>` or `argus <cmd>`
+    # inside backticks. Prose like "argus as the server" is not a claim about
+    # a subcommand, and treating it as one made this check cry wolf.
+    named = set()
+    for text in texts.values():
+        named |= set(_re.findall(r"python -m argus ([a-z][a-z-]+)", text))
+        named |= set(_re.findall(r"`argus ([a-z][a-z-]+)", text))
+        # inside a fenced shell block the command often has no backticks and
+        # no `python -m` prefix, which is where most examples live
+        for block in _re.findall(r"```(?:bash|sh|console)?\n(.*?)```", text,
+                                 _re.S):
+            named |= set(_re.findall(r"(?m)^\s*(?:\$\s*)?argus\s+([a-z][a-z-]+)",
+                                     block))
+    bogus = sorted(n for n in named if n not in real)
+    check(f"docs name only real subcommands ({len(real)})", not bogus,
+          f"{bogus} not in {sorted(real)}")
+
+    # 3. counts claimed in prose match the code
+    joined = "\n".join(texts.values())
+    claims = [
+        ("tool", len(tool_names), _re.findall(r"(\d+)[- ]tools?\b", joined)
+         + _re.findall(r"\b(\d+) of the (?:\d+) tools", joined)),
+        ("class", len(proof.classes()),
+         _re.findall(r"(\d+) (?:proof-matrix )?classes", joined)),
+        ("skill", len(list((ROOT / "argus" / "skills").glob("*.md"))) - 1,
+         _re.findall(r"(\d+) (?:loadable )?(?:methodology |knowledge )?modules",
+                     joined)),
+    ]
+    served = len(tool_manifest())
+    for label, actual, found in claims:
+        nums = {int(n) for n in found}
+        # `46 of the 56 tools` contributes both numbers legitimately
+        allowed = {actual, served} if label == "tool" else {actual}
+        wrong = sorted(nums - allowed)
+        # A regex that stops matching would make this check pass forever on
+        # nothing. If the docs no longer state the count anywhere, that is
+        # itself the failure - say so rather than reporting success.
+        check(f"doc {label} counts match the code ({actual})",
+              bool(nums) and not wrong,
+              f"docs state {sorted(nums) or 'NO COUNT AT ALL'}, "
+              f"code has {sorted(allowed)}"
+              + (f" - wrong: {wrong}" if wrong else ""))
+
+    # 3b. every `--flag` the docs name is one a parser accepts. It checked no
+    #     flags at all, so a doc naming `--max-depth` or `--target` passed.
+    cli_src_all = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+    cfg_src = (ROOT / "argus" / "config.py").read_text(encoding="utf-8")
+    real_flags = set(_re.findall(r'add_argument\(\s*"(--[a-z0-9-]+)"',
+                                 cli_src_all + cfg_src))
+    real_flags |= {"--help", "--version", "--json", "--csv", "--team",
+                   "--quiet"}
+    # A flag named on the same LINE as one of the external tools argus drives
+    # belongs to that tool, not to argus. Self-maintaining: the allowlist was a
+    # hand-written set, and `--alert` (sqlmap's) was already outside it.
+    from argus.tools.analysis import _ALLOWED_TOOLS
+    doc_flags, foreign = set(), set()
+    flag_re = _re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]{2,})")
+    for name, text in texts.items():
+        for line in text.splitlines():
+            found = set(flag_re.findall(line))
+            if not found:
+                continue
+            if any(t in line for t in _ALLOWED_TOOLS) \
+                    or "docker" in line or "pip " in line:
+                foreign |= found
+            else:
+                doc_flags |= found
+    invented = sorted(doc_flags - real_flags - foreign)
+    check(f"docs name only real flags ({len(real_flags)})", not invented,
+          f"{invented} accepted by no parser")
+
+    # 3c. the test and selftest counts the docs state. I corrected both by
+    #     hand six times in one session, which is exactly the kind of number
+    #     that rots - so it is checked against a collection run, not trusted.
+    import subprocess
+    stated_tests = {int(n) for n in
+                    _re.findall(r"pytest tests/ -q`?: (\d+) tests", joined)}
+    if stated_tests:
+        try:
+            proc = subprocess.run(
+                [sys.executable, "-m", "pytest", "tests/", "--collect-only",
+                 "-q"], cwd=str(ROOT), capture_output=True, text=True,
+                timeout=180)
+            m = _re.search(r"(\d+) tests? collected", proc.stdout)
+            actual = int(m.group(1)) if m else 0
+        except (OSError, subprocess.SubprocessError):
+            actual = 0
+        check(f"doc pytest count matches collection ({actual})",
+              actual > 0 and stated_tests == {actual},
+              f"docs state {sorted(stated_tests)}, collection finds {actual}"
+              if actual else "could not collect; skipped")
+    # 4. every ARGUS_* environment variable the docs name is one the code
+    #    reads. Writing a plausible-looking opt-in flag into a README is the
+    #    same defect as naming a removed command, and I made exactly that
+    #    mistake while fixing the others.
+    code = ""
+    for src in (ROOT / "argus").rglob("*.py"):
+        code += src.read_text(encoding="utf-8")
+    # A variable named in `models.json` under `api_key_env` is read for real:
+    # `models.Model.credential()` walks that list through os.environ. Grepping
+    # only the .py files called ARGUS_LOCAL_API_KEY invented when it is the
+    # one thing a local server needs set.
+    for data in (ROOT / "argus").rglob("*.json"):
+        code += data.read_text(encoding="utf-8", errors="replace")
+    real_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", code))
+    doc_env = set(_re.findall(r"ARGUS_[A-Z0-9_]+", joined))
+    invented = sorted(doc_env - real_env)
+    check(f"docs name only real ARGUS_* variables ({len(real_env)})",
+          not invented, f"{invented} not read anywhere in argus/")
+
+    # 4b. the residuals section states how many classes are capped for want
+    #     of a verifier. That number lived only in prose and drifted from the
+    #     matrix twice while classes came off the list, in both ARCHITECTURE
+    #     and CHANGELOG, so `cap_reason` makes it derivable and this check
+    #     holds the sentence to it.
+    # "no"/"none" so the docs can state a count of ZERO explicitly rather
+    # than by saying nothing - a deleted sentence must not read as agreement
+    _WORDS = {"no": 0, "none": 0,
+              "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
+              "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
+    unimplemented = sorted(
+        spec.vuln_class
+        for spec in {s.vuln_class: s for s in proof.MATRIX.values()}.values()
+        if spec.cap_reason == proof.CAP_UNIMPLEMENTED)
+    stated = set()
+    for text in texts.values():
+        for word in _re.findall(
+                r"(?i)\*\*([A-Za-z]+) class(?:es)? (?:are|is) capped at "
+                r"`candidate`", text):
+            if word.lower() in _WORDS:
+                stated.add(_WORDS[word.lower()])
+            elif word.isdigit():
+                stated.add(int(word))
+    check(f"docs state the capped count correctly ({len(unimplemented)}: "
+          f"{', '.join(unimplemented)})",
+          bool(stated) and stated == {len(unimplemented)},
+          f"docs say {sorted(stated) or 'nothing'}, the matrix caps "
+          f"{len(unimplemented)} for want of a verifier")
+    # Which names in that paragraph are the capped ones cannot be read out of
+    # prose - it also names the classes that CAME OFF the list, in the same
+    # sentence. What is unambiguous, and is the risk worth covering, is the
+    # other direction: a cap added to the matrix and never written down.
+    capped_doc = "\n".join(texts.values())
+    undocumented = sorted(k for k in unimplemented
+                          if f"`{k}`" not in capped_doc)
+    check("every capped class is named somewhere in the docs",
+          not undocumented,
+          f"{undocumented} capped for want of a verifier and named in no doc")
+    # and the real-reason caps, which are a different promise to the reader
+    real = sorted(spec.vuln_class
+                  for spec in {s.vuln_class: s
+                               for s in proof.MATRIX.values()}.values()
+                  if spec.ceiling and spec.cap_reason != proof.CAP_UNIMPLEMENTED)
+    missing_real = sorted(k for k in real if f"`{k}`" not in capped_doc)
+    check(f"every real-reason cap is named too ({', '.join(real)})",
+          not missing_real, f"{missing_real} capped and named in no doc")
+    # This sentence IS parseable, unlike the other paragraph: the backticked
+    # names come immediately before the claim. It listed `ppoll` as capped for
+    # a real reason when ppoll is not capped at all.
+    claimed_real = set()
+    for text in texts.values():
+        for head in _re.findall(
+                r"(?i)\*\*((?:`[a-z]{3,12}`[^*]{0,40}){1,5})are capped for a "
+                r"real reason", text):
+            claimed_real |= set(_re.findall(r"`([a-z]{3,12})`", head))
+    not_capped = sorted(n for n in claimed_real
+                        if proof.spec_for(n) is not None
+                        and not proof.spec_for(n).ceiling)
+    check("the real-reason sentence names only capped classes",
+          not not_capped,
+          f"{not_capped} claimed capped for a real reason, but the matrix "
+          f"does not cap them at all")
+
+    # 5. every proof class named in a doc exists, and every class the docs
+    #    claim is refused really is
+    classes = set(proof.classes())
+    named_classes = set(_re.findall(r"argus proof ([a-z-]+)", joined))
+    missing = sorted(c for c in named_classes
+                     if c and proof.spec_for(c) is None)
+    check("docs name only real proof classes", not missing, f"{missing}")
+    check("the matrix still refuses dos",
+          proof.spec_for("dos") is not None
+          and proof.spec_for("dos").verifier is proof.verify_refused)
+    check("every proof class has a requirement sentence",
+          all(proof.requirement_of(c) for c in classes))
 
 
 def _ok(fn) -> bool:

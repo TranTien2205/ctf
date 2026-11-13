@@ -23,7 +23,8 @@ argus = "argus.cli:main"
 include = ["argus*"]
 
 [tool.setuptools.package-data]
-argus = ["skills/*.md", "team/roles/*.md",
+argus = ["models.json",
+         "skills/*.md", "team/roles/*.md",
          "resources/wordlists/*.txt",
          "resources/exploits/*/manifest.json",
          "resources/exploits/*/*.py"]

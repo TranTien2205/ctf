@@ -21,8 +21,15 @@ Baseline `1`, then `1'` (syntax probe), then a matched pair on the SAME input:
 
 ## Extraction order (only after confirming)
 
+`argus proof sqli` is the requirement: the engine named PLUS at least one row
+from a named table. An error message is the channel, not the data - a finding
+quoting only `sqlite3.OperationalError` grades `candidate`, and the missing
+checks are printed back to you. Five rows is a proof; a full dump is an
+incident.
+
 1. Fingerprint DBMS once: MySQL `@@version`, Postgres `version()`, MSSQL
-   `@@version`, Oracle `v$version`.
+   `@@version`, Oracle `v$version`. Cite this exchange alongside the dump -
+   the grading reads both.
 2. UNION: find column count with `ORDER BY N` (raise N until error) -
    `probe_sqli(url, param, union_cols=10)` automates this in the context
    (quoted/numeric) that matched - then
@@ -30,6 +37,12 @@ Baseline `1`, then `1'` (syntax probe), then a matched pair on the SAME input:
 3. information_schema: `table_name` from `information_schema.tables`, then
    `column_name` from `information_schema.columns where table_name='x'`.
 4. Blind: binary-search character codes (~7 requests/char), not linear scan.
+
+Shortcut once the context and column count are known:
+`probe_sqli(url, param, union_cols=8, extract_table="users",
+extract_columns="username,password")` composes the UNION in the context it
+measured and applies the LIMIT itself. Quote one row from its response, cite
+it together with the fingerprint request, and the class is proven.
 
 ## Auth bypass quick set (login forms only)
 

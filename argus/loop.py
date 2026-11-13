@@ -13,7 +13,7 @@ from pathlib import Path
 
 from .config import Config
 from .httpclient import GuardedClient
-from .llm import ClaudeClient
+from .llm import make_client
 from .scope import ScopeGuard
 from .session import Session
 from .system import build_seed, build_system
@@ -109,8 +109,11 @@ class AgentLoop:
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
             "tls_verify": cfg.tls_verify,
             "tools": sorted(allowed) if allowed else "all",
+            "require_proof": cfg.require_proof,
+            "chain_keyed": bool(cfg.seal_key),
         }, resume=Path(cfg.resume) if cfg.resume else None,
-            secrets=cfg.secret_values)
+            secrets=cfg.secret_values, require_proof=cfg.require_proof,
+            seal_key=cfg.seal_key)
         skills_dir = Path(__file__).parent / "skills"
         if client is None:
             from .ratelimit import RateLimiter
@@ -136,9 +139,7 @@ class AgentLoop:
             board=board, mcp=mcp, agent_name=agent_name, role=role,
             allowed=frozenset(allowed) if allowed else None,
         )
-        self.llm = llm or ClaudeClient(cfg.api_key, cfg.api_base, cfg.model,
-                                       max_tokens=cfg.llm_max_tokens,
-                                       auth_token=cfg.auth_token)
+        self.llm = llm or make_client(cfg)
         self.system = system or build_system(cfg, self.scope)
         self.seed = seed or build_seed(cfg)
         if getattr(self.session, "resumed", False) and seed is None \
@@ -333,7 +334,8 @@ class AgentLoop:
                     extra={"mode": "team" if self.ctx.board is not None
                            else "single",
                            "llm_calls": self.llm.calls,
-                           "llm_tokens": self._token_stats()}))
+                           "llm_tokens": self._token_stats(),
+                           "llm_cost": self._cost_stats()}))
             except Exception as exc:
                 # a render failure must not swallow the run result or the
                 # seal below - the transcript is still intact evidence
@@ -352,10 +354,37 @@ class AgentLoop:
             "requests": self.session._seq,
             "findings": len(self.session.findings),
             "report": report_path,
+            "model": self.cfg.model,
             "llm_calls": self.llm.calls,
             "llm_tokens": self._token_stats(),
+            "llm_cost": self._cost_stats(),
             "summary": self.ctx.finish_summary,
             "error": self._last_error or None,
+        }
+
+    def _cost_stats(self) -> dict:
+        """USD for the tokens this run spent, or why there is no number.
+
+        A cost that cannot be traced to a price someone can check is a made-up
+        number, so an unlisted model reports `usd: null` and says so rather
+        than guessing a rate. The table version travels with the figure
+        because prices move and a stale rate is a wrong report.
+        """
+        from . import models as models_mod
+        tokens = self._token_stats()
+        spec = models_mod.get(self.cfg.model)
+        if spec is None:
+            return {"usd": None, "model": self.cfg.model,
+                    "table_version": models_mod.table_version(),
+                    "basis": "model is not in models.json; no price to apply"}
+        return {
+            "usd": spec.cost(tokens["in"], tokens["out"],
+                             cache_read=tokens["cache_read"]),
+            "model": self.cfg.model,
+            "table_version": models_mod.table_version(),
+            "usd_per_mtok_in": spec.usd_per_mtok_in,
+            "usd_per_mtok_out": spec.usd_per_mtok_out,
+            "basis": "cache reads billed at 10% of input, per models.json",
         }
 
     def _token_stats(self) -> dict:

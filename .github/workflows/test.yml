@@ -19,10 +19,74 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e ".[dev]"
+      - name: versions
+        shell: bash
+        run: |
+          python -VV
+          python -c "import pytest, httpx; print('pytest', pytest.__version__, 'httpx', httpx.__version__)"
+      # A failing matrix job used to report only "exit code 1": the log needs
+      # admin rights to download, so whoever is debugging from outside the
+      # repo cannot see which test failed. The tail goes into the job summary,
+      # which is public, so the failure is visible wherever the run is.
       - name: pytest
-        run: python -m pytest tests/ -q
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest tests/ -q -rf --tb=short 2>&1 | tee pytest.out
+      # The job summary turned out to be invisible from outside: the Actions
+      # check-run exposes `output.summary` as null. Annotations ARE public, so
+      # the failure travels as one - head AND tail, because a collection error
+      # prints at the start and a test failure at the end.
+      - name: pytest failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          {
+            echo "### pytest failed on ${{ matrix.os }} / py${{ matrix.python }}"
+            echo '```'
+            tail -n 120 pytest.out || echo "(no output captured)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import pathlib
+          try:
+              lines = pathlib.Path("pytest.out").read_text(
+                  encoding="utf-8", errors="replace").splitlines()
+          except OSError:
+              lines = ["(no pytest.out)"]
+          keep = lines[:25] + (["..."] if len(lines) > 55 else []) + lines[-30:]
+          msg = "%0A".join(l.replace("%", "%25").replace("\r", "")
+                           for l in keep)
+          print(f"::error title=pytest::{msg}")
+          PY
       - name: selftest
-        run: python selftest.py
+        id: selftest
+        shell: bash
+        run: |
+          set -o pipefail
+          python selftest.py 2>&1 | tee selftest.out
+      # `if: failure()` fired when PYTEST was the failing step, so the run
+      # carried a second annotation reading `selftest: (no selftest.out)` -
+      # a failure report for a step that never ran, next to the real one.
+      - name: selftest failure annotation
+        if: always() && steps.selftest.conclusion == 'failure'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import pathlib
+          import re
+          try:
+              text = pathlib.Path("selftest.out").read_text(
+                  encoding="utf-8", errors="replace")
+          except OSError:
+              text = "(no selftest.out)"
+          bad = [l for l in text.splitlines()
+                 if re.search(r"FAIL|Traceback|Error", l)]
+          keep = (bad or text.splitlines())[-30:]
+          msg = "%0A".join(l.replace("%", "%25").replace("\r", "")
+                           for l in keep)
+          print(f"::error title=selftest::{msg}")
+          PY
 
   wheel:
     # packaging regressions are invisible to tests run from the repo tree -
@@ -41,6 +105,7 @@ jobs:
           names = zipfile.ZipFile(glob.glob("dist/*.whl")[0]).namelist()
           for need in ("argus/skills/sqli.md", "argus/team/roles/lead.md",
                        "argus/lab/vulnapp.py",
+                       "argus/models.json",
                        "argus/resources/wordlists/dirs-small.txt",
                        "argus/resources/exploits/lab-jwt-forge/manifest.json"):
               assert need in names, f"wheel missing {need}"
@@ -50,6 +115,7 @@ jobs:
         run: |
           pip install dist/*.whl
           argus skills | grep -q sqli   # bundled data resolvable post-install
+          argus models --json | python -c "import json,sys; d=json.load(sys.stdin); assert d['models'], 'model table empty after install'"
           argus sessions --session-dir /tmp/none --json | grep -q '\[\]'
           # demo must run from site-packages too - it once sys.path'ed to
           # the repo-only lab/ dir and died ModuleNotFoundError on wheels

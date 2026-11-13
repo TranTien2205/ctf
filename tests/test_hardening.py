@@ -282,3 +282,40 @@ def test_atomic_write_cleans_temp_on_failure(tmp_path):
     with pytest.raises(OSError):
         _atomic_write(target, "[]")
     assert not list(tmp_path.glob("*.tmp-*")), "temp file left behind"
+
+def test_no_test_hard_codes_an_absolute_path_to_this_checkout():
+    """A test that names an absolute path passes on one machine only.
+
+    `tests/test_windows.py` hard-coded the author's own checkout, so it was
+    green locally and red on all six CI runners with a FileNotFoundError
+    naming that path - and it could not be reproduced in a clean clone on the
+    same machine, because the path still existed there.
+    """
+    import pathlib
+    import re
+    root = pathlib.Path(__file__).resolve().parent.parent
+    bad = re.compile(r"""['"](/(?:home|Users|root|mnt|media)/[^'"\n]+)['"]""")
+    # this package's own files - not the vendored CTF challenges that share
+    # the checkout, and not a site-packages tree somebody's venv put here
+    targets = [root / "selftest.py"]
+    for folder in ("argus", "tests", "lab", "test"):
+        targets += sorted((root / folder).glob("**/*.py"))
+    offenders = []
+    for path in targets:
+        if not path.exists() or any(
+                part in (".git", "__pycache__", "build", "dist", ".venv",
+                         "site-packages")
+                for part in path.parts):
+            continue
+        for n, line in enumerate(
+                path.read_text(encoding="utf-8", errors="replace").splitlines(),
+                1):
+            if line.lstrip().startswith("#"):
+                continue
+            hit = bad.search(line)
+            if hit:
+                offenders.append(
+                    f"{path.relative_to(root)}:{n}: {hit.group(1)}")
+    assert not offenders, (
+        "absolute paths into somebody's home directory:\n  "
+        + "\n  ".join(offenders))

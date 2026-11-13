@@ -18,7 +18,9 @@ from pathlib import Path
 
 from ..config import Config
 from ..httpclient import GuardedClient
-from ..llm import ClaudeClient
+from dataclasses import replace
+
+from ..llm import make_client
 from ..loop import AgentLoop
 from ..ratelimit import RateLimiter
 from ..scope import ScopeGuard
@@ -63,9 +65,12 @@ class TeamRun:
             "mode": "team", "scope": cfg.scope_hosts,
             "max_turns": cfg.max_turns, "max_requests": cfg.max_requests,
             "rate_rps": cfg.rate_rps, "exclude_paths": cfg.exclude_paths,
-            "proxy": bool(cfg.proxy), "tls_verify": cfg.tls_verify},
+            "proxy": bool(cfg.proxy), "tls_verify": cfg.tls_verify,
+            "require_proof": cfg.require_proof,
+            "chain_keyed": bool(cfg.seal_key)},
             resume=Path(cfg.resume) if cfg.resume else None,
-            secrets=cfg.secret_values)
+            secrets=cfg.secret_values, require_proof=cfg.require_proof,
+            seal_key=cfg.seal_key)
         self.rate = RateLimiter(cfg.rate_rps)
         from ..mcp import MCPManager, discover_config_path
         self.mcp = MCPManager(discover_config_path(cfg.mcp_config))
@@ -97,10 +102,86 @@ class TeamRun:
                 f"do not re-verify:\n{prior}")
 
     # ------------------------------------------------------------- llm
+    # A team role maps onto a job in the model table. The four cards want
+    # different things: the lead holds the plan, recon makes many cheap calls
+    # over a wide surface, exploit holds one long chain of reasoning about one
+    # target, and the writer turns recorded findings into prose.
+    TABLE_ROLE = {"lead": "planner", "recon": "breadth",
+                  "exploit": "depth", "report": "writer"}
+
+    def model_for(self, role: str) -> str:
+        """The model this role runs on, and why it is that one.
+
+        Off by default. Silently running four agents on four models would
+        make a run harder to explain than it is worth, and an operator with
+        one credential would watch three of them fail. With `--role-models`
+        the table picks, and a pick whose credential is not set falls back to
+        the run's own model rather than failing the agent.
+        """
+        if not getattr(self.cfg, "role_models", False):
+            return self.cfg.model
+        from .. import models as models_mod
+        table_role = self.TABLE_ROLE.get(role, "")
+        if not table_role:
+            return self.cfg.model
+        pick = models_mod.for_role(
+            table_role, str(getattr(self.cfg, "policy", "") or "cheap"))
+        if pick is None:
+            return self.cfg.model
+        if pick.provider != "anthropic" and not pick.credential():
+            # naming the variable beats a role that dies on its first call
+            print(f"[argus] {role}: the table picks {pick.key} for "
+                  f"{table_role}, but none of "
+                  f"{', '.join(pick.api_key_env) or '(no variable named)'} "
+                  f"is set - falling back to {self.cfg.model}",
+                  file=sys.stderr)
+            return self.cfg.model
+        return pick.key
+
+    def _cost_breakdown(self) -> dict:
+        """USD per agent and in total, each line naming the model it used.
+
+        A team run can span providers, so one rate cannot describe it. An
+        agent whose model is not in the table contributes no number and says
+        so, rather than contributing a zero that reads as free.
+        """
+        from .. import models as models_mod
+        per_agent, total, unpriced = {}, 0.0, []
+        for name, res in self._results.items():
+            if not isinstance(res, dict):
+                continue
+            tok = res.get("llm_tokens") if isinstance(
+                res.get("llm_tokens"), dict) else {}
+            # a crashed worker has no result dict to name its model, so fall
+            # back to what the role WOULD have used rather than to the team's
+            model = str(res.get("model") or "")
+            if not model:
+                role = name.rsplit("-", 1)[0] if "-" in name else name
+                model = self.model_for(role)
+            spec = models_mod.get(model)
+            if spec is None:
+                unpriced.append(f"{name} ({model})")
+                per_agent[name] = {"model": model, "usd": None}
+                continue
+            usd = spec.cost(tok.get("in", 0), tok.get("out", 0),
+                            cache_read=tok.get("cache_read", 0))
+            total += usd
+            per_agent[name] = {"model": model, "usd": usd}
+        out = {"usd": round(total, 6), "per_agent": per_agent,
+               "table_version": models_mod.table_version(),
+               "basis": "cache reads billed at 10% of input, per models.json"}
+        if unpriced:
+            out["unpriced"] = unpriced
+            out["basis"] += (f"; {len(unpriced)} agent(s) ran a model with no "
+                             "line in models.json and contribute no number")
+        return out
+
     def _default_llm(self, role: str, name: str):
-        return ClaudeClient(self.cfg.api_key, self.cfg.api_base, self.cfg.model,
-                            max_tokens=self.cfg.llm_max_tokens,
-                            auth_token=self.cfg.auth_token)
+        model = self.model_for(role)
+        if model == self.cfg.model:
+            return make_client(self.cfg)
+        # one field differs; everything else about the run is unchanged
+        return make_client(replace(self.cfg, model=model))
 
     # ------------------------------------------------------------- spawn
     def _spawn_guarded(self, role: str, task: str) -> dict:
@@ -136,8 +217,13 @@ class TeamRun:
     def _start_worker(self, name: str, card, task: str) -> None:
         self.board.register(name, card.name, task)
         import dataclasses
+        # `model` goes in too, or the loop reports the TEAM's model while its
+        # client talks to the role's one - which priced every worker at the
+        # wrong rate in `summary.json`, defeating the whole point of
+        # --role-models. The cfg a loop holds must name the model it uses.
         wcfg = dataclasses.replace(
             self.cfg,
+            model=self.model_for(card.name),
             max_turns=card.turns or self.cfg.max_turns,
             max_requests=card.requests or self.cfg.max_requests)
         system = build_system(wcfg, self.scope) + "\n\n" + card.prompt()
@@ -185,7 +271,8 @@ class TeamRun:
                   "it technically for every worker's requests too.")
         seed += self._resume_note()
         loop = AgentLoop(
-            self.cfg, llm=self._llm_factory("lead", name),
+            replace(self.cfg, model=self.model_for("lead")),
+            llm=self._llm_factory("lead", name),
             quiet=self.quiet, scope=self.scope, session=self.session,
             client=self._mk_client(name), board=self.board, mcp=self.mcp,
             agent_name=name, role="lead", allowed=LEAD.tools, system=system,
@@ -285,6 +372,7 @@ class TeamRun:
         tokens = {"in": _sum_tokens("in"), "out": _sum_tokens("out"),
                   "cache_read": _sum_tokens("cache_read"),
                   "cache_write": _sum_tokens("cache_write")}
+        cost = self._cost_breakdown()
         calls = sum(r.get("llm_calls", 0)
                     if isinstance(r.get("llm_calls"), int) else 0
                     for r in self._results.values())
@@ -294,6 +382,7 @@ class TeamRun:
                 self.session, cfg, summary, extra={
                     "mode": "team", "agents": self.board.agents(),
                     "llm_calls": calls, "llm_tokens": tokens,
+                    "llm_cost": cost,
                 }))
         except Exception as exc:
             # render failure must not swallow the run result or the seal

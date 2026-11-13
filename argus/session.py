@@ -8,6 +8,7 @@ not trusted.
 from __future__ import annotations
 
 import hashlib
+import hmac as _hmac
 import json
 import re
 import sys
@@ -17,6 +18,7 @@ import urllib.parse
 from pathlib import Path
 
 from . import __version__
+from . import proof
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 _CVSS_RE = re.compile(
@@ -43,10 +45,25 @@ def _atomic_write(path: Path, text: str) -> None:
         tmp.unlink(missing_ok=True)   # a failed write leaves no litter
 
 
-def _chain(prev: str, entry: dict) -> str:
-    """Hash-chain link: sha256(prev_link + canonical entry). Makes silent
-    edits, insertions and mid-deletions in transcript.jsonl detectable."""
+def _chain(prev: str, entry: dict, key: str = "") -> str:
+    """Hash-chain link over the canonical entry.
+
+    Unkeyed (the default) this is sha256(prev + entry): it makes silent edits,
+    insertions and mid-deletions detectable, which is what "tamper-evident"
+    means and all it means. It does NOT resist forgery - anyone with this code
+    can build a self-consistent session from nothing, because the chain is
+    computable by anyone.
+
+    With a key it is HMAC-SHA256, and then only a holder of the key can
+    produce a chain that verifies. That is the difference between "this file
+    was not edited after the run" and "this run happened", and an engagement
+    whose report will be read by someone who did not watch it run wants the
+    second. `--seal-key` supplies one; it is never written to any artifact.
+    """
     payload = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+    if key:
+        return _hmac.new(key.encode("utf-8"), (prev + payload).encode("utf-8"),
+                         hashlib.sha256).hexdigest()
     return hashlib.sha256((prev + payload).encode("utf-8")).hexdigest()
 
 
@@ -112,7 +129,7 @@ def _redact_obj(obj, secrets: set[str]):
     return obj
 
 
-def verify_transcript(sdir: Path) -> dict:
+def verify_transcript(sdir: Path, seal_key: str = "") -> dict:
     """Recompute the hash chain over transcript.jsonl. Detects edited,
     inserted or mid-deleted entries, and tail truncation when
     summary.json still anchors the recorded chain head."""
@@ -149,12 +166,23 @@ def verify_transcript(sdir: Path) -> dict:
                 out["bad_lines"].append(i)
             continue  # legacy pre-chain prefix: excluded from verification
         out["chained"] = True
-        expect = _chain(prev, entry)
+        expect = _chain(prev, entry, seal_key)
         if expect != stored:
             out["bad_lines"].append(i)
         prev = stored
         out["entries"] += 1
         entries[entry.get("id", "")] = entry
+    # A keyed run cannot be verified without the key, and verifying it
+    # unkeyed would report every line as tampered - say which it is rather
+    # than producing a confident wrong answer.
+    mpath = Path(sdir) / "meta.json"
+    if mpath.is_file():
+        try:
+            meta = json.loads(mpath.read_text(encoding="utf-8"))
+        except (ValueError, OSError):
+            meta = None
+        if isinstance(meta, dict) and meta.get("chain_keyed") and not seal_key:
+            out["key_required"] = True
     # summary.json anchors the last link - if present, a tail-truncated
     # transcript no longer reaches the recorded head
     spath = Path(sdir) / "summary.json"
@@ -187,6 +215,9 @@ def verify_transcript(sdir: Path) -> dict:
         bad = findings_bad(entries, stored_findings)
         if bad:
             out["findings_bad"] = bad
+        inflated = findings_overgraded(entries, stored_findings)
+        if inflated:
+            out["findings_overgraded"] = inflated
     # a run sealed with artifacts_digest anchors every un-chained file:
     # meta.json, findings.json and summary.json (minus the mutable head/
     # duration fields). Any post-run edit surfaces as a digest mismatch.
@@ -227,6 +258,69 @@ def verify_transcript(sdir: Path) -> dict:
                 mismatched.append(name)
         if mismatched:
             out["artifact_mismatch"] = mismatched
+    return out
+
+
+def findings_overgraded(entries: dict, findings: list) -> list[dict]:
+    """Findings claiming a proof grade the cited evidence does not support.
+
+    `argus verify` already re-validates that every excerpt is verbatim bytes
+    from a chained exchange. That catches an invented finding and leaves the
+    next edit open: raise `"grade"` from candidate to proven in findings.json
+    and the claim gets stronger with no new evidence. The grade is recomputed
+    here from the chained entries, so the claim has to hold against the
+    transcript rather than against the file it is written in.
+
+    Only an INFLATED grade is reported. A stored grade weaker than the
+    recomputed one means the matrix grew more permissive since the run, which
+    is benign - failing a verify on that would make every requirement change
+    retroactively condemn old sessions.
+    """
+    out = []
+    entries = entries if isinstance(entries, dict) else {}
+    rows = [f for f in (findings or []) if isinstance(f, dict)]
+    # Does this file grade at all? If any row carries a grade, a row without
+    # one had it removed - deleting the grade AND the proof block together
+    # otherwise looked exactly like a session recorded before grading existed.
+    graded_file = any(str(f.get("grade") or "").strip() for f in rows)
+    for f in rows:
+        stored = str(f.get("grade") or "").strip().lower()
+        if not stored and graded_file:
+            out.append({"id": f.get("id", "?"), "claimed": "(removed)",
+                        "evidence_supports": "unknown",
+                        "missing": ["the grade is missing from a row in a "
+                                    "graded findings file"]})
+            continue
+        if not stored:
+            # no grade at all: recorded before grading existed, or by a tool
+            # that does not grade. Only flag it when the row carries a proof
+            # block, which means it WAS graded and the grade was removed.
+            if isinstance(f.get("proof"), dict) and f["proof"].get("checks"):
+                out.append({"id": f.get("id", "?"), "claimed": "(removed)",
+                            "evidence_supports": "unknown",
+                            "missing": ["the grade was deleted from a graded "
+                                        "finding"]})
+            continue
+        if stored not in _GRADE_RANK:
+            # `Proven`, `proven `, `PROVEN`, `prooven` - normalizing catches
+            # the first three, and anything still unrecognized is an edit, not
+            # a legacy row. Skipping it let a one-word change defeat the whole
+            # control.
+            out.append({"id": f.get("id", "?"), "claimed": str(f.get("grade")),
+                        "evidence_supports": "not a grade",
+                        "missing": [f"{f.get('grade')!r} is not one of "
+                                    f"{sorted(_GRADE_RANK)}"]})
+            continue
+        ids = f.get("evidence_ids")
+        cited = [entries.get(r) for r in ids if isinstance(r, str)] \
+            if isinstance(ids, list) else []
+        verdict = proof.grade(f.get("vuln_class") or f.get("category") or "",
+                              str(f.get("evidence_excerpt") or ""),
+                              [e for e in cited if isinstance(e, dict)])
+        if _GRADE_RANK.get(stored, 0) > _GRADE_RANK.get(verdict.grade, 0):
+            out.append({"id": f.get("id", "?"), "claimed": stored,
+                        "evidence_supports": verdict.grade,
+                        "missing": verdict.missing})
     return out
 
 
@@ -278,6 +372,9 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
     return "\n".join(p for p in parts if p)
 
 
+_GRADE_RANK = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
+
+
 def _finding_key(category: str, url: str) -> tuple:
     """Dedup key: same bug class on the same endpoint+params is one finding."""
     cat = re.sub(r"[^a-z0-9]", "", str(category or "").lower())
@@ -296,21 +393,29 @@ def _finding_key(category: str, url: str) -> tuple:
 # names maps to the canonical CWE automatically (normalized: strip
 # non-alphanumerics, so "info-disclosure" == "infodisclosure").
 _CWE = {
-    "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
+    # rce is the canonical class the matrix normalizes command injection to,
+    # and it was the one class with no mapping - so the project's headline
+    # finding carried no CWE and no OWASP row in the report.
+    "rce": "CWE-78", "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
     "time": "CWE-78", "cmdinjection": "CWE-78", "lfi": "CWE-22",
     "rfi": "CWE-98", "xss": "CWE-79", "reflection": "CWE-79",
     "idor": "CWE-639", "enum": "CWE-204", "enumeration": "CWE-204",
     "lockout": "CWE-307", "massassign": "CWE-915",
     "massassignment": "CWE-915", "ssrf": "CWE-918", "xxe": "CWE-611",
-    "csrf": "CWE-352", "xfh": "CWE-444", "upload": "CWE-434",
+    # CWE-444 is request smuggling; an X-Forwarded-Host ACL bypass is header
+    # neutralization, and the two are separate classes in the matrix now.
+    "csrf": "CWE-352", "xfh": "CWE-290", "hostheader": "CWE-290",
+    "upload": "CWE-434",
     "race": "CWE-362", "deserialize": "CWE-502",
-    "deserialization": "CWE-502", "cache": "CWE-525",
+    "deserialization": "CWE-502", "cache": "CWE-525", "massassign": "CWE-915",
+    "ppoll": "CWE-1321", "race": "CWE-362",
     "cachepoisoning": "CWE-525", "ppoll": "CWE-1321",
     "prototypepollution": "CWE-1321", "smuggle": "CWE-444",
     "requestsmuggling": "CWE-444", "disclosure": "CWE-200",
     "infodisclosure": "CWE-200", "websocket": "CWE-1385",
     "crlf": "CWE-113", "redirect": "CWE-601", "openredirect": "CWE-601",
     "cors": "CWE-942", "jwt": "CWE-347", "method": "CWE-749",
+    "graphql": "CWE-639", "dos": "CWE-400",
 }
 
 
@@ -348,6 +453,7 @@ _OWASP = {
     "CWE-502": "A08 Integrity Failures",
     "CWE-918": "A10 SSRF",
     "CWE-98": "A08 Integrity Failures",
+    "CWE-290": "A01 Broken Access Control",
 }
 
 
@@ -366,8 +472,25 @@ def sanitized_findings(rows) -> list[dict]:
         g = dict(f)
         for k in ("id", "severity", "title", "category", "url",
                   "description", "remediation", "cvss", "cwe", "owasp",
-                  "agent", "evidence_excerpt"):
+                  "agent", "evidence_excerpt", "vuln_class", "grade"):
             g[k] = str(g.get(k) or "")
+        # the report renders the proof block from this; an edited file may
+        # carry anything at all under those keys
+        verdict = g.get("proof")
+        if not isinstance(verdict, dict):
+            g["proof"] = {}
+        else:
+            checks = verdict.get("checks")
+            verdict = dict(verdict)
+            verdict["checks"] = [c for c in checks
+                                 if isinstance(c, dict)] \
+                if isinstance(checks, list) else []
+            missing = verdict.get("missing")
+            verdict["missing"] = [str(x) for x in missing] \
+                if isinstance(missing, list) else []
+            for k in ("vuln_class", "requirement"):
+                verdict[k] = str(verdict.get(k) or "")
+            g["proof"] = verdict
         ids = g.get("evidence_ids")
         g["evidence_ids"] = [str(i) for i in ids] \
             if isinstance(ids, list) else []
@@ -382,8 +505,14 @@ def sanitized_findings(rows) -> list[dict]:
 class Session:
     def __init__(self, base_dir: Path, target: str, meta: dict,
                  resume: Path | None = None,
-                 secrets: list[str] | None = None):
+                 secrets: list[str] | None = None,
+                 require_proof: bool = False,
+                 seal_key: str = ""):
         self._lock = threading.Lock()
+        self.require_proof = bool(require_proof)
+        # never persisted: meta.json records that the chain is keyed, never
+        # the key, or the artifact would carry its own forging material
+        self.seal_key = str(seal_key or "")
         # >=4 chars: a shorter 'secret' would redact innocent bytes across
         # the whole transcript - enforce the floor here, not just in CLI
         secrets = {s for s in (secrets or []) if len(s) >= 4}
@@ -596,7 +725,8 @@ class Session:
                 entry["agent"] = agent
             if note:
                 entry["note"] = note
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry,
+                                    getattr(self, "seal_key", ""))
             # serialize BEFORE committing in-memory state: a non-JSON leaf
             # in a caller-built request dict must fail without leaving
             # _transcript/_last_chain ahead of the file (chain gap)
@@ -617,7 +747,8 @@ class Session:
                         _redact_obj(detail, self.secret_values).items()}}
             if agent:
                 entry["agent"] = agent
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry,
+                                    getattr(self, "seal_key", ""))
             line = json.dumps(entry, ensure_ascii=False) + "\n"
             self._last_chain = entry["chain"]
             self._transcript[rid] = entry
@@ -667,7 +798,8 @@ class Session:
         with self._lock:
             entry = {"id": "seal", "ts": round(time.time(), 3),
                      "kind": "artifacts_digest", "files": files}
-            entry["chain"] = _chain(self._last_chain, entry)
+            entry["chain"] = _chain(self._last_chain, entry,
+                                    getattr(self, "seal_key", ""))
             line = json.dumps(entry, ensure_ascii=False) + "\n"
             self._last_chain = entry["chain"]
             self._transcript["seal"] = entry
@@ -737,10 +869,27 @@ class Session:
         if not evidence_ids:
             # Resolve the proving exchange from the excerpt itself - the
             # verbatim gate is unchanged: the quote must exist in a recorded
-            # response/event. Cite the first entry that contains it.
-            evidence_ids = [r for r in transcript_snapshot
-                            if excerpt in self._evidence_text_of(
-                                transcript_snapshot.get(r))][:1]
+            # response/event. Cite the MOST RECENT entry that contains it.
+            #
+            # It used to cite the first, and that is how the checked-in sample
+            # session came to carry a critical "forged admin token accepted"
+            # whose evidence is `GET /api/user/1`: the demo sent the forged
+            # token, got `"role": "admin"` back, and the auto-resolution
+            # reached past it to an earlier IDOR response that happened to
+            # contain the same bytes. The proving exchange is the one just
+            # sent, not the first one that ever matched.
+            matches = [r for r in reversed(list(transcript_snapshot))
+                       if excerpt in self._evidence_text_of(
+                           transcript_snapshot.get(r))]
+            # Prefer a real request/response over a non-HTTP event. The most
+            # recent match can be a scanner's output line, and citing that
+            # fails the proof matrix's wire check for every class - so a
+            # provable finding came back unproven because an `external_result`
+            # happened to quote the same bytes.
+            exchanges = [r for r in matches
+                         if isinstance((transcript_snapshot.get(r) or {})
+                                       .get("response"), dict)]
+            evidence_ids = (exchanges or matches)[:1]
             if not evidence_ids:
                 raise ValueError(
                     "evidence_excerpt is not a verbatim substring of any "
@@ -753,16 +902,84 @@ class Session:
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
-        key = _finding_key(category, _redact_url(url))
+        vuln_class = proof.canonical(category)
+        cited = [transcript_snapshot.get(r) for r in evidence_ids]
+        verdict = proof.grade(category, excerpt, cited)
+        if verdict.grade == "refused":
+            # Not gated on require_proof: the matrix does not say this evidence
+            # is thin, it says the system does not prove this class at all.
+            # Recording it anyway - the old behaviour kept a `critical` dos
+            # finding on file - is the exact assertion-instead-of-proof the
+            # gate exists to stop.
+            spec = proof.spec_for(category)
+            raise ValueError(
+                f"{vuln_class} is a refused class: "
+                f"{(spec.refusal if spec else '') or verdict.requirement}. "
+                "Describe the mechanism in note() instead - there is no "
+                "evidence that would make this a finding here")
+        if getattr(self, "require_proof", False) and not verdict.proven:
+            raise ValueError(
+                f"--require-proof: {vuln_class} graded {verdict.grade}, not proven. "
+                f"Requirement: {verdict.requirement or 'class not in the proof matrix'}. "
+                f"Missing: {', '.join(verdict.missing) or 'n/a'}. "
+                "Collect those and record again, or keep it in note()")
+        # The class, not the author's spelling. `SQLi`, `sql-injection` and
+        # `sqlinjection` normalized to three different keys, so two workers
+        # could record one bug three times - the dedup the docs promised.
+        key = _finding_key(vuln_class, _redact_url(url))
         with self._lock:
             for existing in self.findings:
-                if _finding_key(existing.get("category"),
-                                existing.get("url")) == key:
-                    raise ValueError(
-                        f"duplicate of {existing.get('id')} "
-                        f"({category} on {url}); "
-                        "same bug class + endpoint is one finding - put extra "
-                        "evidence in note() instead")
+                if _finding_key(existing.get("vuln_class") or existing.get("category"),
+                                existing.get("url")) != key:
+                    continue
+                # Better evidence for a bug already on record is an UPGRADE,
+                # not a duplicate. Refusing it was a trap the grading itself
+                # created: the agent is told which checks a candidate is
+                # missing, goes and collects them, and then had nowhere to put
+                # them. The finding keeps its id so earlier references and the
+                # transcript still resolve.
+                if _GRADE_RANK.get(verdict.grade, 0) > \
+                        _GRADE_RANK.get(existing.get("grade", ""), 0):
+                    fields = {
+                        "title": str(title or "").strip() or existing.get("title"),
+                        "severity": severity,
+                        "evidence_ids": evidence_ids,
+                        "evidence_excerpt": excerpt[:2000],
+                        "grade": verdict.grade,
+                        "proof": verdict.to_dict(),
+                        "upgraded_from": existing.get("grade", ""),
+                        # the ORIGINAL citation stays readable: the upgrade
+                        # replaced evidence_ids wholesale, so a second worker
+                        # grading higher erased the first worker's reference
+                        # and the report could no longer show what it had.
+                        "superseded_evidence_ids": [
+                            *(existing.get("superseded_evidence_ids") or []),
+                            *[i for i in (existing.get("evidence_ids") or [])
+                              if i not in evidence_ids]],
+                        # `ts` is when the finding was FIRST recorded, and
+                        # time_to_first_finding_s is computed from it - the
+                        # upgrade used to rewrite it to the upgrade time
+                        "upgraded_ts": round(time.time(), 3),
+                    }
+                    if cvss:
+                        fields["cvss"] = cvss
+                    if agent:
+                        fields["agent"] = agent
+                    existing.update(fields)
+                    if description:
+                        existing["description"] = str(description).strip()
+                    if remediation:
+                        existing["remediation"] = str(remediation).strip()
+                    _atomic_write(
+                        self.findings_path,
+                        json.dumps(self.findings, indent=2, ensure_ascii=False))
+                    return dict(existing)
+                raise ValueError(
+                    f"duplicate of {existing.get('id')} "
+                    f"({vuln_class} on {url}, already {existing.get('grade', 'recorded')}); "
+                    "same bug class + endpoint is one finding. Re-record only "
+                    "with evidence that grades higher - otherwise put the extra "
+                    "evidence in note()")
             finding = {
                 "id": f"F{len(self.findings) + 1:02d}",
                 "title": str(title or "").strip(),
@@ -771,6 +988,9 @@ class Session:
                 "url": _redact_url(url),
                 "evidence_ids": evidence_ids,
                 "evidence_excerpt": excerpt[:2000],
+                "vuln_class": vuln_class,
+                "grade": verdict.grade,
+                "proof": verdict.to_dict(),
                 "description": str(description or "").strip(),
                 "remediation": str(remediation or "").strip(),
                 "ts": round(time.time(), 3),
@@ -779,16 +999,21 @@ class Session:
                 finding["agent"] = str(agent)
             if cvss:
                 finding["cvss"] = cvss
-            cwe = _cwe_of(category)
+            cwe = _cwe_of(vuln_class) or _cwe_of(category)
             if cwe:
                 finding["cwe"] = cwe
                 owasp = _owasp_of(cwe)
                 if owasp:
                     finding["owasp"] = owasp
-            self.findings.append(finding)
+            # Write first, commit second. Appending before the write left a
+            # finding in memory that never reached findings.json if the write
+            # failed, so `stats()` and summary.json counted a finding the file
+            # did not have.
+            pending = [*self.findings, finding]
             _atomic_write(
                 self.findings_path,
-                json.dumps(self.findings, indent=2, ensure_ascii=False))
+                json.dumps(pending, indent=2, ensure_ascii=False))
+            self.findings = pending
         return finding
 
     def note(self, text: str, agent: str = "") -> None:

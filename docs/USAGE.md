@@ -25,7 +25,7 @@ source resolved, then retries with the full tool schema. Exit codes:
 auth rejected; 2 = auth works but the tool surface was rejected
 (degraded - constrain it). Note: OAuth (subscription) auth bills calls
 to your account's "extra usage" budget, not plan limits - on a
-constrained account the full ~46-tool schema may be rejected
+constrained account the full ~56-tool schema may be rejected
 (`--tools` shrinks it; team mode splits tools across role cards and
 fits under the cap).
 
@@ -33,12 +33,15 @@ fits under the cap).
 
 ```bash
 python -m argus run https://app.example
+# --scope adds in-scope hosts, --header repeats, --require-proof refuses
+# anything the proof matrix does not settle
 python -m argus run https://app.example \
-    --scope api.example,cdn.example \   # extra in-scope hosts
+    --scope api.example,cdn.example \
     --exclude /logout --exclude /admin/reset \
-    --header "Cookie: session=abc" \    # auth'd session (repeatable)
+    --header "Cookie: session=abc" \
     --header "Authorization: Bearer x" \
     --goal "prioritize /api and the checkout flow" \
+    --require-proof \
     --rate 3 --max-requests 600 --max-time 3600
 ```
 
@@ -59,7 +62,9 @@ python -m argus run https://app.example \
 | `--proxy` | none | route via Burp/ZAP for inspection — the only proxy path; env `HTTP(S)_PROXY` and `~/.netrc` are ignored for target traffic (LLM API calls still honor env proxies) |
 | `--llm-max-tokens` | 4096 | per-call response cap for the LLM |
 | `--mcp-config` | none | extra MCP servers config file |
-| `--tools` | all | `run` only: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests |
+| `--tools` | all | `run` and `mcp-serve`: comma tool allowlist (finish always included) — shrinks the per-call schema payload, needed when auth rejects large requests. `team` refuses it: role cards already subset tools per worker |
+| `--seal-key` | none | HMAC key, or a path to a file holding one, for the transcript chain (also `ARGUS_SEAL_KEY`). Unkeyed the chain proves the file was not edited after the run; keyed, only a holder of the key can produce a chain that verifies. Never written to an artifact — `argus verify --seal-key ...` checks it |
+| `--require-proof` | off | refuse a finding whose evidence does not meet the proof requirement for its class. Off by default: a candidate is worth recording and re-testing. On, `findings.json` holds only what was proven — the condition an evaluation wants to be able to state |
 | `--resume` | none | session dir to continue from |
 | `--allow-private` | auto if target private | permit RFC1918/loopback |
 | `--tls-verify` | off | verify certs (self-signed labs need off) |
@@ -77,7 +82,8 @@ python -m argus demo --team   # same, through the lead/worker pipeline
 ```
 
 Spins up `lab/vulnapp.py`, runs a canned probe sequence through the real
-agent loop, and lands five evidence-gated findings (SQLi, XSS, IDOR,
+agent loop, and lands six graded findings (SQLi, OS command injection,
+XSS, IDOR,
 info-disclosure, weak-JWT forge) in a
 normal session dir - use it to demo the pipeline at a defense without
 spending tokens. `--team` runs the same assessment through TeamRun: a lead
@@ -111,6 +117,25 @@ The session dir gains `agent-<name>.log` per member plus the shared
 `transcript.jsonl` (each entry tagged with its agent), `findings.json`,
 and `report.md`.
 
+### A model per role
+
+```bash
+python -m argus team <target> --role-models            # cheapest per job
+python -m argus team <target> --role-models --policy strong
+```
+
+Off by default. The four cards want different things - the lead holds the
+plan, recon makes many cheap calls over a wide surface, exploit holds one long
+chain of reasoning about one target, the writer turns recorded findings into
+prose - so `--role-models` gives each the model `argus models` lists for that
+job. A pick whose credential is not set falls back to `--model` and says which
+variable to set, rather than letting that agent die on its first call.
+
+`summary.json` then carries `llm_cost.per_agent`, each line naming the model
+that agent ran on: one rate cannot describe a run that spanned providers, and
+an agent on a model with no line in the table reports `null` rather than a
+zero that would read as free.
+
 ## Probe coverage
 
 Every probe baseline-diffs or uses a matched pair — the verdict is a
@@ -120,9 +145,10 @@ verbatim evidence from a cited response.
 | Bug class | Tool | Detection approach |
 |---|---|---|
 | Reflected XSS | `probe_reflection` | canary reflection, context detection |
-| SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count |
+| SQL injection | `probe_sqli` | AND/OR pairs quoted+numeric, error/xpath exfil, opt-in UNION col count, opt-in bounded read (`extract_table`/`extract_columns`, LIMIT applied in the tool) |
 | NoSQL injection | `probe_nosqli` | `$ne`/`$gt`/`$regex` JSON + urlencoded `param[$op]` carrier |
-| Command injection | `probe_time` | sleep separators vs measured baseline latency |
+| Command injection | `probe_cmdi` | `id; echo <nonce>` across 8 separator families, reads the OUTPUT; reports a reflection as a reflection; falls back to the timing oracle, measured twice against two baselines. A delay alone is **not recordable as an rce finding** - the class floor is the identity line, so it grades `unproven`. Put it in `note()` and say what you could not reach |
+| Command injection (blind) | `probe_time` | sleep separators vs measured baseline latency |
 | SSTI | `probe_ssti` | `{{7*7}}`-family eval per engine syntax |
 | File read / LFI | `probe_lfi` | traversal/absolute/encoded/null-byte + `file://`, `php://filter` decode |
 | Open redirect | `probe_redirect` | canonical + //host, backslash, userinfo, suffix-confuse; meta/JS hops |
@@ -140,7 +166,7 @@ verbatim evidence from a cited response.
 | Prototype pollution | `probe_ppoll` | `__proto__` + `constructor.prototype` carriers, cross-object read |
 | Request smuggling | `probe_smuggle` | CL.TE + TE.CL + obfuscated-TE raw sends; 'G'/'GPOST' poison own next request only |
 | Info disclosure | `probe_disclosure` | sensitive-path sweep w/ artifact signatures |
-| WebSocket | `probe_websocket` | RFC 6455 upgrade handshake (101 + accept check) |
+| WebSocket | `probe_websocket` | cross-origin RFC 6455 handshake (101 + accept recomputed) **and** one masked text frame, read back off the wire |
 | CRLF/response split | `probe_crlf` | CRLF canary in header-context params (redirect/cookie) |
 | User enumeration | `probe_enum` | bogus vs real usernames - error text/status + timing differential |
 | Login rate-limit | `probe_lockout` | bounded bad-cred burst: 429/lockout text/latency = throttled |
@@ -196,8 +222,32 @@ compare `run` vs `team` on speed, coverage and cost.
 Each finding carries `severity`, optional `cvss`, and an auto-mapped `cwe`
 (the named bug class resolves to the canonical CWE identifier, e.g.
 `sqli` -> CWE-89 -> OWASP A03 Injection; unknown categories simply omit
-both), plus verbatim
-`evidence_excerpt` and cited `evidence_ids`.
+both), plus verbatim `evidence_excerpt` and cited `evidence_ids`.
+
+It also carries `vuln_class`, `grade` and a `proof` block listing every
+check with its outcome:
+
+| grade | means | in the report |
+|---|---|---|
+| `proven` | the class artifact and its control are both on record | listed first; SARIF `kind: fail` |
+| `candidate` | a real signal, a named check still missing | listed after, with the missing check printed; SARIF `kind: review`, `level: none` |
+| `unproven` | nothing in the cited evidence meets the requirement | listed last with the requirement quoted |
+| `refused` | this system does not prove the class | cannot be recorded at all |
+
+`summary.json` carries `grades` as counts. Read the candidates as work to
+finish, not as results: `argus proof <class>` prints what each one needs.
+
+`argus verify <dir>` recomputes the grades from the chained transcript, so a
+grade raised by hand in `findings.json` fails the check — including after an
+`argus report` re-render has recomputed the artifact seal.
+
+What the chain proves is narrower than it looks. Unkeyed it is
+`sha256(previous + entry)`, computable by anyone with this code: it proves no
+entry was edited, inserted or removed after the run, and nothing about whether
+the run happened. For an engagement whose report will be read by someone who
+did not watch it, pass `--seal-key` — each link becomes HMAC-SHA256 and only a
+holder of the key can produce a chain that verifies. `argus verify` then needs
+the same key and says so rather than reporting every line as tampered.
 
 `python -m argus findings <session_dir>` reprints the table;
 `python -m argus report <session_dir>` re-renders `report.md`;
@@ -287,6 +337,194 @@ proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
 working directory. If a run is refused, pick the in-scope equivalent —
 e.g. `-b name=value` instead of a cookie-jar path.
 
+## A second model on the evidence (`argus judge`)
+
+```bash
+python -m argus judge <session>                  # the table picks the judge
+python -m argus judge <session> --dry-run        # print the case file, no call
+python -m argus judge <session> --judge-model gpt-4.1 --only F01,F03
+```
+
+One rule governs everything this command does:
+
+> **a judge can dispute a finding or lower its severity. It can never promote
+> one.**
+
+The proof matrix is deterministic and auditable. A model's opinion is neither.
+If an opinion could raise a `candidate` to `proven`, the strongest claim this
+system makes would rest on its weakest check — so `grade` is never touched
+here, and a disagreement lands in a separate `judge` field the report prints
+next to the grade it disputes.
+
+What a judge is *for*, then, is the gap the matrix cannot see. The matrix
+grades whether the cited bytes meet a class's requirement. It cannot tell you
+the finding is filed under the wrong class, that the title claims more than
+the bytes support, or that the severity is indefensible. Those are judgements,
+and a model from a different family is a real second opinion on them.
+
+The judge is shown the finding, its class's requirement, and the cited records
+— never the first model's reasoning, because the disagreement worth having is
+the one that reasoning would not produce. `--dry-run` prints exactly what it
+would be sent.
+
+Four refusals worth knowing:
+
+* **No independent judge is an answer.** If every model listed for the `judge`
+  role outside the author's family needs a credential that is not set, the
+  command says so and exits. Running the author's own family as its own
+  reviewer and calling it cross-verification would be the kind of claim this
+  system exists not to make — `--judge-model` is refused for the same reason.
+* **Prose is not a verdict.** A reply with no JSON object carrying `agrees` is
+  recorded as *no verdict*, not as assent.
+* **Two contradicting objects are not a verdict either.** A model that
+  illustrated the format and then answered, and one that answered and then
+  hedged, emit the same two objects in the same order; picking one would be a
+  guess, and a guess landing on "agrees" manufactures the assent the command
+  exists to avoid.
+* **A transport failure is not a dispute.** It is recorded as an error with no
+  `reason`, so it cannot read as a substantive disagreement in the report.
+
+The verdicts are recorded into the transcript as a `cross_verification` event,
+so they are inside the hash chain, and the session is re-sealed afterwards —
+the same trade `argus report` makes.
+
+## Asking the evidence what is next (`argus next`)
+
+```bash
+python -m argus next engagements/2026-11-09-120000-target
+python -m argus next <session> --json      # for a harness
+```
+
+The answer is computed from `transcript.jsonl` and `findings.json` and from
+nothing else. It never saw the conversation, which is the point: a model whose
+context has rolled over, or whose last four turns were the same payload with a
+new separator, gets the same answer a fresh reader of the evidence would give.
+
+Seven ordered rules, each naming the observation that fired it:
+
+| action | fires when |
+|---|---|
+| `record_finding` | an exchange on disk already meets a proof requirement and no finding cites it |
+| `close_proof_gap` | a recorded finding is `candidate`, and the matrix names the exact missing check |
+| `probe` | a parameterised endpoint carries named inputs that no class-bearing probe touched |
+| `park_and_switch` | one class has spent its probe budget on one endpoint with nothing recorded |
+| `widen_surface` | findings exist but only one endpoint was ever reached |
+| `report` | every endpoint is probed for the first-pass classes and every finding is graded |
+| `open_session` / `recon` | there is no session, or no request/response pair yet |
+
+The agent can ask the same question mid-run with the `next_action` tool. It is
+advice, not a rail: departing from it is normal and often right, and the
+contract is only that the departure is stated.
+
+What it will not do is invent work. An endpoint with no named input is not
+recommended for probing, because there is nowhere to put a payload; a static
+asset is not surface; and rule 1 grades a probe's output **only under that
+probe's own class**, because re-grading every exchange against all 29 would
+turn any page that echoes its query into a recommendation to record `sqli` -
+the exact failure the proof matrix exists to prevent.
+
+## Choosing a model (`argus models`)
+
+The provider is a fact about the model, not about the code. `argus/models.json`
+says which provider each model belongs to, what it costs, and which jobs it is
+listed for; `argus models` prints it.
+
+```bash
+python -m argus models          # the table, with which credentials are set
+python -m argus models --json   # the same, for a script
+```
+
+Four columns matter. `provider` picks the adapter (`anthropic` speaks the
+Messages API, `openai` speaks chat-completions - the loop itself is unchanged
+either way). `in`/`out` are USD per million tokens **as published when the
+line was written**, which is why a cost in a report names the table version:
+a price that moved makes a stale report wrong, and you can check the line.
+`cred` says whether an environment variable named for that model is actually
+set right now - it is not a claim that the key works, only that one exists.
+
+Name a model directly, or say what the task needs:
+
+```bash
+python -m argus run <target> --model deepseek-chat   # by name
+python -m argus run <target> --role depth            # cheapest that can do it
+python -m argus run <target> --role depth --policy strong
+```
+
+`--model` always wins over `--role`, because an operator naming a model has a
+reason the table does not know. A model the table has never heard of is sent
+to Anthropic rather than refused: an unknown name is far more likely a new
+Claude release than a typo. The five roles are described in the table itself
+(`planner`, `breadth`, `depth`, `judge`, `writer`) - `judge` is the one worth
+reading, because a reviewer from the family that produced the finding is the
+same prior answering twice, not a second opinion.
+
+A non-Anthropic credential is refused over plaintext `http://` unless the
+model's line opts in (`local` does, for a loopback server). That is not
+paranoia about the lab; it is that an API key in cleartext on the wire is
+spent.
+
+### What the cost number is and is not
+
+`summary.json` carries `llm_cost`, and the report prints it. It is the token
+counts this run recorded, multiplied by the rates in `models.json`, with cache
+reads at a tenth of input. It is **not** a bill: it ignores request overhead,
+it uses the rate in the file rather than the rate you were charged, and a
+model that is not in the table reports `usd: null` with the reason rather than
+a guessed number - the same rule as every other figure here.
+
+## Proof requirements
+
+```
+python -m argus proof            # all 29 classes, one line each
+python -m argus proof rce        # one class in full
+python -m argus proof sqli --json
+```
+
+Read it before probing a class, not after writing the finding —
+`load_skill("<class>")` attaches the same requirement to the methodology
+module, which is the moment it still changes what gets sent.
+
+```
+rce - proof requirement
+
+  the output of `id; echo <nonce>` returned by the target, with the nonce
+  tying the output to the probe
+
+  checks that must pass:
+    - a benign command was sent
+    - identity output returned by the target
+    - marker echoed in the output
+  without this one, nothing above 'unproven' is available:
+    - identity output returned by the target
+  disqualifies the evidence entirely:
+    - proof command stayed benign
+```
+
+## Serving argus to your own LLM (`argus mcp-serve`)
+
+```
+python -m argus mcp-serve http://127.0.0.1:8777 --allow-private \
+    --require-proof --session-dir sessions
+```
+
+Speaks newline-delimited stdio JSON-RPC and serves 46 of the 56 tools.
+Takes the same flags as `run`. Register it with any MCP host:
+
+```json
+{"mcpServers": {"argus": {
+  "command": "python",
+  "args": ["-m", "argus", "mcp-serve", "http://127.0.0.1:8777",
+           "--allow-private", "--require-proof"]}}}
+```
+
+The scope guard, rate limiter, transcript, dedup and proof matrix stay on
+this side. `initialize` returns the operating contract as `instructions`.
+Withheld: the eight board tools (the host LLM is the orchestrator here, and
+outside team mode there is no Board for them to reach) and
+`mcp_list`/`mcp_call` (argus calling out while serving would be a loop the
+operator cannot see). `finish` renders and seals the session, so
+`argus verify` has an anchor for a served engagement too.
+
 ## MCP tool servers
 
 `mcp_list` / `mcp_call` bridge external MCP servers (search, fetch, CVE
@@ -328,3 +566,8 @@ sensitive data read → high-critical; verified primitives with unclear
 reach → medium; hygiene issues → low/info. A finding only exists if the
 excerpt proving it is inside a recorded response — if `report.md` says
 it, `transcript.jsonl` shows it.
+
+Severity and grade answer different questions, and both are printed.
+Severity is how bad it would be; the grade is how sure we are. A
+`critical` + `candidate` row is a lead worth a day of someone's time, not a
+result — and `probe_*` verdicts say "candidate" for the same reason.

@@ -12,6 +12,8 @@ import socket
 import subprocess
 from pathlib import Path
 
+from .. import proof
+from ..scope import ScopeError
 from .registry import Context, _ival
 
 # ---------------------------------------------------------------- jwt
@@ -122,8 +124,28 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
     p64 = _b64url_enc(json.dumps(payload, separators=(",", ":")).encode())
     out["alg_none"] = f"{h_none}.{p64}."
     out["payload_used"] = payload
+    # Leave an artifact. Without one there is nothing in the session showing
+    # that THIS SYSTEM minted the credential, and a working auth check - good
+    # session 200, expired session 401 - has the same shape on the wire as a
+    # forgery. The signature is fingerprinted, not stored: a usable credential
+    # does not belong in an artifact, and the fingerprint is enough to link
+    # the mint to the request that carried it.
+    import hashlib as _h
+    fp = {}
+    for kind in ("resigned", "alg_none"):
+        if out.get(kind):
+            fp[kind] = _h.sha256(out[kind].encode()).hexdigest()[:16]
+    out["event_id"] = ctx.session.record_event(
+        "jwt_forge",
+        {"claims_set": overrides, "payload_used": payload,
+         "alg_in": header.get("alg"), "weak_secret_used": bool(secret),
+         "token_sha256_16": fp},
+        agent=ctx.agent_name) if getattr(ctx, "session", None) else ""
     out["note"] = ("send 'resigned' or 'alg_none' as the Bearer token via "
-                   "http_request; a 200 echoing your claims is the finding")
+                   "http_request; a 200 echoing your claims is the finding. "
+                   "Cite event_id alongside the accepted request: it is what "
+                   "shows the credential was minted here and not simply a "
+                   "valid session")
     return out
 
 
@@ -141,7 +163,20 @@ def load_skill(ctx: Context, name: str) -> dict:
     path = skills_dir / f"{safe}.md"
     if not path.exists():
         return {"error": f"no skill named {name!r}; call load_skill('index')"}
-    return {"skill": safe, "content": path.read_text(encoding="utf-8")}
+    out = {"skill": safe, "content": path.read_text(encoding="utf-8")}
+    # The requirement belongs here, not only in the record_finding result: the
+    # skill is read BEFORE probing the class, which is when knowing what has to
+    # be collected still changes what gets sent.
+    spec = proof.spec_for(safe)
+    if spec is not None:
+        out["vuln_class"] = spec.vuln_class
+        out["proof_requirement"] = spec.requirement
+        out["proof_checks"] = list(spec.required)
+        if spec.refusal:
+            out["refused"] = spec.refusal
+        if spec.notes:
+            out["proof_notes"] = spec.notes
+    return out
 
 
 # ---------------------------------------------------------------- transcript
@@ -193,6 +228,31 @@ def read_notes(ctx: Context) -> dict:
             "truncated": len(text) > 50_000}
 
 
+def next_action(ctx: Context) -> dict:
+    """What this session's own recorded evidence says to do next.
+
+    The point of this tool is that its answer does not come from the
+    conversation. It is computed from `transcript.jsonl` and `findings.json`,
+    so a context that has rolled over, or a turn that has started repeating
+    itself, gets the same answer a fresh reader would get. Departing from it
+    is allowed and often right - the contract is only that the departure is
+    stated, not that the ledger is obeyed.
+    """
+    from .. import decide as decide_mod
+    try:
+        action = decide_mod.next_action(ctx.session.dir)
+    except Exception as exc:                                  # pragma: no cover
+        # a controller that crashes must not take the run with it: the agent
+        # can still probe, it just loses the second opinion
+        return {"error": f"the ledger could not be computed: "
+                         f"{type(exc).__name__}: {exc}"}
+    out = action.to_dict()
+    out["note"] = ("computed from recorded evidence, not from this "
+                   "conversation. Depart from it when you have a reason, and "
+                   "say the reason in one line.")
+    return out
+
+
 # ---------------------------------------------------------------- findings
 
 def record_finding(ctx: Context, title: str, severity: str, category: str,
@@ -210,8 +270,26 @@ def record_finding(ctx: Context, title: str, severity: str, category: str,
         evidence_excerpt=evidence_excerpt, description=description,
         remediation=remediation, agent=ctx.agent_name, cvss=cvss,
     )
-    return {"recorded": finding["id"], "title": finding["title"],
-            "severity": finding["severity"]}
+    out = {"recorded": finding["id"], "title": finding["title"],
+           "severity": finding["severity"],
+           "vuln_class": finding.get("vuln_class", ""),
+           "grade": finding.get("grade", "")}
+    verdict = finding.get("proof") or {}
+    if verdict.get("requirement"):
+        out["requirement"] = verdict["requirement"]
+    missing = verdict.get("missing") or []
+    if missing:
+        # Naming the checks is the point: a candidate left as a candidate is a
+        # finding the report has to hedge. The details say what to send next.
+        out["missing"] = missing
+        out["details"] = [c["detail"] for c in verdict.get("checks") or []
+                          if not c.get("ok") and c.get("detail")]
+        out["note"] = ("this claim is a " + (finding.get("grade") or "candidate") +
+                       ": collect the missing checks and record_finding again "
+                       "(the duplicate guard allows a re-record only after you "
+                       "delete nothing - instead cite the new ids in note() and "
+                       "say so in finish)")
+    return out
 
 
 # ---------------------------------------------------------------- external
@@ -243,11 +321,58 @@ def _hostish_token(tok: str) -> bool:
     if re.fullmatch(r"[0-9a-fA-FxX.]+", tok) and \
             ("." in tok or "x" in tok.lower()):
         return True  # numeric IP spelling - let the scope guard decide
-    try:
-        socket.getaddrinfo(tok, None)
-        return True
-    except OSError:
-        return False
+    return _resolves(host_or_token=tok)
+
+
+_RESOLVE_CACHE: dict[str, bool] = {}
+_RESOLVE_BUDGET = [256]
+
+
+def _resolves(host_or_token: str) -> bool:
+    """Does this token resolve? Cached, budgeted and deadlined.
+
+    It is called once per line of a `-iL`/`-r`/`-l`/`--bulk-file` target list,
+    and it used to call `socket.getaddrinfo` with no cache, no cap and no
+    deadline - so a 50k-line target file was 50k blocking lookups on the
+    agent's thread, and a slow resolver turned a scope check into a hang.
+    """
+    key = host_or_token.lower()
+    if key in _RESOLVE_CACHE:
+        return _RESOLVE_CACHE[key]
+    if _RESOLVE_BUDGET[0] <= 0:
+        return False        # see the note on the default, below
+    _RESOLVE_BUDGET[0] -= 1
+    # Bounded WITHOUT touching socket.setdefaulttimeout: that is
+    # process-global, so it leaked into every socket created while a lookup
+    # was in flight - including the target connections and, in the test
+    # suite, the lab's own server. getaddrinfo takes no timeout, so the
+    # lookup runs on a daemon thread and the join is the deadline.
+    import threading
+    result: list[bool] = []
+
+    def _lookup() -> None:
+        try:
+            socket.getaddrinfo(host_or_token, None)
+            result.append(True)
+        except OSError:
+            result.append(False)
+
+    worker = threading.Thread(target=_lookup, daemon=True)
+    worker.start()
+    worker.join(2.0)
+    # Default False - "not a host" - which is what the unbounded version did,
+    # because a failed lookup raised OSError. It is tempting to fail closed
+    # here and scope-check anything we cannot resolve, and that is wrong: this
+    # heuristic exists to tell a single-label HOSTNAME (`localhost`, `db01`)
+    # from a WORD, and the words it sees are things like `Host` - the header
+    # name in a saved request file - `vuln` and `80`. Failing closed refused a
+    # legitimate `sqlmap -r request.txt` because the file says `Host:`.
+    #
+    # Dotted names and IP literals never reach here: `_HOST_RE` matches them
+    # without a lookup. So what a spent budget or a timeout gives up is
+    # single-label names past the 256th distinct token in one argument list.
+    _RESOLVE_CACHE[key] = result[0] if result else False
+    return _RESOLVE_CACHE[key]
 
 
 def _args_scope_check(ctx: Context, args: str) -> None:
@@ -261,6 +386,13 @@ def _args_scope_check(ctx: Context, args: str) -> None:
         # 'http://host:8080/' token also trips the >=2-colon IPv6 branch
         # and gets falsely rejected as an invalid literal
         if "://" in tok:
+            # http(s) was already handled by _URL_RE. Anything else was
+            # skipped entirely, so `curl file:///etc/passwd` and
+            # `curl gopher://evil.test/` reached the external tool with no
+            # scope check at all - ScopeGuard refuses a non-http scheme, so
+            # hand it the token and let it say so.
+            if not re.match(r"(?i)https?://", tok):
+                ctx.scope.check(tok)
             continue
         if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
             continue
