@@ -183,7 +183,8 @@ system. All notable milestones on `agent-v2`.
   evaluate AND echo the raw payload (error-page style) instead of
   requiring the payload to vanish. Lab gains `/bad-headers`,
   `/graphql-strict` and `/hello2`; `probe_method` gets its first
-  coverage.
+  coverage. Selftest exercises all four new paths (bad-header notes,
+  schema+GET transport, suggestion leak, eval-and-reflect SSTI).
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
@@ -194,7 +195,7 @@ system. All notable milestones on `agent-v2`.
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
 ### Verification & packaging
-- `python selftest.py`: 117 offline checks.
+- `python selftest.py`: 121 offline checks.
 - `python -m pytest tests/ -q`: 186 tests (unit + live-lab + loop +
   team + MCP + CLI + external-tool subprocess path + hardening
   regressions) — every hardened fix now carries a regression test

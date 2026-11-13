@@ -97,7 +97,7 @@ def main() -> int:
 
     cfg = Config(target=base, allow_private=True, session_dir=tmp)
     scope = ScopeGuard(base, allow_private=True)
-    client = GuardedClient(scope, s, RateLimiter(0), max_requests=300)
+    client = GuardedClient(scope, s, RateLimiter(0), max_requests=400)
     ctx = Context(cfg=cfg, scope=scope, session=s, client=client,
                   skills_dir=ROOT / "argus" / "skills")
 
@@ -177,6 +177,19 @@ def main() -> int:
                   for c in out["cookies"]))
     check("fingerprint flags session-cookie hygiene",
           any("HttpOnly" in n for n in out["cookie_notes"]))
+    out = web.fingerprint(ctx, base + "/bad-headers")
+    _hn = " ".join(out["header_notes"])
+    check("fingerprint flags bad header values",
+          all(t in _hn for t in ("x-frame-options",
+                                 "strict-transport-security",
+                                 "content-security-policy")))
+    out = web.graphql_introspect(ctx, base + "/graphql")
+    check("graphql introspects schema + GET transport",
+          out["verdict"].startswith("schema introspected")
+          and out["get_transport"] is True)
+    out = web.graphql_introspect(ctx, base + "/graphql-strict")
+    check("graphql suggestion leak when introspection off",
+          out["suggestion_leak"] is True)
     out = web.crawl(ctx, base, depth=1)
     check("crawl finds forms/endpoints", len(out["endpoints"]) >= 4)
     out = web.js_recon(ctx, base)
@@ -201,6 +214,10 @@ def main() -> int:
           {"mysql", "postgres", "mssql", "mysql-benchmark"} <= slow)
     out = probes.probe_ssti(ctx, base + "/hello?name=x", "name")
     check("ssti probe sees eval", "ssti candidate" in out["verdict"])
+    out = probes.probe_ssti(ctx, base + "/hello2?name=x", "name")
+    check("ssti probe sees eval-and-reflect",
+          "ssti candidate" in out["verdict"]
+          and any(r.get("also_reflected") for r in out["results"]))
     out = probes.probe_lfi(ctx, base + "/download?file=x", "file")
     check("lfi probe sees file bytes", "confirmed marker" in out["verdict"])
     out = probes.probe_redirect(ctx, base + "/redirect?next=/", "next")
