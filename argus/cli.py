@@ -280,6 +280,19 @@ def main(argv: list[str] | None = None) -> int:
         if args.json:
             print(json.dumps(data, indent=2, ensure_ascii=False))
         else:
+            # context line: which target + build produced these claims
+            _m = {}
+            try:
+                _r = json.loads((Path(args.session_dir) / "meta.json")
+                                .read_text(encoding="utf-8"))
+                _m = _r if isinstance(_r, dict) else {}
+            except Exception:
+                pass
+            _ctx = f" target={_m['target']}" if _m.get("target") else ""
+            _ctx += f" argus={_m['argus_version']}" \
+                if _m.get("argus_version") else ""
+            if _ctx:
+                print(f"--- {Path(args.session_dir).name}{_ctx} ---")
             for f in data:
                 if not isinstance(f, dict):
                     print("[?       ] ? <malformed entry> UNVERIFIED")
