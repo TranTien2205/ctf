@@ -55,9 +55,10 @@ class _NoCloseFile:
 # Headers whose VALUES are operator secrets, not assessment evidence.
 # They ride every request silently (--header/--header-file), so persisting
 # them verbatim would leak live credentials into transcript.jsonl and the
-# shareable report. Evidence only cites response bodies/event output, so
-# redaction cannot break a finding. Names stay visible - the audit still
-# shows the request was authenticated.
+# shareable report. Evidence text covers response headers/bodies and event
+# output - never request headers - so this redaction cannot break a
+# finding. Names stay visible - the audit still shows the request was
+# authenticated.
 _SENSITIVE_REQ_HEADERS = {
     "authorization", "proxy-authorization", "cookie", "x-api-key",
     "x-auth-token", "x-access-token", "x-csrf-token", "x-xsrf-token",
