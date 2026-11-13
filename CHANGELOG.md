@@ -961,6 +961,54 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### CI was red for two pushes, and both failures were mine
+- I reported CI as green. It was not. Querying it before flipping the race
+  table showed `1e0b5ee` and `4869825` both **failed**, each with two jobs
+  down, and the same two tests in both runs. Neither reproduced locally -
+  633 passed here on every run - which is why nothing surfaced until I
+  looked at the actual runs instead of carrying forward an earlier state.
+- **`test_a_malformed_frame_does_not_kill_the_server`, ubuntu 3.14, twice,
+  deterministic.** The hostile frame is `[`x100000 + `]`x100000, which is
+  BALANCED, so it has two legitimate answers: a recursive parser hits the
+  recursion limit and the frame is "invalid JSON", while a parser with
+  headroom parses it into a deeply nested *list*, which is then "not an
+  object". Both are the hardening working - the server survived and
+  reported an error. Asserting only the first wording made the test a
+  measurement of CPython's JSON internals, and 3.14 in CI answers
+  differently from 3.14.6 here. It now asserts the property, and that the
+  server reported *some* error at all. Verified by driving the server with
+  a frame that parses to a non-object and confirming the message is exactly
+  the one CI produced, rather than assuming the set covers it.
+- **`probe_csrf` in the proving direction, Windows only, 3.10 then 3.12.**
+  This one is a defect I introduced. I made `_ordering` fail-closed so that
+  equal timestamps cannot be ordered - correct reasoning, wrong premise.
+  The premise was "at the recorder's resolution those two events cannot be
+  told apart", and the clock's resolution is not the recorder's: `ts` is
+  `round(time.time(), 3)` and `time.time()` on Windows has a granularity
+  near 16ms, so events tens of milliseconds apart tie there, land in
+  neither `before` nor `after` under the strict comparisons, and a csrf the
+  lab really has grades `candidate`.
+- The recorder knew the order the whole time. `record_exchange` assigns
+  `r1`, `r2`, `r3` from a counter under its own lock, before any author
+  sees them, and the transcript is chained. So `ts` stays primary and the
+  recorder's sequence breaks ties. This is **not** the "position" that
+  function refuses: that was the index in `[entries.get(r) for r in
+  evidence_ids]`, which is whatever order the claimant listed.
+- Reproduced CI's failure deterministically rather than reasoning about it.
+  Quantising the session clock to 1s ties all four stamps: with the
+  tie-break, `proven`; with it removed, `candidate` and
+  `missing: ['the state changed between two reads']` - CI's message word
+  for word. A 16ms-granularity clock was not enough to tie them on this
+  host, because requests here take ~47ms; a CI runner on loopback is
+  faster, which is why the failure is Windows-only and intermittent.
+- The security property is what the updated test now pins, because it is
+  the one that could have been lost: the verdict must not move when the
+  citation order moves, and the recorder's order must win over the author's.
+  So the tied entries are graded cited forwards and backwards (same
+  verdict), and then relabelled so the read carrying the new value was
+  recorded BEFORE the write - which must NOT prove, in either citation
+  order.
+
 ### A check that could only be satisfied by falsifying the record
 - Having made the race window deterministic, I went to raise the proving
   coverage and could not. The check that guards the figure asserted every

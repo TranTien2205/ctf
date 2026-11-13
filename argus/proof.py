@@ -573,6 +573,12 @@ def _req_headers(entry: dict) -> dict:
     return headers if isinstance(headers, dict) else {}
 
 
+# The recorder's sequence number, as issued in the entry id (`r12` -> 12).
+# Used only to separate events whose `ts` collided at the recorder's
+# millisecond rounding - see `_ordering`.
+_ID_SEQ_RE = re.compile(r"(\d+)$")
+
+
 def _ordering(exchanges: list) -> dict:
     """Recorded time per cited exchange, for checks that need before/after.
 
@@ -586,17 +592,38 @@ def _ordering(exchanges: list) -> dict:
 
     So it is fail-closed: an exchange without a usable `ts` gets no
     position, and a check that needs to order it finds nothing to order.
-    Equal timestamps are equally unusable - a strict `<` or `>` against the
-    write excludes them, which is right, because at the recorder's
-    resolution those two events cannot be told apart.
+
+    Equal timestamps used to be equally unusable, on the reasoning that at
+    the recorder's resolution two events cannot be told apart. The
+    reasoning was right and the resolution was the problem: `ts` is written
+    as `round(time.time(), 3)`, and `time.time()` on Windows has a
+    granularity near 16ms. Two events TENS of milliseconds apart therefore
+    carry the same stamp there, land in neither `before` nor `after` under
+    the strict comparisons, and a csrf the lab really has graded `candidate`
+    with "the state changed between two reads" missing. That is what failed
+    two Windows CI jobs, on two different Python versions.
+
+    The tie-break is the recorder's own sequence, parsed from the entry id.
+    It is NOT the "position" this function refuses: that was the index in
+    `[entries.get(r) for r in evidence_ids]`, which is whatever order the
+    finding's author listed, and ordering by it let a claimant choose which
+    read was "before". An id is assigned by `record_exchange` under its
+    lock, strictly increasing, before any author sees it. `r3` was recorded
+    after `r2` no matter how the two are cited, so the sequence carries the
+    same authority as `ts` and cannot tie.
+
+    `ts` stays primary, so an explicitly stamped order still decides; the
+    sequence only separates events the clock could not.
     """
     out = {}
     for entry in exchanges or ():
         value = (entry or {}).get("ts")
         try:
-            out[id(entry)] = float(value)
+            stamp = float(value)
         except (TypeError, ValueError):
             continue
+        match = _ID_SEQ_RE.search(str((entry or {}).get("id") or ""))
+        out[id(entry)] = (stamp, int(match.group(1)) if match else 0)
     return out
 
 

@@ -2599,10 +2599,26 @@ def test_csrf_ordering_is_fail_closed_without_timestamps():
     would decide which read came "before" the write. An ordering a claimant
     controls is not an ordering.
 
-    So it fails closed: no recorded time, no before/after, no proof. The
-    same holds for two exchanges sharing a timestamp - at the recorder's
-    resolution they cannot be told apart, and a strict comparison excludes
-    them.
+    So it fails closed: no recorded time, no before/after, no proof.
+
+    That part is unchanged. What DID change is the tied-timestamp case,
+    which this test also used to refuse on the reasoning that "at the
+    recorder's resolution they cannot be told apart". The reasoning was
+    right and the premise was wrong: the clock's resolution is not the
+    recorder's. `ts` is `round(time.time(), 3)` and `time.time()` on
+    Windows has a granularity near 16ms, so events tens of milliseconds
+    apart tie there - which graded a csrf the lab really has as
+    `candidate` and failed two Windows CI jobs on two Python versions.
+
+    Meanwhile the recorder knows the order exactly and always did: it
+    assigns `r1`, `r2`, `r3` from a counter under its own lock, before any
+    author sees them. That sequence is the tie-break now.
+
+    The security property is what the last block asserts, because it is the
+    one that could have been lost: a claimant controls which ids are cited
+    and in what order, so the verdict must not move when the citation order
+    does, and must follow the RECORDER's order even when the author's
+    contradicts it.
     """
     foreign = {"Origin": "https://evil.example"}
     no_ts = [
@@ -2626,10 +2642,29 @@ def test_csrf_ordering_is_fail_closed_without_timestamps():
     assert proof.grade("csrf", "email: evil@attacker",
                        stamped).grade == "proven"
 
-    # ...and one shared timestamp is not an order either
+    # one shared timestamp is still an order, because the recorder issued
+    # r1/r2/r3 in that order and nothing an author does changes which
+    # number each entry carries
     tied = [dict(e, ts=5.0) for e in no_ts]
     assert proof.grade("csrf", "email: evil@attacker",
-                       tied).grade != "proven"
+                       tied).grade == "proven"
+
+    # the property that matters: the citation order is the author's, so it
+    # must not decide. Same three entries, cited backwards, same verdict.
+    assert proof.grade("csrf", "email: evil@attacker",
+                       list(reversed(tied))).grade == "proven"
+
+    # and the recorder's order wins over the author's: relabel so the read
+    # carrying the new value was recorded BEFORE the write, and the change
+    # is no longer evidenced by it - whatever order it is cited in
+    relabelled = [dict(tied[0], id="r9"),      # the pre-write read, late
+                  dict(tied[1], id="r5"),      # the write
+                  dict(tied[2], id="r1")]      # the post-write read, early
+    for ordering in (relabelled, list(reversed(relabelled))):
+        v2 = proof.grade("csrf", "email: evil@attacker", ordering)
+        assert v2.grade != "proven", v2.checks
+        assert any("state changed between two reads" in str(c.get("check"))
+                   and not c.get("ok") for c in v2.checks), v2.checks
 
 def test_massassign_refuses_a_read_that_does_not_carry_the_field():
     """"A later read shows it set" asked only that SOME bytes came back.

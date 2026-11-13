@@ -484,15 +484,29 @@ def test_a_malformed_frame_does_not_kill_the_server(tmp_path):
                    if l.strip()]
         return rc, replies
 
+    # The nesting frame is BALANCED - `[`*n + `]`*n - so it has two
+    # legitimate answers and which one appears is a property of the
+    # interpreter, not of the hardening. A recursive parser hits the
+    # recursion limit and the frame is "invalid JSON"; a parser that does
+    # not recurse (or has headroom) parses it into a deeply nested LIST,
+    # which is then "not an object". Both are the fix working: the server
+    # survived and reported an error.
+    #
+    # Asserting only the first wording made this test a measurement of
+    # CPython's JSON internals. It passed on 3.14.6 here and failed on
+    # 3.14 in CI with 'frame is not an object' - twice, deterministically.
+    # The claim is the property, so that is what is asserted.
     for frame, expect in (
-            ("[" * 100000 + "]" * 100000 + "\n", "invalid JSON frame"),
-            ("not json at all\n", "invalid JSON frame"),
-            ("x" * (_MAX_FRAME + 1) + "\n", "frame exceeds"),
+            ("[" * 100000 + "]" * 100000 + "\n",
+             ("invalid JSON frame", "frame is not an object")),
+            ("not json at all\n", ("invalid JSON frame",)),
+            ("x" * (_MAX_FRAME + 1) + "\n", ("frame exceeds",)),
     ):
         rc, replies = drive(frame)
         assert rc == 0
         errors = [r["error"]["message"] for r in replies if "error" in r]
-        assert any(expect in e for e in errors), (expect, errors)
+        assert errors, ("the server reported no error at all", frame[:40])
+        assert any(e_ in e for e_ in expect for e in errors), (expect, errors)
 
     # ...and an ordinary call still works, or the hardening ate the server
     rc, replies = drive(_json.dumps({"jsonrpc": "2.0", "id": 2,
