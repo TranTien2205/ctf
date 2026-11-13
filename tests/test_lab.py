@@ -479,3 +479,11 @@ def test_csrf_samesite_none_is_weak():
     assert probes._weak_samesite("sess=x; Path=/")
     assert not probes._weak_samesite("sess=x; SameSite=Lax")
     assert not probes._weak_samesite("sess=x; SameSite=Strict")
+
+
+def test_probe_method_catches_unadvertised_trace(lab_url, ctx):
+    """TRACE echo is caught even though the probe now fires whether or
+    not Allow advertises it (the lab plants global XST)."""
+    out = probes.probe_method(ctx, lab_url + "/")
+    assert out["trace_attempt"]["echoes"] is True, out
+    assert "cross-site tracing" in out["verdict"], out

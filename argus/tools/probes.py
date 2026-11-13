@@ -525,15 +525,15 @@ def probe_method(ctx: Context, url: str) -> dict:
             if out["put_verified"]:
                 ctx.client.send("DELETE", url.rstrip("/") + f"/{canary}.txt",
                                 tool="probe_method", note="cleanup canary")
-    if "TRACE" in allow.upper():
-        # TRACE that echoes request headers back is cross-site tracing -
-        # it leaks HttpOnly cookies/auth headers to a reading XSS
-        canary = _marker("tr")
-        t = ctx.client.send("TRACE", url, headers={"X-Argus-Trace": canary},
-                            tool="probe_method", note="TRACE echo")
-        out["trace_attempt"] = {"status": t["status"],
-                                "request_id": t["request_id"],
-                                "echoes": canary in (t.get("body") or "")}
+    # TRACE is probed regardless of Allow: that header describes what the
+    # endpoint claims, while TRACE acceptance is a server-level feature
+    # that is frequently on without ever being advertised
+    canary = _marker("tr")
+    t = ctx.client.send("TRACE", url, headers={"X-Argus-Trace": canary},
+                        tool="probe_method", note="TRACE echo")
+    out["trace_attempt"] = {"status": t["status"],
+                            "request_id": t["request_id"],
+                            "echoes": canary in (t.get("body") or "")}
     out["dangerous_methods"] = dangerous
     if out.get("put_verified"):
         verdict = "writable method confirmed"
