@@ -61,6 +61,75 @@ def _one(server, pipe, msg):
     return frames[-1] if frames else None
 
 
+def test_every_tool_that_needs_a_board_is_declared_a_board_tool():
+    """The direction that rots, for the third time in this log.
+
+    `WITHHELD` is `BOARD_TOOLS` plus the two mcp_* tools, and the tests
+    around it all assert that nothing withheld reaches the manifest. That
+    direction cannot fail by neglect - you only add to BOARD_TOOLS on
+    purpose. What fails by neglect is a new team tool that needs
+    `ctx.board` and never gets declared, and the cost is spread over four
+    readers rather than one:
+
+      * `mcpserver` advertises it to a host that can never call it
+        successfully - "a lie in the catalogue", in that module's own words;
+      * `loop` offers it to a single-agent run, which has no board at all;
+      * `cli` lists it under `argus tools` and accepts it in `--tools`.
+
+    Then `_board(ctx)` raises RuntimeError and the operator sees a tool that
+    exists, is offered, and cannot work.
+
+    So this derives the board-needing set from the implementation instead of
+    trusting a list, and asserts the derivation's own precondition: that
+    `argus/tools/team.py` is still the only module whose tools reach a
+    board. If that stops being true the derivation silently under-counts,
+    which is the failure mode this whole check exists to avoid.
+    """
+    import inspect
+    import re as _re
+    from pathlib import Path
+
+    from argus.tools import registry
+    from argus.tools import team as teammod
+
+    known = {t["name"] for t in registry.TOOL_SCHEMAS}
+    src = inspect.getsource(teammod)
+    needs = set()
+    for m in _re.finditer(r"^def ([a-z_][a-z0-9_]*)\(ctx", src, _re.M):
+        body = src[m.end():]
+        nxt = _re.search(r"^def ", body, _re.M)
+        if nxt:
+            body = body[:nxt.start()]
+        if "_board(ctx)" in body or "ctx.board" in body:
+            needs.add(m.group(1))
+    needs &= known
+
+    assert needs, ("the derivation found no board-needing tools at all, so "
+                   "it has stopped measuring anything - check that team.py "
+                   "still calls _board(ctx)")
+
+    undeclared = sorted(needs - registry.BOARD_TOOLS)
+    assert not undeclared, (
+        f"{undeclared} need a board but are not in BOARD_TOOLS, so the MCP "
+        "manifest advertises them, a single-agent run is offered them, and "
+        "calling one raises RuntimeError")
+
+    # the declared set must not name tools that do not exist, or it filters
+    # nothing and the gap reopens silently one level up
+    assert registry.BOARD_TOOLS <= known, sorted(registry.BOARD_TOOLS - known)
+
+    # the derivation's precondition: team.py is the only tool module that
+    # reaches a board. loop.py touches ctx.board once, for a mode label.
+    reaches = set()
+    for fp in sorted(Path("argus").rglob("*.py")):
+        text = fp.read_text(encoding="utf-8")
+        if "_board(ctx)" in text or "ctx.board" in text:
+            reaches.add(fp.as_posix())
+    assert reaches <= {"argus/tools/team.py", "argus/loop.py"}, (
+        f"{sorted(reaches)} reach a board, so deriving the set from "
+        "team.py alone under-counts it")
+
+
 def test_manifest_is_mcp_shaped():
     for tool in tool_manifest():
         assert set(tool) == {"name", "description", "inputSchema"}

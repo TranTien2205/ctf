@@ -961,6 +961,42 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The same shape a third time: BOARD_TOOLS
+- `mcpserver.py` states the principle plainly - *"A manifest entry a host
+  can never call successfully is a lie in the catalogue"* - and withholds
+  `BOARD_TOOLS` plus the two `mcp_*` tools. Three tests assert that nothing
+  withheld reaches the manifest. All three check the same direction, and it
+  is the direction you only change on purpose.
+- The direction that rots by neglect is a new team tool that needs
+  `ctx.board` and never gets declared. Measured, the cost is spread over
+  four readers rather than one: `mcpserver` advertises it to a host that
+  can never call it, `loop` offers it to a single-agent run that has no
+  board, `argus check` lists it in the tool surface, and `--tools` accepts
+  it as a valid name. Then `_board(ctx)` raises RuntimeError.
+- Measured today: eight implementations reach a board, every one of them is
+  declared, **no gap**. So
+  for the third time in this stretch there was nothing to fix, only a
+  partition to hold - and that is itself the finding. This repository
+  reliably checks the direction that cannot rot and leaves the other one to
+  care.
+- The set is derived from the implementation rather than hand-listed, and
+  the check asserts its own precondition: that `argus/tools/team.py` is
+  still the only tool module reaching a board (`loop.py` touches
+  `ctx.board` once, for a mode label). A derivation that silently
+  under-counts is exactly the failure this check exists to prevent.
+- Four assertions, each proved to fail on its own. Undeclaring
+  `spawn_worker`: *"['spawn_worker'] need a board but are not in
+  BOARD_TOOLS, so the MCP manifest advertises them, a single-agent run is
+  offered them, and calling one raises RuntimeError"*. Declaring a tool
+  that does not exist: the subset assertion names it. Renaming `_board` so
+  the derivation matches nothing: *"the derivation found no board-needing
+  tools at all, so it has stopped measuring anything"*. Letting a second
+  module reach a board: the precondition names all three files.
+- Writing this entry, the gate refused my own prose twice: for naming a
+  subcommand that does not exist, and for a bare count it correctly read as
+  a claim about the tool total. Third time this stretch. A gate that only
+  ever catches other people's drift is not being run.
+
 ### The shared prompt was a single-agent playbook given to four roles
 - `build_system` was unconditional, and `SYSTEM`'s numbered method is
   imperative throughout - "fingerprint() the target, crawl() the surface",
@@ -1669,7 +1705,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 630 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 631 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
