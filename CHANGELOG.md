@@ -925,6 +925,31 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The target's password was still in three writers
+- Redacting the target's userinfo in `meta.json` and `notes.md`'s header
+  covered the URL FIELDS. The credential also travels as **free text**: the
+  loop logs `session <id> -> <target>`, and a note or an event detail can
+  quote the URL. Measured with the earlier fix in place: `notes.md`,
+  `transcript.jsonl` and `agent.log` each still held it - and `agent.log` is
+  sealed into the chain and shipped with the bundle. Ninth half-fix in this
+  stretch, two commits after the first half of the same leak.
+- One change covers every writer: the target's **password** joins the
+  declared-secret set, so everything that already scrubs declared values
+  handles it - notes, events, logs, report. Fixing `_log` alone would have
+  been the tenth half-fix.
+- Two deliberate limits, both load-bearing. The **password only**: scrubbing
+  the username by substring would mangle prose, since a user called `admin`
+  would redact the word everywhere. And free text keeps **other** URLs'
+  userinfo, because a target leaking `http://svc:pw@db/` in its own HTML is
+  a disclosure finding and the note describing it is the evidence - a
+  blanket scrub would eat the finding it was meant to protect, the same
+  shape as redacting `Transfer-Encoding` out of a desync. The existing
+  4-character floor still applies, so a 3-char password stays out rather
+  than redacting innocent bytes everywhere.
+- Checked by disabling the fix and watching the test name the files
+  (`['notes.md', 'transcript.jsonl'] == []`) - before trusting it, this
+  time.
+
 ### A sweep test that claimed four fixes and covered one
 - The four redaction leaks were each found alone, so the obvious follow-up
   was one end-to-end guard: plant a distinct secret in every
@@ -1402,7 +1427,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 618 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 619 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

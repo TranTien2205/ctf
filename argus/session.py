@@ -516,6 +516,26 @@ class Session:
         # >=4 chars: a shorter 'secret' would redact innocent bytes across
         # the whole transcript - enforce the floor here, not just in CLI
         secrets = {s for s in (secrets or []) if len(s) >= 4}
+        # The target's own basic-auth PASSWORD joins the declared set, so
+        # every writer that already scrubs declared values covers it at
+        # once: notes.md, the transcript's events, agent.log, the report.
+        # `_redact_url` only reaches URL FIELDS, and the credential also
+        # travels as free text - the loop logs `session <id> -> <target>`,
+        # and a note or an event detail can quote it. Measured before this:
+        # notes.md, transcript.jsonl and agent.log each kept it.
+        #
+        # The PASSWORD only, and only at >=4 chars. Scrubbing the username
+        # by substring would mangle unrelated prose - a user called `admin`
+        # would redact the word everywhere - and scrubbing every URL's
+        # userinfo out of free text would eat a real finding: a target
+        # leaking `http://svc:pw@db/` in its own HTML is a disclosure, and
+        # the note describing it is the evidence.
+        try:
+            _pw = urllib.parse.urlsplit(target).password or ""
+        except ValueError:
+            _pw = ""
+        if len(_pw) >= 4:
+            secrets = set(secrets) | {_pw}
         if resume is not None:
             self.secret_values: set[str] = secrets
             self._resume(Path(resume), target, meta)

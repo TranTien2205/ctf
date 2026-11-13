@@ -295,3 +295,45 @@ def test_basic_auth_in_the_target_persists_in_no_artifact(tmp_path):
     with pytest.raises(ValueError):
         Session(tmp_path, "http://other.example/", meta={},
                 resume=str(sess.dir))
+
+
+def test_the_target_password_is_scrubbed_from_free_text_too(tmp_path):
+    """`_redact_url` reaches URL fields; the credential also travels as prose.
+
+    Measured before the fix, with the target's userinfo already redacted in
+    `meta.json`: `notes.md`, `transcript.jsonl` and `agent.log` each still
+    held it, because the loop logs `session <id> -> <target>` and a note or
+    an event detail can quote the URL. Three writers, one credential - the
+    ninth half-fix in this stretch, two commits after the first half.
+
+    The fix puts the target's PASSWORD into the declared-secret set, so
+    every writer that already scrubs declared values covers it at once.
+    Two deliberate limits, both load-bearing:
+
+    * the password only. Scrubbing the username by substring would mangle
+      prose - a user called `admin` would redact the word everywhere.
+    * free text keeps other URLs' userinfo. A target leaking
+      `http://svc:pw@db/` in its own HTML is a disclosure finding, and the
+      note describing it is the evidence; a blanket scrub would eat it.
+    """
+    target = "http://admin:FREETEXT9@10.0.0.5/app"
+    sess = Session(tmp_path, target, meta={})
+    sess.note("found it at " + target)
+    sess.record_event("note", {"detail": "target is " + target})
+
+    leaked = [p.name for p in sorted(sess.dir.iterdir())
+              if p.is_file() and "FREETEXT9" in p.read_text(errors="replace")]
+    assert leaked == [], leaked
+    assert "FREETEXT9" in sess.secret_values
+    # the username is not scrubbed as a word
+    assert "admin" not in sess.secret_values
+    # ...and another host's userinfo in free text survives, because that is
+    # a finding rather than an operator credential
+    sess.note("the page exposes http://svc:OtherPw1@db.internal/")
+    notes = (sess.dir / "notes.md").read_text(encoding="utf-8")
+    assert "OtherPw1" in notes
+
+    # a short password stays out of the set: a 3-char value would redact
+    # innocent bytes across every artifact
+    short = Session(tmp_path, "http://u:abc@10.0.0.6/", meta={})
+    assert "abc" not in short.secret_values
