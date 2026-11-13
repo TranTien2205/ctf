@@ -28,7 +28,10 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Rate limit and request budget always active | `GuardedClient.send` gate order: validate → rate → budget | `test_send_timeout_never_infinite`, `test_response_body_read_is_bounded` |
 | Non-finite/negative budgets rejected, not silently unlimited | `math.isfinite` in `load_config` and `RateLimiter` | `test_nonfinite_budgets_rejected` |
 | External tools cannot name out-of-scope targets | arg allowlists + URL spellings scanned in `argus/tools/external.py` | `test_curl_arg_guards`, `test_sqlmap_arg_guards`, `test_nmap_arg_guards`, `test_ffuf_arg_guards`, `test_nuclei_arg_guards`, `test_external_args_scope_scan` |
-| Exploit manifests cannot escape scope or leak env | `run_exploit` arg scan + env scrub + command escape guard | `test_run_exploit_scope`, `test_run_exploit_args_scope`, `test_run_exploit_env_scrubbed`, `test_run_exploit_command_escape` |
+| Exploit manifests cannot escape scope or leak env | `run_exploit` arg scan + env scrub (key-name AND declared-value) + command escape guard | `test_run_exploit_scope`, `test_run_exploit_args_scope`, `test_run_exploit_env_scrubbed`, `test_run_exploit_command_escape` |
+| Malformed manifests fail before anything executes | `command` must be a non-empty list; `proof_marker` regex must compile or is ignored | `test_run_exploit_malformed_manifest` |
+| Pipelined raw reads bounded | `send_raw` caps `reads` at 8 (each holds a socket timeout) | `probe_smuggle` paths + code review |
+| Blocked redirects record the destination | verbatim `Location` kept before `urljoin` parses it | `test_redirect_follow_stays_in_scope` + code review |
 
 ## Evidence and findings
 
@@ -47,11 +50,13 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Property | Enforced in | Proven by |
 |---|---|---|
 | Transcript is hash-chained; edits/inserts/deletes detected | `Session._chain` links + `verify_transcript` | `test_transcript_hash_chain_detects_tamper`, `test_chain_head_anchor_catches_tail_truncation` |
+| A failed transcript write cannot open a chain gap | lines serialize before `_last_chain`/`_transcript` mutate in `record_exchange`/`record_event`/`seal_artifacts` | `test_transcript_hash_chain_detects_tamper` + code review |
 | Chain head anchored outside the transcript | `summary.json` `transcript_chain_head` | `test_sealed_artifacts_detect_edits` |
 | Reports/metadata/findings digests sealed | `Session.seal_artifacts` `artifacts_digest` event | `argus verify docs/sample-session` → "N chained entries verified" |
 | All artifact writes atomic | `_atomic_write` for meta/findings/summary/reports | crash-safety reviewed; readers never see partial JSON |
 | Tampered sessions degrade to warnings, never crashes | dict/shape guards across verify/report/findings/diff/compare | `test_readers_survive_mutated_session_dir`, `test_cli_tolerates_corrupt_session_files`, `test_verify_tolerates_nonregular_artifact` |
 | Resume carries transcript+findings, refuses wrong target | `Session._resume` target check | `test_session_resume`, `test_session_resume_wrong_target_refused`, `test_loop_resume_seed_carries_findings` |
+| Cross-host diffs/compares warn instead of silently misleading | `diff`/`compare` check meta.json targets; retests stay port-insensitive | verified on synthetic sessions (different host warns; same host new port does not) |
 
 ## Secrets and data hygiene
 
