@@ -894,6 +894,16 @@ somebody reading only the list.
   test module, with a second check that the column has not quietly emptied.
   `CHANGELOG.md` stays out of scope on purpose: it is a historical record,
   so an entry saying a test was deleted names it correctly by its old name.
+- And a repository invariant the gate did not hold: nothing large or opaque
+  may be tracked. The biggest tracked file is about 150 KB and the package is
+  standard-library-only by design, so a megabyte of anything is a mistake -
+  and the mistake is close at hand. This working tree holds a 19 MB
+  `ghidra.zip` and two 4 MB binaries, untracked and **not** ignored, so one
+  `git add -A` writes some 27 MB of binaries into the history, where removing
+  them means rewriting it. The check refuses archives and anything over a
+  mebibyte; it does not decide what may be committed, only which shapes
+  cannot be taken back. The examined count is in the label, so a checkout
+  with no git reads as "0 examined" rather than as agreement.
   `race` and `deserialize` are excluded with a stated reason in the module
   docstring - `/import` returns a parser error and never executes, so
   "identity output plus the probe nonce" is unobtainable against this lab,
@@ -992,7 +1002,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 149 offline checks, including a documentation
+- `python selftest.py`: 150 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

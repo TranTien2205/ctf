@@ -687,6 +687,7 @@ _NOT_TOOLS = {
 
 def _doc_consistency() -> None:
     import re as _re
+    import subprocess as _sub
     from argus.tools.registry import TOOL_SCHEMAS
     from argus.mcpserver import tool_manifest
     from argus import proof
@@ -1010,6 +1011,47 @@ def _doc_consistency() -> None:
     # A regex that stops matching would make the check above pass forever on
     # nothing, and the claims table without its third column is just
     # assertions.
+    # 7. nothing large or opaque is tracked in git.
+    #
+    #    The biggest tracked file is ~150 KB and the package is
+    #    standard-library-only by design, so a megabyte of anything is a
+    #    mistake - and the mistake is close at hand. This working tree holds
+    #    a 19 MB `ghidra.zip` and two 4 MB binaries, untracked and NOT
+    #    ignored, so one `git add -A` writes ~27 MB of binaries into the
+    #    history, where removing them means rewriting it. This check does
+    #    not decide what may be committed; it refuses the shapes that cannot
+    #    be taken back. The file count is in the label so a run with no git
+    #    (an sdist checkout) reads as "0 examined" rather than as agreement.
+    _LIMIT = 1 << 20
+    _OPAQUE = (".zip", ".tar", ".tgz", ".gz", ".bz2", ".xz", ".7z", ".rar",
+               ".iso", ".dmg", ".exe", ".dll", ".so", ".bin", ".jar")
+    tracked, oversized = [], []
+    try:
+        listing = _sub.run(["git", "ls-files", "-z"], cwd=ROOT,
+                           capture_output=True, timeout=30)
+        if listing.returncode == 0:
+            tracked = [n for n in listing.stdout.decode(
+                "utf-8", "replace").split("\0") if n]
+    except (OSError, _sub.SubprocessError):
+        tracked = []
+    for name in tracked:
+        fp = ROOT / name
+        if not fp.is_file():
+            continue
+        if name.lower().endswith(_OPAQUE):
+            oversized.append(f"{name} (opaque)")
+        else:
+            try:
+                size = fp.stat().st_size
+            except OSError:
+                continue
+            if size > _LIMIT:
+                oversized.append(f"{name} ({size // 1024} KiB)")
+    check(f"nothing large or opaque is tracked ({len(tracked)} examined)",
+          not oversized,
+          f"{sorted(oversized)[:6]} - an archive or a megabyte of binary in "
+          "the history can only be removed by rewriting it")
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "
