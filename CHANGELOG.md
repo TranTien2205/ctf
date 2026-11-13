@@ -171,6 +171,11 @@ system. All notable milestones on `agent-v2`.
   `argus compare` warn when session targets resolve to different base
   hosts (a cross-host diff silently reads as all-fixed + all-new);
   same-host retests on a different port stay quiet and keep matching.
+- Artifact provenance: `meta.json` and `summary.json` record the
+  producing `argus_version` (resume keeps the original and marks
+  `resumed_by`); `argus sessions` lists it, `argus verify` reports it
+  (text + `--json` `produced_by`/`resumed_by`), and `argus compare`
+  warns when metric sets come from different builds.
 
 ### Verification & packaging
 - `python selftest.py`: 117 offline checks.
