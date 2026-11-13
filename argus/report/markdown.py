@@ -133,20 +133,6 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     ttf = round(first_ts - session.started, 1) \
         if first_ts and session.started else None
 
-    lines = [
-        f"# Penetration Test Report - {session.id}",
-        "",
-        f"- **Target:** `{session.dir.name.split('-', 2)[-1]}` ({session.dir.name})",
-        f"- **Date:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started))}",
-        f"- **Duration:** {_duration(session)}s",
-        f"- **Agent model:** {cfg.model}",
-        f"- **Requests sent:** {session._seq}",
-        "",
-        "## Executive summary",
-        "",
-        summary or "_No agent summary was recorded._",
-        "",
-    ]
     meta = {}
     mp = session.dir / "meta.json"
     if mp.exists():
@@ -156,6 +142,23 @@ def render_report(session: Session, cfg: Config, summary: str = "",
             meta = {}
         if not isinstance(meta, dict):
             meta = {}
+    lines = [
+        f"# Penetration Test Report - {session.id}",
+        "",
+        f"- **Target:** `{session.dir.name.split('-', 2)[-1]}` ({session.dir.name})",
+        f"- **Date:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started))}",
+        f"- **Duration:** {_duration(session)}s",
+        f"- **Agent model:** {cfg.model}",
+        # the build that produced the session - falls back to this
+        # renderer's on old artifacts without a stamp
+        f"- **Argus version:** {meta.get('argus_version') or __version__}",
+        f"- **Requests sent:** {session._seq}",
+        "",
+        "## Executive summary",
+        "",
+        summary or "_No agent summary was recorded._",
+        "",
+    ]
     if meta.get("operator"):
         lines.insert(6, f"- **Operator:** {meta['operator']}")
     lines += [
