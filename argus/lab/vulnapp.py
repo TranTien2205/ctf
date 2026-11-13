@@ -54,7 +54,6 @@ import re
 import sqlite3
 import sys
 import tempfile
-import threading
 import time
 import urllib.parse
 import urllib.request

@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 
 from ..mcp import MCPError
-from ..scope import ScopeError
 from .registry import Context, _ival
 
 RETURN_CAP = 12_000

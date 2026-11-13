@@ -10,10 +10,8 @@ import re
 import shutil
 import socket
 import subprocess
-import urllib.parse
 from pathlib import Path
 
-from ..scope import ScopeError
 from .registry import Context, _ival
 
 # ---------------------------------------------------------------- jwt

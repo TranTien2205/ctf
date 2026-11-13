@@ -6,7 +6,6 @@ import json
 import os
 import re
 import subprocess
-import time
 import urllib.parse
 from pathlib import Path
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 import threading
 import time
 
-from .leads import Lead, LeadQueue
+from .leads import LeadQueue
 
 
 class Board:

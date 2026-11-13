@@ -6,7 +6,6 @@ stays at one package. Honors ANTHROPIC_BASE_URL for gateways/proxies.
 from __future__ import annotations
 
 import time
-from typing import Callable
 
 import httpx
 
@@ -127,7 +126,7 @@ class ClaudeClient:
                     continue
                 if not isinstance(data, dict):
                     # valid JSON, wrong shape - same transient-gateway class
-                    last_error = f"HTTP 200 with non-object JSON body"
+                    last_error = "HTTP 200 with non-object JSON body"
                     time.sleep(delay)
                     delay = min(delay * 2, 30)
                     continue
