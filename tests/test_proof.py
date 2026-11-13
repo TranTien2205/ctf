@@ -5,6 +5,7 @@ evidence is easy; a gate that refuses a plausible-looking claim is the whole
 point, and the case that proves it is a benign page that happens to contain
 the right-looking string.
 """
+import itertools
 import sys
 from pathlib import Path
 
@@ -15,9 +16,22 @@ from argus import proof
 from argus.session import Session
 
 
+_TS = itertools.count(1_700_000_000.0, 0.25)
+
+
 def ex(rid, url, body, status=200, headers=None, method="GET",
-       req_headers=None, req_body=None):
+       req_headers=None, req_body=None, ts=None):
+    """A recorded exchange, with a `ts` because a real one always has one.
+
+    This helper built entries WITHOUT `ts`, which made it an unfaithful
+    fixture for any requirement that orders evidence in time - and
+    `verify_state_change` reads recorded time to tell the read before a
+    write from the read after it. Entries get an increasing stamp in
+    creation order, which is how a transcript is actually written; a test
+    that needs a specific order passes `ts` explicitly.
+    """
     return {"id": rid,
+            "ts": next(_TS) if ts is None else ts,
             "request": {"method": method, "url": url,
                         "headers": req_headers or {"host": "t.local"},
                         "body": req_body},
@@ -835,21 +849,35 @@ def test_cors_allowlist_working_is_not_a_finding():
 def test_csrf_needs_a_tokenless_cross_origin_write():
     """Any GET plus any POST plus any difference graded csrf - that is a web
     site, not a finding."""
-    before = ex("b22", "http://t.local/settings", "<p>email: old@x.test</p>")
+    # explicit stamps: each write has to sit BETWEEN the two reads, because
+    # that is the sequence the claim describes. Left to creation order,
+    # `cross` and `tokened` are built after `after` and so are recorded
+    # after it - and a write that followed the read it supposedly caused is
+    # correctly refused.
+    before = ex("b22", "http://t.local/settings", "<p>email: old@x.test</p>",
+                ts=10.0)
     write = ex("b23", "http://t.local/settings/update-email", "ok", 200,
-               method="POST", req_body="email=new@evil.test")
-    after = ex("b24", "http://t.local/settings", "<p>email: new@evil.test</p>")
+               method="POST", req_body="email=new@evil.test", ts=11.0)
+    after = ex("b24", "http://t.local/settings", "<p>email: new@evil.test</p>",
+               ts=12.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, write, after]).grade != "proven"
     cross = ex("b25", "http://t.local/settings/update-email", "ok", 200,
                method="POST", req_body="email=new@evil.test",
-               req_headers={"origin": "http://evil.test"})
+               req_headers={"origin": "http://evil.test"}, ts=11.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, cross, after]).grade == "proven"
+    # ...and the same write recorded AFTER the read it is claimed to have
+    # caused is not a finding
+    late = ex("b25b", "http://t.local/settings/update-email", "ok", 200,
+              method="POST", req_body="email=new@evil.test",
+              req_headers={"origin": "http://evil.test"}, ts=99.0)
+    assert proof.grade("csrf", "new@evil.test",
+                       [before, late, after]).grade != "proven"
     tokened = ex("b26", "http://t.local/settings/update-email", "ok", 200,
                  method="POST",
                  req_body="email=new@evil.test&csrf_token=abc",
-                 req_headers={"origin": "http://evil.test"})
+                 req_headers={"origin": "http://evil.test"}, ts=11.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, tokened, after]).grade != "proven"
 
@@ -2561,12 +2589,20 @@ def test_csrf_refuses_two_different_pages_as_the_change():
     assert v.grade == "proven", v.missing
 
 
-def test_csrf_ordering_falls_back_to_position_without_timestamps():
-    """An old session with no `ts` must still order before/after correctly.
+def test_csrf_ordering_is_fail_closed_without_timestamps():
+    """I asserted the opposite here, and the assertion was the defect.
 
-    Ordering each entry on its own - `ts` when present, position otherwise -
-    mixes two scales: every position-ordered entry (1, 2, 3) sorts before
-    every timestamped one (1.79e9). So the fallback is all-or-nothing.
+    The first version of this ordered an exchange by its POSITION when the
+    session carried no `ts`. But the cited list is built as
+    `[entries.get(r) for r in evidence_ids]`, so its order is whatever the
+    finding's author wrote - a claimant listing the ids in a chosen order
+    would decide which read came "before" the write. An ordering a claimant
+    controls is not an ordering.
+
+    So it fails closed: no recorded time, no before/after, no proof. The
+    same holds for two exchanges sharing a timestamp - at the recorder's
+    resolution they cannot be told apart, and a strict comparison excludes
+    them.
     """
     foreign = {"Origin": "https://evil.example"}
     no_ts = [
@@ -2581,11 +2617,19 @@ def test_csrf_ordering_falls_back_to_position_without_timestamps():
          "response": {"status": 200, "body": "email: evil@attacker"}},
     ]
     v = proof.grade("csrf", "email: evil@attacker", no_ts)
-    assert v.grade == "proven", v.missing
-    # and the reverse claim is still refused without timestamps
-    v = proof.grade("csrf", "email: old@x", no_ts)
     assert v.grade != "proven", v.checks
+    assert any("state changed between two reads" in str(c.get("check"))
+               and not c.get("ok") for c in v.checks)
 
+    # the same three with recorded time, in order, do prove
+    stamped = [dict(e, ts=float(i + 1)) for i, e in enumerate(no_ts)]
+    assert proof.grade("csrf", "email: evil@attacker",
+                       stamped).grade == "proven"
+
+    # ...and one shared timestamp is not an order either
+    tied = [dict(e, ts=5.0) for e in no_ts]
+    assert proof.grade("csrf", "email: evil@attacker",
+                       tied).grade != "proven"
 
 def test_massassign_refuses_a_read_that_does_not_carry_the_field():
     """"A later read shows it set" asked only that SOME bytes came back.

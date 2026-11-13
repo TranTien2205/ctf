@@ -556,6 +556,13 @@ def _acl_header_changed_the_answer(served: dict | None, exchanges: list,
         hdrs = " ".join(f"{k}: {v}" for k, v in _req_headers(entry).items())
         if ACL_HEADER_RE.search(hdrs):
             continue
+        # ...and the control has to be a real answer. A transient 500 on the
+        # same URL satisfies "same request, no ACL header, excerpt absent"
+        # for a reason that has nothing to do with the header: the page
+        # failed. That would make a flaky error the evidence that an ACL was
+        # bypassed.
+        if not (200 <= status_of(entry) < 400):
+            continue
         if excerpt not in resp_body(entry):
             return True
     return False
@@ -567,29 +574,30 @@ def _req_headers(entry: dict) -> dict:
 
 
 def _ordering(exchanges: list) -> dict:
-    """When each cited exchange happened, for checks that need before/after.
+    """Recorded time per cited exchange, for checks that need before/after.
 
-    `ts` is what the recorder wrote at the time; the cited order is a
-    claimant-supplied list and must not be the only thing a "before" rests
-    on. Position is the fallback for an old session that has no `ts`.
+    `ts` is what the recorder wrote at the time, and it is the ONLY thing
+    this may rest on. The first version fell back to the entry's position
+    when a session had no `ts`, and broke ties on position too - but the
+    cited list is built as `[entries.get(r) for r in evidence_ids]`, so its
+    order is whatever the finding's author wrote. A claimant listing the
+    ids in a chosen order would then decide which read was "before" the
+    write, which is the opposite of a check.
 
-    The two scales must not be mixed. Ordering each entry independently -
-    `ts` when it has one, position otherwise - puts every position-ordered
-    entry (1, 2, 3) before every timestamped one (1.79e9), which is not a
-    fallback but a wrong answer. So it is `ts` only when EVERY cited
-    exchange has one, and position for all of them otherwise.
+    So it is fail-closed: an exchange without a usable `ts` gets no
+    position, and a check that needs to order it finds nothing to order.
+    Equal timestamps are equally unusable - a strict `<` or `>` against the
+    write excludes them, which is right, because at the recorder's
+    resolution those two events cannot be told apart.
     """
-    stamps = []
+    out = {}
     for entry in exchanges or ():
         value = (entry or {}).get("ts")
         try:
-            stamps.append(float(value))
+            out[id(entry)] = float(value)
         except (TypeError, ValueError):
-            stamps = None
-            break
-    if stamps is None:
-        return {id(e): (float(i), i) for i, e in enumerate(exchanges or ())}
-    return {id(e): (stamps[i], i) for i, e in enumerate(exchanges or ())}
+            continue
+    return out
 
 
 def _path_of(entry: dict) -> str:

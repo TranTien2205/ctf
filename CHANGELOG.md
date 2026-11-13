@@ -925,6 +925,40 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### An audit of this session's own changes, and two holes in them
+- The rule this repository already records is to audit a gate adversarially
+  before trusting the green suite, because a passing test asserts what its
+  author thought of. Nine verifiers and six probes changed here; the audit
+  had been done in spots and not over the whole diff. Over the whole diff it
+  found two.
+- **An ordering a claimant controls.** `_ordering`, added for the csrf
+  before/after check, fell back to an exchange's POSITION when the session
+  carried no `ts`. But the cited list is built as
+  `[entries.get(r) for r in evidence_ids]` - its order is whatever the
+  finding's author wrote. A claimant listing the ids in a chosen order would
+  decide which read came "before" the write, and the tie-break on equal
+  timestamps was position too. It is fail-closed now: no recorded time, no
+  before/after, no proof - and two exchanges sharing a stamp are equally
+  unusable, because at the recorder's resolution they cannot be told apart.
+- **A transient error as the control.** `_acl_header_changed_the_answer`
+  asked for the same URL, no ACL header, and the quoted content absent. A
+  flaky 500 on that URL satisfies all three for a reason that has nothing to
+  do with the header: the page failed. The control must be a real answer
+  (2xx/3xx) now.
+- Three things about the instruments, kept because the next session will
+  otherwise repeat them. My own test
+  `test_csrf_ordering_falls_back_to_position_without_timestamps` existed to
+  **protect** the positional fallback; it asserts the opposite now and says
+  where I was wrong. `ex()` - the fixture helper behind 178 tests - built
+  exchanges with **no `ts`** while a real session always has one, making it
+  unfaithful to the recorder for every time-ordered requirement; it stamps
+  in creation order now, and the csrf test's writes carry explicit stamps
+  because, left to creation order, a write built after the read it supposedly
+  caused is recorded after it and correctly refused. And a
+  `replace(..., 1)` of mine matched a function-local `import json` instead of
+  the module header and broke the file - the one place in this stretch where
+  I omitted the `assert s.count(old) == 1` guard I had used everywhere else.
+
 ### deserialize comes off the "cannot be proven here" list
 - I had written that this class needs "a second code-execution path, which
   `CLAUDE.md` blocks", and cited the rule at the reader twice. Reading the
