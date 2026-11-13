@@ -691,12 +691,36 @@ somebody reading only the list.
   `argus compare` both warns on cross-build metric sets and prints
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
+### Costs, verdict parsing, and three smaller things the audit had flagged
+- **Cache writes were free.** `Model.cost` charged cache READS at a tenth of
+  input and never charged cache WRITES at all, so a run that primed a large
+  prefix was understated - the cheaper half priced, the more expensive half
+  free. On the published 5-minute-TTL rates a write is ~1.25x input, so a
+  100k-write / 900k-read run was reported at 0.27 USD and actually costs
+  0.645. Both call sites pass the fourth count now, and `summary.json`'s
+  `basis` line says what it charges.
+- **`parse_verdict` was quadratic.** It restarted the brace scan from every
+  `{` and ran to the end of the reply, so an 8 KB answer with nested objects
+  took seconds - per finding. One depth-tracking pass does the same work in
+  3 ms at 16 KB, and it no longer counts braces that sit inside a JSON string.
+- **Every cited record was labelled `(event)`** in the judge's case file -
+  the word this module's own prompt uses for evidence that is NOT class
+  evidence - so a judge reading a real request/response pair was told it was
+  not one. An exchange reads `(http exchange)`; an event keeps its kind.
+- **An unrated finding swallowed a severity reduction.** `apply_verdict`
+  compared against `_RANK` and gave up when the finding's own severity was
+  absent or misspelled, silently dropping the one direction this module is
+  supposed to allow. It applies it and records `severity_was_unrated`.
+- **The lab's frame echo had no deadline.** `settimeout` bounds one `recv`,
+  not a frame, so a client feeding one byte at a time held a handler thread
+  indefinitely - test-only code, but it runs in the selftest's own process.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 542 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 548 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

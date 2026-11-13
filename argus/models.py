@@ -48,20 +48,36 @@ class Model:
     allow_insecure_base: bool = False
     note: str = ""
 
-    def cost(self, tokens_in: int, tokens_out: int,
-             cache_read: int = 0) -> float:
-        """USD for this many tokens.
+    #: Cache reads bill at about a tenth of base input, cache writes at about
+    #: 1.25x, on the published 5-minute-TTL rates the loop's ephemeral
+    #: breakpoints use. Reads are the whole reason the loop marks a
+    #: breakpoint; writes were simply not counted, which understated a run
+    #: that primed a large prefix - the cheaper half was priced and the
+    #: more expensive half was free.
+    CACHE_READ_MULTIPLIER = 0.1
+    CACHE_WRITE_MULTIPLIER = 1.25
 
-        Cache reads bill at a tenth of input on the paths that support them,
-        which is the whole reason the loop marks a cache breakpoint - counting
-        them at full price would make the caching look like it does nothing.
+    def cost(self, tokens_in: int, tokens_out: int,
+             cache_read: int = 0, cache_write: int = 0) -> float:
+        """USD for this many tokens, on the rates in `models.json`.
+
+        Four counts, because a run has four: uncached input, cache reads,
+        cache writes, and output. A caller that omits `cache_write` gets the
+        old answer, which is why it defaults to zero rather than raising -
+        but `summary.json` passes all four.
         """
-        billed_in = max(int(tokens_in or 0), 0)
-        reads = max(int(cache_read or 0), 0)
+        def _n(value) -> int:
+            try:
+                return max(int(value or 0), 0)
+            except (TypeError, ValueError):
+                return 0
+
+        rate_in = self.usd_per_mtok_in
         return round(
-            (billed_in * self.usd_per_mtok_in
-             + reads * self.usd_per_mtok_in * 0.1
-             + max(int(tokens_out or 0), 0) * self.usd_per_mtok_out) / 1e6, 6)
+            (_n(tokens_in) * rate_in
+             + _n(cache_read) * rate_in * self.CACHE_READ_MULTIPLIER
+             + _n(cache_write) * rate_in * self.CACHE_WRITE_MULTIPLIER
+             + _n(tokens_out) * self.usd_per_mtok_out) / 1e6, 6)
 
     def credential(self) -> str:
         for name in self.api_key_env:

@@ -171,6 +171,18 @@ def pick_judge(author_model: str, policy: str = "strong"):
     return pick
 
 
+def _kind_of(entry: dict) -> str:
+    """What this record IS, for a judge reading the case file.
+
+    Every cited record was labelled `(event)` - the word this module's own
+    prompt uses for evidence that is not class evidence - so a judge reading
+    a real request/response pair was told it was not one.
+    """
+    if isinstance(entry.get("response"), dict):
+        return "http exchange"
+    return str(entry.get("kind") or "event")
+
+
 def render_case(finding: dict, entries: list[dict]) -> str:
     """The case file a judge reads: claim, requirement, cited bytes."""
     klass = proof.normalize(str(finding.get("vuln_class") or ""))
@@ -212,7 +224,7 @@ def render_case(finding: dict, entries: list[dict]) -> str:
             req.get("headers"), dict) else {}
         lines += [
             "",
-            f"### {entry.get('id')} ({entry.get('kind', 'event')})",
+            f"### {entry.get('id')} ({_kind_of(entry)})",
             _scrub(f"{req.get('method', '')} {req.get('url', '')}".strip())
             or "(no request recorded)",
         ]
@@ -251,27 +263,39 @@ def parse_verdict(text: str, finding_id: str, judge_model: str) -> Verdict:
     is recorded as no verdict, not as assent.
     """
     raw = str(text or "")
+    # One pass, not one per brace. The old scan restarted from every `{` and
+    # ran to the end of the reply, so an 8 KB answer with nested objects took
+    # seconds - per finding. Depth tracking finds the same balanced objects in
+    # a single sweep, and skips braces inside strings, which the old scan
+    # counted.
     found: list[dict] = []
-    start = raw.find("{")
-    while start != -1:
-        depth, end = 0, -1
-        for i in range(start, len(raw)):
-            if raw[i] == "{":
-                depth += 1
-            elif raw[i] == "}":
+    depth, start, in_string, escaped = 0, -1, False, False
+    for i, ch in enumerate(raw):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            if depth:
                 depth -= 1
-                if depth == 0:
-                    end = i + 1
-                    break
-        if end == -1:
-            break
-        try:
-            candidate = json.loads(raw[start:end])
-        except ValueError:
-            candidate = None
-        if isinstance(candidate, dict) and "agrees" in candidate:
-            found.append(candidate)
-        start = raw.find("{", start + 1)
+                if depth == 0 and start != -1:
+                    try:
+                        candidate = json.loads(raw[start:i + 1])
+                    except ValueError:
+                        candidate = None
+                    if isinstance(candidate, dict) and "agrees" in candidate:
+                        found.append(candidate)
+                    start = -1
     if not found:
         return Verdict(finding_id, judge_model, agrees=False,
                        error="the judge returned no JSON object carrying "
@@ -345,9 +369,16 @@ def apply_verdict(finding: dict, verdict: Verdict) -> dict:
     if not verdict.agrees and not verdict.error:
         out["disputed"] = True
     if verdict.severity:
-        current = _RANK.get(str(out.get("severity") or "").lower(), 99)
+        raw = str(out.get("severity") or "").lower()
         proposed = _RANK.get(verdict.severity, 99)
-        if proposed > current:          # higher rank number = less severe
+        if raw not in _RANK:
+            # No canonical severity to compare against - an unrated or
+            # misspelled finding used to swallow the reduction silently,
+            # which is the one direction this module is supposed to allow.
+            out["severity_claimed"] = out.get("severity")
+            out["severity"] = verdict.severity
+            out["severity_was_unrated"] = True
+        elif proposed > _RANK[raw]:     # higher rank number = less severe
             out["severity_claimed"] = out.get("severity")
             out["severity"] = verdict.severity
     if (verdict.vuln_class

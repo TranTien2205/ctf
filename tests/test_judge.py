@@ -336,3 +336,54 @@ def test_a_later_judge_cannot_present_itself_as_the_whole_story():
     assert "DISPUTED by cross-verification" in block, block
     assert "2 judges read this evidence" in block
     assert "gpt-4.1 disputed" in block and "claude-opus-4-5 agreed" in block
+
+
+def test_the_verdict_scan_is_linear_in_the_reply_length():
+    """It restarted from every `{` and ran to the end, so an 8 KB answer with
+    nested objects took seconds - per finding."""
+    import time
+    timings = {}
+    for n in (500, 8000):
+        reply = "{" * n + "}" * n + '{"agrees": false, "reason": "no control"}'
+        start = time.monotonic()
+        verdict = judge.parse_verdict(reply, "F01", "gpt-4.1")
+        timings[n] = time.monotonic() - start
+        assert verdict.agrees is False
+        assert verdict.reason == "no control"
+    # sixteen times the input must not cost anything like sixteen times as long
+    assert timings[8000] < timings[500] * 8 + 0.5, timings
+
+
+def test_a_brace_inside_a_string_is_not_an_object():
+    verdict = judge.parse_verdict(
+        '{"agrees": false, "reason": "the body was {not} json"}', "F", "m")
+    assert verdict.agrees is False
+    assert verdict.reason == "the body was {not} json"
+    assert not verdict.error
+
+
+def test_a_cited_http_exchange_is_not_labelled_an_event():
+    """Every record was labelled `(event)` - the word this module's own prompt
+    uses for evidence that is NOT class evidence - so a judge reading a real
+    request/response pair was told it was not one."""
+    case = judge.render_case(FINDING, [ENTRY])
+    headers = [l for l in case.splitlines() if l.startswith("### ")]
+    assert headers and "http exchange" in headers[0], headers
+    event = {"id": "r9", "kind": "jwt_forge", "claims_set": "{}"}
+    case = judge.render_case(FINDING, [event])
+    assert "(jwt_forge)" in case
+
+
+def test_an_unrated_finding_still_takes_a_severity_reduction():
+    """A finding with no canonical severity swallowed the reduction silently -
+    the one direction this module is supposed to allow."""
+    out = judge.apply_verdict(
+        {"id": "F01", "vuln_class": "sqli", "grade": "proven"},
+        judge.Verdict("F01", "gpt-4.1", agrees=False, severity="low"))
+    assert out["severity"] == "low"
+    assert out["severity_was_unrated"] is True
+    # and raising is still refused, unrated or not
+    out = judge.apply_verdict(
+        {"id": "F01", "severity": "low", "grade": "proven"},
+        judge.Verdict("F01", "gpt-4.1", agrees=False, severity="critical"))
+    assert out["severity"] == "low"

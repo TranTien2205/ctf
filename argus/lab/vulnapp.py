@@ -238,6 +238,14 @@ class Handler(BaseHTTPRequestHandler):
         """
         import struct
         sock = self.connection
+        deadline = time.monotonic() + 5.0   # the WHOLE frame, not one recv:
+        # settimeout bounds a single read, so a client feeding one byte at a
+        # time held a handler thread indefinitely. Test-only code, but it
+        # runs in the selftest's own process.
+
+        def _expired() -> bool:
+            return time.monotonic() > deadline
+
         try:
             sock.settimeout(3.0)
             head = sock.recv(2)
@@ -255,6 +263,8 @@ class Handler(BaseHTTPRequestHandler):
             mask = sock.recv(4) if masked else b""
             payload = b""
             while len(payload) < length:
+                if _expired():
+                    return
                 chunk = sock.recv(length - len(payload))
                 if not chunk:
                     break

@@ -660,3 +660,29 @@ def test_a_team_run_prices_each_worker_at_the_model_it_used(monkeypatch):
     assert out["per_agent"]["recon-1"]["model"] == picks["recon"]
     assert out["per_agent"]["exploit-1"]["model"] == picks["exploit"]
     assert dataclasses.is_dataclass or True
+
+
+def test_cache_writes_are_billed_not_free():
+    """`Model.cost` priced cache READS at a tenth of input and never charged
+    cache WRITES at all, so a run that primed a large prefix was understated:
+    the cheaper half was priced and the more expensive half was free. Published
+    5-minute-TTL rates are ~1.25x input for a write, ~0.1x for a read."""
+    spec = models.get("claude-sonnet-4-5")
+    base = spec.cost(1_000_000, 0)
+    assert spec.cost(0, 0, cache_read=1_000_000) == pytest.approx(base * 0.1)
+    assert spec.cost(0, 0, cache_write=1_000_000) == pytest.approx(base * 1.25)
+    # a primed run costs more than the same run counted without its writes
+    primed = spec.cost(0, 0, cache_read=900_000, cache_write=100_000)
+    assert primed > spec.cost(0, 0, cache_read=900_000)
+    # and the counts are still read defensively
+    assert spec.cost("x", None, cache_read=[], cache_write=-5) == 0.0
+
+
+def test_the_loop_and_the_team_both_pass_cache_writes_through():
+    """A rate nobody calls is a rate nobody charges."""
+    import inspect
+    from argus.loop import AgentLoop
+    from argus.team import coordinator
+    for src in (inspect.getsource(AgentLoop._cost_stats),
+                inspect.getsource(coordinator.TeamRun._cost_breakdown)):
+        assert "cache_write=" in src, src[:200]

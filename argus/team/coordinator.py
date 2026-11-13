@@ -164,12 +164,14 @@ class TeamRun:
                 per_agent[name] = {"model": model, "usd": None}
                 continue
             usd = spec.cost(tok.get("in", 0), tok.get("out", 0),
-                            cache_read=tok.get("cache_read", 0))
+                            cache_read=tok.get("cache_read", 0),
+                            cache_write=tok.get("cache_write", 0))
             total += usd
             per_agent[name] = {"model": model, "usd": usd}
         out = {"usd": round(total, 6), "per_agent": per_agent,
                "table_version": models_mod.table_version(),
-               "basis": "cache reads billed at 10% of input, per models.json"}
+               "basis": "cache reads at 10% and cache writes at 125% of "
+                        "input, per models.json"}
         if unpriced:
             out["unpriced"] = unpriced
             out["basis"] += (f"; {len(unpriced)} agent(s) ran a model with no "

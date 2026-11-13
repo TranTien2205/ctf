@@ -379,12 +379,14 @@ class AgentLoop:
                     "basis": "model is not in models.json; no price to apply"}
         return {
             "usd": spec.cost(tokens["in"], tokens["out"],
-                             cache_read=tokens["cache_read"]),
+                             cache_read=tokens["cache_read"],
+                             cache_write=tokens["cache_write"]),
             "model": self.cfg.model,
             "table_version": models_mod.table_version(),
             "usd_per_mtok_in": spec.usd_per_mtok_in,
             "usd_per_mtok_out": spec.usd_per_mtok_out,
-            "basis": "cache reads billed at 10% of input, per models.json",
+            "basis": "cache reads at 10% and cache writes at 125% of input, "
+                     "per models.json on the published 5-minute-TTL rates",
         }
 
     def _token_stats(self) -> dict:
