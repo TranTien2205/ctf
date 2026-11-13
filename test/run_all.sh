@@ -112,7 +112,7 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/vba_extract.py tools/forensics/browser_hist.py \
          tools/forensics/squashfs_read.py tools/forensics/fat_read.py \
          tools/forensics/part_table.py tools/forensics/wtmp_parse.py \
-         tools/jclass_info.py tools/forensics/ioc_scan.py \
+         tools/jclass_info.py tools/dotnet_info.py tools/forensics/ioc_scan.py \
          tools/dtmf_decode.py tools/fmt_write.py tools/sc_gen.py \
          tools/forensics/img_struct.py tools/proto_decode.py \
          tools/forensics/pdf_objs.py tools/forensics/ext_read.py \
