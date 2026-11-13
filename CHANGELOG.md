@@ -27,13 +27,24 @@ system. All notable milestones on `agent-v2`.
   and dot-segments cannot bypass `--exclude` (httpx decodes/resolves
   before sending, so the raw-path check was fail-open).
 - Operator secrets never persist: `Authorization`/`Cookie`/`Set-Cookie`/
-  `X-*-Token` and any `--header`-configured value are redacted at record
-  time (transcript + logs) and re-redacted at render time (old sessions);
+  `X-*-Token` are redacted at record time by HEADER NAME (transcript +
+  logs) and re-redacted at render time (old sessions);
   `--proxy` remains the wire-fidelity path. `--secret`/`ARGUS_SECRETS`
   declare credential *values* (login passwords posted in bodies, quoted
   tokens) that `Session` redacts inside every artifact write — bodies,
   event output, notes, meta.json, logs — while the model still sees the
   real bytes.
+- That sentence used to end "...and any `--header`-configured value are
+  redacted at record time", which claimed value-based redaction for every
+  `--header`. The code does not do that and **should not**: adding each
+  header value to the scrubbed set would put `application/json` from
+  `--header 'Accept: application/json'` into it and redact that string
+  across every artifact, destroying evidence. Name-based redaction for the
+  credential-bearing headers, plus `--secret` for a credential used
+  anywhere else, is the design - `docs/ARCHITECTURE.md` always stated it
+  correctly. A claim stronger than the implementation is the defect this
+  repository exists to refuse, and the documentation gate cannot catch this
+  one: it checks names and counts, not whether a sentence is true.
 
 ### The proof matrix (`argus/proof.py`)
 - The verbatim gate proves the bytes were observed, not that the class was
