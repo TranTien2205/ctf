@@ -185,6 +185,8 @@ system. All notable milestones on `agent-v2`.
   `/graphql-strict` and `/hello2`; `probe_method` gets its first
   coverage. Selftest exercises all four new paths (bad-header notes,
   schema+GET transport, suggestion leak, eval-and-reflect SSTI).
+- `render_html` tolerates a transcript entry carrying `response: null`
+  (forensic readers degrade malformed artifacts, never traceback).
 - Recon extraction quality: `js_recon` recovers endpoints from generic
   HTTP-client call shapes (`this.http.get`, axios instances,
   superagent `.request`) with a path-like restriction so `map.get('k')`
