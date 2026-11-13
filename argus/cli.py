@@ -325,7 +325,8 @@ def main(argv: list[str] | None = None) -> int:
                                findings=len(s.get("findings") or []),
                                requests=s.get("requests", "?"),
                                duration=s.get("duration_s"),
-                               sealed=bool(s.get("sealed")))
+                               sealed=bool(s.get("sealed")),
+                               version=s.get("argus_version") or "?")
                 except Exception:
                     pass
             rows.append(row)
@@ -341,7 +342,8 @@ def main(argv: list[str] | None = None) -> int:
             seal = " sealed" if r.get("sealed") else ""
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
-                  f"requests={r.get('requests','?')} dur={dur}{seal}")
+                  f"requests={r.get('requests','?')} dur={dur} "
+                  f"v{r.get('version','?')}{seal}")
         return 0
 
     if args.cmd == "verify":
@@ -580,6 +582,7 @@ def main(argv: list[str] | None = None) -> int:
                 "llm_calls": s.get("llm_calls", 0),
                 "tokens": _tok if isinstance(_tok, dict) else {},
                 "workers": len(agents),
+                "version": s.get("argus_version") or "",
             }
         if len(args.dirs) < 2:
             print("compare needs at least two session dirs")
@@ -601,6 +604,14 @@ def main(argv: list[str] | None = None) -> int:
                   "- metrics only compare like-for-like on the same "
                   "target", file=sys.stderr)
         sums = [_summ(d) for d in args.dirs]
+        # metrics produced by different argus builds are not like-for-like
+        # either - probe counts and detection logic change between versions
+        versions = {s.get("version") for s in sums} - {""}
+        if len(versions) > 1:
+            print(f"warning: argus versions differ "
+                  f"({', '.join(sorted(versions))}) - metrics only "
+                  "compare like-for-like on the same build",
+                  file=sys.stderr)
         if args.csv:
             hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
                    "endpoints,llm_calls,workers,tokens_in,tokens_out,"

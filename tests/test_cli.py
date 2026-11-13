@@ -183,16 +183,17 @@ def test_dotenv_whitelists_keys(tmp_path, monkeypatch):
     assert os.environ["ARGUS_MODEL"] == "m1"
 
 
-def _synth_session(tmp_path, name, target, findings=None):
+def _synth_session(tmp_path, name, target, findings=None, version="1.0.0"):
     """Minimal session dir: meta.json + findings.json + summary.json."""
     d = tmp_path / name
-    d.mkdir()
+    d.mkdir(parents=True)
     (d / "meta.json").write_text(
         json.dumps({"target": target}), encoding="utf-8")
     (d / "findings.json").write_text(
         json.dumps(findings or []), encoding="utf-8")
     (d / "summary.json").write_text(json.dumps({
         "mode": "single", "counts": {"findings": len(findings or [])},
+        "argus_version": version,
         "requests_total": 1}), encoding="utf-8")
     return d
 
@@ -239,3 +240,20 @@ def test_compare_same_target_no_warning(tmp_path, capsys):
     rc = main(["compare", str(a), str(b)])
     err = capsys.readouterr().err
     assert rc == 0 and "targets differ" not in err
+
+
+def test_compare_warns_on_different_versions(tmp_path, capsys):
+    """Metric deltas across builds are not like-for-like either."""
+    a = _synth_session(tmp_path, "a", "http://a.example", version="1.0.0")
+    b = _synth_session(tmp_path, "b", "http://a.example", version="0.9.0")
+    rc = main(["compare", str(a), str(b)])
+    err = capsys.readouterr().err
+    assert rc == 0 and "argus versions differ" in err
+
+
+def test_sessions_lists_version(tmp_path, capsys):
+    root = tmp_path / "sessions"
+    _synth_session(root, "s1", "http://a.example", version="1.0.0")
+    rc = main(["sessions", "--session-dir", str(root)])
+    out = capsys.readouterr().out
+    assert rc == 0 and "v1.0.0" in out
