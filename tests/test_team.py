@@ -252,6 +252,33 @@ def test_run_exploit_command_escape(ctx, lab_url, tmp_path, monkeypatch):
     assert "escapes" in out["error"]
 
 
+def test_run_exploit_malformed_manifest(ctx, lab_url, tmp_path, monkeypatch):
+    """A manifest with a string (not list) 'command' used to iterate the
+    string char-by-char into a garbage argv (48f32a5), and an invalid
+    proof_marker regex crashed run_capped AFTER the subprocess had run.
+    Both must fail before anything executes."""
+    import argus.tools.team as tt
+    for name, manifest in (
+            ("strcmd", '{"id":"strcmd","command":"echo x {target}"}'),
+            ("emptycmd", '{"id":"emptycmd","command":[]}'),
+            ("badmarker",
+             '{"id":"badmarker","command":["p.py"],'
+             '"proof_marker":"("}')):
+        d = tmp_path / name
+        d.mkdir()
+        (d / "manifest.json").write_text(manifest)
+        (d / "p.py").write_text("print('SHOULD-NOT-RUN')\n")
+    monkeypatch.setattr(tt, "EXPLOITS", tmp_path)
+    out = tt.run_exploit(ctx, "strcmd", lab_url)
+    assert "not a non-empty list" in out["error"]
+    out = tt.run_exploit(ctx, "emptycmd", lab_url)
+    assert "not a non-empty list" in out["error"]
+    # invalid regex is treated as absent: script runs but never 'proves'
+    out = tt.run_exploit(ctx, "badmarker", lab_url)
+    assert "SHOULD-NOT-RUN" in out.get("output", "")
+    assert out.get("proof") is not True
+
+
 # ------------------------------------------------------------ e2e team
 
 def _tool(name, **inp):

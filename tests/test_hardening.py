@@ -270,3 +270,15 @@ def test_nonfinite_budgets_rejected(monkeypatch):
             load_config(args_for(max_time=bad_t))
     cfg = load_config(args_for(rate=2.5, max_time=30))
     assert cfg.rate_rps == 2.5 and cfg.max_time_s == 30
+
+
+def test_atomic_write_cleans_temp_on_failure(tmp_path):
+    """A failed _atomic_write (e.g. target swapped for a directory) must
+    not litter .tmp-* files next to the deliverable (bed2276)."""
+    import pytest
+    from argus.session import _atomic_write
+    target = tmp_path / "findings.json"
+    target.mkdir()  # replace() onto a dir must fail
+    with pytest.raises(OSError):
+        _atomic_write(target, "[]")
+    assert not list(tmp_path.glob("*.tmp-*")), "temp file left behind"

@@ -14,6 +14,16 @@ def _call(name, inp, n=0):
             "type": "tool_use"}
 
 
+def test_truncate_result_survives_nonjson():
+    """A tool impl returning bytes/a set/NaN must produce a string for
+    tool_result, not raise out of the loop mid-run (fcf7d78)."""
+    from argus.loop import _truncate_result
+    for weird in ({"b": b"\xff"}, {"s": {1, 2}}, {"f": float("nan")},
+                  "plain", 5, None):
+        out = _truncate_result(weird)
+        assert isinstance(out, str)
+
+
 def test_compact_history_bounds_context():
     """Old tool_results compact to stubs naming their request_ids, so a long
     run stays under the context window; recent results stay verbatim."""
