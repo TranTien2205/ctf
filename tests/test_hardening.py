@@ -206,3 +206,32 @@ def test_readers_survive_mutated_session_dir(tmp_path):
             argv += ["--json"]
         rc = cli_main(argv)
         assert isinstance(rc, int)  # returned a status, never raised
+
+
+def test_api_base_url_shared_by_run_and_check(monkeypatch):
+    """`argus check` must probe the same endpoint a real run targets.
+    Regressed once: check used the hardcoded API_URL while run honored
+    ANTHROPIC_BASE_URL, so a gateway operator got a green check for a
+    path run would never use."""
+    from argus import config
+    from argus.config import api_base_url
+
+    monkeypatch.delenv("ANTHROPIC_BASE_URL", raising=False)
+    assert api_base_url() == config.API_URL
+
+    monkeypatch.setenv("ANTHROPIC_BASE_URL", "http://gw.local/api/")
+    assert api_base_url() == "http://gw.local/api/messages"
+
+    # load_config resolves api_base through the same helper - no drift
+    # between the check ping and a real engagement's endpoint
+    args = type("A", (), {"api_key": None, "target": "http://t.example",
+                          "header": None, "header_file": None,
+                          "exclude": "", "rate": 1.0, "max_time": 60,
+                          "max_requests": 5, "max_turns": 5,
+                          "proxy": "", "no_external": True,
+                          "mcp_config": "", "model": None, "secret": None,
+                          "session_dir": "", "resume": "", "tools": "",
+                          "tls_verify": True, "goal": "", "operator": "",
+                          "allow_private": False, "llm_max_tokens": 4096})()
+    cfg = config.load_config(args)
+    assert cfg.api_base == "http://gw.local/api/messages"
