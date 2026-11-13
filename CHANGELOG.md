@@ -691,6 +691,21 @@ somebody reading only the list.
   `argus compare` both warns on cross-build metric sets and prints
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
+### The evaluation doc said nine, and the matrix said three
+- `docs/EXPERIMENTS.md` stated that **nine** classes cannot reach `proven`.
+  Three can't: `xss` (no browser), `ssrf` (no out-of-band collector) and `dos`
+  (refused by construction). The other six came off that list as their
+  verifiers were written, and nothing noticed, because the doc gate counted
+  tools, classes, flags and test totals - not this. It is the denominator of
+  every recall figure in the evaluation, so a stale nine would have understated
+  the agent's recall by six classes.
+- The gate counts it now, and checks that every unreachable class is named.
+- It also stated the offline reproduction numbers - 6 findings on both demo
+  paths, 5 `proven` and one honest `candidate` - as the shape every measured
+  run is compared against, with nothing checking them. A test reads the
+  numbers out of the document and runs both paths against the bundled lab, so
+  the two cannot drift apart silently. Both match today.
+
 ### The ledger hid a finding and crashed on a well-formed file
 - Rule 1's suppression was per CLASS, so an `rce` recorded on `/a` hid an
   unrecorded `rce` proof on `/b` for the rest of the run - and the probe
@@ -744,14 +759,14 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 552 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 553 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 143 offline checks, including a documentation
+- `python selftest.py`: 145 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

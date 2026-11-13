@@ -885,6 +885,35 @@ def _doc_consistency() -> None:
           f"{not_capped} claimed capped for a real reason, but the matrix "
           f"does not cap them at all")
 
+    # 4c. `docs/EXPERIMENTS.md` states how many classes cannot reach `proven`
+    #     at all, and that number is the denominator of every recall figure in
+    #     the evaluation. It said nine for a long time after it was three,
+    #     because nothing counted it: the doc gate counted tools, classes and
+    #     test totals, and not this.
+    unreachable = sorted(
+        spec.vuln_class
+        for spec in {x.vuln_class: x for x in proof.MATRIX.values()}.values()
+        if spec.ceiling or spec.verifier is proof.verify_refused)
+    stated_unreachable = set()
+    for text in texts.values():
+        for word in _re.findall(
+                r"(?i)\*\*([A-Za-z]+) class(?:es)? cannot reach `proven`",
+                text):
+            if word.lower() in _WORDS:
+                stated_unreachable.add(_WORDS[word.lower()])
+            elif word.isdigit():
+                stated_unreachable.add(int(word))
+    check(f"docs state the unreachable-class count correctly "
+          f"({len(unreachable)}: {', '.join(unreachable)})",
+          bool(stated_unreachable)
+          and stated_unreachable == {len(unreachable)},
+          f"docs say {sorted(stated_unreachable) or 'nothing'}, the matrix "
+          f"puts {len(unreachable)} out of reach")
+    missing_named = sorted(k for k in unreachable
+                           if f"`{k}`" not in "\n".join(texts.values()))
+    check("every unreachable class is named in the docs", not missing_named,
+          f"{missing_named} cannot reach proven and is named in no doc")
+
     # 5. every proof class named in a doc exists, and every class the docs
     #    claim is refused really is
     classes = set(proof.classes())

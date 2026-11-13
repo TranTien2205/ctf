@@ -261,3 +261,43 @@ def test_sessions_lists_version(tmp_path, capsys):
     rc = main(["sessions", "--session-dir", str(root)])
     out = capsys.readouterr().out
     assert rc == 0 and "v1.0.0" in out
+
+
+def test_both_demo_paths_match_what_the_evaluation_doc_claims(tmp_path):
+    """`docs/EXPERIMENTS.md` states the offline reproduction numbers - 6
+    findings on both paths, 5 `proven` and one honest `candidate` - and uses
+    them as the shape every measured run is compared against. Nothing checked
+    them, which is how the same document came to claim nine unreachable
+    classes when there were three.
+
+    Both paths run offline against the bundled lab, so this is cheap and
+    deterministic. If the demo legitimately changes, change the doc in the
+    same commit; the point is that the two cannot drift apart silently.
+    """
+    import collections
+    import json
+    import pathlib
+    import re
+
+    from argus.cli import main
+
+    doc = (pathlib.Path(__file__).resolve().parent.parent
+           / "docs" / "EXPERIMENTS.md").read_text(encoding="utf-8")
+    claim = re.search(r"(\d+) findings on both paths, (\d+) of them "
+                      r"`proven` and one an\s+honest `candidate`", doc)
+    assert claim, "docs/EXPERIMENTS.md no longer states the demo numbers"
+    want_total, want_proven = int(claim.group(1)), int(claim.group(2))
+
+    for args in ([], ["--team"]):
+        out = tmp_path / ("team" if args else "single")
+        assert main(["demo", *args, "--session-dir", str(out)]) == 0
+        sessions = sorted(p for p in out.iterdir() if p.is_dir())
+        assert len(sessions) == 1, sessions
+        rows = json.loads((sessions[0] / "findings.json")
+                          .read_text(encoding="utf-8"))
+        grades = collections.Counter(r.get("grade") for r in rows)
+        label = "team" if args else "single"
+        assert len(rows) == want_total, f"{label}: {len(rows)} findings"
+        assert grades["proven"] == want_proven, f"{label}: {dict(grades)}"
+        assert grades["candidate"] == want_total - want_proven, \
+            f"{label}: {dict(grades)}"

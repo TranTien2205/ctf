@@ -106,18 +106,22 @@ proven count, not the total.
   are the recall denominator — and split each by grade. A class found but
   left a candidate is a partial result; say so rather than scoring it as a
   hit or discarding it.
-- **Nine classes cannot reach `proven` in this system at all**, by
-  construction and by their own requirement sentences: `xss` and the
-  client-side half of prototype pollution need a browser; `ssrf` needs an
-  out-of-band collector; `enum` and `method` and `upload` and `crlf` and
-  `websocket` and `smuggle` and `race` are measured here as a difference
-  where the artifact is a count, a header, an execution or an ordering.
-  `dos` is refused outright. Score those classes as found-as-candidate, and
-  state the ceiling in the table - a recall figure that counts them in the
-  denominator while they can only ever be candidates is measuring the
-  system's honesty as if it were the agent's failure.
-  `python -m argus proof` prints each one's requirement and says what would
-  settle it.
+- **Three classes cannot reach `proven` in this system**, and the number is
+  derivable rather than stated: `xss` needs a browser to execute the payload
+  and `ssrf` needs an out-of-band collector the target can reach - neither
+  ships here - and `dos` is refused outright, because its proof is the damage.
+  Score those as found-as-candidate and state the ceiling in the table: a
+  recall figure that counts them in the denominator while they can only ever
+  be candidates measures the system's honesty as if it were the agent's
+  failure. `python -m argus proof <class>` prints each one's requirement, says
+  whether it is capped, and says why.
+
+  This list was nine. `enum`, `lockout`, `crlf`, `method`, `upload`, `race`,
+  `websocket` and `smuggle` came off it: in each case the stated limit
+  described the verifier rather than the evidence, and the transcript already
+  recorded what the class needed. Do not copy a ceiling count out of an older
+  draft - derive it, and `selftest.py` checks the number this paragraph
+  states against the matrix.
 - Run each arm a second time with `--require-proof` to get the strict-mode
   numbers. The two conditions answer different questions: the default
   measures what the agent noticed, strict measures what it finished.
