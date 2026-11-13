@@ -188,9 +188,21 @@ def test_upload_probe(lab_url, ctx):
 def test_graphql_introspect(lab_url, ctx):
     from argus.tools import web
     out = web.graphql_introspect(ctx, lab_url + "/graphql")
-    assert out["verdict"] == "schema introspected", out
+    assert out["verdict"].startswith("schema introspected"), out
     names = {t["name"] for t in out["types"]}
     assert "User" in names, out
+    # the lab answers ?query= too - GET-accepted queries are CSRF-able
+    # and the tool must flag the transport
+    assert out["get_transport"] is True, out
+    assert out["get_request_id"], out
+
+
+def test_graphql_suggestion_leak(lab_url, ctx):
+    """Introspection off but 'did you mean' still enumerates the schema."""
+    from argus.tools import web
+    out = web.graphql_introspect(ctx, lab_url + "/graphql-strict")
+    assert out["suggestion_leak"] is True, out
+    assert "suggestions" in out["verdict"], out
 
 
 def test_race_probe(lab_url, ctx):

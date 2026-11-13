@@ -474,8 +474,15 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
         errs = [str(e.get("message", "?")) if isinstance(e, dict)
                 else str(e) for e in raw_errs[:5]] \
             if isinstance(raw_errs, list) else []
-        return {"verdict": "introspection refused or empty",
-                "request_id": r["request_id"], "errors": errs}
+        # introspection may be off while "did you mean" suggestions still
+        # leak schema names - that enables blind enumeration (clairvoyance
+        # style), so probe it whenever the schema stayed hidden
+        sug = _suggestion_probe(ctx, url)
+        return {"verdict": "introspection refused or empty"
+                          + ("; field suggestions still leak schema names"
+                             if sug else ""),
+                "request_id": r["request_id"], "errors": errs,
+                "suggestion_leak": sug}
     types = [t for t in (schema.get("types") or [])
              if isinstance(t, dict) and t.get("name")
              and not str(t["name"]).startswith("__")]
@@ -483,10 +490,38 @@ def graphql_introspect(ctx: Context, url: str) -> dict:
                   "fields": [f["name"] for f in (t.get("fields") or [])
                              if isinstance(f, dict) and f.get("name")][:40]}
                  for t in types][:40]
-    return {"verdict": "schema introspected",
+    # the schema already leaked - one extra request answers whether the
+    # GET transport accepts it too, which makes the same data CSRF-able
+    # and lands queries in proxy logs/referers
+    get_transport = g is not None  # GET fallback already proved it
+    get_probe_id = g["request_id"] if g else None
+    if g is None:
+        sep = "&" if urllib.parse.urlparse(url).query else "?"
+        gp = ctx.client.send(
+            "GET", url + sep + "query="
+            + urllib.parse.quote("{__schema{queryType{name}}}"),
+            tool="graphql_introspect", note="GET transport check")
+        get_probe_id = gp["request_id"]
+        get_transport = "__schema" in (gp.get("body") or "")
+    verdict = "schema introspected"
+    if get_transport:
+        verdict += " (+GET transport - queries are CSRF-able)"
+    return {"verdict": verdict,
             "request_id": r["request_id"],
+            "get_request_id": get_probe_id,
+            "get_transport": get_transport,
             "query_root": (schema.get("queryType") or {}).get("name"),
             "mutation_root": (schema.get("mutationType") or {}).get("name"),
             "subscription_root":
                 (schema.get("subscriptionType") or {}).get("name"),
             "types": out_types}
+
+
+def _suggestion_probe(ctx: Context, url: str) -> bool:
+    """One cheap query with a typo'd field - "did you mean X" errors leak
+    schema names even when introspection is disabled."""
+    r = ctx.client.send(
+        "POST", url, headers={"Content-Type": "application/json"},
+        body='{"query": "{usr{namee}}"}', tool="graphql_introspect",
+        note="field-suggestion probe")
+    return "did you mean" in (r.get("body") or "").lower()

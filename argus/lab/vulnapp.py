@@ -841,6 +841,24 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
                 self._send(body=json.dumps({"data": {}}),
                            ctype="application/json")
             return
+        if path == "/graphql-strict":
+            # introspection disabled BUT "did you mean" still leaks schema
+            # names - the blind-enumeration surface graphql_introspect's
+            # suggestion probe exists to flag
+            b = self._body()
+            q = b.get("query", "") if isinstance(b, dict) else ""
+            if "__schema" in q:
+                self._send(body=json.dumps({"errors": [{"message":
+                    "introspection is disabled"}]}),
+                    ctype="application/json")
+            elif "namee" in q:
+                self._send(body=json.dumps({"errors": [{"message":
+                    'Cannot query field "namee" on type "User". '
+                    'Did you mean "name"?'}]}), ctype="application/json")
+            else:
+                self._send(body=json.dumps({"data": {}}),
+                           ctype="application/json")
+            return
         self._send(404, "<html><body>not found</body></html>")
 
     def do_OPTIONS(self):
