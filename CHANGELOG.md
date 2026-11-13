@@ -961,6 +961,40 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### A check that could only be satisfied by falsifying the record
+- Having made the race window deterministic, I went to raise the proving
+  coverage and could not. The check that guards the figure asserted every
+  `"N of the M proof classes"` string in four files against the CURRENT
+  value - and two of those strings are **historical changelog entries**,
+  true about the day they were written. Raising the number meant editing
+  them into saying something they did not say at the time.
+- Isolated the mechanism rather than asserting it. Running the old loop
+  with a hypothetical coverage of 28 produces four failures, two of them
+  `CHANGELOG.md says 27`. A check satisfiable only by rewriting the record
+  has frozen the measurement instead of verifying it.
+- The anti-rot guard was worse. `assert seen >= 2` exists so a regex that
+  stops matching cannot make the test pass forever on nothing - and it was
+  **load-bearing on exactly those two frozen lines**. Measured: `AGENTS.md`
+  matched zero times and this module matched zero times, while the module's
+  own docstring *claimed* to state the figure. So the floor was met by the
+  changelog alone: the living documentation could have dropped the claim
+  entirely and the guard would not have noticed.
+- Both halves fixed. The module docstring now states the figure in full,
+  which makes its own long-standing claim true and gives the floor a second
+  living source. The changelog is out of the assertion, with the reason
+  written where the list used to be: a historical entry is a statement
+  about its own time, and asserting it as a current claim is a category
+  error that costs the ability to change the thing being measured.
+- The floor now counts distinct FILES, not matches, so one document saying
+  it twice cannot stand in for two documents still saying it. Proved both
+  ways: changing the living figure reports *"docs/VERIFICATION.md says
+  26"*, and dropping it from the docstring reports *"only
+  ['docs/VERIFICATION.md'] states the coverage - the living documents are
+  where this claim has to survive"*.
+- The figure is now changeable without touching history, which is the
+  precondition for driving `race` once CI has been seen green on Windows.
+  That remains the open evidence, not this.
+
 ### The race window was a wager on the host's scheduler
 - `/redeem` is the lab's TOCTOU endpoint, and its window was
   `time.sleep(0.15)` plus the hope that a burst lands inside it. That made

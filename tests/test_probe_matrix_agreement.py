@@ -92,8 +92,12 @@ is, and the first attempt used `_marker("deser")` while `NONCE_RE` is
 `\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as this probe's
 own and the class sat at a candidate with its nonce in plain sight.
 
-Two classes are still not driven in the proving direction: `dos` (refused by
-construction - its proof is the damage) and `race` (below).
+The proving direction covers 27 of the 29 proof classes. Two are still not
+driven in it: `dos` (refused by construction - its proof is the damage) and
+`race` (below). That sentence is a count, and the test at the bottom of this
+module asserts it against the tables AND against the living documents that
+repeat it - this docstring included, which is why the figure is stated here
+in full rather than described.
 
 Two directions, and no reading of the probe's prose - a verdict is English and
 this asserts against evidence:
@@ -524,16 +528,40 @@ def test_the_stated_coverage_matches_the_tables_and_the_docs():
 
     root = Path(__file__).resolve().parent.parent
     pattern = re.compile(r"(\d+) of the (\d+) proof classes")
-    seen = 0
-    for rel in ("docs/VERIFICATION.md", "CHANGELOG.md", "AGENTS.md",
-                "tests/test_probe_matrix_agreement.py"):
+
+    # CHANGELOG.md is deliberately NOT in this list, and that is a
+    # correction. It used to be, and it carries two entries stating the
+    # figure that was current when they were written - so the assertion
+    # "every stated figure equals the CURRENT coverage" made the number
+    # unchangeable: raising it meant editing two historical entries into
+    # saying something they did not say at the time. A check that can only
+    # be satisfied by falsifying the record has frozen the measurement
+    # instead of verifying it.
+    #
+    # Worse, the anti-rot guard below was load-bearing on exactly those two
+    # frozen lines. `AGENTS.md` and this module stated the figure nowhere -
+    # measured: zero matches in each, while this docstring CLAIMED to state
+    # it - so `seen` reached its floor on the changelog alone. The living
+    # documentation could have dropped the claim entirely and the guard
+    # would not have noticed. It is now stated in both living sources, and
+    # the floor is what proves they are both still saying it.
+    current = ("docs/VERIFICATION.md", "AGENTS.md",
+               "tests/test_probe_matrix_agreement.py")
+    seen, by_file = 0, {}
+    for rel in current:
         path = root / rel
         if not path.is_file():
             continue
         for stated, total in pattern.findall(
                 path.read_text(encoding="utf-8")):
             seen += 1
+            by_file[rel] = by_file.get(rel, 0) + 1
             assert int(stated) == PROVING_COVERAGE, f"{rel} says {stated}"
             assert int(total) == MATRIX_CLASSES, f"{rel} says of {total}"
-    # a regex that stops matching would make this pass forever on nothing
+    # a regex that stops matching would make this pass forever on nothing,
+    # and naming the files is what keeps the floor honest: two sources that
+    # both still say it, not one source saying it twice
+    assert len(by_file) >= 2, (
+        f"only {sorted(by_file) or 'nothing'} states the coverage - the "
+        "living documents are where this claim has to survive")
     assert seen >= 2, "no document states the coverage any more"
