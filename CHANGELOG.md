@@ -915,6 +915,25 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### Two tools the model could call that no document mentioned
+- The gate asked that a tool named in a document is real. It never asked
+  that a real tool is named - and two were not: **`read_findings` and
+  `list_exploits` were registered, callable, and named in no document at
+  all.** Not the reference in `docs/USAGE.md`, not the README, not a
+  methodology module. A reader of the documentation could not learn they
+  exist, and the model's own description was the only place they were
+  written down.
+- Both are now in `docs/USAGE.md` beside the other utility tools, with what
+  they are for: `read_findings` is the read side of `record_finding` and the
+  cheap way to see what a run already has before probing a class again, and
+  `list_exploits` is how you learn what `run_exploit` can be pointed at
+  without reading `resources/exploits/` by hand.
+- The reverse check now holds it. One direction of a correspondence is half
+  a check, and this gate has now been wrong that way four times in a row -
+  about test tables, probe coverage, the document set, and methodology
+  modules naming their own tool. The asymmetry, not the instance, was the
+  defect each time.
+
 ### The package claimed a Python range CI did not prove
 - `requires-python = ">=3.10"` is open-ended: pip installs on every version
   from the floor up, so each one is a support claim. The matrix tested
@@ -1066,7 +1085,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 152 offline checks, including a documentation
+- `python selftest.py`: 153 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

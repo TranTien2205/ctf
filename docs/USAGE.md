@@ -182,6 +182,12 @@ Utility tools: `read_response` re-reads any recorded response (or external
 tool output) from the transcript — bodies are stored at 200k chars while
 tool results truncate at 12k, so long pages are paged through here instead
 of re-requested. `note`/`read_notes` keep the working narrative.
+`read_findings` lists every finding recorded so far (id, severity, category,
+url, evidence) — the read side of `record_finding`, and the cheap way to see
+what the run already has before probing a class again. `list_exploits` lists
+the manifests under `resources/exploits/` with their `affects` fingerprint
+and CVE, which is how you find out what `run_exploit` can be pointed at
+without reading the directory. Both take no arguments.
 
 ## Resources
 

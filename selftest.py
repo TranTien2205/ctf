@@ -1131,6 +1131,21 @@ def _doc_consistency() -> None:
                "no python matrix or no requires-python floor found - the "
                "support claim became uncheckable"))
 
+    # 10. the reverse direction: every registered tool is named somewhere.
+    #
+    #     The check above asks that a tool named in a document is real. It
+    #     never asked that a real tool is named, and two were not: the model
+    #     could call `read_findings` and `list_exploits` while no document
+    #     said they exist, so nobody reading the reference could learn to
+    #     use them. One direction of a correspondence is half a check, and
+    #     this gate has now been wrong that way about test tables, probe
+    #     coverage, the document set and methodology modules.
+    tool_doc_text = "\n".join(texts.values())
+    unnamed = sorted(n for n in tool_names if n not in tool_doc_text)
+    check(f"every registered tool is named in a document ({len(tool_names)})",
+          not unnamed,
+          f"{unnamed} can be called and no document says so")
+
     check("the claims table still names the tests that hold it",
           cited_total >= 50,
           f"only {cited_total} test names cited across the live docs - "
