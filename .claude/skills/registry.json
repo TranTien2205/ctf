@@ -122,7 +122,7 @@
       "categories": [
         "crypto"
       ],
-      "skill_tokens": 4433,
+      "skill_tokens": 4532,
       "depth_files": 8,
       "depth_tokens": 5368,
       "use_when": [
@@ -982,7 +982,7 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3248,
+      "skill_tokens": 3344,
       "depth_files": 3,
       "depth_tokens": 617,
       "use_when": [
@@ -1707,7 +1707,7 @@
         "htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput",
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
-      "skill_tokens": 1598,
+      "skill_tokens": 1685,
       "depth_files": 7,
       "depth_tokens": 5186,
       "use_when": [

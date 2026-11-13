@@ -181,6 +181,12 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    fs.cramfs list` walks the packed 12-byte inode tree and `get
    NAME` inflates its per-block zlib pointers; `jffs2_read.py` does
    the JFFS2 node walk (DIRENT names, INODE data for COPY/ZLIB).
+   A uImage-wrapped kernel/ramdisk (u-boot magic `0x27051956`):
+   `python3 tools/forensics/uimage_info.py kern.uimg` names
+   os/arch/type/compression and checks both CRCs; `--extract
+   out.gz` writes the payload (gzip/lzma decompressed, bzip2/lz4/
+   zstd reported as needing an external tool). An FDT magic
+   (`d00dfeed`) instead means a FIT image — route to `dtb_dump`.
    A `.kdbx` in the bundle answers "which cipher/KDF/rounds guard
    the vault" before any crack: `python3
    tools/forensics/kdbx_info.py vault.kdbx` reads the TLV header —

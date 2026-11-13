@@ -45,7 +45,13 @@ each `REDUCE` counted, `data-only stream` vs `code-execution opcodes
 present` — never unpickle to inspect. For PHP streams,
 `python3 tools/php_ser_parse.py blob.ser` (or `--str 'O:8:"User":...'`)
 decodes the `a:N:{...}` grammar to JSON and lists every serialized
-class name — the object-injection surface to hunt in source. Java
+class name — the object-injection surface to hunt in source. To
+BUILD the payload rather than read one:
+`python3 tools/php_ser_gen.py --spec '{"O":"User","props":{"is_admin":true}}'`
+emits the exact bytes with length prefixes counted for you —
+hand-counting is the classic failure — and `{"S":"val"}` emits the
+`S:` hex-escape string type that bypasses `addslashes`-style
+filters which `s:` cannot. Java
 streams too: `python3 tools/java_ser.py payload.ser` (or `--b64
 rO0AB...`) walks the `aced 0005` TC_* tokens into a classdesc
 inventory (names, serialVersionUIDs, fields) plus every TC_STRING,

@@ -40,6 +40,16 @@ def parse(b, i=0):
         start = j + 2                                   # :"
         return b[start:start + ln].decode("utf-8", "replace"), \
             start + ln + 2, objs                        # +";
+    if t == b"S":                                       # escaped string
+        j = b.index(b":", i + 2)
+        ln = int(b[i + 2:j])
+        start = j + 2
+        raw = b[start:start + ln]
+        # PHP decodes \xNN escapes inside S: strings when unserializing;
+        # that is also what makes S: bypass s:-only filters
+        raw = re.sub(rb"\\x([0-9a-fA-F]{2})",
+                     lambda m: bytes([int(m.group(1), 16)]), raw)
+        return raw.decode("utf-8", "replace"), start + ln + 2, objs
     if t == b"a":
         j = b.index(b":", i + 2)
         n = int(b[i + 2:j])
