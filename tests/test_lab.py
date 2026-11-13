@@ -385,3 +385,63 @@ def test_send_raw_redacts_secrets_keeps_structure(lab_url, tmp_path):
     assert "live-session-tok3n" not in text
     assert "Authorization: •••redacted•••" in text
     assert "Transfer-Encoding: chunked" in text  # evidence untouched
+
+
+def test_user_agent_header_is_not_a_secret(lab_url, tmp_path):
+    """User-Agent is a public banner on every request, not a credential.
+    It once fell into the >=8-char default-header sniff and every UA echo
+    a target sent back was 'redacted' out of the evidence (e98d8b0)."""
+    from argus.scope import ScopeGuard
+    from argus.ratelimit import RateLimiter
+    from argus.session import Session
+    from argus.httpclient import GuardedClient
+    session = Session(tmp_path, lab_url, meta={})
+    client = GuardedClient(
+        ScopeGuard(lab_url, allow_private=True), session, RateLimiter(0),
+        agent="t")
+    out = client.send("GET", lab_url + "/", tool="t")
+    client.close()
+    entry = session._transcript[out["request_id"]]
+    ua = entry["request"]["headers"].get("user-agent", "")
+    assert ua and "redacted" not in ua  # the banner survives the record
+    # while a real credential under the same header map is still redacted
+    client2 = GuardedClient(
+        ScopeGuard(lab_url, allow_private=True), session, RateLimiter(0),
+        default_headers={"X-Api-Key": "live-key-12345"}, agent="t")
+    out2 = client2.send("GET", lab_url + "/", tool="t")
+    client2.close()
+    wire2 = session._transcript[out2["request_id"]]["request"]["headers"]
+    assert wire2["x-api-key"] == "•••redacted•••"
+
+
+def test_jwt_decode_malformed_inputs(ctx):
+    """Malformed tokens must return an error dict, never raise - the model
+    feeds this tool whatever string it finds in a response (57b02e6)."""
+    from argus.tools.analysis import jwt_decode
+    for bad in ("", "x", "a.b", "!.!.!", "a.b.c.d",
+                "bnVsbA.bnVsbA.", 5, None, ["x"]):
+        out = jwt_decode(ctx, bad)
+        assert isinstance(out, dict)
+        assert "error" in out or "issues" in out or "header" in out
+    # a valid-JSON non-object segment decodes but is flagged, not trusted
+    import base64
+    seg = base64.urlsafe_b64encode(b'"x"').decode().rstrip("=")
+    out = jwt_decode(ctx, f"{seg}.{seg}.{seg}")
+    assert out.get("issues")
+
+
+def test_lab_survives_garbage_content_length(lab_url):
+    """A garbage Content-Length must not kill the lab handler thread -
+    the lab is the deterministic fixture every other test stands on
+    (5f6e473)."""
+    import socket
+    from urllib.parse import urlparse
+    p = urlparse(lab_url)
+    s = socket.create_connection((p.hostname, p.port), timeout=5)
+    try:
+        s.sendall(b"POST /search HTTP/1.1\r\nHost: x\r\n"
+                  b"Content-Length: garbage\r\n\r\n")
+        resp = s.recv(4096)
+    finally:
+        s.close()
+    assert b"HTTP/1.1" in resp and b" 5" not in resp.split(b"\r\n")[0]
