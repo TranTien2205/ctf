@@ -229,6 +229,17 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         f"- **Argus version:** {meta.get('argus_version') or __version__}",
         f"- **Requests sent:** {session._seq}",
         "",
+        # The run's terminal error, above everything else, because every
+        # number below it describes a run that may not have happened. A
+        # session that died on its first API call rendered a report
+        # indistinguishable from a clean one with no findings: 0 requests,
+        # 0 findings, an empty findings table. The reader has to be told
+        # before reading the table, not after.
+        *( [f"> **RUN DID NOT COMPLETE.** `{extra.get('error')}`", "",
+            "> Every figure below describes an incomplete run. Findings may",
+            "> be missing because the run stopped, not because the target",
+            "> is clean.", ""]
+           if extra.get("error") else []),
         "## Executive summary",
         "",
         summary or "_No agent summary was recorded._",

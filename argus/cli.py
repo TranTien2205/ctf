@@ -570,7 +570,13 @@ def main(argv: list[str] | None = None) -> int:
                                requests=s.get("requests", "?"),
                                duration=s.get("duration_s"),
                                sealed=bool(s.get("sealed")),
-                               version=s.get("argus_version") or "?")
+                               version=s.get("argus_version") or "?",
+                               # A run that died reads as a clean sealed run
+                               # with nothing found, in the listing a
+                               # reviewer scans first. `compare --by-arm`
+                               # learned to exclude those trials; this
+                               # reader and the one below had not.
+                               error=str(s.get("error") or ""))
                 except Exception:
                     pass
             rows.append(row)
@@ -584,10 +590,14 @@ def main(argv: list[str] | None = None) -> int:
             dur = f"{r['duration']:.0f}s" if isinstance(
                 r.get("duration"), (int, float)) else "?"
             seal = " sealed" if r.get("sealed") else ""
+            # FAILED first, because `findings=0` on its own reads as a
+            # finding-free run rather than a run that never happened
+            died = r.get("error") or ""
+            flag = "  FAILED: " + died[:70] if died else ""
             print(f"{r['dir']}  {r.get('mode','?'):<6} "
                   f"findings={r.get('findings','?')} "
                   f"requests={r.get('requests','?')} dur={dur} "
-                  f"v{r.get('version','?')}{seal}")
+                  f"v{r.get('version','?')}{seal}{flag}")
         return 0
 
     if args.cmd == "verify":
@@ -943,7 +953,7 @@ def main(argv: list[str] | None = None) -> int:
             hdr = ("session,mode,findings,proven,candidate,unproven,"
                    "requests,ttf_s,duration_s,"
                    "endpoints,llm_calls,workers,tokens_in,tokens_out,"
-                   "cache_read,cache_write,target_host,argus_version")
+                   "cache_read,cache_write,target_host,argus_version,error")
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
@@ -955,9 +965,14 @@ def main(argv: list[str] | None = None) -> int:
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
                       f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)},"
                       f"{t.get('cache_read',0)},{t.get('cache_write',0)},"
-                      f"{s.get('host','')},{s.get('version','')}")
+                      f"{s.get('host','')},{s.get('version','')},"
+                      f"{str(s.get('error','')).replace(',', ';')[:80]}")
             return 0
-        keys = [("host", "target_host"), ("version", "argus_version"),
+        # `error` leads, because every row under it describes a run that
+        # may not have happened: findings 0 / requests 0 / cost 0 is what a
+        # clean finding-free run looks like too.
+        keys = [("error", "FAILED"),
+                ("host", "target_host"), ("version", "argus_version"),
                 ("mode", "mode"), ("findings", "findings"),
                 ("proven", "proven"), ("candidate", "candidate"),
                 ("unproven", "unproven"),
@@ -978,7 +993,10 @@ def main(argv: list[str] | None = None) -> int:
                     return f"{t.get('in',0)}/{t.get('out',0)}"
                 if k == "cache":
                     return f"{t.get('cache_read',0)}/{t.get('cache_write',0)}"
-                return str(s.get(k))
+                value = str(s.get(k) or "")
+                # an API error is a sentence, and an un-truncated one runs
+                # into the next column and makes the table unreadable
+                return (value[:w - 2] + "..") if len(value) > w - 1 else value
             print(f"{label:<24}" + "".join(f"{_v(s):<{w}}" for s in sums))
         return 0
 

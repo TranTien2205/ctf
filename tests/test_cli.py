@@ -498,3 +498,68 @@ def test_a_run_that_dies_records_the_error_in_its_summary():
     src = inspect.getsource(loop_mod)
     assert '"error": self._last_error or None}))' in src, (
         "the summary extra must carry the terminal error")
+
+
+def test_every_reader_of_a_dead_run_says_so(tmp_path, capsys):
+    """One reader learning the lesson is the half-fix shape again.
+
+    `compare --by-arm` was taught to exclude a failed trial. `sessions`,
+    the A/B table, the CSV and the report all read the same summary.json and
+    had not been: each rendered a run that died on its first API call as a
+    clean, sealed run with nothing found - `findings=0 requests=0 sealed`.
+    """
+    dead = _fake_session(tmp_path, "single", 1, proven=0, requests=0)
+    payload = json.loads((dead / "summary.json").read_text(encoding="utf-8"))
+    payload["error"] = "Anthropic API error 400: no extra usage"
+    (dead / "summary.json").write_text(json.dumps(payload), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["sessions", "--session-dir", str(dead.parent)]) == 0
+    out = capsys.readouterr().out
+    assert "FAILED" in out and "400" in out, out
+
+    assert main(["sessions", "--session-dir", str(dead.parent), "--json"]) == 0
+    rows = json.loads(capsys.readouterr().out)
+    assert rows and rows[0].get("error"), rows
+
+    live = _fake_session(tmp_path, "team", 1, proven=3)
+    assert main(["compare", str(dead), str(live)]) == 0
+    table = capsys.readouterr().out
+    assert "FAILED" in table.splitlines()[2], table.splitlines()[:4]
+
+    assert main(["compare", "--csv", str(dead), str(live)]) == 0
+    csv_out = capsys.readouterr().out
+    assert csv_out.splitlines()[0].rstrip().endswith("error"), csv_out
+    assert "Anthropic API error 400" in csv_out
+
+
+def test_the_report_warns_before_the_numbers_not_after(tmp_path):
+    """A reader must be told before reading the findings table.
+
+    A dead run's report was indistinguishable from a clean one: 0 requests,
+    0 findings, an empty table. The warning sits above every figure because
+    each of them describes a run that may not have happened.
+    """
+    from argus.config import Config
+    from argus.report.markdown import render_report
+    from argus.session import Session
+
+    sess = Session(tmp_path, "http://127.0.0.1:8777", meta={"t": 1})
+    cfg = Config(target="http://127.0.0.1:8777", allow_private=True,
+                 session_dir=tmp_path)
+    path = render_report(sess, cfg, "", extra={
+        "mode": "single", "llm_calls": 0,
+        "llm_tokens": {"in": 0, "out": 0, "cache_read": 0, "cache_write": 0},
+        "llm_cost": {"usd": 0.0},
+        "error": "Anthropic API error 400: no extra usage"})
+    text = path.read_text(encoding="utf-8")
+    assert "RUN DID NOT COMPLETE" in text
+    # ...and above the findings section, not buried under it
+    assert text.index("RUN DID NOT COMPLETE") < text.index("Requests sent") \
+        or text.index("RUN DID NOT COMPLETE") < len(text) // 2, text[:400]
+    # a clean run must not grow the banner
+    clean = render_report(sess, cfg, "", extra={
+        "mode": "single", "llm_calls": 1,
+        "llm_tokens": {"in": 10, "out": 2, "cache_read": 0, "cache_write": 0},
+        "llm_cost": {"usd": 0.0}, "error": None})
+    assert "RUN DID NOT COMPLETE" not in clean.read_text(encoding="utf-8")
