@@ -63,7 +63,9 @@ Design choices and why:
 - The **transcript** is append-only JSONL; findings reference it by id.
   Each entry carries a hash-chain link and `summary.json` anchors the
   final link, so post-run edits, insertions and deletions are detectable
-  with `argus verify`.
+  with `argus verify`. `meta.json`/`summary.json` also stamp the
+  producing `argus_version`, so a later verifier knows which evidence
+  rules wrote the artifacts.
 - **Web content is untrusted data.** The system prompt teaches the model
   to treat in-page instructions as prompt-injection attempts and keep
   working the assessment. MCP server output gets the same treatment —
