@@ -146,7 +146,7 @@ class TeamRun:
         so, rather than contributing a zero that reads as free.
         """
         from .. import models as models_mod
-        per_agent, total, unpriced = {}, 0.0, []
+        per_agent, total, unpriced, priced = {}, 0.0, [], 0
         for name, res in self._results.items():
             if not isinstance(res, dict):
                 continue
@@ -167,8 +167,15 @@ class TeamRun:
                             cache_read=tok.get("cache_read", 0),
                             cache_write=tok.get("cache_write", 0))
             total += usd
+            priced += 1
             per_agent[name] = {"model": model, "usd": usd}
-        out = {"usd": round(total, 6), "per_agent": per_agent,
+        # every agent unpriced is not a free run: it is an unknown one, and
+        # the single-agent path already reports None for it. Summing Nones
+        # into 0.0 made a team run read as free with only the `unpriced`
+        # list to contradict it - which a median across trials prints as a
+        # cost of 0.00 beside a single-agent arm's `-`.
+        total_usd = None if (unpriced and not priced) else round(total, 6)
+        out = {"usd": total_usd, "per_agent": per_agent,
                "table_version": models_mod.table_version(),
                "basis": "cache reads at 10% and cache writes at 125% of "
                         "input, per models.json"}
@@ -176,6 +183,9 @@ class TeamRun:
             out["unpriced"] = unpriced
             out["basis"] += (f"; {len(unpriced)} agent(s) ran a model with no "
                              "line in models.json and contribute no number")
+            if not priced:
+                out["basis"] += ("; no agent had a price, so there is no "
+                                 "total")
         return out
 
     def _default_llm(self, role: str, name: str):

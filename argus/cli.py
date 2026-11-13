@@ -215,6 +215,12 @@ def main(argv: list[str] | None = None) -> int:
                         "(e.g. run vs team for the experiment chapter)")
     p_cmp.add_argument("dirs", nargs="+",
                        help="two or more session dirs")
+    p_cmp.add_argument("--by-arm", action="store_true",
+                       help="group the trials by configuration and report the "
+                            "median of each metric per arm, with N and the "
+                            "spread. The arm is the parent directory with a "
+                            "trailing -<trial> stripped, which is the layout "
+                            "docs/EXPERIMENTS.md lays out")
     p_cmp.add_argument("--csv", action="store_true",
                        help="print metrics as CSV rows for spreadsheets")
 
@@ -896,10 +902,15 @@ def main(argv: list[str] | None = None) -> int:
                 "coverage": len(_eps) if isinstance(_eps, list) else 0,
                 "llm_calls": s.get("llm_calls", 0),
                 "tokens": _tok if isinstance(_tok, dict) else {},
+                "cost": s.get("llm_cost")
+                        if isinstance(s.get("llm_cost"), dict) else {},
                 "workers": len(agents),
                 "version": s.get("argus_version") or "",
                 "host": _host_of(d),
             }
+        if getattr(args, "by_arm", False):
+            return _compare_by_arm(args.dirs, _summ, _host_of,
+                                   csv=bool(args.csv))
         if len(args.dirs) < 2:
             print("compare needs at least two session dirs")
             return 2
@@ -913,7 +924,8 @@ def main(argv: list[str] | None = None) -> int:
         sums = [_summ(d) for d in args.dirs]
         # metrics produced by different argus builds are not like-for-like
         # either - probe counts and detection logic change between versions
-        versions = {s.get("version") for s in sums} - {""}
+        versions = {s["version"] for s in sums
+                    if isinstance(s.get("version"), str)} - {""}
         if len(versions) > 1:
             print(f"warning: argus versions differ "
                   f"({', '.join(sorted(versions))}) - metrics only "
@@ -1493,6 +1505,164 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
     cfg.max_turns = 15
     return TeamRun(cfg, llm_factory=_factory, quiet=args.quiet,
                    n_recon=1, n_exploit=1, n_report=0).run()
+
+
+_ARM_METRICS = (
+    # (key, label, higher_is_better) - `proven` first because EXPERIMENTS
+    # makes it the primary measure: a configuration that records more
+    # findings at a lower proven rate is not better, and a total cannot
+    # show that.
+    ("proven", "proven findings", True),
+    ("candidate", "candidates", None),
+    ("unproven", "unproven", None),
+    ("findings", "findings (total)", None),
+    ("requests", "wire requests", False),
+    ("ttf", "time to first finding (s)", False),
+    ("duration_s", "duration (s)", False),
+    ("coverage", "endpoints touched", True),
+    ("llm_calls", "llm calls", False),
+    ("tokens_in", "tokens in", False),
+    ("tokens_out", "tokens out", False),
+    ("cache_read", "cache read tokens", False),
+    ("cache_write", "cache write tokens", False),
+    ("usd", "cost (usd)", False),
+)
+
+# A median over the priced subset of an arm would read as the arm's cost
+# while describing only part of it, so these report `-` unless every trial
+# in the arm carries the figure. `usd` is None whenever the model is absent
+# from models.json, which is every scripted demo.
+_ARM_METRICS_ALL_OR_NOTHING = ("usd",)
+
+
+def _arm_of(path) -> str:
+    """The configuration a trial belongs to.
+
+    `docs/EXPERIMENTS.md` lays the trials out as `exp/single-1/<session>` and
+    `exp/team-3/<session>`, so the arm is the parent directory with a
+    trailing `-<trial>` stripped. A session dir given on its own falls back to
+    its own name, which makes every such dir its own arm - correct, and
+    visible in the N column rather than silently merged.
+    """
+    import re as _re
+    parent = Path(path).resolve().parent.name
+    if not parent:
+        return Path(path).name
+    return _re.sub(r"[-_]\d+$", "", parent) or parent
+
+
+def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
+    """Median of each metric per configuration, with N and the spread.
+
+    `EXPERIMENTS.md` asks for medians twice and nothing computed one, so every
+    evaluation did it by hand in a spreadsheet - which is exactly where a
+    number gets mistyped and no reader can check it.
+
+    The median is `median_low`, not the mean of the middle two: on an even N
+    that would report a value no trial produced, and this system's whole claim
+    is that it does not invent numbers. The spread is printed beside it
+    because a median alone hides a bimodal arm.
+    """
+    import statistics
+
+    def _flatten(row: dict) -> dict:
+        """Lift the nested token and cost figures to scalars.
+
+        `_summ` reports `tokens` as a dict and the cost under `llm_cost`, and
+        a median needs a number. `usd` stays `None` when the run's model is
+        not in `models.json` - there is no price to apply, and reporting 0
+        would claim the run was free.
+        """
+        out = dict(row)
+        tokens = row.get("tokens")
+        if isinstance(tokens, dict):
+            out["tokens_in"] = tokens.get("in")
+            out["tokens_out"] = tokens.get("out")
+            out["cache_read"] = tokens.get("cache_read")
+            out["cache_write"] = tokens.get("cache_write")
+        cost = row.get("cost")
+        if isinstance(cost, dict):
+            out["usd"] = cost.get("usd")
+        return out
+
+    arms: dict[str, list[dict]] = {}
+    for d in dirs:
+        arms.setdefault(_arm_of(d), []).append(_flatten(summarise(d)))
+    if not arms:
+        print("compare --by-arm needs at least one session dir")
+        return 2
+
+    hosts = {host_of(d) for d in dirs} - {""}
+    if len(hosts) > 1:
+        print(f"warning: targets differ ({', '.join(sorted(hosts))}) - "
+              "metrics only compare like-for-like on the same target",
+              file=sys.stderr)
+    versions = {s["version"] for s in
+                (x for rows in arms.values() for x in rows)
+                if isinstance(s.get("version"), str)} - {""}
+    if len(versions) > 1:
+        print(f"warning: argus versions differ "
+              f"({', '.join(sorted(versions))}) - probe counts and detection "
+              "logic change between builds", file=sys.stderr)
+
+    def _values(rows, key):
+        out = []
+        for row in rows:
+            value = row.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                continue
+            out.append(value)
+        if key in _ARM_METRICS_ALL_OR_NOTHING and len(out) != len(rows):
+            return []
+        return out
+
+    empty = {arm: sum(1 for r in arms[arm] if "findings" not in r)
+             for arm in arms}
+    if any(empty.values()):
+        where = ", ".join(f"{a} ({n})" for a, n in sorted(empty.items()) if n)
+        print(f"warning: {where} - session dir(s) with no summary.json. "
+              "They count toward N but contribute no metric, which skews "
+              "every median in that arm", file=sys.stderr)
+
+    names = sorted(arms)
+    if csv:
+        print("arm,n,metric,median,min,max")
+        for arm in names:
+            for key, label, _ in _ARM_METRICS:
+                vals = _values(arms[arm], key)
+                if not vals:
+                    continue
+                print(f"{arm},{len(arms[arm])},{key},"
+                      f"{statistics.median_low(vals)},{min(vals)},{max(vals)}")
+        return 0
+
+    width = max(26, max(len(a) for a in names) + 12)
+    print(f"{'metric':<26}" + "".join(
+        f"{a + ' (n=' + str(len(arms[a])) + ')':<{width}}" for a in names))
+    print("-" * (26 + width * len(names)))
+    for key, label, higher in _ARM_METRICS:
+        cells = []
+        for arm in names:
+            vals = _values(arms[arm], key)
+            if not vals:
+                cells.append("-")
+                continue
+            med = statistics.median_low(vals)
+            lo, hi = min(vals), max(vals)
+            spread = "" if lo == hi else f"  [{lo}-{hi}]"
+            cells.append(f"{med}{spread}")
+        print(f"{label:<26}" + "".join(f"{c:<{width}}" for c in cells))
+    print()
+    print("median is median_low: on an even N the mean of the middle two "
+          "would be a number no trial produced.")
+    print("proven is the primary measure - a configuration that records more "
+          "findings at a lower proven")
+    print("rate is not better, and the total cannot show that.")
+    singles = [a for a in names if len(arms[a]) == 1]
+    if singles:
+        print(f"\nn=1 for {', '.join(singles)}: a single trial has no median. "
+              f"EXPERIMENTS suggests 5.")
+    return 0
 
 
 def _cmd_judge(args) -> int:

@@ -718,6 +718,39 @@ somebody reading only the list.
   numbers out of the document and runs both paths against the bundled lab, so
   the two cannot drift apart silently. Both match today.
 
+### The evaluation asked for medians and nothing computed one
+- `docs/EXPERIMENTS.md` says "report median" and "Report medians per
+  configuration" - and no code computed a median. Every evaluation of this
+  system would have taken the figures out of N session dirs by hand into a
+  spreadsheet, which is exactly where a number gets mistyped and no reader
+  can check it.
+- `argus compare --by-arm` groups the session dirs by configuration - the
+  parent directory with a trailing `-<trial>` stripped, which is the layout
+  the document's own loops write (`exp/single-$i`) - and prints the median
+  of each metric per arm with N and the min-max spread. `--csv` for a
+  spreadsheet.
+- Two decisions in that output are load-bearing. The median is
+  `median_low`, so on an even N it is a figure some trial produced rather
+  than the mean of the middle two: a system whose claim is that it invents
+  nothing should not report a measurement no run made. And the spread is
+  printed beside every median, because a median alone cannot distinguish
+  five trials at 5 from five trials at 1, 1, 5, 9, 9.
+- `cost (usd)` prints `-` unless every trial in the arm carries a price. A
+  median over the priced subset would still appear under that heading and
+  read as the arm's cost.
+- Printing the two arms side by side immediately found a real defect:
+  **a team run with no priced model reported a total cost of `0.0`**.
+  `_cost_breakdown` summed per-agent costs, each `None` contributed
+  nothing, and the total came out zero - which reads as free. The
+  single-agent path has always reported `None` for this, and its own
+  docstring said "rather than contributing a zero that reads as free". It
+  reports `None` now, with the basis saying there is no total.
+- And a crash either side of it: a session dir with no `summary.json` has
+  no `argus_version`, so the version warning ran `sorted({"1.0.0", None})`
+  and `compare` died with a `TypeError` instead of reporting what it had.
+  Both compare paths now ignore non-string versions, and `--by-arm` warns
+  that such a dir counts toward N while contributing no metric.
+
 ### The ledger hid a finding and crashed on a well-formed file
 - Rule 1's suppression was per CLASS, so an `rce` recorded on `/a` hid an
   unrecorded `rce` proof on `/b` for the rest of the run - and the probe
@@ -771,7 +804,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 553 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 561 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

@@ -257,7 +257,13 @@ request counts plus the producing argus version (`--json` for scripts);
 table (mode, findings, requests,
 time-to-first-finding, endpoints touched, llm calls, workers, tokens
 incl. cache read/write) for run-vs-team experiments; `--csv` emits one
-row per session for spreadsheets/pandas.
+row per session for spreadsheets/pandas. `--by-arm` is the N-trial form:
+it groups the dirs by configuration (the parent directory with a trailing
+`-<trial>` stripped, the layout `docs/EXPERIMENTS.md` lays out) and prints
+the median of each metric per arm with N and the min-max spread. The
+median is `median_low`, so on an even N it is a figure some trial produced
+rather than the mean of the middle two, and `cost (usd)` stays blank
+unless every trial in the arm carries a price.
 `python -m argus diff <before> <after>` is the retest view: findings are
 matched across the two sessions by bug class + host + path + params
 (ports ignored, so a fresh lab instance still lines up) and printed as

@@ -85,8 +85,30 @@ done
 ```bash
 python -m argus compare exp/single-1/<dir> exp/team-1/<dir>
 python -m argus compare --csv exp/single-*/2*/ exp/team-*/2*/   # N trials, one table
+python -m argus compare --by-arm exp/single-*/2*/ exp/team-*/2*/  # medians per arm
+python -m argus compare --by-arm --csv exp/*/2*/ > medians.csv
 python -m argus sessions --session-dir exp/single-1
 ```
+
+`--by-arm` is the one that answers this section: it groups the trials by
+configuration — the parent directory with the trailing `-<trial>` stripped,
+which is why the loops above write to `exp/single-$i` — and prints the
+median of each metric with N and the min–max spread beside it. Do not take
+the medians out by hand; a figure typed into a spreadsheet is a figure no
+reader can check.
+
+Two properties of that output are deliberate:
+
+- The median is `median_low`, so on an even N it is a value some trial
+  actually produced rather than the mean of the middle two. Nothing in this
+  system reports a number it did not measure.
+- The spread is printed beside every median, because a median alone hides a
+  bimodal arm — five trials at 1, 1, 5, 9, 9 proven have the same median as
+  five trials at 5, and they are not the same result.
+
+`cost (usd)` prints `-` unless every trial in the arm carries a price: a
+median over the priced subset would read as the arm's cost while describing
+part of it. An arm at N=1 is labelled as having no median.
 
 Report medians per configuration: **proven** findings, candidates,
 requests, tokens, time-to-first-finding, endpoints covered. Proven count is

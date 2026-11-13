@@ -301,3 +301,141 @@ def test_both_demo_paths_match_what_the_evaluation_doc_claims(tmp_path):
         assert grades["proven"] == want_proven, f"{label}: {dict(grades)}"
         assert grades["candidate"] == want_total - want_proven, \
             f"{label}: {dict(grades)}"
+
+
+def _fake_session(root, arm, trial, *, proven, requests=10, usd=0.5,
+                  summary=True):
+    """A session dir in the layout docs/EXPERIMENTS.md lays out.
+
+    `exp/<arm>-<trial>/<session>`: the arm is the parent directory with the
+    trial suffix stripped, which is what `compare --by-arm` groups on.
+    """
+    sdir = root / f"{arm}-{trial}" / "20260101-000000-127.0.0.1"
+    sdir.mkdir(parents=True)
+    (sdir / "meta.json").write_text(
+        json.dumps({"target": "http://127.0.0.1:8000"}), encoding="utf-8")
+    if summary:
+        (sdir / "summary.json").write_text(json.dumps({
+            "mode": arm, "argus_version": "1.0.0",
+            "findings": [{"grade": "proven"}] * proven,
+            "grades": {"proven": proven, "candidate": 0, "unproven": 0},
+            "requests": requests, "duration_s": 3.0,
+            "time_to_first_finding_s": 0.5,
+            "coverage": {"endpoints": ["/a", "/b"]},
+            "llm_calls": 4,
+            "llm_tokens": {"in": 100, "out": 20,
+                           "cache_read": 0, "cache_write": 0},
+            "llm_cost": {"usd": usd},
+        }), encoding="utf-8")
+    return sdir
+
+
+def test_by_arm_groups_trials_and_reports_the_median_with_the_spread(
+        tmp_path, capsys):
+    """EXPERIMENTS asks for medians per configuration; this computes them.
+
+    Three single trials at 1, 5 and 9 proven and two team trials at 2 and 8:
+    the medians are 5 and 2, and both arms print their min-max so a median
+    cannot hide a bimodal arm.
+    """
+    for trial, proven in enumerate([1, 5, 9], start=1):
+        _fake_session(tmp_path, "single", trial, proven=proven)
+    for trial, proven in enumerate([2, 8], start=1):
+        _fake_session(tmp_path, "team", trial, proven=proven)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    out = capsys.readouterr().out
+    assert "single (n=3)" in out and "team (n=2)" in out
+    line = next(ln for ln in out.splitlines()
+                if ln.startswith("proven findings"))
+    assert "5  [1-9]" in line, line
+    # median_low on an even N: 2 is a count a trial produced, 5.0 is not
+    assert "2  [2-8]" in line, line
+    assert "5.0" not in line
+
+
+def test_by_arm_median_never_reports_a_figure_no_trial_produced(
+        tmp_path, capsys):
+    """An even N must not average the middle two.
+
+    This system's claim is that it does not invent numbers, and a mean of
+    two trials is a number no run of the tool ever measured.
+    """
+    for trial, reqs in enumerate([40, 60], start=1):
+        _fake_session(tmp_path, "single", trial, proven=1, requests=reqs)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    line = next(ln for ln in capsys.readouterr().out.splitlines()
+                if ln.startswith("wire requests"))
+    assert "40" in line and "50" not in line, line
+
+
+def test_by_arm_says_so_when_an_arm_has_a_single_trial(tmp_path, capsys):
+    _fake_session(tmp_path, "single", 1, proven=3)
+    sdir = next(next(tmp_path.iterdir()).iterdir())
+    capsys.readouterr()
+    # one arm is allowed: the two-dir guard belongs to the A/B table
+    assert main(["compare", "--by-arm", str(sdir)]) == 0
+    out = capsys.readouterr().out
+    assert "n=1 for single" in out and "no median" in out
+
+
+def test_by_arm_reports_no_cost_unless_every_trial_in_the_arm_is_priced(
+        tmp_path, capsys):
+    """A median over the priced subset would describe part of the arm.
+
+    It would still print under `cost (usd)`, read as the arm's cost, and be
+    wrong by however many trials ran an unpriced model.
+    """
+    _fake_session(tmp_path, "single", 1, proven=1, usd=0.4)
+    _fake_session(tmp_path, "single", 2, proven=1, usd=None)
+    _fake_session(tmp_path, "team", 1, proven=1, usd=0.8)
+    _fake_session(tmp_path, "team", 2, proven=1, usd=0.6)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    line = next(ln for ln in capsys.readouterr().out.splitlines()
+                if ln.startswith("cost (usd)"))
+    cells = line[len("cost (usd)"):].split()
+    assert cells[0] == "-", line          # single: one trial unpriced
+    assert cells[1].startswith("0.6"), line   # team: both priced
+
+
+def test_by_arm_warns_about_a_trial_with_no_summary(tmp_path, capsys):
+    """A dir with no summary.json counts toward N and skews every median."""
+    _fake_session(tmp_path, "single", 1, proven=5)
+    _fake_session(tmp_path, "single", 2, proven=5, summary=False)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    cap = capsys.readouterr()
+    assert "no summary.json" in cap.err
+    assert "single (1)" in cap.err
+    assert "single (n=2)" in cap.out
+
+
+def test_by_arm_csv_is_one_row_per_arm_and_metric(tmp_path, capsys):
+    for trial, proven in enumerate([1, 5, 9], start=1):
+        _fake_session(tmp_path, "single", trial, proven=proven)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", "--csv", *dirs]) == 0
+    rows = capsys.readouterr().out.splitlines()
+    assert rows[0] == "arm,n,metric,median,min,max"
+    assert "single,3,proven,5,1,9" in rows
+
+
+def test_compare_does_not_crash_on_a_dir_with_no_summary(tmp_path, capsys):
+    """`sorted({"1.0.0", None})` raises, and a missing summary.json gave None.
+
+    Found while adding `--by-arm`; the A/B table had the same crash, so a
+    comparison against an interrupted run died with a TypeError from the
+    version warning instead of reporting what it had.
+    """
+    a = _fake_session(tmp_path, "single", 1, proven=4)
+    b = _fake_session(tmp_path, "single", 2, proven=4, summary=False)
+    capsys.readouterr()
+    assert main(["compare", str(a), str(b)]) == 0
+    assert "findings" in capsys.readouterr().out

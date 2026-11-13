@@ -686,3 +686,35 @@ def test_the_loop_and_the_team_both_pass_cache_writes_through():
     for src in (inspect.getsource(AgentLoop._cost_stats),
                 inspect.getsource(coordinator.TeamRun._cost_breakdown)):
         assert "cache_write=" in src, src[:200]
+
+
+def test_team_cost_is_unknown_not_zero_when_no_agent_has_a_price():
+    """A team where nothing was priced must not report a total of 0.0.
+
+    The single-agent path reports `usd: None` for a model that is not in
+    models.json. The team path summed the Nones into 0.0, so an unpriced
+    team run read as free - `argus compare --by-arm` printed `cost (usd)
+    0.0` for the team arm next to `-` for the single arm of the same
+    scripted demo.
+    """
+    from argus.team.coordinator import TeamRun
+
+    class _Stub:
+        cfg = None
+        _results = {
+            "lead": {"model": "no-such-model", "llm_tokens":
+                     {"in": 1000, "out": 500}},
+            "recon-1": {"model": "also-not-published", "llm_tokens":
+                        {"in": 10, "out": 2}},
+        }
+
+        def model_for(self, role):
+            return "no-such-model"
+
+    out = TeamRun._cost_breakdown(_Stub())
+    assert out["usd"] is None, out
+    assert len(out["unpriced"]) == 2
+    assert "no total" in out["basis"]
+    # the per-agent lines still name every model, so the reader can see
+    # which ones the table is missing
+    assert all(v["usd"] is None for v in out["per_agent"].values())

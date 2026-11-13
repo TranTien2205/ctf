@@ -57,6 +57,8 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Tampered sessions degrade to warnings, never crashes | dict/shape guards across verify/report/findings/diff/compare | `test_readers_survive_mutated_session_dir`, `test_cli_tolerates_corrupt_session_files`, `test_verify_tolerates_nonregular_artifact` |
 | Resume carries transcript+findings, refuses wrong target | `Session._resume` target check | `test_session_resume`, `test_session_resume_wrong_target_refused`, `test_loop_resume_seed_carries_findings` |
 | Cross-host diffs/compares warn instead of silently misleading | `diff`/`compare` check meta.json targets; retests stay port-insensitive | `test_diff_warns_on_different_hosts`, `test_diff_same_host_new_port_matches`, `test_compare_warns_on_different_hosts`, `test_compare_same_target_no_warning` |
+| Reported medians are figures a trial produced | `compare --by-arm` uses `median_low` and prints the min-max spread; cost is blank unless every trial in the arm is priced | `test_by_arm_groups_trials_and_reports_the_median_with_the_spread`, `test_by_arm_median_never_reports_a_figure_no_trial_produced`, `test_by_arm_reports_no_cost_unless_every_trial_in_the_arm_is_priced` |
+| An unpriced run is unknown, never free | `TeamRun._cost_breakdown` returns `usd: None` when no agent had a price, matching the single-agent path | `test_team_cost_is_unknown_not_zero_when_no_agent_has_a_price` |
 | Artifacts carry build provenance | `meta.json`/`summary.json` stamp `argus_version`; resume preserves + `resumed_by`; `sessions`/`verify`/`compare` surface it | `test_compare_warns_on_different_versions`, `test_sessions_lists_version` |
 
 ## Secrets and data hygiene
