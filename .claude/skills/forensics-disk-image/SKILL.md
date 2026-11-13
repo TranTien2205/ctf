@@ -160,6 +160,11 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    corrupt: `python3 tools/forensics/luks_info.py vol.img` names the
    cipher/mode/hash, payload offset, which key slots are live and
    their KDF cost — LUKS2 emits its full JSON metadata.
+   Apple `.dmg` (UDIF — macOS bundles, `dmg2img`/`hdiutil` absent):
+   `python3 tools/forensics/dmg_udif.py a.dmg` reads the `koly`
+   trailer -> resource plist -> `mish` block tables (raw/zero-fill/
+   zlib/bzip2 chunks listed), and `--extract flat.img` writes the
+   decompressed image for part_table and the fs readers.
    `.vhd` disks: `python3 tools/forensics/vhd_read.py disk.vhd dump
    guest.img` walks footer -> cxsparse header -> BAT (fixed, dynamic,
    and differencing with its parent locator named). `.vmdk`:
