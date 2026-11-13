@@ -57,6 +57,7 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Tampered sessions degrade to warnings, never crashes | dict/shape guards across verify/report/findings/diff/compare | `test_readers_survive_mutated_session_dir`, `test_cli_tolerates_corrupt_session_files`, `test_verify_tolerates_nonregular_artifact` |
 | Resume carries transcript+findings, refuses wrong target | `Session._resume` target check | `test_session_resume`, `test_session_resume_wrong_target_refused`, `test_loop_resume_seed_carries_findings` |
 | Cross-host diffs/compares warn instead of silently misleading | `diff`/`compare` check meta.json targets; retests stay port-insensitive | `test_diff_warns_on_different_hosts`, `test_diff_same_host_new_port_matches`, `test_compare_warns_on_different_hosts`, `test_compare_same_target_no_warning` |
+| Artifacts carry build provenance | `meta.json`/`summary.json` stamp `argus_version`; resume preserves + `resumed_by`; `sessions`/`verify`/`compare` surface it | `test_compare_warns_on_different_versions`, `test_sessions_lists_version` |
 
 ## Secrets and data hygiene
 
