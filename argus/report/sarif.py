@@ -7,6 +7,7 @@ import json
 import time
 from pathlib import Path
 
+from .. import __version__
 from ..session import Session, _cwe_of, _owasp_of, sanitized_findings
 
 _LEVEL = {"critical": "error", "high": "error", "medium": "warning",
@@ -67,7 +68,7 @@ def render_sarif(session: Session) -> Path:
         "runs": [{
             "tool": {"driver": {
                 "name": "Argus",
-                "version": "1.0.0",
+                "version": __version__,
                 "informationUri":
                     "https://github.com/TranTien2205/ctf",
                 "rules": list(rules.values()),
