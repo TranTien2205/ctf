@@ -346,6 +346,23 @@ class Handler(BaseHTTPRequestHandler):
             rendered = re.sub(r"\{\{(.*?)\}\}", render, name)
             self._send(body=f"<html><body>Hello, {rendered}!</body></html>")
 
+        elif path == "/hello2":
+            # planted both-present SSTI: the page renders {{expr}} AND
+            # echoes the raw input (error-page style) - a detector that
+            # only counts evals when the payload is absent misses this
+            name = p.get("name", "guest")
+            def render2(m):
+                expr = m.group(1)
+                if re.fullmatch(r"[\d\s+\-*/().]+", expr):
+                    try:
+                        return str(eval(expr, {"__builtins__": {}}, {}))
+                    except Exception:
+                        return m.group(0)
+                return m.group(0)
+            rendered = re.sub(r"\{\{(.*?)\}\}", render2, name)
+            self._send(body=f"<html><body>Hello, {rendered}!"
+                            f" <i>you typed: {name}</i></body></html>")
+
         elif path == "/download":
             fname = p.get("file", "welcome.txt")
             if fname.startswith("/"):

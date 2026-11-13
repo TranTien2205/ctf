@@ -85,6 +85,16 @@ def test_ssti_probe(lab_url, ctx):
     assert "ssti candidate" in out["verdict"]
 
 
+def test_ssti_eval_and_reflect(lab_url, ctx):
+    """Engines that render the expr AND echo the raw input (error-page
+    style) must still count - expect is a random sum that cannot occur
+    naturally."""
+    out = probes.probe_ssti(ctx, lab_url + "/hello2?name=x", "name")
+    assert "ssti candidate" in out["verdict"], out
+    hit = next(r for r in out["results"] if not r.get("negative"))
+    assert hit["also_reflected"] is True, hit
+
+
 def test_lfi_probe(lab_url, ctx):
     out = probes.probe_lfi(ctx, lab_url + "/download?file=x", "file")
     assert "confirmed marker" in out["verdict"]

@@ -287,9 +287,13 @@ def probe_ssti(ctx: Context, url: str, param: str, method: str = "GET",
         payload = tpl % (a, b)
         r = _send(ctx, url, param, payload, method, data, "probe_ssti", family)
         body = r.get("body", "")
-        if expect in body and payload not in body:
+        # expect is a random sum that cannot occur naturally: its presence
+        # alone proves evaluation. Engines that both evaluate AND echo the
+        # raw payload (error pages rendering partial output) still count
+        if expect in body:
             hits.append({"family": family, "request_id": r["request_id"],
-                         "evidence": f"{payload} -> {expect} in response"})
+                         "evidence": f"{payload} -> {expect} in response",
+                         "also_reflected": payload in body})
         elif payload in body:
             hits.append({"family": family, "request_id": r["request_id"],
                          "evidence": "reflected unrendered (not SSTI)", "negative": True})
