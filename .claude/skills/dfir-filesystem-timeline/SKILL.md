@@ -223,15 +223,14 @@ names (Created/Removed/Renamed/Modified/File/Folder), and path — the
 equivalent of `$UsnJrnl` on a macOS image.
 
 On Windows the same journal role is `$Extend\$UsnJrnl:$J`:
-`python3 tools/forensics/usnjrnl.py UsnJrnl.bin --grep flag` walks
-the self-delimiting USN_RECORD_V2/V4 records (skipping sparse zero
-pages) and decodes each one to file/parent MFT ref, timestamp, and
-named reasons — FileCreate/RenameOldName/RenameNewName/FileDelete/
-Close — which answers "when was X created, renamed, or deleted"
-without parsing the full NTFS volume. `.lnk` shortcuts under
-`Recent\` answer "what did the user open":
-`python3 tools/forensics/lnk_read.py file.lnk` recovers the LinkInfo
-local_base_path, volume type/serial, and working-dir/args.
+`python3 tools/forensics/usn_parse.py UsnJrnl.bin` walks the
+USN records into JSONL — file/parent MFT refs, timestamps, and
+reason bits — and `--deleted` keeps only FileDelete lines, which
+answers "when was X created, renamed, or deleted" without parsing
+the full NTFS volume. `.lnk` shortcuts under `Recent\` answer
+"what did the user open": `python3 tools/forensics/lnk_parse.py
+file.lnk` recovers the LinkInfo local_base_path, volume
+serial/label, and the string-data blocks (args, working dir).
 
 `$Recycle.Bin` `$I*` records answer "what was deleted, from where,
 when": `python3 tools/forensics/recycle_i.py '$IABC.txt'` decodes
@@ -240,10 +239,10 @@ version-1/2 records (original path, size, deletion FILETIME), and
 `r_exists` false when only the metadata survives.
 
 Registry hives (SAM/SYSTEM/SOFTWARE/NTUSER.DAT/Amcache.hve) parse
-without python-registry: `python3 tools/forensics/regf_read.py hive
-tree` walks the hbin cells — `nk` keys, `lf/lh/li/ri` subkey lists,
-`vk` values — and `ls <path>` / `find --pat 'flag'` surfaces value
-data decoded by type (SZ, MULTI_SZ, DWORD, QWORD, inline data).
+offline: `python3 tools/forensics/hive_parse.py hive tree` walks the
+regf cells into a path index; `get <path>` reads values and the named
+extractors (`userassist`, `shimcache`, `amcache`, `mru`) decode the
+rot13 counts, AppCompat entries and recent-lists directly.
 
 Record: BOTH timestamp sets (`$STANDARD_INFORMATION` vs `$FILE_NAME` attribute
 times) — a patched Created/Modified shows as a disagreement between the two,
