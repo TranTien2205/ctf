@@ -508,15 +508,16 @@ def main(argv: list[str] | None = None) -> int:
         # construction - every finding reads as fixed+new. Retest diffs
         # are deliberately port-insensitive, but a host mismatch is
         # operator error, not a retest.
-        def _meta_host(d):
+        def _meta(d):
             try:
                 m = json.loads((Path(d) / "meta.json")
                                .read_text(encoding="utf-8"))
-                t = m.get("target") if isinstance(m, dict) else None
-                return _up.urlparse(str(t or "")).hostname
+                return m if isinstance(m, dict) else {}
             except Exception:
-                return None
-        hb, ha = _meta_host(args.before), _meta_host(args.after)
+                return {}
+        mb, ma = _meta(args.before), _meta(args.after)
+        hb = _up.urlparse(str(mb.get("target") or "")).hostname
+        ha = _up.urlparse(str(ma.get("target") or "")).hostname
         if hb and ha and hb.lower() != ha.lower():
             print(f"warning: targets differ ({hb} vs {ha}) - a diff "
                   "across hosts reads every finding as fixed+new; "
@@ -543,6 +544,14 @@ def main(argv: list[str] | None = None) -> int:
         new = [after[k] for k in sorted(set(after) - set(before))]
         if args.json:
             print(json.dumps({
+                # provenance so a JSON diff is self-documenting, like
+                # the compare table's target/version rows
+                "before": {"dir": Path(args.before).name,
+                           "target": mb.get("target"),
+                           "argus_version": mb.get("argus_version")},
+                "after": {"dir": Path(args.after).name,
+                          "target": ma.get("target"),
+                          "argus_version": ma.get("argus_version")},
                 "fixed": fixed, "new": new,
                 "still_present": [
                     {"id_before": b.get("id"), "id_after": a.get("id"),
