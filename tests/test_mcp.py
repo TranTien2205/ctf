@@ -66,6 +66,28 @@ def test_mcp_tools_without_config(ctx):
     assert listing["servers"] == []
 
 
+def test_mcp_list_coerces_hostile_tool_entries(ctx, tmp_path, monkeypatch):
+    """A buggy/hostile server returning non-str descriptions or non-dict
+    tool entries must not crash the listing (0161307)."""
+    class StubClient:
+        def tools(self):
+            # tools() itself filters non-dicts (mcp.py:178); descriptions
+            # and names of any type get str()-coerced at mcp_list
+            return [{"name": "ok", "description": 5},
+                    {"name": ["x"], "description": None}, {}]
+
+    mgr = MCPManager(_config(tmp_path))
+    monkeypatch.setattr(mgr, "client", lambda name: StubClient())
+    ctx.mcp = mgr
+    try:
+        out = mcp_tools.mcp_list(ctx)
+        assert out["servers"][0]["server"] == "fake"
+        assert out["servers"][0]["tools"][0]["description"] == "5"
+        json.dumps(out)  # result must stay serializable
+    finally:
+        mgr.close()
+
+
 def test_mcp_call_unknown_server(ctx, tmp_path):
     ctx.mcp = MCPManager(_config(tmp_path))
     try:

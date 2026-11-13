@@ -348,3 +348,32 @@ def test_role_cards_reference_real_tools():
     for card in (RECON, EXPLOIT, REPORT, LEAD):
         assert card.tools <= names, \
             f"{card.name} card references tools without schemas"
+
+
+def test_worker_crash_does_not_kill_team(tmp_path, lab_url):
+    """A worker whose LLM raises inside chat() must land as a status
+    entry, not propagate - the lead still drains and the run still seals
+    (coordinator._run wraps loop.run)."""
+    from argus.llm import ScriptedClient
+
+    class CrashClient(ScriptedClient):
+        def chat(self, messages, tools, system):
+            raise RuntimeError("model endpoint exploded")
+
+    scripts = {
+        ("lead", "lead"): ScriptedClient([
+            {"tool_calls": [_tool("read_board")]},
+            {"tool_calls": [_tool("finish_engagement", summary="done")]},
+        ]),
+        ("recon", "recon-1"): CrashClient([]),
+    }
+    cfg = Config(target=lab_url, allow_private=True,
+                 session_dir=tmp_path, max_turns=10, max_requests=100,
+                 max_time_s=60, rate_rps=0)
+    team = TeamRun(cfg, llm_factory=lambda role, name: scripts[(role, name)],
+                   quiet=True, n_recon=1, n_exploit=0)
+    result = team.run()
+    assert result["lead_error"] is None
+    agent = result["agents"]["recon-1"]
+    assert agent["status"] == "done"
+    assert "exploded" in (agent.get("error") or "")
