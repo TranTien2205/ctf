@@ -238,7 +238,8 @@ class TeamRun:
             model=self.model_for(card.name),
             max_turns=card.turns or self.cfg.max_turns,
             max_requests=card.requests or self.cfg.max_requests)
-        system = build_system(wcfg, self.scope) + "\n\n" + card.prompt()
+        system = (build_system(wcfg, self.scope, allowed=card.tools)
+                  + "\n\n" + card.prompt())
         seed = (f"You are {name}, a {card.name} worker on an authorized "
                 f"team assessment of {self.cfg.target}.\n"
                 f"Task from the lead: {task}\n"
@@ -274,7 +275,8 @@ class TeamRun:
     def _start_lead(self) -> None:
         name = "lead"
         self.board.register(name, "lead", "coordinate the engagement")
-        system = build_system(self.cfg, self.scope) + "\n\n" + LEAD.prompt()
+        system = (build_system(self.cfg, self.scope, allowed=LEAD.tools)
+                  + "\n\n" + LEAD.prompt())
         goal_line = (f"Operator goal: {self.cfg.goal}" if self.cfg.goal else
                      "Operator goal: full authorized web assessment.")
         seed = _LEAD_SEED.format(

@@ -961,6 +961,55 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The shared prompt was a single-agent playbook given to four roles
+- `build_system` was unconditional, and `SYSTEM`'s numbered method is
+  imperative throughout - "fingerprint() the target, crawl() the surface",
+  "record_finding() IMMEDIATELY", "finish() with", "call next_action()".
+  Every team role got it verbatim while `dispatch` enforces the role's
+  card, so the prompt instructed what the gate denied:
+
+  | role | instructed to call, gate denies |
+  | --- | --- |
+  | recon | `record_finding`, `next_action` |
+  | exploit | `crawl`, `fingerprint`, `js_recon`, `next_action` |
+  | report | `crawl`, `fingerprint`, `js_recon`, `record_finding`, `next_action` |
+  | lead | `finish`, `record_finding`, `next_action` |
+
+- Proven by calling it, not by reading: `dispatch` with each role's real
+  grant answers `{"error": "tool next_action is not available to role
+  'recon-1'"}`, and the same for exploit and for the lead.
+- Two measurements decided which half was wrong. Every role CARD's own
+  prompt is exactly consistent with its own grant - zero mismatches across
+  all four - so the shared block is the broken one, and widening the grants
+  to match it would dissolve the role separation that is the point of team
+  mode. Recon maps, exploit proves, so only exploit records: that is a
+  design, not an oversight.
+- `next_action` was the worst of them because **no card held it at all**,
+  the lead's included, while `decide.py`'s docstring names two readers of
+  the ledger - the operator, and "the agent itself, via the `next_action`
+  tool". For every team agent the second was false. The instruction also
+  fires at the three moments the agent most needs an answer: unsure what is
+  worth doing, a class has stopped producing signal, the engagement looks
+  finished. A worker spent a turn there and got a refusal naming its own
+  role, with no fallback named.
+- So the lead now holds the ledger - deciding what happens next from
+  recorded evidence is what a coordinator does - and every other role is
+  told the truth instead: which tools it has, which of the method's tools
+  it does not, that those steps belong to another worker, and how to hand
+  them over. Both the disclaimer and the hand-over tools are **derived from
+  the grant**, because a hand-written list is what drifted in the first
+  place.
+- That derivation immediately caught my own fix doing the same thing. The
+  hand-over sentence named `emit_lead()`, which the `report` role does not
+  hold - the half-fix, in the paragraph written to fix the half-fix. The
+  hand-over tools are now filtered against the grant too.
+- Three checks, each proved to fail on its own. Dropping the grant block:
+  *"recon is instructed to call record_finding and cannot, with no
+  statement in the prompt that it cannot"*. Rendering the disclaimer in
+  single-agent mode, where all 56 tools are granted and nothing is
+  withheld: `'YOUR TOOLS.' not in ...` fails. Taking the ledger back off
+  the lead: the grant assertion names the frozenset it is missing from.
+
 ### The probe-attribution denominator came from the mapping it checked
 - `PROBE_CLASS` maps a probe tool to the class it tests, and the ledger
   reads it for three separate things: the per-class budget, rule 6's offer
@@ -1620,7 +1669,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 627 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 630 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

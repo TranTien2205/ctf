@@ -1,6 +1,7 @@
 """Team mode: lead queue, blackboard, role gating, exploit runner, e2e."""
 from __future__ import annotations
 
+import re
 import json
 import threading
 import time
@@ -194,6 +195,94 @@ def test_a_spent_lead_bound_does_not_claim_the_surface_is_covered(ctx):
     assert out["queued"] is False and out["refusal"] == "capacity"
     assert "duplicate" not in out["reason"]
     assert "NOT covered" in out["reason"]
+
+
+def test_no_role_is_told_to_call_a_tool_its_grant_denies(ctx):
+    """The shared prompt was a single-agent playbook given to four roles.
+
+    `SYSTEM`'s numbered method is imperative - "fingerprint() the target,
+    crawl() the surface", "record_finding() IMMEDIATELY", "finish() with",
+    "call next_action()" - and it was rendered identically for every role
+    while `dispatch` enforces the role's card. Measured before the fix:
+
+        recon    record_finding, next_action
+        exploit  crawl, fingerprint, js_recon, next_action
+        report   crawl, fingerprint, js_recon, record_finding, next_action
+        lead     finish, record_finding, next_action
+
+    The grants are deliberate - recon maps, exploit proves, so only exploit
+    records - and every role CARD's own prompt is consistent with its own
+    grant. So the shared prompt was the wrong half, and widening the grants
+    to match it would have dissolved the role separation that is the point
+    of team mode.
+
+    This test does not demand that the two sets match. It demands that the
+    prompt never silently instructs what the gate denies: either the role
+    can call the tool, or the prompt says out loud that it cannot and who
+    does. That is derived in `_grant_block`, so it cannot drift from a card.
+    """
+    from argus.scope import ScopeGuard
+    from argus.system import build_system
+    from argus.team.cards import CARDS, LEAD
+    from argus.tools import registry
+
+    known = {t["name"] for t in registry.TOOL_SCHEMAS}
+    scope = ScopeGuard(ctx.cfg.target)
+    roles = [(name, card.tools) for name, card in CARDS.items()]
+    roles.append(("LEAD", LEAD.tools))
+
+    for name, grant in roles:
+        rendered = build_system(ctx.cfg, scope, allowed=grant)
+        named = {m for m in re.findall(r"\b([a-z_][a-z0-9_]*)\s*\(", rendered)
+                 if m in known}
+        assert named, (f"{name}: the rendered prompt names no tools at "
+                       "all, so this test is measuring nothing")
+        for tool in sorted(named - set(grant)):
+            # not granted, so the prompt must say so by name
+            assert "YOUR TOOLS." in rendered, (
+                f"{name} is instructed to call {tool} and cannot, with no "
+                "statement in the prompt that it cannot")
+            disclaimer = rendered.split("YOUR TOOLS.", 1)[1]
+            assert tool in disclaimer, (
+                f"{name} is instructed to call {tool}, its grant denies it, "
+                "and the disclaimer does not name it - so the agent spends a "
+                f"turn on 'tool {tool} is not available to role'")
+
+
+def test_single_agent_mode_gets_no_disclaimer_because_it_needs_none(ctx):
+    """The other direction: with every tool granted, nothing is withheld.
+
+    If this fails while the test above passes, the disclaimer has started
+    appearing where it is false - telling a single agent that holds all 56
+    tools that some of them belong to another worker, on a run that has no
+    other worker.
+    """
+    from argus.scope import ScopeGuard
+    from argus.system import build_system
+
+    rendered = build_system(ctx.cfg, ScopeGuard(ctx.cfg.target))
+    assert "YOUR TOOLS." not in rendered
+    assert "next_action()" in rendered          # single mode really holds it
+    assert "belongs to the lead" not in rendered
+
+
+def test_the_lead_can_actually_reach_the_ledger(ctx):
+    """`decide.py` names two readers: the operator, and the agent itself.
+
+    For every team agent the second was false - `next_action` was in the
+    registry and in no card, so `dispatch` refused it by role name. The lead
+    is the role it belongs to, because deciding what happens next from
+    recorded evidence is what a coordinator does.
+    """
+    from argus.team.cards import LEAD
+    from argus.tools import registry
+
+    assert "next_action" in LEAD.tools
+    assert "next_action" in {t["name"] for t in registry.TOOL_SCHEMAS}
+    ctx.board = Board(ctx.session)
+    ctx.allowed = frozenset(LEAD.tools)
+    out = registry.dispatch(ctx, "next_action", {})
+    assert "not available to role" not in str(out.get("error", ""))
 
 
 def test_emit_lead_scope_checked(ctx):

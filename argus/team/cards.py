@@ -74,6 +74,12 @@ LEAD = RoleCard(
         "http_request", "fingerprint", "crawl", "js_recon",
         "spawn_worker", "list_workers", "read_findings",
         "emit_lead", "finish_engagement",
+        # the ledger belongs to the role whose job is deciding what happens
+        # next: it answers from recorded evidence rather than from the
+        # conversation, which is what a coordinator needs - and which no
+        # card granted to anyone, while the shared prompt told all four to
+        # call it
+        "next_action",
     }),
     prompt_file="lead.md",
     worker=False,
