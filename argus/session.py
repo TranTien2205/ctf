@@ -263,7 +263,19 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
         return ""
     resp = entry.get("response") or {}
     body = resp.get("body") if isinstance(resp, dict) else None
-    return str(body or "") or str(entry.get("output") or "")
+    # response headers carry the proof for header-class findings (CRLF
+    # injection, security headers, server disclosure) - the recorded
+    # headers are already redacted, so serializing them into the
+    # citable text lets a finding quote its real evidence. Both the
+    # JSON shape the model saw and wire-style 'k: v' lines are included
+    # so either quotation form matches.
+    hdrs = resp.get("headers") if isinstance(resp, dict) else None
+    parts = []
+    if isinstance(hdrs, dict) and hdrs:
+        parts.append(json.dumps(hdrs, ensure_ascii=False))
+        parts.extend(f"{k}: {v}" for k, v in hdrs.items())
+    parts.append(str(body or "") or str(entry.get("output") or ""))
+    return "\n".join(p for p in parts if p)
 
 
 def _finding_key(category: str, url: str) -> tuple:
@@ -686,16 +698,11 @@ class Session:
 
     @staticmethod
     def _evidence_text_of(entry: dict | None) -> str:
-        if not entry:
-            return ""
-        resp = entry.get("response") or {}
-        body = resp.get("body", "") or ""
-        if body:
-            return body
-        return entry.get("output", "") or ""
+        return _evidence_text_of_entry(entry)
 
     def evidence_text(self, rid: str) -> str:
-        """Verbatim bytes a finding may quote: response body or event output."""
+        """Verbatim bytes a finding may quote: response headers + body,
+        or event output."""
         return self._evidence_text_of(self._transcript.get(rid))
 
     # ------------------------------------------------------------------
