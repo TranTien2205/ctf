@@ -62,7 +62,7 @@ looked like a crash is a handled error or a clean exit. Go back to
 | `malloc`/`free` on user-sized chunks, double free, use-after-free | `../ctf-pwn/heap-techniques.md` |
 | Heap chain that needs a file-structure primitive | `../ctf-pwn/heap-fsop.md` |
 | A kernel module, a driver, or a supplied `bzImage` | `../ctf-pwn/kernel.md` |
-| `seccomp` is on, or the shell is blocked | `../ctf-pwn/sandbox-escape.md` |
+| `seccomp` is on, or the shell is blocked — dump the filter first: `python3 tools/seccomp_dump.py ./chal` extracts the BPF program and names the allowed/denied syscalls (seccomp-tools and gdb are absent here) | `../ctf-pwn/sandbox-escape.md` |
 | Shellcode is accepted and the page is executable | `../ctf-pwn/rop-and-shellcode.md` |
 | Nothing above fits | `../ctf-pwn/advanced-exploits.md`, one file at a time |
 

@@ -32,6 +32,10 @@ DANGEROUS = {
     "puts": "single-argument leak primitive for ret2plt",
     "free": "heap: pair with malloc for a use-after-free or double-free",
     "malloc": "heap: allocator-level chain rather than a stack overflow",
+    "seccomp": "sandbox: a BPF filter decides which syscalls live -- dump it "
+               "with tools/seccomp_dump.py before planning the chain",
+    "prctl": "possible seccomp install (PR_SET_SECCOMP) -- check for a "
+             "BPF filter with tools/seccomp_dump.py",
 }
 
 

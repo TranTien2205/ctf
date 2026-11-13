@@ -64,7 +64,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.8k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-geolocation`, `osint-identity-pivot`, `osint-infra-records` … |
-| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.0k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
+| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.1k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.8k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.1k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
