@@ -570,6 +570,16 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "compare":
+        import urllib.parse as _up
+        def _host_of(d):
+            try:
+                m = json.loads((Path(d) / "meta.json")
+                               .read_text(encoding="utf-8"))
+                t = m.get("target") if isinstance(m, dict) else None
+                return (_up.urlparse(str(t or "")).hostname or "").lower()
+            except Exception:
+                return ""
+
         def _summ(d):
             p = Path(d) / "summary.json"
             if not p.exists():
@@ -600,21 +610,13 @@ def main(argv: list[str] | None = None) -> int:
                 "tokens": _tok if isinstance(_tok, dict) else {},
                 "workers": len(agents),
                 "version": s.get("argus_version") or "",
+                "host": _host_of(d),
             }
         if len(args.dirs) < 2:
             print("compare needs at least two session dirs")
             return 2
         # A/B comparisons assume the same target - different hosts make
         # the metric deltas meaningless, so flag it like `diff` does
-        import urllib.parse as _up
-        def _host_of(d):
-            try:
-                m = json.loads((Path(d) / "meta.json")
-                               .read_text(encoding="utf-8"))
-                t = m.get("target") if isinstance(m, dict) else None
-                return (_up.urlparse(str(t or "")).hostname or "").lower()
-            except Exception:
-                return ""
         hosts = {_host_of(d) for d in args.dirs} - {""}
         if len(hosts) > 1:
             print(f"warning: targets differ ({', '.join(sorted(hosts))}) "
@@ -630,9 +632,11 @@ def main(argv: list[str] | None = None) -> int:
                   "compare like-for-like on the same build",
                   file=sys.stderr)
         if args.csv:
+            # context columns are appended last so existing positional
+            # parsers keep working
             hdr = ("session,mode,findings,requests,ttf_s,duration_s,"
                    "endpoints,llm_calls,workers,tokens_in,tokens_out,"
-                   "cache_read,cache_write")
+                   "cache_read,cache_write,target_host,argus_version")
             print(hdr)
             for s in sums:
                 t = s.get("tokens") or {}
@@ -641,9 +645,11 @@ def main(argv: list[str] | None = None) -> int:
                       f"{s.get('duration_s') or ''},"
                       f"{s.get('coverage','?')},{s.get('llm_calls',0)},"
                       f"{s.get('workers',0)},{t.get('in',0)},{t.get('out',0)},"
-                      f"{t.get('cache_read',0)},{t.get('cache_write',0)}")
+                      f"{t.get('cache_read',0)},{t.get('cache_write',0)},"
+                      f"{s.get('host','')},{s.get('version','')}")
             return 0
-        keys = [("mode", "mode"), ("findings", "findings"),
+        keys = [("host", "target_host"), ("version", "argus_version"),
+                ("mode", "mode"), ("findings", "findings"),
                 ("requests", "requests"),
                 ("ttf", "time_to_first_finding_s"),
                 ("duration_s", "duration_s"),
