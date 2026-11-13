@@ -58,11 +58,32 @@ write that merely mentioned `role` and got a 200, paired with any later
 read, proved the class. `/api/order` drops every injected field and its own
 probe says so; it graded `proven` on that endpoint's ordinary answer.
 
-Two classes are still not driven in the proving direction, each for a stated
-reason: `race` (below) and `deserialize` (the lab's `/import` returns a
-parser error and never executes, so "identity output plus the probe nonce"
-is unobtainable here - a limit of this lab, not of the class). `dos`,
-`graphql` and `jwt` have no probe at all.
+`graphql` and `jwt` had no row at all, and the reason they were missed is
+the same counting error: neither is driven by a `probe_*` tool, so neither
+appeared in any coverage figure derived from the probe table. Both were
+already reachable - `graphql_introspect` sends the introspection query and
+the GET fallback under its own name, and `jwt` is `jwt_decode` recovering
+the weak HMAC secret offline, `jwt_forge` minting a token, then three plain
+requests. Driving them found two more things:
+
+* `graphql` was absent from `decide.PROBE_CLASS`, so the ledger attributed
+  none of `graphql_introspect`'s exchanges to the class. A run could call it
+  five times and `argus next` would still say the class had never been
+  probed - the per-class budget never counted it and rule 6 never offered
+  its evidence. That is exactly the drift the decision controller exists to
+  prevent.
+* This module could not have graded `jwt` even with a row, because
+  `_exchanges` filters the transcript to entries carrying a response - and
+  `jwt`'s first requirement, "this system minted the credential", is made
+  of the `jwt_forge` EVENT and nothing else. Measured: the same evidence
+  grades `unproven` on the exchanges and `proven` on the full set. Grading
+  now sees the events; quotes still come from responses only.
+
+Three classes are still not driven in the proving direction, each for a
+stated reason: `dos` (refused by construction - its proof is the damage),
+`race` (below) and `deserialize` (the lab's `/import` returns a parser error
+and never executes, so "identity output plus the probe nonce" is
+unobtainable here - a limit of this lab, not of the class).
 
 Two directions, and no reading of the probe's prose - a verdict is English and
 this asserts against evidence:
@@ -87,8 +108,41 @@ import re
 import pytest
 
 from argus import proof
-from argus.decide import PROBE_CLASS
-from argus.tools import probes
+from argus.decide import CLASS_TOOL_CHAIN, PROBE_CLASS
+from argus.tools import analysis, probes, web
+
+def _drive_jwt(c, b, *, forge: bool):
+    """The jwt class is a chain, not a probe, which is why it was never here.
+
+    `jwt_decode` and `jwt_forge` send nothing - they recover the weak HMAC
+    secret offline and mint a token - so the wire part is three plain
+    requests: mint a real token, present a credential, present another and
+    be refused. With `forge=False` the credential presented is the server's
+    OWN token, which is an auth system working and must not grade.
+    """
+    import json as _json
+
+    r = c.client.send("GET", b + "/token?user=guest", tool="http_request",
+                      note="mint a real token")
+    token = _json.loads(r["body"] or "{}")["token"]
+    present = token
+    out = None
+    if forge:
+        decoded = analysis.jwt_decode(c, token)
+        out = analysis.jwt_forge(
+            c, token, claims='{"role":"admin"}',
+            secret=decoded.get("recovered_secret") or "")
+        present = out.get("resigned") or ""
+    c.client.send("GET", b + "/api/me",
+                  headers={"Authorization": f"Bearer {present}"},
+                  tool="http_request",
+                  note="credential presented on a privileged resource")
+    c.client.send("GET", b + "/api/me",
+                  headers={"Authorization": "Bearer not.a.token"},
+                  tool="http_request",
+                  note="control: another credential on the same endpoint")
+    return out or {"presented": "the server's own token"}
+
 
 # (probe, class, callable) where the lab genuinely has the bug.
 VULNERABLE = [
@@ -162,6 +216,13 @@ VULNERABLE = [
      lambda c, b: probes.probe_csrf(c, b + "/api/config", method="POST",
                                     data="csrfmark=landed",
                                     read_url=b + "/api/config")),
+    # The two classes that had no row at all. Neither is driven by a
+    # `probe_*` tool, which is the whole reason: `graphql_introspect` sends
+    # the introspection query under its own name, and `jwt` is a chain of
+    # two offline tools plus three plain requests.
+    ("graphql_introspect", "graphql",
+     lambda c, b: web.graphql_introspect(c, b + "/graphql")),
+    ("jwt_forge", "jwt", lambda c, b: _drive_jwt(c, b, forge=True)),
     # `race` is deliberately NOT here in the proving direction. Its evidence
     # is wall-clock concurrency, and whether eight threads actually overlap
     # on a loaded runner is a property of the host, not of the probe or the
@@ -250,6 +311,13 @@ CLEAN = [
      lambda c, b: probes.probe_csrf(c, b + "/search", method="POST",
                                     data="q=x",
                                     read_url=b + "/internal/status")),
+    # introspection disabled: the refusal is the defence working
+    ("graphql_introspect", "graphql",
+     lambda c, b: web.graphql_introspect(c, b + "/graphql-strict")),
+    # the server's OWN token accepted and a bad one refused is an auth
+    # system working - without the mint it must not grade, which is the
+    # distinction `verify_token_forgery` exists to make
+    ("jwt_forge", "jwt", lambda c, b: _drive_jwt(c, b, forge=False)),
 ]
 # `method` and `xfh` have no clean case either, for the same reason as `cors`
 # below: the lab answers TRACE on every path and honours X-Original-URL
@@ -267,8 +335,15 @@ CLEAN = [
 # themselves and against every document that states it. The first version of
 # that sentence said 23 and the tables held 24, which is the kind of number
 # this repository's doc gate exists to refuse - it just did not reach here.
-PROVING_COVERAGE = 24
-PROBED_CLASSES = 26
+#
+# The denominator is the MATRIX, not the set of classes that happen to have a
+# `probe_*` tool. Counting against the tooling is how `graphql` and `jwt` sat
+# outside this module without anyone noticing: neither is driven by a probe,
+# so neither appeared in a coverage figure derived from the probe table.
+PROVING_COVERAGE = 26
+MATRIX_CLASSES = 29
+# Each with a reason stated in the module docstring above.
+NOT_DRIVEN = {"dos", "race", "deserialize"}
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
@@ -282,7 +357,22 @@ def _exchanges(session) -> list[dict]:
             if isinstance(e.get("response"), dict)]
 
 
-def _best_grade(klass: str, entries: list[dict]) -> tuple[str, list[str]]:
+def _entries(session) -> list[dict]:
+    """Everything recorded, events included.
+
+    `_exchanges` drops the non-HTTP events, which is right for choosing a
+    quote and wrong for grading: `jwt`'s first requirement - "this system
+    minted the credential" - is made of the `jwt_forge` event and nothing
+    else. Grading with exchanges alone put that class permanently out of
+    this module's reach, which is the likeliest reason nobody added it.
+    Measured: the same evidence grades `unproven` on exchanges and `proven`
+    on the full set.
+    """
+    return [e for e in session._transcript.values() if isinstance(e, dict)]
+
+
+def _best_grade(klass: str, entries: list[dict],
+                graded: list[dict] | None = None) -> tuple[str, list[str]]:
     """The best grade any honest quote from this evidence can reach.
 
     A probe does not choose the excerpt - the agent does - so the question is
@@ -310,7 +400,7 @@ def _best_grade(klass: str, entries: list[dict]) -> tuple[str, list[str]]:
         quotes += [t for t in dict.fromkeys(_TOKEN_RE.findall(body))
                    if t not in quotes]
         for quote in quotes[:60]:
-            verdict = proof.grade(klass, quote, entries)
+            verdict = proof.grade(klass, quote, graded or entries)
             if _ORDER.get(verdict.grade, 0) > _ORDER.get(best, 0):
                 best, missing = verdict.grade, verdict.missing
             if best == "proven":
@@ -325,11 +415,13 @@ def test_the_probe_collects_what_its_class_requires(
     spec = proof.spec_for(klass)
     assert spec is not None, f"{name} maps to {klass!r}, not a matrix class"
     before = len(_exchanges(ctx.session))
+    before_all = len(_entries(ctx.session))
     call(ctx, lab_url)
     entries = _exchanges(ctx.session)[before:]
     assert entries, f"{name} recorded no exchange at all"
 
-    grade, missing = _best_grade(klass, entries)
+    grade, missing = _best_grade(klass, entries,
+                                 _entries(ctx.session)[before_all:])
     want = spec.ceiling or "proven"
     assert _ORDER[grade] >= _ORDER[want], (
         f"{name} ran against a {klass} the lab really has, and nothing it "
@@ -362,9 +454,15 @@ def test_every_driven_probe_exists_and_maps_to_a_real_class():
     known = {t["name"] for t in registry.TOOL_SCHEMAS}
     for name, klass, _ in VULNERABLE + CLEAN:
         assert name in known, f"{name} is driven here but is not a tool"
-        assert PROBE_CLASS.get(name) == klass, (
+        # A class whose proof needs a chain cannot be in PROBE_CLASS: those
+        # steps send nothing, so mapping them as evidence would mark the
+        # class tried on an offline call. `CLASS_TOOL_CHAIN` names them
+        # instead, and a row may be driven by any step of its own chain.
+        chain = CLASS_TOOL_CHAIN.get(klass, ())
+        assert PROBE_CLASS.get(name) == klass or name in chain, (
             f"{name} is driven as {klass!r} but decide.PROBE_CLASS says "
-            f"{PROBE_CLASS.get(name)!r}")
+            f"{PROBE_CLASS.get(name)!r} and the class's tool chain is "
+            f"{list(chain)}")
 
 
 def test_both_directions_are_exercised_for_the_classes_that_have_both():
@@ -392,16 +490,19 @@ def test_the_stated_coverage_matches_the_tables_and_the_docs():
     from pathlib import Path
 
     driven = {k for _, k, _ in VULNERABLE}
-    probed = set(PROBE_CLASS.values())
+    matrix = {spec.vuln_class for spec in proof.MATRIX.values()}
     assert len(driven) == PROVING_COVERAGE, sorted(driven)
-    assert len(probed) == PROBED_CLASSES, sorted(probed)
-    # the two left out are named with a reason in the docstring above
-    assert probed - driven == {"race", "deserialize"}, probed - driven
+    assert len(matrix) == MATRIX_CLASSES, sorted(matrix)
+    # the ones left out are named with a reason in the docstring above
+    assert matrix - driven == NOT_DRIVEN, matrix - driven
     for name in driven:
         assert proof.spec_for(name) is not None, name
+    # and every class a probe tool claims to test is driven, or excluded
+    assert set(PROBE_CLASS.values()) - driven <= NOT_DRIVEN, \
+        set(PROBE_CLASS.values()) - driven
 
     root = Path(__file__).resolve().parent.parent
-    pattern = re.compile(r"(\d+) of the (\d+) probed classes")
+    pattern = re.compile(r"(\d+) of the (\d+) proof classes")
     seen = 0
     for rel in ("docs/VERIFICATION.md", "CHANGELOG.md", "AGENTS.md",
                 "tests/test_probe_matrix_agreement.py"):
@@ -412,6 +513,6 @@ def test_the_stated_coverage_matches_the_tables_and_the_docs():
                 path.read_text(encoding="utf-8")):
             seen += 1
             assert int(stated) == PROVING_COVERAGE, f"{rel} says {stated}"
-            assert int(total) == PROBED_CLASSES, f"{rel} says of {total}"
+            assert int(total) == MATRIX_CLASSES, f"{rel} says of {total}"
     # a regex that stops matching would make this pass forever on nothing
     assert seen >= 2, "no document states the coverage any more"

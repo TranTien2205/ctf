@@ -98,6 +98,11 @@ probe, update the lab and its test together.
   probe reported a whitelist. And **measure each clean endpoint, never
   assume it**: this module has twice asserted a lab endpoint was clean and
   been wrong, so drive it first and keep only what grades below its ceiling.
+  And **count against the matrix, not against the tooling**: `graphql` and
+  `jwt` sat outside the module entirely because neither is driven by a
+  `probe_*` tool, so neither appeared in a coverage figure derived from the
+  probe table. A denominator taken from the thing being checked cannot show
+  what the thing never covered.
 - **Then re-read the verifier as an attacker of it.** Five holes were found
   that way, all in freshly written code, and most were the same mistake: a
   "control" or "read-back" exchange that is not required to be the *same

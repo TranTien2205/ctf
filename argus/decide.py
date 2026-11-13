@@ -49,6 +49,27 @@ PROBE_CLASS = {
     "probe_method": "method", "probe_race": "race",
     "probe_smuggle": "smuggle", "probe_ppoll": "ppoll",
     "probe_websocket": "websocket", "probe_disclosure": "disclosure",
+    # Not named `probe_*`, but it names its class and it sends: the
+    # introspection query and the GET fallback are both tagged
+    # `graphql_introspect`, so they ARE evidence the class was tried. They
+    # were attributed to nothing, which cost three separate things - the
+    # per-class budget never counted them, rule 6 never offered their
+    # evidence for grading, and `_tool_for_class("graphql")` fell through to
+    # `http_request`. A run could call it five times and the ledger would
+    # still say graphql had never been probed, which is exactly the drift
+    # this module exists to prevent.
+    "graphql_introspect": "graphql",
+}
+
+# What to reach for FIRST on a class whose proof needs a chain this
+# controller cannot name as one probe. Recommendations only, never
+# evidence: `jwt_decode` and `jwt_forge` send nothing, so putting them in
+# PROBE_CLASS would mark the class tried on an offline call - the same
+# reason `fingerprint` is not in there. The ledger used to answer
+# `http_request` here, which is the last step of the chain with no hint
+# that the first two exist.
+CLASS_TOOL_CHAIN = {
+    "jwt": ("jwt_decode", "jwt_forge", "http_request"),
 }
 # `probe_time` is deliberately absent: a latency measurement is consistent
 # with sqli, with rce, and with a slow database, so recording it as "this
@@ -337,6 +358,7 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
             tool=_tool_for_class(klass),
             detail={"missing": missing,
                     "requirement": proof.requirement_of(klass),
+                    "tool_chain": list(CLASS_TOOL_CHAIN.get(klass, ())),
                     "cited_evidence": finding.get("evidence_ids") or []})
 
     # Rule 3 - surface with named inputs that no class-bearing probe touched.
@@ -509,6 +531,9 @@ def _excerpts(body: str, limit: int = 8) -> list[str]:
 
 
 def _tool_for_class(klass: str) -> str:
+    chain = CLASS_TOOL_CHAIN.get(klass)
+    if chain:
+        return chain[0]
     for tool, mapped in PROBE_CLASS.items():
         if mapped == klass:
             return tool

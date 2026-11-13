@@ -549,3 +549,43 @@ def test_a_proof_on_a_second_endpoint_is_still_recommended(tmp_path):
     sdir2 = _session(tmp_path / "both", [cmdi("r1", "/a"), cmdi("r2", "/b")],
                      [found("F01", "/a", "r1"), found("F02", "/b", "r2")])
     assert decide.next_action(sdir2).action != "record_finding"
+
+
+def test_graphql_work_is_attributed_to_the_graphql_class():
+    """`graphql_introspect` sends, under its own name, so it is evidence.
+
+    It was absent from PROBE_CLASS, so none of its exchanges were attributed
+    to the class: the per-class budget never counted them, rule 6 never
+    offered their evidence, and `_tool_for_class("graphql")` fell through to
+    `http_request`. A run could call it five times and the ledger would still
+    say the class had never been probed.
+    """
+    from argus.decide import PROBE_CLASS, _tool_for_class
+    assert PROBE_CLASS["graphql_introspect"] == "graphql"
+    assert _tool_for_class("graphql") == "graphql_introspect"
+
+
+def test_a_chain_class_is_recommended_its_first_step_not_its_last():
+    """jwt's recommendation was `http_request` - the last step of three.
+
+    `jwt_decode` recovers the secret, `jwt_forge` mints the token, and only
+    then does a request carry it. Answering with the last step told the agent
+    to send a credential it had no way to make.
+    """
+    from argus.decide import CLASS_TOOL_CHAIN, PROBE_CLASS, _tool_for_class
+    assert _tool_for_class("jwt") == "jwt_decode"
+    assert CLASS_TOOL_CHAIN["jwt"][-1] == "http_request"
+    # ...and the offline steps are NOT evidence the class was tried
+    for step in CLASS_TOOL_CHAIN["jwt"][:2]:
+        assert step not in PROBE_CLASS, step
+
+
+def test_the_proof_gap_action_carries_the_tool_chain():
+    """So the agent sees the whole sequence, not just the first step."""
+    from argus import decide
+    chain = decide.CLASS_TOOL_CHAIN["jwt"]
+    assert len(chain) == 3 and chain[0] == "jwt_decode"
+    # the detail key the action fills is the one `argus next` prints
+    import inspect
+    src = inspect.getsource(decide)
+    assert '"tool_chain": list(CLASS_TOOL_CHAIN.get(klass, ()))' in src

@@ -839,7 +839,36 @@ somebody reading only the list.
   test totals and does not reach a count stated about a test module. A test
   does: it reads "N of the M probed classes" out of every document that
   states it and asserts both numbers against the tables.
-- The proving direction now covers 24 of the 26 probed classes.
+- Then the two classes that had no row at all, missed for the same counting
+  error one level up: `graphql` and `jwt` are not driven by a `probe_*`
+  tool, so neither appeared in any coverage figure derived from the probe
+  table. Both were already reachable, and driving them found two more
+  things:
+  - **`graphql` was absent from `decide.PROBE_CLASS`.** `graphql_introspect`
+    sends the introspection query and the GET fallback under its own name,
+    so those exchanges ARE evidence the class was tried - and they were
+    attributed to nothing. A run could call it five times and `argus next`
+    would still say the class had never been probed: the per-class budget
+    never counted it, rule 6 never offered its evidence for grading, and
+    `_tool_for_class("graphql")` fell through to `http_request`. That is the
+    drift the decision controller exists to prevent.
+  - **the agreement module could not have graded `jwt` even with a row.**
+    `_exchanges` filters the transcript to entries carrying a response, and
+    `jwt`'s first requirement - "this system minted the credential" - is
+    made of the `jwt_forge` EVENT and nothing else. Measured: the same
+    evidence grades `unproven` on the exchanges and `proven` on the full
+    set. Grading sees the events now; quotes still come from responses.
+- `jwt`'s recommendation was `http_request`, the LAST step of a chain, with
+  no hint that the first two exist. A `CLASS_TOOL_CHAIN` names the chain
+  (`jwt_decode` → `jwt_forge` → `http_request`), `_tool_for_class` answers
+  with its first step, and the action carries the rest in `tool_chain`. It
+  is deliberately separate from `PROBE_CLASS`: those two tools send nothing,
+  so mapping them as evidence would mark the class tried on an offline call
+  - the same reason `fingerprint` is not in there.
+- The coverage denominator is the MATRIX now, not the set of classes that
+  happen to have a `probe_*` tool. Counting against the tooling is precisely
+  how `graphql` and `jwt` sat outside the module unnoticed.
+- The proving direction now covers 26 of the 29 proof classes.
   `race` and `deserialize` are excluded with a stated reason in the module
   docstring - `/import` returns a parser error and never executes, so
   "identity output plus the probe nonce" is unobtainable against this lab,
@@ -931,7 +960,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 592 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 599 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
