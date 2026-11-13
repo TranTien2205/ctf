@@ -66,6 +66,14 @@ vol -f mem.raw windows.pslist
 vol -f mem.raw windows.cmdline | grep -v svchost
 ```
 
+volatility absent? `python3 tools/forensics/crashdump.py mem.dmp`
+reads the PAGE/DU64 header directly — bugcheck code + 4 params
+(answers "why did it crash"), machine type, DTB / PFN database /
+PsLoadedModuleList / PsActiveProcessHead kernel pointers, and
+recognises minidumps (`MDMP`). Content extraction then falls back
+to `tools/forensics/ioc_scan.py mem.dmp --utf16` — strings, paths,
+URLs and flag tokens with byte offsets.
+
 ## Routing
 
 Shares signals with: `../dfir-execution-trace/`, `../forensics-pcap-carve/`. Check those before committing to this one.

@@ -140,7 +140,8 @@ for f in tools/web/variant_matrix.py tools/web/race_probe.py tools/web/bundle_mi
          tools/forensics/xpress.py tools/forensics/vhdx_read.py \
          tools/forensics/shellbags.py tools/forensics/info2.py \
          tools/forensics/exfat_read.py tools/forensics/binarycookie.py \
-         tools/forensics/sqlite_journal.py; do
+         tools/forensics/sqlite_journal.py \
+         tools/forensics/crashdump.py; do
   if [ -f "$f" ]; then
     printf -- '-- %s --selftest\n' "$f"
     "$PY" "$f" --selftest >/dev/null || { echo "FAILED: $f --selftest"; fail=1; }
