@@ -1,19 +1,20 @@
 {
-  "session": "20261109-010802-127.0.0.1",
+  "session": "20261113-104750-127.0.0.1",
+  "argus_version": "1.0.0",
   "findings": [
     {
       "id": "F05",
       "title": "JWT weak secret: forged admin token accepted",
       "severity": "critical",
       "category": "jwt",
-      "url": "http://127.0.0.1:42394/api/me",
+      "url": "http://127.0.0.1:16208/api/me",
       "evidence_ids": [
         "r15"
       ],
       "evidence_excerpt": "\"role\": \"admin\"",
       "description": "The lab JWT verifies against the dictionary secret 'secret123'; a forged admin token is accepted and its claims echoed back verbatim.",
       "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
-      "ts": 1794161283.106,
+      "ts": 1794541671.517,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-347",
@@ -24,14 +25,14 @@
       "title": "SQL injection in /item id parameter",
       "severity": "high",
       "category": "sqli",
-      "url": "http://127.0.0.1:42394/item?id=1",
+      "url": "http://127.0.0.1:16208/item?id=1",
       "evidence_ids": [
         "r2"
       ],
       "evidence_excerpt": "sqlite3.OperationalError",
       "description": "The quote probe produces a raw sqlite error - unsanitized input reaches the query.",
       "remediation": "Use parameterized queries.",
-      "ts": 1794161283.055,
+      "ts": 1794541671.435,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-89",
@@ -42,14 +43,14 @@
       "title": "IDOR: /api/user/<id> serves any user object",
       "severity": "high",
       "category": "idor",
-      "url": "http://127.0.0.1:42394/api/user/2",
+      "url": "http://127.0.0.1:16208/api/user/2",
       "evidence_ids": [
         "r13"
       ],
       "evidence_excerpt": "\"username\"",
       "description": "Neighboring ids return other users' objects with no authorization check.",
       "remediation": "Enforce per-object ownership checks.",
-      "ts": 1794161283.065,
+      "ts": 1794541671.451,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-639",
@@ -60,14 +61,14 @@
       "title": "Reflected XSS in /search q parameter",
       "severity": "medium",
       "category": "xss",
-      "url": "http://127.0.0.1:42394/search?q=x",
+      "url": "http://127.0.0.1:16208/search?q=x",
       "evidence_ids": [
         "r12"
       ],
       "evidence_excerpt": "<>'\"&=/",
       "description": "Canary chars < > \" ' reflect unescaped in html context.",
       "remediation": "Output-encode by context; add CSP.",
-      "ts": 1794161283.058,
+      "ts": 1794541671.441,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       "cwe": "CWE-79",
@@ -78,14 +79,14 @@
       "title": "Exposed /.env and /.git/HEAD at web root",
       "severity": "medium",
       "category": "info-disclosure",
-      "url": "http://127.0.0.1:42394/.env",
+      "url": "http://127.0.0.1:16208/.env",
       "evidence_ids": [
         "r20"
       ],
       "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
       "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
       "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
-      "ts": 1794161283.101,
+      "ts": 1794541671.511,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-200",
@@ -98,8 +99,8 @@
     "medium": 2
   },
   "requests": 56,
-  "duration_s": 0.4,
-  "time_to_first_finding_s": 0.3,
+  "duration_s": 0.9,
+  "time_to_first_finding_s": 0.8,
   "coverage": {
     "requests_by_tool": {
       "http_request": 1,
@@ -130,7 +131,7 @@
       "GET /api/user/1",
       "GET /api/user/2",
       "GET /api/user/3",
-      "GET /arg404mutaivk2",
+      "GET /arg4049k9giohx",
       "GET /backup.zip",
       "GET /composer.json",
       "GET /console",
@@ -165,7 +166,7 @@
       "probe_xfh"
     ]
   },
-  "transcript_chain_head": "0586bc3f3fe0d5b126b56b99fe4247efc83273cdd27c4863dba67e6b8da0b495",
+  "transcript_chain_head": "8093651a34852551ecd5dd7b4412fd77e70bfd1db873bf27ae9ec6d11d991121",
   "mode": "single",
   "llm_calls": 14,
   "llm_tokens": {

@@ -1,8 +1,8 @@
-# Penetration Test Report - 20261109-010802-127.0.0.1
+# Penetration Test Report - 20261113-104750-127.0.0.1
 
-- **Target:** `127.0.0.1` (20261109-010802-127.0.0.1)
-- **Date:** 2026-11-09 01:08:02
-- **Duration:** 0.4s
+- **Target:** `127.0.0.1` (20261113-104750-127.0.0.1)
+- **Date:** 2026-11-13 10:47:50
+- **Duration:** 0.9s
 - **Agent model:** scripted-demo
 - **Requests sent:** 56
 
@@ -40,7 +40,7 @@ Demo run: SQLi + XSS + IDOR + info disclosure + forged-JWT admin takeover verifi
 - **Category:** jwt
 - **CWE:** `CWE-347`
 - **OWASP:** A02 Cryptographic Failures
-- **Endpoint:** `http://127.0.0.1:42394/api/me`
+- **Endpoint:** `http://127.0.0.1:16208/api/me`
 - **Evidence:** r15
 
 **Description**  
@@ -54,19 +54,19 @@ The lab JWT verifies against the dictionary secret 'secret123'; a forged admin t
 **Remediation**  
 Rotate to a high-entropy secret; prefer asymmetric signing.
 
-<details><summary>Transcript r15: GET http://127.0.0.1:42394/api/user/1 -> 200</summary>
+<details><summary>Transcript r15: GET http://127.0.0.1:16208/api/user/1 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:42394/api/user/1
-host: 127.0.0.1:42394
+GET http://127.0.0.1:16208/api/user/1
+host: 127.0.0.1:16208
 accept: */*
 accept-encoding: gzip, deflate
 connection: keep-alive
-user-agent: •••redacted•••
+user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.12.0
-date: Sun, 08 Nov 2026 18:08:03 GMT
+date: Fri, 13 Nov 2026 03:47:51 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 75
@@ -82,7 +82,7 @@ content-length: 75
 - **Category:** sqli
 - **CWE:** `CWE-89`
 - **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:42394/item?id=1`
+- **Endpoint:** `http://127.0.0.1:16208/item?id=1`
 - **Evidence:** r2
 
 **Description**  
@@ -96,19 +96,19 @@ sqlite3.OperationalError
 **Remediation**  
 Use parameterized queries.
 
-<details><summary>Transcript r2: GET http://127.0.0.1:42394/item?id=1%27 -> 500</summary>
+<details><summary>Transcript r2: GET http://127.0.0.1:16208/item?id=1%27 -> 500</summary>
 
 ```http
-GET http://127.0.0.1:42394/item?id=1%27
-host: 127.0.0.1:42394
+GET http://127.0.0.1:16208/item?id=1%27
+host: 127.0.0.1:16208
 accept: */*
 accept-encoding: gzip, deflate
 connection: keep-alive
-user-agent: •••redacted•••
+user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/500
 server: LabVuln/1.0 Python/3.12.0
-date: Sun, 08 Nov 2026 18:08:03 GMT
+date: Fri, 13 Nov 2026 03:47:51 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 102
@@ -124,7 +124,7 @@ content-length: 102
 - **Category:** idor
 - **CWE:** `CWE-639`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:42394/api/user/2`
+- **Endpoint:** `http://127.0.0.1:16208/api/user/2`
 - **Evidence:** r13
 
 **Description**  
@@ -138,19 +138,19 @@ Neighboring ids return other users' objects with no authorization check.
 **Remediation**  
 Enforce per-object ownership checks.
 
-<details><summary>Transcript r13: GET http://127.0.0.1:42394/api/user/2 -> 200</summary>
+<details><summary>Transcript r13: GET http://127.0.0.1:16208/api/user/2 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:42394/api/user/2
-host: 127.0.0.1:42394
+GET http://127.0.0.1:16208/api/user/2
+host: 127.0.0.1:16208
 accept: */*
 accept-encoding: gzip, deflate
 connection: keep-alive
-user-agent: •••redacted•••
+user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.12.0
-date: Sun, 08 Nov 2026 18:08:03 GMT
+date: Fri, 13 Nov 2026 03:47:51 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 74
@@ -166,7 +166,7 @@ content-length: 74
 - **Category:** xss
 - **CWE:** `CWE-79`
 - **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:42394/search?q=x`
+- **Endpoint:** `http://127.0.0.1:16208/search?q=x`
 - **Evidence:** r12
 
 **Description**  
@@ -180,24 +180,24 @@ Canary chars < > " ' reflect unescaped in html context.
 **Remediation**  
 Output-encode by context; add CSP.
 
-<details><summary>Transcript r12: GET http://127.0.0.1:42394/search?q=x3am04xe2%3C%3E%27%22%26%3D%2F -> 200</summary>
+<details><summary>Transcript r12: GET http://127.0.0.1:16208/search?q=xrxvuzobk%3C%3E%27%22%26%3D%2F -> 200</summary>
 
 ```http
-GET http://127.0.0.1:42394/search?q=x3am04xe2%3C%3E%27%22%26%3D%2F
-host: 127.0.0.1:42394
+GET http://127.0.0.1:16208/search?q=xrxvuzobk%3C%3E%27%22%26%3D%2F
+host: 127.0.0.1:16208
 accept: */*
 accept-encoding: gzip, deflate
 connection: keep-alive
-user-agent: •••redacted•••
+user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.12.0
-date: Sun, 08 Nov 2026 18:08:03 GMT
+date: Fri, 13 Nov 2026 03:47:51 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 55
 
-<html><body>Results for: x3am04xe2<>'"&=/</body></html>
+<html><body>Results for: xrxvuzobk<>'"&=/</body></html>
 ```
 </details>
 
@@ -208,7 +208,7 @@ content-length: 55
 - **Category:** info-disclosure
 - **CWE:** `CWE-200`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:42394/.env`
+- **Endpoint:** `http://127.0.0.1:16208/.env`
 - **Evidence:** r20
 
 **Description**  
@@ -222,19 +222,19 @@ SECRET_KEY=lab-secret-0123
 **Remediation**  
 Deny dotfile/VCS paths at the web server; rotate exposed secrets.
 
-<details><summary>Transcript r20: GET http://127.0.0.1:42394/.env -> 200</summary>
+<details><summary>Transcript r20: GET http://127.0.0.1:16208/.env -> 200</summary>
 
 ```http
-GET http://127.0.0.1:42394/.env
-host: 127.0.0.1:42394
+GET http://127.0.0.1:16208/.env
+host: 127.0.0.1:16208
 accept: */*
 accept-encoding: gzip, deflate
 connection: keep-alive
-user-agent: •••redacted•••
+user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.12.0
-date: Sun, 08 Nov 2026 18:08:03 GMT
+date: Fri, 13 Nov 2026 03:47:51 GMT
 content-type: text/plain
 x-powered-by: LabVuln/1.0
 content-length: 67
@@ -282,7 +282,7 @@ SECRET_KEY=lab-secret-0123
 - `GET /api/user/1`
 - `GET /api/user/2`
 - `GET /api/user/3`
-- `GET /arg404mutaivk2`
+- `GET /arg4049k9giohx`
 - `GET /backup.zip`
 - `GET /composer.json`
 - `GET /console`
@@ -314,7 +314,7 @@ SECRET_KEY=lab-secret-0123
 Autonomous agent run: recon (fingerprint, crawl, js_recon) -> input
 mapping -> hypothesis-driven probes (matched true/false pairs,
 baseline-diffed) -> verification -> evidence-gated findings.
-The complete request/response transcript is in `transcript.jsonl`
+The complete request/response transcript is in `transcript.jsonl`,
 (56 entries). Working notes are in `notes.md`.
 
 _All findings cite verbatim response excerpts verified against the
@@ -323,7 +323,7 @@ recorded transcript at write time._
 <details><summary>Appendix: agent working notes (audit)</summary>
 
 ```
-# Working notes - http://127.0.0.1:42394
+# Working notes - http://127.0.0.1:16208
 
 ## Agent summary (agent)
 
