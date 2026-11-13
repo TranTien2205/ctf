@@ -105,11 +105,32 @@ def _redact_request_text(text: str, secret_values: set[str]) -> str:
     evidence (e.g. duplicated/conflicting headers)."""
     out = []
     for line in text.split("\r\n"):
-        if ": " in line:
-            name, _, val = line.partition(": ")
-            if name.lower() in _SENSITIVE_REQ_HEADERS \
-                    or val in secret_values:
-                line = name + ": " + _REDACTED
+        # Split on the FIRST colon, not on ": ". Two shapes defeated the
+        # old test, and both are header NAMES, which on this path are
+        # model-supplied input:
+        #
+        #   `Authorization:Bearer tok`  - the optional space after the
+        #       colon is legal HTTP, and `": " in line` was False, so the
+        #       line passed through verbatim.
+        #   `Authorization:Bearer tok: ` - a name carrying the colon and
+        #       the value. `partition(": ")` took everything before the
+        #       first `": "` as the name, so the name did not match the
+        #       sensitive list and the token persisted.
+        #
+        # Neither is reachable through `send_raw`'s own composition, which
+        # always writes `f"{k}: {v}"` - they are reachable through the
+        # header pairs a model hands it, which is exactly what this path
+        # exists to send. A credential the operator did not declare with
+        # `--secret` has no second line of defence, so the name check has
+        # to hold on its own.
+        if ":" in line:
+            name, _, val = line.partition(":")
+            canonical = name.strip().lower()
+            folded = canonical.partition(":")[0].strip()
+            if canonical in _SENSITIVE_REQ_HEADERS \
+                    or folded in _SENSITIVE_REQ_HEADERS \
+                    or val.strip() in secret_values:
+                line = name.strip() + ": " + _REDACTED
         out.append(line)
     return "\r\n".join(out)
 

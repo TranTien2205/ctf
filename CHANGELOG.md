@@ -925,6 +925,34 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### Raw-wire redaction was defeated by the header name
+- The lens that found two credential leaks in an earlier session is "what
+  leaves the machine", and `httpclient.py`'s redaction had not been asked
+  that here. `_redact_request_text` keyed on `": "`, and the header names on
+  that path are **model-supplied input**. Two shapes walked an operator
+  credential into `transcript.jsonl` and the shareable report:
+  `Authorization:Bearer tok` - the space after the colon is optional in
+  HTTP, so `": " in line` was False and the line persisted verbatim - and
+  `Authorization:Bearer tok: `, a name carrying the colon and the value, so
+  `partition(": ")` took the token as part of the NAME and the name did not
+  match the sensitive list.
+- Reachability, stated rather than implied: neither is reachable through
+  `send_raw`'s own composition, which always writes `f"{k}: {v}"`. Both are
+  reachable through the header pairs a model hands it - which is precisely
+  what that path exists to send. And a credential the operator did not
+  declare with `--secret` has **no second line of defence**, because
+  `Session._redact_obj` only knows declared values; the name check has to
+  hold on its own. It splits on the first colon now and folds a
+  colon-bearing name.
+- A declared secret inside a non-sensitive header value was the other
+  hypothesis and it is **not** a leak: `Session._redact_obj` replaces
+  declared values by substring across the whole request structure, which was
+  checked before changing anything.
+- The test asserts the other direction too, because it matters more than
+  usual here: `Transfer-Encoding` and `Content-Length` must survive
+  untouched. Those lines ARE the desync evidence, and a redaction that ate
+  them would destroy the finding it exists to protect.
+
 ### The scope boundary disagreed with itself about multicast
 - `scope.py` is the module the "authorised testing only" claim rests on, and
   nothing in this stretch had looked at it. Measured against a **public**
@@ -1321,7 +1349,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 613 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 614 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

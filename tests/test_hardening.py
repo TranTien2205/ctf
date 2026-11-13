@@ -319,3 +319,47 @@ def test_no_test_hard_codes_an_absolute_path_to_this_checkout():
     assert not offenders, (
         "absolute paths into somebody's home directory:\n  "
         + "\n  ".join(offenders))
+
+
+def test_raw_wire_redaction_is_not_defeated_by_the_header_name():
+    """Two shapes walked an operator credential into the transcript.
+
+    `_redact_request_text` keyed on `": "`, and the header names on this
+    path are MODEL-supplied input:
+
+      `Authorization:Bearer tok`   - the space after the colon is optional
+          in HTTP, so `": " in line` was False and the line persisted
+          verbatim.
+      `Authorization:Bearer tok: ` - a name carrying the colon and the
+          value, so `partition(": ")` took the token as part of the NAME,
+          the name did not match the sensitive list, and the token
+          persisted.
+
+    Neither is reachable through send_raw's own composition, which always
+    writes `f"{k}: {v}"`. Both are reachable through the header pairs a
+    model hands it - which is what this path exists to send. And a
+    credential the operator did not declare with `--secret` has no second
+    line of defence, because Session's substring redaction only knows
+    declared values.
+    """
+    from argus.httpclient import _REDACTED, _redact_request_text
+
+    def line_of(header, secrets=frozenset()):
+        raw = f"GET / HTTP/1.1\r\nHost: t\r\n{header}\r\n\r\n"
+        return _redact_request_text(raw, set(secrets)).split("\r\n")[2]
+
+    for header in ("Authorization:Bearer live-tok-9",
+                   "Authorization:Bearer live-tok-9: ",
+                   "Authorization: Bearer live-tok-9",
+                   "Cookie:sid=secret9",
+                   "  authorization : Bearer live-tok-9"):
+        got = line_of(header)
+        assert _REDACTED in got, (header, got)
+        assert "live-tok-9" not in got and "secret9" not in got, (header, got)
+
+    # ...and the lines that ARE the evidence must survive untouched: the
+    # framing headers are the whole point of a desync probe, and a
+    # redaction that ate them would destroy the finding it protects
+    assert line_of("Transfer-Encoding: chunked") == "Transfer-Encoding: chunked"
+    assert line_of("Content-Length: 6") == "Content-Length: 6"
+    assert line_of("X-Request-Id: abc-123") == "X-Request-Id: abc-123"
