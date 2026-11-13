@@ -236,7 +236,10 @@ serial/label, and the string-data blocks (args, working dir).
 when": `python3 tools/forensics/recycle_i.py '$IABC.txt'` decodes
 version-1/2 records (original path, size, deletion FILETIME), and
 `--dir <bin>` pairs each $I with its `$R` content file, marking
-`r_exists` false when only the metadata survives.
+`r_exists` false when only the metadata survives. Pre-Vista images
+(XP/2003) keep one `RECYCLED\INFO2` instead — fixed 0x320-byte
+records with drive letter, ASCII + UTF-16 original path, size and
+deletion time: `python3 tools/forensics/info2.py INFO2`.
 
 Registry hives (SAM/SYSTEM/SOFTWARE/NTUSER.DAT/Amcache.hve) parse
 offline: `python3 tools/forensics/hive_parse.py hive tree` walks the
