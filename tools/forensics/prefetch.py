@@ -53,8 +53,22 @@ def _ft(b):
 def parse_pf(path):
     data = Path(path).read_bytes()
     if data[:4] == b"MAM\x04":
-        return {"error": "MAM-compressed prefetch body - needs "
-                         "libscca/PECmd on this file", "mam": True}
+        sys.path.insert(0, str(Path(__file__).parent))
+        try:
+            import xpress
+            data, _info = xpress.mam_decompress(data)
+        except Exception as e:
+            return {"error": "MAM decompress failed: %s" % e,
+                    "mam": True}
+        out = _parse_scca(data)
+        out["mam"] = True
+        return out
+    if len(data) < 0x98 or data[4:8] != b"SCCA":
+        return {"error": "not a prefetch file (no SCCA signature)"}
+    return _parse_scca(data)
+
+
+def _parse_scca(data):
     if len(data) < 0x98 or data[4:8] != b"SCCA":
         return {"error": "not a prefetch file (no SCCA signature)"}
     ver = struct.unpack("<I", data[:4])[0]
@@ -105,6 +119,23 @@ def _selftest():
     tmp.write_bytes(bytes(pf8))
     out8 = parse_pf(tmp)
     assert out8["run_count"] == 3 and len(out8["last_run_times"]) == 2, out8
+    # MAM frame: XPRESS-Huffman stream wraps the same SCCA body.
+    # All-literal stream: 32 symbols at length 5 fills the table.
+    sys.path.insert(0, str(Path(__file__).parent))
+    import xpress
+    body = bytes(pf8)
+    used = sorted(set(body))
+    syms = used + [s for s in range(512) if s not in used][
+        :32 - len(used)]
+    lens = {s: 5 for s in syms}
+    codes = {s: i for i, s in enumerate(sorted(syms))}
+    stream = xpress._pack_stream([(codes[b], 5) for b in body], lens)
+    mam = b"MAM\x04" + struct.pack("<I", len(body)) + stream
+    tmp.write_bytes(mam)
+    outm = parse_pf(tmp)
+    assert outm.get("mam") is True, outm
+    assert outm["executable"] == "FLAG.EXE", outm
+    assert outm["run_count"] == 3, outm
     print("prefetch selftest: ok")
 
 

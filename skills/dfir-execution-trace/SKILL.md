@@ -122,9 +122,12 @@ own creation time - Windows 7 stores one timestamp, so that answer does not exis
 (DLLs and data touched in the first ten seconds) ties a loader to its payload and recovers a dropped path. Windows
 8.1/10/11 `.pf` are **compressed**: `MAM\x04` at offset 0, algorithm `COMPRESSION_FORMAT_XPRESS_HUFF`, SCCA header
 visible only after LZXPRESS-Huffman decompression, so `strings` returning nothing is compression, not emptiness.
-`python3 tools/forensics/prefetch.py file.pf` decodes uncompressed `.pf` to JSON (executable, `run_count`,
+`python3 tools/forensics/prefetch.py file.pf` decodes `.pf` to JSON (executable, `run_count`,
 `last_run_times` - one slot on v17/23, eight on v26+; the v30 variant-2/v31 count offset is told apart by the
-0x54 metrics-array marker) and reports a `MAM\x04` body honestly as compressed rather than misreading it.
+0x54 metrics-array marker). A `MAM\x04` body is decompressed in-tree: `tools/forensics/xpress.py` is a pure-stdlib
+MS-XCA LZ77+Huffman decoder (256-byte nibble length table, canonical codes, match symbols 256-511) — it also
+unwraps the same stream from `xpress.py --mam file.pf -o out.pf` for manual inspection, and the same codec is what
+hiberfil `\x81\x81xpress` blocks and WIM chunks carry.
 Policy gate: `HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Memory Management\PrefetchParameters`,
 `EnablePrefetcher` 0 disabled / 1 application launch / 2 boot only / 3 both (client default); server builds default to
 boot only, so no application `.pf` on a server is expected, not evidence.
