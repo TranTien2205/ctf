@@ -45,7 +45,24 @@ def _is_private_host(host: str) -> bool:
 
 
 def _ip_private(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
-    return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+    """Is this address one the operator has to ask for explicitly?
+
+    `is_multicast` is in the list because leaving it out was inconsistent in
+    the one direction that matters. Measured against a PUBLIC target with
+    `allow_private` off: `localhost` and `10.0.0.1` were refused and
+    `224.0.0.1` and `239.255.255.250` - the SSDP group, a local-network
+    address - were allowed. The host still has to be in scope, so this was
+    never an allowlist bypass; it was a disagreement about what counts as
+    private inside a boundary whose whole job is to refuse before any bytes
+    are sent.
+
+    `ipaddress` already resolves the IPv4-mapped IPv6 forms correctly -
+    `::ffff:127.0.0.1` is loopback and `::ffff:169.254.169.254` is
+    link-local - which was checked rather than assumed, because the obvious
+    guess was that they were the gap and they are not.
+    """
+    return (ip.is_private or ip.is_loopback or ip.is_link_local
+            or ip.is_reserved or ip.is_multicast)
 
 
 class ScopeGuard:

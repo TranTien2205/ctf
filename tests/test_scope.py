@@ -492,3 +492,50 @@ def test_nuclei_arg_guards(ctx, tmp_path):
     assert n(["-p", "http://proxy:8080", "-u", "http://x/"])
     assert n(["-o", "../res.txt", "-u", "http://x/"])
     assert n(["-u", "http://x/", "-t", "cves/"]) is None
+
+
+def test_multicast_is_private_and_a_public_address_still_passes():
+    """The boundary refused RFC1918 and loopback and allowed multicast.
+
+    Measured against a PUBLIC target with `allow_private` off: `localhost`
+    and `10.0.0.1` were refused, `224.0.0.1` and `239.255.255.250` - the
+    SSDP group, a local-network address - were allowed. The host still had
+    to be in scope, so this was never an allowlist bypass; it was a
+    disagreement about what counts as private inside a module whose job is
+    to refuse before any bytes are sent.
+
+    The second half of this test is the half that keeps the fix honest: a
+    real public address must still pass, or the repair is just a stricter
+    gate.
+    """
+    guard = ScopeGuard("http://example.com/",
+                       extra_hosts=["10.0.0.1", "224.0.0.1",
+                                    "239.255.255.250", "93.184.216.34"],
+                       allow_private=False)
+    assert guard.allow_private is False
+    guard.check("http://example.com/x")
+    guard.check("http://93.184.216.34/x")
+    for host in ("10.0.0.1", "224.0.0.1", "239.255.255.250"):
+        with pytest.raises(ScopeError):
+            guard.check(f"http://{host}/x")
+
+
+def test_ipv4_mapped_ipv6_was_not_the_gap():
+    """Checked rather than assumed - the obvious guess was wrong.
+
+    `::ffff:127.0.0.1` looks like a classic way past a loopback check, and
+    `ipaddress` already resolves the mapped forms: it reports loopback for
+    that and link-local for `::ffff:169.254.169.254`. Asserting it keeps a
+    future reader from "fixing" what is not broken, and catches a stdlib
+    change if one ever lands.
+    """
+    import ipaddress
+
+    from argus.scope import _ip_private
+
+    for text in ("::ffff:127.0.0.1", "::ffff:10.0.0.1",
+                 "::ffff:169.254.169.254", "64:ff9b::7f00:1",
+                 "::1", "fc00::1", "fe80::1"):
+        assert _ip_private(ipaddress.ip_address(text)), text
+    for text in ("8.8.8.8", "93.184.216.34", "2606:4700::1111"):
+        assert not _ip_private(ipaddress.ip_address(text)), text

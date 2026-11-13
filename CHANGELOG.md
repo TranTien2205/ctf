@@ -925,6 +925,30 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The scope boundary disagreed with itself about multicast
+- `scope.py` is the module the "authorised testing only" claim rests on, and
+  nothing in this stretch had looked at it. Measured against a **public**
+  target with `allow_private` off: `localhost` and `10.0.0.1` were refused,
+  and `224.0.0.1` and `239.255.255.250` - the SSDP group, a local-network
+  address - were allowed. `is_multicast` was simply not in `_ip_private`.
+- Stated at its real size: the host still has to be in scope, so this was
+  **never an allowlist bypass**. It was a disagreement about what counts as
+  private inside a boundary whose job is to refuse before any bytes are
+  sent. One predicate closes it.
+- Two measurements of mine were wrong on the way here, and both are in the
+  test file now so the next reader does not repeat them. The first put the
+  private host in as the TARGET and read `10.0.0.1` being allowed as the
+  gap - but `allow_private = allow_private or target_private` is deliberate,
+  because labs run on loopback; the risk path is a public target plus a
+  private host discovered later. The second was the hypothesis that
+  IPv4-mapped IPv6 was the hole: `::ffff:127.0.0.1` looks like the classic
+  way past a loopback check, and `ipaddress` already reports it as loopback
+  and `::ffff:169.254.169.254` as link-local. Believing it would have meant
+  "fixing" something that was not broken, so it is asserted instead - which
+  also catches a stdlib change if one ever lands.
+- The second half of the new test is the half that keeps the fix honest: a
+  real public address must still pass, or the repair is just a stricter gate.
+
 ### An audit of this session's own changes, and two holes in them
 - The rule this repository already records is to audit a gate adversarially
   before trusting the green suite, because a passing test asserts what its
@@ -1297,7 +1321,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 611 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 613 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
