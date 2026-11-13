@@ -320,10 +320,13 @@ def run_exploit(ctx: Context, exploit_id: str, target: str,
     timeout_s = _ival(timeout_s, manifest.get("timeout_s", 60), 5, 300)
     try:
         # exploit PoCs are the least-trusted local code (often downloaded)
-        # - scrub credentials from the environment they inherit
+        # - scrub credentials from the environment they inherit: key names
+        # matching the secret pattern AND any declared --secret value under
+        # an innocuous name (run_external already does both)
         from ..mcp import MCPClient
         env = {k: v for k, v in os.environ.items()
-               if not any(s in k.upper() for s in MCPClient._SECRET_RE)}
+               if not any(s in k.upper() for s in MCPClient._SECRET_RE)
+               and v not in ctx.session.secret_values}
         from ._subproc import run_capped
         marker = manifest.get("proof_marker")
         marker = marker if isinstance(marker, str) else ""

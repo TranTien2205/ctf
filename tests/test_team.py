@@ -231,13 +231,20 @@ def test_run_exploit_env_scrubbed(ctx, lab_url, tmp_path, monkeypatch):
     (d / "probe.py").write_text(
         "import os\n"
         "print('SEEN=' + os.environ.get('MY_API_KEY','<absent>'))\n"
+        "print('SEEN2=' + os.environ.get('HARMLESS_NAME','<absent>'))\n"
         "print('ok')\n")
     monkeypatch.setenv("MY_API_KEY", "topsecret")
+    # a declared --secret VALUE under an innocuous name must scrub too -
+    # run_external already drops both name-matches and value-matches
+    monkeypatch.setenv("HARMLESS_NAME", "op-login-passw0rd")
+    ctx.session.secret_values.add("op-login-passw0rd")
     monkeypatch.setattr(tt, "EXPLOITS", tmp_path)
     out = tt.run_exploit(ctx, "envcheck", lab_url)
     assert out.get("proof") is True, out
     assert "SEEN=<absent>" in out["output"]
+    assert "SEEN2=<absent>" in out["output"]
     assert "topsecret" not in out["output"]
+    assert "op-login-passw0rd" not in out["output"]
 
 
 def test_run_exploit_command_escape(ctx, lab_url, tmp_path, monkeypatch):
