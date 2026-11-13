@@ -691,6 +691,19 @@ somebody reading only the list.
   `argus compare` both warns on cross-build metric sets and prints
   `target_host`/`argus_version` as table rows + trailing CSV columns.
 
+### `argus judge` left the report contradicting the record
+- Writing a verdict into `findings.json` and then re-sealing left `report.md`,
+  `report.html`, `report.sarif` and `summary.json` describing findings that no
+  longer matched: a reader opening the report saw a `proven` finding with no
+  sign a judge had disputed it, under a seal that covered both. The command
+  re-renders before sealing now, and records which model cross-verified and
+  when. A render failure warns and keeps the verdicts rather than losing them.
+- `parse_verdict` took the LAST of several agreeing objects. A model that
+  answers and then appends `Summary: {"agrees": false}` put its reason,
+  severity and missing list in the first one, so all three were discarded.
+  Agreeing objects merge - later wins on the fields it carries, earlier detail
+  survives where it does not - and a contradiction is still no verdict.
+
 ### Costs, verdict parsing, and three smaller things the audit had flagged
 - **Cache writes were free.** `Model.cost` charged cache READS at a tenth of
   input and never charged cache WRITES at all, so a run that primed a large
@@ -720,7 +733,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 548 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 550 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

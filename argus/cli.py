@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
 from .config import Config, load_config
@@ -1626,6 +1627,32 @@ def _cmd_judge(args) -> int:
         "verdicts": [x.to_dict() for x in verdicts]})
     _atomic_write(session.findings_path,
                   json.dumps(session.findings, indent=2, ensure_ascii=False))
+
+    # Re-render before sealing. Writing the verdict into findings.json and
+    # then sealing left report.md, report.html, report.sarif and summary.json
+    # describing findings that no longer matched - a reader opening the report
+    # saw a `proven` finding with no sign a judge had disputed it, under a
+    # seal that covered both. The report is the deliverable; it has to say
+    # what the record says.
+    try:
+        from .report.markdown import render_report
+        prior = {}
+        spath = session.dir / "summary.json"
+        if spath.exists():
+            try:
+                loaded = json.loads(spath.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    prior = loaded
+            except (ValueError, OSError):
+                prior = {}
+        render_report(session, cfg, str(prior.get("agent_summary") or ""),
+                      extra={"cross_verified_by": pick.key,
+                             "cross_verified_at": int(time.time())})
+    except Exception as exc:
+        # a render failure must not lose the verdicts already written
+        print(f"warning: report re-render failed after judging: {exc}; "
+              f"findings.json carries the verdicts and the report does not",
+              file=sys.stderr)
 
     if args.json:
         print(json.dumps([x.to_dict() for x in verdicts], indent=2,

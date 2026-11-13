@@ -310,8 +310,16 @@ def parse_verdict(text: str, finding_id: str, judge_model: str) -> Verdict:
                        error=f"the judge returned {len(found)} verdicts that "
                              "contradict each other; recorded as no verdict",
                        reason=raw.strip()[:300])
-    # they agree on the answer, so the last one carries the fullest detail
-    data = found[-1]
+    # They agree on the answer. The LAST one is not necessarily the fullest:
+    # a model that answers and then appends `Summary: {"agrees": false}` put
+    # its reason, severity and missing list in the first object, and taking
+    # the last discarded all three. Merge instead - later objects win on the
+    # fields they actually carry, earlier detail survives where they do not.
+    data = {}
+    for obj in found:
+        data.update({k: v for k, v in obj.items()
+                     if v not in (None, "", [], {})})
+    data["agrees"] = found[-1].get("agrees")
     severity = str(data.get("severity") or "").strip().lower()
     # A scalar `missing` was iterated into characters, so a judge answering
     # `"missing": "a control"` produced ['a', ' ', 'c', 'o', ...] in the

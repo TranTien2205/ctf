@@ -387,3 +387,79 @@ def test_an_unrated_finding_still_takes_a_severity_reduction():
         {"id": "F01", "severity": "low", "grade": "proven"},
         judge.Verdict("F01", "gpt-4.1", agrees=False, severity="critical"))
     assert out["severity"] == "low"
+
+
+def test_agreeing_verdicts_merge_rather_than_the_last_one_winning():
+    """A model that answers and then appends `Summary: {"agrees": false}` put
+    its reason, severity and missing list in the FIRST object; taking the last
+    discarded all three."""
+    verdict = judge.parse_verdict(
+        '{"agrees": false, "reason": "no control was cited", '
+        '"severity": "low", "missing": ["a baseline"]}\n'
+        'Summary: {"agrees": false}', "F01", "gpt-4.1")
+    assert verdict.agrees is False
+    assert verdict.reason == "no control was cited"
+    assert verdict.severity == "low"
+    assert verdict.missing == ["a baseline"]
+
+    # and a later object still wins on the fields it carries
+    verdict = judge.parse_verdict(
+        '{"agrees": true}\n'
+        '{"agrees": true, "reason": "rows came back", "severity": "critical"}',
+        "F01", "gpt-4.1")
+    assert verdict.reason == "rows came back"
+    assert verdict.severity == "critical"
+
+    # a contradiction is still no verdict, however full either object is
+    verdict = judge.parse_verdict(
+        '{"agrees": true, "reason": "fine"}\n{"agrees": false}', "F", "m")
+    assert verdict.agrees is False
+    assert "contradict" in verdict.error
+
+
+def test_judging_re_renders_the_report_before_sealing(tmp_path, monkeypatch):
+    """Writing the verdict into findings.json and then sealing left report.md,
+    report.html, report.sarif and summary.json describing findings that no
+    longer matched - a reader opening the report saw a `proven` finding with
+    no sign a judge had disputed it, under a seal covering both."""
+    import json
+    import pathlib
+    import shutil
+    import types
+
+    src = pathlib.Path(__file__).resolve().parent.parent / "docs" / "sample-session"
+    sdir = tmp_path / "sess"
+    shutil.copytree(src, sdir)
+
+    class _Fake:
+        def chat(self, messages, tools, system):
+            return {"content": [{"type": "text", "text": json.dumps({
+                "agrees": False,
+                "reason": "the 500 is an error message, not rows",
+                "severity": "low", "class": "disclosure",
+                "missing": ["one row from a named table"]})}]}
+
+    from argus import llm
+    monkeypatch.setattr(llm, "make_client", lambda cfg: _Fake())
+    monkeypatch.setattr(judge, "pick_judge", lambda author, policy="strong":
+                        types.SimpleNamespace(
+                            key="gpt-4.1", provider="openai",
+                            roles=["judge"], api_key_env=["OPENAI_API_KEY"],
+                            credential=lambda: "sk-x"))
+
+    from argus.cli import main
+    assert main(["judge", str(sdir), "--only", "F01"]) == 0
+
+    rows = json.loads((sdir / "findings.json").read_text(encoding="utf-8"))
+    first = next(r for r in rows if r["id"] == "F01")
+    assert first["disputed"] is True
+    assert first["severity"] == "low"
+    assert first["severity_claimed"] == "critical"
+
+    report = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "DISPUTED by cross-verification" in report
+    assert "Severity lowered from `critical`" in report
+
+    # and the session still verifies: the seal covers the re-rendered report
+    from argus.session import verify_transcript
+    assert verify_transcript(sdir).get("chained") is True
