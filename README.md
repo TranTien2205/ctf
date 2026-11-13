@@ -275,5 +275,7 @@ Declare scope precisely (`--scope`, `--exclude`) — the guard enforces it
 technically, but the legal obligation is yours.
 
 See `docs/ARCHITECTURE.md` for the design, `docs/USAGE.md` for flags,
-auth, external tools, and reading a report, and `docs/EXPERIMENTS.md` for
-the run-vs-team evaluation protocol.
+auth, external tools, and reading a report, `docs/EXPERIMENTS.md` for
+the run-vs-team evaluation protocol, and `docs/VERIFICATION.md` for
+the property → enforcement → test matrix (where every safety claim
+lives in code and which test proves it).

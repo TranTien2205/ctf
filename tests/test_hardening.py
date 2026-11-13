@@ -235,3 +235,38 @@ def test_api_base_url_shared_by_run_and_check(monkeypatch):
                           "allow_private": False, "llm_max_tokens": 4096})()
     cfg = config.load_config(args)
     assert cfg.api_base == "http://gw.local/api/messages"
+
+
+def test_nonfinite_budgets_rejected(monkeypatch):
+    """`--rate nan` used to slip past the `x < 0` check (nan comparisons
+    are all False) and silently become 'unlimited'. Non-finite and
+    negative rate/time budgets must fail loudly, in both load_config and
+    the RateLimiter itself."""
+    import argparse
+    import math
+    import pytest
+    from argus.config import load_config
+    from argus.ratelimit import RateLimiter
+
+    def args_for(**over):
+        base = dict(api_key="k", auth_token=None, header_file=None,
+                    header=[], scope=[], exclude=[],
+                    target="http://127.0.0.1:1", model=None, max_turns=1,
+                    max_requests=1, max_time=1, rate=1.0, goal="",
+                    operator="", proxy="", llm_max_tokens=1,
+                    mcp_config=None, resume=None, allow_private=True,
+                    tls_verify=False, no_external=False, quiet=True,
+                    session_dir="", tools="", secret=None)
+        base.update(over)
+        return argparse.Namespace(**base)
+
+    for bad in (math.nan, math.inf, -math.inf, -1.0):
+        with pytest.raises(SystemExit):
+            load_config(args_for(rate=bad))
+        with pytest.raises((ValueError, SystemExit)):
+            RateLimiter(bad)
+    for bad_t in (math.nan, math.inf, -1.0):
+        with pytest.raises(SystemExit):
+            load_config(args_for(max_time=bad_t))
+    cfg = load_config(args_for(rate=2.5, max_time=30))
+    assert cfg.rate_rps == 2.5 and cfg.max_time_s == 30
