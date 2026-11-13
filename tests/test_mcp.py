@@ -160,3 +160,68 @@ def test_mcp_call_scope_blocks_foreign_url(ctx, tmp_path):
         assert "scope" not in str(out3.get("error", ""))
     finally:
         ctx.mcp.close()
+
+
+def test_a_hostile_frame_does_not_silently_kill_the_reader():
+    """The mirror of the MCP *server* bug, on the client side.
+
+    `_reader_loop` wrapped `json.loads` in `except ValueError`, and a deeply
+    nested frame raises RecursionError - measured, `b"[" * 100000` does. The
+    difference is the symptom: this runs in a thread, so the process lived
+    on. The legitimate reply that followed was lost, and every later call
+    waited out its full timeout and reported "timed out", pointing an
+    operator at the server or the network instead of at a dead reader in
+    this client.
+
+    `tests/hostile_mcp_server.py` answers `initialize`, then emits the
+    hostile frame followed by a valid reply - the exact sequence.
+    """
+    import sys
+    import time
+    from pathlib import Path
+
+    from argus.mcp import MCPClient
+
+    script = Path(__file__).resolve().parent / "hostile_mcp_server.py"
+    client = MCPClient("hostile", [sys.executable, "-u", str(script)],
+                       timeout_s=6.0)
+    try:
+        started = time.monotonic()
+        tools = client.tools()
+        elapsed = time.monotonic() - started
+        # the reply after the hostile frame must arrive, and arrive fast -
+        # a pass that took the full timeout would mean the reader died and
+        # something else answered
+        assert tools == [], tools
+        assert elapsed < 5.0, elapsed
+    finally:
+        client.close()
+
+
+def test_a_dead_reader_is_reported_as_such_not_as_a_timeout():
+    """A dead reader and a slow server both show up as silence.
+
+    They need different actions from the operator - one is this client's
+    fault and the other is not - so `_rpc` checks whether the reader is
+    still alive before blaming the server.
+    """
+    import queue
+    import threading
+
+    from argus.mcp import MCPClient, MCPError
+
+    client = MCPClient.__new__(MCPClient)
+    client.name = "stalled"
+    client._pending = {}
+    client._next_id = 0
+    client.timeout_s = 0.2
+    client._write = lambda msg: None
+    dead = threading.Thread(target=lambda: None)
+    dead.start()
+    dead.join()
+    client._reader = dead
+
+    with pytest.raises(MCPError) as excinfo:
+        client._rpc("tools/list", {}, 0.2)
+    assert "no longer running" in str(excinfo.value)
+    assert "not a timeout" in str(excinfo.value)

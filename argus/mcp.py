@@ -76,6 +76,7 @@ class MCPClient:
         self.env_extra = env or {}
         self.timeout_s = timeout_s
         self._proc: subprocess.Popen | None = None
+        self._reader: threading.Thread | None = None
         self._lock = threading.Lock()
         self._next_id = 0
         self._pending: dict[int, queue.Queue] = {}
@@ -100,7 +101,9 @@ class MCPClient:
             self._proc = subprocess.Popen(
                 self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL, env=env, bufsize=0)
-            threading.Thread(target=self._reader_loop, daemon=True).start()
+            self._reader = threading.Thread(target=self._reader_loop,
+                                            daemon=True)
+            self._reader.start()
             self._initialize()
         except Exception:
             # never leave a half-started server around - next call retries
@@ -124,7 +127,15 @@ class MCPClient:
                 break
             try:
                 msg = json.loads(line.decode("utf-8", "replace"))
-            except ValueError:
+            except Exception:
+                # NOT just ValueError: a deeply nested frame raises
+                # RecursionError - measured, `b"[" * 100000` does - which
+                # escaped this handler and killed the reader THREAD. The
+                # process lived on, so the symptom was not a crash: the
+                # legitimate reply that followed was lost and every later
+                # call waited out its full timeout and reported "timed
+                # out", pointing an operator at the network instead of at a
+                # dead reader.
                 continue
             if not isinstance(msg, dict):
                 continue    # a list/str frame would kill the reader on .get
@@ -149,6 +160,16 @@ class MCPClient:
                          "params": params})
             resp = q.get(timeout=timeout)
         except queue.Empty:
+            # Say which it is. A dead reader and a slow server both show up
+            # here as silence, and they need different actions from the
+            # operator - one is this client's fault and the other is not.
+            reader = getattr(self, "_reader", None)
+            if reader is not None and not reader.is_alive():
+                raise MCPError(
+                    f"{method}: the reader thread for {self.name!r} is no "
+                    "longer running, so no reply could ever arrive - the "
+                    "server's output stream ended or could not be parsed. "
+                    "This is not a timeout on the server's side")
             raise MCPError(f"{method}: timed out after {timeout}s")
         except (BrokenPipeError, OSError) as exc:
             raise MCPError(f"{method}: {exc}")

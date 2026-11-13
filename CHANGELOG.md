@@ -936,6 +936,31 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### The same hole on the MCP client side, with a worse symptom
+- Having fixed the server's read loop, I asked the mirror question one
+  module over: `argus/mcp.py`'s `_reader_loop` also wrapped `json.loads` in
+  `except ValueError`, and a deeply nested frame from a server raises
+  **RecursionError**. It already bounded `readline` at 4 MiB - the author
+  had thought about a newline-free stream - so the gap was only the catch.
+- The symptom is worse than the server's crash, and that is the part worth
+  keeping. This runs in a thread, so **the process lived on**: the
+  legitimate reply that followed the hostile frame was lost, and every later
+  call waited out its full timeout and reported `timed out`, pointing an
+  operator at the server or the network instead of at a dead reader inside
+  this client. A dead component that still answers "timeout" is harder to
+  diagnose than one that crashes.
+- So the fix has two halves. Every parse failure is skipped rather than
+  fatal; and `_rpc` now checks whether the reader is alive before blaming
+  the server, because a dead reader and a slow server are the same silence
+  and need different actions. Reverting the catch now produces
+  *"the reader thread for 'hostile' is no longer running, so no reply could
+  ever arrive ... This is not a timeout on the server's side"* instead of
+  `timed out after 4s`.
+- Driven end to end against `tests/hostile_mcp_server.py`, which answers
+  `initialize` and then emits the hostile frame followed by a valid reply -
+  the exact sequence. With the fix the reply arrives in 1.5s; without it the
+  call fails at the timeout.
+
 ### One malformed frame killed the MCP server and skipped the seal
 - `argus mcp-serve` is the `user → LLM → MCP → tool` path the project is
   graded on, and its read loop wrapped `json.loads` in `except ValueError`.
@@ -1485,7 +1510,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 621 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 623 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
