@@ -57,9 +57,24 @@ _SCRUB = (
 )
 
 
+# `scheme://user:pass@host` ANYWHERE in prose. `_redact_url` only works
+# when the whole string is a URL, so calling it on a case-file blob was a
+# no-op - a line that looked like a defence and could not fire. Measured:
+# `"target is http://admin:SuperSecret123@10.0.0.5/app now"` came back
+# unchanged. This text goes to a SECOND vendor, which is the strongest
+# reason to scrub it rather than the weakest.
+#
+# Only the password is replaced, so the host and the username still read -
+# a judge asked whether a disclosure happened needs to see the shape of
+# what leaked, not its value.
+_URL_USERINFO = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://[^\s/@:]+:)"
+                           r"[^\s/@]+(@)")
+
+
 def _scrub(text: str) -> str:
     """Re-redact credential shapes before the text leaves the machine."""
-    out = _redact_url(str(text or ""))
+    out = _URL_USERINFO.sub(lambda m: m.group(1) + _REDACTED + m.group(2),
+                            _redact_url(str(text or "")))
     for pattern in _SCRUB:
         out = pattern.sub(
             lambda m: "".join(g for g in m.groups() if g) + _REDACTED

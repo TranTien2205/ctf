@@ -463,3 +463,44 @@ def test_judging_re_renders_the_report_before_sealing(tmp_path, monkeypatch):
     # and the session still verifies: the seal covers the re-rendered report
     from argus.session import verify_transcript
     assert verify_transcript(sdir).get("chained") is True
+
+
+def test_scrub_catches_url_credentials_inside_prose():
+    """The case file goes to a SECOND vendor, and this defence could not fire.
+
+    `_scrub` called `_redact_url` on the whole blob, and `_redact_url` only
+    works when the entire string is a URL. Measured:
+    `"target is http://admin:SuperSecret123@10.0.0.5/app now"` came back
+    unchanged. A line that looks like a defence and never fires is worse
+    than none, because it is counted as one.
+
+    Only the password is replaced: a judge asked whether a disclosure
+    happened needs the shape of what leaked, not its value, so the host and
+    the username still read.
+    """
+    from argus.judge import _REDACTED, _scrub
+
+    for text, secret in (
+            ("http://admin:SuperSecret123@10.0.0.5/app", "SuperSecret123"),
+            ("target is http://admin:SuperSecret123@10.0.0.5/app now",
+             "SuperSecret123"),
+            ("the page exposes http://svc:DbPass9@db.internal/", "DbPass9"),
+    ):
+        out = _scrub(text)
+        assert secret not in out, (text, out)
+        assert _REDACTED in out, (text, out)
+
+    # two in one blob, both scrubbed
+    both = _scrub("see http://a:pw1xx@h1/x and https://b:pw2yy@h2/y")
+    assert "pw1xx" not in both and "pw2yy" not in both
+
+    # the host and user survive - the judge needs to see what leaked
+    kept = _scrub("http://admin:SuperSecret123@10.0.0.5/app")
+    assert "10.0.0.5" in kept
+
+    # ...and text without a URL credential is untouched: an `@` in prose or
+    # a credential-free URL must not be mangled
+    assert _scrub("no creds: http://10.0.0.5:8080/app") == (
+        "no creds: http://10.0.0.5:8080/app")
+    assert _scrub("mailto style a@b.c and a plain @ sign") == (
+        "mailto style a@b.c and a plain @ sign")

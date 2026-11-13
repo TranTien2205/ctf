@@ -925,6 +925,32 @@ somebody reading only the list.
   deliberately NOT ignored: it is committed on branch `ctf-v3`, so the author
   does keep it. Each line is one line to delete if a directory becomes
   content.
+### A defence on the vendor-egress path that could not fire
+- `argus judge` sends a case file to a **second model vendor**, and `_scrub`
+  is the last thing between that text and the wire. It called `_redact_url`
+  on the whole blob - and `_redact_url` only works when the entire string is
+  a URL. Measured: `"target is http://admin:SuperSecret123@10.0.0.5/app
+  now"` came back **unchanged**. A line that looks like a defence and never
+  fires is worse than none, because it is counted as one.
+- A prose-level pattern replaces the password of any
+  `scheme://user:pass@host` anywhere in the text now. Only the password:
+  the host and the username still read, because a judge asked whether a
+  disclosure happened needs the shape of what leaked, not its value - and
+  this is the one place where scrubbing beats preserving evidence, since
+  the text crosses to another vendor.
+- Two shapes are deliberately untouched, and asserted: a credential-free
+  URL, and a bare `@` in prose. A scrubber that mangles either is a
+  scrubber that corrupts the case the judge is asked to rule on.
+- Also measured and left alone, with the reasoning recorded rather than
+  guessed: `Cookie:` values are not in `_SCRUB`'s shapes, and a bearer
+  token under 16 characters is below its floor. The first is covered on the
+  first line - `cookie` is in the client's sensitive-header set, so a
+  transcript never carries the value - and the second floor exists to stop
+  the pattern eating ordinary prose. Both are second-line gaps whose first
+  line holds; saying so is more useful than widening a regex until it bites.
+- Checked by removing the fix and watching the test fail
+  (`assert 'SuperSecret123' not in ...`).
+
 ### The target's password was still in three writers
 - Redacting the target's userinfo in `meta.json` and `notes.md`'s header
   covered the URL FIELDS. The credential also travels as **free text**: the
@@ -1427,7 +1453,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 619 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 620 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
