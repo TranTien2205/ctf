@@ -142,7 +142,13 @@ never fsck or repair a forensic image. Evidence is the recovered bytes.
    and differencing with its parent locator named).
    cramfs firmware images: `python3 tools/forensics/cramfs_read.py
    fs.cramfs list` walks the packed 12-byte inode tree and `get
-   NAME` inflates its per-block zlib pointers.
+   NAME` inflates its per-block zlib pointers; `jffs2_read.py` does
+   the JFFS2 node walk (DIRENT names, INODE data for COPY/ZLIB).
+   A `.kdbx` in the bundle answers "which cipher/KDF/rounds guard
+   the vault" before any crack: `python3
+   tools/forensics/kdbx_info.py vault.kdbx` reads the TLV header —
+   cipher uuid, compression, transform_rounds (the dictionary-cost
+   estimate); decryption is named as needing the master key.
 7. Office documents carrying VBA (`.doc`, `.xls`, `.xlsm`,
    `vbaProject.bin`): `python3 tools/forensics/vba_extract.py file`
    dumps every module's decompressed source via the CFB container and
