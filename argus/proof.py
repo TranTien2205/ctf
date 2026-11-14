@@ -2464,6 +2464,54 @@ def _window(entry: dict) -> tuple[float, float]:
     return (end - elapsed, end)
 
 
+def _window_start(entry: dict) -> float:
+    """When this request began, by the best evidence recorded for it.
+
+    `_window` answers one question - did these two windows intersect - and
+    answers it fail-closed: an entry with no usable duration gets
+    `(0.0, 0.0)`, which overlaps nothing. That is right for OVERLAP and
+    wrong for ORDER, and `verify_concurrent_crossing` asked both of the
+    same tuple. Position zero is not a conservative start; it is the
+    beginning of the epoch, so a request whose duration did not record
+    sorts ahead of the whole transcript and can never be "after the burst".
+
+    Why that is not hypothetical. `elapsed_ms` is a difference of two
+    `time.monotonic()` reads, so on a platform whose monotonic clock ticks
+    coarsely it is a MULTIPLE of that tick - and zero for anything shorter
+    than one tick. Up to Python 3.12 `time.monotonic()` on Windows is
+    GetTickCount64, which ticks near 15.6ms: CPython gh-88494 moved it to
+    QueryPerformanceCounter in 3.13, measured there as 100ns against the
+    old 15.6ms. The companion gh-63207 moved `time.time()` to
+    GetSystemTimePreciseAsFileTime in the same release, which is the change
+    `probe_race`'s serial-baseline gaps were reasoning about - the other
+    half of the same release note, and not the half that was failing. `probe_race`'s serial controls are
+    refusals, which this lab answers in 2-5ms, so on those runners they
+    recorded `elapsed_ms: 0.0`, got the epoch as their start, failed
+    `>= burst_end`, and left the class with no control at all.
+
+    That is the `race` failure that cost four rounds of Windows CI and sent
+    the class out of the proving table twice. The simulation that cleared
+    the earlier fix quantised the RECORDER's clock - the one behind `ts` -
+    and measured 20/20 proven, because `ts` is not where the damage is.
+    Quantising `elapsed_ms` on the same real recording grades `unproven`
+    with `a serial attempt afterwards was refused` missing, which is the
+    symptom those jobs reported.
+
+    So: the instant is still recorded even when the duration is not. `ts`
+    is stamped when the exchange is recorded, which is the end of the
+    window, and an end is a sound lower bound for a start. Overlap keeps
+    reading `_window` and keeps refusing on a zero-width window; only the
+    ordering questions read this.
+    """
+    start = _window(entry)[0]
+    if start:
+        return start
+    try:
+        return float(entry.get("ts") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _overlaps(a: dict, b: dict) -> bool:
     (s1, e1), (s2, e2) = _window(a), _window(b)
     if not e1 or not e2:
@@ -2537,7 +2585,7 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
     best: tuple[int, list[dict], list[dict], str] = (0, [], [], "")
     for key, entries in groups.items():
-        ordered = sorted(entries, key=lambda e: _window(e)[0])
+        ordered = sorted(entries, key=_window_start)
         for i, first in enumerate(ordered):
             burst = [first] + [o for o in ordered[i + 1:]
                                if _overlaps(first, o)]
@@ -2546,7 +2594,7 @@ def verify_concurrent_crossing(claim: Claim, spec: "ProofSpec") -> list[dict]:
             won = [e for e in burst if 200 <= status_of(e) < 300]
             burst_end = max(_window(e)[1] for e in burst)
             after = [e for e in ordered
-                     if _window(e)[0] >= burst_end
+                     if _window_start(e) >= burst_end
                      and not any(_overlaps(e, o) for o in ordered
                                  if o is not e)]
             refused = [e for e in after if _spent_refusal(e, won)]

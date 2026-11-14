@@ -2978,12 +2978,77 @@ prefix with a tool - a module, a transcript field, a probe parameter. One
 more for a file that does not exist would have made the list the place the
 gate's own failures go to be forgotten.
 
+### One value answering two questions, and four rounds of Windows CI
+
+`race` was the one proof class missing from the proving direction of
+`tests/test_probe_matrix_agreement.py`, and the note holding its place said
+what was missing was not a mechanism but a diagnosis: on Windows 3.10, 3.11
+and 3.12 it graded `unproven` with `missing: ['no evidence']` while Windows
+3.13, 3.14 and every ubuntu job proved it. It had been added and reverted
+twice on local evidence. Here is the diagnosis.
+
+`proof._window` reconstructs a request's window as `[ts - elapsed_ms, ts]`
+and returns `(0.0, 0.0)` when the duration is unusable - documented, and
+right, as "a zero-width window: it overlaps nothing, which is the
+fail-closed answer". `verify_concurrent_crossing` then asked that same
+tuple a second question, *is this entry after the burst*, as
+`_window(e)[0] >= burst_end` and as a sort key. Zero is the conservative
+answer to *did it overlap*. It is the **epoch** as an answer to *when was
+it*: before everything, so an entry whose duration did not record could
+never be after anything.
+
+`elapsed_ms` is a difference of two `time.monotonic()` reads, and
+`time.monotonic()` on Windows is `GetTickCount64` up to Python 3.12 -
+CPython gh-88494 moved it to `QueryPerformanceCounter` in 3.13, 15.6ms to
+100ns. A difference of two reads of a 15.6ms clock is a multiple of 15.6ms
+and **zero for anything shorter than one tick**. `probe_race`'s serial
+controls are refusals, which the lab answers in 2-5ms. So on those three
+runners both controls recorded `elapsed_ms: 0.0`, were placed at the epoch,
+and the class had no control at all.
+
+Measured on a real local recording, quantising only the recorded
+quantities to that tick and changing nothing else:
+
+| model of the platform | grade |
+| --- | --- |
+| as recorded | `proven` |
+| `ts` quantised only | `proven` |
+| `elapsed_ms` quantised | `unproven`, missing the serial control |
+| both quantised | `unproven`, missing the serial control |
+
+The second row is what the simulation that cleared the previous fix
+modelled - it coarsened the recorder's clock, behind `ts`, and left
+`elapsed_ms` precise. That is why it measured 20/20 twice and was wrong
+twice, and it is a sharper statement than "the simulation was unfaithful":
+it was unfaithful in one nameable respect.
+
+- `proof._window_start` is a separate accessor for the ordering question:
+  the reconstructed start when there is one, the recorded `ts` otherwise.
+  `_window` is untouched, so overlap stays fail-closed on a zero-width
+  window. Widening `_window` to `(ts, ts)` would also have fixed the
+  ordering and would have let one instant inside another request's window
+  count as "two attempts on the wire at once"; that is the second plant,
+  and `test_a_window_with_no_duration_still_overlaps_nothing` fails on it.
+- Four cases in `tests/test_proof.py`, both directions: a duration that did
+  not record still has a position; a window with no duration still overlaps
+  nothing; a fast refusal recorded *before* the burst is still not the
+  serial control; an attempt the target never answered is still not the
+  serial control. Removing the fix fails the first with
+  `'unproven' == 'proven'`.
+- `race` is back in the proving table - 28 of the 29 classes now driven in
+  the proving direction, `dos` alone excluded, by construction.
+- What this does NOT fix: a loaded runner that serialises the burst. The 8s
+  barrier in `/redeem` makes that unlikely and the first assertion would
+  report it (six 200s against one coupon cannot happen without
+  concurrency), but it is a different failure from the one diagnosed here
+  and it is not addressed.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 672 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 677 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

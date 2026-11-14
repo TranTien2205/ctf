@@ -1434,6 +1434,99 @@ def test_race_is_proven_by_an_overlap_and_a_refusal():
     assert "more than one of them succeeded" in verdict.missing
 
 
+def test_a_duration_that_did_not_record_still_has_a_position():
+    """The four-round Windows failure, as four lines of arithmetic.
+
+    `_window` answers "did these two intersect" and answers it fail-closed:
+    no usable duration, no window. `verify_concurrent_crossing` asked the
+    same tuple a second question - "is this one AFTER the burst" - and for
+    an entry with no duration the answer it got was the epoch. The epoch is
+    not a conservative start. It is before everything, so a request whose
+    duration did not record could never be after anything.
+
+    `elapsed_ms` is a difference of two `time.monotonic()` reads, so on a
+    coarse monotonic clock it is a multiple of that tick and ZERO for
+    anything shorter than one. `time.monotonic()` on Windows is
+    GetTickCount64 up to Python 3.12, ticking near 15.6ms; 3.13 moved it to
+    QueryPerformanceCounter. `probe_race`'s serial controls are refusals,
+    answered in 2-5ms. So on Windows 3.10, 3.11 and 3.12 both controls
+    recorded `elapsed_ms: 0.0`, both were placed at the epoch, neither was
+    after the burst, and the class graded `unproven` - which is exactly what
+    those three jobs reported while 3.13, 3.14 and every ubuntu job proved
+    it. Measured on a real recording by quantising `elapsed_ms` to that
+    tick: `unproven`, missing this check. Quantising `ts` instead - which is
+    what the simulation that cleared the earlier fix did - stays `proven`,
+    which is why that simulation said 20/20 and was wrong twice.
+    """
+    burst = [_race("r1", 1000.30, 300), _race("r2", 1000.32, 300),
+             _race("r3", 1000.31, 300, status=409, body="already used")]
+    serial = [_race("r4", 1001.00, 0.0, status=409, body="already used"),
+              _race("r5", 1001.20, 0.0, status=409, body="already used")]
+    assert proof.grade("race", "ok", burst + serial).grade == "proven"
+
+    # and the mechanism, named: the WINDOW is still refused, the POSITION is
+    # not. A fix that gave `_window` a non-zero end instead would pass the
+    # assertion above and change what overlap means, which is the next test.
+    assert proof._window(serial[0])[0] == 0.0
+    assert proof._window_start(serial[0]) == 1001.00
+
+
+def test_a_window_with_no_duration_still_overlaps_nothing():
+    """The posture `_window` exists to hold, held while its misuse is fixed.
+
+    An entry with no recorded duration is not evidence of concurrency with
+    anything, including an exchange whose window contains its instant: all
+    that is known is when it was recorded, not how long it was on the wire.
+    Widening `_window` to `(ts, ts)` would have fixed the ordering bug too,
+    and would have let one instant inside another request's window count as
+    "two attempts on the wire at once". This asserts it does not.
+    """
+    wide = _race("r1", 1000.30, 300)        # on the wire [1000.00, 1000.30]
+    instant = _race("r2", 1000.20, 0.0)     # recorded inside that window
+    assert proof._overlaps(wide, instant) is False
+    assert proof._overlaps(instant, wide) is False
+    # so a burst of them is not a burst
+    verdict = proof.grade("race", "ok", [
+        _race("r1", 1000.30, 0.0), _race("r2", 1000.30, 0.0),
+        _race("r3", 1001.00, 0.0, status=409, body="already used")])
+    assert verdict.grade != "proven"
+    assert "two attempts were on the wire at once" in verdict.missing
+
+
+def test_a_fast_refusal_before_the_burst_is_not_the_serial_control():
+    """Giving the control a position must not make `before` into `after`.
+
+    The fix reads `ts` when the duration is missing, and `ts` orders both
+    ways - so the check that was unsatisfiable must not become one that
+    anything satisfies. A refusal recorded BEFORE the burst says the action
+    was already spent when the burst started, which is the opposite of the
+    claim.
+    """
+    early = _race("r0", 999.00, 0.0, status=409, body="already used")
+    burst = [_race("r1", 1000.30, 300), _race("r2", 1000.32, 300),
+             _race("r3", 1000.31, 300, status=409, body="already used")]
+    verdict = proof.grade("race", "ok", [early] + burst)
+    assert verdict.grade != "proven"
+    assert "a serial attempt afterwards was refused" in verdict.missing
+
+
+def test_an_attempt_the_target_never_answered_is_not_the_serial_control():
+    """A transport failure also records no duration, and is not a refusal.
+
+    `GuardedClient` writes `status: 0` and an empty body when the send
+    itself failed, and the duration of a connection that was never made is
+    not evidence that a limit was crossed. The positional fallback must not
+    turn a dead attempt into the control that carries this class.
+    """
+    burst = [_race("r1", 1000.30, 300), _race("r2", 1000.32, 300),
+             _race("r3", 1000.31, 300, status=409, body="already used")]
+    dead = _race("r4", 1001.00, 0.0, status=0, body="")
+    dead["response"]["error"] = "ConnectError: connection refused"
+    verdict = proof.grade("race", "ok", burst + [dead])
+    assert verdict.grade != "proven"
+    assert "a serial attempt afterwards was refused" in verdict.missing
+
+
 def test_race_fails_closed_when_the_timings_are_missing():
     """A zero-width window overlaps nothing.
 

@@ -874,7 +874,9 @@ def _doc_consistency() -> None:
         check(f"doc pytest count matches collection ({actual})",
               actual > 0 and stated_tests == {actual},
               f"docs state {sorted(stated_tests)}, collection finds {actual}"
-              if actual else "could not collect; skipped")
+              if actual else "pytest could not collect the suite at all, so "
+              "the count the docs state is unverified - this is a FAILURE "
+              "and not a skip")
     # 4. every ARGUS_* environment variable the docs name is one the code
     #    reads. Writing a plausible-looking opt-in flag into a README is the
     #    same defect as naming a removed command, and I made exactly that

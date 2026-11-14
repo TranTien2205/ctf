@@ -495,6 +495,30 @@ def test_the_race_window_can_be_made_deterministic(lab_url, ctx):
 # proving table. Diagnosing the rest needs the platform; the vehicle for
 # that is a throwaway branch that prints the recorded windows, not the
 # mainline.
+#
+# DIAGNOSED. The deleted test's conclusion was right and its reason was
+# incomplete: the model was unfaithful in one specific, nameable respect.
+# It quantised the RECORDER's clock - `time.time()`, behind `ts` - and left
+# `elapsed_ms` precise. A window is `[ts - elapsed_ms, ts]`, and
+# `elapsed_ms` comes from `time.monotonic()`, which on Windows is
+# GetTickCount64 up to 3.12 (CPython gh-88494 moved it in 3.13). The
+# platform coarsens BOTH, and only the second one does the damage: a
+# difference of two reads of a 15.6ms clock is zero for anything shorter
+# than one tick, the serial controls are refusals answered in 2-5ms, and
+# `_window` maps a zero duration to `(0.0, 0.0)` - the epoch, which is
+# before everything, so neither control could be "after the burst".
+#
+# Measured on a real local recording, quantising only the recorded
+# quantities and changing nothing else:
+#     as recorded              proven
+#     ts quantised only        proven     <- what this test modelled
+#     elapsed_ms quantised     unproven, missing the serial control
+#     both quantised           unproven, missing the serial control
+#
+# The fix is `proof._window_start`. It is covered by four synthetic cases
+# in `tests/test_proof.py` rather than by a live quantised race, because
+# the mechanism is arithmetic and does not need a scheduler to exhibit it -
+# which is also the mistake this note was written about.
 
 
 def test_arming_the_window_is_opt_in(lab_url, ctx):

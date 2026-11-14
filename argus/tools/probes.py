@@ -1940,6 +1940,20 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
         # down by different amounts and the second one's reconstructed
         # start slips behind the first one's end: they appear to overlap,
         # and that disqualifies BOTH, leaving no control at all.
+        #
+        # Both gaps are right and both stay. They were not the whole
+        # failure, and the reasoning above says why without noticing it:
+        # it is entirely about `ts`, the clock gh-63207 changed. The SECOND
+        # quantity a window is built from is `elapsed_ms`, a difference of
+        # two `time.monotonic()` reads - GetTickCount64 up to 3.12, moved
+        # to QueryPerformanceCounter by gh-88494 in 3.13. A difference of
+        # two reads of a 15.6ms clock is a multiple of 15.6ms and ZERO
+        # below one tick, and these controls are refusals answered in
+        # 2-5ms. `_window` maps a zero duration to `(0.0, 0.0)`, so on
+        # Windows 3.10-3.12 both controls were positioned at the epoch and
+        # neither could be "after the burst". Fixed in `proof._window_start`
+        # and covered synthetically in `tests/test_proof.py`; no gap here
+        # could have reached it.
         serial = [_fire("serial baseline")]
         _time.sleep(0.05)
         serial.append(_fire("serial baseline"))

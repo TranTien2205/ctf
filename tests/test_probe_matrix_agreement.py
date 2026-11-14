@@ -92,10 +92,10 @@ is, and the first attempt used `_marker("deser")` while `NONCE_RE` is
 `\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as this probe's
 own and the class sat at a candidate with its nonce in plain sight.
 
-The proving direction covers 27 of the 29 proof classes. Two are not driven
-in it: `dos`, refused by construction because its proof is the damage, and
-`race`, whose live case was re-added and reverted again - see the note at its
-place in the table. That sentence is a count, and the test at the bottom of this
+The proving direction covers 28 of the 29 proof classes. One is not driven
+in it: `dos`, refused by construction because its proof is the damage.
+`race` is back for a fifth round, this time with the diagnosis its own note
+demanded - see that note at its place in the table. That sentence is a count, and the test at the bottom of this
 module asserts it against the tables AND against the living documents that
 repeat it - this docstring included, which is why the figure is stated here
 in full rather than described.
@@ -111,12 +111,15 @@ this asserts against evidence:
   reach `proven`. This is the direction that matters: it is the one that fails
   when a verifier is too loose rather than when a probe is too thin.
 
-`race` has now been out, re-added, and taken out again - four rounds of
-Windows CI. The lab side is fixed and tested: a barrier puts every request
-inside the window and the endpoint's delay keeps each recorded window wide.
-What is still unexplained is why `verify_race` finds no usable evidence at
-all on Windows 3.10-3.12 while 3.13, 3.14 and every ubuntu job pass. See the
-note at its place in the table.
+`race` was out, re-added, and taken out again - four rounds of Windows CI -
+and what was missing each time was a diagnosis. There is one now, and it is
+not about concurrency: `_window` reconstructs `[ts - elapsed_ms, ts]`, and
+`elapsed_ms` is a difference of two `time.monotonic()` reads, which on
+Windows is GetTickCount64 up to 3.12 and therefore zero for any request
+shorter than its ~15.6ms tick. The serial controls are refusals answered in
+2-5ms. A zero duration became `(0.0, 0.0)` - the epoch - so neither control
+was ever "after the burst". Fixed in `proof._window_start`; see the note at
+this class's place in the table for the measurements.
 """
 from __future__ import annotations
 
@@ -311,6 +314,44 @@ VULNERABLE = [
     # `tests/test_proof.py`. What is missing is a diagnosis, not a
     # mechanism. Do not re-add this on local measurement alone - that is
     # twice now.
+    #
+    # FIFTH ROUND, and the diagnosis exists. It was never the recorder's
+    # clock. `_window` reconstructs `[ts - elapsed_ms, ts]` and the second
+    # quantity is the one that broke: `elapsed_ms` is a difference of two
+    # `time.monotonic()` reads, and `time.monotonic()` on Windows is
+    # GetTickCount64 up to Python 3.12 - CPython gh-88494 moved it to
+    # QueryPerformanceCounter in 3.13, 15.6ms to 100ns. A difference of two
+    # reads of a 15.6ms clock is a MULTIPLE of 15.6ms, and zero for
+    # anything shorter than one tick. `probe_race`'s serial controls are
+    # refusals, which this lab answers in 2-5ms. So on those three runners
+    # both controls recorded `elapsed_ms: 0.0`, `_window` mapped that to
+    # `(0.0, 0.0)` - correct fail-closed for OVERLAP, the epoch for ORDER -
+    # and the check that needs an attempt AFTER the burst was asking
+    # whether the beginning of time is after it.
+    #
+    # Measured on a real local recording, quantising only the recorded
+    # quantities to that tick and changing nothing else:
+    #     as recorded               proven
+    #     ts quantised only         proven     <- what the 20/20 sim did
+    #     elapsed_ms quantised      unproven, missing the serial control
+    #     both quantised            unproven, missing the serial control
+    # The third line is the symptom those jobs reported. The fix is
+    # `proof._window_start`; `tests/test_proof.py` covers it in both
+    # directions, and removing the fix fails the positive case while
+    # widening `_window` instead fails the overlap case - both planted and
+    # watched.
+    #
+    # The standing instruction said not to re-add on local measurement
+    # alone, and this is not that: it is a named platform difference with a
+    # CPython issue number, and a model that reproduces the exact recorded
+    # symptom when the fix is removed. If it fails a fifth time, the only
+    # remaining candidate is a loaded runner serialising the burst despite
+    # the 8s barrier - and the first assertion will say so, because six
+    # 200s against one coupon cannot happen without concurrency. If that
+    # assertion passes and this one fails, something about the RECORD is
+    # still wrong and the windows need printing again. Delete the entry and
+    # say so. Do not add a conditional skip.
+    ("probe_race", "race", _drive_race),
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -440,10 +481,10 @@ CLEAN = [
 # `probe_*` tool. Counting against the tooling is how `graphql` and `jwt` sat
 # outside this module without anyone noticing: neither is driven by a probe,
 # so neither appeared in a coverage figure derived from the probe table.
-PROVING_COVERAGE = 27
+PROVING_COVERAGE = 28
 MATRIX_CLASSES = 29
 # Each with a reason stated in the module docstring above.
-NOT_DRIVEN = {"dos", "race"}
+NOT_DRIVEN = {"dos"}
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
