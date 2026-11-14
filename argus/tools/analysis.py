@@ -151,6 +151,46 @@ def jwt_forge(ctx: Context, token: str, claims: str = "{}",
 
 # ---------------------------------------------------------------- skills
 
+# A tool that does not name a class cannot say which class a module
+# teaches. `http_request` is in `jwt`'s chain because it is the last step of
+# that chain, and `probe_time` is deliberately in no mapping at all - a
+# latency measurement is consistent with sqli, with rce, and with a slow
+# database. Both appear in nearly every module, so treating them as class
+# evidence would make every module teach everything.
+_UNTELLING_TOOLS = ("http_request", "probe_time")
+
+
+def _also_taught(text: str, own: str) -> list[str]:
+    """Classes this module teaches besides the one its filename resolves to.
+
+    DERIVED from the driving tools the module names, through the same
+    tool->class mapping the ledger uses for evidence attribution. Nothing
+    is invented: `selftest` already checks this relation in the other
+    direction - that a module whose stem resolves to a class names that
+    class's driving tool - and this reads it forwards.
+
+    It exists because `load_skill` attached a requirement only when the
+    module's STEM resolved. Five gradeable classes have no `<class>.md`:
+    `enum` and `lockout` are taught by `auth-enum` and `auth-session`,
+    `jwt` and `massassign` by `auth-session`, `method` by `triage`. An
+    agent loading the right module for any of them got the methodology and
+    none of the proof requirement - which is the half that changes what it
+    sends, and the only half it cannot reconstruct afterwards.
+    """
+    from ..decide import CLASS_TOOL_CHAIN, PROBE_CLASS
+
+    tool_class = dict(PROBE_CLASS)
+    for klass, chain in CLASS_TOOL_CHAIN.items():
+        for tool in chain:
+            if tool in _UNTELLING_TOOLS:
+                continue
+            tool_class.setdefault(tool, klass)
+    found = {klass for tool, klass in tool_class.items()
+             if re.search(rf"\b{re.escape(tool)}\b", text)}
+    found.discard(own)
+    return sorted(found)
+
+
 def load_skill(ctx: Context, name: str) -> dict:
     skills_dir = Path(ctx.skills_dir)
     name = name if isinstance(name, str) else ""
@@ -176,6 +216,23 @@ def load_skill(ctx: Context, name: str) -> dict:
             out["refused"] = spec.refusal
         if spec.notes:
             out["proof_notes"] = spec.notes
+    # ...and every OTHER class this module teaches, with its requirement.
+    # The requirement is only useful before probing, and a worker that
+    # loaded `auth-session` for a JWT problem used to be told nothing about
+    # what proving `jwt` takes.
+    also = []
+    for klass in _also_taught(out["content"], out.get("vuln_class", "")):
+        other = proof.spec_for(klass)
+        if other is None:
+            continue
+        row = {"vuln_class": other.vuln_class,
+               "proof_requirement": other.requirement,
+               "proof_checks": list(other.required)}
+        if other.refusal:
+            row["refused"] = other.refusal
+        also.append(row)
+    if also:
+        out["also_teaches"] = also
     return out
 
 

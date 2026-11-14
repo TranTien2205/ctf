@@ -961,6 +961,42 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The last sweep finding: the mapping was derivable after all
+- I closed the sweep saying this one needed "a module-to-classes mapping
+  that does not exist, and inventing one is how a taxonomy acquires a wrong
+  row". The second half stands; the first was wrong. The mapping was already
+  in the repository, written as the tools each module names.
+- `load_skill` attached a proof requirement only when the module's STEM
+  resolved to a class. Five gradeable classes have no `<class>.md`: `enum`
+  and `lockout`, `jwt` and `massassign` (all in `auth-enum` and
+  `auth-session`), and `method` (in `triage`). A worker that loaded
+  `auth-session` for a JWT problem got the methodology and nothing about
+  what proving `jwt` takes - and the requirement is only useful BEFORE
+  probing, because it is the half that changes which request gets sent.
+- Derived through the same tool-to-class table the ledger uses for evidence
+  attribution, so the two cannot disagree, and `selftest` check 8 already
+  reads that relation in the other direction. Measured after:
+  `auth-session` carries `jwt`, `lockout` and `massassign`; `auth-enum`
+  carries `enum`; `triage` carries `graphql` and `method`; a single-class
+  module like `sqli` carries nothing extra.
+- `http_request` and `probe_time` are excluded, and that exclusion is the
+  whole difference between a derivation and a mess: `http_request` is the
+  last step of the jwt chain and `probe_time` names no class at all because
+  a latency measurement is consistent with sqli, with rce, and with a slow
+  database. Both appear in modules that teach neither.
+- Check 8b is the mirror of check 8 - every gradeable class is taught by
+  some module, 28 of 28, with `dos` exempt because it is refused and has no
+  methodology to teach.
+- Two things the plants caught, both in my own new work. The selftest check
+  calls `_also_taught` directly, so **removing the wiring from
+  `load_skill` left it passing** - it proves the derivation exists, not that
+  anything uses it; the pytest test is what catches that, and the pair is
+  the coverage. And my assertion that the generic tools imply no class used
+  `sqli` as its subject, which never mentions `http_request`, so it passed
+  whether the exclusion existed or not. Third vacuous assertion of my own
+  this session, found the same way as the other two: by planting the defect
+  and watching nothing happen.
+
 ### A bounded shutdown that was bounded everywhere except its last line
 - `MCPClient.call()` takes `self._lock` and holds it across `_rpc`'s
   blocking `q.get(timeout=...)`, a per-server timeout clamped at 600s.
@@ -2334,14 +2370,14 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 644 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 645 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 157 offline checks, including a documentation
+- `python selftest.py`: 158 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

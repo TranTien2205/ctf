@@ -1155,6 +1155,44 @@ def _doc_consistency() -> None:
           "that drives it, so the agent reading it does not learn the tool "
           "exists")
 
+    # 8b. ...and the mirror: every gradeable class is TAUGHT by some module.
+    #
+    #     Check 8 reads module -> class, which is the direction you only
+    #     change on purpose. The direction that rots is a class with no
+    #     module: `load_skill` attached a proof requirement only when the
+    #     module's STEM resolved, and five gradeable classes have no
+    #     `<class>.md` - `enum`, `jwt`, `lockout`, `massassign` and
+    #     `method`, taught by `auth-enum`, `auth-session` and `triage`. An
+    #     agent loading the right module for any of them got the methodology
+    #     and none of the requirement, which is the half that changes what
+    #     it sends.
+    #
+    #     Coverage is derived the same way `load_skill` derives it - from
+    #     the driving tools each module names - so the two cannot disagree.
+    #     `dos` is exempt because it is refused by construction and has no
+    #     methodology to teach.
+    from argus.tools.analysis import _also_taught
+
+    taught: set[str] = set()
+    for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
+        if fp.name == "INDEX.md":
+            continue
+        body = fp.read_text(encoding="utf-8")
+        own = proof.spec_for(fp.stem)
+        own_class = own.vuln_class if own else ""
+        if own_class:
+            taught.add(own_class)
+        taught.update(_also_taught(body, own_class))
+    gradeable = {k for k in proof.classes()
+                 if proof.spec_for(k).verifier is not proof.verify_refused}
+    untaught = sorted(gradeable - taught)
+    check(f"every gradeable class is taught by a module "
+          f"({len(taught)} taught, {len(gradeable)} gradeable)",
+          not untaught and len(taught) >= len(gradeable),
+          f"{untaught} can be proven and no methodology module teaches them, "
+          "so `load_skill` has nothing to attach a requirement to"
+          if untaught else f"{len(taught)} reachable, none orphaned")
+
     # 9. the Python range the package CLAIMS is the range CI proves.
     #
     #    `requires-python = ">=3.10"` is open-ended: pip installs on every

@@ -3058,3 +3058,63 @@ def test_a_destructive_deserialize_payload_voids_the_evidence():
     assert v.grade != "proven", v.checks
     assert any("stayed benign" in str(c.get("check"))
                and not c.get("ok") for c in v.checks)
+
+
+def test_load_skill_carries_every_class_its_module_teaches():
+    """`load_skill` attached a requirement only for the module's STEM.
+
+    The requirement is only useful BEFORE probing - it is what changes which
+    request gets sent - and five gradeable classes have no `<class>.md`:
+    `enum` and `lockout`, `jwt` and `massassign`, and `method`, taught by
+    `auth-enum`, `auth-session` and `triage`. A worker that loaded
+    `auth-session` for a JWT problem got the methodology and nothing about
+    what proving `jwt` takes.
+
+    The mapping is DERIVED from the driving tools each module names, through
+    the same tool->class table the ledger uses for evidence attribution -
+    so nothing is invented, and `selftest` check 8 already reads that same
+    relation in the other direction. `http_request` and `probe_time` are
+    excluded because neither names a class: the first is the last step of
+    the jwt chain and the second is consistent with sqli, rce and a slow
+    database, and both appear in nearly every module.
+    """
+    from pathlib import Path
+
+    from argus.tools import analysis
+
+    class _Ctx:
+        skills_dir = Path(__file__).resolve().parent.parent / "argus" / "skills"
+
+    out = analysis.load_skill(_Ctx(), "auth-session")
+    taught = {r["vuln_class"] for r in out.get("also_teaches", [])}
+    assert {"jwt", "lockout", "massassign"} <= taught, out.get("also_teaches")
+    for row in out["also_teaches"]:
+        assert row["proof_requirement"], row
+        assert row["proof_checks"], row
+
+    assert {r["vuln_class"] for r in
+            analysis.load_skill(_Ctx(), "auth-enum").get("also_teaches", [])
+            } == {"enum"}
+    assert {"method", "graphql"} <= {
+        r["vuln_class"] for r in
+        analysis.load_skill(_Ctx(), "triage").get("also_teaches", [])}
+
+    # a single-class module gains nothing, or every skill load would carry
+    # requirements for classes it does not teach
+    sqli = analysis.load_skill(_Ctx(), "sqli")
+    assert sqli["vuln_class"] == "sqli"
+    assert not sqli.get("also_teaches"), sqli.get("also_teaches")
+
+    # The generic tools must not imply a class, or every module teaches
+    # jwt - `http_request` is the last step of the jwt chain. The subject
+    # has to be a module that actually NAMES the generic tool, or the
+    # assertion is vacuous: my first version used `sqli`, which never
+    # mentions `http_request`, so it passed whether the exclusion existed
+    # or not. `websocket` names it.
+    ws = analysis.load_skill(_Ctx(), "websocket")
+    assert "http_request" in ws["content"], \
+        "this subject no longer names the generic tool, so the next " \
+        "assertion proves nothing"
+    assert "jwt" not in {r["vuln_class"]
+                         for r in ws.get("also_teaches", [])}, \
+        ws.get("also_teaches")
