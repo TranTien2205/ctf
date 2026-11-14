@@ -359,6 +359,7 @@ _CMDI_SEPARATORS = [
 # the Windows one matched a JSON `\r` escape on any JSON-returning target.
 from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
 from ..proof import _overlaps                        # noqa: E402
+from ..proof import latency_ramp as _latency_ramp    # noqa: E402
 from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
 from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
 from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
@@ -1311,19 +1312,45 @@ def probe_lockout(ctx: Context, url: str, data: str,
     last = results[-1]
     throttled = last["status"] == 429 or last["lock_marker"] or \
         any(t["lock_marker"] for t in results)
-    # slow-down channel: a linearly growing elapsed_ms is soft throttling
-    if not throttled and len(results) >= 4:
-        first_half = sum(t["elapsed_ms"] for t in results[:3]) / 3
-        last_half = sum(t["elapsed_ms"] for t in results[-3:]) / 3
-        throttled = last_half > first_half * 3 + 150
+    # Slow-down channel: a growing elapsed_ms is soft throttling. This read
+    # its own derived quantity - means of three, `last > first * 3 + 150` -
+    # and on the commonest real ramp, 150 -> 600ms over ten attempts, that
+    # computes 553 > 650 and reported the target UNTHROTTLED. The gate's
+    # verifier refuses that same evidence, so probe and verifier disagreed
+    # on one property, and the probe disagreed in the direction that writes
+    # a false finding: "online password guessing is unthrottled".
+    #
+    # It also averaged `results[:3]` against `results[-3:]`, which overlap
+    # once there are fewer than six attempts, so at the `len >= 4` gate it
+    # was comparing a window with itself.
+    #
+    # Now it calls the verifier's own `latency_ramp`, so there is one
+    # definition of "ramps" and the two halves cannot drift apart again.
+    # The status filter is the correction `probe_time` took in this module:
+    # an attempt that never got an answer has an `elapsed_ms` that is the
+    # timeout, not a server's delay, and counting it reads a dropped
+    # connection as a throttle.
+    _answered = [t["elapsed_ms"] for t in results
+                 if 100 <= status_of_result(t) < 600]
+    _ramp = None
+    if not throttled and len(_answered) == len(results):
+        _ramp = _latency_ramp(_answered)
+        throttled = bool(_ramp)
     verdict = (
         "throttling observed: " +
         ("429 / lockout message" if any(
             t["status"] == 429 or t["lock_marker"] for t in results)
+         else f"responses grow slower (soft throttle): a median "
+              f"{_ramp[0]:.0f}ms across the first attempts, "
+              f"{_ramp[1]:.0f}ms across the last" if _ramp
          else "responses grow slower (soft throttle)")
         if throttled else
         f"no lockout or rate limit after {len(results)} failed attempts - "
-        "online password guessing is unthrottled")
+        "online password guessing is unthrottled"
+        + ("" if len(_answered) == len(results) else
+           f" (judged on status and wording only: "
+           f"{len(results) - len(_answered)} attempt(s) got no answer, so "
+           f"a progressive delay could not be ruled out)"))
     return {"verdict": verdict, "attempts": len(results),
             "results": results}
 

@@ -2365,12 +2365,127 @@ somebody reading only the list.
   not a frame, so a client feeding one byte at a time held a handler thread
   indefinitely - test-only code, but it runs in the selftest's own process.
 
+### Before and after belonged to the claimant, in four verifiers
+
+A second adversarial sweep was pointed at the shapes the first one proved
+real rather than at guesses, and its best lens was the one that measured
+something: nine verifiers pair two exchanges with `_pairs`, and only two
+ordered the pair. Four of the unordered ones needed to.
+
+`_ordering` has a docstring that refuses exactly this defect - "a claimant
+listing the ids in a chosen order would then decide which read was
+'before' the write, which is the opposite of a check" - and three
+verifiers were doing it anyway, through `claim.exchanges.index(...)`. The
+cited list is built as `[transcript.get(r) for r in evidence_ids]`, so its
+order is whatever the finding's author wrote. Each was reproduced before
+being touched:
+
+- **`method`**: a GET recorded BEFORE the PUT, carrying the nonce because
+  the server had left it in that resource earlier, graded **proven** with
+  the detail "argusput7k3m9x2q was written by r2 and read back by r1".
+  `_witness` made it worse rather than catching it: the honest post-write
+  read refutes the claim and scores 1 of 2 required checks, the pre-write
+  read confirms it and scores 2, so the scoring *preferred* the exchange
+  that predates the write and discarded the one that disproves the finding.
+- **`upload`**: the identical two entries graded **proven** cited
+  [upload, fetch] and **unproven** cited [fetch, upload], with the fetch
+  recorded first by both id sequence and `ts` in each case. The detail text
+  for the failing branch reads "<id> was recorded before the upload" - it
+  was asserting a fact about the recorder while reading a fact about the
+  claimant.
+- **`jwt`**: a `jwt_forge` event stamped a full second AFTER the response
+  it is credited with graded **proven**, floor check reading "jwt_forge r9
+  set ['role'], echoed 'admin'". Cheap to hit by accident, which is what
+  makes it bad: the echoed value is a short ordinary string - a role, a
+  tenant, a department - that any authenticated page carries. Read a page
+  with a legitimate session, mint a token afterwards, cite both.
+- **`smuggle`**: both directions were live. The same two entries graded
+  proven cited [ambiguity, effect] and unproven cited [effect, ambiguity],
+  so a real desync written up effect-first was refused, and any
+  earlier-recorded response on the endpoint whose body names a G-prefixed
+  verb became "the effect" by being listed after it.
+
+The desync one is the quietest form of the half-fix shape in this log. It
+ordered by citation position *and said why*: "the ids are the recorder's
+business, and an id this verifier cannot parse made it raise rather than
+refuse". The worry was real and `_ordering` had already answered it - an
+unparseable id gets sequence 0 instead of an exception. The reason expired;
+the workaround did not.
+
+`_follows(when, later, earlier)` is now one named predicate, fail-closed,
+used at all four sites. It spans events and exchanges because
+`record_event` and `record_exchange` increment one `self._seq` under one
+lock and both return `r<n>`, so the sequence is authoritative over the
+whole transcript rather than its HTTP half. Eight verifiers order their
+evidence now, up from three.
+
+Two tests hold the shape rather than the four instances: one fails if any
+verifier reads `exchanges.index(...)` or enumerates positions again, and
+one requires every verifier to either order its evidence or be listed in
+`_ORDER_FREE` with the reason it does not need to - so a new verifier
+written tomorrow fails until someone decides which it is. **Four of the
+seven unordered verifiers were right to ignore order** and are listed
+there: a true-payload and a false-payload response differ whichever was
+sent first, an injected header and its echo are the same exchange. Fixing
+those would have been a change to code with no defect in it.
+
+Five existing tests failed on the new requirement, and the fixtures were
+what was wrong, not the gate: they hand-rolled entry dicts with no `ts`,
+bypassing the `ex()` helper that was given one earlier in this work for
+precisely this reason. `record_exchange` and `record_event` write a stamp
+on every entry, so an unstamped entry cannot come from this system. The
+gate was not relaxed to accommodate a fixture. One of those tests had a
+leg named "a fetch recorded BEFORE the upload" that passed only because
+the citation order happened to agree with the recorder - it never covered
+the defect it was named for.
+
+### A lockout check with three holes, all of them mine
+
+The progressive-delay check added earlier in this session shipped with
+three defects, found by pointing the same sweep at it. All three measured:
+
+- **Gated at six attempts while the class accepts five.** The minimum
+  series `lockout` accepts was exactly the series whose latency was never
+  read: five attempts ramping 150 -> 650ms graded **proven** - "this
+  target has no lockout" - while the identical shape at ten graded
+  candidate. Two literals for one threshold, 5 and 6, written in the same
+  change. They are one constant now.
+- **Fail-open on a missing `elapsed_ms`.** It required every cited
+  exchange to carry one and skipped the whole check otherwise, so
+  appending a single latency-free entry to the ten-attempt ramp - the
+  exact evidence the fix was measured on - put it back to **proven**. The
+  claimant could turn the check off by citing one more exchange, in a
+  check whose stated reason for existing is that refusing is the
+  fail-closed direction here.
+- **Measured in citation order.** Citing the same ten attempts
+  newest-first made the ramp read as a decline and graded **proven**. This
+  one the sweep did not report; it turned up by applying the sweep's own
+  ordering lens to the code I had just written.
+
+The probe half was still wrong too, and the comment in `verify_no_throttle`
+*documented* that instead of fixing it - "the probe's own half missed it
+too, and for the reason this log keeps recording". `probe_lockout` tested
+the same property with its own derived quantity, means of three and
+`last > first * 3 + 150`, which on a 150 -> 600ms ramp computes 553 > 650
+and reported the target UNTHROTTLED. So probe and verifier disagreed on
+one property, and the probe disagreed in the direction that writes a false
+finding. It also averaged `results[:3]` against `results[-3:]`, which
+overlap below six attempts, so at its own `len >= 4` gate it compared a
+window with itself. Both halves now call one `proof.latency_ramp`, the way
+`probe_cmdi` already borrows `_overlaps`.
+
+What is still open, and now stated in the report text rather than hidden:
+if no attempt carries a recorded latency the ramp cannot be measured, and
+the class can still prove blind. The detail used to read "all N answered
+without a throttle" in that case; it now says how many were timed and that
+a progressive delay could not be ruled out.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 645 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 656 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

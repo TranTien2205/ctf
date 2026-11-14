@@ -315,7 +315,22 @@ def test_idor_needs_two_subjects_and_a_difference():
     assert proof.grade("idor", '"username"', [mine, theirs]).grade == "unproven"
 
 
-FORGE_EVENT = {"id": "e1", "kind": "jwt_forge",
+# `record_event` stamps every event and ids it `r<n>` from the SAME
+# sequence as the exchanges, and a mint necessarily precedes the request
+# that carries the token - so this fixture needs both, or it cannot be
+# ordered against the response it is credited with. It had neither, which
+# made it unfaithful in exactly the way `verify_token_forgery` now reads:
+# an unstamped event gets no position from `_ordering` at all.
+#
+# `r1` because this is the first thing the session did. The two tests that
+# cite it id their exchanges `b8..b10` and `r16..r17`, so no mint can
+# precede both by sequence unless it is lower than either - and a mint
+# recorded first is the faithful arrangement anyway. The lesson is the ad
+# hoc prefixes: a real transcript numbers everything from one counter, so
+# `b8` beside `r16` is a fixture artefact that makes the sequence
+# meaningless across tests. Left as they are rather than renumbered,
+# because changing ids changes what several other assertions here mean.
+FORGE_EVENT = {"id": "r1", "ts": 1_000_000.0, "kind": "jwt_forge",
                "claims_set": {"role": "admin"},
                "token_sha256_16": {"resigned": "0123456789abcdef"}}
 
@@ -1850,7 +1865,10 @@ def test_a_confirmation_page_is_not_a_stored_upload():
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; '
             f'filename="x.svg"\r\nContent-Type: image/svg+xml\r\n\r\n'
             f"{svg}\r\n--{boundary}--\r\n")
-    upload = {"id": "u1",
+    # Stamped, because `verify_served_upload` reads which of the two the
+    # recorder wrote first. It compared positions in the cited list before
+    # this, so an unstamped pair graded on citation order alone.
+    upload = {"id": "u1", "ts": 1_700_000_100.0,
               "request": {"method": "POST", "url": "http://t.local/upload",
                           "headers": {}, "body": body},
               "response": {"status": 200, "headers": {},
@@ -1860,7 +1878,7 @@ def test_a_confirmation_page_is_not_a_stored_upload():
         headers = {"content-type": ctype}
         if disposition:
             headers["content-disposition"] = disposition
-        return {"id": rid,
+        return {"id": rid, "ts": 1_700_000_200.0,
                 "request": {"method": "GET", "url": "http://t.local" + path,
                             "headers": {}, "body": None},
                 "response": {"status": status, "headers": headers,
@@ -2127,11 +2145,20 @@ def test_a_refused_upgrade_proves_nothing():
                        [shake]).grade != "proven"
 
 
-def _ambiguous(rid, url, body, status=200, method="POST"):
-    """A request declaring BOTH framings, as send_raw records it."""
+def _ambiguous(rid, url, body, status=200, method="POST", ts=None):
+    """A request declaring BOTH framings, as send_raw records it.
+
+    With a `ts`, because `record_exchange` writes one on every entry and
+    `verify_desync` orders the effect against the ambiguity by what the
+    recorder wrote. These helpers predate that requirement and built
+    entries without a stamp, which made them unfaithful the moment the
+    verifier started reading it: `_ordering` is fail-closed on a missing
+    `ts`, so an unstamped pair cannot be ordered at all. Stamps run in
+    creation order, which is how a transcript is actually written.
+    """
     text = (f"{method} /x HTTP/1.1\r\nHost: t.local\r\n"
             "Content-Length: 6\r\nTransfer-Encoding: chunked\r\n\r\n")
-    return {"id": rid,
+    return {"id": rid, "ts": next(_TS) if ts is None else ts,
             "request": {"method": method, "url": url,
                         "headers": {"Content-Length": "6",
                                     "Transfer-Encoding": "chunked"},
@@ -2139,8 +2166,8 @@ def _ambiguous(rid, url, body, status=200, method="POST"):
             "response": {"status": status, "headers": {}, "body": body}}
 
 
-def _followup(rid, url, body, status=501, method="GET"):
-    return {"id": rid,
+def _followup(rid, url, body, status=501, method="GET", ts=None):
+    return {"id": rid, "ts": next(_TS) if ts is None else ts,
             "request": {"method": method, "url": url, "headers": {},
                         "request_text": f"{method} /x HTTP/1.1", "body": None},
             "response": {"status": status, "headers": {}, "body": body}}
@@ -2390,15 +2417,15 @@ def test_an_upload_fetched_from_another_host_is_not_this_targets_problem():
             f'filename="x.svg"\r\nContent-Type: image/svg+xml\r\n\r\n'
             f"{svg}\r\n--{boundary}--\r\n")
 
-    def upload(rid, status=200):
-        return {"id": rid,
+    def upload(rid, status=200, ts=1_700_000_100.0):
+        return {"id": rid, "ts": ts,
                 "request": {"method": "POST", "url": "http://t.local/upload",
                             "headers": {}, "body": body},
                 "response": {"status": status, "headers": {},
                              "body": '{"url":"/files/x.svg"}'}}
 
-    def fetch(rid, host="t.local"):
-        return {"id": rid,
+    def fetch(rid, host="t.local", ts=1_700_000_200.0):
+        return {"id": rid, "ts": ts,
                 "request": {"method": "GET",
                             "url": f"http://{host}/files/x.svg",
                             "headers": {}, "body": None},
@@ -2416,9 +2443,14 @@ def test_an_upload_fetched_from_another_host_is_not_this_targets_problem():
     # an upload the server refused
     assert proof.grade("upload", svg[:50],
                        [upload("u5", 403), fetch("u6")]).grade != "proven"
-    # a fetch recorded BEFORE the upload cannot be the stored file
+    # A fetch recorded BEFORE the upload cannot be the stored file. Both
+    # halves of the record have to say so, or the fixture is asserting the
+    # right thing for an accidental reason: `u7` precedes `u8` in the
+    # recorder's sequence, and the stamp is set to match instead of being
+    # left at a default that says the opposite.
     assert proof.grade("upload", svg[:50],
-                       [fetch("u7"), upload("u8")]).grade != "proven"
+                       [fetch("u7", ts=1_700_000_050.0),
+                        upload("u8")]).grade != "proven"
 
 
 def test_a_benign_body_naming_get_is_not_a_desync():
@@ -2824,6 +2856,107 @@ def test_lockout_reads_the_latency_the_throttle_lives_in():
                        flat).grade == "proven"
 
 
+def _ramping_attempt(n, elapsed, ts=None, rid=None):
+    """One failed login with a recorded latency, for the three tests below."""
+    kw = {} if elapsed is None else {"elapsed_ms": elapsed}
+    return ex(rid or f"k{n + 1}", "http://t/login",
+              "Invalid username or password", status=401, method="POST",
+              req_body=f"username=admin&password=guess{n}",
+              req_headers={"Content-Type":
+                           "application/x-www-form-urlencoded"},
+              ts=1000.0 + n if ts is None else ts, **kw)
+
+
+def test_the_ramp_check_covers_the_smallest_series_the_class_accepts():
+    """The check above was gated at six attempts; the class accepts five.
+
+    So the MINIMUM series `lockout` accepts was exactly the series whose
+    latency was never read. Measured, with the fix above in place: five
+    attempts ramping 150 -> 650ms graded `proven` - "this target has no
+    lockout" - while the identical shape at ten attempts graded
+    `candidate`. The hole sat precisely at the floor, which is the worst
+    place for one, because the floor is the least a claimant can cite.
+
+    Two literals for one threshold, 5 and 6, written in the same change.
+    They are one constant now, so this cannot come back by drift; the test
+    pins the behaviour rather than the constant, so it fails if the gate is
+    raised again by any means.
+    """
+    five = [_ramping_attempt(n, 150.0 + 125 * n) for n in range(5)]
+    assert len(five) == proof._LOCKOUT_FLOOR
+    v = proof.grade("lockout", "Invalid username or password", five)
+    assert v.grade != "proven", v.checks
+    refused = [c for c in v.checks
+               if "none of them was refused" in str(c.get("check"))]
+    assert refused and not refused[0]["ok"], v.checks
+    assert "latency ramps" in refused[0]["detail"], refused[0]["detail"]
+
+    # and five flat attempts - the floor, unthrottled - must still prove
+    assert proof.grade("lockout", "Invalid username or password",
+                       [_ramping_attempt(n, 150.0)
+                        for n in range(5)]).grade == "proven"
+
+
+def test_one_latency_free_entry_does_not_switch_the_ramp_check_off():
+    """The check required EVERY cited exchange to carry `elapsed_ms`.
+
+    `if all(v is not None for v in _el)` - so one entry without a recorded
+    latency skipped the whole check. Appending a single such entry to the
+    ten-attempt ramp the test above measures put the grade back to
+    `proven`: the claimant could turn the check off by citing one more
+    exchange. Fail-open, in a check whose entire reason for existing is
+    that refusing is the fail-closed direction here.
+
+    It now reads the attempts that DO carry a latency. What stays open is
+    stated in the detail text rather than hidden: when too few carry one,
+    the report says a progressive delay could not be ruled out instead of
+    claiming the attempts "answered without a throttle".
+    """
+    ramp = [_ramping_attempt(n, 150.0 + 50 * n) for n in range(10)]
+    ramp.append(_ramping_attempt(10, None))
+    v = proof.grade("lockout", "Invalid username or password", ramp)
+    assert v.grade != "proven", v.checks
+
+    # the honest-report half: a series nobody timed must not be described
+    # as one that answered without a throttle
+    untimed = [_ramping_attempt(n, None) for n in range(10)]
+    u = proof.grade("lockout", "Invalid username or password", untimed)
+    detail = [c["detail"] for c in u.checks
+              if "none of them was refused" in str(c.get("check"))][0]
+    assert "rule out a progressive delay" in detail, detail
+
+
+def test_the_ramp_is_measured_in_the_recorders_order_not_the_claimants():
+    """A bound the claimant controls is not a bound.
+
+    The ramp was measured over `series` in citation order, so citing the
+    same ten attempts newest-first made a 150 -> 600ms ramp read as a
+    decline and graded `proven`. This is the defect `_ordering` was added
+    for in `verify_mass_assignment` and `verify_unkeyed_input`, surviving
+    in a check written after both of them - the half-fix shape, one more
+    time, in the same file.
+    """
+    ramp = [_ramping_attempt(n, 150.0 + 50 * n) for n in range(10)]
+    forwards = proof.grade("lockout", "Invalid username or password", ramp)
+    backwards = proof.grade("lockout", "Invalid username or password",
+                            list(reversed(ramp)))
+    assert forwards.grade != "proven", forwards.checks
+    assert backwards.grade == forwards.grade, (
+        "reversing the citation order changed the verdict: "
+        f"{forwards.grade} -> {backwards.grade}")
+
+    # and the recorder's order is what decides it, not the list's: the same
+    # ten latencies running DOWN the recorded sequence are a decline, not a
+    # ramp, and must still prove. Writing this the obvious way - reversing
+    # `ts` and leaving the ids alone - asserted nothing, because `_ordering`
+    # keys on the recorder's id sequence first and `k1..k10` still said the
+    # latencies ramped. The fixture has to decline in the order the gate
+    # actually reads, which is the point of the fix being tested.
+    declining = [_ramping_attempt(n, 600.0 - 50 * n) for n in range(10)]
+    assert proof.grade("lockout", "Invalid username or password",
+                       declining).grade == "proven"
+
+
 def test_race_refusal_needs_a_winner_to_differ_from():
     """`all()` over an empty sequence is True, and that was load-bearing.
 
@@ -3118,3 +3251,319 @@ def test_load_skill_carries_every_class_its_module_teaches():
     assert "jwt" not in {r["vuln_class"]
                          for r in ws.get("also_teaches", [])}, \
         ws.get("also_teaches")
+
+
+# ---------------------------------------------------------------------------
+# Ordering: "before" and "after" belong to the recorder, not to the claimant.
+#
+# `_ordering` existed and two verifiers used it. A sweep measured the rest:
+# nine verifiers pair two exchanges with `_pairs` and only two ordered the
+# pair, and three decided before/after from `claim.exchanges.index(...)` -
+# the position in the cited list, which `session.py` builds as
+# `[transcript.get(r) for r in evidence_ids]`, i.e. whatever order the
+# finding's author wrote. All three were reproduced before being fixed.
+# ---------------------------------------------------------------------------
+
+# Verifiers that compare two exchanges where neither has to precede the
+# other, with the reason. This set is the honest half of the sweep's finding:
+# four of the seven unordered verifiers were RIGHT to ignore order, and
+# adding a guard to them would have been a fix to code that had no defect.
+_ORDER_FREE = {
+    "verify_differential": "a true-payload and a false-payload response "
+                           "differ whichever was sent first",
+    "verify_off_origin_redirect": "one response's Location is off-origin; "
+                                  "the control only has to be the same "
+                                  "endpoint",
+    "verify_restricted_access": "a path that answers 403 to one caller and "
+                                "200 to another is the finding in either "
+                                "order",
+    "verify_header_injection": "the injected header and its echo are the "
+                               "same exchange",
+    "verify_cors": "the request's Origin and the response's "
+                   "Allow-Origin are the same exchange",
+    "verify_oracle": "two different answers to two different inputs; "
+                     "neither is the other's effect",
+    "verify_graphql": "introspection answered, and a field read - the "
+                      "schema does not stop existing afterwards",
+    "verify_secret_leak": "the secret is in one response",
+    "verify_command_output": "the nonce is echoed by the exchange that "
+                             "sent it",
+    "verify_data_extraction": "the dump and its fingerprint are one "
+                              "response",
+    "verify_file_read": "the file content is in the response that asked "
+                        "for it",
+    "verify_template_eval": "the evaluated expression comes back in the "
+                            "same response",
+    "verify_operator_injection": "a payload response and its control; "
+                                 "neither causes the other",
+    "verify_browser_execution": "the execution record and the response it "
+                                "belongs to are one observation",
+    "verify_websocket_channel": "frames inside one connection, already in "
+                                "protocol order",
+    "verify_generic": "says only that a difference is on record",
+    "verify_refused": "grades the refusal, not evidence",
+    "verify_concurrent_crossing": "reads `_overlaps`, which is recorded "
+                                  "time by construction",
+}
+
+
+def test_no_verifier_orders_evidence_by_where_it_was_cited():
+    """The claimant writes `evidence_ids`; the recorder writes ids and `ts`.
+
+    A check that reads the first to decide before/after is not a check, and
+    three did: `verify_served_upload` compared
+    `claim.exchanges.index(fetch) > claim.exchanges.index(up)`,
+    `verify_desync` took `min(exchanges.index(e) for e in ambiguous)` and
+    `enumerate`d positions against it, and `verify_method_effect` never
+    ordered its pair at all.
+
+    This is a source check on purpose. The three reproductions below pin
+    the behaviour of the three classes that were wrong; this one fails for
+    a FOURTH verifier written the same way tomorrow, which is the half-fix
+    shape this file keeps recording - a defect fixed where it was found and
+    left standing in its siblings.
+    """
+    import inspect
+
+    source = inspect.getsource(proof)
+    verifiers = [name for name in dir(proof) if name.startswith("verify_")]
+    assert len(verifiers) >= 24, verifiers
+
+    offenders = []
+    for name in verifiers:
+        body = inspect.getsource(getattr(proof, name))
+        for line in body.splitlines():
+            bare = line.strip()
+            if bare.startswith("#"):
+                continue
+            if ("exchanges.index(" in bare or "entries.index(" in bare
+                    or "enumerate(exchanges)" in bare
+                    or "enumerate(claim.exchanges)" in bare):
+                offenders.append(f"{name}: {bare[:70]}")
+    assert not offenders, (
+        "these verifiers decide before/after from the citation order, which "
+        "the finding's author controls: " + "; ".join(offenders))
+
+    # ...and the fix has to be reachable, or the test above passes on a
+    # module that cannot order anything at all
+    assert "def _follows(" in source
+    assert source.count("_follows(") >= 4, source.count("_follows(")
+
+
+def test_every_verifier_either_orders_its_pair_or_says_why_not():
+    """The denominator comes from the module, not from a list kept by hand.
+
+    A check whose denominator is maintained beside the thing it checks
+    hides whatever it never covered - which is how two ordered verifiers
+    sat next to seven unordered ones without anything noticing. So this
+    derives the verifiers from `proof` and requires each one to be in
+    exactly one of two sets: it orders its evidence, or it is listed in
+    `_ORDER_FREE` with the reason it does not need to.
+
+    A new verifier is in neither, so it fails here until someone decides
+    which it is. That is the point: the question gets asked once per
+    verifier instead of once per defect.
+    """
+    import inspect
+
+    verifiers = [n for n in dir(proof) if n.startswith("verify_")]
+    unclassified = []
+    for name in verifiers:
+        body = inspect.getsource(getattr(proof, name))
+        orders = "_ordering(" in body or "_follows(" in body
+        if orders and name in _ORDER_FREE:
+            unclassified.append(f"{name} orders but is listed as order-free")
+        elif not orders and name not in _ORDER_FREE:
+            unclassified.append(f"{name} orders nothing and gives no reason")
+    assert not unclassified, "; ".join(unclassified)
+
+    # the listed reasons must be about verifiers that exist
+    stale = [n for n in _ORDER_FREE if not hasattr(proof, n)]
+    assert not stale, stale
+
+    # and the ordering half must be non-trivial, or this passes by listing
+    # every verifier as order-free
+    ordered = [n for n in verifiers if n not in _ORDER_FREE]
+    assert len(ordered) >= 7, ordered
+
+
+def test_method_refuses_a_read_back_recorded_before_the_write():
+    """A read that predates a write cannot show the write landed.
+
+    This class's requirement sentence is "a PUT whose bytes a LATER GET
+    returns" and nothing established "later". Measured: a GET recorded
+    BEFORE the PUT, whose body carried the nonce because the server had
+    left it there earlier, graded `method` PROVEN with the detail
+    "argusput7k3m9x2q was written by r2 and read back by r1".
+
+    `_witness` made it worse rather than catching it. The honest post-write
+    GET - the one that refutes the claim, because the server answered 201
+    and discarded the body - scores 1 of the 2 required checks, while the
+    pre-write GET that confirms it scores 2, so the scoring preferred the
+    exchange that predates the write and discarded the one that disproves
+    the finding.
+    """
+    nonce = "argusput7k3m9x2q"
+    pre = ex("r1", "http://t/notes/7",
+             '{"note":"left here earlier: %s"}' % nonce, ts=1000.0)
+    put = ex("r2", "http://t/notes/7", "", status=201, method="PUT",
+             req_body='{"note":"%s"}' % nonce, ts=1001.0)
+    post = ex("r3", "http://t/notes/7",
+              '{"note":"left here earlier: nothing new"}', ts=1002.0)
+    opts = ex("r4", "http://t/notes/7", "", method="OPTIONS",
+              headers={"allow": "GET, POST"}, ts=1003.0)
+
+    v = proof.grade("method", nonce, [pre, put, post, opts])
+    assert v.grade != "proven", v.checks
+    effect = [c for c in v.checks if "observable effect" in str(c["check"])]
+    assert effect and not effect[0]["ok"], v.checks
+    assert "recorded before the write" in effect[0]["detail"], effect[0]
+
+    # the proving direction, and it must not turn on the citation order
+    later = ex("r2", "http://t/notes/7", '{"note":"%s"}' % nonce, ts=1001.0)
+    write = ex("r1", "http://t/notes/7", "", status=201, method="PUT",
+               req_body='{"note":"%s"}' % nonce, ts=1000.0)
+    allow = ex("r3", "http://t/notes/7", "", method="OPTIONS",
+               headers={"allow": "GET, POST"}, ts=1002.0)
+    assert proof.grade("method", nonce,
+                       [write, later, allow]).grade == "proven"
+    assert proof.grade("method", nonce,
+                       [later, allow, write]).grade == "proven"
+
+
+def _svg_upload(up_id, up_ts, fetch_id, fetch_ts):
+    """An upload and a fetch of the same bytes, stamped as asked."""
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg"><text>argusuplz9q4m1'
+           '</text></svg>')
+    multipart = ('--b\r\nContent-Disposition: form-data; name="f"; '
+                 'filename="p.svg"\r\nContent-Type: image/svg+xml\r\n\r\n'
+                 + svg + '\r\n--b--\r\n')
+    fetch = ex(fetch_id, "http://t/files/p.svg", svg,
+               headers={"content-type": "image/svg+xml"}, ts=fetch_ts)
+    upload = ex(up_id, "http://t/upload", "ok", status=201, method="POST",
+                req_body=multipart,
+                req_headers={"host": "t.local",
+                             "content-type":
+                             "multipart/form-data; boundary=b"},
+                ts=up_ts)
+    return upload, fetch
+
+
+def test_upload_asks_the_recorder_which_came_first_not_the_citation():
+    """The detail text claimed a fact it had not read.
+
+    `after = claim.exchanges.index(fetch) > claim.exchanges.index(up)`, and
+    the message for the failing branch reads "<id> was recorded before the
+    upload, so it cannot be the stored file" - a statement about the
+    recorder, decided by the claimant. Measured: the identical two entries,
+    with the fetch recorded first by BOTH id sequence and `ts`, graded
+    `upload` proven cited [upload, fetch] and unproven cited [fetch,
+    upload].
+
+    Both directions were live, so this asserts the verdict is the same in
+    both citation orders - which fails whichever way the defect is
+    reintroduced.
+    """
+    # fetch recorded BEFORE the upload: not the stored file, either order
+    up, fetch = _svg_upload("r2", 1001.0, "r1", 1000.0)
+    assert proof.grade("upload", "argusuplz9q4m1", [up, fetch]).grade \
+        == proof.grade("upload", "argusuplz9q4m1", [fetch, up]).grade \
+        != "proven"
+
+    # fetch recorded AFTER it: the finding, either order
+    up, fetch = _svg_upload("r1", 1000.0, "r2", 1001.0)
+    assert proof.grade("upload", "argusuplz9q4m1", [up, fetch]).grade \
+        == proof.grade("upload", "argusuplz9q4m1", [fetch, up]).grade \
+        == "proven"
+
+
+def test_jwt_refuses_a_mint_recorded_after_the_response_it_explains():
+    """A response cannot have honoured claims that did not exist yet.
+
+    `minted` was pulled out of `claim.events` and its claim values tested
+    against the accepted response body, with nothing requiring the mint to
+    come first. Measured: a `jwt_forge` event stamped a full second AFTER
+    the accepted read graded `jwt` proven, floor check reading "jwt_forge
+    r9 set ['role'], echoed 'admin'".
+
+    Cheap to hit by accident, which is what makes it bad: the echoed value
+    is a short ordinary string - a role, a tenant, a department - that any
+    authenticated page carries. Read a page with a legitimate session, mint
+    a token afterwards, cite both, and the gate said the server honoured a
+    forgery.
+
+    It also crosses the two kinds of transcript entry, which works because
+    `record_event` and `record_exchange` share one sequence under one lock.
+    """
+    def mint(rid, ts):
+        return {"id": rid, "ts": ts, "kind": "jwt_forge",
+                "claims_set": {"role": "admin"}}
+
+    def read(rid, ts, status=200, body='{"role":"admin","dept":"ops"}',
+             cookie="session=x"):
+        return ex(rid, "http://t/api/me", body, status=status,
+                  req_headers={"host": "t.local", "cookie": cookie}, ts=ts)
+
+    late = [read("r1", 1000.0), read("r2", 1001.0, 401,
+                                     '{"error":"bad token"}', "session=y"),
+            mint("r9", 2000.0)]
+    v = proof.grade("jwt", '"role":"admin","dept":"ops"', late)
+    assert v.grade != "proven", v.checks
+    floor = [c for c in v.checks if "minted the credential" in str(c["check"])]
+    assert floor and not floor[0]["ok"], v.checks
+    assert "recorded after the response" in floor[0]["detail"], floor[0]
+
+    # minted first: the finding, and not sensitive to where it is cited
+    early = [mint("r1", 1000.0), read("r2", 1001.0),
+             read("r3", 1002.0, 401, '{"error":"bad token"}', "session=y")]
+    assert proof.grade("jwt", '"role":"admin","dept":"ops"',
+                       early).grade == "proven"
+    assert proof.grade("jwt", '"role":"admin","dept":"ops"',
+                       list(reversed(early))).grade == "proven"
+
+
+def test_desync_orders_the_effect_against_the_ambiguity_by_record():
+    """A local workaround that outlived the general fix.
+
+    This one ordered by citation position and said why: "the ids are the
+    recorder's business, and an id this verifier cannot parse made it raise
+    rather than refuse". The worry was real, and `_ordering` answers it -
+    an unparseable id gets sequence 0 instead of an exception, and an entry
+    with no usable `ts` gets no position at all. So the reason had expired
+    and the workaround had not, which is the half-fix shape at its
+    quietest.
+
+    Both directions were measured: the same two entries graded proven cited
+    [ambiguity, effect] and unproven cited [effect, ambiguity], so a real
+    desync written up effect-first was refused - and any earlier-recorded
+    response on the endpoint whose body names a G-prefixed verb became "the
+    effect" by being listed after it.
+    """
+    wire = ("POST /cart HTTP/1.1\r\nHost: t\r\nContent-Length: 6\r\n"
+            "Transfer-Encoding: chunked\r\n\r\n0\r\n\r\nG")
+
+    def entry(rid, ts, method, status, body, raw=None):
+        request = {"method": method, "url": "http://t/cart",
+                   "headers": {"host": "t"}, "body": ""}
+        if raw:
+            request["request_text"] = raw
+        return {"id": rid, "ts": ts, "request": request,
+                "response": {"status": status, "headers": {}, "body": body}}
+
+    amb = entry("r7", 1700.0, "POST", 200, "ok", raw=wire)
+    effect = entry("r8", 1701.0, "-", 400,
+                   "400 Bad Request: unknown method GPOST")
+    early = entry("r5", 1699.0, "GET", 400,
+                  "400 Bad Request: unknown method GPOST")
+
+    # recorded after the ambiguity: the finding, in either citation order
+    assert proof.grade("smuggle", "unknown method GPOST",
+                       [amb, effect]).grade == "proven"
+    assert proof.grade("smuggle", "unknown method GPOST",
+                       [effect, amb]).grade == "proven"
+
+    # recorded BEFORE it: not its effect, in either citation order
+    assert proof.grade("smuggle", "unknown method GPOST",
+                       [amb, early]).grade != "proven"
+    assert proof.grade("smuggle", "unknown method GPOST",
+                       [early, amb]).grade != "proven"

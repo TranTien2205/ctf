@@ -144,3 +144,73 @@ def test_probe_time_does_not_call_a_transport_failure_a_delay():
                              "http://t/item?id=1", "id")
     assert "time-based candidate" in out2["verdict"], out2
     assert any(r["slow"] for r in out2["results"]), out2["results"]
+
+
+def test_probe_lockout_and_its_verifier_agree_on_one_ramp():
+    """The probe's half read a DERIVED quantity and lost the signal.
+
+    `probe_lockout` decided soft throttling with means of three and
+    `last > first * 3 + 150`. On the commonest real ramp - ten failed
+    logins answering 150ms and creeping to 600ms, no 429, no lockout
+    wording - that computes 553 > 650 and reported "online password
+    guessing is unthrottled", while `verify_no_throttle` refuses the same
+    bytes. One property, two quantities, and the probe was wrong in the
+    direction that writes a false finding into a report.
+
+    Both halves now call `proof.latency_ramp`, so this test asserts the
+    agreement rather than either number: it fails if the probe stops
+    calling it, and it fails if the two disagree for any other reason.
+    """
+    from argus import proof
+
+    ramp = [150.0, 150.0, 200.0, 250.0, 300.0, 350.0, 420.0, 500.0, 560.0,
+            600.0]
+    responses = [_resp("Invalid username or password", status=401,
+                       elapsed_ms=ms) for ms in ramp]
+    out = probes.probe_lockout(_Ctx(_Client(responses)), "http://t/login",
+                               "username=x&password=y")
+    assert "throttling observed" in out["verdict"], out["verdict"]
+    assert "grow slower" in out["verdict"], out["verdict"]
+    assert len(out["results"]) == len(ramp), out["results"]
+
+    # the same evidence through the gate's own half, which must not call it
+    # unthrottled either
+    entries = [
+        {"id": f"p{n + 1}", "ts": 1000.0 + n,
+         "request": {"method": "POST", "url": "http://t/login",
+                     "headers": {"content-type":
+                                 "application/x-www-form-urlencoded"},
+                     "body": f"username=admin&password=guess{n}"},
+         "response": {"status": 401, "headers": {}, "elapsed_ms": ms,
+                      "body": "Invalid username or password"}}
+        for n, ms in enumerate(ramp)]
+    assert proof.grade("lockout", "Invalid username or password",
+                       entries).grade != "proven"
+
+    # ...and the unthrottled direction, where both must still say so
+    flat = [_resp("Invalid username or password", status=401, elapsed_ms=120.0)
+            for _ in ramp]
+    clean = probes.probe_lockout(_Ctx(_Client(flat)), "http://t/login",
+                                 "username=x&password=y")
+    assert "unthrottled" in clean["verdict"], clean["verdict"]
+
+
+def test_probe_lockout_does_not_read_a_dropped_attempt_as_a_slowdown():
+    """An attempt that got no answer has the timeout in `elapsed_ms`.
+
+    This is the correction `probe_time` took in the same module. Ten
+    attempts where the last few are blackholed at 15s look exactly like a
+    savage ramp, and reading them as one reports a throttle that the target
+    never applied - the opposite error, but the same unread status beside
+    the duration.
+
+    The verdict has to say what it judged on, because "no lockout after ten
+    attempts" means something different when four of them got no answer.
+    """
+    responses = [_resp("Invalid", status=401, elapsed_ms=120.0)
+                 for _ in range(6)]
+    responses += [_resp("", status=0, elapsed_ms=15000.0) for _ in range(4)]
+    out = probes.probe_lockout(_Ctx(_Client(responses)), "http://t/login",
+                               "username=x&password=y")
+    assert "throttling observed" not in out["verdict"], out["verdict"]
+    assert "got no answer" in out["verdict"], out["verdict"]

@@ -647,6 +647,41 @@ def _ordering(exchanges: list) -> dict:
     return out
 
 
+def _follows(when: dict, later, earlier) -> bool:
+    """Did the RECORDER write `later` after `earlier`? Fail-closed.
+
+    `_ordering` existed and two verifiers used it. Seven others needed the
+    same guarantee and did not have it, and three of those decided
+    before/after from `claim.exchanges.index(...)` - the position in the
+    cited list, which `session.py` builds as `[transcript.get(r) for r in
+    evidence_ids]`, i.e. whatever order the finding's author wrote.
+    `_ordering`'s own docstring refuses exactly that, and the detail text
+    of one of them said "recorded before the upload" about a fact it had
+    not read. Measured, all three:
+
+      * `method`: a GET recorded BEFORE the PUT, carrying the nonce in a
+        body the server left there earlier, graded `proven` - and `_witness`
+        PREFERRED it, because the honest post-write read that refutes the
+        claim scores lower than the pre-write read that confirms it.
+      * `upload`: the identical two entries graded `proven` cited
+        [upload, fetch] and `unproven` cited [fetch, upload], with the fetch
+        recorded first by both id and `ts` in each case.
+      * `jwt`: a forge event stamped a full second AFTER the response it is
+        credited with graded `proven`, i.e. the server honoured claims that
+        did not exist yet.
+
+    One named predicate, so the next sibling that needs it is a call and
+    not a re-derivation. It works across events and exchanges because
+    `record_event` and `record_exchange` increment ONE `self._seq` under
+    one lock and both return `r<n>`, so the sequence `_ordering` keys on is
+    authoritative over the whole transcript, not just its HTTP half.
+    """
+    if later is None or earlier is None:
+        return False
+    before, after = when.get(id(earlier)), when.get(id(later))
+    return before is not None and after is not None and after > before
+
+
 def _path_of(entry: dict) -> str:
     url = str(_req(entry).get("url") or "") if entry else ""
     return urllib.parse.urlparse(url).path or "/"
@@ -1161,6 +1196,7 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
                    if (e.get("kind") or "") == "jwt_forge"), None)
     claims_set = (minted or {}).get("claims_set")
     claims_set = claims_set if isinstance(claims_set, dict) else {}
+    _when = _ordering(claim.entries)
 
     def build(pair) -> list[dict]:
         accepted, rejected = (pair if pair else (None, None))
@@ -1181,17 +1217,35 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
         echoed = [str(v) for v in claims_set.values()
                   if str(v) and accepted
                   and str(v) in resp_body(accepted)]
+        # The mint has to come FIRST. A response cannot have honoured claims
+        # that did not exist when it was written, and nothing here said so:
+        # a jwt_forge event stamped a second AFTER the accepted read graded
+        # `jwt` proven, with the floor check reading "jwt_forge r9 set
+        # ['role'], echoed 'admin'". That is cheap to reach by accident,
+        # because the echoed value is a short ordinary string - a role, a
+        # tenant, a department - that an authenticated page carries anyway.
+        # Read a page with a legitimate session, mint a token afterwards,
+        # cite both, and the gate said the server honoured a forgery.
+        #
+        # `_follows` spans the two kinds here because `record_event` and
+        # `record_exchange` share one `self._seq` under one lock, so the
+        # sequence is authoritative over the whole transcript.
+        first = _follows(_when, accepted, minted)
         return [
             _check("this system minted the credential",
-                   minted is not None and bool(echoed),
+                   minted is not None and bool(echoed) and first,
                    f"jwt_forge {minted.get('id')} set "
                    f"{sorted(claims_set)}, echoed {echoed[0]!r}"
-                   if minted is not None and echoed else
+                   if minted is not None and echoed and first else
                    ("cite the jwt_forge event: nothing in the session shows the "
                     "accepted credential was minted here, and a working auth "
                     "check looks the same on the wire" if minted is None else
                     "none of the forged claims come back in the accepted "
-                    "response - the server did not honour them")),
+                    "response - the server did not honour them"
+                    if not echoed else
+                    f"jwt_forge {minted.get('id')} was recorded after the "
+                    "response it is credited with - the server cannot have "
+                    "honoured claims that did not exist yet")),
             _check("a forged credential was accepted",
                    ok_code and bool(cred_a) and quoted,
                    f"{_endpoint_shape(accepted)} returned "
@@ -1803,6 +1857,44 @@ _AUTH_FAIL_RE = re.compile(
     r"wrong (?:password|user)|\"ok\"\s*:\s*false")
 
 
+# How many failed attempts make a series worth judging - and the same number
+# the latency ramp needs. These were two literals, 5 and 6, and the gap was a
+# hole exactly at the floor: the smallest series the class accepts was the one
+# whose latency was never read. One name, so they cannot drift apart again.
+_LOCKOUT_FLOOR = 5
+
+
+def latency_ramp(timed: list) -> tuple | None:
+    """Do these recorded latencies, in recorded order, ramp? Public because
+    `probe_lockout` reads it too, and that is the whole point of it existing.
+
+    Returns the two medians when they do, `None` when they do not.
+
+    Medians of the first and last third, so one slow request cannot decide
+    it, and an absolute floor beside the ratio so millisecond noise on a
+    fast loopback target cannot either.
+
+    This lived inside `verify_no_throttle` while `probe_lockout` tested the
+    same property with its own DERIVED quantity - means of three,
+    `last > first * 3 + 150` - which on a 150 -> 600ms ramp computes
+    553 > 650 and answers "no lockout". So the probe told the operator the
+    target was unthrottled on the same bytes the gate refused to call
+    unthrottled, and the two halves of one claim disagreed in the direction
+    that writes a false finding. Two quantities for one property is the
+    defect; one function with two readers is the fix, and the reason this is
+    not a private helper.
+    """
+    series = [v for v in (timed or []) if isinstance(v, (int, float))]
+    if len(series) != len(timed or []) or len(series) < _LOCKOUT_FLOOR:
+        return None
+    third = max(2, len(series) // 3)
+    first = statistics.median(series[:third])
+    last = statistics.median(series[-third:])
+    if first > 0 and last >= first * 2 and last - first >= 100:
+        return (first, last)
+    return None
+
+
 def _is_auth_attempt(entry: dict) -> bool:
     return bool(_CREDENTIAL_FIELD_RE.search(req_text(entry)))
 
@@ -1861,28 +1953,58 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     # fail-closed direction: this class claims a target has NO lockout, so
     # the cost of being eager is declining to make a claim, and the cost of
     # being blind is making a false one.
+    #
+    # That check shipped with three holes, all of them the shapes this log
+    # keeps recording, and all three measured:
+    #
+    #  - It was gated at six attempts while the class accepts five, so the
+    #    MINIMUM series the class accepts was exactly the one where latency
+    #    was never read. Five attempts ramping 150 -> 650ms graded `proven`
+    #    - "this target has no lockout" - while the same shape at ten graded
+    #    `candidate`. A second literal for one threshold is a half-fix
+    #    waiting to happen, so the floor is now one constant used in both
+    #    places and the two cannot drift apart again.
+    #
+    #  - It required EVERY cited exchange to carry `elapsed_ms` and skipped
+    #    the whole check otherwise, which let one latency-free entry turn
+    #    the check off: appending a single such entry to the ten-attempt
+    #    ramp above - the exact evidence this fix was measured on - put it
+    #    back to `proven`. Fail-open, in a check whose reason for existing
+    #    is the fail-closed direction. It now measures the attempts that DO
+    #    carry a latency and ignores the ones that do not.
+    #
+    #  - It measured the ramp in CITATION order, which the claimant writes.
+    #    Citing the same ten attempts newest-first made the ramp read as a
+    #    decline and graded `proven`. A bound defeated by something it does
+    #    not control is not a bound; the series is now ordered by the
+    #    recorder before any of it is read, the same `_ordering` fix
+    #    `verify_mass_assignment` and `verify_unkeyed_input` got.
+    #
+    # What is still open and deliberate: if NO attempt carries a latency,
+    # the ramp cannot be measured and this class can still prove blind. The
+    # detail text now says so rather than claiming the attempts "answered
+    # without a throttle", so the report does not overstate what was read.
     _ramp = []
-    if len(series) >= 6:
-        _el = [_elapsed_of(e) for e in series]
-        if all(v is not None for v in _el):
-            third = max(2, len(_el) // 3)
-            first_half = statistics.median(_el[:third])
-            last_half = statistics.median(_el[-third:])
-            if (first_half > 0 and last_half >= first_half * 2
-                    and last_half - first_half >= 100):
-                _ramp = [series[-1], first_half, last_half]
+    _when = _ordering(claim.exchanges)
+    _timed = sorted((e for e in series
+                     if id(e) in _when and _elapsed_of(e) is not None),
+                    key=lambda e: _when[id(e)])
+    _found = latency_ramp([_elapsed_of(e) for e in _timed])
+    if _found:
+        _ramp = [_timed[-1], _found[0], _found[1]]
     failed = [e for e in series if _auth_failed(e)]
-    enough = len(series) >= 5 and len(failed) >= 5
+    enough = (len(series) >= _LOCKOUT_FLOOR
+              and len(failed) >= _LOCKOUT_FLOOR)
     if enough:
         why = f"{len(failed)} failed authentication attempts on {shape}"
     elif not series:
         why = ("no cited request carries a credential field (password, pass, "
                "pwd, otp, passcode) - five page views are not five "
                "authentication attempts, and this check used to accept them")
-    elif len(series) < 5:
+    elif len(series) < _LOCKOUT_FLOOR:
         why = (f"only {len(series)} authentication attempt(s) on one "
-               "endpoint - send at least five, so 'never refused' means "
-               "something")
+               f"endpoint - send at least {_LOCKOUT_FLOOR}, so 'never "
+               "refused' means something")
     else:
         why = (f"{len(series)} attempts but only {len(failed)} failed - a "
                "lockout policy applies to FAILURES, so a series that "
@@ -1892,8 +2014,13 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
                "record", enough, why),
         _check("none of them was refused",
                enough and not throttled and not _ramp,
-               f"all {len(series)} answered without a throttle" if enough
-               and not throttled and not _ramp else
+               (f"all {len(series)} answered without a throttle, and the "
+                f"latency recorded across {len(_timed)} of them does not "
+                f"ramp" if len(_timed) >= _LOCKOUT_FLOOR else
+                f"all {len(series)} answered without a throttle by status "
+                f"or wording - but only {len(_timed)} carry a recorded "
+                f"latency, too few to rule out a progressive delay")
+               if enough and not throttled and not _ramp else
                (f"no attempt was refused by status or wording, but the "
                 f"recorded latency ramps from a median {_ramp[1]:.0f}ms "
                 f"across the first attempts to {_ramp[2]:.0f}ms across the "
@@ -2031,6 +2158,8 @@ def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
     attachment` neutralises it again, so a response carrying one does not
     pass.
     """
+    _when = _ordering(claim.entries)
+
     def build(pair) -> list[dict]:
         up, fetch = pair if isinstance(pair, tuple) else (pair, None)
         out: list[dict] = []
@@ -2068,9 +2197,15 @@ def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
         same_host = (fetch is not None and up is not None
                      and _endpoint_shape(fetch).split("/")[0]
                      == _endpoint_shape(up).split("/")[0])
-        after = (fetch is not None and up is not None
-                 and claim.exchanges.index(fetch)
-                 > claim.exchanges.index(up))
+        # ...and "after" means after on the RECORDER's clock. This read
+        # `claim.exchanges.index(fetch) > claim.exchanges.index(up)`, the
+        # position in the cited list, so the author's citation order decided
+        # it: the same two entries graded `proven` cited [upload, fetch] and
+        # `unproven` cited [fetch, upload], with the fetch recorded first by
+        # both id and `ts` either way. The detail below says "was recorded
+        # before the upload" - it was asserting a fact about the recorder
+        # while reading a fact about the claimant.
+        after = _follows(_when, fetch, up)
         served = bool(uploaded and up_ok and fetch is not None and back
                       and dominant and same_host and after
                       and 200 <= status_of(fetch) < 300)
@@ -2337,6 +2472,7 @@ def verify_desync(claim: Claim, spec: "ProofSpec") -> list[dict]:
     which is what an ambiguous request deserves and not a desync.
     """
     exchanges = claim.exchanges
+    _when = _ordering(claim.entries)
     checks: list[dict] = []
 
     ambiguous = [e for e in exchanges
@@ -2351,14 +2487,24 @@ def verify_desync(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
     desync, detail = None, "no response names a method the probe never sent"
     if ambiguous:
-        # Order by position in the cited list, not by parsing `r<n>` out of
-        # the id. The ids are the recorder's business, and an id this
-        # verifier cannot parse made it raise rather than refuse - which
-        # `grade()` reports as "evidence is readable", hiding the real answer.
-        first = min(exchanges.index(e) for e in ambiguous)
+        # "After the ambiguity" means after it on the RECORDER's clock.
+        #
+        # This ordered by position in the cited list, and said so: "the ids
+        # are the recorder's business, and an id this verifier cannot parse
+        # made it raise rather than refuse". The worry was real and
+        # `_ordering` answers it - an unparseable id gets sequence 0 rather
+        # than an exception, and an entry with no usable `ts` gets no
+        # position at all - so what is left is a local workaround outliving
+        # the general fix, which is the half-fix shape in its quietest form.
+        #
+        # Both directions were live. The same two entries graded `proven`
+        # cited [ambiguity, effect] and `unproven` cited [effect, ambiguity],
+        # so a real desync written up effect-first was refused, and any
+        # earlier-recorded response on the endpoint whose body names a
+        # G-prefixed verb became "the effect" by being listed later.
         shapes = {_endpoint_shape(e) for e in ambiguous}
-        for position, entry in enumerate(exchanges):
-            if position <= first:
+        for entry in exchanges:
+            if not any(_follows(_when, entry, amb) for amb in ambiguous):
                 continue              # before the ambiguity: not its effect
             if _endpoint_shape(entry) not in shapes:
                 continue
@@ -2528,6 +2674,8 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
     Both paths emit the same two check names, so the floor means the same
     thing either way: an effect was observed, not merely a status.
     """
+    _when = _ordering(claim.entries)
+
     def build(pair) -> list[dict]:
         a, b = pair if isinstance(pair, tuple) else (pair, None)
         out: list[dict] = []
@@ -2615,11 +2763,28 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             read = resp_body(b)
             carried = [m.group(0) for m in NONCE_RE.finditer(wrote)
                        if m.group(0) in read]
+            # The read-back has to be LATER. This class's requirement
+            # sentence says "a PUT whose bytes a later GET returns" and
+            # nothing here established "later": a GET recorded BEFORE the
+            # PUT, carrying the nonce in a body the server had left there
+            # earlier, graded `method` PROVEN with the detail "written by r2
+            # and read back by r1". Worse than unguarded - `_witness`
+            # PREFERS that pair, because the honest post-write read that
+            # refutes the claim scores 1/2 while the pre-write read that
+            # confirms it scores 2/2, so the one exchange that disproves the
+            # finding is discarded in favour of the one that predates the
+            # write.
+            later = _follows(_when, b, a)
             effect = bool(same and _method_of(b) == "GET"
-                          and 200 <= status_of(b) < 300 and carried)
+                          and 200 <= status_of(b) < 300 and carried and later)
             if effect:
                 detail = (f"{carried[0]} was written by {a.get('id')} and "
                           f"read back by {b.get('id')}")
+            elif carried and not later:
+                detail = (f"{b.get('id')} was recorded before the write "
+                          f"{a.get('id')}, so the bytes it returned were "
+                          "already there - a read that predates a write "
+                          "cannot show the write landed")
             elif not same:
                 detail = (f"{b.get('id')} is a different path - the read-back "
                           "has to be of what was written")
