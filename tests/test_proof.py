@@ -20,7 +20,7 @@ _TS = itertools.count(1_700_000_000.0, 0.25)
 
 
 def ex(rid, url, body, status=200, headers=None, method="GET",
-       req_headers=None, req_body=None, ts=None):
+       req_headers=None, req_body=None, ts=None, elapsed_ms=None):
     """A recorded exchange, with a `ts` because a real one always has one.
 
     This helper built entries WITHOUT `ts`, which made it an unfaithful
@@ -29,15 +29,29 @@ def ex(rid, url, body, status=200, headers=None, method="GET",
     write from the read after it. Entries get an increasing stamp in
     creation order, which is how a transcript is actually written; a test
     that needs a specific order passes `ts` explicitly.
+
+    `elapsed_ms` is the same kind of omission one layer along, and it is
+    deliberately NOT defaulted. A real exchange always carries one, and
+    `verify_no_throttle` and `_window` both read it - but `_window` treats a
+    missing or zero duration as a zero-width window that overlaps nothing,
+    which is the fail-closed answer every existing race and ppoll fixture
+    here relies on. Handing all of them a duration would quietly give close
+    stamps intersecting windows and change what those tests assert. So a
+    test that needs the duration passes it, the same way a test that needs a
+    specific order passes `ts`, and the key is absent otherwise rather than
+    present and wrong.
     """
+    response = {"status": status,
+                "headers": headers or {"content-type": "text/html"},
+                "body": body}
+    if elapsed_ms is not None:
+        response["elapsed_ms"] = elapsed_ms
     return {"id": rid,
             "ts": next(_TS) if ts is None else ts,
             "request": {"method": method, "url": url,
                         "headers": req_headers or {"host": "t.local"},
                         "body": req_body},
-            "response": {"status": status,
-                         "headers": headers or {"content-type": "text/html"},
-                         "body": body}}
+            "response": response}
 
 
 # The page that broke the old gate: no vulnerability of any kind, but it
@@ -2665,6 +2679,141 @@ def test_csrf_ordering_is_fail_closed_without_timestamps():
         assert v2.grade != "proven", v2.checks
         assert any("state changed between two reads" in str(c.get("check"))
                    and not c.get("ok") for c in v2.checks), v2.checks
+
+def test_lockout_reads_the_latency_the_throttle_lives_in():
+    """A progressive delay is a throttle, and this check could not see one.
+
+    `verify_no_throttle` decided "refused" from status 429 and a body regex
+    only. `elapsed_ms` is recorded on every exchange and, until this, no
+    verifier but `verify_concurrent_crossing` ever read it - so the
+    commonest real defence, backing off a little more each time with no 429
+    and no lockout wording, graded `lockout` PROVEN. Proven here means "this
+    target has no lockout", so the gate was asserting the absence of a
+    defence that was in the record it declined to read.
+
+    The probe's half missed it for the reason this suite keeps recording:
+    `probe_lockout` tests the same property with a DERIVED ratio,
+    `last3_avg > first3_avg * 3 + 150`, which on this ramp computes
+    550 > 750 and says no. Two quantities describe one property; the
+    recorded one is the one that kept the signal.
+    """
+    def attempt(n, elapsed):
+        return ex(f"r{n + 1}", "http://t/login",
+                  "Invalid username or password", status=401, method="POST",
+                  req_body=f"username=admin&password=guess{n}",
+                  req_headers={"Content-Type":
+                               "application/x-www-form-urlencoded"},
+                  elapsed_ms=elapsed, ts=1000.0 + n)
+
+    ramp = [attempt(n, 150.0 + 50 * n) for n in range(10)]
+    v = proof.grade("lockout", "Invalid username or password", ramp)
+    assert v.grade != "proven", v.checks
+    refused = [c for c in v.checks
+               if "none of them was refused" in str(c.get("check"))]
+    assert refused and not refused[0]["ok"], v.checks
+    assert "latency ramps" in refused[0]["detail"], refused[0]["detail"]
+
+    # ...and a series that really is unthrottled must still prove, or the
+    # class has just been made unprovable
+    flat = [attempt(n, 150.0) for n in range(10)]
+    assert proof.grade("lockout", "Invalid username or password",
+                       flat).grade == "proven"
+
+
+def test_race_refusal_needs_a_winner_to_differ_from():
+    """`all()` over an empty sequence is True, and that was load-bearing.
+
+    `_spent_refusal` ends with `all(body != resp_body(w) for w in won)`, so
+    with no winner in the burst it returned True on the status allowlist
+    alone - and the check whose whole stated job is "a different answer than
+    the one the burst got" passed with nothing to differ from. Three
+    overlapping 409s and a later 409 satisfied it.
+
+    The grade stayed `unproven` because "more than one of them succeeded"
+    fails independently, so this was a check reporting a pass on nothing
+    rather than a false positive. It still mattered: it feeds
+    `score = (len(burst) >= 2) + (len(won) >= 2) + bool(refused)`, where it
+    hands an all-refused group a point it can win the group selection with,
+    against a group that actually contains the race.
+    """
+    burst = [ex("r1", "http://t/redeem", '{"ok":false}', status=409,
+                ts=1000.20, elapsed_ms=200.0),
+             ex("r2", "http://t/redeem", '{"ok":false}', status=409,
+                ts=1000.25, elapsed_ms=200.0)]
+    after = ex("r3", "http://t/redeem", '{"ok":false}', status=409,
+               ts=1001.0, elapsed_ms=100.0)
+    v = proof.grade("race", '{"ok":false}', burst + [after])
+    assert v.grade != "proven", v.checks
+    refusal = [c for c in v.checks
+               if "a serial attempt afterwards was refused" in str(c.get("check"))]
+    assert refusal and not refusal[0]["ok"], v.checks
+
+
+def test_massassign_refuses_a_read_recorded_before_the_write():
+    """A false positive, found by an adversarial sweep and reproduced here.
+
+    The check is named "a later read shows it set" and nothing established
+    "later". `_pairs` yields both orderings of every cited pair and
+    `_witness` keeps the best-scoring one, so a read recorded BEFORE the
+    write satisfied it.
+
+    What that accepts is the defence working. A legitimately-admin account
+    read from GET /api/me, paired with a POST /api/register that sends
+    `role=admin`, gets a 200 and silently DROPS the field - the exact case
+    this verifier's docstring says was measured on `/api/order` - graded
+    `massassign` proven.
+
+    `verify_state_change` was fixed for this same shape, with a ten-line
+    comment about quoting the pre-write state, and the fix never reached
+    here. Two siblings, one of them corrected.
+    """
+    read = ex("r1", "http://t/api/me", '{"user":"bob","role":"admin"}',
+              ts=1000.0)
+    write = ex("r2", "http://t/api/register", '{"ok":true}', ts=1001.0,
+               method="POST", req_body='{"user":"bob","role":"admin"}')
+    v = proof.grade("massassign", '"role":"admin"', [write, read])
+    assert v.grade != "proven", v.checks
+    assert any("a later read shows it set" in str(c.get("check"))
+               and not c.get("ok") for c in v.checks), v.checks
+
+    # the same write with a read recorded AFTER it is the real finding
+    later = ex("r3", "http://t/api/me", '{"user":"bob","role":"admin"}',
+               ts=1002.0)
+    assert proof.grade("massassign", '"role":"admin"',
+                       [write, later]).grade == "proven"
+
+    # and the citation order is the author's, so it must not decide
+    assert proof.grade("massassign", '"role":"admin"',
+                       [later, write]).grade == "proven"
+
+
+def test_cache_refuses_a_victim_read_recorded_before_the_poisoning():
+    """The same false positive in the other verifier that pairs exchanges.
+
+    `verify_unkeyed_input` serves both `cache` and `ppoll`, and in each case
+    it is the `floor` check. It required the value to be in the poisoner's
+    request, in the victim's response, absent from the victim's request, and
+    both on one endpoint shape - but never that the poisoning happened
+    first. So any value already on the page before the probe ran satisfied
+    "the value reached a requester that did not send it".
+    """
+    victim = ex("r1", "http://t/p?x=1", "hello evil.test bye", ts=1000.0)
+    poisoner = ex("r2", "http://t/p?x=2", "ok", ts=1001.0,
+                  req_headers={"X-Forwarded-Host": "evil.test"})
+    for klass in ("cache", "ppoll"):
+        v = proof.grade(klass, "evil.test", [poisoner, victim])
+        assert v.grade != "proven", (klass, v.checks)
+        assert any("reached a requester that did not send it"
+                   in str(c.get("check")) and not c.get("ok")
+                   for c in v.checks), (klass, v.checks)
+
+    after = ex("r3", "http://t/p?x=1", "hello evil.test bye", ts=1002.0)
+    assert proof.grade("cache", "evil.test",
+                       [poisoner, after]).grade == "proven"
+    # citation order is the author's
+    assert proof.grade("cache", "evil.test",
+                       [after, poisoner]).grade == "proven"
+
 
 def test_massassign_refuses_a_read_that_does_not_carry_the_field():
     """"A later read shows it set" asked only that SOME bytes came back.

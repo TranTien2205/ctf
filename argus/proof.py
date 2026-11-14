@@ -41,6 +41,7 @@ Two consequences, both deliberate:
 from __future__ import annotations
 
 import re
+import statistics
 import urllib.parse
 from dataclasses import dataclass, field
 from typing import Callable
@@ -1240,7 +1241,23 @@ def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
     Without the same-resource condition a reflected search term that also
     appears somewhere else on the site graded as poisoning.
+
+    And the poisoning request has to come FIRST. Nothing established that:
+    `_pairs` yields both orderings of every cited pair and `_witness` keeps
+    the best-scoring one, so {victim read, then poisoning request} was
+    indistinguishable from {poisoning request, then victim read}. Measured:
+    a GET at ts 1000.0 whose body already contained `evil.test`, paired with
+    a later GET at ts 1001.0 carrying `X-Forwarded-Host: evil.test`, graded
+    `cache` proven - the value was served a full second BEFORE anything
+    injected it, which means it was simply on the page.
+
+    That is a false positive, and it reached both classes this verifier
+    serves: `cache` and `ppoll`, in each case the `floor` check. Ordering is
+    `_ordering`'s, so it is the recorder's: `ts` primary, the recorder's id
+    sequence breaking ties a coarse clock cannot.
     """
+    when = _ordering(claim.exchanges)
+
     def build(pair) -> list[dict]:
         poisoner, victim = (pair if pair else (None, None))
         sent = bool(poisoner) and bool(claim.excerpt) \
@@ -1250,16 +1267,24 @@ def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
             and claim.excerpt not in req_text(victim)
         same = bool(poisoner) and bool(victim) and \
             _endpoint_shape(poisoner) == _endpoint_shape(victim)
+        p_at = when.get(id(poisoner)) if poisoner is not None else None
+        v_at = when.get(id(victim)) if victim is not None else None
+        ordered = p_at is not None and v_at is not None and v_at > p_at
         return [
             _check("the value reached a requester that did not send it",
-                   sent and served and same,
+                   sent and served and same and ordered,
                    f"sent in {poisoner.get('id')}, served to {victim.get('id')} "
-                   f"on {_endpoint_shape(victim)}" if sent and served and same
-                   else ("the two exchanges are on different resources - a value "
+                   f"on {_endpoint_shape(victim)}"
+                   if sent and served and same and ordered
+                   else ("the victim read was not recorded after the "
+                         "injecting request - a value already on the page "
+                         "before anything injected it was not poisoned there"
+                         if sent and served and same and not ordered else
+                         ("the two exchanges are on different resources - a value "
                          "appearing elsewhere on the site is not a cache entry"
                          if sent and served else
                          "no cited pair has one request sending the value and "
-                         "another response returning it")),
+                         "another response returning it"))),
             _check("the injecting request is on record", sent,
                    f"exchange {poisoner.get('id')}" if sent else
                    "cite the poisoning request as well as the victim read"),
@@ -1582,6 +1607,8 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
     This was graded by the idor verifier, which asks about object references
     and knows nothing about fields.
     """
+    when = _ordering(claim.exchanges)
+
     def build(pair) -> list[dict]:
         wrote, read = (pair if pair else (None, None))
         request = req_text(wrote) if wrote else ""
@@ -1608,8 +1635,31 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
         low = excerpt.lower()
         landed = next(((name, value) for name, value in pairs
                        if name.lower() in low and value.lower() in low), None)
+        # ...and the read has to actually be LATER. The check is named "a
+        # later read shows it set" and nothing established "later": `_pairs`
+        # yields both orderings of every cited pair and `_witness` keeps the
+        # best-scoring one, so a read recorded BEFORE the write satisfied it.
+        #
+        # That is a false positive, not a looseness. Measured: a GET
+        # /api/me at ts 1000.0 returning `{"user":"bob","role":"admin"}` -
+        # a legitimately-admin account - paired with a POST /api/register at
+        # ts 1001.0 that sends `role=admin` and gets a 200 while silently
+        # DROPPING the field, graded `massassign` proven. That is exactly
+        # the defence working, read as the bug.
+        #
+        # `verify_state_change` was fixed for this same shape and the fix
+        # never reached here. Ordering is `_ordering`'s, so it is the
+        # recorder's: `ts` primary, the recorder's id sequence breaking ties
+        # a coarse clock cannot. No same-resource constraint, deliberately -
+        # the field is set by POST /api/register and read from GET /api/me,
+        # and requiring one endpoint would refuse the real case.
+        wrote_at = when.get(id(wrote)) if wrote is not None else None
+        read_at = when.get(id(read)) if read is not None else None
+        later = (wrote_at is not None and read_at is not None
+                 and read_at > wrote_at)
         back = bool(read) and bool(excerpt) \
             and bool(landed) \
+            and later \
             and excerpt in resp_body(read) \
             and excerpt not in req_text(read) \
             and landed[1].lower() not in req_text(read).lower()
@@ -1626,13 +1676,19 @@ def verify_mass_assignment(claim: Claim, spec: "ProofSpec") -> list[dict]:
             _check("a later read shows it set", back,
                    f"{landed[0]}={landed[1]} read back in {read.get('id')}"
                    if back else
-                   ("the quoted bytes carry no privileged field and value that "
-                    "the write sent - quote the field as the read returns it, "
-                    "e.g. `\"role\": \"admin\"`, not the response at large"
+                   ("the cited read was not recorded after the write - a "
+                    "response that already carried the field before the "
+                    "write happened shows the account was like that, not "
+                    "that the write set it"
+                    if read is not None and landed and not later else
+                    ("the quoted bytes carry no privileged field and value "
+                    "that the write sent - quote the field as the read "
+                    "returns it, e.g. `\"role\": \"admin\"`, not the "
+                    "response at large"
                     if read is not None and pairs and not landed else
                     "cite the read that shows the field took effect - the "
                     "write echoing its own input proves only that it was "
-                    "accepted")),
+                    "accepted"))),
         ]
 
     return _witness(_pairs(claim.exchanges) or [None], build, spec.required)
@@ -1764,6 +1820,38 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
                  if status_of(e) == 429
                  or re.search(r"(?i)too many|rate limit|locked|try again later|"
                               r"temporarily (?:blocked|disabled)", resp_body(e))]
+    # A progressive DELAY is a throttle, and this check could not see one.
+    # It decided "refused" from status 429 and a body regex only, while
+    # `elapsed_ms` is recorded on every exchange and no verifier but
+    # `verify_concurrent_crossing` ever read it. So the commonest real
+    # defence - back off a bit more each time, no 429, no lockout wording -
+    # graded `lockout` PROVEN, i.e. "this target has no lockout", with the
+    # entire throttle sitting in bytes the gate declined to read. Measured:
+    # ten 401s on /login whose elapsed_ms ramps 150 -> 600ms graded proven
+    # on both checks.
+    #
+    # The probe's own half missed it too, and for the reason this log keeps
+    # recording: `probe_lockout` tests the same property with a DERIVED
+    # ratio, `last3_avg > first3_avg * 3 + 150`, which on that ramp computes
+    # 550 > 750 and says no. Two quantities describe one property and the
+    # derived one lost the signal; this reads the recorded one.
+    #
+    # Compared as medians of the first and last third, so one slow request
+    # cannot decide it, and gated on an absolute floor so millisecond noise
+    # on a fast loopback target cannot either. Refusing here is the
+    # fail-closed direction: this class claims a target has NO lockout, so
+    # the cost of being eager is declining to make a claim, and the cost of
+    # being blind is making a false one.
+    _ramp = []
+    if len(series) >= 6:
+        _el = [_elapsed_of(e) for e in series]
+        if all(v is not None for v in _el):
+            third = max(2, len(_el) // 3)
+            first_half = statistics.median(_el[:third])
+            last_half = statistics.median(_el[-third:])
+            if (first_half > 0 and last_half >= first_half * 2
+                    and last_half - first_half >= 100):
+                _ramp = [series[-1], first_half, last_half]
     failed = [e for e in series if _auth_failed(e)]
     enough = len(series) >= 5 and len(failed) >= 5
     if enough:
@@ -1783,12 +1871,18 @@ def verify_no_throttle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     return [
         _check("a counted series of failed authentication attempts is on "
                "record", enough, why),
-        _check("none of them was refused", enough and not throttled,
+        _check("none of them was refused",
+               enough and not throttled and not _ramp,
                f"all {len(series)} answered without a throttle" if enough
-               and not throttled else
-               (f"{throttled[0].get('id')} answered "
-                f"{status_of(throttled[0])} - that is the lockout working"
-                if throttled else "no series to judge")),
+               and not throttled and not _ramp else
+               (f"no attempt was refused by status or wording, but the "
+                f"recorded latency ramps from a median {_ramp[1]:.0f}ms "
+                f"across the first attempts to {_ramp[2]:.0f}ms across the "
+                f"last - a progressive delay IS the lockout, answering "
+                f"slower instead of saying no" if enough and _ramp else
+                (f"{throttled[0].get('id')} answered "
+                 f"{status_of(throttled[0])} - that is the lockout working"
+                 if throttled else "no series to judge"))),
     ]
 
 
@@ -2013,6 +2107,21 @@ def verify_served_upload(claim: Claim, spec: "ProofSpec") -> list[dict]:
                      "served with a content-type a browser acts on"))
 
 
+def _elapsed_of(entry: dict):
+    """The recorded round-trip of one exchange in ms, or None.
+
+    `elapsed_ms` is written on every exchange by the client and, until
+    `verify_no_throttle` started reading it, only `_window` ever looked -
+    which is how a progressive-delay lockout sat in the record unread.
+    """
+    resp = entry.get("response") if isinstance(entry, dict) else None
+    try:
+        value = float((resp or {}).get("elapsed_ms"))
+    except (TypeError, ValueError):
+        return None
+    return value if value >= 0 else None
+
+
 def _window(entry: dict) -> tuple[float, float]:
     """When this request was on the wire, as [start, end].
 
@@ -2056,7 +2165,22 @@ def _spent_refusal(entry: dict, won: list[dict]) -> bool:
     establishes there was a limit, so it has to actually say so - and it has
     to be a different answer than the one the burst got, or it is not a
     refusal of anything.
+
+    Which requires there to BE an answer the burst got. The final clause is
+    `all(body != resp_body(w) for w in won)`, and `all()` over an empty
+    sequence is True - so with no winner in the burst this returned True on
+    the status allowlist alone, and the check whose whole stated job is "a
+    different answer than the one the burst got" passed with nothing to
+    differ from. Three overlapping 409s and a later 409 satisfied it.
+    The grade stayed `unproven` because "more than one of them succeeded"
+    fails independently, so this is a check reporting a pass on nothing
+    rather than a false positive - but it also feeds
+    `score = (len(burst) >= 2) + (len(won) >= 2) + bool(refused)`, where it
+    hands an all-refused group a point and can win the group selection
+    against a group that actually contains the race.
     """
+    if not won:
+        return False
     status = status_of(entry)
     if status not in _SPENT_STATUS:
         return False

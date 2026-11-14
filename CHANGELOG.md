@@ -961,6 +961,89 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### Two false positives in the proof gate, found by adversarial sweep
+- Ran a six-lens sweep over the repository with every candidate finding put
+  to three independent agents prompted to REFUTE it, surviving only on
+  2-of-3. 38 candidates, 19 survived. The two that matter are **false
+  positives in the proof gate** - the gate accepting what it exists to
+  refuse, which is the worst defect class this repository has.
+- **`massassign` graded `proven` on a read recorded BEFORE the write.** The
+  check is named "a later read shows it set" and nothing established
+  "later": `_pairs` yields both orderings of every cited pair and `_witness`
+  keeps the best-scoring one. Reproduced exactly: a legitimately-admin
+  account read from `GET /api/me` at ts 1000.0, paired with a
+  `POST /api/register` at ts 1001.0 that sends `role=admin`, returns 200 and
+  silently DROPS the field - the very case this verifier's docstring says
+  was measured on `/api/order` - graded proven. What it accepted was the
+  defence working.
+- **`cache` and `ppoll` graded `proven` on a victim read recorded BEFORE the
+  poisoning request.** `verify_unkeyed_input` is the `floor` check for both
+  classes. It required the value in the poisoner's request, in the victim's
+  response, absent from the victim's request, and one endpoint shape - never
+  that the poisoning came first. So any value already on the page before the
+  probe ran satisfied "the value reached a requester that did not send it".
+  Reproduced: served a full second before anything injected it.
+- Both are the same shape, and it is the one this log keeps recording:
+  `verify_state_change` was fixed for exactly this, with a ten-line comment
+  about quoting the pre-write state, and **the fix never reached its
+  siblings**. Three verifiers pair exchanges; one had been corrected.
+- Fixed with the ordering the recorder owns - `_ordering`, `ts` primary with
+  the recorder's id sequence breaking ties a coarse clock cannot. No
+  same-resource constraint added to `massassign`, deliberately: the field is
+  set by `POST /api/register` and read from `GET /api/me`, so requiring one
+  endpoint would refuse the real case.
+- Verified in both directions and against the lab. Read-before-write now
+  grades `candidate` naming the real reason; read-after-write still proves;
+  citation order does not decide, because that order is the author's. All
+  six proving and clean cases for `cache`, `ppoll` and `massassign` still
+  pass against the live lab, which is what says the probes were not broken
+  by tightening the gate.
+- Both pinned, and both proved to fail without their fix: reverting either
+  check reports `assert 'proven' != 'proven'` - the false positive itself.
+- **A third false positive, from the same sweep: `lockout` could not see a
+  progressive delay.** `verify_no_throttle` decided "none of them was
+  refused" from status 429 and a body regex only, while `elapsed_ms` is
+  recorded on every exchange and no verifier but
+  `verify_concurrent_crossing` had ever read it. So the commonest real
+  defence - back off a little more each time, no 429, no lockout wording -
+  graded `lockout` PROVEN, and proven here means *this target has no
+  lockout*: the gate asserting the absence of a defence that was sitting in
+  the record it declined to read. Reproduced: ten 401s on `/login` whose
+  recorded latency ramps 150 -> 600ms.
+- The probe's half missed it for the reason this log keeps recording.
+  `probe_lockout` tests the same property with a DERIVED ratio,
+  `last3_avg > first3_avg * 3 + 150`, which on that ramp computes 550 > 750
+  and says no. Two quantities describe one property and the derived one lost
+  the signal; the verifier now reads the recorded one, as medians of the
+  first and last third so one slow request cannot decide it, with an
+  absolute floor so loopback noise cannot either. A genuinely flat series
+  still proves - otherwise the class would just have been made unprovable.
+- **And one check that passed on nothing.** `_spent_refusal` ends with
+  `all(body != resp_body(w) for w in won)`, and `all()` over an empty
+  sequence is True - so with no winner in the burst it returned True on the
+  status allowlist alone, and the check whose stated job is "a different
+  answer than the one the burst got" passed with nothing to differ from.
+  The grade stayed `unproven` because another check fails independently, so
+  this was not a false positive; it still fed
+  `score = (len(burst) >= 2) + (len(won) >= 2) + bool(refused)`, where it
+  hands an all-refused group a point it can win group selection with against
+  a group that actually contains the race.
+- Writing those two tests turned up the fixture doing the same thing one
+  layer along. `ex()` in `tests/test_proof.py` never set `elapsed_ms` at
+  all - the identical unfaithfulness its own docstring records being fixed
+  for `ts`. It now takes one, deliberately NOT defaulted: `_window` reads a
+  missing duration as a zero-width window that overlaps nothing, which is
+  the fail-closed answer every existing race and ppoll fixture relies on, so
+  handing them all a duration would quietly give close stamps intersecting
+  windows and change what those tests assert. The key is absent rather than
+  present and wrong, and the docstring says so.
+- One finding from the sweep I could not reproduce and am not fixing: it
+  claimed `lockout` proves on a bare 401 ramp, and my first attempt graded
+  `unproven` on both checks. It reproduced once I put credentials in the
+  request body - the "counted series" check requires a login shape - so the
+  finding was right and my first construction was wrong. Worth recording
+  because the obvious read was "the agent overclaimed".
+
 ### The simulation said 20/20 and the platform disagreed
 - The coarse-clock race test from the entry below **failed on real Windows
   3.10, 3.11 and 3.12** - all three jobs, that one test, nothing else. It
@@ -2071,7 +2154,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 638 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
