@@ -208,17 +208,43 @@ class MCPClient:
             }, timeout=timeout_s)
 
     def close(self) -> None:
-        with self._lock:
-            if self._proc and self._proc.poll() is None:
+        """Stop the server. Bounded, and it does not wait for the lock.
+
+        This took `self._lock` unconditionally, and `call()` HOLDS that lock
+        across `_rpc`'s blocking `q.get(timeout=...)` - a per-server timeout
+        clamped at 600s. The manager is shared by every worker thread, so
+        `Coordinator.run()`, which deliberately bounds its join to 30s
+        because "workers are daemon threads so a straggler can't hang",
+        then called `close()` and blocked on the lock a straggler was
+        holding. The bounded shutdown was bounded everywhere except its
+        last line.
+        #
+        Terminating the subprocess is exactly what unblocks that waiter:
+        the server's stdout closes, the reader thread ends, and `_rpc`
+        returns the dead-reader error instead of waiting out its timeout.
+        So a short attempt at the lock, and on failure proceed anyway - the
+        lock protects request/response pairing, which has no meaning once
+        the process is going away.
+
+        `self._proc` is read into a local first, because without the lock
+        another thread may be clearing it.
+        """
+        got = self._lock.acquire(timeout=2.0)
+        try:
+            proc = self._proc
+            if proc and proc.poll() is None:
                 try:
-                    self._proc.terminate()
-                    self._proc.wait(timeout=3)
+                    proc.terminate()
+                    proc.wait(timeout=3)
                 except Exception:
                     try:
-                        self._proc.kill()
+                        proc.kill()
                     except Exception:
                         pass
             self._proc = None
+        finally:
+            if got:
+                self._lock.release()
 
 
 class MCPManager:

@@ -961,6 +961,38 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### A bounded shutdown that was bounded everywhere except its last line
+- `MCPClient.call()` takes `self._lock` and holds it across `_rpc`'s
+  blocking `q.get(timeout=...)`, a per-server timeout clamped at 600s.
+  `close()` took the same lock unconditionally. The manager is shared by
+  every worker thread, so `Coordinator.run()` - which bounds its join to 30s
+  with the comment *"workers are daemon threads so a straggler can't
+  hang"* - then called `close()` and blocked on the lock the straggler was
+  holding. Every deliberate bound in that shutdown, defeated by its own last
+  statement.
+- Terminating the subprocess is precisely what unblocks the waiter: the
+  server's stdout closes, the reader thread ends, and `_rpc` returns the
+  dead-reader error instead of waiting out its timeout. So `close()` now
+  tries briefly for the lock and proceeds without it - the lock protects
+  request/response pairing, which has no meaning once the process is going
+  away - and reads `self._proc` into a local first, because without the
+  lock another thread may be clearing it.
+- The test asserts the bound by actually holding the lock while calling
+  `close()`, which is the only way to assert a bound rather than describe
+  one. Measured with the plant: the unconditional version waited the **full
+  30 seconds** the holder held it; the fix returns immediately.
+- That closes every finding from the sweep except one, which stays open and
+  measured: `load_skill` attaches a proof requirement only when a module's
+  STEM resolves to a class, so `enum`, `jwt`, `lockout`, `massassign` and
+  `method` - taught by multi-class modules - get none. 24 of 27 stems
+  resolve. Closing it needs a module-to-classes mapping that does not
+  exist, and inventing one is how a taxonomy acquires a wrong row.
+- Sweep tally: 38 candidates, 19 survived three adversarial refuters,
+  18 fixed across six commits, 1 left open with its measurement written
+  down. Three were false positives in the proof gate - the gate accepting
+  what it exists to refuse - and one was a false negative in the same
+  function I had corrected earlier in the other direction.
+
 ### The wall clock was primary, and it is the one thing that can go back
 - `_ordering` had `ts` primary with the recorder's sequence breaking ties
   only. An NTP or chrony step, a VM resumed from suspend, a container host
@@ -2302,7 +2334,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 643 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 644 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

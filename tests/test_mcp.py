@@ -225,3 +225,51 @@ def test_a_dead_reader_is_reported_as_such_not_as_a_timeout():
         client._rpc("tools/list", {}, 0.2)
     assert "no longer running" in str(excinfo.value)
     assert "not a timeout" in str(excinfo.value)
+
+
+def test_close_does_not_wait_for_a_lock_an_in_flight_call_holds():
+    """The bounded shutdown was bounded everywhere except its last line.
+
+    `call()` takes `self._lock` and holds it across `_rpc`'s blocking
+    `q.get(timeout=...)`, a per-server timeout clamped at 600s. `close()`
+    took the same lock unconditionally. The manager is shared by every
+    worker thread, so `Coordinator.run()` - which bounds its join to 30s
+    because "workers are daemon threads so a straggler can't hang" - then
+    called `close()` and blocked on the lock the straggler was holding.
+
+    Terminating the subprocess is what unblocks that waiter: the server's
+    stdout closes, the reader thread ends, and `_rpc` returns its
+    dead-reader error rather than waiting out the timeout. So `close()`
+    tries briefly for the lock and proceeds without it, and this asserts
+    the bound by actually holding the lock while calling it.
+    """
+    import threading
+    import time
+
+    from argus.mcp import MCPClient
+
+    client = MCPClient.__new__(MCPClient)
+    client._lock = threading.Lock()
+    client._proc = None
+
+    held = threading.Event()
+    release = threading.Event()
+
+    def hog():
+        with client._lock:
+            held.set()
+            release.wait(30)
+
+    t = threading.Thread(target=hog, daemon=True)
+    t.start()
+    assert held.wait(5), "the holder thread never took the lock"
+
+    started = time.monotonic()
+    client.close()                      # must not wait for the holder
+    elapsed = time.monotonic() - started
+    release.set()
+    t.join(timeout=5)
+
+    assert elapsed < 10, (
+        f"close() waited {elapsed:.1f}s for a lock an in-flight call was "
+        "holding - the shutdown is only bounded if this returns")
