@@ -961,6 +961,38 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The simulation said 20/20 and the platform disagreed
+- The coarse-clock race test from the entry below **failed on real Windows
+  3.10, 3.11 and 3.12** - all three jobs, that one test, nothing else. It
+  is removed, and the note in its place in `tests/test_lab.py` says why.
+- So the 16ms simulation is not a faithful model of the platform, and
+  measuring it 20 times did not make it one. That is the third time in this
+  stretch that I established something locally and the platform disagreed,
+  and the first two had the decency to be single samples - this one was a
+  rate.
+- What the arithmetic says should happen: `ts` lands on a ~15.6ms grid,
+  `elapsed_ms` is precise, so a reconstructed window start is out by at
+  most one tick; two independent errors is at most ~32ms; the gaps are 50ms
+  each. It should hold. On the platform it does not, and I cannot close
+  that gap from here. Ruled out on paper, not on the platform: the
+  millisecond rounding in `ts` (adds <=0.5ms), the burst's own spread (it
+  only moves `burst_end` later, which helps), and `_fire` returning before
+  the burst completes (it cannot - the pool is drained with `list()`).
+- The gaps in `probe_race` STAY. They removed a real failure mode in
+  simulation, they cost 100ms, and they cannot make a non-race prove - the
+  control must still be refused and must still overlap nothing. But their
+  evidence is **simulation only**, and that is now written where it will be
+  read rather than implied by a passing test.
+- `race` stays out of the proving table. The honest state is unchanged from
+  the revert: a mechanism that is diagnosed on paper, reproduced in a model
+  that the platform has now contradicted, and not demonstrated where it
+  matters. Diagnosing the rest needs the platform, and the vehicle for that
+  is a throwaway branch that prints the recorded windows - not the mainline,
+  and not another confident entry here.
+- The pattern across all three is the same and worth stating once: a model
+  I built to stand in for a platform agreed with me every time, and the
+  platform did not. The model was mine; the agreement was not evidence.
+
 ### The race diagnosis: a coarse clock and two adjacent controls
 - Diagnosed the failure the revert above could not name, and the pattern
   gave it away. `time.time()` on Windows resolves to 15.6ms up to Python
@@ -2039,7 +2071,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 635 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
