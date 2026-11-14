@@ -609,10 +609,9 @@ def test_the_report_warns_before_the_numbers_not_after(tmp_path):
 def test_the_shipped_sample_session_still_verifies():
     """`argus verify docs/sample-session` ran ONLY in CI's wheel job.
 
-    Not in `test/run_all.sh`, not in `selftest.py`, not in pytest - so the
-    four-layer local gate could not see it, and a change to the proof
-    matrix that regraded a committed artifact passed 663 local tests and
-    158 doc checks before CI said:
+    Not in `selftest.py`, not in pytest - so the local gate could not see
+    it, and a change to the proof matrix that regraded a committed
+    artifact passed 663 local tests and 158 doc checks before CI said:
 
         TAMPERED: F06 claims grade 'proven' but its cited evidence
         supports 'unproven' - unmet: this system minted the credential

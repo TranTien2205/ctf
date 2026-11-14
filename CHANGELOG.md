@@ -2740,8 +2740,8 @@ within a minute:
     'unproven' - unmet: this system minted the credential
 
 `python -m argus verify docs/sample-session` ran **only** in CI's wheel
-job - not in `test/run_all.sh`, not in `selftest.py`, not in pytest - so
-the four-layer local gate could not see it. That is the gap, and it
+job - not in `selftest.py`, not in pytest - so the local gate could not
+see it. That is the gap, and it
 matters more than the change that fell into it: `argus verify` re-grades
 every finding against the transcript, which makes it the one check that
 notices when the proof matrix moves under a shipped proof. It is a pytest
@@ -2945,6 +2945,38 @@ is patched away from this platform's. It reproduces the CI failure exactly
 on the old shape and passes on the new one. Narrow on purpose - it covers
 the module these tests drive - and a mechanism rather than a source grep,
 so it fails on the behaviour and not on the spelling.
+
+### The doc gate refused a name and the exemption list was the wrong fix
+
+    [FAIL] docs name only registered tools (56) - CHANGELOG.md: [...]
+
+The refused token was a `run_*`-shaped identifier, matching the family
+`run_external` defines, and the obvious answer was to add it to
+`_NOT_TOOLS` beside `run_id`, which is exempt for exactly that reason. The
+comment written beside the new entry said it was "this gate's own script,
+`test/run_*.sh`, which the operating rules tell a reader to run before
+accepting any change".
+
+There is no such script in this tree. Neither is there a
+`test/cases/proof_*.json`. Both belong to the superseded tree the archive
+banner points away from; this one states its gate in `AGENTS.md` as
+`python selftest.py` and `python -m pytest tests/ -q`, which is what every
+run in this log has been. The only three things naming that script were
+the three pieces of prose written beside the exemption.
+
+So the gate was right and the exemption silenced it. A check whose stated
+purpose is "documentation names only things that exist" had found a
+document naming something that does not exist, and the repair applied was
+to stop it looking. The exemption is gone and the prose names the gate this
+tree has - and the gate then refused the first draft of THIS entry, which
+still spelled the identifier out.
+
+Worth recording for the shape rather than the typo: an exemption list is
+the one repair that always works, which is what makes it the wrong
+instinct. Every other entry in `_NOT_TOOLS` is a real thing sharing a
+prefix with a tool - a module, a transcript field, a probe parameter. One
+more for a file that does not exist would have made the list the place the
+gate's own failures go to be forgotten.
 
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
