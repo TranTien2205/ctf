@@ -1678,8 +1678,11 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
         # the burst ended, so it is discarded and the class grades
         # `unproven` with no evidence.
         #
-        # Not hypothetical. `time.time()` on Windows has ~16ms granularity
-        # up to Python 3.12 and is precise from 3.13, and this failed CI on
+        # Not hypothetical. `time.time()` on Windows resolves to 15.6ms up
+        # to Python 3.12; 3.13 switched it to
+        # GetSystemTimePreciseAsFileTime() for better than 1us
+        # (CPython gh-63207, and the `versionchanged:: 3.13` note on
+        # `time.time`). This failed CI on
         # Windows 3.10, 3.11 and 3.12 while Windows 3.13, 3.14 and every
         # ubuntu job passed. Reproduced locally by quantising the recorder's
         # clock: 16ms gives `unproven` / `['no evidence']`, 1ms and precise

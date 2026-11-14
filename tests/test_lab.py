@@ -433,9 +433,12 @@ def test_race_proves_on_a_coarse_recorder_clock(lab_url, ctx, monkeypatch):
     ended, is discarded, and the class grades `unproven` with no evidence at
     all.
 
-    `time.time()` on Windows has ~16ms granularity up to Python 3.12 and is
-    precise from 3.13. That is exactly the CI split: Windows 3.10, 3.11 and
-    3.12 failed; Windows 3.13, 3.14 and every ubuntu job passed.
+    `time.time()` on Windows resolves to 15.6ms up to Python 3.12; 3.13
+    switched it to GetSystemTimePreciseAsFileTime() for better than 1us
+    (CPython gh-63207, and the `versionchanged:: 3.13` note on
+    `time.time`). That is exactly the CI split, which is the local evidence
+    for the documented one: Windows 3.10, 3.11 and 3.12 failed; Windows
+    3.13, 3.14 and every ubuntu job passed.
 
     There are TWO separations, and finding the second one is the whole
     reason this test exists. A gap before the baseline is not enough: the

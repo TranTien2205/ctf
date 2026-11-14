@@ -963,9 +963,13 @@ somebody reading only the list.
 
 ### The race diagnosis: a coarse clock and two adjacent controls
 - Diagnosed the failure the revert above could not name, and the pattern
-  gave it away. `time.time()` on Windows has ~16ms granularity up to Python
-  3.12 and is precise from 3.13 - exactly the CI split, Windows 3.10/3.11/
-  3.12 failing while Windows 3.13/3.14 and every ubuntu job passed.
+  gave it away. `time.time()` on Windows resolves to 15.6ms up to Python
+  3.12; 3.13 switched it to `GetSystemTimePreciseAsFileTime()` for better
+  than 1us - CPython gh-63207, with a `versionchanged:: 3.13` note on
+  `time.time` itself. That is exactly the CI split: Windows 3.10/3.11/3.12
+  failed while Windows 3.13/3.14 and every ubuntu job passed. I had the
+  release from memory and went and checked it, because a mechanism asserted
+  from memory is the thing this repository refuses everywhere else.
 - The gate reconstructs each window as `[ts - elapsed_ms, ts]`: `ts` is the
   recorder's wall clock, `elapsed_ms` comes from `monotonic()`. A coarse end
   with a precise duration puts the reconstructed START out by up to one
