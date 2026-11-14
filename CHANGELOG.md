@@ -2774,6 +2774,73 @@ Both directions were checked by planting them: making the absent state
 refuse reproduces CI's message locally, and letting the no-match state
 through fails the defence-working test.
 
+### Three tests whose assertions did not touch their subject
+
+All three passed, all three would have passed with the code they are named
+for deleted, and a sweep lens built for exactly this shape found them.
+
+**The lab's path containment, twice.** `test_cat_containment_is_not_prefix_based`
+ended with
+
+    sibling = realpath(FAKEFS) + "-other"
+    assert not realpath(join(FAKEFS, "x")).startswith(sibling)
+
+which is true for every possible value of `FAKEFS` - the left side
+continues with `/x` exactly where the right side continues with `-other` -
+and never called `_lab_exec`, the containment it is named for. The subject
+was not even the lab's root: `lab/vulnapp.py` is a shim that snapshots
+`globals().update(vars(_real))` once at import, while `make_server`
+rebinds `FAKEFS` with `global FAKEFS` inside `argus.lab.vulnapp`. So
+`vulnapp.FAKEFS` stays `""` all session and `realpath("")` is the process
+cwd: the assertion compared `<cwd>/x` against `<cwd>-other`. The function
+is shared and only the global is stale, which is why `_lab_exec` itself
+worked. It also did not request the lab fixture, so it depended on another
+test having started the server first.
+
+It now creates a real sibling directory beside the live root, asserts
+`_lab_exec` refuses to read out of it, asserts a file inside the root
+still reads (or "refuses everything" would pass), and asserts the naive
+prefix test would have let the sibling through - which is what the
+separator in the real comparison is for. Dropping that separator now fails
+it with the sibling's contents in the output.
+
+**`test_cat_containment_is_case_folded`** rebuilt the comparison from
+`ntpath.normpath`, `str.lower` and `ntpath.sep` and asserted its own
+model; nothing from `vulnapp` or `argus` appeared in the loop. Its only
+link to the code was `assert "os.path.normcase" in src`, which proves an
+identifier occurs in the function text, not that it is applied to both
+sides. The model also differed from the code twice: `str.lower()` where
+the code uses `os.path.normcase` (which on NT also folds `/` to `\`), and
+`ntpath.sep` where the code uses `os.sep`.
+
+The containment is now a named `_within_root(path, root)` so a test can
+have it as its subject, and the Windows test drives that function under
+patched NT semantics. Dropping `normcase` or dropping the separator each
+fail it.
+
+The wiring - that `cat` consults that function - is deliberately NOT
+asserted there. A source grep cannot tell a call from a mention, measured:
+planting `if _within_root(path, FAKEFS) is False and False:` keeps the
+substring, disables the guard, and passes a grep for it. The behavioural
+test in `test_lab.py` holds the wiring instead. Logic in one place, wiring
+in the other, neither pretending to be the other.
+
+**`test_windows_semantics`'s "skipped as a path" leg** computed
+`[t for t in toks if os.sep in t]` inside a block that patches `os.sep` to
+`"\"`, one line after `[t for t in toks if "\" in t]` - the same
+predicate twice. The second assertion could not fail unless the first had,
+and it never touched the external-arg scope check whose behaviour it
+claimed to verify. It now drives `_args_scope_check` with a recording
+scope and asserts the Windows path was not read as a hostname while a
+bare hostname beside it still was.
+
+And what that does NOT pin, measured rather than claimed: deleting the
+`os.sep in tok` skip leaves both assertions passing, because
+`_hostish_token` rejects every token containing a separator - `C:\lists\
+hosts.txt` splits to host part `"C"`. That skip is defence in depth and
+the second guard does the work. Removing the hostname check instead does
+fail the test, which is how the two were told apart.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

@@ -968,19 +968,69 @@ def test_injected_segments_are_bounded():
     assert vulnapp._lab_exec("echo a\x00b") is not None
 
 
-def test_cat_containment_is_not_prefix_based():
+def test_cat_containment_is_not_prefix_based(lab_url):
     """startswith on the directory name lets /x/fake-other through when the
-    root is /x/fake, and a symlink inside the tree pointed anywhere."""
+    root is /x/fake, and a symlink inside the tree pointed anywhere.
+
+    The sibling leg of this test used to assert
+
+        not realpath(join(FAKEFS, "x")).startswith(realpath(FAKEFS) + "-other")
+
+    which is true for every possible value of FAKEFS - the left side
+    continues with `/x` exactly where the right side continues with
+    `-other` - and never called `_lab_exec`, the containment it is named
+    for. Worse, the subject was not even the lab's root: `lab/vulnapp.py`
+    is a shim that snapshots `globals().update(vars(_real))` once at
+    import, while `make_server` rebinds `FAKEFS` with `global FAKEFS`
+    inside `argus.lab.vulnapp`. So `vulnapp.FAKEFS` stays `""` for the
+    whole session and `realpath("")` is the process cwd: the assertion
+    compared `<cwd>/x` against `<cwd>-other`.
+
+    The function is shared and only the global is stale, which is why
+    `_lab_exec` itself worked - it reads the real module's `FAKEFS`. This
+    now reads the same global the code does, takes `lab_url` so the root
+    exists at all (the old version depended on another test having started
+    the server first), and makes `_lab_exec` the subject against a sibling
+    directory that really exists.
+    """
     import os
     import vulnapp
+    from argus.lab import vulnapp as live
+
     assert "root:x:0:0" in vulnapp._lab_exec("cat /etc/passwd")
     for path in ("../../../etc/shadow", "/../etc/shadow",
                  "..%2f..%2fetc%2fshadow"):
         out = vulnapp._lab_exec(f"cat {path}")
         assert "Permission denied" in out or "No such file" in out, (path, out)
-    sibling = os.path.realpath(vulnapp.FAKEFS) + "-other"
-    assert not os.path.realpath(
-        os.path.join(vulnapp.FAKEFS, "x")).startswith(sibling)
+
+    root = os.path.realpath(live.FAKEFS)
+    assert root and os.path.isdir(root), (live.FAKEFS, root)
+    sibling = root + "-other"
+    os.makedirs(sibling, exist_ok=True)
+    try:
+        secret = os.path.join(sibling, "secret.txt")
+        with open(secret, "w", encoding="utf-8") as fh:
+            fh.write("sibling-directory-contents")
+
+        # the naive prefix test WOULD have let this through, which is the
+        # whole point of the separator in the real comparison
+        assert os.path.realpath(secret).startswith(root)
+        assert not os.path.realpath(secret).startswith(root + os.sep)
+
+        out = vulnapp._lab_exec(
+            f"cat ../{os.path.basename(sibling)}/secret.txt")
+        assert "sibling-directory-contents" not in out, out
+        assert "Permission denied" in out, out
+
+        # ...and the control, or the assertion above would hold on a
+        # containment that refuses everything
+        inside = os.path.join(root, "readable.txt")
+        with open(inside, "w", encoding="utf-8") as fh:
+            fh.write("inside-the-root")
+        assert "inside-the-root" in vulnapp._lab_exec("cat readable.txt")
+    finally:
+        import shutil
+        shutil.rmtree(sibling, ignore_errors=True)
 
 
 def test_external_tools_do_not_inherit_stdin():

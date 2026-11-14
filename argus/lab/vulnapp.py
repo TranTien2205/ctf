@@ -149,6 +149,34 @@ def _injected_commands(value: str) -> list[str]:
             break
     return out
 
+def _within_root(path: str, root: str) -> bool:
+    """Is `path` inside `root`, by this platform's path semantics?
+
+    Pulled out of `_lab_exec` so it can be the SUBJECT of a test. The
+    Windows-semantics test for this rebuilt the comparison from
+    `ntpath.normpath`, `str.lower` and `ntpath.sep` and asserted its own
+    model - nothing from this module appeared in the loop at all - and its
+    only link to the code was `assert "os.path.normcase" in src`, which
+    proves the identifier occurs somewhere in the function text, not that
+    it is applied to both sides. The model also differed from the code in
+    two ways: `str.lower()` where the code uses `os.path.normcase` (which
+    on NT also folds `/` to `\\`), and `ntpath.sep` where the code uses
+    `os.sep`. A simulation that agrees with the code proves nothing about
+    the code; one that quietly differs from it is worse.
+
+    `realpath` first, because a symlink inside the tree can point anywhere
+    at all. Compared against the root WITH its separator, because a plain
+    prefix test lets `/x/fake-other` through when the root is `/x/fake`.
+    `normcase`, because on NT the comparison is case-insensitive and a
+    plain `startswith` refuses `FAKE\\x` inside root `fake` - failing
+    closed, but refusing a legitimate read the rce and lfi demonstrations
+    depend on.
+    """
+    real_root = os.path.normcase(os.path.realpath(root))
+    real_path = os.path.normcase(os.path.realpath(path))
+    return real_path == real_root or real_path.startswith(real_root + os.sep)
+
+
 def _lab_exec(command: str) -> str:
     try:
         parts = shlex.split(command)
@@ -180,9 +208,7 @@ def _lab_exec(command: str) -> str:
         # plain startswith refuses `FAKE\x` inside root `fake` - failing closed,
         # but refusing a legitimate read the rce/lfi demo depends on. Verified
         # against ntpath semantics rather than assumed.
-        root = os.path.normcase(os.path.realpath(FAKEFS))
-        real = os.path.normcase(os.path.realpath(path))
-        if real != root and not real.startswith(root + os.sep):
+        if not _within_root(path, FAKEFS):
             return f"cat: {parts[1]}: Permission denied"
         try:
             with open(path, encoding="utf-8", errors="replace") as fh:
