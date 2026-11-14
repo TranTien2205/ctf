@@ -43,3 +43,53 @@ def test_run_external_env_scrubbed(ctx, monkeypatch):
 def test_run_external_rejects_unlisted(ctx):
     out = run_external(ctx, "nmap-evil", ctx.cfg.target)
     assert "error" in out
+
+
+def test_the_timeout_kills_what_the_tool_spawned_not_just_the_tool():
+    """`subprocess.run(timeout=)` kills one pid; children survive it.
+
+    On TimeoutExpired CPython sends SIGKILL to the direct child and waits
+    for it. Anything that child spawned is reparented to init and keeps
+    the stdout fd it inherited - a temp file this module has already
+    unlinked, so it grows with no visible file - along with its network
+    access.
+
+    For this package that is not tidiness. The orphan goes on talking to
+    the target with no ScopeGuard, no RateLimiter and no request budget,
+    nothing it does reaches the transcript, and the engagement's own
+    record says the run was stopped after N seconds. Every claim argus
+    makes about bounding what it sends is false for that process's
+    lifetime.
+
+    Measured both ways before the fix went in: with `subprocess.run` the
+    grandchild's marker file appears after the run reports a timeout; with
+    the process group killed it never appears.
+    """
+    import os
+    import subprocess
+    import tempfile
+    import time
+
+    import pytest
+
+    if os.name != "posix":
+        pytest.skip("process groups and `sh` are POSIX; CI covers nt "
+                    "through the taskkill branch, which needs a real "
+                    "Windows runner to exercise")
+
+    marker = os.path.join(tempfile.mkdtemp(), "orphan-was-alive")
+    # a child that spawns a grandchild due to touch the marker shortly,
+    # then sleeps long enough that the timeout always fires first
+    cmd = ["sh", "-c", f"( sleep 2; touch {marker} ) & sleep 30"]
+    started = time.monotonic()
+    with pytest.raises(subprocess.TimeoutExpired):
+        _subproc.run_capped(cmd, timeout_s=0.5)
+    # the contract callers depend on is unchanged: analysis.py turns this
+    # into {"error": "timed out after Ns"}
+    assert time.monotonic() - started < 5.0
+
+    time.sleep(3.0)
+    assert not os.path.exists(marker), (
+        "a process the timed-out tool spawned outlived the timeout: it "
+        "still has the target, the unlinked stdout fd, and no place in "
+        "the transcript")

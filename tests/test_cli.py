@@ -316,7 +316,7 @@ def test_both_demo_paths_match_what_the_evaluation_doc_claims(tmp_path):
 
 
 def _fake_session(root, arm, trial, *, proven, requests=10, usd=0.5,
-                  summary=True):
+                  summary=True, ttf=0.5, duration_s=3.0):
     """A session dir in the layout docs/EXPERIMENTS.md lays out.
 
     `exp/<arm>-<trial>/<session>`: the arm is the parent directory with the
@@ -331,8 +331,10 @@ def _fake_session(root, arm, trial, *, proven, requests=10, usd=0.5,
             "mode": arm, "argus_version": "1.0.0",
             "findings": [{"grade": "proven"}] * proven,
             "grades": {"proven": proven, "candidate": 0, "unproven": 0},
-            "requests": requests, "duration_s": 3.0,
-            "time_to_first_finding_s": 0.5,
+            "requests": requests, "duration_s": duration_s,
+            # null for every run that found nothing, which is the shape
+            # that caught `--by-arm` reporting a median over a subset
+            "time_to_first_finding_s": ttf,
             "coverage": {"endpoints": ["/a", "/b"]},
             "llm_calls": 4,
             "llm_tokens": {"in": 100, "out": 20,
@@ -382,6 +384,45 @@ def test_by_arm_median_never_reports_a_figure_no_trial_produced(
     line = next(ln for ln in capsys.readouterr().out.splitlines()
                 if ln.startswith("wire requests"))
     assert "40" in line and "50" not in line, line
+
+
+def test_by_arm_will_not_median_a_figure_only_some_trials_have(
+        tmp_path, capsys):
+    """The all-or-nothing guard covered `usd` and not its two siblings.
+
+    The reason beside it - "a median over the priced subset of an arm
+    would read as the arm's cost while describing only part of it" -
+    applies word for word to `ttf` and `duration_s`, and both became
+    nullable: `time_to_first_finding_s` is null for every run that found
+    nothing, and `duration_s` was made nullable in this same body of work,
+    AFTER the guard was written.
+
+    So an arm of three trials where one found nothing printed a median
+    over the two that did, under the arm's full N. For `ttf` the subset is
+    systematically the SUCCESSFUL trials, which is the worst possible
+    bias: the arm that fails more often reports the better
+    time-to-first-finding.
+    """
+    _fake_session(tmp_path, "single", 1, proven=1, ttf=2.0)
+    _fake_session(tmp_path, "single", 2, proven=1, ttf=4.0)
+    _fake_session(tmp_path, "single", 3, proven=0, ttf=None,
+                  duration_s=None)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    out = capsys.readouterr().out
+
+    for label in ("time to first finding (s)", "duration (s)"):
+        line = next(ln for ln in out.splitlines() if ln.startswith(label))
+        assert "-" in line, line
+        assert "2.0" not in line and "4.0" not in line, line
+        assert "3.0" not in line, line
+
+    # ...and a metric every trial does carry is still reported, or this
+    # would pass on a table that prints nothing at all
+    line = next(ln for ln in out.splitlines()
+                if ln.startswith("wire requests"))
+    assert "10" in line, line
 
 
 def test_by_arm_says_so_when_an_arm_has_a_single_trial(tmp_path, capsys):

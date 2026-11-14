@@ -17,11 +17,51 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "lab"))
 
 from argus import proof
+import pytest
+
 from argus.tools import analysis
 
 
 def assert_ok(name, ok, detail=""):
     assert ok, f"{name}: {detail}"
+
+
+@pytest.fixture(autouse=True)
+def _posix_pathlib_under_a_patched_os_name():
+    """Make this machine behave like 3.10/3.11 for one specific trap.
+
+    `pathlib.Path()` chooses its flavour from `os.name` AT CALL TIME on
+    Python 3.10 and 3.11, so real code calling `Path(...)` inside a
+    `mock.patch.object(os, "name", "nt")` block instantiates a
+    `WindowsPath` on Linux and raises `NotImplementedError`. A test in this
+    file did exactly that: green on 3.12, 3.13 and 3.14 here, red on the
+    two CI jobs for the versions this machine does not have.
+
+    Rather than rely on CI to notice it again, this makes the failure
+    reproducible locally on every version: while `os.name` is patched to
+    "nt", constructing a Path through `analysis` raises the way the old
+    interpreters would. It is narrow on purpose - it covers the module
+    these tests drive, not every import in the package - and it is a
+    mechanism rather than a source grep, so it fails on the behaviour and
+    not on the spelling.
+    """
+    real = analysis.Path
+
+    class _FlavourBound:
+        def __new__(cls, *a, **kw):
+            if os.name == "nt" and os.name != _REAL_OS_NAME:
+                raise NotImplementedError(
+                    "cannot instantiate 'WindowsPath' on your system")
+            return real(*a, **kw)
+
+    analysis.Path = _FlavourBound
+    try:
+        yield
+    finally:
+        analysis.Path = real
+
+
+_REAL_OS_NAME = os.name
 
 
 def test_windows_semantics():
@@ -37,44 +77,46 @@ def test_windows_semantics():
         has_backslash = [t for t in toks if "\\" in t]
         assert_ok("a windows path token survives splitting",
               bool(has_backslash), f"{toks}")
-        # ...and it must then be skipped as a filename rather than
-        # scope-checked. This used to assert `[t for t in toks if os.sep in t]`
-        # - and `os.sep` IS "\\" inside this patch, so that was the previous
-        # line's predicate restated: it could not fail unless the assertion
-        # above had already failed, and it never touched the scope check whose
-        # skipping behaviour it claimed to verify.
-        #
-        # The subject is `_args_scope_check` now. A recording scope says what
-        # was actually handed to it, which is the thing that matters: a
-        # Windows path must not be read as a hostname, and a real hostname
-        # must still be checked - or "nothing was scope-checked" would pass
-        # this.
-        checked = []
+    # ...and it must then be skipped as a filename rather than
+    # scope-checked. Two separate claims, deliberately split, and the split
+    # is the whole lesson of this file: this ran `_args_scope_check` inside
+    # the `os.name = "nt"` patch above, and `pathlib.Path()` chooses its
+    # flavour from `os.name` AT CALL TIME on Python 3.10 and 3.11 - so
+    # `Path(tok).exists()` inside the code under test instantiated a
+    # `WindowsPath` on Linux and raised `NotImplementedError`. Green on
+    # 3.12, 3.13 and 3.14 locally, red on the two CI jobs for the versions
+    # this machine does not have. Simulating a platform around real code
+    # changes more than the one thing being simulated.
+    #
+    # So the splitting claim keeps the patch (it is about `_split_args`,
+    # which reads `os.name` and touches no paths), and the scope-check
+    # claim runs unpatched on this platform with this platform's separator.
+    # The property is not Windows-specific: a token containing `os.sep` is
+    # not a hostname, whatever `os.sep` is.
+    checked = []
 
-        class _RecordingScope:
-            def check(self, target):
-                checked.append(target)
+    class _RecordingScope:
+        def check(self, target):
+            checked.append(target)
 
-        class _Ctx:
-            scope = _RecordingScope()
+    class _Ctx:
+        scope = _RecordingScope()
 
-        analysis._args_scope_check(
-            _Ctx(), "-iL targets.txt C:\\lists\\hosts.txt evil.example")
-        assert_ok("a windows path token is not read as a hostname",
-                  not any("hosts.txt" in c or "lists" in c for c in checked),
-                  f"{checked}")
-        assert_ok("a bare hostname beside it is still scope-checked",
-                  any("evil.example" in c for c in checked), f"{checked}")
+    analysis._args_scope_check(
+        _Ctx(), f"-iL targets.txt {os.sep}etc{os.sep}hosts evil.example")
+    assert_ok("a path token is not read as a hostname",
+              not any("etc" in c or "hosts" in c for c in checked),
+              f"{checked}")
+    assert_ok("a bare hostname beside it is still scope-checked",
+              any("evil.example" in c for c in checked), f"{checked}")
 
-        # What this does NOT pin, measured rather than assumed: deleting
-        # the `os.sep in tok` skip from `_args_scope_check` leaves both
-        # assertions passing. `_hostish_token` rejects every token
-        # containing a separator - `C:\lists\hosts.txt` splits to host
-        # part `"C"`, and `evil.example\sub` stays unhostish - so no token
-        # exists whose outcome depends on that skip. It is defence in depth
-        # and the second guard is the one doing the work. Removing the
-        # hostname check instead DOES fail the second assertion, which is
-        # how the two were told apart.
+    # What this does NOT pin, measured rather than assumed: deleting the
+    # `os.sep in tok` skip from `_args_scope_check` leaves both assertions
+    # passing, because `_hostish_token` rejects every token containing a
+    # separator. That skip is defence in depth and the second guard does
+    # the work. Removing the hostname check instead DOES fail the second
+    # assertion, which is how the two were told apart.
+
     # posix hosts keep posix splitting
     toks2 = analysis._split_args("-iL targets.txt /etc/hosts evil.example")
     assert_ok("posix splitting is unchanged", "evil.example" in toks2, f"{toks2}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -485,3 +486,266 @@ def test_no_operator_credential_reaches_any_artifact(lab_url, tmp_path):
         if hits:
             leaked[path.name] = hits
     assert not leaked, _json.dumps(leaked, indent=2)
+
+
+def test_send_raw_will_not_drain_a_body_the_target_chose_the_length_of():
+    """BODY_CAP bounded memory and nothing else.
+
+    The drain loop was `while True: chunk = resp.read(65536); if not chunk:
+    break; if len(buf) <= BODY_CAP: buf += chunk` - the cap gates the
+    APPEND, never the read, so the loop ran until the server chose to end
+    the body. Its declared Content-Length or its chunked stream is data the
+    target alone controls, which makes the duration
+    `declared_length / bandwidth`: unbounded. The comment above the `reads`
+    clamp claimed "each extra read holds a 3s socket timeout, so an
+    unbounded value would pin the tool for reads*3 seconds", and that was
+    false for exactly this reason. The sibling httpx path gets it right -
+    `_fetch_capped` breaks out of `iter_bytes` once past the cap.
+
+    It cannot just stop early and carry on: the comment above the loop
+    says why, and it is a protocol fact rather than a preference - a
+    connection whose stream position is unknown cannot be read again. So
+    the cut reports itself through `error`, which also stops the further
+    reads, instead of handing back a truncated body that looks whole.
+    """
+    import socket
+    import threading
+    import time
+
+    from argus.httpclient import (BODY_CAP, GuardedClient, _RAW_DRAIN_CAP)
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    declared = 10_000_000
+    assert declared > _RAW_DRAIN_CAP > BODY_CAP
+
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+    stop = threading.Event()
+
+    def serve():
+        conn, _ = listener.accept()
+        try:
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                         b"Content-Length: %d\r\n\r\n" % declared)
+            chunk = b"A" * 65536
+            sent = 0
+            while sent < declared and not stop.is_set():
+                try:
+                    conn.sendall(chunk)
+                except OSError:
+                    break
+                sent += len(chunk)
+        finally:
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+    threading.Thread(target=serve, daemon=True).start()
+    url = f"http://127.0.0.1:{port}/"
+    with tempfile.TemporaryDirectory() as tmp:
+        session = Session(Path(tmp), url, meta={})
+        client = GuardedClient(ScopeGuard(url, allow_private=True), session,
+                               RateLimiter(0), agent="t")
+        try:
+            started = time.monotonic()
+            out = client.send_raw(
+                url, [{"method": "GET", "headers": [], "body": b""}],
+                tool="t")
+            elapsed = time.monotonic() - started
+        finally:
+            stop.set()
+            client.close()
+
+        send = out["sends"][0]
+        assert send["status"] == 200, send
+        assert "not drained" in str(send.get("error")), send
+        assert elapsed < 20.0, elapsed
+        stored = session._transcript[send["request_id"]]["response"]["body"]
+        assert len(stored) <= BODY_CAP, len(stored)
+
+
+def test_a_websocket_frame_deadline_bounds_the_body_not_just_the_header():
+    """The docstring promised a deadline over the whole frame.
+
+    `_exact` checked `time.monotonic() > end_by` between `fh.read()` calls,
+    and `fh` is a `BufferedReader` over the socket: `read(n)` loops on the
+    raw stream internally until it has all n bytes or hits EOF. So a server
+    that declares a length - it chooses it, up to `_WS_MAX_FRAME` - and
+    then feeds one byte at a time stayed inside a single `fh.read()` call
+    for length x interval, with the deadline consulted only after. The
+    bound covered the two-byte header and nothing on the body.
+
+    Driven here with the deadline passed in, so the test is seconds rather
+    than the fourteen minutes 16,384 bytes at one every 50ms would take.
+    """
+    import socket
+    import threading
+    import time
+
+    from argus.httpclient import GuardedClient
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    server, client_sock = socket.socketpair()
+    stop = threading.Event()
+
+    def trickle():
+        # a text frame (0x81) declaring 16,384 bytes via the 126 form,
+        # then one byte every 50ms and never the rest
+        try:
+            server.sendall(b"\x81\x7e\x40\x00")
+            while not stop.is_set():
+                server.sendall(b"A")
+                time.sleep(0.05)
+        except OSError:
+            pass
+
+    threading.Thread(target=trickle, daemon=True).start()
+    fh = client_sock.makefile("rb")
+    with tempfile.TemporaryDirectory() as tmp:
+        session = Session(Path(tmp), "http://127.0.0.1:1/", meta={})
+        gc = GuardedClient(ScopeGuard("http://127.0.0.1:1/",
+                                      allow_private=True), session,
+                           RateLimiter(0), agent="t")
+        try:
+            started = time.monotonic()
+            out = gc._ws_read_frame(fh, deadline=time.monotonic() + 1.0)
+            elapsed = time.monotonic() - started
+        finally:
+            stop.set()
+            gc.close()
+            fh.close()
+            client_sock.close()
+            server.close()
+
+    # the deadline is what returns, and it returns empty: a frame that
+    # never arrived is not an answer
+    assert elapsed < 6.0, elapsed
+    assert out == "", out
+
+
+def test_a_spent_budget_costs_no_rate_interval_and_bounds_the_crawl():
+    """Two bounds the target could set the cost of.
+
+    `send` called `self.rate.wait()` BEFORE testing the request budget, so
+    every call made after the budget was spent slept one full rate interval
+    and then raised without sending a byte. `crawl` treats a refusal as
+    "try the next link" - `errors.append(str(exc)); continue` - and its
+    own bound, `len(pages) < max_pages`, counts pages APPENDED, which only
+    happens after `send` returns. So neither bound advanced on a refusal,
+    and the queue length is the target's choice: `_SurfaceParser.links` has
+    no cap and one BODY_CAP body holds thousands of hrefs.
+
+    Measured as a duration, because that is what was wrong: a spent budget
+    against a queue of 200 links at the shipped rate.
+    """
+    import time
+
+    from argus.httpclient import GuardedClient, RequestBudgetExhausted
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    url = "http://127.0.0.1:1/"
+    with tempfile.TemporaryDirectory() as tmp:
+        session = Session(Path(tmp), url, meta={})
+        client = GuardedClient(ScopeGuard(url, allow_private=True), session,
+                               RateLimiter(2.0), agent="t", max_requests=0)
+        try:
+            started = time.monotonic()
+            for _ in range(5):
+                with pytest.raises(RequestBudgetExhausted):
+                    client.send("GET", url, tool="t")
+            elapsed = time.monotonic() - started
+        finally:
+            client.close()
+
+    # five refusals at a 2s interval used to cost ten seconds of sleeping
+    assert elapsed < 1.0, (
+        f"{elapsed:.1f}s to refuse five calls the budget had already "
+        "spent - the rate limiter is being paid for requests that are "
+        "never sent")
+
+
+def test_a_trickling_body_is_bounded_and_says_it_was(monkeypatch):
+    """The read timeout bounds one read; a byte arriving resets it.
+
+    `httpx.Timeout(15.0, connect=8.0)` is the client default and the
+    comment beside the per-call timeout treats it as the thing that stops
+    an infinite wait. It bounds the longest SILENT GAP. `_fetch_capped`
+    consumes the body with `for chunk in resp.iter_bytes(65536)`, so a
+    target sending one byte just inside the window is never timed out: the
+    real ceiling was BODY_CAP reads x the read timeout, and the call came
+    back status 200 with `error: None` - nothing downstream could tell a
+    trickle from a fast response, while every probe in this package
+    decides on that body.
+
+    The deadline is shrunk here because the shipped one is a minute; the
+    mechanism is the same at either value.
+    """
+    import socket
+    import threading
+    import time
+
+    from argus import httpclient
+    from argus.httpclient import GuardedClient
+    from argus.ratelimit import RateLimiter
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    monkeypatch.setattr(httpclient, "_BODY_DEADLINE_SECONDS", 1.0)
+
+    declared = 5_000_000
+    listener = socket.socket()
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    listener.bind(("127.0.0.1", 0))
+    listener.listen(1)
+    port = listener.getsockname()[1]
+    stop = threading.Event()
+
+    def serve():
+        conn, _ = listener.accept()
+        try:
+            conn.recv(65536)
+            conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                         b"Content-Length: %d\r\n\r\n" % declared)
+            # one byte at a time, forever: never silent long enough to
+            # trip a read timeout, never finished either
+            while not stop.is_set():
+                try:
+                    conn.sendall(b"A")
+                except OSError:
+                    break
+                time.sleep(0.01)
+        finally:
+            try:
+                conn.close()
+            except OSError:
+                pass
+
+    threading.Thread(target=serve, daemon=True).start()
+    url = f"http://127.0.0.1:{port}/"
+    with tempfile.TemporaryDirectory() as tmp:
+        session = Session(Path(tmp), url, meta={})
+        client = GuardedClient(ScopeGuard(url, allow_private=True), session,
+                               RateLimiter(0), agent="t")
+        try:
+            started = time.monotonic()
+            out = client.send("GET", url, tool="t")
+            elapsed = time.monotonic() - started
+        finally:
+            stop.set()
+            client.close()
+
+    assert elapsed < 20.0, elapsed
+    # ...and the caller is told, because a body cut short is not a
+    # complete response and used to be indistinguishable from one
+    assert "still arriving" in str(out.get("error")), out

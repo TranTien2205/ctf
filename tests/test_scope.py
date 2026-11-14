@@ -342,7 +342,13 @@ def test_send_timeout_never_infinite(ctx):
         encoding = "utf-8"
         url = "http://127.0.0.1/"
 
-        def iter_bytes(self, n):
+        # httpx's signature is `iter_bytes(chunk_size=None)`, and a
+        # fake with a MANDATORY argument is unfaithful to the thing
+        # it stands in for: `_fetch_capped` passes no size now, so
+        # it can come back to its deadline per arriving piece, and
+        # these two fakes raised TypeError on a change the real
+        # client accepts.
+        def iter_bytes(self, chunk_size=None):
             return iter(())
 
     orig = ctx.client._client.stream
@@ -380,7 +386,13 @@ def test_response_body_read_is_bounded(ctx):
         encoding = "utf-8"
         url = "http://127.0.0.1/"
 
-        def iter_bytes(self, n):
+        # httpx's signature is `iter_bytes(chunk_size=None)`, and a
+        # fake with a MANDATORY argument is unfaithful to the thing
+        # it stands in for: `_fetch_capped` passes no size now, so
+        # it can come back to its deadline per arriving piece, and
+        # these two fakes raised TypeError on a change the real
+        # client accepts.
+        def iter_bytes(self, chunk_size=None):
             # three 128KB chunks = 384KB > 200KB cap
             for _ in range(3):
                 yield b"A" * 131072

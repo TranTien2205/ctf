@@ -2841,12 +2841,117 @@ hosts.txt` splits to host part `"C"`. That skip is defence in depth and
 the second guard does the work. Removing the hostname check instead does
 fail the test, which is how the two were told apart.
 
+### Six bounds the target set the cost of
+
+Each one claimed a limit in a comment and bounded something narrower. A
+sweep lens asked, of every bound in the package, *what actually defeats
+this* - and the answers were all the same shape: a quantity the target
+chooses.
+
+**A timeout that killed one process.** `subprocess.run(..., timeout=)`
+sends SIGKILL to the direct child and waits for it; anything that child
+spawned is reparented to init and keeps the stdout fd it inherited - a
+temp file already unlinked, so it grows with no visible file - along with
+its network access. For this package that is not tidiness: the orphan goes
+on talking to the target with no ScopeGuard, no RateLimiter and no request
+budget, nothing it does reaches the transcript, and the engagement's own
+record says the run was stopped after N seconds. Measured both ways - with
+`subprocess.run` a grandchild's marker file appears after the run reports
+a timeout; with the process group killed it never does. POSIX gets
+`start_new_session` plus `killpg`, Windows `taskkill /T`, and both fall
+back to killing the one child, which is the old behaviour.
+
+**A drain that read whatever the target sent.** `send_raw` kept only
+`BODY_CAP`, and the cap gated the APPEND, never the read - so the loop ran
+until the server chose to end the body. Memory was bounded; time was
+`declared_length / bandwidth`. The comment above the `reads` clamp claimed
+"each extra read holds a 3s socket timeout, so an unbounded value would
+pin the tool for reads*3 seconds", and that was false for exactly this
+reason. The sibling httpx path gets it right. It cannot simply stop early
+either - the comment above the loop says why, and it is a protocol fact:
+a connection whose stream position is unknown cannot be read again. So the
+cut reports itself through `error`, which also stops the further reads.
+
+**A read timeout that bounded the silence between bytes.** `_fetch_capped`
+consumed the body with `iter_bytes(65536)`, and an httpx read timeout
+bounds one read, which every arriving byte resets. A target sending one
+byte just inside the window was never timed out: the ceiling was
+`BODY_CAP` reads x the read timeout, and the call returned status 200 with
+`error: None`, so nothing downstream could tell a trickle from a fast
+response while every probe here decides on that body.
+
+The first version of that fix was wrong in the way it was fixing. It added
+a deadline and kept `iter_bytes(65536)`, and httpx accumulates until it HAS
+65536 bytes - so the deadline was consulted between chunks and a target
+sending a byte every 10ms stayed inside the first yield for eleven
+minutes. The test for it hung until it was killed. `iter_bytes()` with no
+size yields per arriving piece. Same shape as `BufferedReader.read(n)` in
+`_ws_read_frame`, two bounds apart in the same file.
+
+**A frame deadline that bounded the header.** `_ws_read_frame`'s docstring
+promises "a deadline over the whole frame", implemented by checking the
+clock between `fh.read()` calls - and `fh` is a `BufferedReader`, whose
+`read(n)` loops on the raw socket internally until it has all n bytes. A
+server that declares a length, up to `_WS_MAX_FRAME`, and then feeds one
+byte at a time stayed inside a single call for length x interval. `read1`
+makes at most one call to the raw stream. Planted back, the test is killed
+at 25 seconds; fixed, it returns in one.
+
+**A page bound that counted successes.** `crawl`'s `len(pages) < max_pages`
+counts pages APPENDED, which happens only after `send` returns - so a
+refused send fell through to `continue` without advancing it. And `send`
+called `self.rate.wait()` BEFORE testing the request budget, so every call
+after the budget was spent slept a full rate interval and raised without
+sending a byte. The queue length is the target's choice: `_SurfaceParser.
+links` has no cap and one `BODY_CAP` body holds thousands of hrefs.
+Attempts are bounded now as well as pages, and the budget is checked before
+the wait - refusing costs nothing.
+
+**A guard written for one metric.** `compare --by-arm` reports `-` rather
+than a median over part of an arm, with the reason beside it: "a median
+over the priced subset of an arm would read as the arm's cost while
+describing only part of it". It covered `usd`. `time_to_first_finding_s`
+is null for every run that found nothing, and `duration_s` was made
+nullable in this same body of work, AFTER that guard was written - so an
+arm of five trials where one found nothing printed a median over the four
+that did, under the arm's full N. For `ttf` the subset is systematically
+the SUCCESSFUL trials, which is the worst bias available: the arm that
+fails more often reports the better time-to-first-finding.
+
+Every one of the six was planted back and watched to fail, which also
+caught a seventh thing: setting `response_data["error"]` records a slow
+body in the transcript and leaves `out["error"]` - the dict every probe
+reads - saying `None`.
+
+### A platform simulated around real code changes more than one thing
+
+`test_windows_semantics` ran `_args_scope_check` inside
+`mock.patch.object(os, "name", "nt")`. `pathlib.Path()` chooses its
+flavour from `os.name` AT CALL TIME on Python 3.10 and 3.11, so
+`Path(tok).exists()` inside the code under test instantiated a
+`WindowsPath` on Linux and raised `NotImplementedError`. Green on 3.12,
+3.13 and 3.14 - the three interpreters on this machine - and red on the
+two CI jobs for the versions it does not have.
+
+The two claims are now separate: the splitting claim keeps the patch,
+because it is about `_split_args`, which reads `os.name` and touches no
+paths; the scope-check claim runs unpatched with this platform's own
+separator, because "a token containing `os.sep` is not a hostname" is not
+Windows-specific.
+
+And the trap is reproducible here now rather than only in CI: an autouse
+fixture makes `analysis.Path` raise the way 3.10 would whenever `os.name`
+is patched away from this platform's. It reproduces the CI failure exactly
+on the old shape and passes on the new one. Narrow on purpose - it covers
+the module these tests drive - and a mechanism rather than a source grep,
+so it fails on the behaviour and not on the spelling.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 666 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 672 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

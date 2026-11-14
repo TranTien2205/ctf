@@ -18,6 +18,16 @@ from .session import Session
 
 BODY_CAP = 200_000  # bytes stored in transcript
 RETURN_CAP = 12_000  # chars returned to the model
+# How much of a raw response this will read off the wire before giving up on
+# draining it, and for how long. Separate from BODY_CAP, which bounds what is
+# STORED: a cap on the append bounds memory and nothing else, and the drain
+# loop in `send_raw` ran for as long as the target chose to keep sending.
+_RAW_DRAIN_CAP = 4 * BODY_CAP
+_RAW_DRAIN_SECONDS = 10.0
+# How long a single response body may take to arrive. An httpx read timeout
+# bounds one read, and a byte arriving resets it, so a trickling target held
+# a call open for BODY_CAP reads x that timeout. This bounds the call.
+_BODY_DEADLINE_SECONDS = 60.0
 
 
 def _headers_dict(resp) -> dict:
@@ -305,12 +315,39 @@ class GuardedClient:
                         f"connection to {resp.request.url.host} resolved to "
                         f"private address {peer} at connect time "
                         f"(DNS rebinding protection)")
+            # ...and a deadline over the whole body, not just the gaps
+            # between its bytes. An httpx read timeout bounds ONE read
+            # operation, and every byte that arrives resets the window - so
+            # a target sending one byte just inside the read timeout was
+            # never timed out. The real ceiling was BODY_CAP reads x the
+            # read timeout, which at the shipped 15s is weeks, and the call
+            # returned status 200 with `error: None`, so nothing downstream
+            # could tell a trickle from a fast response.
+            #
+            # The byte cap below was the only bound that held, and a target
+            # that sends slowly never reaches it.
             buf = bytearray()
-            for chunk in resp.iter_bytes(65536):
+            slow = False
+            body_by = time.monotonic() + _BODY_DEADLINE_SECONDS
+            # `iter_bytes()` with NO chunk size, so the loop comes back to
+            # the clock per arriving piece. The first version of this fix
+            # kept `iter_bytes(65536)` and was wrong in exactly the way it
+            # was fixing: httpx accumulates until it HAS 65536 bytes, so
+            # the deadline was consulted between chunks and a target
+            # sending one byte every 10ms stayed inside the first yield for
+            # eleven minutes. Measured - the test for this hung until it
+            # was killed. Same shape as `BufferedReader.read(n)` in
+            # `_ws_read_frame`, two bounds apart in the same file.
+            for chunk in resp.iter_bytes():
                 buf += chunk
                 if len(buf) > BODY_CAP:
                     break
+                if time.monotonic() > body_by:
+                    slow = True
+                    break
             truncated = len(buf) > BODY_CAP
+            if slow:
+                box["slow_body"] = _BODY_DEADLINE_SECONDS
             return resp, bytes(buf[:BODY_CAP]), truncated
 
     @staticmethod
@@ -346,9 +383,22 @@ class GuardedClient:
         if headers is not None and not isinstance(headers, dict):
             raise TypeError(
                 f"headers must be a dict, got {type(headers).__name__}")
-        self.rate.wait()
+        # Budget BEFORE the rate wait. These were the other way round, so
+        # every call made after the budget was spent slept one full rate
+        # interval and then raised without sending anything - and a caller
+        # that treats a refusal as "try the next one", which `crawl` does,
+        # paid that interval per queued link. At the shipped default the
+        # queue is the target's choice: one BODY_CAP body holds thousands
+        # of hrefs. Refusing costs nothing now.
         with self._sent_lock:
             if self.sent >= self.max_requests:
+                raise RequestBudgetExhausted(
+                    f"request budget exhausted ({self.max_requests}); "
+                    "call finish"
+                )
+        self.rate.wait()
+        with self._sent_lock:
+            if self.sent >= self.max_requests:          # re-check post-wait
                 raise RequestBudgetExhausted(
                     f"request budget exhausted ({self.max_requests}); "
                     "call finish"
@@ -411,6 +461,21 @@ class GuardedClient:
             }
             if chain:
                 response_data["redirects"] = chain
+            # A body cut short by the deadline is not a complete response,
+            # and it used to be indistinguishable from one: status 200,
+            # `error: None`, a body that looks whole. Every probe in this
+            # package decides on that body.
+            if box.get("slow_body"):
+                # the LOCAL `error`, not just `response_data["error"]`:
+                # `out["error"]` below is populated from this variable, so
+                # setting only the recorded dict put it in the transcript
+                # and left the caller - every probe in this package -
+                # seeing `error: None` on a body that never finished
+                error = (
+                    f"body still arriving after {box['slow_body']:.0f}s - "
+                    "the response is incomplete, so a marker absent from it "
+                    "may simply not have arrived yet")
+                response_data["error"] = error
         except httpx.InvalidURL as exc:
             # Not an HTTPError: httpx refuses to parse the redirect target
             # (javascript:/data:/malformed Location). The event hook held on
@@ -758,12 +823,28 @@ class GuardedClient:
 
         end_by = (deadline or time.monotonic() + self._WS_READ_DEADLINE)
 
+        # `read1`, not `read`, and in small pieces. `fh` is a
+        # `BufferedReader` over the socket, and `BufferedReader.read(n)`
+        # loops on the raw stream internally until it has all n bytes or
+        # hits EOF - so the deadline above was only consulted BETWEEN
+        # `fh.read()` calls, and a server that declares a length (it
+        # chooses it, up to `_WS_MAX_FRAME`) and then feeds one byte at a
+        # time stayed inside a single call for length x interval. The
+        # deadline the docstring promises bounded the frame HEADERS and
+        # nothing on the body.
+        #
+        # `read1` makes at most one call to the raw stream, so the loop
+        # comes back to the clock after every arriving piece. The 4096 cap
+        # is belt and braces for a reader without `read1`.
+        _read1 = getattr(fh, "read1", None)
+
         def _exact(n: int) -> bytes:
             buf = b""
             while len(buf) < n:
                 if time.monotonic() > end_by:
                     return b""
-                chunk = fh.read(n - len(buf))
+                want = min(n - len(buf), 4096)
+                chunk = _read1(want) if _read1 else fh.read(want)
                 if not chunk:
                     return buf
                 buf += chunk
@@ -923,21 +1004,70 @@ class GuardedClient:
                         resp.fp.close()  # private reader never read - swap
                         resp.fp = _NoCloseFile(rbfile)  # share the real one
                         resp.begin()
-                        # the full body MUST be drained or its bytes corrupt
+                        # The full body MUST be drained or its bytes corrupt
                         # the next response's parse on this reused connection -
-                        # but only the first BODY_CAP is kept: a hostile server
-                        # cannot exhaust memory with an unbounded body
+                        # but only the first BODY_CAP is kept, so a hostile
+                        # server cannot exhaust MEMORY with an unbounded body.
+                        #
+                        # Memory was the only thing it bounded. The cap gated
+                        # the append and never the read, so the loop ran until
+                        # the server chose to end the body - its declared
+                        # Content-Length or its chunked stream, data the target
+                        # alone controls. The comment above the `reads` clamp
+                        # says "each extra read holds a 3s socket timeout, so
+                        # an unbounded value would pin the tool for reads*3
+                        # seconds", and that was false for exactly this reason:
+                        # one read can last declared_length / bandwidth. The
+                        # sibling httpx path gets it right - `_fetch_capped`
+                        # breaks out of `iter_bytes` once past the cap.
+                        #
+                        # It cannot simply stop early and keep going, because
+                        # of the first sentence: a connection whose stream
+                        # position is unknown cannot be read again. So the cut
+                        # sets `error`, which both stops the further reads
+                        # below and tells the operator why this response is
+                        # partial, instead of handing back a truncated body
+                        # that looks whole.
                         buf = bytearray()
+                        read_bytes = 0
+                        drain_by = time.monotonic() + _RAW_DRAIN_SECONDS
+                        over = ""
                         while True:
                             chunk = resp.read(65536)
                             if not chunk:
                                 break
+                            read_bytes += len(chunk)
                             if len(buf) <= BODY_CAP:
                                 buf += chunk
+                            if read_bytes > _RAW_DRAIN_CAP:
+                                over = (f"body exceeded {_RAW_DRAIN_CAP} "
+                                        "bytes and was not drained")
+                                break
+                            if time.monotonic() > drain_by:
+                                over = (f"body still arriving after "
+                                        f"{_RAW_DRAIN_SECONDS:.0f}s and was "
+                                        "not drained")
+                                break
                         rbody = bytes(buf[:BODY_CAP]).decode(
                             "utf-8", "replace")
+                        if over and error is None:
+                            error = (f"{over} - this connection cannot be "
+                                     "read again, so no further response was "
+                                     "collected")
                         status = resp.status
                         rheaders = dict(resp.getheaders())
+                        # Detach from the shared file. On a cut-short drain
+                        # the response is finalized with an unconsumed body
+                        # and its destructor flushes `rbfile`, which the
+                        # `finally` below has already closed - printing
+                        # "Exception ignored ... ValueError: I/O operation
+                        # on closed file" to stderr. The headers are parsed
+                        # by now and the connection is deliberately
+                        # unusable, so there is nothing left to read.
+                        try:
+                            resp.fp = None
+                        except Exception:              # pragma: no cover
+                            pass
                     except (http.client.HTTPException, OSError,
                             TimeoutError) as exc:
                         if error is None:

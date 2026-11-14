@@ -97,7 +97,16 @@ def crawl(ctx: Context, url: str, depth: int = 2, max_pages: int = 40) -> dict:
         return urllib.parse.urlunparse((p.scheme, p.netloc, p.path or "/",
                                         "", clean_q, ""))
 
-    while queue and len(pages) < max_pages:
+    # `len(pages) < max_pages` bounds SUCCESSFUL pages, and `pages.append`
+    # happens only after `send` returns - so a refused send fell through to
+    # `continue` without advancing the bound. `send` raises for every call
+    # once the request budget is spent, and the queue length is the
+    # target's choice (`_SurfaceParser.links` has no cap, and one BODY_CAP
+    # body holds thousands of hrefs), so the iteration count was the
+    # target's to set. Both are bounded now: pages kept, and attempts made.
+    attempts = 0
+    while queue and len(pages) < max_pages and attempts < max_pages * 4:
+        attempts += 1
         cur, d = queue.pop(0)
         key = canon(cur)
         if key in seen:

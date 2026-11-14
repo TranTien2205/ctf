@@ -1555,7 +1555,19 @@ _ARM_METRICS = (
 # while describing only part of it, so these report `-` unless every trial
 # in the arm carries the figure. `usd` is None whenever the model is absent
 # from models.json, which is every scripted demo.
-_ARM_METRICS_ALL_OR_NOTHING = ("usd",)
+#
+# `ttf` and `duration_s` belong here for the same reason and were missing
+# it. `time_to_first_finding_s` is null for every run that found nothing
+# (`report/markdown.py` returns None unless there is a first finding AND a
+# real start stamp), and `duration_s` was made nullable in this same body
+# of work - so an arm of five trials where one found nothing printed a
+# median over the four that did, under the arm's full N. For `ttf` the
+# subset is systematically the SUCCESSFUL trials, which is the worst
+# possible bias: the arm that fails more often reports the better
+# time-to-first-finding. A guard written for one metric and not for its
+# two siblings is the half-fix this log keeps recording, and this time the
+# siblings were made nullable after the guard was written.
+_ARM_METRICS_ALL_OR_NOTHING = ("usd", "ttf", "duration_s")
 
 
 def _arm_of(path) -> str:

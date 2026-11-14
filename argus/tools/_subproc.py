@@ -7,9 +7,49 @@ back only the head (transcript) and tail (model view) we actually keep.
 """
 from __future__ import annotations
 
+import os
 import re
+import signal
 import subprocess
 import tempfile
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill the child AND anything it spawned.
+
+    `subprocess.run(..., timeout=)` sends SIGKILL to the direct child only
+    and then waits for it. Anything that child spawned survives, is
+    reparented to init, and keeps the inherited stdout fd - a temp file
+    already unlinked, so it grows with no visible file - along with its
+    network access.
+
+    For this system that is not a tidiness problem. The orphan goes on
+    talking to the target with no ScopeGuard, no RateLimiter and no request
+    budget, nothing it does reaches the transcript, and the engagement's
+    own record says the run was stopped after N seconds. Every claim this
+    package makes about bounding what it sends is false for the lifetime of
+    that process.
+
+    On POSIX the child is started with `start_new_session=True`, so it
+    leads its own process group and the group can be signalled as a unit.
+    On Windows `taskkill /T` walks the child tree by pid. Both fall back to
+    killing the direct child, which is what the old behaviour was, so a
+    platform where neither works is no worse off than before.
+    """
+    try:
+        if os.name == "posix":
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            return
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       stdin=subprocess.DEVNULL, timeout=10)
+        return
+    except Exception:                       # pragma: no cover - platform dep
+        pass
+    try:
+        proc.kill()
+    except Exception:                       # pragma: no cover
+        pass
 
 
 def run_capped(cmd: list[str], timeout_s: float, cwd: str | None = None,
@@ -29,9 +69,24 @@ def run_capped(cmd: list[str], timeout_s: float, cwd: str | None = None,
         # - sqlmap prompting, curl with no URL, anything interactive - consumes
         # the host's frames and the session wedges with no error anywhere.
         # A pentest tool has no business reading our stdin in any mode.
-        proc = subprocess.run(cmd, stdout=fo, stderr=fe,
-                              stdin=subprocess.DEVNULL,
-                              timeout=timeout_s, cwd=cwd, env=env)
+        # `Popen` rather than `run`, so the timeout path can kill the whole
+        # tree instead of one pid. `start_new_session` makes the child a
+        # process-group leader on POSIX; see `_kill_tree`.
+        extra = {"start_new_session": True} if os.name == "posix" else {}
+        proc = subprocess.Popen(cmd, stdout=fo, stderr=fe,
+                                stdin=subprocess.DEVNULL, cwd=cwd, env=env,
+                                **extra)
+        try:
+            proc.wait(timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            _kill_tree(proc)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:   # pragma: no cover
+                pass
+            # the contract callers depend on is unchanged: `analysis.py`
+            # turns this into {"error": "timed out after Ns"}
+            raise
         so_size, se_size = fo.tell(), fe.tell()
 
         def _rd(tf, off: int, n: int) -> str:
