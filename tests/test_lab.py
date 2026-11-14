@@ -196,9 +196,20 @@ def test_csrf_proves_when_the_recorder_s_clock_is_coarse(lab_url, ctx,
     """
     import argus.session as session_mod
 
-    real = session_mod.time.time
-    monkeypatch.setattr(session_mod.time, "time",
-                        lambda: real() // 1.0 * 1.0)
+    # A CONSTANT clock, not a quantised one, and the difference is a defect
+    # I shipped. The first version was `real() // 1.0 * 1.0` - a 1-second
+    # granularity - which does not guarantee the stamps collide: it
+    # guarantees they fall within a second, and a run that straddles a
+    # second boundary gets TWO values. Measured: the probe's exchanges span
+    # ~0.136s, so a boundary splits them about 14% of the time, and the
+    # test failed 3 times in 24 isolated runs - 12.5%, against a ~14%
+    # prediction. It went green on 11/11 CI jobs by luck.
+    #
+    # That is the same defect class this test exists to catch, committed in
+    # the test itself: a measurement that depends on where the wall clock
+    # happens to be. A constant has no boundary to straddle, and every
+    # stamp is identical by construction.
+    monkeypatch.setattr(session_mod.time, "time", lambda: 1_700_000_000.0)
 
     # `_usercfg` is a class variable on a session-scoped server, so the
     # write below would otherwise outlive this test and leave the next

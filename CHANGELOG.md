@@ -961,6 +961,39 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The test written to catch a flake was itself flaky, at 13%
+- The CI matrix is Python 3.10-3.14 and the local gate only ever ran
+  3.14.6, so I ran the suite under the 3.12 and 3.13 interpreters that are
+  also installed here. 3.12 passed. **3.13 failed** -
+  `test_csrf_proves_when_the_recorder_s_clock_is_coarse`, the test added two
+  commits earlier to make a Windows-only clock defect local.
+- It was not a version defect. In isolation it passed 3/3 under 3.13, and
+  the whole of `test_lab.py` passed under 3.13; only the full suite failed
+  it. Measured directly instead of guessed: **3 failures in 24 isolated
+  runs, 12.5%**, against a span of 0.136s across the probe's exchanges that
+  predicts ~14% - because I coarsened the clock by QUANTISING it to one
+  second, and a quantisation does not collide stamps. It guarantees they
+  fall within a second; a run that straddles a boundary gets two values.
+- So the defect class this test exists to catch was committed inside the
+  test: a measurement that depends on where the wall clock happens to be.
+  It went green on 11/11 CI jobs, which across ~10 samples at an 87% pass
+  rate is about a 1-in-4 outcome. The green was luck, and I reported it as
+  evidence.
+- Fixed by making the clock a CONSTANT rather than a quantisation. There is
+  no boundary to straddle and every stamp is identical by construction.
+  Measured after: **0 failures in 30 runs**, ten each under 3.12, 3.13 and
+  3.14.
+- Both assertions re-proved live afterwards: removing the ordering tie-break
+  fails it for its real reason, and removing the clock patch fires its own
+  guard - *"the coarsened clock did not actually collide the stamps, so this
+  test is not measuring the thing it exists for"*, naming the four distinct
+  stamps.
+- What actually found this is worth naming, because it was not the lens I
+  reached for. Running the suite under three interpreters did not surface a
+  version difference - it tripled the sample count, and a 12.5% flake that
+  a single run had missed more than ten times showed up on the third pass.
+  More samples, not more platforms.
+
 ### race is driven in the proving direction again
 - The note standing where this entry now sits ended: *"if you re-add a live
   proving case here, expect it to fail on somebody else's machine."* It was
