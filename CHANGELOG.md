@@ -961,6 +961,37 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### race reverted, fourth round - and my evidence was the wrong half
+- The flip failed CI on Windows 3.10, 3.11 and 3.12. Windows 3.13, 3.14 and
+  every ubuntu job passed. Reverted, because the entry's own instruction
+  said to delete it and say so rather than add a conditional skip.
+- The part I got right is not the part that mattered. I read the earlier
+  Windows failure as proof that the burst DOES achieve concurrency there -
+  its first assertion passed, six requests returned 200 against one coupon -
+  and that reading holds up:
+  `test_the_race_window_can_be_made_deterministic` passed on the very
+  Windows jobs that failed this case. The lab side is fixed.
+- But concurrency was never the whole requirement, and I treated "the
+  mechanism works" as "the class proves". The grade came back `unproven`
+  with `missing: ['no evidence']` - which is `_best_grade`'s *starting*
+  value, so not one quote from any recorded exchange graded above unproven.
+  That is a different failure from the three before it, and I cannot yet
+  name its cause. Checked and ruled out: the overlap reconstruction, which
+  takes windows of `[ts - elapsed_ms, ts]` with a strict intersection -
+  those are ~150ms wide and start within ~16ms of each other, so they
+  intersect even when Windows' coarse `ts` makes them identical.
+- So the honest state is a missing diagnosis, not a missing mechanism, and
+  the entry says that instead of pretending the warning it replaced was
+  satisfied. The earlier note predicted failure on somebody else's machine
+  and I answered it with local measurement plus one reading of one CI run.
+  Twice now. The note now says: do not re-add this on local measurement
+  alone.
+- What stays, all independently green: the barrier and the wide window in
+  `/redeem`, their two tests in `tests/test_lab.py`, and the synthetic
+  both-direction assertions in `tests/test_proof.py`. Coverage is back to 27
+  of the 29 proof classes, and the changelog again needed no edit for that
+  figure.
+
 ### The test written to catch a flake was itself flaky, at 13%
 - The CI matrix is Python 3.10-3.14 and the local gate only ever ran
   3.14.6, so I ran the suite under the 3.12 and 3.13 interpreters that are
@@ -1967,7 +1998,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 635 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

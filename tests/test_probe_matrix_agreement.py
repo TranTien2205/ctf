@@ -92,8 +92,10 @@ is, and the first attempt used `_marker("deser")` while `NONCE_RE` is
 `\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as this probe's
 own and the class sat at a candidate with its nonce in plain sight.
 
-The proving direction covers 28 of the 29 proof classes. One is still not
-driven in it: `dos`, refused by construction - its proof is the damage. That sentence is a count, and the test at the bottom of this
+The proving direction covers 27 of the 29 proof classes. Two are not driven
+in it: `dos`, refused by construction because its proof is the damage, and
+`race`, whose live case was re-added and reverted again - see the note at its
+place in the table. That sentence is a count, and the test at the bottom of this
 module asserts it against the tables AND against the living documents that
 repeat it - this docstring included, which is why the figure is stated here
 in full rather than described.
@@ -109,12 +111,12 @@ this asserts against evidence:
   reach `proven`. This is the direction that matters: it is the one that fails
   when a verifier is too loose rather than when a probe is too thin.
 
-`race` is driven here again after three rounds of Windows CI failures kept it
-out. Its evidence is concurrency, which used to make provability a fact about
-the host's scheduler; both halves of that - which requests are inside the
-window, and whether their recorded windows are wide enough to intersect - are
-now guaranteed server-side by the lab. See the note at its table entry, which
-also says what to do if that turns out to be wrong.
+`race` has now been out, re-added, and taken out again - four rounds of
+Windows CI. The lab side is fixed and tested: a barrier puts every request
+inside the window and the endpoint's delay keeps each recorded window wide.
+What is still unexplained is why `verify_race` finds no usable evidence at
+all on Windows 3.10-3.12 while 3.13, 3.14 and every ubuntu job pass. See the
+note at its place in the table.
 """
 from __future__ import annotations
 
@@ -286,7 +288,29 @@ VULNERABLE = [
     # two requests in flight at once - delete this entry, put `race` back in
     # NOT_DRIVEN, and say so. Do not add a conditional skip; that is how the
     # case came to be testing the scheduler the first time.
-    ("probe_race", "race", _drive_race),
+    # REVERTED, fourth round. Re-added on local evidence (8/8 proven,
+    # windows 157-173ms) and on a reading of the Windows run that failed:
+    # its first assertion passed, six requests returned 200 against one
+    # coupon, so the burst does achieve concurrency there. That much was
+    # right - `test_the_race_window_can_be_made_deterministic` passed on
+    # the very Windows jobs that failed THIS case.
+    #
+    # But concurrency was never the whole requirement. On Windows 3.10,
+    # 3.11 and 3.12 the grade came back `unproven` with
+    # `missing: ['no evidence']` - which is `_best_grade`'s starting value,
+    # so no quote from any recorded exchange graded above unproven at all.
+    # Windows 3.13, 3.14 and every ubuntu job passed. Something about what
+    # the burst RECORDS on those runners does not satisfy `verify_race`,
+    # and I do not yet know what. The entry's own instruction said to delete
+    # it and say so rather than add a conditional skip, so that is what this
+    # is.
+    #
+    # What stays: the barrier and the window in `/redeem` are independently
+    # green and independently tested in `tests/test_lab.py`, and the
+    # unconditional both-direction assertions remain synthetic in
+    # `tests/test_proof.py`. What is missing is a diagnosis, not a
+    # mechanism. Do not re-add this on local measurement alone - that is
+    # twice now.
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -393,10 +417,10 @@ CLEAN = [
 # `probe_*` tool. Counting against the tooling is how `graphql` and `jwt` sat
 # outside this module without anyone noticing: neither is driven by a probe,
 # so neither appeared in a coverage figure derived from the probe table.
-PROVING_COVERAGE = 28
+PROVING_COVERAGE = 27
 MATRIX_CLASSES = 29
 # Each with a reason stated in the module docstring above.
-NOT_DRIVEN = {"dos"}
+NOT_DRIVEN = {"dos", "race"}
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
