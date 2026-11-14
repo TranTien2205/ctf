@@ -81,6 +81,58 @@ def test_reflection_probe(lab_url, ctx):
     assert "<" in out["unescaped_chars"]
 
 
+def test_a_reflection_past_the_returned_prefix_is_still_found(lab_url, ctx):
+    """The probe decided on 12,000 characters; the transcript keeps 200,000.
+
+    `GuardedClient.send` stores `body[:BODY_CAP]` and returns
+    `body[:RETURN_CAP]`, and sets `body_truncated_at` only for the 200k
+    cut - so a probe could not tell its view was a prefix. Every probe
+    that asks "is my marker in the body" was asking of the first 12,000
+    characters.
+
+    Measured on this endpoint: a 15,688-character page echoing the canary
+    at offset 15,665. `probe_reflection` answered "not reflected" while
+    the proof gate, reading the recorded body, found the same reflection -
+    probe and gate disagreeing on the same bytes with the probe blind.
+    A false negative is the quiet kind: the operator is told there is
+    nothing there and moves on.
+
+    Both halves are asserted, because the point is that they agree.
+    """
+    from argus.httpclient import BODY_CAP, RETURN_CAP
+
+    out = probes.probe_reflection(ctx, lab_url + "/long-search?q=x", "q")
+    assert out["reflected"], out
+    assert "<" in out["unescaped_chars"], out
+
+    # the geometry the test depends on, asserted rather than assumed: the
+    # reflection really is past the prefix and really is inside what the
+    # transcript keeps, or this passes without testing anything
+    entry = ctx.session._transcript[out["request_id"]]
+    body = entry["response"]["body"]
+    # `_marker("x")` is "x" + 8 of [a-z0-9], not the "argus..." prefix the
+    # other probes use - so the pattern is derived from the reflected
+    # payload rather than guessed at. The probe reflects `<canary><>'"&=/`,
+    # so the canary is what precedes that punctuation in the window.
+    canary = re.search(r"([a-z0-9]{9})<>'\"&=/", out["excerpt"])
+    assert canary, out["excerpt"][:160]
+    marker = canary.group(1)
+    offset = body.find(marker)
+    assert offset > RETURN_CAP, (offset, RETURN_CAP)
+    assert len(body) < BODY_CAP, len(body)
+
+    # ...and the gate, which has always read the recorded body, agrees.
+    # The quoted bytes are the payload WITH its punctuation: the gate's
+    # check is that the reflection carries raw < > " ', which a bare
+    # marker does not. `xss` is capped at candidate here because this
+    # system has no browser, so the check is what is asserted, not the
+    # grade.
+    verdict = proof.grade("xss", canary.group(0), [entry])
+    reflected = [c for c in verdict.checks
+                 if "reflected unencoded" in str(c["check"])]
+    assert reflected and reflected[0]["ok"], verdict.explain()
+
+
 def test_sqli_probe_error_based(lab_url, ctx):
     out = probes.probe_sqli(ctx, lab_url + "/item?id=1", "id")
     assert "error" in out["verdict"] or "candidate" in out["verdict"]

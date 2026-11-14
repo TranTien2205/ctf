@@ -417,6 +417,20 @@ class Handler(BaseHTTPRequestHandler):
             q = p.get("q", "")
             self._send(body=f"<html><body>Results for: {q}</body></html>")
 
+        elif path == "/long-search":
+            # The same reflection, pushed past the 12,000-character prefix
+            # `GuardedClient` hands a probe back. The transcript keeps
+            # 200,000, so the recorded evidence contains the reflection
+            # while the probe's view used to stop short of it - and
+            # `body_truncated_at` is set only for the 200k cut, so nothing
+            # told the probe its view was a prefix. A real app has pages
+            # this long; this endpoint exists so a test can be about the
+            # real path rather than a fake client.
+            q = p.get("q", "")
+            filler = "<p>lorem ipsum dolor sit amet consectetur</p>\n" * 340
+            self._send(body=f"<html><body>{filler}Results for: {q}"
+                            "</body></html>")
+
         elif path == "/item":
             i = p.get("id", "1")
             try:

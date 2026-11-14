@@ -352,13 +352,36 @@ CLEAN = [
     # endpoint was MEASURED clean, not assumed: this module has twice
     # asserted a lab endpoint was clean and been wrong, so the rule is to
     # drive it first and keep only what grades below its ceiling.
+    #
+    # What the rule does NOT give, measured by sabotage: forcing every
+    # `_check` in `proof.py` to pass unconditionally fails 21 of these 22
+    # rows and leaves `probe_websocket-websocket` passing. That row's
+    # `/ws-strict` refusal offers no quotable line, so `_best_grade`
+    # returns `unproven` with `missing == ['no evidence']` without ever
+    # calling `proof.grade` - it asserts the probe produced nothing
+    # citable, which is true and is a weaker claim than "the verifier
+    # refused it". Before the ceiling fix below, that sabotage left THREE
+    # rows passing, the two capped ones among them.
     # `/internal/status` serves a fixed JSON body and reflects nothing
     ("probe_reflection", "xss",
      lambda c, b: probes.probe_reflection(c, b + "/internal/status?x=y",
                                           "x")),
-    # `/search` echoes its term and makes no server-side fetch
+    # `ssrf` is graded by `verify_generic`, whose one required check is
+    # "the excerpt discriminates against a control" - and `/search?q=x`,
+    # which this row used to drive, echoes its term, so the payload and the
+    # control differ and the row reached `candidate`, the best this capped
+    # class can reach. A clean endpoint reaching the class maximum is what
+    # the CLEAN direction exists to catch, and the assertion below could
+    # not see it: it read `grade != "proven"`, which is true of every
+    # possible input for a class capped at `candidate`.
+    #
+    # `/internal/status` serves a fixed JSON body, so the payload and the
+    # control come back identical and the discrimination check genuinely
+    # fails - measured `unproven`. For a class whose only measurable signal
+    # is "two responses differ", an endpoint that answers identically is
+    # the only meaningful clean side.
     ("probe_ssrf", "ssrf",
-     lambda c, b: probes.probe_ssrf(c, b + "/search?q=x", "q")),
+     lambda c, b: probes.probe_ssrf(c, b + "/internal/status?x=y", "x")),
     # ...and parses no XML
     ("probe_xxe", "xxe", lambda c, b: probes.probe_xxe(c, b + "/search")),
     # `/api/order` echoes order/owner/total and drops every other field -
@@ -518,12 +541,26 @@ def test_the_matrix_refuses_a_probe_run_on_a_clean_endpoint(
     call(ctx, lab_url)
     entries = _exchanges(ctx.session)[before:]
     assert entries, f"{name} recorded no exchange at all"
-    grade, _ = _best_grade(klass, entries)
-    assert grade != "proven", (
+    grade, missing = _best_grade(klass, entries)
+    # Below the class's ATTAINABLE ceiling, which is what the comment on
+    # the CLEAN table already says ("keep only what grades below its
+    # ceiling") and what this assertion did not check. It read
+    # `grade != "proven"`, and `xss` and `ssrf` are both capped at
+    # `candidate`, so for those two rows it was true for every possible
+    # input: `ProofSpec.verdict` runs `_clamp(raw, self.ceiling)`, so
+    # `proven` is not in the range of `proof.grade` for them at all.
+    # Replacing both verifiers with one that marks every required check
+    # `ok` left both rows passing - the test could not see the thing it
+    # exists to see.
+    ceiling = proof.spec_for(klass).ceiling or "proven"
+    ranks = proof._GRADE_RANK_ORDER
+    assert ranks.index(grade) < ranks.index(ceiling), (
         f"{name} against an endpoint with no {klass} produced evidence that "
-        f"grades `proven`. That is the verifier accepting something it should "
-        f"refuse - the search box that echoes its query, in whatever form it "
-        f"has taken this time.")
+        f"grades `{grade}`, which is the best this class can reach "
+        f"(ceiling `{ceiling}`). That is the verifier accepting something "
+        f"it should refuse - the search box that echoes its query, in "
+        f"whatever form it has taken this time.\n"
+        f"  missing: {missing}")
 
 
 def test_every_driven_probe_exists_and_maps_to_a_real_class():

@@ -2667,12 +2667,75 @@ request carrying the operator's own cookie while the mint sat unreferenced -
 which is to say they were the defence working, graded proven, written down
 as the expected result.
 
+### Probes decided on 12,000 characters; the transcript keeps 200,000
+
+`GuardedClient.send` stores `body[:BODY_CAP]` (200,000) in the transcript
+and hands `body[:RETURN_CAP]` (12,000) back to the caller - and sets
+`body_truncated_at` only for the 200k cut, so a probe could not tell its
+view was a prefix. Every probe that asks "is my marker in the body" was
+asking of the first 12,000 characters: `probe_reflection`, `probe_sqli`'s
+similarities, `probe_lfi`'s markers, `probe_cmdi`'s identity match,
+`probe_massassign`, `probe_upload`, `probe_disclosure`'s soft-404
+equality.
+
+Measured on a new lab endpoint built for it: a 15,688-character page
+echoing the canary with raw `<>"'` at offset 15,665 made
+`probe_reflection` answer "not reflected", while the proof gate - which
+has always read the recorded body - found the same reflection and passed
+"payload reflected unencoded into HTML". Probe and gate disagreeing on the
+same bytes with the probe blind, and a false negative is the quiet kind:
+the operator is told there is nothing there and moves on.
+
+`_send` now returns the recorded body, which fixes every probe downstream
+of it in one place rather than at thirty call sites. Nothing passes a whole
+body into a probe's RESULT - the excerpts there are explicitly bounded - so
+what reaches the model is unchanged. `probe_race` had been reaching the
+recorded entry this way all along and was the only one.
+
+The test drives the real lab rather than a fake client, and asserts the
+geometry it depends on - that the reflection really is past
+`RETURN_CAP` and really is inside `BODY_CAP` - because otherwise it would
+pass without testing anything.
+
+### A clean endpoint already reached the best grade its class can reach
+
+`test_the_matrix_refuses_a_probe_run_on_a_clean_endpoint` asserted
+`grade != "proven"`, and `xss` and `ssrf` are both capped at `candidate` -
+`ProofSpec.verdict` runs `_clamp(raw, self.ceiling)`, so `proven` is not in
+the range of `proof.grade` for them on any input. For those two rows the
+assertion was true for every possible input.
+
+The table's own comment states the right rule - "keep only what grades
+below its ceiling" - and the assertion implemented a weaker one. Tightened
+to match the comment, 21 of 22 rows pass and the ssrf row fails: driven
+against `/search?q=x`, a clean search box reached `candidate` with
+`missing == ['settled by this system (held at candidate)']`, meaning every
+required check PASSED and only the cap held it down.
+
+That is not a defect in the verifier. `ssrf` is graded by
+`verify_generic`, whose one check is "the excerpt discriminates against a
+control", and a search box that echoes its term differs from its own
+control by construction - which is exactly why the class is capped. The
+row was pointed at the one kind of endpoint the clean direction cannot
+mean anything for. `/internal/status` serves a fixed JSON body, so payload
+and control come back identical and the check genuinely fails: measured
+`unproven`.
+
+Checked by sabotage, which is how the refuter found it: forcing every
+`_check` to pass unconditionally now fails 21 of the 22 clean rows. Before
+this it left three passing, the two capped ones among them. The one that
+still passes is recorded in the table's comment rather than left for a
+reader to assume - `/ws-strict`'s refusal offers no quotable line, so
+`_best_grade` returns `unproven` without ever calling `proof.grade`, and
+that row asserts the probe produced nothing citable, which is a weaker
+claim than "the verifier refused it".
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 663 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 664 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

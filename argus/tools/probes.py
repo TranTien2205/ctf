@@ -70,15 +70,42 @@ def _inject_body(data: str, param: str, value: str) -> str:
 def _send(ctx: Context, url: str, param: str, value: str,
           method: str = "GET", data: str | None = None,
           tool: str = "probe", note: str = ""):
+    """Send one injected request and return it with the RECORDED body.
+
+    The client hands back `body[:RETURN_CAP]` - 12,000 characters - to
+    bound what reaches the model, while storing `body[:BODY_CAP]` -
+    200,000 - in the transcript. Every probe downstream of here decides
+    "is my marker in the body" and was deciding on the first 12,000
+    characters of it, with no way to tell its view was a prefix:
+    `body_truncated_at` is set only for the 200k cut.
+
+    Measured: a 15,460-char page echoing the canary with raw `<>"'` at
+    offset 15,430 made `probe_reflection` answer "not reflected", while
+    the proof gate - which reads the recorded body - found it. Probe and
+    gate disagreeing on the same bytes, with the probe blind, and a false
+    negative is the quiet kind: the operator is told there is nothing
+    there.
+
+    Swapping it in here rather than at thirty call sites, because every
+    one of them reads `r["body"]` and the fix belongs where the body is
+    handed over. Nothing passes a whole body into a probe's RESULT - the
+    excerpts there are explicitly bounded - so what reaches the model is
+    unchanged.
+    """
     method = str(method or "GET").upper()
     data = data if isinstance(data, str) else (
         None if data is None else str(data))
     if method == "GET" or data is None:
-        return ctx.client.send("GET", _inject(url, param, value), tool=tool, note=note)
-    body = _inject_body(data, param, value)
-    headers = {"Content-Type": "application/json"} if data.strip().startswith("{") \
-        else {"Content-Type": "application/x-www-form-urlencoded"}
-    return ctx.client.send(method, url, headers=headers, body=body, tool=tool, note=note)
+        sent = ctx.client.send("GET", _inject(url, param, value),
+                               tool=tool, note=note)
+    else:
+        body = _inject_body(data, param, value)
+        headers = {"Content-Type": "application/json"} \
+            if data.strip().startswith("{") \
+            else {"Content-Type": "application/x-www-form-urlencoded"}
+        sent = ctx.client.send(method, url, headers=headers, body=body,
+                               tool=tool, note=note)
+    return {**sent, "body": recorded_body(ctx, sent)}
 
 
 def _similarity(a: str, b: str) -> float:
@@ -310,6 +337,45 @@ def status_of_result(r) -> int:
         return int((r or {}).get("status") or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def recorded_body(ctx, r) -> str:
+    """The response body as RECORDED, not the prefix the client returns.
+
+    `GuardedClient.send` stores `body[:BODY_CAP]` (200,000) in the
+    transcript and hands `body[:RETURN_CAP]` (12,000) back to the caller,
+    and it sets `body_truncated_at` only for the 200k cut - so a probe
+    could not even tell its view was a prefix. Every probe that decides
+    "is my marker in the body" was deciding on the first 12,000
+    characters.
+
+    Measured: a 15,460-char page that echoes the canary with raw `<>"'` at
+    offset 15,430 made `probe_reflection` answer "not reflected". The proof
+    gate, which reads the recorded body, finds it and grades the class at
+    its ceiling - so probe and gate disagreed on the same bytes, with the
+    probe blind. A false negative is the quiet kind: the operator is told
+    there is nothing there and moves on.
+
+    `probe_race` already reached the recorded entry this way and was the
+    only one. The fallback is the returned prefix, because a probe must
+    still work when there is no session to read - which is how most of
+    this module's unit tests drive it.
+    """
+    session = getattr(ctx, "session", None)
+    entry = None
+    if session is not None:
+        try:
+            entry = (getattr(session, "_transcript", {}) or {}).get(
+                (r or {}).get("request_id"))
+        except Exception:                                  # pragma: no cover
+            entry = None
+    if isinstance(entry, dict):
+        response = entry.get("response")
+        if isinstance(response, dict):
+            body = response.get("body")
+            if isinstance(body, str):
+                return body
+    return str((r or {}).get("body") or "")
 
 
 def answered(r) -> bool:
