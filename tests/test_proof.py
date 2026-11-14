@@ -864,32 +864,40 @@ def test_cors_allowlist_working_is_not_a_finding():
 def test_csrf_needs_a_tokenless_cross_origin_write():
     """Any GET plus any POST plus any difference graded csrf - that is a web
     site, not a finding."""
-    # explicit stamps: each write has to sit BETWEEN the two reads, because
-    # that is the sequence the claim describes. Left to creation order,
-    # `cross` and `tokened` are built after `after` and so are recorded
-    # after it - and a write that followed the read it supposedly caused is
-    # correctly refused.
-    before = ex("b22", "http://t.local/settings", "<p>email: old@x.test</p>",
+    # Each write has to sit BETWEEN the two reads, because that is the
+    # sequence the claim describes - and the order is now carried by the
+    # recorder's SEQUENCE, parsed from the id, not by the stamp. `_ordering`
+    # made that swap because the wall clock is the one thing here that can
+    # step backward; the ids below say what the stamps used to.
+    #
+    # This fixture is why the swap needed care. It creates `cross`, `late`
+    # and `tokened` after `after` and then used explicit stamps to claim
+    # they came earlier - so it built entries in one order and asserted
+    # another, and ids assigned in creation order quietly disagreed. The
+    # numbers now encode each sub-case's order directly, which is both
+    # faithful and the only thing the gate reads.
+    before = ex("b220", "http://t.local/settings", "<p>email: old@x.test</p>",
                 ts=10.0)
-    write = ex("b23", "http://t.local/settings/update-email", "ok", 200,
+    write = ex("b225", "http://t.local/settings/update-email", "ok", 200,
                method="POST", req_body="email=new@evil.test", ts=11.0)
-    after = ex("b24", "http://t.local/settings", "<p>email: new@evil.test</p>",
+    after = ex("b240", "http://t.local/settings", "<p>email: new@evil.test</p>",
                ts=12.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, write, after]).grade != "proven"
-    cross = ex("b25", "http://t.local/settings/update-email", "ok", 200,
+    cross = ex("b230", "http://t.local/settings/update-email", "ok", 200,
                method="POST", req_body="email=new@evil.test",
                req_headers={"origin": "http://evil.test"}, ts=11.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, cross, after]).grade == "proven"
-    # ...and the same write recorded AFTER the read it is claimed to have
-    # caused is not a finding
-    late = ex("b25b", "http://t.local/settings/update-email", "ok", 200,
+    # ...and the same write RECORDED AFTER the read it is claimed to have
+    # caused is not a finding - by sequence now, which is what a later
+    # recording actually means
+    late = ex("b990", "http://t.local/settings/update-email", "ok", 200,
               method="POST", req_body="email=new@evil.test",
               req_headers={"origin": "http://evil.test"}, ts=99.0)
     assert proof.grade("csrf", "new@evil.test",
                        [before, late, after]).grade != "proven"
-    tokened = ex("b26", "http://t.local/settings/update-email", "ok", 200,
+    tokened = ex("b231", "http://t.local/settings/update-email", "ok", 200,
                  method="POST",
                  req_body="email=new@evil.test&csrf_token=abc",
                  req_headers={"origin": "http://evil.test"}, ts=11.0)
@@ -2693,6 +2701,48 @@ def test_csrf_ordering_is_fail_closed_without_timestamps():
         assert v2.grade != "proven", v2.checks
         assert any("state changed between two reads" in str(c.get("check"))
                    and not c.get("ok") for c in v2.checks), v2.checks
+
+def test_a_backward_clock_step_does_not_invert_before_and_after():
+    """The wall clock is the one component here that can move backward.
+
+    `_ordering` had `ts` primary with the recorder's sequence only breaking
+    ties. An NTP or chrony step correction, a VM resumed from suspend, or a
+    container host resync mid-engagement makes `ts(read) < ts(write)` - and
+    then the post-write read falls into neither `before` nor `after` under
+    the strict comparisons, because `before` additionally requires the
+    excerpt to be ABSENT and this read is the one carrying it. A csrf the
+    target really has drops from `proven` to `candidate`.
+
+    A false negative, where the first version of this reasoning produced a
+    false positive. The sequence cannot do either: `record_exchange`
+    increments it under its own lock and writes it into the id before any
+    author sees it, and the transcript is hash-chained, so it is monotonic
+    by construction AND as authoritative as the stamp ever was. It is
+    primary now; `ts` separates entries that somehow share one.
+    """
+    foreign = {"origin": "http://evil.test",
+               "referer": "http://evil.test/attack.html"}
+    before = ex("c10", "http://t.local/p", "email: old@x", ts=1000.0)
+    write = ex("c11", "http://t.local/p", "ok", 200, method="POST",
+               req_body="email=evil@attacker", req_headers=foreign, ts=1001.0)
+    # the clock stepped back two seconds between the write and the read
+    stepped = ex("c12", "http://t.local/p", "email: evil@attacker", ts=999.0)
+    v = proof.grade("csrf", "email: evil@attacker", [before, write, stepped])
+    assert v.grade == "proven", v.checks
+
+    # a monotonic clock is of course unaffected
+    normal = ex("c13", "http://t.local/p", "email: evil@attacker", ts=1002.0)
+    assert proof.grade("csrf", "email: evil@attacker",
+                       [before, write, normal]).grade == "proven"
+
+    # and the recorder's order still wins over a claimant's: a read
+    # RECORDED before the write cannot be the read that shows its effect,
+    # however it is stamped or cited
+    early = ex("c09", "http://t.local/p", "email: evil@attacker", ts=5000.0)
+    for ordering in ([before, write, early], [early, write, before]):
+        assert proof.grade("csrf", "email: evil@attacker",
+                           ordering).grade != "proven"
+
 
 def test_every_gradeable_class_reaches_an_owasp_bucket():
     """`_CWE` is pinned to the matrix; the second hop was pinned to nothing.

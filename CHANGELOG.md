@@ -961,6 +961,49 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The wall clock was primary, and it is the one thing that can go back
+- `_ordering` had `ts` primary with the recorder's sequence breaking ties
+  only. An NTP or chrony step, a VM resumed from suspend, a container host
+  resync mid-engagement makes `ts(read) < ts(write)` - and the post-write
+  read then falls into neither `before` nor `after`, because `before` also
+  requires the excerpt to be ABSENT and this read is the one carrying it.
+  Measured: step the clock back two seconds and a csrf the lab really has
+  drops from `proven` to `candidate`.
+- A false negative, where **the first version of this same reasoning
+  produced a false positive**. This is the second correction to one
+  function, and it reverses the first: `ts` was made primary "so an
+  explicitly stamped order still decides", which left the deciding to the
+  only component that can move backward.
+- The sequence cannot do either. `record_exchange` increments it under its
+  own lock and writes it into the id before any author sees it, and the
+  transcript is hash-chained - monotonic by construction and as
+  authoritative as the stamp ever was. It is primary now; `ts` separates
+  entries that somehow share one, and an entry still needs a usable stamp
+  to participate at all, which is the fail-closed behaviour a hand-written
+  finding depends on.
+- The swap broke one existing test, and the break was the useful part.
+  `test_csrf_needs_a_tokenless_cross_origin_write` creates `cross`, `late`
+  and `tokened` AFTER the post-write read and then used explicit stamps to
+  claim they came earlier - so it built entries in one order and asserted
+  another, and the ids assigned in creation order quietly disagreed with
+  both. Its own comment said why it needed the stamps. The ids now encode
+  each sub-case's order directly, which is faithful and is the only thing
+  the gate reads.
+- Verified against the live lab as well as in fixtures: all 52 proving and
+  clean cases still pass, so the ordering change did not quietly make a
+  class unprovable. The new test also pins the property that could have
+  been lost - a read RECORDED before the write cannot be the read that
+  shows its effect, however it is stamped or cited.
+- Two sweep findings remain unaddressed and are named here rather than
+  closed: `mcp.close()` contends for a lock held across an in-flight RPC,
+  defeating its own bounded shutdown; and `load_skill` attaches a proof
+  requirement only when a module's STEM resolves to a class, so `enum`,
+  `jwt`, `lockout`, `massassign` and `method` - taught by multi-class
+  modules - get none. Measured: 24 of 27 module stems resolve, and those
+  five gradeable classes have no module of their own. Fixing the second
+  needs a module-to-classes mapping that does not exist yet, and inventing
+  one is how a taxonomy acquires a wrong row.
+
 ### A report that said 1970, and three partitions closed while empty
 - **The report printed a date of `1970-01-01` and a duration of about
   1.76e9 seconds.** `_reopen` initialises `started` to 0.0 and overwrites it
@@ -2259,7 +2302,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 642 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 643 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

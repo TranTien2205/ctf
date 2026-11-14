@@ -613,8 +613,27 @@ def _ordering(exchanges: list) -> dict:
     after `r2` no matter how the two are cited, so the sequence carries the
     same authority as `ts` and cannot tie.
 
-    `ts` stays primary, so an explicitly stamped order still decides; the
-    sequence only separates events the clock could not.
+    The SEQUENCE is primary and `ts` only separates entries that somehow
+    share one. That is the second correction to this function, and it
+    reverses the first: `ts` was primary "so an explicitly stamped order
+    still decides", which left the wall clock deciding, and the wall clock
+    is the one component here that can move BACKWARD - an NTP or chrony
+    step, a VM resumed from suspend, a container host resync. Measured: step
+    the clock back two seconds between a cross-origin write and the read
+    that shows its effect, and the read falls into neither `before` nor
+    `after` under the strict comparisons, so a csrf the lab really has drops
+    from `proven` to `candidate`. A false negative, where the earlier
+    version of this reasoning produced a false positive.
+    #
+    The sequence cannot do that. `record_exchange` increments it under its
+    own lock, assigns it into the id before any author sees it, and the
+    transcript is hash-chained - so it is both monotonic by construction and
+    as authoritative as `ts` ever was.
+
+    An entry still needs a usable `ts` to participate at all. That is the
+    fail-closed behaviour a hand-written finding depends on, and dropping it
+    would let a citation with no recorded time be ordered by id alone, which
+    is a bigger change than this defect warrants.
     """
     out = {}
     for entry in exchanges or ():
@@ -624,7 +643,7 @@ def _ordering(exchanges: list) -> dict:
         except (TypeError, ValueError):
             continue
         match = _ID_SEQ_RE.search(str((entry or {}).get("id") or ""))
-        out[id(entry)] = (stamp, int(match.group(1)) if match else 0)
+        out[id(entry)] = (int(match.group(1)) if match else 0, stamp)
     return out
 
 
