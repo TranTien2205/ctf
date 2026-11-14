@@ -961,6 +961,64 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### Five more from the sweep, and two wrong fixes not made
+- **A proven finding that vanished from the summary.** `_CWE` is pinned to
+  the matrix by a test; the second hop to `_OWASP` was pinned in neither
+  direction and was already two short. `CWE-1321` had no bucket, so a
+  `ppoll` finding that graded PROVEN carried a CWE and then dropped out of
+  the OWASP taxonomy the audit report is organised by - present in one,
+  absent from the other. Bucketed, with `CWE-400` (dos, refused by
+  construction) named as an explicit exemption, and the pair held by a test.
+- That bucket choice is where I nearly invented something. I was about to
+  write `CWE-1321 -> A08 Integrity Failures` as "the official OWASP
+  mapping", checked it, and **OWASP's A08:2021 CWE list does not name
+  CWE-1321 at all** - it names CWE-915, the parent weakness, which this
+  table files under A04. So the child goes where the parent lives here, the
+  disagreement is written in the comment, and the parent's row is left
+  alone because relabelling it would change what already-written reports
+  say.
+- **`probe_time` called a transport failure a delay.** `slow = elapsed_ms >=
+  threshold` read a duration and ignored the `status` in the same dict. On a
+  read timeout the client records status 0 and keeps `elapsed_ms` as the
+  whole wait - 15s against a threshold of baseline + 2800ms at the default -
+  so a WAF that blackholes requests containing `SLEEP(`, `pg_sleep(` or
+  `WAITFOR` rather than rejecting them reported a time-based candidate on
+  every payload family at once. The defence manufacturing the evidence for
+  the bug it defends against. Now requires an answer; a 500 still counts,
+  because a database that errors after sleeping did sleep.
+- **A precondition of mine, two commits old, was vacuous from the wrong
+  directory.** `Path("argus").rglob(...)` in the board-reach test is
+  relative to the process cwd, so running pytest from `tests/` yielded zero
+  files and the assertion passed on the empty set - measured: 0 files from
+  `tests/`, 39 anchored at the test file. That assertion is the stated
+  precondition for the whole derivation above it, and it was exactly the
+  vacuous-check shape the check was written to prevent.
+- **The flag exemption said per-line and did per-corpus.** `foreign` was one
+  set accumulated across every line of every gated document and subtracted
+  globally, so a flag seen once on a curl or nmap line was excused
+  everywhere - 11 names in this tree. Measured first: with the global union
+  and with the per-line rule, `invented` is empty either way, so this closes
+  a hole with no current occupant, which is the cheapest moment to close
+  one.
+- **A doc check that validated two names out of 29.** "docs name only real
+  proof classes" extracted from one literal form, `argus proof <name>`,
+  which across the whole gated doc set names `rce` and `sqli` and nothing
+  else - and had no floor, so rewording those two usage examples would have
+  left it reporting PASS while validating zero. Widened to `load_skill(...)`
+  and to backticked names on lines about classes or skills (10 now), and
+  floored, because a check that can validate nothing is not a check.
+- **And the reverse direction, which I checked and did not "fix".** The
+  obvious next move was to require every matrix class to be named in the
+  docs. Measured: 24 of 29 appear in living documents, which looks like five
+  undocumented classes - and then every one of the five turned out to be
+  reachable. `cache-poisoning`, `info-disclosure`, `host-header` and
+  `deserialization` are the names the docs use and **all four resolve
+  through `spec_for` to their class**, and `massassign` is named in the
+  README's diagram without backticks, which is why my pattern missed it.
+  There was no gap. Had I shipped the check I was about to write, I would
+  have pasted five class names into the documentation to satisfy a defect
+  that did not exist.
+
 ### Two false positives in the proof gate, found by adversarial sweep
 - Ran a six-lens sweep over the repository with every candidate finding put
   to three independent agents prompted to REFUTE it, surviving only on
@@ -2154,7 +2212,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 638 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 640 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

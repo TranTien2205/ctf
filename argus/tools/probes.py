@@ -272,6 +272,20 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
     return out
 
 
+def status_of_result(r) -> int:
+    """The status the client recorded for one send, or 0 for no response.
+
+    `GuardedClient` records status 0 when nothing came back - a connect
+    failure, a read timeout, a reset - and keeps `elapsed_ms` as the full
+    time spent waiting. Any probe that reads a duration without reading
+    this is treating a transport failure as a measurement.
+    """
+    try:
+        return int((r or {}).get("status") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
                data: str | None = None, delay_s: int = 4) -> dict:
     delay_s = _ival(delay_s, 4, 2, 10)
@@ -294,8 +308,25 @@ def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
     hits, results = [], []
     for family, payload in payloads:
         r = _send(ctx, url, param, payload, method, data, tool, family)
-        slow = r["elapsed_ms"] >= threshold
+        # The target has to have ANSWERED. This read `elapsed_ms >=
+        # threshold` and ignored the `status` sitting in the same dict, so a
+        # request that never came back was counted as a delay: on a read
+        # timeout the client records status 0 with elapsed_ms set to the
+        # full wait against a 15s read timeout, while the threshold at the
+        # default delay is only baseline + 2800ms. A WAF that blackholes
+        # requests containing `SLEEP(`/`pg_sleep(`/`WAITFOR` rather than
+        # rejecting them therefore reported as a time-based candidate on
+        # every family at once - the defence producing the evidence for the
+        # bug it is defending against.
+        #
+        # A status of 0 is this client's "no response"; anything the server
+        # actually sent is fair game, including a 500, because a database
+        # that errors after sleeping still slept.
+        answered = 100 <= status_of_result(r) < 600
+        slow = answered and r["elapsed_ms"] >= threshold
         results.append({"family": family, "elapsed_ms": r["elapsed_ms"],
+                        "status": status_of_result(r),
+                        "answered": answered,
                         "slow": slow, "request_id": r["request_id"]})
         if slow:
             hits.append(family)

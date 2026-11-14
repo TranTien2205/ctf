@@ -454,6 +454,33 @@ _OWASP = {
     "CWE-918": "A10 SSRF",
     "CWE-98": "A08 Integrity Failures",
     "CWE-290": "A01 Broken Access Control",
+    # Prototype pollution had NO bucket, so a `ppoll` finding that graded
+    # proven carried a CWE and then dropped out of the OWASP summary the
+    # audit report is actually organised by - a finding present in one
+    # taxonomy and absent from the other.
+    #
+    # A04 is chosen for internal consistency, and the reasoning is worth
+    # recording because it is not the obvious answer. CWE-1321 is the
+    # prototype-specific form of CWE-915, and this table already files
+    # CWE-915 under A04. OWASP's own A08:2021 CWE list names CWE-915 and
+    # does NOT name CWE-1321, so OWASP would put the parent somewhere this
+    # table does not. Rather than guess at a bucket for the child or
+    # relabel the parent - which would change what already-written reports
+    # say - the child goes where the parent lives here, and the
+    # disagreement is stated instead of inherited silently.
+    "CWE-1321": "A04 Insecure Design",
+}
+
+# A CWE this table deliberately does not bucket, and why. The pair is a
+# partition that `tests/test_proof.py` holds: every CWE reachable by a
+# gradeable class has an OWASP bucket, or is named here. `_CWE` is already
+# pinned to `proof.classes()` by a test, and that test stops at the first
+# hop - the second hop was checked in neither direction and was already
+# two short.
+_OWASP_UNBUCKETED = {
+    "CWE-400": "dos is refused by construction - the class never grades, so "
+               "no finding can ever carry this CWE into a summary. Bucketing "
+               "it would be inventing a row nothing can reach.",
 }
 
 

@@ -120,11 +120,23 @@ def test_every_tool_that_needs_a_board_is_declared_a_board_tool():
 
     # the derivation's precondition: team.py is the only tool module that
     # reaches a board. loop.py touches ctx.board once, for a mode label.
+    # Anchored at this FILE, not at the process cwd. `Path("argus")` is
+    # relative to wherever pytest was started, so running it from `tests/`,
+    # from an IDE with a different cwd, or against an installed wheel
+    # yielded zero paths - `reaches` stayed empty and the assertion below
+    # passed on the empty set. That assertion is the stated precondition for
+    # the whole derivation above it, so vacating it would let a new module
+    # start touching a board with nothing noticing. My own line, two
+    # commits old, and exactly the vacuous-check shape the check was
+    # written to prevent.
+    root = Path(__file__).resolve().parent.parent
+    files = sorted((root / "argus").rglob("*.py"))
+    assert files, f"no package sources found under {root / 'argus'}"
     reaches = set()
-    for fp in sorted(Path("argus").rglob("*.py")):
+    for fp in files:
         text = fp.read_text(encoding="utf-8")
         if "_board(ctx)" in text or "ctx.board" in text:
-            reaches.add(fp.as_posix())
+            reaches.add(fp.relative_to(root).as_posix())
     assert reaches <= {"argus/tools/team.py", "argus/loop.py"}, (
         f"{sorted(reaches)} reach a board, so deriving the set from "
         "team.py alone under-counts it")

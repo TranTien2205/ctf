@@ -5,6 +5,7 @@ evidence is easy; a gate that refuses a plausible-looking claim is the whole
 point, and the case that proves it is a benign page that happens to contain
 the right-looking string.
 """
+import re
 import itertools
 import sys
 from pathlib import Path
@@ -2679,6 +2680,46 @@ def test_csrf_ordering_is_fail_closed_without_timestamps():
         assert v2.grade != "proven", v2.checks
         assert any("state changed between two reads" in str(c.get("check"))
                    and not c.get("ok") for c in v2.checks), v2.checks
+
+def test_every_gradeable_class_reaches_an_owasp_bucket():
+    """`_CWE` is pinned to the matrix; the second hop was pinned to nothing.
+
+    `test_every_class_maps_to_a_cwe` holds the first hop - every proof class
+    has a CWE. Reports are summarised in a second taxonomy, and nothing held
+    that one in either direction. It was already short: `_CWE` carried 29
+    distinct CWEs and `_OWASP` had 27 keys, so a `ppoll` finding that graded
+    PROVEN carried a CWE and then vanished from the OWASP summary the audit
+    report is organised by - present in one taxonomy, absent from the other.
+
+    So: every CWE reachable by a gradeable class has a bucket, or is named
+    in `_OWASP_UNBUCKETED` with the reason it cannot be reached. `dos` is
+    the only member, because it is refused by construction and no finding
+    can ever carry its CWE anywhere.
+    """
+    from argus.session import _CWE, _OWASP, _OWASP_UNBUCKETED, _owasp_of
+
+    for klass in proof.classes():
+        cwe = _CWE.get(re.sub(r"[^a-z0-9]", "", klass.lower()), "")
+        assert cwe, f"{klass} has no CWE - the first hop is broken"
+        if cwe in _OWASP_UNBUCKETED:
+            continue
+        assert _owasp_of(cwe), (
+            f"{klass} grades and carries {cwe}, which reaches no OWASP "
+            "bucket - the finding would be summarised in one taxonomy and "
+            "dropped from the other. Add the bucket, or name the CWE in "
+            "_OWASP_UNBUCKETED with the reason it is unreachable.")
+
+    # the exemptions must be real CWEs of real classes, or they cover
+    # nothing and the gap reopens one level up
+    assert set(_OWASP_UNBUCKETED) <= set(_CWE.values()), \
+        sorted(set(_OWASP_UNBUCKETED) - set(_CWE.values()))
+    assert not (set(_OWASP_UNBUCKETED) & set(_OWASP))
+    for cwe, why in _OWASP_UNBUCKETED.items():
+        assert len(why) > 40, f"{cwe} is exempt without a stated reason"
+
+    # and the class that prompted it really does summarise now
+    assert _owasp_of(_CWE["ppoll"]), "ppoll still reaches no bucket"
+
 
 def test_lockout_reads_the_latency_the_throttle_lives_in():
     """A progressive delay is a throttle, and this check could not see one.

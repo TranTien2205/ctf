@@ -829,7 +829,18 @@ def _doc_consistency() -> None:
     # belongs to that tool, not to argus. Self-maintaining: the allowlist was a
     # hand-written set, and `--alert` (sqlmap's) was already outside it.
     from argus.tools.analysis import _ALLOWED_TOOLS
-    doc_flags, foreign = set(), set()
+    # Decided PER LINE, which is what the rule above says and what the code
+    # did not do. `foreign` used to be one set accumulated across every line
+    # of every gated document and then subtracted globally, so a flag that
+    # appeared once on a curl or nmap line was excused on every other line
+    # in every other document - 11 names in the current tree, including
+    # `--alert` and `--data-urlencode`, which no argus parser accepts.
+    #
+    # Measured before tightening: with the global union and with the
+    # per-line rule, `invented` is empty either way, so this closes a hole
+    # with no current occupant rather than fixing a live miss. That is the
+    # cheapest moment to close one.
+    doc_flags = set()
     flag_re = _re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]{2,})")
     for name, text in texts.items():
         for line in text.splitlines():
@@ -838,10 +849,9 @@ def _doc_consistency() -> None:
                 continue
             if any(t in line for t in _ALLOWED_TOOLS) \
                     or "docker" in line or "pip " in line:
-                foreign |= found
-            else:
-                doc_flags |= found
-    invented = sorted(doc_flags - real_flags - foreign)
+                continue          # this line is about another tool
+            doc_flags |= found
+    invented = sorted(doc_flags - real_flags)
     check(f"docs name only real flags ({len(real_flags)})", not invented,
           f"{invented} accepted by no parser")
 
@@ -979,10 +989,40 @@ def _doc_consistency() -> None:
     # 5. every proof class named in a doc exists, and every class the docs
     #    claim is refused really is
     classes = set(proof.classes())
-    named_classes = set(_re.findall(r"argus proof ([a-z-]+)", joined))
+    # Widened, and given a floor. This matched one literal form, `argus
+    # proof <name>`, which across the whole gated doc set names exactly two
+    # classes - `rce` and `sqli`. Reword those two usage examples to
+    # `argus proof <class>` and `named_classes` is empty, `missing` is
+    # empty, and the check reports PASS while validating nothing; from that
+    # point a document could name a class the matrix does not have.
+    #
+    # It now also reads `load_skill("<name>")` and backtick-quoted names on
+    # a line that mentions a class or a skill, and the floor is what makes
+    # the widening honest: a check that can validate zero names is not a
+    # check. Names are resolved through `spec_for`, so an ALIAS counts - the
+    # docs name `cache-poisoning`, `info-disclosure`, `host-header` and
+    # `deserialization`, every one of which resolves, and demanding the bare
+    # class name would have been a wrong fix dressed as a strictness.
+    named_classes = set(_re.findall(r"argus proof ([a-z][a-z0-9-]*)", joined))
+    named_classes |= set(_re.findall(r'load_skill\(\s*"([a-z][a-z0-9-]*)"',
+                                     joined))
+    for line in joined.splitlines():
+        if not _re.search(r"(?i)\bclass(?:es)?\b|\bskill\b", line):
+            continue
+        for token in _re.findall(r"`([a-z][a-z0-9-]{2,24})`", line):
+            if proof.spec_for(token) is not None:
+                named_classes.add(token)
     missing = sorted(c for c in named_classes
                      if c and proof.spec_for(c) is None)
-    check("docs name only real proof classes", not missing, f"{missing}")
+    check(f"docs name only real proof classes "
+          f"({len(named_classes)} named, {len(classes)} in the matrix)",
+          not missing and len(named_classes) >= 10,
+          f"{missing} named in a doc and absent from the matrix" if missing
+          else (f"{len(named_classes)} resolved, none invented"
+                if len(named_classes) >= 10 else
+                f"only {len(named_classes)} class name(s) found in the gated "
+                "docs - the patterns have stopped matching, so this check is "
+                "validating almost nothing"))
     check("the matrix still refuses dos",
           proof.spec_for("dos") is not None
           and proof.spec_for("dos").verifier is proof.verify_refused)
