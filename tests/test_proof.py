@@ -3870,3 +3870,79 @@ def test_method_needs_the_written_bytes_back_not_the_path_echoed():
                   "you searched for argus method probe argusput9k2x")
     assert proof.grade("method", "argusput9k2x",
                        [put, reflect, refused]).grade != "proven"
+
+
+def test_the_credential_digest_has_three_states_not_two():
+    """Fail-closed on a digest that does not match; not on one absent.
+
+    The fingerprint requirement was written fail-closed in both
+    directions, and `python -m argus verify docs/sample-session` found
+    the cost within a minute of CI starting: `TAMPERED: F06 claims grade
+    'proven' but its cited evidence supports 'unproven'`. That artifact is
+    a real forgery - a `jwt_forge` event WITH fingerprints, a Bearer token
+    accepted 200 echoing the forged claims, another refused 401 - and only
+    the digest of the accepted request was missing, because the field did
+    not exist when the session was recorded. Reporting TAMPERED there is a
+    false alarm about the evidence, not a finding about the target.
+
+    Without a digest there is nothing to correlate: both requests persist
+    as `Bearer <redacted>`, which is why `differ` is only `bool(cred_r)`.
+    So the absent state is graded by the old rule and the detail text says
+    which rule ran.
+
+    The third state is not a loophole in this build: `GuardedClient`
+    writes a digest for every credential header, so an accepted request
+    that carried a credential has one - and one that carried none fails
+    "a forged credential was accepted" on its own. This asserts that too,
+    because it is the thing that keeps the compatibility path narrow.
+    """
+    import hashlib
+
+    token_fp = hashlib.sha256(b"forged.jwt").hexdigest()[:16]
+    mint = {"id": "r1", "ts": 1_000_000.0, "kind": "jwt_forge",
+            "claims_set": {"role": "admin"},
+            "token_sha256_16": {"resigned": token_fp}}
+
+    def read(rid, status, body, cred, fp="auto"):
+        entry = ex(rid, "http://t/api/me", body, status=status,
+                   req_headers={"host": "t.local", "authorization": cred})
+        if fp is None:                       # as an old session recorded it
+            entry["request"].pop("credential_sha256_16", None)
+        return entry
+
+    refused = read("r3", 401, '{"error":"bad token"}', "Bearer other")
+
+    # 1. digest present and matching: the finding
+    assert proof.grade("jwt", '{"role":"admin"}', [
+        mint, read("r2", 200, '{"role":"admin"}', "Bearer forged.jwt"),
+        refused]).grade == "proven"
+
+    # 2. digest present, no match: the accepted request carried something
+    #    else, so the 200 is an auth system working
+    v = proof.grade("jwt", '{"role":"admin"}', [
+        mint, read("r2", 200, '{"role":"admin"}', "Bearer not-the-forgery"),
+        refused])
+    assert v.grade != "proven", v.checks
+    floor = [c for c in v.checks if "minted the credential" in str(c["check"])]
+    assert floor and "carried something else" in floor[0]["detail"], floor
+
+    # 3. digest absent: the old rule, and the detail says so
+    old = proof.grade("jwt", '{"role":"admin"}', [
+        mint, read("r2", 200, '{"role":"admin"}', "Bearer forged.jwt",
+                   fp=None), refused])
+    assert old.grade == "proven", old.explain()
+    floor = [c for c in old.checks
+             if "minted the credential" in str(c["check"])][0]
+    assert "records no credential digest" in floor["detail"], floor
+
+    # ...and the absent state cannot be reached by a request that carried
+    # no credential at all, which is what keeps it narrow
+    none_at_all = ex("r2", "http://t/api/me", '{"role":"admin"}', 200,
+                     req_headers={"host": "t.local"})
+    assert "credential_sha256_16" not in none_at_all["request"]
+    bare = proof.grade("jwt", '{"role":"admin"}',
+                       [mint, none_at_all, refused])
+    assert bare.grade != "proven", bare.explain()
+    accepted_check = [c for c in bare.checks
+                      if "forged credential was accepted" in str(c["check"])]
+    assert accepted_check and not accepted_check[0]["ok"], bare.checks

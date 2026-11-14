@@ -687,6 +687,11 @@ _NOT_TOOLS = {
     "proof_requirement",     # transcript ids that survive history compaction - `run_id` shares the
     # `run_*` family with run_external/run_exploit and is not a tool
     "run_id", "call_id",
+    # `run_all` is this gate's own script, `test/run_all.sh`, which the
+    # operating rules tell a reader to run before accepting any change -
+    # so a document naming it is correct and the `run_*` family caught it
+    # for the same reason it caught `run_id`
+    "run_all",
     # a probe PARAMETER, not a tool: probe_csrf takes `read_url` to bracket
     # the write with a read before and after
     "read_url",

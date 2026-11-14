@@ -563,3 +563,44 @@ def test_the_report_warns_before_the_numbers_not_after(tmp_path):
         "llm_tokens": {"in": 10, "out": 2, "cache_read": 0, "cache_write": 0},
         "llm_cost": {"usd": 0.0}, "error": None})
     assert "RUN DID NOT COMPLETE" not in clean.read_text(encoding="utf-8")
+
+
+def test_the_shipped_sample_session_still_verifies():
+    """`argus verify docs/sample-session` ran ONLY in CI's wheel job.
+
+    Not in `test/run_all.sh`, not in `selftest.py`, not in pytest - so the
+    four-layer local gate could not see it, and a change to the proof
+    matrix that regraded a committed artifact passed 663 local tests and
+    158 doc checks before CI said:
+
+        TAMPERED: F06 claims grade 'proven' but its cited evidence
+        supports 'unproven' - unmet: this system minted the credential
+
+    The artifact was right and the new requirement was too strict for
+    evidence recorded before the field it reads existed. The fix for THAT
+    is three states instead of two, in `verify_token_forgery`. The fix for
+    the gap that let it reach CI is this test: the sample session is a
+    committed artifact and every layer should re-validate it, because
+    `argus verify` re-grades every finding against the transcript and is
+    therefore the one check that notices when the matrix moves under a
+    shipped proof.
+
+    It runs in-process rather than as a subprocess so a failure prints the
+    reason rather than an exit code.
+    """
+    import io
+    import contextlib
+    from pathlib import Path
+
+    from argus import cli
+
+    sample = Path(__file__).resolve().parent.parent / "docs" / "sample-session"
+    assert sample.is_dir(), sample
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        code = cli.main(["verify", str(sample)])
+    text = out.getvalue()
+    assert code == 0, text
+    assert "OK:" in text, text
+    assert "findings re-validated" in text, text

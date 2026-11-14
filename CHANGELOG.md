@@ -2730,12 +2730,56 @@ reader to assume - `/ws-strict`'s refusal offers no quotable line, so
 that row asserts the probe produced nothing citable, which is a weaker
 claim than "the verifier refused it".
 
+### CI verified a committed artifact that the local gate never looked at
+
+The credential-digest requirement above went in fail-closed in both
+directions, passed 663 local tests and 158 doc checks, and CI answered
+within a minute:
+
+    TAMPERED: F06 claims grade 'proven' but its cited evidence supports
+    'unproven' - unmet: this system minted the credential
+
+`python -m argus verify docs/sample-session` ran **only** in CI's wheel
+job - not in `test/run_all.sh`, not in `selftest.py`, not in pytest - so
+the four-layer local gate could not see it. That is the gap, and it
+matters more than the change that fell into it: `argus verify` re-grades
+every finding against the transcript, which makes it the one check that
+notices when the proof matrix moves under a shipped proof. It is a pytest
+test now, so all ten pytest jobs and the local gate run it too.
+
+The artifact was right. F06 is a real forgery - a `jwt_forge` event with
+its fingerprints, a Bearer token accepted 200 echoing the forged claims,
+another credential refused 401 - and only the digest of the accepted
+request was missing, because the field did not exist when the session was
+recorded. Failing closed there reports TAMPERED on a legitimate proof,
+which is a false alarm about the evidence rather than a finding about the
+target.
+
+So the check has three states and not two:
+
+    digest present and matching  -> this request carried the minted token
+    digest present, no match     -> it carried something else: REFUSE
+    digest absent entirely       -> graded by the old rule, and said so
+
+The third is not a loophole in this build. `GuardedClient` writes a digest
+for every credential header, so an accepted request that carried a
+credential has one; one that carried none fails "a forged credential was
+accepted" on its own. That is asserted, because it is what keeps the
+compatibility path narrow. And without a digest there is genuinely nothing
+to correlate - both requests persist as `Bearer <redacted>`, which is the
+reason `differ` is only `bool(cred_r)` two checks down - so the detail text
+names which rule ran rather than letting the gate quietly be two gates.
+
+Both directions were checked by planting them: making the absent state
+refuse reproduces CI's message locally, and letting the no-match state
+through fails the defence-working test.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 664 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 666 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

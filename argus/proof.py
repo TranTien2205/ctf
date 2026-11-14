@@ -1335,17 +1335,51 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
         # minted. Fail-closed when the exchange records no fingerprint: a
         # real one always does, and an evidence set that cannot be
         # correlated is exactly the set this class used to prove on.
+        # Three states, not two, and the middle one is why. `sent` is the
+        # digests the ACCEPTED request recorded:
+        #
+        #   present and matching  -> this request carried the minted token
+        #   present, no match     -> it carried something else: REFUSE
+        #   absent entirely       -> recorded before this field existed
+        #
+        # The third is not a loophole a claimant can reach in this build.
+        # `GuardedClient` writes a digest for every credential header, so
+        # an accepted request that carried a credential has one - and if it
+        # carried none, `cred_a` is empty and "a forged credential was
+        # accepted" fails on its own. What the third state IS: the sessions
+        # already on disk. `python -m argus verify docs/sample-session`
+        # caught this within a minute of CI starting, and the artifact was
+        # right - a jwt_forge event WITH fingerprints, a Bearer token
+        # accepted 200 echoing the forged claims, another refused 401. Only
+        # the digest of the accepted request was missing, because the field
+        # did not exist when it was recorded. Failing closed there reports
+        # TAMPERED on a legitimate proof, which is a false alarm about the
+        # evidence rather than a finding about the target.
+        #
+        # Without a digest there is genuinely nothing to correlate: both
+        # requests persist as `Bearer <redacted>`, which is the reason
+        # `differ` is only `bool(cred_r)` two checks down. So old evidence
+        # is graded by the old rule and the detail text says which rule
+        # ran, rather than the gate quietly being two different gates.
         sent = _credential_fp(accepted)
+        unfingerprinted = accepted is not None and not sent
         carried = bool(_mint_fp) and bool(sent & _mint_fp)
         return [
             _check("this system minted the credential",
                    minted is not None and bool(echoed) and first
-                   and carried,
-                   f"jwt_forge {minted.get('id')} set "
-                   f"{sorted(claims_set)}, echoed {echoed[0]!r}, and "
-                   f"{(accepted or {}).get('id')} carried that token"
-                   if minted is not None and echoed and first and carried
-                   else
+                   and (carried or unfingerprinted),
+                   (f"jwt_forge {minted.get('id')} set "
+                    f"{sorted(claims_set)}, echoed {echoed[0]!r}, and "
+                    f"{(accepted or {}).get('id')} carried that token"
+                    if carried else
+                    f"jwt_forge {minted.get('id')} set "
+                    f"{sorted(claims_set)}, echoed {echoed[0]!r} - "
+                    f"{(accepted or {}).get('id')} records no credential "
+                    f"digest, so which request carried the minted token "
+                    f"could not be checked (recorded before this system "
+                    f"fingerprinted them)")
+                   if minted is not None and echoed and first
+                   and (carried or unfingerprinted) else
                    ("cite the jwt_forge event: nothing in the session shows the "
                     "accepted credential was minted here, and a working auth "
                     "check looks the same on the wire" if minted is None else
