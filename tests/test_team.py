@@ -197,6 +197,41 @@ def test_a_spent_lead_bound_does_not_claim_the_surface_is_covered(ctx):
     assert "NOT covered" in out["reason"]
 
 
+def test_every_registered_tool_is_granted_to_some_role():
+    """The direction that rots, for the tool registry this time.
+
+    Every card's tools are checked against the registry - a card naming a
+    tool that does not exist fails loudly. Nothing checked the reverse: a
+    tool that exists and is in NO card is unreachable for every agent in
+    team mode, and nothing says so. `next_action` was exactly that, found by
+    hand: the registry had it, four cards did not, and `decide.py`'s own
+    docstring named the agent as one of the ledger's two readers.
+
+    Measured now: 56 registered tools, 56 reachable. The partition is
+    satisfied, which is the cheapest moment to hold it - a new probe added
+    to the registry and forgotten in `cards.py` reaches no worker, and the
+    probe's absence looks exactly like a probe that found nothing.
+    """
+    from argus.team.cards import CARDS, LEAD
+    from argus.tools import registry
+
+    known = {t["name"] for t in registry.TOOL_SCHEMAS}
+    granted = set(LEAD.tools)
+    for card in CARDS.values():
+        granted |= set(card.tools)
+
+    assert known, "the registry is empty, so this test measures nothing"
+    unreachable = sorted(known - granted)
+    assert not unreachable, (
+        f"{unreachable} exist in the registry and are in no role card, so no "
+        "agent can call them in team mode. Grant each to the role that "
+        "should have it, or take it out of the registry.")
+
+    # and every granted name is a real tool, or a card is filtering on a
+    # typo and silently narrowing that role
+    assert granted <= known, sorted(granted - known)
+
+
 def test_no_role_is_told_to_call_a_tool_its_grant_denies(ctx):
     """The shared prompt was a single-agent playbook given to four roles.
 

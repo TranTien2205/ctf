@@ -315,3 +315,49 @@ def test_a_rerender_of_a_keyed_session_keeps_the_chain(tmp_path):
         assert main(["verify", str(s.dir), "--seal-key", key]) == 0
     finally:
         srv.shutdown()
+
+
+def test_a_session_with_no_start_stamp_reports_unknown_not_1970(tmp_path):
+    """Two figures in the header were computed from a start time of zero.
+
+    `_reopen` initialises `started` to 0.0 and only overwrites it when
+    meta.json exists, parses, and carries a truthy `started` - and that
+    `except: pass` is deliberate, so a damaged session is still reportable.
+    summary.json is written BY this renderer, so on the FIRST report of such
+    a session both sources were absent and the header printed
+    `Date: 1970-01-01 00:00:00` and a duration of `time.time() - 0.0`:
+    about 1.76e9 seconds, roughly fifty-six years, in a report whose whole
+    job is to be checkable.
+
+    Saying "unknown" is the only honest answer, and summary.json carries
+    null rather than a number so a reader can tell "no measurable time"
+    from "nothing recorded when it began".
+    """
+    import json
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+
+    meta = json.loads((sdir / "meta.json").read_text(encoding="utf-8"))
+    meta.pop("started", None)
+    (sdir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    (sdir / "summary.json").unlink()          # as on a first render
+
+    assert main(["report", str(sdir)]) == 0
+    report = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "1970" not in report, "a start time of zero reached the header"
+    assert "- **Date:** unknown" in report
+    assert "- **Duration:** unknown" in report
+    assert json.loads(
+        (sdir / "summary.json").read_text(encoding="utf-8")
+    )["duration_s"] is None
+
+    # ...and a healthy session still reports real figures, or this has just
+    # made every report say "unknown"
+    fresh = tmp_path / "fresh"
+    assert main(["demo", "--session-dir", str(fresh), "--quiet"]) == 0
+    fdir = next(p for p in fresh.iterdir() if p.is_dir())
+    healthy = (fdir / "report.md").read_text(encoding="utf-8")
+    assert "- **Date:** unknown" not in healthy
+    assert "- **Duration:** unknown" not in healthy

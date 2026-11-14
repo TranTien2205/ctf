@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import time
 import urllib.parse
@@ -165,10 +166,55 @@ def resolve_auth(args) -> tuple[str, str]:
 # ANTHROPIC_BASE_URL would send the API key to a hostile gateway, and
 # ARGUS_MCP_CONFIG names subprocesses to run: a .env inside an untrusted
 # project dir must not be able to set either.
+# The credential half is DERIVED from the model catalogue, because a
+# hand-written list covered three names while `models.json` declared seven:
+# `OPENAI_API_KEY`, `DEEPSEEK_API_KEY`, `OLLAMA_API_KEY` and
+# `ARGUS_LOCAL_API_KEY` were silently dropped from any `.env`, so an
+# operator who put their key there got "no API key" and nothing saying why.
+# The allowlist's job is to bound WHICH names a .env may set, and the
+# catalogue is the honest definition of that bound: a provider's key becomes
+# loadable the moment the catalogue declares it, and a name the catalogue
+# does not declare still cannot be set.
+def _declared_key_envs() -> set[str]:
+    """Every `api_key_env` the model catalogue names, or nothing on error.
+
+    Falls back to the empty set rather than raising: a damaged catalogue
+    must not stop `.env` from loading the settings below it, and the three
+    Anthropic names stay listed explicitly so credential loading never
+    depends on this file parsing.
+    """
+    try:
+        import json as _json
+        raw = _json.loads(
+            (Path(__file__).resolve().parent / "models.json").read_text(
+                encoding="utf-8"))
+    except Exception:
+        return set()
+    found: set[str] = set()
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            value = node.get("api_key_env")
+            if isinstance(value, str):
+                found.add(value)
+            elif isinstance(value, list):
+                found.update(v for v in value if isinstance(v, str))
+            for child in node.values():
+                walk(child)
+        elif isinstance(node, list):
+            for child in node:
+                walk(child)
+
+    walk(raw)
+    # only ordinary env-var names, so a hand-edited catalogue cannot widen
+    # this into anything else
+    return {n for n in found if re.fullmatch(r"[A-Z][A-Z0-9_]{2,40}", n)}
+
+
 _DOTENV_ALLOWED = {
     "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN",
     "ARGUS_MODEL", "ARGUS_SECRETS",
-}
+} | _declared_key_envs()
 
 
 def _load_dotenv(path: Path = Path(".env")) -> None:

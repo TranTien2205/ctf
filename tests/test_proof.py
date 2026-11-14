@@ -962,7 +962,20 @@ def test_upgrade_keeps_the_original_timestamp_and_the_new_metadata(tmp_path):
         "sqlite3.OperationalError", "d", "r", agent="exploit-1",
         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N")
     original_ts = first["ts"]
-    time.sleep(0.01)
+    # 50ms, not 10. Both stamps are `round(time.time(), 3)`, and
+    # `time.time()` on Windows resolves to 15.6ms up to Python 3.12
+    # (precise from 3.13, CPython gh-63207), so a 10ms gap can leave both on
+    # the same tick and make the strict `>` below false. Two lenses of an
+    # adversarial sweep flagged this independently; one verifier refuted it
+    # on the grounds that the line has survived nine Windows job-runs whose
+    # failures were enumerated in full, and another reproduced it at 22% by
+    # quantising the clock.
+    #
+    # The dispute is not resolved here, because resolving it costs a CI run
+    # and the defensive change costs 40ms. A simulation agreeing with me is
+    # the evidence that failed twice in this repository's history; a gap
+    # three ticks wide needs no model at all.
+    time.sleep(0.05)
     r2 = s.record_exchange(
         "http_request",
         {"method": "GET", "url": "http://t.local/i?id=1' UNION SELECT a,b "

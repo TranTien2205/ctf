@@ -961,6 +961,53 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### A report that said 1970, and three partitions closed while empty
+- **The report printed a date of `1970-01-01` and a duration of about
+  1.76e9 seconds.** `_reopen` initialises `started` to 0.0 and overwrites it
+  only when meta.json exists, parses and carries a truthy `started` - and
+  that `except: pass` is deliberate so a damaged session stays reportable.
+  summary.json is written BY the renderer, so on the FIRST report of such a
+  session both sources were absent and the header computed from zero. Fifty-
+  six years, in a report whose whole job is to be checkable.
+- Two figures, not one: I fixed the duration, wrote a comment claiming the
+  renderer prints "unknown" for a negative value, checked, and it does not -
+  it prints the number with an `s` after it. The `Date:` line one row above
+  had the identical defect via `localtime(0.0)`. Both now say "unknown", and
+  summary.json carries `null` rather than a number so a reader can tell "no
+  measurable time" from "nothing recorded when it began". A healthy session
+  is asserted to still show real figures, or the fix would simply have made
+  every report say unknown.
+- **`.env` silently dropped four of seven declared credentials.**
+  `_DOTENV_ALLOWED` was hand-written with the three Anthropic names while
+  `models.json` declares seven `api_key_env` values, so `OPENAI_API_KEY`,
+  `DEEPSEEK_API_KEY`, `OLLAMA_API_KEY` and `ARGUS_LOCAL_API_KEY` in a `.env`
+  were ignored - an operator putting their key there got "no API key" and
+  nothing saying why. The credential half is now DERIVED from the catalogue,
+  which is the honest definition of the bound this allowlist exists to
+  enforce: a provider's key becomes loadable when the catalogue declares it,
+  a name the catalogue does not declare still cannot be set, and the
+  Anthropic three stay listed explicitly so credentials never depend on that
+  file parsing.
+- **A test that depended on state it did not own.** `test_cache_probe` was
+  the only reader of `/cached` that did not reset it first, and
+  `probe_cache` reports `undecided` when it finds an entry it did not put
+  there - so any new or reordered test that touches `/cached` first turns
+  its assertion into a failure about someone else's request. Third instance
+  of this shape in two days; the reset endpoint already existed.
+- **And three partitions closed while they were still empty**, which is the
+  cheapest moment: every registered tool is granted to some role card (56 of
+  56 today - `next_action` was the one that was not, found by hand, and the
+  plant reproduces exactly that), every CWE reachable by a gradeable class
+  has an OWASP bucket, and the doc flag exemption is decided per line.
+- **One dispute left unresolved on purpose.** Two sweep lenses independently
+  flagged a 10ms sleep separating two `round(time.time(), 3)` stamps
+  compared with a strict `>`. One verifier refuted it on nine Windows
+  job-runs whose failures were enumerated in full; another reproduced it at
+  22% by quantising the clock. Settling that costs a CI run; widening the
+  gap to 50ms - three Windows ticks - costs 40ms. A simulation agreeing with
+  me is the evidence that failed twice in this log, so the cheap defensive
+  change wins over being right.
+
 ### Five more from the sweep, and two wrong fixes not made
 - **A proven finding that vanished from the summary.** `_CWE` is pinned to
   the matrix by a test; the second hop to `_OWASP` was pinned in neither
@@ -2212,7 +2259,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 640 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 642 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

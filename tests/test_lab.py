@@ -498,6 +498,14 @@ def test_deserialize_probe(lab_url, ctx):
 
 
 def test_cache_probe(lab_url, ctx):
+    # `/cached` is a class-variable cache on a session-scoped server, and
+    # this was the only reader of it that did not reset first. `probe_cache`
+    # reports `undecided` when it finds an entry it did not put there, so
+    # anything that reads `/cached` before this test - a new test, or these
+    # tests reordered - turns the assertion below into a failure about
+    # someone else's request.
+    ctx.client.send("GET", lab_url + "/cached/reset",
+                    tool="http_request", note="own the cache state")
     out = probes.probe_cache(ctx, lab_url + "/cached")
     assert "cache-poisoning candidate" in out["verdict"], out
     out = probes.probe_cache(ctx, lab_url + "/profile")

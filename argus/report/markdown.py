@@ -92,7 +92,13 @@ def _coverage(session: Session) -> dict:
             "probes": sorted(probes)}
 
 
-def _duration(session: Session) -> float:
+def _dur_text(session: Session) -> str:
+    """The duration as the report prints it, or "unknown"."""
+    value = _duration(session)
+    return "unknown" if value is None else f"{value}s"
+
+
+def _duration(session: Session) -> float | None:
     """Run duration: reuse the value stored in summary.json on first render
     so a re-rendered report shows the run's real length, not time-since."""
     try:
@@ -102,6 +108,21 @@ def _duration(session: Session) -> float:
             return float(prev["duration_s"])
     except Exception:
         pass
+    # `started` has to be a real stamp. On the forensic reopen path it is
+    # initialised to 0.0 and only overwritten when meta.json exists, parses
+    # and carries a truthy `started` - and that `except: pass` is deliberate
+    # so a damaged session is still reportable. summary.json is written BY
+    # this renderer, so on the FIRST report of a session whose meta.json is
+    # missing, corrupt, or lacking `started`, both sources were absent and
+    # this returned `time.time() - 0.0`: a duration of about 1.76e9 seconds,
+    # printed as the run's length. Fifty-six years, in a report whose whole
+    # job is to be checkable.
+    #
+    # 0.0 is not a duration anyone can act on, so say nothing instead of
+    # saying something false. `None` here, and both readers below render it
+    # as "unknown" rather than printing a number.
+    if not session.started or session.started <= 0:
+        return None
     return round(time.time() - session.started, 1)
 
 
@@ -221,8 +242,14 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         f"# Penetration Test Report - {session.id}",
         "",
         f"- **Target:** `{session.dir.name.split('-', 2)[-1]}` ({session.dir.name})",
-        f"- **Date:** {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started))}",
-        f"- **Duration:** {_duration(session)}s",
+        # `started` is 0.0 on a reopen whose meta.json is missing, corrupt
+        # or lacks the stamp, and this line printed `1970-01-01 00:00:00`
+        # for it - the same defect as the duration below, one line up.
+        f"- **Date:** "
+        f"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started))}"
+        if session.started and session.started > 0 else
+        "- **Date:** unknown (this session's meta.json carries no start time)",
+        f"- **Duration:** {_dur_text(session)}",
         f"- **Agent model:** {cfg.model}",
         # the build that produced the session - falls back to this
         # renderer's on old artifacts without a stamp
@@ -450,6 +477,9 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         # original and digest-valid.
         "agent_summary": summary or "",
         "requests": session._seq,
+        # null, not a number: a reader of summary.json must be able to tell
+        # "the run took no measurable time" from "nothing recorded when it
+        # began"
         "duration_s": _duration(session),
         "time_to_first_finding_s": ttf,
         "coverage": coverage,
