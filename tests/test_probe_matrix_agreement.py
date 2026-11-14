@@ -92,9 +92,8 @@ is, and the first attempt used `_marker("deser")` while `NONCE_RE` is
 `\bargus[a-z0-9]{4,24}\b`, so the token was unrecognisable as this probe's
 own and the class sat at a candidate with its nonce in plain sight.
 
-The proving direction covers 27 of the 29 proof classes. Two are still not
-driven in it: `dos` (refused by construction - its proof is the damage) and
-`race` (below). That sentence is a count, and the test at the bottom of this
+The proving direction covers 28 of the 29 proof classes. One is still not
+driven in it: `dos`, refused by construction - its proof is the damage. That sentence is a count, and the test at the bottom of this
 module asserts it against the tables AND against the living documents that
 repeat it - this docstring included, which is why the figure is stated here
 in full rather than described.
@@ -110,10 +109,12 @@ this asserts against evidence:
   reach `proven`. This is the direction that matters: it is the one that fails
   when a verifier is too loose rather than when a probe is too thin.
 
-One class is absent from the proving direction on purpose. `race` is evidenced
-by wall-clock concurrency, so whether it can be proven here is a fact about
-the host's scheduler; see the note on the tables below. Its unconditional
-assertions are synthetic.
+`race` is driven here again after three rounds of Windows CI failures kept it
+out. Its evidence is concurrency, which used to make provability a fact about
+the host's scheduler; both halves of that - which requests are inside the
+window, and whether their recorded windows are wide enough to intersect - are
+now guaranteed server-side by the lab. See the note at its table entry, which
+also says what to do if that turns out to be wrong.
 """
 from __future__ import annotations
 
@@ -124,6 +125,21 @@ import pytest
 from argus import proof
 from argus.decide import CLASS_TOOL_CHAIN, PROBE_CLASS
 from argus.tools import analysis, probes, web
+
+def _drive_race(c, b):
+    """Arm the window, then drive the burst into it.
+
+    `/redeem/reset?parties=6` holds every request on a barrier INSIDE the
+    TOCTOU window - after the `coupons > 0` check, before the commit - so
+    all six are past the guard before any of them commits. The endpoint
+    then still sleeps, which is what keeps each recorded window wide enough
+    for two of them to be shown overlapping. Both halves are server-side;
+    see the note at this entry in the table.
+    """
+    c.client.send("GET", b + "/redeem/reset?parties=6",
+                  tool="http_request", note="arm a 6-party race window")
+    return probes.probe_race(c, b + "/redeem", n=6)
+
 
 def _drive_jwt(c, b, *, forge: bool):
     """The jwt class is a chain, not a probe, which is why it was never here.
@@ -244,21 +260,33 @@ VULNERABLE = [
     # clean case below.
     ("probe_deserialize", "deserialize",
      lambda c, b: probes.probe_deserialize(c, b + "/import?data=x", "data")),
-    # `race` is deliberately NOT here in the proving direction. Its evidence
-    # is wall-clock concurrency, and whether eight threads actually overlap
-    # on a loaded runner is a property of the host, not of the probe or the
-    # gate: three rounds of Windows CI failures came from it, first because
-    # the burst was serialised, then because the windows intersected while
-    # only ONE request got past the guard. Two conditional skips later the
-    # case was testing the scheduler.
+    # `race` was absent here for three rounds of Windows CI failures, and
+    # the note that stood in its place ended "if you re-add a live proving
+    # case here, expect it to fail on somebody else's machine". That warning
+    # was right about the design it described, so here is what changed.
     #
-    # It keeps its CLEAN entry below, which is deterministic, and its
-    # unconditional both-direction assertions are synthetic in
-    # `tests/test_proof.py` - where three overlapping wins plus a 409 naming
-    # the action spent proves, and a 404, a 302, a 500, a 429 or a 409
-    # carrying the burst's own body do not. That is the whole requirement,
-    # asserted without a clock. If you re-add a live proving case here,
-    # expect it to fail on somebody else's machine.
+    # Proving this class needed two things from the host, and both are now
+    # taken away from it. That every request is inside the window before any
+    # commits is guaranteed by a barrier in `/redeem`, not hoped for from a
+    # sleep. That each recorded window is wide enough for two of them to be
+    # shown overlapping is guaranteed by the endpoint's own delay, which the
+    # barrier release does not shorten - the first attempt removed that
+    # delay, proved the race, and destroyed the `elapsed_ms` the overlap is
+    # reconstructed from.
+    #
+    # The decisive evidence is in the Windows run that failed. Its first
+    # assertion PASSED: six requests returned 200 against one coupon. Six
+    # successes means all six were inside the window, so the burst does
+    # achieve concurrency on Windows - only its MEASURABILITY ever failed
+    # there, and measurability is the half that is now server-side.
+    #
+    # Measured before re-adding: 8/8 proven locally, six successes each,
+    # narrowest recorded window 157-173ms against a 150ms server delay. If
+    # this does start failing, the honest read is that a runner cannot get
+    # two requests in flight at once - delete this entry, put `race` back in
+    # NOT_DRIVEN, and say so. Do not add a conditional skip; that is how the
+    # case came to be testing the scheduler the first time.
+    ("probe_race", "race", _drive_race),
 ]
 
 # The same probes where the lab has no such bug. `proven` here would be the
@@ -365,10 +393,10 @@ CLEAN = [
 # `probe_*` tool. Counting against the tooling is how `graphql` and `jwt` sat
 # outside this module without anyone noticing: neither is driven by a probe,
 # so neither appeared in a coverage figure derived from the probe table.
-PROVING_COVERAGE = 27
+PROVING_COVERAGE = 28
 MATRIX_CLASSES = 29
 # Each with a reason stated in the module docstring above.
-NOT_DRIVEN = {"dos", "race"}
+NOT_DRIVEN = {"dos"}
 
 _ORDER = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 

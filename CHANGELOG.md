@@ -961,6 +961,47 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### race is driven in the proving direction again
+- The note standing where this entry now sits ended: *"if you re-add a live
+  proving case here, expect it to fail on somebody else's machine."* It was
+  right about the design it described, so this records what changed rather
+  than quietly deleting it.
+- Proving this class needed two things from the host. Both are now taken
+  away from it. That every request is inside the window before any commits
+  is guaranteed by a barrier in `/redeem`; that each recorded window is wide
+  enough for two of them to be shown overlapping is guaranteed by the
+  endpoint's own delay, which the barrier release does not shorten. The
+  first attempt removed that delay, proved the race, and destroyed the
+  `elapsed_ms` the overlap is reconstructed from - which is why the delay is
+  now the thing a test asserts rather than an implementation detail.
+- The decisive evidence was sitting in the Windows run that **failed**. Its
+  first assertion passed: six requests returned 200 against one coupon. Six
+  successes means all six were inside the window, so the burst does achieve
+  concurrency on Windows. Only its *measurability* ever failed there, and
+  measurability is the half that is now server-side. I had been treating the
+  failure as evidence that Windows cannot overlap requests; it was evidence
+  of the opposite.
+- Measured before re-adding: 8/8 proven locally, six successes each,
+  narrowest recorded window 157-173ms against a 150ms server delay, and the
+  parametrised case green on six consecutive runs.
+- Proved the entry is not passing vacuously: planting a lock around the
+  check-then-act - i.e. fixing the lab's vulnerability - makes it fail with
+  *"reached: unproven ... missing: ['no evidence']"*, while the CLEAN entry
+  for the same class still passes, which is what a fixed endpoint should
+  look like.
+- The table entry carries the instruction for the next person: if this does
+  start failing, the honest read is that a runner cannot get two requests in
+  flight at once - delete the entry, put `race` back in `NOT_DRIVEN`, and
+  say so. Do not add a conditional skip; that is how the case came to be
+  testing the scheduler the first time.
+- One class remains undriven in the proving direction: `dos`, refused by
+  construction because its proof is the damage. That one is not coming back.
+- Worth noting what this change did NOT need: **the changelog was not
+  touched for the coverage figure.** Raising it used to require editing two
+  historical entries into saying something they did not say at the time.
+  That assertion was scoped to living documents a few commits ago, and this
+  is the first change to collect on it.
+
 ### The local gate cannot see a platform defect, so one was made local
 - Two of this stretch's CI failures were invisible here: 633 tests passed
   locally every run while Windows and ubuntu-3.14 jobs went red. The repo's
@@ -1893,7 +1934,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 635 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
