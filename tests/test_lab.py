@@ -420,6 +420,78 @@ def test_the_race_window_can_be_made_deterministic(lab_url, ctx):
         s >= 400 for s in out["serial_statuses"]), out
 
 
+def test_race_proves_on_a_coarse_recorder_clock(lab_url, ctx, monkeypatch):
+    """The fourth Windows failure, made local and deterministic.
+
+    The gate picks the serial control as an exchange whose window starts at
+    or after the burst's end and overlaps nothing, reconstructing that
+    window as `[ts - elapsed_ms, ts]`. `ts` is the recorder's WALL clock and
+    `elapsed_ms` comes from `monotonic()`, so a coarse `ts` with a precise
+    duration puts the reconstructed start out by up to one tick - and
+    sending the baseline the instant the burst ends left that boundary no
+    slack. Round `ts` down and the control appears to start before the burst
+    ended, is discarded, and the class grades `unproven` with no evidence at
+    all.
+
+    `time.time()` on Windows has ~16ms granularity up to Python 3.12 and is
+    precise from 3.13. That is exactly the CI split: Windows 3.10, 3.11 and
+    3.12 failed; Windows 3.13, 3.14 and every ubuntu job passed.
+
+    There are TWO separations, and finding the second one is the whole
+    reason this test exists. A gap before the baseline is not enough: the
+    gate also requires the control to overlap NOTHING, and the two controls
+    are adjacent to each other - each ~150ms wide, the second starting as
+    the first returns. Round both `ts` values down by different amounts and
+    the second one's reconstructed start slips behind the first one's end;
+    they appear to overlap, and that disqualifies BOTH.
+
+    Rates, measured rather than sampled once - which is how the first fix
+    looked sufficient when it was not:
+
+      both gaps (current):  0 failures in 10 runs here, 20/20 proven at
+                            16ms and 20/20 at 32ms in a direct harness
+      pre-gap only:         4 failures in 10 runs
+      no gaps (as shipped): 1 failure in 10 runs
+
+    Those last two are 10-sample estimates with wide error bars, so do not
+    read 1-vs-4 as a real ordering; what they establish is that every
+    variant missing a separation fails at a rate CI will find, and the
+    current one does not.
+    """
+    import argus.session as session_mod
+
+    from argus import proof
+
+    real = session_mod.time.time
+    monkeypatch.setattr(session_mod.time, "time",
+                        lambda: real() // 0.0156 * 0.0156)
+
+    ctx.client.send("GET", lab_url + "/redeem/reset?parties=6",
+                    tool="http_request", note="arm a 6-party window")
+    probes.probe_race(ctx, lab_url + "/redeem", n=6)
+
+    entries = [e for e in (ctx.session.get_exchange(i)
+                           for i in ctx.session._transcript) if e]
+    best = "unproven"
+    for entry in entries:
+        body = (entry.get("response") or {}).get("body") or ""
+        quotes = [ln.strip() for ln in body.splitlines()
+                  if 8 <= len(ln.strip()) <= 400]
+        if body.strip():
+            quotes.append(body.strip())
+        for quote in quotes:
+            if proof.grade("race", quote, entries).grade == "proven":
+                best = "proven"
+                break
+        if best == "proven":
+            break
+    assert best == "proven", (
+        "the recorder's clock is coarse and race no longer proves - the "
+        "serial control's reconstructed window has slipped back across the "
+        "burst's end, which is what the probe's pre-baseline gap exists to "
+        "prevent")
+
+
 def test_arming_the_window_is_opt_in(lab_url, ctx):
     """No `parties`, no barrier - the demo and any manual run are unchanged.
 

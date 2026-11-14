@@ -1666,7 +1666,41 @@ def probe_race(ctx: Context, url: str, method: str = "GET",
                      if a is not b)
     serial: list[dict] = []
     if len(ok) > 1:
-        serial = [_fire("serial baseline"), _fire("serial baseline")]
+        # Put a deliberate GAP between the burst and the serial baseline.
+        # The gate selects the serial control as an exchange whose window
+        # starts at or after the burst's end and overlaps nothing, and it
+        # reconstructs that window as [ts - elapsed_ms, ts] - where `ts` is
+        # the recorder's wall clock and `elapsed_ms` comes from
+        # `monotonic()`. A COARSE `ts` with a precise duration puts the
+        # reconstructed start out by up to one clock tick, and sending the
+        # baseline the instant the burst ends leaves that boundary no slack
+        # at all: round `ts` down and the control appears to begin before
+        # the burst ended, so it is discarded and the class grades
+        # `unproven` with no evidence.
+        #
+        # Not hypothetical. `time.time()` on Windows has ~16ms granularity
+        # up to Python 3.12 and is precise from 3.13, and this failed CI on
+        # Windows 3.10, 3.11 and 3.12 while Windows 3.13, 3.14 and every
+        # ubuntu job passed. Reproduced locally by quantising the recorder's
+        # clock: 16ms gives `unproven` / `['no evidence']`, 1ms and precise
+        # both give `proven`.
+        #
+        # 50ms is three of those ticks. It cannot make a non-race look like
+        # one - the control still has to be refused and still has to overlap
+        # nothing - so the slack only removes a false negative.
+        _time.sleep(0.05)
+        # ...and the two controls must be separated from EACH OTHER too,
+        # which is the half a 50ms pre-gap alone does not fix. Measured:
+        # with only the pre-gap, 16ms granularity still graded `unproven`
+        # 2 times in 10. The gate requires the serial control to overlap
+        # NOTHING, and these two requests are adjacent - each ~150ms wide,
+        # the second starting as the first returns. Round both `ts` values
+        # down by different amounts and the second one's reconstructed
+        # start slips behind the first one's end: they appear to overlap,
+        # and that disqualifies BOTH, leaving no control at all.
+        serial = [_fire("serial baseline")]
+        _time.sleep(0.05)
+        serial.append(_fire("serial baseline"))
     s_ok = [r for r in serial if _ok(r)]
     if len(ok) > 1 and len(s_ok) == len(serial):
         # repeatable is provable without overlap - check it first

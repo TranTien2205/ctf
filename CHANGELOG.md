@@ -961,6 +961,43 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The race diagnosis: a coarse clock and two adjacent controls
+- Diagnosed the failure the revert above could not name, and the pattern
+  gave it away. `time.time()` on Windows has ~16ms granularity up to Python
+  3.12 and is precise from 3.13 - exactly the CI split, Windows 3.10/3.11/
+  3.12 failing while Windows 3.13/3.14 and every ubuntu job passed.
+- The gate reconstructs each window as `[ts - elapsed_ms, ts]`: `ts` is the
+  recorder's wall clock, `elapsed_ms` comes from `monotonic()`. A coarse end
+  with a precise duration puts the reconstructed START out by up to one
+  tick. The serial control has to start at or after the burst's end, and the
+  probe sent it the instant the burst returned - so that boundary had no
+  slack, the control slipped behind it, and
+  `verify_concurrent_crossing` found no control at all.
+- Reproduced locally and deterministically by quantising the recorder's
+  clock: at 16ms, `unproven` / `['no evidence']` - the CI message word for
+  word. At 1ms and precise, `proven`.
+- **The first fix looked sufficient and was not, and only measuring found
+  that.** A 50ms gap before the baseline made one run prove at 16, 32, 48
+  and 64ms granularity, and I nearly recorded "4x headroom" off those single
+  samples. Ten runs at 16ms: 8/10. The next sample failed.
+- The second separation is the real one. The gate also requires the control
+  to overlap NOTHING, and the two controls are adjacent - each ~150ms wide,
+  the second starting as the first returns. Round both stamps down by
+  different amounts and the second's start slips behind the first's end:
+  they appear to overlap each other, and that disqualifies BOTH. Separating
+  them too gives 20/20 proven at 16ms and 20/20 at 32ms.
+- Made local, like the clock defect before it: the new test quantises the
+  recorder's clock to 16ms and requires the class to prove anyway. Failure
+  rates with each half removed - 4 in 10 with only the pre-gap, 1 in 10 with
+  neither - are recorded in its docstring as 10-sample estimates with wide
+  error bars, because 1-vs-4 is not a real ordering and claiming it would be
+  the same mistake one layer up.
+- `race` stays OUT of the proving table in this commit. The mechanism is
+  now diagnosed rather than guessed, but the note says not to re-add on
+  local measurement alone, and this is local measurement. The new test ships
+  first; if CI passes it on Windows 3.10-3.12, that is the platform evidence
+  the table entry needs.
+
 ### race reverted, fourth round - and my evidence was the wrong half
 - The flip failed CI on Windows 3.10, 3.11 and 3.12. Windows 3.13, 3.14 and
   every ubuntu job passed. Reverted, because the entry's own instruction
@@ -1998,7 +2035,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 635 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
