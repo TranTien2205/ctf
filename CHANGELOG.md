@@ -961,6 +961,39 @@ somebody reading only the list.
   the exact sequence. With the fix the reply arrives in 1.5s; without it the
   call fails at the timeout.
 
+### The local gate cannot see a platform defect, so one was made local
+- Two of this stretch's CI failures were invisible here: 633 tests passed
+  locally every run while Windows and ubuntu-3.14 jobs went red. The repo's
+  own rule is to run the gate before accepting a change, which implies the
+  gate is sufficient, and for timing and clock-resolution defects it is not.
+  So the clock one is now a local test: the recorder's clock is coarsened to
+  a full second, every stamp in the run collides, and the csrf proof has to
+  survive it. It fails with the tie-break removed - *"every exchange in this
+  run shares one timestamp, and csrf no longer proves"*. It is the test that
+  would have caught me.
+- It also asserts that the coarsening actually collided the stamps, because
+  a clock patch that silently stopped applying would leave the test passing
+  on nothing.
+- **And writing it reproduced the defect class it was written for.** The new
+  test passed, and it broke a sibling in another file: the
+  proving-direction csrf case started failing - but only when run AFTER
+  mine, never alone. Not a leaked clock patch. `/api/config` keeps
+  `_usercfg` as a CLASS variable on a session-scoped server, so my write
+  left `csrfmark` in it, and the next probe's own write then changed nothing
+  NEW - so "the state changed between two reads" failed in a test that had
+  nothing to do with the one that polluted it.
+- Found only by running the plant. The test passed, the suite passed, and
+  the contamination showed up because removing the tie-break made me run
+  the two together. A new test is a new writer of shared state, and that is
+  not visible in its own result.
+- Fixed the way this lab already handles it: `/api/config/reset`, the same
+  shape and the same reason as `/redeem/reset` and `/cached/reset`, and the
+  test takes the state and hands it back in a `finally`. Re-proved
+  afterwards that under the plant my test fails and the sibling does not,
+  which is the isolation actually being claimed.
+- CI is green on the tip: 11/11 on `6044010`, with the race window test
+  passing on every Windows job now that the window stays wide.
+
 ### The barrier proved the race and destroyed the evidence for it
 - CI also failed the test I had just added for the barrier -
   `test_the_race_window_can_be_made_deterministic`, Windows 3.12 - and the
@@ -1860,7 +1893,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 633 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 634 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

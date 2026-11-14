@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from argus import proof
 from argus.tools import probes, web
 
 
@@ -170,6 +171,73 @@ def test_xxe_probe(lab_url, ctx):
     assert "xxe candidate" in out["verdict"], out
     xi = next(r for r in out["results"] if r["name"] == "xinclude-fallback")
     assert xi["marker"], xi
+
+
+def test_csrf_proves_when_the_recorder_s_clock_is_coarse(lab_url, ctx,
+                                                          monkeypatch):
+    """The Windows-only failure, made local and deterministic.
+
+    `_ordering` compares recorded times with a strict `<`/`>` against the
+    write, and `ts` is `round(time.time(), 3)`. On Windows `time.time()`
+    has a granularity near 16ms, so a read and the write tens of
+    milliseconds apart carry the SAME stamp, fall into neither `before` nor
+    `after`, and a csrf the lab really has grades `candidate` with "the
+    state changed between two reads" missing. It failed two Windows CI jobs
+    on two Python versions while 633 tests passed here every time.
+
+    The reason it could not be caught locally is that nothing local was
+    coarse: requests on this host take ~45ms, so the stamps separate by
+    accident. So the clock is coarsened on purpose - a full second, which
+    guarantees every stamp in the run collides - and the proof has to
+    survive it. The tie-break that makes it survive is the recorder's own
+    sequence, which no clock resolution can blur.
+
+    This is the test that would have caught me.
+    """
+    import argus.session as session_mod
+
+    real = session_mod.time.time
+    monkeypatch.setattr(session_mod.time, "time",
+                        lambda: real() // 1.0 * 1.0)
+
+    # `_usercfg` is a class variable on a session-scoped server, so the
+    # write below would otherwise outlive this test and leave the next
+    # csrf probe's own write changing nothing new. That is not a guess: it
+    # broke the proving-direction csrf case in another file, and the plant
+    # for THIS test is what surfaced it.
+    ctx.client.send("GET", lab_url + "/api/config/reset",
+                    tool="http_request", note="own the config state")
+    try:
+        probes.probe_csrf(ctx, lab_url + "/api/config", method="POST",
+                          data="csrfmark=landed",
+                          read_url=lab_url + "/api/config")
+    finally:
+        ctx.client.send("GET", lab_url + "/api/config/reset",
+                        tool="http_request", note="hand it back clean")
+    entries = [e for e in (ctx.session.get_exchange(i)
+                           for i in ctx.session._transcript) if e]
+    stamps = {e["ts"] for e in entries if e.get("tool") == "probe_csrf"}
+    assert len(stamps) == 1, (
+        "the coarsened clock did not actually collide the stamps, so this "
+        "test is not measuring the thing it exists for", sorted(stamps))
+
+    best = "unproven"
+    for entry in entries:
+        body = (entry.get("response") or {}).get("body") or ""
+        for quote in [ln.strip() for ln in body.splitlines()
+                      if 8 <= len(ln.strip()) <= 400] + [body.strip()]:
+            if not quote:
+                continue
+            v = proof.grade("csrf", quote, entries)
+            if v.grade == "proven":
+                best = "proven"
+                break
+        if best == "proven":
+            break
+    assert best == "proven", (
+        "every exchange in this run shares one timestamp, and csrf no "
+        "longer proves - the recorder's sequence is the only thing that "
+        "can order them, so the tie-break is gone")
 
 
 def test_csrf_probe(lab_url, ctx):

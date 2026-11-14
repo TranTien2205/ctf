@@ -870,6 +870,23 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             else:
                 self._send(body="imported: " + v[:80])
 
+        elif path == "/api/config/reset":
+            # Test support, not part of the vulnerable surface - same shape
+            # and same reason as /redeem/reset and /cached/reset. `_usercfg`
+            # is a CLASS variable on a session-scoped server, so a test
+            # that writes to /api/config leaves the key there for every
+            # later test: the next csrf probe's own write then changes
+            # nothing NEW, and "the state changed between two reads" fails
+            # in a test that has nothing to do with the one that polluted
+            # it. Measured exactly that way round - a new test of mine
+            # broke a sibling in another file, and only the plant found it.
+            # Resetting is explicit so the dependency is visible in the
+            # test that needs it.
+            type(self)._usercfg = {"theme": "dark", "lang": "en"}
+            type(self)._pp = {}
+            self._send(body=json.dumps(type(self)._usercfg),
+                       ctype="application/json")
+
         elif path == "/api/config":
             cfg = dict(self._usercfg)
             cfg.update(type(self)._pp)    # polluted keys leak into every object
