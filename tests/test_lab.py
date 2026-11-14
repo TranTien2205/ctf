@@ -676,6 +676,30 @@ def test_transcript_redacts_operator_secrets(lab_url, tmp_path):
     assert "live-session-tok3n" not in str(entry)
     assert wire["cookie"].startswith("sid=")
 
+    # A DIGEST of each credential is recorded beside the redacted value, so
+    # a verifier can ask which request carried a token this system minted -
+    # the link `jwt_forge`'s own comment promised ("the fingerprint is
+    # enough to link the mint to the request that carried it") while
+    # nothing fingerprinted what a request SENT. Without it
+    # `verify_token_forgery` graded a forged token REFUSED, beside the
+    # operator's own session reading its own role, as "a forged credential
+    # was accepted".
+    #
+    # It is one-way and 16 hex wide, the same shape `jwt_forge` already
+    # writes, and the assertions below are both halves: the digest is
+    # right, and the credential is still absent from the file an operator
+    # shares.
+    import hashlib
+
+    fingerprints = entry["request"]["credential_sha256_16"]
+    assert fingerprints["authorization"] == hashlib.sha256(
+        b"live-session-tok3n").hexdigest()[:16]
+    assert fingerprints["cookie"] == hashlib.sha256(
+        b"sid=sekrit-value").hexdigest()[:16]
+    transcript = session.transcript_path.read_text(encoding="utf-8")
+    assert "live-session-tok3n" not in transcript
+    assert "sekrit-value" not in transcript
+
 
 def test_send_raw_redacts_secrets_keeps_structure(lab_url, tmp_path):
     """send_raw merges operator headers onto the wire; the recorded wire

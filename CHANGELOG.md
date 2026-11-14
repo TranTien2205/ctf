@@ -2607,6 +2607,66 @@ earlier versions scanned for the words a claim uses instead, and flagged
 `probe_enum`'s correct "no enumeration signal" on the word "enumeration":
 a keyword list tests the wording, not the claim.
 
+### The gate called the defence working the finding
+
+`verify_token_forgery`'s floor check is "this system minted the
+credential", and it could not tell which request carried the minted token,
+because nothing in the system recorded that. Measured, with the ordering
+fix above already in place:
+
+    jwt_forge r1       claims_set {"role": "admin"}
+    r2  GET /api/me    cookie: s=mine                 200  {"role":"admin"}
+    r3  GET /api/me    authorization: Bearer forged   401  invalid signature
+
+    grade: proven, missing: []
+      [x] this system minted the credential
+      [x] a forged credential was accepted
+      [x] the same endpoint refuses another credential
+
+The forged token was **refused**. The 200 is the operator's own session
+reading its own role. The gate reported it as a forgery accepted - the
+exact inversion the test named
+`test_the_defence_working_is_not_a_finding` exists to prevent, and that
+test did not catch it, because its jwt leg cites no mint at all. With no
+`jwt_forge` event the only failing check is the spec's floor, which is
+already the whole subject of a different test, and the two checks that
+would have to tell an auth system working from a forgery both passed. The
+defence-detection logic could have been deleted and the assertion would
+still have held.
+
+Three things let the inversion through, all measured: `echoed` asks only
+whether a forged claim VALUE appears in the accepted response, and a forged
+`role=admin` echoes trivially out of a real admin's own page; `differ` was
+`bool(cred_r)`, so "a different credential" was never established; and
+`_pairs` picks (accepted, rejected) by status, never by which request
+carried the token.
+
+**The correlating datum was half-built and unread.** `jwt_forge`
+fingerprints the token it mints, and its comment says what for - "the
+fingerprint is enough to link the mint to the request that carried it" -
+but nothing fingerprinted the credential a request SENT, so there was
+nothing to link it to, and `token_sha256_16` appeared nowhere in
+`proof.py`. One half of a mechanism, with a comment describing the whole.
+
+`GuardedClient` now records `request.credential_sha256_16`, a sha256-16 per
+credential header with the scheme word stripped so it hashes the same bytes
+`jwt_forge` does, and the verifier requires the accepted request's digest to
+be one the mint produced. It is a one-way digest of the same shape
+`analysis.py` already wrote for the same reason; the header value stays
+redacted, and the live-lab test asserts both halves - the digest is right,
+and the credential is still absent from the transcript an operator shares.
+
+Fail-closed when no fingerprint is recorded, because a real exchange always
+has one and an evidence set that cannot be correlated is exactly the set
+this class used to prove on.
+
+The jwt fixtures were unfaithful in the same way, and `ex()` now calls the
+recorder's own `credential_fingerprints` rather than a copy, so a fixture
+cannot drift from the thing it stands in for. Two of them had the accepted
+request carrying the operator's own cookie while the mint sat unreferenced -
+which is to say they were the defence working, graded proven, written down
+as the expected result.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

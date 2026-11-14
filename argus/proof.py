@@ -789,6 +789,18 @@ def _endpoint_shape(entry: dict) -> str:
     return host + path + ("?" + ",".join(params) if params else "")
 
 
+def _credential_fp(entry) -> set:
+    """The credential digests a request recorded, as a set.
+
+    `GuardedClient` writes `request.credential_sha256_16` as
+    `{header_name: sha256-16}`; `jwt_forge` writes `token_sha256_16` as
+    `{kind: sha256-16}`. The two meet here, which is the link the mint's
+    own comment promised and nothing implemented.
+    """
+    fp = _req(entry).get("credential_sha256_16") if entry else None
+    return {str(v) for v in fp.values()} if isinstance(fp, dict) else set()
+
+
 def _credential(entry: dict) -> str:
     """The credential a request presented, as one comparable string. Empty when
     it presented none."""
@@ -1263,6 +1275,28 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
     claims_set = (minted or {}).get("claims_set")
     claims_set = claims_set if isinstance(claims_set, dict) else {}
     _when = _ordering(claim.entries)
+    # ...and WHICH request carried it. This was the hole that made the
+    # whole check decorative: `echoed` asks only whether a forged claim
+    # VALUE appears in the accepted response, and a forged `role=admin`
+    # echoes trivially out of a real admin's own `{"role":"admin"}`;
+    # `differ` is `bool(cred_r)`, so "a different credential" was never
+    # established; and `_pairs` picks (accepted, rejected) by status, never
+    # by which request carried the minted token. Measured: the forged token
+    # REFUSED 401 "invalid signature" beside the operator's own legitimate
+    # session reading its own role, graded `jwt` PROVEN - "a forged
+    # credential was accepted". The gate called the defence working the
+    # finding, which is the inversion this class exists to avoid.
+    #
+    # The datum was half-built and unread. `jwt_forge` fingerprints the
+    # token it mints, and its comment says what for - "the fingerprint is
+    # enough to link the mint to the request that carried it" - but nothing
+    # fingerprinted the credential a request SENT, so there was nothing to
+    # link. `GuardedClient` now records `credential_sha256_16` per
+    # credential header, and this reads it. A digest, not a credential; the
+    # header value stays redacted.
+    _mint_fp = (minted or {}).get("token_sha256_16")
+    _mint_fp = {str(v) for v in _mint_fp.values()} if isinstance(
+        _mint_fp, dict) else set()
 
     def build(pair) -> list[dict]:
         accepted, rejected = (pair if pair else (None, None))
@@ -1297,12 +1331,21 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
         # `record_exchange` share one `self._seq` under one lock, so the
         # sequence is authoritative over the whole transcript.
         first = _follows(_when, accepted, minted)
+        # The accepted request has to have carried a token this system
+        # minted. Fail-closed when the exchange records no fingerprint: a
+        # real one always does, and an evidence set that cannot be
+        # correlated is exactly the set this class used to prove on.
+        sent = _credential_fp(accepted)
+        carried = bool(_mint_fp) and bool(sent & _mint_fp)
         return [
             _check("this system minted the credential",
-                   minted is not None and bool(echoed) and first,
+                   minted is not None and bool(echoed) and first
+                   and carried,
                    f"jwt_forge {minted.get('id')} set "
-                   f"{sorted(claims_set)}, echoed {echoed[0]!r}"
-                   if minted is not None and echoed and first else
+                   f"{sorted(claims_set)}, echoed {echoed[0]!r}, and "
+                   f"{(accepted or {}).get('id')} carried that token"
+                   if minted is not None and echoed and first and carried
+                   else
                    ("cite the jwt_forge event: nothing in the session shows the "
                     "accepted credential was minted here, and a working auth "
                     "check looks the same on the wire" if minted is None else
@@ -1311,7 +1354,17 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
                     if not echoed else
                     f"jwt_forge {minted.get('id')} was recorded after the "
                     "response it is credited with - the server cannot have "
-                    "honoured claims that did not exist yet")),
+                    "honoured claims that did not exist yet" if not first
+                    else
+                    f"no credential this system minted was sent by "
+                    f"{(accepted or {}).get('id')} - the accepted request "
+                    "carried something else, so the 200 is an authorisation "
+                    "system working and the refusal is it refusing the "
+                    "forgery. Cite the request that CARRIED the minted "
+                    "token" if _mint_fp else
+                    f"jwt_forge {minted.get('id')} records no token "
+                    "fingerprint, so nothing can link the mint to the "
+                    "request that carried it")),
             _check("a forged credential was accepted",
                    ok_code and bool(cred_a) and quoted,
                    f"{_endpoint_shape(accepted)} returned "

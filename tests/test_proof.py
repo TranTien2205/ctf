@@ -14,6 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from argus import proof
+from argus.httpclient import credential_fingerprints
 from argus.session import Session
 
 
@@ -47,11 +48,22 @@ def ex(rid, url, body, status=200, headers=None, method="GET",
                 "body": body}
     if elapsed_ms is not None:
         response["elapsed_ms"] = elapsed_ms
+    request = {"method": method, "url": url,
+               "headers": req_headers or {"host": "t.local"},
+               "body": req_body}
+    # The recorder's own function, not a copy of it. `GuardedClient` writes
+    # `credential_sha256_16` for every credential header a request carried,
+    # and `verify_token_forgery` reads it to ask which request carried a
+    # token this system minted. A fixture that builds the header without
+    # the digest is unfaithful in exactly the way that check exists for -
+    # the same omission `ts` and `elapsed_ms` had above - and calling the
+    # production function means the fixture cannot drift from it.
+    fingerprints = credential_fingerprints(request["headers"])
+    if fingerprints:
+        request["credential_sha256_16"] = fingerprints
     return {"id": rid,
             "ts": next(_TS) if ts is None else ts,
-            "request": {"method": method, "url": url,
-                        "headers": req_headers or {"host": "t.local"},
-                        "body": req_body},
+            "request": request,
             "response": response}
 
 
@@ -330,9 +342,12 @@ def test_idor_needs_two_subjects_and_a_difference():
 # `b8` beside `r16` is a fixture artefact that makes the sequence
 # meaningless across tests. Left as they are rather than renumbered,
 # because changing ids changes what several other assertions here mean.
+# The fingerprint has to be of the token the accepted request actually
+# carries, which is what makes the link checkable. `0123456789abcdef` was a
+# placeholder that matched nothing, and nothing read it.
 FORGE_EVENT = {"id": "r1", "ts": 1_000_000.0, "kind": "jwt_forge",
                "claims_set": {"role": "admin"},
-               "token_sha256_16": {"resigned": "0123456789abcdef"}}
+               "token_sha256_16": {"resigned": "ccdd35168ab474fa"}}
 
 
 def test_jwt_needs_the_mint_and_the_rejected_control():
@@ -813,9 +828,16 @@ def test_difference_only_classes_cannot_reach_proven():
 
 def test_jwt_needs_the_same_endpoint_and_a_different_credential():
     """Any Cookie-bearing 2xx plus any 401 anywhere graded jwt proven - and
-    every browser-shaped request carries a Cookie."""
+    every browser-shaped request carries a Cookie.
+
+    The accepted request carries the FORGED token here, which is the shape
+    this class is about. It used to carry `cookie: session=abc` - the
+    operator's own session - and still graded proven, because nothing
+    asked which request carried the minted credential. That fixture was
+    the defence working, and the test below is about exactly that.
+    """
     api = ex("b8", "http://t.local/api/me", '{"role":"admin"}', 200,
-             req_headers={"cookie": "session=abc"})
+             req_headers={"authorization": "Bearer forged"})
     logout = ex("b9", "http://t.local/logout", "unauthorized", 401)
     assert proof.grade("jwt", '{"role":"admin"}',
                        [api, logout, FORGE_EVENT]).grade != "proven"
@@ -1592,6 +1614,57 @@ def test_the_defence_working_is_not_a_finding():
     expired = ex("d7", "http://t.local/api/me", "session expired", 401,
                  req_headers={"host": "t.local", "cookie": "s=old"})
     assert proof.grade("jwt", '{"role":"admin"}', [ok, expired]).grade == "unproven"
+
+    # ...and that leg asserted almost nothing. With no `jwt_forge` event
+    # cited, the only failing check is the spec's floor - which is already
+    # the whole subject of `test_jwt_unproven_when_the_cited_request_
+    # carries_no_credential`. The two checks that would have to tell a
+    # working auth system from a forgery both PASSED on it, so
+    # `verify_token_forgery`'s defence detection could have been deleted
+    # and this assertion would still have held.
+    #
+    # Give the leg the shape its own name describes - the mint IS cited,
+    # the FORGED token is the one that was refused, and the operator's own
+    # legitimate session reads its own role - and the gate graded
+    # **proven** with nothing missing. The defence working, reported as
+    # the finding, which is the inversion this test is named after.
+    #
+    # Three things let it: `echoed` asks only whether a forged claim VALUE
+    # appears in the accepted response, and a forged `role=admin` echoes
+    # trivially out of a real admin's own page; `differ` was `bool(cred_r)`,
+    # so "a different credential" was never established; and `_pairs`
+    # picks the pair by status, never by which request carried the token.
+    import hashlib
+
+    forged_fp = hashlib.sha256(b"forged.jwt.here").hexdigest()[:16]
+    mint = {"id": "d8", "ts": 1_000_000.0, "kind": "jwt_forge",
+            "claims_set": {"role": "admin"},
+            "token_sha256_16": {"resigned": forged_fp}}
+    own_session = ex("d9", "http://t.local/api/me", '{"role":"admin"}', 200,
+                     req_headers={"host": "t.local", "cookie": "s=mine"})
+    forged_refused = ex("d10", "http://t.local/api/me",
+                        '{"error":"invalid signature"}', 401,
+                        req_headers={"host": "t.local",
+                                     "authorization": "Bearer forged.jwt.here"})
+    v = proof.grade("jwt", '{"role":"admin"}',
+                    [mint, own_session, forged_refused])
+    assert v.grade != "proven", v.explain()
+    floor = [c for c in v.checks
+             if "minted the credential" in str(c["check"])]
+    assert floor and not floor[0]["ok"], v.checks
+    assert "carried something else" in floor[0]["detail"], floor[0]
+
+    # and the honest shape of the same three entries still proves: the
+    # minted token is the one that was ACCEPTED
+    forged_ok = ex("d11", "http://t.local/api/me", '{"role":"admin"}', 200,
+                   req_headers={"host": "t.local",
+                                "authorization": "Bearer forged.jwt.here"})
+    wrong = ex("d12", "http://t.local/api/me",
+               '{"error":"invalid signature"}', 401,
+               req_headers={"host": "t.local",
+                            "authorization": "Bearer nonsense"})
+    assert proof.grade("jwt", '{"role":"admin"}',
+                       [mint, forged_ok, wrong]).grade == "proven"
 
 
 def test_a_refusal_is_not_data():
@@ -3495,17 +3568,24 @@ def test_jwt_refuses_a_mint_recorded_after_the_response_it_explains():
     It also crosses the two kinds of transcript entry, which works because
     `record_event` and `record_exchange` share one sequence under one lock.
     """
+    import hashlib
+
     def mint(rid, ts):
         return {"id": rid, "ts": ts, "kind": "jwt_forge",
-                "claims_set": {"role": "admin"}}
+                "claims_set": {"role": "admin"},
+                # of the token the accepted read below carries, so the
+                # ORDER is the only thing left for this check to fail on
+                "token_sha256_16": {
+                    "resigned": hashlib.sha256(b"forged").hexdigest()[:16]}}
 
     def read(rid, ts, status=200, body='{"role":"admin","dept":"ops"}',
-             cookie="session=x"):
+             cred="Bearer forged"):
         return ex(rid, "http://t/api/me", body, status=status,
-                  req_headers={"host": "t.local", "cookie": cookie}, ts=ts)
+                  req_headers={"host": "t.local", "authorization": cred},
+                  ts=ts)
 
     late = [read("r1", 1000.0), read("r2", 1001.0, 401,
-                                     '{"error":"bad token"}', "session=y"),
+                                     '{"error":"bad token"}', "Bearer other"),
             mint("r9", 2000.0)]
     v = proof.grade("jwt", '"role":"admin","dept":"ops"', late)
     assert v.grade != "proven", v.checks
@@ -3515,7 +3595,8 @@ def test_jwt_refuses_a_mint_recorded_after_the_response_it_explains():
 
     # minted first: the finding, and not sensitive to where it is cited
     early = [mint("r1", 1000.0), read("r2", 1001.0),
-             read("r3", 1002.0, 401, '{"error":"bad token"}', "session=y")]
+             read("r3", 1002.0, 401, '{"error":"bad token"}',
+                  "Bearer other")]
     assert proof.grade("jwt", '"role":"admin","dept":"ops"',
                        early).grade == "proven"
     assert proof.grade("jwt", '"role":"admin","dept":"ops"',

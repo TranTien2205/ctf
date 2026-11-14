@@ -128,6 +128,46 @@ def _redact_headers(headers: dict, secret_values: set[str]) -> dict:
     return out
 
 
+def credential_fingerprints(headers: dict) -> dict:
+    """sha256-16 of each credential a request carried, by header name.
+
+    The missing half of a mechanism this system already half-built.
+    `jwt_forge` fingerprints the token it mints and its comment says why -
+    "the fingerprint is enough to link the mint to the request that carried
+    it" - but nothing fingerprinted the credential a request SENT, so there
+    was nothing to link it to. `verify_token_forgery` therefore had no way
+    to ask which request carried the minted token, and measured the
+    consequence: a forged token REFUSED 401 "invalid signature", beside the
+    operator's own legitimate session reading its own `{"role":"admin"}`,
+    graded `jwt` **proven** - "a forged credential was accepted". The gate
+    inverted the finding and called the defence working the bug.
+
+    A digest, not the credential: the value is redacted in the artifact as
+    before and this is a one-way 16-hex prefix, which is what
+    `argus/tools/analysis.py` already writes for the same reason.
+
+    The scheme word is stripped so `Authorization: Bearer <jwt>`
+    fingerprints the same bytes `jwt_forge` hashed, which is the token
+    itself.
+    """
+    import hashlib
+
+    out = {}
+    for k, v in (headers or {}).items():
+        name = (k if isinstance(k, str) else str(k)).strip()
+        if name.lower() not in _SENSITIVE_REQ_HEADERS:
+            continue
+        value = (v if isinstance(v, str) else str(v)).strip()
+        if not value:
+            continue
+        token = value.split(" ", 1)[1].strip() if " " in value else value
+        if not token:
+            continue
+        out[name.lower()] = hashlib.sha256(
+            token.encode("utf-8", "replace")).hexdigest()[:16]
+    return out
+
+
 def _redact_request_text(text: str, secret_values: set[str]) -> str:
     """Raw wire text (send_raw) carries secrets inline - redact sensitive
     header lines while preserving the line structure that IS the smuggle
@@ -445,6 +485,12 @@ class GuardedClient:
             request={"method": method.upper(), "url": url,
                      "headers": _redact_headers(sent_headers,
                                                 self._secret_values),
+                     # A digest of each credential sent, so a verifier can
+                     # ask WHICH request carried a token this system
+                     # minted. The value stays redacted; see
+                     # `credential_fingerprints`.
+                     "credential_sha256_16":
+                         credential_fingerprints(sent_headers),
                      "body": req_body.decode("utf-8", "replace")
                      if isinstance(req_body, bytes) else req_body},
             response={**response_data,
