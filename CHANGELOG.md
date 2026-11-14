@@ -2480,12 +2480,139 @@ the class can still prove blind. The detail used to read "all N answered
 without a throttle" in that case; it now says how many were timed and that
 a progressive delay could not be ruled out.
 
+### "The target never replied" was not a concept this gate had
+
+`grep '"error"' argus/proof.py` matched one docstring and nothing tested
+`status == 0`, so an exchange the target never answered was evidence like
+any other. `GuardedClient` records a transport failure as `status: 0`, an
+empty body and a `response.error` naming the exception, and every field
+needed to tell that apart from an answer was already in the transcript.
+
+Measured: four POST /login attempts, two answering 200 "Login failed" and
+two that timed out, graded `enum` **proven** - "2 distinct answers over 4
+requests", "both answers repeat". The second answer was the absence of one,
+and it repeated because the target was down twice.
+
+`_answered(entry)` is now `100 <= status < 600`, the same test the
+`status_of_result` callers in `probes.py` use, so both halves agree on what
+an answer is. The status decides it and not `error`, because a response
+that arrived and then failed mid-body carries both and did answer.
+
+Beside it, three more gate false positives from the same sweep, each
+reproduced before being touched and each with a sibling in the same file
+that already had the guard:
+
+- **`nosqli` proven off a flaky 500.** `refused_control = next(c for c in
+  controls if status_of(c) >= 400)` read the server BREAKING as the server
+  refusing. A 503 on the control plus a 200 answering
+  `{"session":"","user":null}` - no access at all - graded proven, and so
+  did a 500 control beside the public listing a search endpoint answers
+  anyway. The rule was written down twice in this file already:
+  `_acl_header_changed_the_answer` guards it in prose, and
+  `verify_restricted_access` uses an allowlist.
+
+  Closing the `access` branch alone was not enough. The `extraction`
+  branch rests on the control NOT carrying documents, which "Internal
+  Server Error" satisfies for free, so the 500 case still proved until a
+  broken control stopped counting as a control at all.
+
+  The first version of `_refused` was a narrow allowlist, and planting the
+  old `>= 400` back showed two things at once: nothing failed, because the
+  caller's filter already excluded 5xx and the allowlist's only remaining
+  contribution was 429 - and leaving 404 out would have introduced a false
+  NEGATIVE, since `POST /api/login` answering 404 "no such user" while the
+  same request with `{"$ne": null}` answers 200 with a session is a real
+  bypass. A guard no test can tell from its absence is not a guard, and
+  one that refuses real evidence is worse than none. It is 4xx except 429
+  now, and both boundaries are asserted.
+
+- **`method` proven by a path echo.** `PUT /files/<canary>.txt` then `GET
+  /files/<canary>.txt` answered by a soft-404 whose body names the URL it
+  could not find graded proven - "written by r2 and read back by r3".
+  Nothing was stored. The comment in the verifier records removing the URL
+  from the WRITE side for this exact reason, and that closed nothing,
+  because `probe_method` puts the canary in the filename AND the body.
+
+  The obvious guard - require the nonce absent from the read's own request
+  - is wrong, and measuring said so: the read's URL always carries the
+  canary, so the honest case dropped to `unproven` and the class became
+  unprovable for the shape its own probe produces. What separates them is
+  the BODY. The stored object comes back; a soft-404 returns the path. The
+  written bytes must appear in the read and must not be something the
+  read's own request supplied, the second half because a reflecting
+  endpoint answering `GET /x?q=<written bytes>` would otherwise echo its
+  way to proven.
+
+A behavioural check now asks the module-wide question rather than the
+three local ones: every gradeable class, handed nothing but exchanges the
+target never answered, must refuse.
+
+### Four probes measured the defence as the bug
+
+`status_of_result` was added to `probes.py` when `probe_time` was
+corrected, with a docstring generalising the rule - "any probe that reads a
+duration without reading this is treating a transport failure as a
+measurement". Four probes went on doing it, one of them 130 lines away. A
+rule in a docstring is not a check.
+
+Every comparison in them is fail-OPEN on a dropped request:
+`_similarity("", page)` is 0.0, which is maximally different, status 0
+differs from any real status, and the read timeout kept in `elapsed_ms`
+clears any delay threshold. So the defence manufactured the evidence for
+the bug it defends against, and in each case the probe told the operator
+to record a finding the proof gate refuses - the direction that wastes an
+engagement:
+
+- `probe_cmdi`'s blind timing fallback: "blind candidate: delay on
+  semicolon, pipe, and, background" - four separator families at once -
+  against a target that blackholed every request carrying a shell
+  separator. The 15s read timeout IS the delay it measured.
+- `probe_sqli`: a dropped payload scored as a boolean-blind differential,
+  with `statuses 0/200` printed in the signal string the model reads as
+  proof. `probe_nosqli` had the same shape in two places.
+- `probe_enum`: a dropped request was a differing answer AND reproduced,
+  because `_similarity("", base)` is 0.0 and `_similarity("", "")` is 1.0 -
+  so a username dropped twice became a confirmed enumeration oracle.
+- `probe_upload`: `served` was a bare body substring test and
+  `entry["status"]` keeps the UPLOAD's status, so the fetch's status
+  appeared nowhere in the probe's output. Against an app that accepts every
+  upload, answers `{"url": "/uploads/<canary>.php"}` and stores nothing:
+  "unrestricted upload: stored and served as active content" for all ten
+  active payload families at once.
+
+`probe_lockout` had a fifth, found by the check below rather than by the
+sweep: against a target that answered nothing it said "no lockout or rate
+limit after 10 failed attempts - online password guessing is unthrottled",
+with "they got no answer" as a parenthetical underneath. Ten attempts that
+got no answer are not ten failed attempts, and a caveat under a wrong
+headline is still a wrong headline.
+
+**The first two versions of the test for all this caught none of it.** With
+every send unanswered, `probe_cmdi`'s threshold is computed from dead
+baselines and never clears, and `_similarity("", "")` is 1.0 so nothing
+differs - the defect needs one side of a comparison answered and the other
+dropped, which is what a WAF blackholing the payload actually does. The
+second version matched the blocked payload against the percent-encoded
+URL, so it matched nothing. Both passed. That is the fifth time in this
+work that a model built to stand in for reality agreed with the fix and
+proved nothing about it, so each of the six defects was planted back and
+the verdict the finding reported was watched to reappear, word for word,
+before the test was kept.
+
+The negative-prefix rule those tests use also cannot see a claim in a
+second clause - "no lockout ... is unthrottled" starts with "no " and
+passes - so the probe that was actually wrong has its own assertion. Two
+earlier versions scanned for the words a claim uses instead, and flagged
+`probe_time`'s correct "no delay observed" on the word "observed" and
+`probe_enum`'s correct "no enumeration signal" on the word "enumeration":
+a keyword list tests the wording, not the claim.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 656 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 663 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

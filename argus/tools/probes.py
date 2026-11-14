@@ -162,10 +162,26 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
     nsim = _similarity(bodies["ntrue"], bodies["nfalse"])
     osim = _similarity(bodies["otrue"], bodies["ofalse"])
     nosim = _similarity(bodies["notrue"], bodies["nofalse"])
-    status_diff = true_r["status"] != false_r["status"]
-    nstatus_diff = ntrue_r["status"] != nfalse_r["status"]
-    ostatus_diff = otrue_r["status"] != ofalse_r["status"]
-    nostatus_diff = notrue_r["status"] != nofalse_r["status"]
+    # A pair where either side went unanswered is not a differential. Both
+    # halves of the comparison are fail-OPEN on a dropped request:
+    # `_similarity("", page)` is 0.0, which clears the 0.85 threshold, and
+    # status 0 differs from any real status. So a target or WAF that
+    # silently drops `1' AND '1'='1` while answering every other payload
+    # with the same page scored "boolean-blind candidate", and the signal
+    # string printed `statuses 0/200` - the 0 it had not read, handed to
+    # the model as proof.
+    def _pair_ok(a, b):
+        return answered(a) and answered(b)
+
+    quoted_ok = _pair_ok(true_r, false_r)
+    numeric_ok = _pair_ok(ntrue_r, nfalse_r)
+    or_ok = _pair_ok(otrue_r, ofalse_r)
+    nor_ok = _pair_ok(notrue_r, nofalse_r)
+    status_diff = quoted_ok and true_r["status"] != false_r["status"]
+    nstatus_diff = numeric_ok and ntrue_r["status"] != nfalse_r["status"]
+    ostatus_diff = or_ok and otrue_r["status"] != ofalse_r["status"]
+    nostatus_diff = nor_ok and notrue_r["status"] != nofalse_r["status"]
+    silent = [k for k, r in pairs if not answered(r)]
 
     verdict, signal = "no signal", None
     xp_echo = bool(re.search(r"xpath syntax|extractvalue|updatexml",
@@ -176,18 +192,18 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
                            error_hits.get("xpath", "xpath error"))
     elif error_hits and "quote" in error_hits:
         verdict, signal = "error-based candidate", error_hits.get("quote")
-    elif sim < 0.85 or status_diff:
+    elif quoted_ok and (sim < 0.85 or status_diff):
         verdict = "boolean-blind candidate"
         signal = f"quoted AND true/false similarity={sim}, statuses {true_r['status']}/{false_r['status']}"
-    elif nsim < 0.85 or nstatus_diff:
+    elif numeric_ok and (nsim < 0.85 or nstatus_diff):
         verdict = "boolean-blind candidate (numeric context)"
         signal = (f"unquoted AND true/false similarity={nsim}, statuses "
                   f"{ntrue_r['status']}/{nfalse_r['status']}")
-    elif osim < 0.85 or ostatus_diff:
+    elif or_ok and (osim < 0.85 or ostatus_diff):
         verdict = "boolean-blind candidate (OR pair)"
         signal = (f"quoted OR true/false similarity={osim}, statuses "
                   f"{otrue_r['status']}/{ofalse_r['status']}")
-    elif nosim < 0.85 or nostatus_diff:
+    elif nor_ok and (nosim < 0.85 or nostatus_diff):
         verdict = "boolean-blind candidate (numeric OR pair)"
         signal = (f"unquoted OR true/false similarity={nosim}, statuses "
                   f"{notrue_r['status']}/{nofalse_r['status']}")
@@ -200,8 +216,17 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         "numeric_true_false_similarity": nsim,
         "or_true_false_similarity": osim,
         "numeric_or_true_false_similarity": nosim,
+        # Named, because a similarity of 0.0 against an empty body looks
+        # exactly like a real difference in the numbers above, and the
+        # operator reading them has to be able to tell which it is.
+        "unanswered": silent,
         "note": "confirm before record_finding: reproduce the difference and quote the differing bytes",
     }
+    if silent:
+        out["note"] = (f"{len(silent)} payload(s) got no answer at all "
+                       f"({', '.join(silent)}) - a dropped request is not a "
+                       "differing response, and those comparisons were not "
+                       "scored. " + out["note"])
     # opt-in ORDER BY enumeration: the first n that errors or empties the
     # page bounds the column count - the number a UNION SELECT must match
     if union_cols > 0:
@@ -209,7 +234,8 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         # unquoted ORDER BY lands inside the string and always "fails";
         # on a numeric context the quoted frag breaks n=1 immediately
         numeric_ctx = verdict == "boolean-blind candidate (numeric context)" \
-            or (nsim < 0.85 or nstatus_diff) and sim >= 0.85
+            or (numeric_ok and (nsim < 0.85 or nstatus_diff)
+                and quoted_ok and sim >= 0.85)
         frag = (lambda n: f"1 ORDER BY {n}-- -") if numeric_ctx \
             else (lambda n: f"1' ORDER BY {n}-- -")
         cols, trace = None, []
@@ -284,6 +310,39 @@ def status_of_result(r) -> int:
         return int((r or {}).get("status") or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def answered(r) -> bool:
+    """Did the target answer this send at all?
+
+    `status_of_result` was added beside it when `probe_time` was corrected,
+    and its docstring generalises the rule - "any probe that reads a
+    duration without reading this is treating a transport failure as a
+    measurement". Four probes in this module were still doing exactly that
+    130 lines away, so the rule needed a name a check can look for rather
+    than a sentence in a docstring:
+
+      * `probe_cmdi`'s blind timing fallback reported "delay on semicolon,
+        pipe, and, background" - four separator families at once - against
+        a target that blackholed every request carrying a shell separator
+        and answered nothing. The 15s read timeout IS the delay it measured.
+      * `probe_sqli` scored a dropped payload as a boolean-blind
+        differential, because `_similarity("", page)` is 0.0 and status 0
+        differs from 200, and printed `statuses 0/200` in the signal string
+        the model reads as proof.
+      * `probe_enum` read a dropped request as a differing answer AND as
+        reproducing, because `_similarity("", base)` is 0.0 and
+        `_similarity("", "")` is 1.0 - so a user whose request was dropped
+        twice became a confirmed enumeration oracle.
+      * `probe_upload` called a payload stored and served as active content
+        when the fetch 404'd, because `served` was a body substring test
+        and the entry kept the UPLOAD's status, so the fetch's status
+        appeared nowhere in the probe's output at all.
+
+    In every case the probe told the operator to record a finding that the
+    proof gate refuses, which is the direction that wastes an engagement.
+    """
+    return 100 <= status_of_result(r) < 600
 
 
 def probe_time(ctx: Context, url: str, param: str, method: str = "GET",
@@ -454,14 +513,19 @@ def probe_cmdi(ctx: Context, url: str, param: str, method: str = "GET",
         payload = sep.format(base="127.0.0.1", cmd=f"sleep {delay_s}")
         r = _send(ctx, url, param, payload, method, data, tool,
                   f"blind/{family}")
-        if r["elapsed_ms"] < threshold:
+        # `answered` first: a request the target dropped keeps the full read
+        # timeout in `elapsed_ms`, which clears any threshold. That is the
+        # correction `probe_time` took in this module, and this sibling was
+        # still measuring the defence that blackholes the payload as the
+        # delay caused by the payload.
+        if not answered(r) or r["elapsed_ms"] < threshold:
             continue
         # Repeat before reporting. One slow response on a tarpit, a cold cache
         # or a GC pause is not an injection, and the note told the caller to
         # repeat a slow family while the probe itself did not.
         again = _send(ctx, url, param, payload, method, data, tool,
                       f"blind/{family}/confirm")
-        if again["elapsed_ms"] < threshold:
+        if not answered(again) or again["elapsed_ms"] < threshold:
             continue
         timed.append({"separator": family,
                       "elapsed_ms": r["elapsed_ms"],
@@ -1214,13 +1278,28 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
             "excerpt": (r.get("body") or "")[:200],
             "similarity_to_bogus": _similarity(r.get("body") or "",
                                                base_body)})
-    hits = [t for t in results
+    # An attempt the target never answered is not a differing answer. Both
+    # tests here are fail-OPEN on one: `_similarity("", base_body)` is 0.0,
+    # which is maximally different, and status 0 differs from the base
+    # status - so a username whose request was dropped became a hit, and
+    # `_similarity("", "")` is 1.0, so its dropped REPEAT marked it
+    # `reproduced: True`. A confirmed enumeration oracle out of a target
+    # that answered nothing twice. The timing channel below fires on the
+    # same 15s read timeout.
+    #
+    # The baseline has to have answered too, or every comparison is
+    # against nothing.
+    silent = [t for t in results if not answered(t)]
+    scored = [t for t in results if answered(t)]
+    if not answered(base):
+        scored = []
+    hits = [t for t in scored
             if t["similarity_to_bogus"] < 0.9 or t["status"] != base["status"]]
     # timing channel: a real account runs a password-hash verify the
     # bogus path skips - ~2.5x+ and 100ms slower is a live oracle when
     # error text is uniform
     base_ms = base["elapsed_ms"]
-    slow = [t for t in results
+    slow = [t for t in scored
             if t["elapsed_ms"] > base_ms * 2.5 + 100 and t not in hits]
     hits = hits + slow
     # The enum requirement wants each answer observed more than once: one
@@ -1269,6 +1348,11 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                    + " - confirm a hit is really a valid user")
     else:
         verdict = "uniform error response - no enumeration signal"
+    if silent:
+        verdict += ("; " + str(len(silent)) + " attempt(s) got no answer at "
+                    "all (" + ", ".join(str(t["user"]) for t in silent)
+                    + ") and were not scored - a dropped request is not a "
+                    "differing answer")
     unstable = [str(c["user"]) for c in confirm if not c["reproduced"]]
     if unstable:
         verdict += ("; the answer did NOT reproduce for "
@@ -1276,6 +1360,7 @@ def probe_enum(ctx: Context, url: str, data: str, param: str = "username",
                     + " - treat it as noise, not an oracle")
     return {"verdict": verdict, "bogus_id": base["request_id"],
             "results": results, "confirmations": confirm,
+            "unanswered": [str(t["user"]) for t in silent],
             "note": "a differing error only proves enumeration when the "
                     "endpoint really checks credentials - verify one hit "
                     "is a real account (e.g. via password-reset). Cite the "
@@ -1345,7 +1430,16 @@ def probe_lockout(ctx: Context, url: str, data: str,
               f"{_ramp[1]:.0f}ms across the last" if _ramp
          else "responses grow slower (soft throttle)")
         if throttled else
-        f"no lockout or rate limit after {len(results)} failed attempts - "
+        # ...and if NOTHING was answered there is no claim to make. The
+        # parenthetical below was first written as a footnote under the
+        # headline "online password guessing is unthrottled", which is a
+        # statement about a target that said nothing at all: ten attempts
+        # that got no answer are not ten failed attempts. A caveat under a
+        # wrong headline is still a wrong headline.
+        f"no answer from the target: {len(results)} attempts, none of them "
+        "answered - nothing here says whether this endpoint throttles"
+        if not _answered else
+        f"no lockout or rate limit after {len(_answered)} failed attempts - "
         "online password guessing is unthrottled"
         + ("" if len(_answered) == len(results) else
            f" (judged on status and wording only: "
@@ -1550,7 +1644,13 @@ def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
         hits.append({"op": next(iter(op)), "status": r["status"],
                      "request_id": r["request_id"],
                      "similarity_to_base": sim,
-                     "differs": r["status"] != base["status"] or sim < 0.7})
+                     # answered first: `_similarity("", base)` is 0.0 and
+                     # status 0 differs from the baseline, so a dropped
+                     # operator payload "flipped the response". The sibling
+                     # defect in `probe_sqli`, named by the same finding.
+                     "answered": answered(r),
+                     "differs": answered(r) and answered(base) and (
+                         r["status"] != base["status"] or sim < 0.7)})
     flip = next((h for h in hits if h["differs"]), None)
     # urlencoded PHP-array syntax is the other classic carrier:
     # password[$ne]=x parses to {"$ne":"x"} on lenient backends, no JSON
@@ -1568,7 +1668,9 @@ def probe_nosqli(ctx: Context, url: str, data: str, param: str) -> dict:
     hits.append({"op": "urlencoded[$ne]", "status": fr["status"],
                  "request_id": fr["request_id"],
                  "similarity_to_base": fsim,
-                 "differs": fr["status"] != base["status"] or fsim < 0.7})
+                 "answered": answered(fr),
+                 "differs": answered(fr) and answered(base) and (
+                     fr["status"] != base["status"] or fsim < 0.7)})
     flip = flip or next((h for h in hits if h["differs"]), None)
     verdict = ("nosqli candidate: operator payload flipped the response "
                f"({flip['op']} status {flip['status']} vs baseline "
@@ -1633,7 +1735,20 @@ def probe_upload(ctx: Context, url: str) -> dict:
                                 urllib.parse.urljoin(url, m.group(1)),
                                 tool="probe_upload", note=f"fetch {name}")
             entry["fetch_id"] = g["request_id"]
-            entry["served"] = canary in (g.get("body") or "")
+            # The FETCH's status, not just its body. This was a bare
+            # substring test and `entry["status"]` keeps the UPLOAD's
+            # status, so the fetch's status appeared nowhere in the probe's
+            # output either. Measured: an app that accepts the upload,
+            # answers `{"url": "/uploads/<canary>.php"}` and stores nothing,
+            # so the fetch 404s with an Apache-style body naming the URL it
+            # could not find - reported as "unrestricted upload: stored and
+            # served as active content" for all ten payload families at
+            # once. `verify_served_upload` requires `200 <= status < 300`
+            # and refuses it, so the probe was telling the operator to
+            # record what the gate would throw out.
+            entry["served_status"] = status_of_result(g)
+            entry["served"] = (200 <= status_of_result(g) < 300
+                               and canary in (g.get("body") or ""))
             # How it is SERVED is the whole question. The same bytes are
             # inert as text/plain and script as image/svg+xml, and a
             # Content-Disposition: attachment neutralises them again - so

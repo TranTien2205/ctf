@@ -343,6 +343,56 @@ def status_of(entry: dict) -> int:
         return 0
 
 
+def _answered(entry) -> bool:
+    """Did the target answer this at all?
+
+    `GuardedClient` records a transport failure - a connect refusal, a read
+    timeout, a reset - as `status: 0`, an empty body and a `response.error`
+    naming the exception (httpclient.py, the `httpx.HTTPError` branch).
+    Until this existed, NO verifier in this module read either field and
+    nothing here tested `status == 0`, so an exchange the target never
+    answered was evidence like any other. Measured: four POST /login
+    attempts, two answering 200 "Login failed" and two that timed out,
+    graded `enum` PROVEN - "2 distinct answers over 4 requests", "both
+    answers repeat". The second answer was the absence of one, and it
+    repeated because the target was down twice.
+
+    The status decides it, not `error`: a response that arrived and then
+    failed mid-body carries both a real status and an error, and it did
+    answer. `100 <= status < 600` is the same test the `status_of_result`
+    callers in `probes.py` use, so both halves of this system agree on what
+    an answer is.
+    """
+    return 100 <= status_of(entry) < 600
+
+
+def _refused(entry) -> bool:
+    """Is this an answer that says NO - as opposed to one that broke?
+
+    `verify_operator_injection` derived it from `status_of(c) >= 400`, so
+    the server breaking counted as the server refusing, and a flaky 503 on
+    the control plus a 200 on the operator request graded `nosqli` proven
+    against a login that returned `{"session":"","user":null}`. The rule
+    was already written down twice in this file and applied neither time
+    there: `_acl_header_changed_the_answer` guards it in prose ("a
+    transient 500 on the same URL ... would make a flaky error the evidence
+    that an ACL was bypassed"), and `verify_restricted_access` uses an
+    allowlist.
+
+    4xx except 429. The first version of this was a narrower allowlist,
+    `(400, 401, 403, 409, 422)`, and planting the old `>= 400` back showed
+    two things at once: nothing failed, because the caller's control filter
+    already excluded 5xx and the allowlist's only remaining contribution
+    was 429 - and excluding 404 would have introduced a false NEGATIVE,
+    since `POST /api/login` answering 404 "no such user" while the same
+    request with `{"$ne": null}` answers 200 with a session is a real
+    bypass. A guard no test can tell from its absence is not a guard, and
+    one that refuses real evidence is worse than none.
+    """
+    status = status_of(entry)
+    return _answered(entry) and 400 <= status < 500 and status != 429
+
+
 def _check(name: str, ok: bool, detail: str = "") -> dict:
     return {"check": name, "ok": bool(ok), "detail": detail}
 
@@ -968,12 +1018,28 @@ def verify_operator_injection(claim: Claim, spec: "ProofSpec") -> list[dict]:
         out = []
         rid = (entry or {}).get("id", "?")
         body = resp_body(entry) if entry else ""
+        # A control the target never answered is not a control. Both
+        # branches below rest on comparing against one, and the `extraction`
+        # branch rests on the control NOT carrying documents - which is
+        # trivially true of "Internal Server Error". Measured: a 500 on
+        # `POST /api/search {"q":"hello"}` plus a 200 carrying the public
+        # listing that endpoint answers anyway graded `nosqli` proven
+        # through this branch even after the refusal allowlist closed the
+        # other one. A broken control proves nothing either way.
         controls = [e for e in claim.exchanges
                     if entry is not None and e is not entry
                     and _endpoint_shape(e) == _endpoint_shape(entry)
+                    and _answered(e) and status_of(e) < 500
                     and not NOSQL_OP_RE.search(req_text(e))] if entry else []
+        # The control has to have been REFUSED, not broken. This read
+        # `status_of(c) >= 400`, so a 500 or a 503 counted - and a flaky
+        # error on the control plus a 200 on the operator request graded
+        # `nosqli` proven twice over: once against a login that answered
+        # `{"session":"","user":null}` (no access at all), and once against
+        # a public search endpoint returning the listing it answers anyway.
+        # In both the only "difference" was an unrelated server error.
         refused_control = next(
-            (c for c in controls if status_of(c) >= 400), None)
+            (c for c in controls if _refused(c)), None)
         answered = bool(entry) and 200 <= status_of(entry) < 300
         access = bool(refused_control and answered)
         records = RECORD_RE.search(body) if entry else None
@@ -1825,6 +1891,15 @@ def verify_oracle(claim: Claim, spec: "ProofSpec") -> list[dict]:
     for key, rows in by_shape.items():
         if len(rows) > len(series):
             series, shape = rows, key
+    # An attempt the target never ANSWERED is not one of the two answers.
+    # This grouped by `(body, status)` and never asked, so a read timeout -
+    # recorded as status 0 with an empty body - became a distinct answer,
+    # and two of them "repeated". Measured: four POST /login attempts, two
+    # answering 200 "Login failed" and two that timed out, graded `enum`
+    # PROVEN. The oracle proven was the target being down twice.
+    attempted = len(series)
+    series = [e for e in series if _answered(e)]
+    silent = attempted - len(series)
     # group the answers: body+status is the observable
     answers: dict[tuple, list[dict]] = {}
     for entry in series:
@@ -1837,8 +1912,12 @@ def verify_oracle(claim: Claim, spec: "ProofSpec") -> list[dict]:
         _check("the same request gave two different answers", distinct,
                f"{len(answers)} distinct answers over {len(series)} requests "
                f"on {shape}" if distinct else
-               f"all {len(series)} cited requests on one endpoint answered "
-               "alike - there is no oracle here"),
+               (f"of {attempted} cited requests on one endpoint, {silent} got "
+                f"no answer at all and the remaining {len(series)} answered "
+                "alike - a request the target never answered is not the "
+                "other answer" if silent else
+                f"all {len(series)} cited requests on one endpoint answered "
+                "alike - there is no oracle here")),
         _check("each answer was observed more than once", repeated,
                "both answers repeat" if repeated else
                "send each case twice: one differing response is noise until it "
@@ -2761,6 +2840,39 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             # was the server printing a name back, not storing anything.
             wrote = str(_req(a).get("body") or "")
             read = resp_body(b)
+            # ...and the nonce must not be something the READ's own request
+            # supplied. The comment below records removing the URL from the
+            # WRITE side, and that closed nothing, because `probe_method`
+            # puts its canary in the filename AND the body: `PUT
+            # /files/<nonce>.txt` then `GET /files/<nonce>.txt` answered by
+            # a soft-404 that echoes the requested path graded `method`
+            # PROVEN with "written by r2 and read back by r3". Nothing was
+            # stored; the server printed a path back.
+            #
+            # The guard exists one function over - `verify_mass_assignment`
+            # requires the value absent from the read's own request, and
+            # `verify_unkeyed_input` requires it absent from the victim's -
+            # and this class could not borrow the universal `_echo_check`
+            # because it sets `reflection_is_the_finding` for the TRACE
+            # branch, which switches that check off for the read-back branch
+            # as well. Two halves of one fix, and only one had been applied.
+            #
+            # Requiring the NONCE to be absent from the read's request is the
+            # obvious guard and it is wrong: `probe_method` PUTs to
+            # `<url>/<canary>.txt`, so the read's own URL always carries the
+            # canary and the class becomes unprovable for the shape its own
+            # probe produces. Measured - the honest case, where the GET
+            # really returns the written bytes, dropped to `unproven`.
+            #
+            # What separates them is not the nonce but the BODY: the stored
+            # object comes back, where a soft-404 returns the path. So the
+            # written bytes have to appear in the read AND not be something
+            # the read's own request supplied - the second half because a
+            # reflecting endpoint answering `GET /x?q=<written bytes>` on
+            # the same path would otherwise echo its way to proven.
+            asked = req_text(b) if b is not None else ""
+            stored = wrote.strip()
+            body_back = bool(stored) and stored in read and stored not in asked
             carried = [m.group(0) for m in NONCE_RE.finditer(wrote)
                        if m.group(0) in read]
             # The read-back has to be LATER. This class's requirement
@@ -2776,7 +2888,8 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             # write.
             later = _follows(_when, b, a)
             effect = bool(same and _method_of(b) == "GET"
-                          and 200 <= status_of(b) < 300 and carried and later)
+                          and 200 <= status_of(b) < 300 and carried
+                          and body_back and later)
             if effect:
                 detail = (f"{carried[0]} was written by {a.get('id')} and "
                           f"read back by {b.get('id')}")
@@ -2793,6 +2906,11 @@ def verify_method_effect(claim: Claim, spec: "ProofSpec") -> list[dict]:
             elif not 200 <= status_of(b) < 300:
                 detail = (f"{b.get('id')} answered {status_of(b)} - the "
                           "written object is not readable")
+            elif carried and not body_back:
+                detail = (f"{b.get('id')} names {carried[0]} but does not "
+                          f"return what {a.get('id')} wrote - a response that "
+                          "echoes the path it was asked for is the server "
+                          "printing a name back, not the stored object")
             elif not wrote:
                 detail = (f"{a.get('id')} carries no request body - a write "
                           "with nothing in it has no bytes to read back, and "

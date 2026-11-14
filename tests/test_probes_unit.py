@@ -8,7 +8,9 @@ app - true.
 """
 from __future__ import annotations
 
+import re
 import sys
+import urllib.parse
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -214,3 +216,256 @@ def test_probe_lockout_does_not_read_a_dropped_attempt_as_a_slowdown():
                                "username=x&password=y")
     assert "throttling observed" not in out["verdict"], out["verdict"]
     assert "got no answer" in out["verdict"], out["verdict"]
+
+
+class _Dead:
+    """A target that answers nothing: status 0, empty body, the full timeout.
+
+    This is what `GuardedClient` records for a connect refusal, a read
+    timeout or a reset - `status: 0`, an empty body, `elapsed_ms` kept at
+    the whole time spent waiting, and `response.error` naming the
+    exception.
+    """
+
+    def __init__(self):
+        self.n = 0
+
+    def _dead(self):
+        self.n += 1
+        return {"status": 0, "headers": {}, "body": "",
+                "request_id": f"r{self.n}", "elapsed_ms": 15000.0,
+                "error": "ReadTimeout: timed out"}
+
+    def send(self, method, url, headers=None, body=None, tool="", note="",
+             **kw):
+        return self._dead()
+
+    def send_raw(self, *a, **kw):
+        out = self._dead()
+        out.update({"request_text": "", "unsolicited": []})
+        return out
+
+    def send_ws(self, *a, **kw):
+        out = self._dead()
+        out.update({"frames": [], "accept_ok": False, "upgraded": False})
+        return out
+
+
+class _Waf(_Dead):
+    """Answers everything EXCEPT requests carrying a blocked substring,
+    which it silently drops.
+
+    The faithful model, and the reason it exists. The first version of
+    these tests used `_Dead` alone and caught none of the four defects it
+    was written for: with every send unanswered, `probe_cmdi`'s threshold
+    is computed from dead baselines and never clears, and
+    `_similarity("", "")` is 1.0 so nothing differs. The defect needs one
+    side of a comparison answered and the other dropped, which is what a
+    WAF blackholing the payload actually does - and what three of the four
+    findings described. A model that agrees with the fix proves nothing
+    about the fix; this one was checked by planting each defect back and
+    watching it reappear with the wording the finding reported.
+
+    It decodes before matching, because `_send` percent-encodes the payload
+    into the URL and a substring test against the encoded form matches
+    nothing - which is how the second version of this test also passed
+    while catching nothing.
+    """
+
+    def __init__(self, blocked):
+        super().__init__()
+        self.blocked = blocked
+
+    def send(self, method, url, headers=None, body=None, tool="", note="",
+             **kw):
+        self.n += 1
+        text = urllib.parse.unquote_plus(f"{url} {body or ''}")
+        if any(b in text for b in self.blocked):
+            return {"status": 0, "headers": {}, "body": "",
+                    "request_id": f"r{self.n}", "elapsed_ms": 15000.0,
+                    "error": "ReadTimeout: timed out"}
+        return {"status": 200, "headers": {"content-type": "text/html"},
+                "body": "<html>hello world, nothing to see here</html>",
+                "request_id": f"r{self.n}", "elapsed_ms": 40.0}
+
+
+class _StoresNothing(_Dead):
+    """Accepts every upload, reports a stored path, and 404s the fetch with
+    an Apache-style body naming the URL it could not find."""
+
+    def send(self, method, url, headers=None, body=None, tool="", note="",
+             **kw):
+        self.n += 1
+        if method.upper() == "POST":
+            match = re.search(r'filename="([^"]+)"', str(body or ""))
+            return {"status": 200,
+                    "headers": {"content-type": "application/json"},
+                    "body": '{"url": "/uploads/%s"}'
+                            % (match.group(1) if match else "x"),
+                    "request_id": f"r{self.n}", "elapsed_ms": 30.0}
+        return {"status": 404, "headers": {"content-type": "text/html"},
+                "body": f"<html><body>The requested URL {url} was not found "
+                        "on this server.</body></html>",
+                "request_id": f"r{self.n}", "elapsed_ms": 20.0}
+
+
+class _NoTranscript:
+    """The session as `probe_race` reaches it, with nothing recorded."""
+
+    _transcript: dict = {}
+
+
+def _drive(name, client, **extra):
+    """Call one probe with placeholder arguments and return its verdict."""
+    import inspect
+
+    fn = getattr(probes, name)
+    ctx = _Ctx(client)
+    ctx.session = _NoTranscript()
+    args = {}
+    for pname, param in list(inspect.signature(fn).parameters.items())[1:]:
+        if param.default is not inspect.Parameter.empty:
+            continue
+        args[pname] = {"url": "http://t.local/x", "param": "q",
+                       "data": "q=1"}.get(pname, "q=1")
+    args.update(extra)
+    return str((fn(ctx, **args) or {}).get("verdict", "")).lower().strip()
+
+
+# How a probe says it found nothing. The tests below require the verdict to
+# start one of these ways, rather than scanning for the words a claim uses -
+# because a keyword list tests the WORDING and not the claim, and two
+# versions of this proved it: the first flagged `probe_time`'s correct "no
+# delay observed" on the word "observed", the second flagged `probe_enum`'s
+# correct "no enumeration signal" on the word "enumeration". Asserting the
+# negative shape fails in the safe direction instead - a probe whose
+# negative wording changes fails here and somebody looks, where a keyword
+# list would pass it silently.
+_NEGATIVE = ("no ", "not ", "uniform ", "inconclusive", "methods: none")
+
+
+def test_no_probe_reports_a_finding_against_a_target_that_answers_nothing():
+    """Every probe, against a target that answers nothing at all.
+
+    Cheap, and it caught a real one: `probe_lockout` answered "no lockout
+    or rate limit after 10 failed attempts - online password guessing is
+    unthrottled" about a target that had said nothing, with the "they got
+    no answer" caveat as a parenthetical underneath. Ten attempts that got
+    no answer are not ten failed attempts, and a caveat under a wrong
+    headline is still a wrong headline.
+
+    The denominator comes from the module rather than a list kept here, so
+    a probe added tomorrow is covered the day it is written.
+    """
+    names = sorted(n for n in dir(probes) if n.startswith("probe_"))
+    assert len(names) >= 25, names
+
+    claimed = []
+    for name in names:
+        extra = {"data": '{"username":"x","password":"y"}'} \
+            if name == "probe_nosqli" else {}
+        try:
+            verdict = _drive(name, _Dead(), **extra)
+        except Exception as exc:                   # a crash is its own bug
+            claimed.append(f"{name} raised {type(exc).__name__}: {exc}")
+            continue
+        if verdict and not verdict.startswith(_NEGATIVE):
+            claimed.append(f"{name}: {verdict[:110]}")
+    assert not claimed, (
+        "these probes claim something against a target that answered "
+        "nothing:\n  " + "\n  ".join(claimed))
+
+    # The negative-prefix rule above cannot see a claim in a SECOND clause,
+    # and this is the one that had it: "no lockout or rate limit after 10
+    # failed attempts - online password guessing is unthrottled" starts
+    # "no " and passes, while asserting the thing the class exists to
+    # assert. So the probe that was actually wrong gets its own line, which
+    # is also what makes the fix testable at all.
+    lockout = _drive("probe_lockout", _Dead())
+    assert "unthrottled" not in lockout, lockout
+    assert "none of them answered" in lockout, lockout
+
+    # ...and a half-dead target: the attempts that DID answer are judged,
+    # and the ones that did not are named rather than counted as failures
+    class _SixThenNothing(_Dead):
+        def send(self, method, url, headers=None, body=None, tool="",
+                 note="", **kw):
+            self.n += 1
+            if self.n <= 6:
+                return {"status": 401, "headers": {},
+                        "body": "Invalid credentials",
+                        "request_id": f"r{self.n}", "elapsed_ms": 120.0}
+            return self._dead()
+
+    half = _drive("probe_lockout", _SixThenNothing())
+    assert "after 6 failed attempts" in half, half
+    assert "got no answer" in half, half
+
+
+# One per probe whose comparison is fail-open on a dropped request, with
+# the payload a WAF would drop. Each was reproduced by planting the defect
+# back and checking the verdict named in the comment reappears.
+_DROPPED_PAYLOAD = (
+    # "boolean-blind candidate", signal "similarity=0.0, statuses 0/200"
+    ("probe_sqli", ["AND '1'='1"], {}),
+    # "blind candidate: delay on semicolon, pipe, and, background" - four
+    # separator families at once, on a target that answered nothing
+    ("probe_cmdi", ["sleep"], {}),
+    # "user-enumeration candidate ... (admin)" with reproduced: True,
+    # because _similarity("", "") is 1.0
+    ("probe_enum", ["admin"], {}),
+    # the sibling the same finding named
+    ("probe_nosqli", ["$ne"], {"data": '{"username":"x","password":"y"}'}),
+)
+
+
+def test_no_probe_reads_a_dropped_payload_as_a_signal():
+    """A WAF that blackholes the payload is not the bug it defends against.
+
+    Both halves of every comparison in these probes are fail-OPEN on a
+    dropped request: `_similarity("", page)` is 0.0, which is maximally
+    different, status 0 differs from any real status, and the read timeout
+    kept in `elapsed_ms` clears any delay threshold. So the defence
+    manufactured the evidence for the bug - and in each case the probe told
+    the operator to record a finding the proof gate refuses.
+
+    `status_of_result` was added to this module when `probe_time` was
+    corrected, with a docstring generalising the rule: "any probe that
+    reads a duration without reading this is treating a transport failure
+    as a measurement". Four probes went on doing it, one of them 130 lines
+    away. A rule in a docstring is not a check.
+    """
+    claimed = []
+    for name, blocked, extra in _DROPPED_PAYLOAD:
+        verdict = _drive(name, _Waf(blocked), **extra)
+        if verdict and not verdict.startswith(_NEGATIVE):
+            claimed.append(f"{name} (blocked {blocked}): {verdict[:100]}")
+    assert not claimed, (
+        "these probes read a dropped payload as a signal:\n  "
+        + "\n  ".join(claimed))
+
+    # and the model has to be able to see a real finding, or it proves
+    # nothing: the same probes against a target that blocks nothing
+    answered = _drive("probe_sqli", _Waf([]))
+    assert answered.startswith(_NEGATIVE), answered
+
+
+def test_probe_upload_reads_the_fetch_status_not_just_its_body():
+    """`served` was `canary in body` and never looked at the fetch.
+
+    `entry["status"]` keeps the UPLOAD's status, so the fetch's status
+    appeared nowhere in the probe's output either. Measured against an app
+    that accepts every upload, answers `{"url": "/uploads/<canary>.php"}`
+    and stores nothing, so the fetch 404s with an Apache-style body naming
+    the URL: "unrestricted upload: stored and served as active content
+    svg-xss as text/html; php-rce as text/html; ..." - all ten active
+    payload families at once.
+
+    `verify_served_upload` requires `200 <= status < 300` and refuses that
+    evidence, so the probe was telling the operator to record what the gate
+    would throw out.
+    """
+    verdict = _drive("probe_upload", _StoresNothing())
+    assert verdict.startswith(_NEGATIVE), verdict
+    assert "stored path undisclosed" in verdict or "no upload" in verdict, \
+        verdict

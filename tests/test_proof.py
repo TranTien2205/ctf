@@ -3567,3 +3567,225 @@ def test_desync_orders_the_effect_against_the_ambiguity_by_record():
                        [amb, early]).grade != "proven"
     assert proof.grade("smuggle", "unknown method GPOST",
                        [early, amb]).grade != "proven"
+
+
+def _att(rid, ts, status, rbody, user="nouserx", err=None, ms=40.0):
+    """One login attempt, optionally one the target never answered."""
+    entry = {"id": rid, "ts": ts,
+             "request": {"method": "POST", "url": "http://t/login",
+                         "headers": {}, "body": f"username={user}&password=w"},
+             "response": {"status": status, "headers": {}, "body": rbody,
+                          "elapsed_ms": ms}}
+    if err:
+        entry["response"]["error"] = err
+    return entry
+
+
+def test_a_request_the_target_never_answered_is_not_an_answer():
+    """`enum` graded proven on a pair of read timeouts.
+
+    `verify_oracle` groups answers by `(body, status)` and never asked
+    whether the target answered at all. `GuardedClient` records a transport
+    failure as status 0, an empty body and a `response.error` naming the
+    exception - and until this, nothing in `proof.py` read either field or
+    tested `status == 0`. Measured: four POST /login attempts, two
+    answering 200 "Login failed" and two that timed out, graded **proven**
+    with "2 distinct answers over 4 requests" and "both answers repeat".
+    The second answer was the absence of one, and it repeated because the
+    target was down twice.
+
+    The unanswered attempts are dropped rather than poisoning the claim, so
+    a real oracle that happens to cite a timeout alongside still proves -
+    fail-closed on the defect, not on the evidence.
+    """
+    timeouts = [_att("r1", 1001.0, 200, "Login failed"),
+                _att("r2", 1002.0, 200, "Login failed"),
+                _att("r3", 1003.0, 0, "", "admin",
+                     err="ReadTimeout: timed out", ms=15000.0),
+                _att("r4", 1004.0, 0, "", "admin",
+                     err="ReadTimeout: timed out", ms=15000.0)]
+    v = proof.grade("enum", "Login failed", timeouts)
+    assert v.grade != "proven", v.checks
+    two = [c for c in v.checks if "two different answers" in str(c["check"])]
+    assert two and not two[0]["ok"], v.checks
+    assert "never answered is not the other answer" in two[0]["detail"]
+
+    # a real oracle: two answers, each seen twice
+    real = [_att("r1", 1001.0, 200, "No such user"),
+            _att("r2", 1002.0, 200, "No such user"),
+            _att("r3", 1003.0, 401, "Wrong password", "admin"),
+            _att("r4", 1004.0, 401, "Wrong password", "admin")]
+    assert proof.grade("enum", "No such user", real).grade == "proven"
+
+    # ...and it still proves with a dead attempt cited alongside
+    assert proof.grade("enum", "No such user", real + [
+        _att("r5", 1005.0, 0, "", "x", err="ConnectError: refused",
+             ms=9000.0)]).grade == "proven"
+
+
+def test_no_class_proves_on_evidence_the_target_never_answered():
+    """The module-wide version of the check above.
+
+    `verify_oracle` was the instance a sweep found. The gap was wider than
+    the instance: `grep '"error"' argus/proof.py` matched nothing outside a
+    docstring and no check anywhere tested `status == 0`, so "the target
+    never replied" was not a concept this gate had. Any verifier could have
+    counted a dead request as an observation.
+
+    So this asks the question of every gradeable class rather than of the
+    one that was caught: evidence consisting only of exchanges the target
+    never answered must not prove anything. It is cheap, it is falsifiable,
+    and it fails for a class added tomorrow that reads a body without
+    asking whether there was a response.
+    """
+    dead = [{"id": f"r{n}", "ts": 1000.0 + n,
+             "request": {"method": "POST", "url": "http://t/x",
+                         "headers": {"host": "t"},
+                         "body": "username=admin&password=w&q=1' OR '1'='1"},
+             "response": {"status": 0, "headers": {}, "body": "",
+                          "elapsed_ms": 15000.0,
+                          "error": "ReadTimeout: timed out"}}
+            for n in range(1, 7)]
+    proven = []
+    for name in proof.classes():
+        if proof.grade(name, "", dead).grade == "proven":
+            proven.append(name)
+        # and with an excerpt that is vacuously a substring of ""
+        if proof.grade(name, "", dead[:2]).grade == "proven":
+            proven.append(f"{name} (2 entries)")
+    assert not proven, (
+        "these classes grade proven on exchanges the target never "
+        f"answered: {sorted(set(proven))}")
+    assert len(proof.classes()) >= 25, len(proof.classes())
+
+
+def test_nosqli_needs_a_control_that_answered_and_said_no():
+    """A 5xx is the server breaking, not the server refusing.
+
+    `refused_control = next((c for c in controls if status_of(c) >= 400))`
+    derived "refused" from a status class. Measured twice: a 503 on the
+    control plus a 200 answering `{"session":"","user":null}` - no access
+    at all - graded `nosqli` **proven**, and a 500 control plus the public
+    listing a search endpoint answers anyway graded proven as well. In both
+    the only difference between the two responses was an unrelated error.
+
+    The rule was already written down twice in this file and applied
+    neither time here: `_acl_header_changed_the_answer` guards it in prose,
+    and `verify_restricted_access` uses an allowlist. Closing the `access`
+    branch alone was not enough - the `extraction` branch rests on the
+    control NOT carrying documents, which "Internal Server Error"
+    satisfies for free, so the 500 case still proved until a broken
+    control stopped counting as a control at all.
+    """
+    def ex_(rid, ts, status, rbody, body, path="/api/login"):
+        return {"id": rid, "ts": ts,
+                "request": {"method": "POST", "url": "http://t" + path,
+                            "headers": {}, "body": body},
+                "response": {"status": status, "headers": {}, "body": rbody,
+                             "elapsed_ms": 40.0}}
+
+    op = ex_("r2", 1001.0, 200, '{"session":"","user":null}',
+             '{"user":"admin","password":{"$ne":null}}')
+    for broken in (500, 502, 503, 504):
+        ctrl = ex_("r1", 1000.0, broken, "Internal Server Error",
+                   '{"user":"admin","password":"guess"}')
+        assert proof.grade("nosqli", '"session":""',
+                           [op, ctrl]).grade != "proven", broken
+
+    # the extraction branch, where a broken control makes "no documents in
+    # the control" true for free
+    pub = ex_("r2", 1001.0, 200, '[{"_id":"507f","title":"public post"}]',
+              '{"q": {"$ne": "zz"}}', "/api/search")
+    err = ex_("r1", 1000.0, 500, "Internal Server Error", '{"q": "hello"}',
+              "/api/search")
+    assert proof.grade("nosqli", '"title":"public post"',
+                       [pub, err]).grade != "proven"
+
+    # A throttled control is not a refused one either, and this is the only
+    # thing `_refused` contributes that the control filter above does not -
+    # so it is asserted, or the guard is indistinguishable from its absence.
+    # That is how the first version of it was caught: planting `>= 400`
+    # back failed nothing.
+    throttled = ex_("r1", 1000.0, 429, "Too Many Requests",
+                    '{"user":"admin","password":"guess"}')
+    session_op = ex_("r2", 1001.0, 200, '{"session":"abc123","user":"admin"}',
+                     '{"user":"admin","password":{"$ne":null}}')
+    assert proof.grade("nosqli", '"session":"abc123"',
+                       [session_op, throttled]).grade != "proven"
+
+    # a real refusal still proves: 401 control, 200 with a session
+    real_ctrl = ex_("r1", 1000.0, 401, '{"error":"invalid credentials"}',
+                    '{"user":"admin","password":"guess"}')
+    assert proof.grade("nosqli", '"session":"abc123"',
+                       [session_op, real_ctrl]).grade == "proven"
+
+    # ...and so does a 404. The first version of the allowlist left it out
+    # on the reasoning that 404 is "missing, not refused", which would have
+    # refused a real bypass: a login answering "no such user" for a name
+    # that the operator query then gets a session for.
+    missing = ex_("r1", 1000.0, 404, '{"error":"no such user"}',
+                  '{"user":"admin","password":"guess"}')
+    assert proof.grade("nosqli", '"session":"abc123"',
+                       [session_op, missing]).grade == "proven"
+
+    # ...and a real extraction: an empty control, documents on the operator
+    empty = ex_("r1", 1000.0, 200, "[]", '{"q":"zzzz"}', "/api/search")
+    docs = ex_("r2", 1001.0, 200,
+               '[{"_id":"507f1f77bcf86cd799439011","title":"secret draft"}]',
+               '{"q":{"$ne":"zzzz"}}', "/api/search")
+    assert proof.grade("nosqli", '"title":"secret draft"',
+                       [docs, empty]).grade == "proven"
+
+
+def test_method_needs_the_written_bytes_back_not_the_path_echoed():
+    """A soft-404 that prints the path it was asked for proved `method`.
+
+    `probe_method` PUTs to `<url>/<canary>.txt` with the canary in the body
+    too, so `GET /files/<canary>.txt` answered `Not Found:
+    /files/<canary>.txt` satisfied "a nonce the write carried appears in
+    the read". Nothing was stored; the server printed a name back. The
+    comment in the verifier records removing the URL from the WRITE side
+    for this exact reason, and that closed nothing, because the canary is
+    in both places.
+
+    The obvious guard - require the nonce to be absent from the read's own
+    request - is wrong, and measuring said so: the read's URL always
+    carries the canary, so the honest case dropped to `unproven` and the
+    class became unprovable for the shape its own probe produces. What
+    separates the two is the BODY. The stored object comes back; a soft-404
+    returns the path.
+    """
+    def ex_(rid, ts, method, url, status, rbody, body=""):
+        return {"id": rid, "ts": ts,
+                "request": {"method": method, "url": url, "headers": {},
+                            "body": body},
+                "response": {"status": status, "headers": {}, "body": rbody,
+                             "elapsed_ms": 40.0}}
+
+    put = ex_("r2", 1001.0, "PUT", "http://t/files/argusput9k2x.txt", 201,
+              "Created", "argus method probe argusput9k2x")
+    refused = ex_("r4", 1003.0, "PUT", "http://t/admin/cfg", 405,
+                  "Method Not Allowed", "x")
+
+    echoed = ex_("r3", 1002.0, "GET", "http://t/files/argusput9k2x.txt", 200,
+                 "Not Found: /files/argusput9k2x.txt")
+    v = proof.grade("method", "argusput9k2x", [put, echoed, refused])
+    assert v.grade != "proven", v.checks
+    effect = [c for c in v.checks if "observable effect" in str(c["check"])]
+    assert effect and not effect[0]["ok"], v.checks
+    assert "printing a name back" in effect[0]["detail"], effect[0]
+
+    # the honest case: the GET returns what the PUT wrote
+    stored = ex_("r3", 1002.0, "GET", "http://t/files/argusput9k2x.txt", 200,
+                 "argus method probe argusput9k2x")
+    assert proof.grade("method", "argusput9k2x",
+                       [put, stored, refused]).grade == "proven"
+
+    # and a reflecting endpoint cannot echo its way there either: the
+    # written bytes come back, but the read's own request supplied them
+    reflect = ex_("r3", 1002.0, "GET",
+                  "http://t/files/argusput9k2x.txt"
+                  "?q=argus+method+probe+argusput9k2x", 200,
+                  "you searched for argus method probe argusput9k2x")
+    assert proof.grade("method", "argusput9k2x",
+                       [put, reflect, refused]).grade != "proven"
