@@ -282,6 +282,18 @@ def verify_transcript(sdir: Path, seal_key: str = "") -> dict:
         added = sorted(present - set(files_dig) - {"transcript.jsonl"})
         if added:
             out["unsealed_additions"] = added
+    # A re-render that re-sealed over an edit records it in the chain, so
+    # the fact survives the re-seal that hides everything else about it.
+    # Reported whether or not the digests currently match - that is the
+    # point: after the re-render they DO match, and this is the only thing
+    # left that says they did not.
+    resealed = [e for e in entries.values()
+                if isinstance(e, dict)
+                and e.get("kind") == "reseal_over_mismatch"]
+    if resealed:
+        out["resealed_over_mismatch"] = [
+            {"id": e.get("id"), "ts": e.get("ts"),
+             "files": e.get("files") or []} for e in resealed]
     return out
 
 

@@ -3757,12 +3757,53 @@ reports `$0.00`. The report already had the branch for an unpriced run
 reaches it: **Model cost:** not priced - 4 model call(s) reported no token
 usage.
 
+### An accepted residual that was also an invisible one
+
+A fourth refusal re-read. This one was refuted correctly and still left
+something to do.
+
+That a re-render re-seals is documented in four places, and
+docs/ARCHITECTURE.md states the residual in its own words: "`argus report`
+recomputes the artifact digests, which is what makes a legitimate
+re-render verify - and therefore what lets an edit made before the
+re-render come out the other side digest-valid." The mitigations named
+there are real - the grade is recomputed from the transcript, and
+`--seal-key` closes the forgery case.
+
+What was missing is that the only signal of the edit was a stderr line at
+render time. The sequence measured end to end: `argus verify` prints
+`TAMPERED: ['findings.json']`; `argus report` warns, re-renders and
+re-seals; `argus verify` afterwards prints `OK: 68 chained entries
+verified ... artifacts sealed` and names nothing. A reader of the session
+later cannot see that a mismatch was ever there, which is the difference
+between an accepted residual and a hidden one - and the same shape as the
+file-added-after-sealing finding earlier in this stretch, where the signal
+was also transient and the fix was to make it durable.
+
+The transcript is an append-only hash chain, so an event recorded at
+re-render time cannot be removed without breaking the chain. `argus
+report` records `reseal_over_mismatch` naming the files, `verify_transcript`
+surfaces it, and `argus verify` prints it as a note beside the OK:
+
+    note: r66: this session was re-rendered and re-sealed while
+    findings.json did not match the seal - the digests above cover the
+    edited bytes, and the grades were recomputed from the transcript
+
+This does not close the residual and does not change the exit code: the
+seal really does match now, and the chain and the recomputed grades are
+the signals the documentation already names. It stops the residual being
+silent.
+
+The test's first version set `severity = "critical"` on a finding that was
+already critical, wrote identical bytes back, and asserted a mismatch that
+never happened - caught because it failed unplanted.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 708 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 709 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

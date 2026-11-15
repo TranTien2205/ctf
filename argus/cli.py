@@ -328,6 +328,36 @@ def main(argv: list[str] | None = None) -> int:
             print(f"warning: {v['unsealed_additions']} were added after the "
                   "run was sealed and are covered by no digest - they are "
                   "not part of the sealed record", file=sys.stderr)
+        # ...and record it, because this re-render is about to RE-SEAL over
+        # those bytes. That a re-render re-seals is documented and accepted
+        # (docs/ARCHITECTURE.md: "an edit made before the re-render comes
+        # out the other side digest-valid"), and the mitigations named there
+        # are real - the grade is recomputed, and `--seal-key` closes the
+        # forgery case. What was missing is that the only signal of the edit
+        # was this stderr line: afterwards `argus verify` printed OK and
+        # named nothing, so whoever reads the session later cannot see that
+        # a mismatch was ever there.
+        #
+        # The transcript is an append-only hash chain, so an event recorded
+        # here cannot be removed without breaking the chain - which makes it
+        # the one place a durable note can go. It does not close the
+        # documented residual; it stops it being invisible.
+        _laundered = (list(v.get("artifact_mismatch") or [])
+                      + list(v.get("unsealed_additions") or []))
+        if _laundered or not v.get("chained"):
+            try:
+                session.record_event("reseal_over_mismatch", {
+                    "files": _laundered,
+                    "chained_before": bool(v.get("chained")),
+                    "detail": "`argus report` re-rendered and re-sealed a "
+                              "session whose artifacts did not match the "
+                              "seal recorded in this transcript; the "
+                              "digests after this point cover the edited "
+                              "bytes",
+                })
+            except Exception as exc:          # a read-only dir must not fail
+                print(f"warning: could not record the re-seal over a "
+                      f"mismatch: {exc}", file=sys.stderr)
         bad = findings_bad(session._transcript, session.findings)
         if bad:
             print(f"warning: findings {bad} fail evidence re-validation - "
@@ -690,6 +720,16 @@ def main(argv: list[str] | None = None) -> int:
                 if res.get("resumed_by") else "]"
         print(f"OK: {res['entries']} chained entries verified{anchored}"
               f"{fchk}{sealed}{prod}")
+        # The seal matches NOW because a re-render recomputed it. The chain
+        # still carries the record that it did not match then, and that is
+        # the only thing left saying so.
+        for ev in res.get("resealed_over_mismatch") or []:
+            files = ", ".join(str(f) for f in (ev.get("files") or [])) \
+                or "(not named)"
+            print(f"note: {ev.get('id')}: this session was re-rendered and "
+                  f"re-sealed while {files} did not match the seal - the "
+                  "digests above cover the edited bytes, and the grades "
+                  "were recomputed from the transcript", file=sys.stderr)
         # An addition does not break the chain or the sealed bytes, so it
         # does not change this exit code - but "artifacts sealed" names
         # nothing, so a file added afterwards used to pass unmentioned

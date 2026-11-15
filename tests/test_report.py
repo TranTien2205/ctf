@@ -727,3 +727,71 @@ def test_a_file_added_after_sealing_is_named(tmp_path, capsys):
         "the human output said 'artifacts sealed' and named nothing: "
         f"{out.out!r} / {out.err!r}")
     assert "added after sealing" in out.err, out.err
+
+
+def test_a_reseal_over_a_mismatch_survives_the_reseal(tmp_path, capsys):
+    """That a re-render re-seals is documented and accepted. Its invisibility was not.
+
+    docs/ARCHITECTURE.md states the residual: "`argus report` recomputes
+    the artifact digests, which is what makes a legitimate re-render verify
+    - and therefore what lets an edit made before the re-render come out
+    the other side digest-valid." The mitigations named there are real: the
+    grade is recomputed from the transcript, and `--seal-key` closes the
+    forgery case.
+
+    What was missing is that the only signal of the edit was a stderr line
+    at render time. Afterwards `argus verify` printed OK and named nothing,
+    so a reader of the session later could not see that a mismatch had ever
+    been there - which is the difference between an accepted residual and a
+    hidden one.
+
+    The transcript is an append-only hash chain, so an event recorded at
+    re-render time cannot be removed without breaking the chain. That makes
+    it the one place a durable note can go. This does not close the
+    residual; it stops it being silent.
+    """
+    import json
+
+    from argus.cli import main
+    from argus.session import verify_transcript
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+
+    before = verify_transcript(sdir)
+    assert before["chained"] and not before.get("artifact_mismatch")
+    assert not before.get("resealed_over_mismatch"), (
+        "a clean session must carry no such record")
+
+    fp = sdir / "findings.json"
+    rows = json.loads(fp.read_text(encoding="utf-8"))
+    # the TITLE, because the first finding of the demo may already carry
+    # whatever severity a test picks - a first version set
+    # `severity = "critical"` on a row that was already critical, wrote the
+    # same bytes back, and asserted a mismatch that never happened
+    rows[0]["title"] = rows[0]["title"] + " (edited by hand)"
+    fp.write_text(json.dumps(rows, indent=2), encoding="utf-8")
+    assert fp.read_text(encoding="utf-8") != "", fp
+
+    tampered = verify_transcript(sdir)
+    assert tampered.get("artifact_mismatch") == ["findings.json"], tampered
+
+    capsys.readouterr()
+    assert main(["report", str(sdir)]) == 0
+    assert "edited since the run was sealed" in capsys.readouterr().err
+
+    after = verify_transcript(sdir)
+    # the seal matches again - that is the documented part
+    assert not after.get("artifact_mismatch"), after
+    # ...and the chain remembers that it did not
+    rec = after.get("resealed_over_mismatch")
+    assert rec, (
+        "the re-render re-sealed over an edit and left nothing saying so")
+    assert "findings.json" in rec[0]["files"], rec
+    assert after["chained"], "the record must not break the chain"
+
+    capsys.readouterr()
+    assert main(["verify", str(sdir)]) == 0
+    out = capsys.readouterr()
+    assert "re-sealed while" in out.err and "findings.json" in out.err, (
+        f"`argus verify` did not name it: {out.out!r} / {out.err!r}")
