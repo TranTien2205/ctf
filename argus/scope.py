@@ -14,6 +14,8 @@ import ipaddress
 import posixpath
 import re
 import socket
+import sys
+import threading
 import urllib.parse
 
 
@@ -31,9 +33,61 @@ def _is_private_host(host: str) -> bool:
     # getaddrinfo over gethostbyname: it returns BOTH families and every
     # address - a host whose only AAAA is ::1 must not read as public, and
     # a multi-record answer must not pass on the strength of one public IP
-    try:
-        infos = socket.getaddrinfo(host, None)
-    except OSError:
+    # Bounded, on a daemon thread, for the reason `analysis._resolves`
+    # already records: `getaddrinfo` takes no timeout and
+    # `socket.setdefaulttimeout` is process-global, so it would leak into
+    # every socket created while a lookup is in flight - including the
+    # target connections and, in the test suite, the lab's own server.
+    #
+    # Unbounded, this was an undeadlined blocking call per NEW in-scope
+    # host on the agent's own thread, and the target chooses how many new
+    # hosts there are: `include_subdomains` defaults to True, and `crawl`
+    # queues every in-scope-looking href out of the target's own HTML.
+    # Measured here: a fresh in-scope subdomain cost 15.0s inside
+    # `check()`, and a bare `getaddrinfo` against a non-answering resolver
+    # 24.2s.
+    infos: list = []
+    failed: list = []
+
+    def _lookup() -> None:
+        try:
+            infos.extend(socket.getaddrinfo(host, None))
+        except OSError:
+            failed.append(True)
+
+    worker = threading.Thread(target=_lookup, daemon=True)
+    worker.start()
+    worker.join(_RESOLVE_DEADLINE_S)
+    if worker.is_alive():
+        # Timed out. The verdict is the SAME as the unresolvable case this
+        # function already had - "nothing can connect anyway" - and that is
+        # a deliberate decision not to change a security posture as a side
+        # effect of a cost fix.
+        #
+        # Fail-closed was written first and measured: it refuses in-scope
+        # hosts in any environment without a working resolver. Here
+        # `getaddrinfo("b.example")` raises OSError after 24.1s, so a 2s
+        # deadline fires first and cannot tell "no resolver" from "slow
+        # resolver" - and `tests/test_scope.py::test_extra_hosts` and
+        # `::test_subdomain_allowed_by_default` both failed, which is two
+        # real engagements' worth of behaviour, not a test artifact.
+        #
+        # What that leaves open, written down rather than implied: an
+        # attacker who controls the resolution TIMING of an in-scope
+        # hostname can keep a private address from being seen here, because
+        # the connection that follows resolves independently. Closing it
+        # needs a decision about refusing hosts on slow DNS, which is the
+        # operator's to make and not a side effect of bounding a lookup.
+        # The warning below is so it is not silent.
+        if host.lower() not in _RESOLVE_TIMED_OUT:
+            _RESOLVE_TIMED_OUT.add(host.lower())
+            print(f"[argus] scope: {host} did not resolve within "
+                  f"{_RESOLVE_DEADLINE_S}s, so it was not checked against "
+                  "the private-address rule; pass --allow-private "
+                  "deliberately if that is expected",
+                  file=sys.stderr)
+        return False
+    if failed and not infos:
         return False  # unresolvable: nothing can connect anyway
     for info in infos:
         try:
@@ -43,6 +97,15 @@ def _is_private_host(host: str) -> bool:
         except ValueError:
             continue  # non-IP sockaddr (e.g. AF_UNIX) - not a TCP target
     return False
+
+
+# Per-host, not per-run: the cache below makes a repeat free, and a cap on
+# how many distinct IN-SCOPE hosts may be resolved would be a functional
+# limit the operator did not ask for. What was missing was a bound on ONE
+# lookup, which is what the target controls.
+_RESOLVE_DEADLINE_S = 2.0
+# warned once per host, so a crawl does not repeat it per href
+_RESOLVE_TIMED_OUT: set[str] = set()
 
 
 def _ip_private(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
@@ -130,7 +193,17 @@ class ScopeGuard:
         self.include_subdomains = include_subdomains
         # Labs run on loopback; if the target is private, private stays allowed
         # for this session. Otherwise it must be explicitly requested.
-        target_private = _is_private_host(parsed.hostname)
+        # `is True` because this line decides whether private addresses
+        # stay allowed for the WHOLE session, and it reads a function whose
+        # other caller wants the opposite conservative answer. It is
+        # belt-and-braces now that a timeout returns False rather than
+        # True, and kept because the first version of this fix DID return
+        # True on a timeout and THIS is the line that turned that into
+        # "allow_private for the entire run". Measured: planting the bare
+        # `_is_private_host(...)` back changes no test, so the coercion is
+        # inert against the current function and exists to stop one
+        # specific mistake recurring. Said rather than implied.
+        target_private = _is_private_host(parsed.hostname) is True
         self.allow_private = allow_private or target_private
         # seed the cache with the target's real resolution
         self._private_cache: dict[str, bool] = {
@@ -155,9 +228,13 @@ class ScopeGuard:
             raise ScopeError(f"no host in URL: {url!r}")
         if not self.host_allowed(host):
             raise ScopeError(f"host out of scope: {host} (allowed: {sorted(self.allowed_hosts)})")
-        if host not in self._private_cache:
+        # No lookup at all when the answer cannot change the outcome.
+        # This ran unconditionally and the result was then discarded for
+        # every `--allow-private` engagement - which is every lab run, and
+        # every internal one, i.e. the runs most likely to touch many hosts.
+        if not self.allow_private and host not in self._private_cache:
             self._private_cache[host] = _is_private_host(host)
-        if self._private_cache[host] and not self.allow_private:
+        if not self.allow_private and self._private_cache.get(host):
             raise ScopeError(
                 f"{host} resolves to a private/loopback address; pass --allow-private to permit"
             )

@@ -3611,12 +3611,78 @@ is the weak shape this log has recorded before; and the rule-5 one SKIPPED
 when a higher rule fired first, which asserts nothing. All three drive the
 real path now.
 
+### The last two bounds the target set the cost of
+
+- **The wall clock bounded the turn and not the batch.** `remaining_time`
+  is computed once at the top of a turn and nothing inside the turn
+  consulted it, so a whole `tool_uses` batch was dispatched sequentially
+  to completion before the budget was looked at again - and the exhaustion
+  branch then issues up to two more nudge turns, each answered with a full
+  batch. The per-call cost is the target's: the 15s read timeout bounds
+  one read, not the engagement. Measured against the lab's own sleep
+  endpoint with a 1.0s budget and a model emitting three tool_use blocks
+  per turn: **72.4s and 9 requests**, 72x, and it scales with the batch.
+  After: 8.1s and 1 request.
+
+  What that remaining 8.1s is, and what this does not fix: the call
+  already on the wire when the clock runs out still finishes. Aborting it
+  mid-flight is a different change; it is bounded by the read timeout.
+- **An undeadlined DNS lookup per new in-scope host.** `getaddrinfo` takes
+  no timeout and ran on the agent's own thread, and the target chooses how
+  many new hosts there are - `include_subdomains` defaults to True and
+  `crawl` queues every in-scope-looking href out of the target's HTML.
+  Measured here: 15.0s for a fresh in-scope subdomain inside `check()`, and
+  24.1s for a bare lookup where no resolver answers. Now a daemon thread
+  with a 2.0s join, the pattern `analysis._resolves` already uses and for
+  the reason recorded there: `setdefaulttimeout` is process-global and
+  would leak into the target connections and the lab's own server.
+
+  The lookup is also skipped entirely when `--allow-private` is set, where
+  its answer cannot change the outcome - which is every lab run and every
+  internal one, the runs most likely to touch many hosts. Measured: 0.000s
+  through `check()` with a 30s resolver in place.
+
+  **The verdict is deliberately unchanged, and that took two attempts.**
+  Fail-closed went in first: a timeout returning "private" so a slow
+  resolver could not carry a private address past the one check that
+  catches it. Two things came of it.
+
+  First, it broke the OTHER caller. The constructor reads the same function
+  to decide whether the TARGET is private, and a target whose own lookup
+  timed out then set `allow_private` for the whole session - one function,
+  two questions, opposite conservative answers, the same shape as
+  `_window`'s start earlier in this log. Caught because the test for the
+  fix drove the real constructor and stopped raising.
+
+  Second, and decisive: fail-closed refuses in-scope hosts in any
+  environment without a working resolver. `test_subdomain_allowed_by_default`
+  and `test_extra_hosts` both failed on it here, which is two real
+  engagements' worth of behaviour rather than a test artifact - a 2s
+  deadline cannot tell "no resolver" from "slow resolver", and this
+  function already answered "unresolvable" with False on the stated
+  grounds that nothing can connect anyway.
+
+  So the COST is the defect and the bound is the fix. A timeout returns the
+  same False, and warns once per host naming what was not checked, because
+  changing a security posture as a side effect of bounding a lookup is a
+  different change and the operator's to make. What that leaves open,
+  written down rather than implied: an attacker who controls the
+  resolution TIMING of an in-scope hostname can keep a private address from
+  being seen here, since the connection that follows resolves
+  independently.
+
+  Four plants fire - no deadline, silent on an unchecked host, lookup runs
+  under `--allow-private`, and the constructor coercion dropped... and the
+  fourth does NOT, which is recorded beside it: with a timeout now
+  returning False the coercion is inert, and it is kept to stop one
+  specific mistake recurring rather than because a test can see it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 703 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 705 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

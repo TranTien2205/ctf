@@ -301,6 +301,35 @@ class AgentLoop:
                         "is_error": False,
                     })
                     continue
+                # ...and the same for the wall clock. `remaining_time` is
+                # computed once at the top of the turn and nothing inside
+                # the turn consulted it, so a whole `tool_uses` batch was
+                # dispatched sequentially to completion before the budget
+                # was looked at again - and the exhaustion branch then
+                # issues up to two more nudge turns, each answered with a
+                # full batch. The per-call cost is the TARGET's: the 15s
+                # httpx read timeout bounds one read, not the engagement.
+                #
+                # Measured against the lab's own sleep endpoint with
+                # `max_time_s=1.0` and a model emitting three tool_use
+                # blocks per turn: 72.4s, 72x the budget, 9 requests sent.
+                # It scales with the batch, so a larger one is worse.
+                #
+                # The model still gets its nudge turn - that is one API
+                # call, bounded by the LLM timeout - but no further bytes
+                # reach the target once the clock is spent.
+                if time.monotonic() - started >= self.cfg.max_time_s:
+                    self._log("wall-clock budget spent mid-batch; "
+                              "skipping the rest of this turn's tools")
+                    results.append({
+                        "type": "tool_result",
+                        "tool_use_id": call.get("id"),
+                        "content": '{"skipped": "wall-clock budget spent '
+                                   '(--max-time); no further requests will '
+                                   'be sent - summarise and call finish"}',
+                        "is_error": False,
+                    })
+                    continue
                 name = call.get("name", "?")
                 args = call.get("input") or {}
                 self._log(f"tool {name} {json.dumps(args)[:200]}")

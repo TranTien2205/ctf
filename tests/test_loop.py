@@ -223,3 +223,65 @@ def test_loop_interrupt_during_dispatch_stops(lab_url, tmp_path):
         aloop.dispatch = orig
     assert result["error"] == "interrupted"
     assert llm.calls == 1  # never reached a second chat turn
+
+
+def test_the_wall_clock_budget_bounds_the_batch_not_just_the_turn(
+        lab_url, tmp_path):
+    """`remaining_time` was read once per turn and never inside one.
+
+    A whole `tool_uses` batch was dispatched sequentially to completion
+    before the budget was consulted again, and the exhaustion branch then
+    issues up to two more nudge turns - each answered with a full batch.
+    The per-call cost is the TARGET's: the 15s httpx read timeout bounds
+    one read, not the engagement, and the lab has an endpoint that sleeps
+    on demand because a real one does too.
+
+    Measured with `max_time_s=1.0` and a model emitting three tool_use
+    blocks per turn against that endpoint: 72.4s and 9 requests - 72x the
+    budget - and it scales with the batch, so a larger one is worse.
+
+    What this does NOT fix, and cannot without aborting a request
+    mid-flight: the call already on the wire when the clock runs out still
+    finishes. That one is bounded by the read timeout. After the fix the
+    same run is 8.1s and 1 request, which is exactly that single call.
+    """
+    import time
+
+    class _ThreeSlowCalls:
+        """Three tool_use blocks per turn, forever, all slow."""
+
+        def __init__(self):
+            self.n = 0
+            self.calls = 0
+            self.input_tokens = 0
+            self.output_tokens = 0
+
+        def chat(self, messages, tools, system):
+            self.n += 1
+            self.calls += 1
+            return {"content": [
+                {"type": "tool_use", "id": f"t{self.n}-{i}",
+                 "name": "http_request",
+                 "input": {"method": "GET",
+                           "url": lab_url + "/ping?host=x;%20sleep%208",
+                           "note": "slow"}}
+                for i in range(3)]}
+
+    cfg = Config(target=lab_url, allow_private=True, session_dir=tmp_path,
+                 api_key="x", max_time_s=1.0, max_turns=50,
+                 max_requests=200)
+    loop = AgentLoop(cfg, llm=_ThreeSlowCalls(), quiet=True)
+    started = time.monotonic()
+    try:
+        loop.run()
+    except Exception:
+        pass            # the stub is not a full client; the clock is the point
+    took = time.monotonic() - started
+
+    assert loop.session.requests_sent <= 2, (
+        f"{loop.session.requests_sent} requests went out on a 1s budget - "
+        "the batch was dispatched to completion before the clock was "
+        "looked at again")
+    assert took < 30.0, (
+        f"the run took {took:.1f}s against a 1.0s budget; before this was "
+        "bounded it took 72.4s")

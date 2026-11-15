@@ -754,3 +754,80 @@ def test_an_exclusion_that_excludes_nothing_is_refused_not_discarded():
                    exclude_paths=["/", "//", "/admin"])
     assert g.exclude_paths == ["/admin"], g.exclude_paths
     assert "excluded paths: /admin" in g.describe(), g.describe()
+
+
+def test_one_slow_resolver_cannot_stall_the_scope_guard(monkeypatch, capsys):
+    """`getaddrinfo` per new in-scope host, undeadlined, on the agent's thread.
+
+    The target chooses how many new hosts there are: `include_subdomains`
+    defaults to True, and `crawl` queues every in-scope-looking href out of
+    the target's own HTML. Measured on this machine, 15.0s for a fresh
+    in-scope subdomain inside `check()` and 24.1s for a bare lookup where
+    no resolver answers.
+
+    The COST is the defect and the bound is the fix. The verdict is
+    deliberately unchanged: a timeout returns the same False this function
+    already returned for an unresolvable host, because fail-closed was
+    written first and measured - it refuses in-scope hosts in any
+    environment without a working resolver, and
+    `test_subdomain_allowed_by_default` and `test_extra_hosts` both failed
+    on it here. Changing a security posture as a side effect of bounding a
+    lookup is not the same change, so the gap is warned about instead of
+    closed silently in either direction.
+
+    The timeout is not `socket.setdefaulttimeout`, which is process-global
+    and would leak into the target connections and the lab's own server -
+    the reason recorded beside the same pattern in `analysis.py`.
+    """
+    import socket
+    import time
+
+    from argus.scope import ScopeGuard, _is_private_host
+    import argus.scope as scope_mod
+
+    assert _is_private_host("127.0.0.1") is True       # still answers
+
+    real = socket.getaddrinfo
+
+    def _hangs(*a, **k):
+        time.sleep(30)
+        return real(*a, **k)
+
+    monkeypatch.setattr(socket, "getaddrinfo", _hangs)
+    monkeypatch.setattr(scope_mod, "_RESOLVE_TIMED_OUT", set())
+
+    # 1. bounded
+    started = time.monotonic()
+    verdict = _is_private_host("slow.example")
+    took = time.monotonic() - started
+    assert took < 10.0, (
+        f"one lookup took {took:.1f}s - the target sets this cost and "
+        "picks how many hosts pay it")
+
+    # 2. the verdict is the one this function already gave, and the gap is
+    #    said out loud rather than left silent
+    assert verdict is False, verdict
+    warned = capsys.readouterr().err
+    assert "slow.example" in warned and "private-address rule" in warned, (
+        f"a host that was never checked passed silently: {warned!r}")
+    _is_private_host("slow.example")
+    assert "slow.example" not in capsys.readouterr().err, (
+        "warned twice for one host - a crawl would repeat it per href")
+
+    # 3. an in-scope host stays reachable where no resolver answers, which
+    #    is what the two tests above this one encode
+    guard = ScopeGuard("http://t.example", allow_private=False,
+                       include_subdomains=True)
+    assert guard.allow_private is False, (
+        "a target whose lookup timed out at construction turned on "
+        "allow_private for the entire run")
+    guard.check("http://sub.t.example/x")
+    capsys.readouterr()
+
+    # 4. --allow-private does not pay for an answer it will not use
+    permissive = ScopeGuard("http://t.example", allow_private=True,
+                            include_subdomains=True)
+    started = time.monotonic()
+    permissive.check("http://other.t.example/x")
+    assert time.monotonic() - started < 1.0, (
+        "the lookup ran for an engagement whose outcome it cannot change")
