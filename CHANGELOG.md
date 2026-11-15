@@ -3877,12 +3877,65 @@ reason. The lesson is the one worth keeping: a fix that creates the
 precondition for another finding has to close that one too, and a refusal
 on reachability expires the moment the reachability changes.
 
+### A proof route that was unreachable by construction
+
+Documenting the `method` write route as uncovered turned out to be the
+wrong stopping point: it was not merely untested, it could never have
+graded. `verify_method_effect` has two routes to `proven` - a TRACE that
+echoes a header the probe sent, and a PUT whose bytes a later GET returns
+- and only the first had ever run. Three things had to be true at once
+before the second could, and none of them was:
+
+1. `probe_method` sent PUT only when `Allow` advertised it
+   (`if "PUT" in allow.upper()`), while the verifier counts a write method
+   only when the endpoint should have REFUSED it (`unadvertised =
+   advertised is not None and method not in str(advertised).upper()`). The
+   probe sent PUT exactly when the verifier would not count it, and never
+   when it would.
+2. The lab had no endpoint honouring a write verb. A run against `/files/`
+   records exactly `OPTIONS /files/` and `TRACE /files/`.
+3. The probe asked OPTIONS of the COLLECTION and wrote to a child, and the
+   verifier reads `Allow` from an exchange with the same endpoint shape -
+   so `advertised` stayed None and the check could not fire even against a
+   vulnerable endpoint.
+
+That is the shape AGENTS.md names: "the probe announced a signal whose
+evidence could never grade, because nobody read the requirement while
+writing it". So the whole write half of that verifier - the body
+read-back, the nonce that ties it to this run, and the ordering check
+added earlier in this stretch - had never run against a target.
+
+- `/dav/` in the lab answers the same `Allow: GET, POST, OPTIONS, TRACE`
+  as everything else and honours PUT and DELETE anyway. The disagreement
+  IS the bug. A first version advertised PUT and the class correctly
+  refused to grade it: a REST resource honouring PUT on its own path is
+  the service working, which the synthetic test for this class already
+  says in as many words, so advertising it would have made the lab teach
+  the wrong thing.
+- `probe_method` sends the PUT whether or not it is advertised - that is
+  the test - and asks OPTIONS of the path it will write to. The canary
+  file goes to a path that did not exist and is DELETEd, which this probe
+  already did on the advertised branch; the cleanup is now asserted.
+- A bug of mine in the lab, caught by the gate: `do_PUT` answered 405 for
+  a non-`/dav/` path WITHOUT reading the body, so with keep-alive the next
+  request parsed the leftover bytes as its request line. The following
+  TRACE came back without the header it echoes and the whole class dropped
+  to `unproven`. Two tests failed and neither was looking for a desync.
+
+And a check retired for the right reason. The source assertion on
+`probe_method`'s body was kept an hour earlier with a measurement saying
+it was load-bearing - removing the canary failed it and left the proving
+table green. Making the route run retired it: the behavioural test fails
+on that plant too, so the grep is redundant and over-constrains what it
+duplicates. The reason it was kept expired, and the note where it stood
+says so.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 710 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 711 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

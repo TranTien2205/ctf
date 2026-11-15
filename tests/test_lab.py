@@ -1064,3 +1064,85 @@ def test_external_tools_do_not_inherit_stdin():
     from argus.tools import _subproc
     src = inspect.getsource(_subproc)
     assert "stdin=subprocess.DEVNULL" in src
+
+
+def test_the_write_route_of_the_method_class_is_reachable_end_to_end(
+        lab_url, ctx):
+    """It was unreachable by construction, in three independent ways.
+
+    `verify_method_effect` has two routes to `proven`: a TRACE that echoes
+    a header the probe sent, and a PUT whose bytes a later GET returns.
+    Only the first had ever run. The second - its body read-back, the nonce
+    that ties it to this run, and the ordering check that the read came
+    AFTER the write - was never exercised against a real target, and three
+    separate things had to change before it could be:
+
+    1. `probe_method` sent PUT only when `Allow` advertised it, while the
+       verifier counts a write method only when the endpoint should have
+       REFUSED it (`unadvertised = advertised is not None and method not in
+       str(advertised).upper()`). The probe sent PUT exactly when the
+       verifier would not count it and never when it would.
+    2. The lab had no endpoint that honours a write verb, so nothing
+       exercised the route at all: a run against `/files/` recorded only
+       `OPTIONS /files/` and `TRACE /files/`.
+    3. The probe asked OPTIONS of the COLLECTION and wrote to a child, and
+       the verifier reads `Allow` from an exchange with the same endpoint
+       shape - so `advertised` stayed None and the check could not fire
+       even against a vulnerable endpoint.
+
+    `/dav/` is the bug and the shape matters: it answers the same
+    `Allow: GET, POST, OPTIONS, TRACE` as everything else and honours PUT
+    anyway. A first version ADVERTISED PUT, and the class correctly refused
+    to grade it - a REST resource honouring PUT on its own path is the
+    service working, which the synthetic test for this class already says.
+    """
+    from argus import proof
+
+    def route(path):
+        before = len(ctx.session._transcript)
+        out = probes.probe_method(ctx, lab_url + path)
+        rows = [e for e in list(ctx.session._transcript.values())[before:]
+                if isinstance(e.get("response"), dict)
+                and (e.get("request") or {}).get("method")
+                in ("OPTIONS", "PUT", "GET")]
+        put = [e for e in rows if e["request"]["method"] == "PUT"]
+        body = str(put[0]["request"].get("body") or "").strip() if put else ""
+        return out, rows, body
+
+    out, rows, body = route("/dav/")
+    assert out["put_verified"] is True, out
+    assert "PUT" not in (out["allow"] or "").upper(), (
+        "the lab must not advertise the verb it is planted to honour: "
+        f"{out['allow']!r}")
+    assert body, "the probe recorded no PUT body"
+
+    verdict = proof.grade("method", body, rows)
+    assert verdict.grade == "proven", (
+        f"the write route still cannot grade on its own evidence: "
+        f"{verdict.grade} missing={verdict.missing}")
+
+    # the citation that proves it must be the WRITE pair, not the TRACE one
+    assert not any(e["request"]["method"] == "TRACE" for e in rows)
+
+    # ...and an endpoint that refuses the write does not grade on it
+    _, clean_rows, clean_body = route("/files/")
+    if clean_body:
+        clean = proof.grade("method", clean_body, clean_rows)
+        assert clean.grade != "proven", (
+            f"an endpoint that refuses PUT graded {clean.grade}")
+
+
+def test_the_dav_endpoint_cleans_up_after_the_probe(lab_url, ctx):
+    """The canary is written to a path that did not exist, and removed.
+
+    The probe already deleted its canary on the advertised branch; sending
+    the PUT unconditionally makes that cleanup matter on every call, so it
+    is asserted rather than assumed.
+    """
+    out = probes.probe_method(ctx, lab_url + "/dav/")
+    canary = out.get("canary") or ""
+    assert canary, out
+    gone = ctx.client.send("GET", f"{lab_url}/dav/{canary}.txt",
+                           tool="http_request", note="canary removed?")
+    assert gone["status"] == 404, (
+        f"the probe left {canary}.txt behind: {gone['status']}")

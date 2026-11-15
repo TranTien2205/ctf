@@ -388,6 +388,19 @@ class Handler(BaseHTTPRequestHandler):
                             "cfg=release-1</body></html>")
             return
 
+        dav = self._dav_name(path)
+        if dav:
+            stored = type(self)._dav.get(dav)
+            if stored is None:
+                self._send(404, "<html><body>not found</body></html>")
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(len(stored)))
+                self.end_headers()
+                self.wfile.write(stored)
+            return
+
         if path == "/":
             self._send(body="""<html><head><title>LabShop</title></head><body>
 <h1>LabShop</h1>
@@ -1283,8 +1296,33 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             return
         self._send(404, "<html><body>not found</body></html>")
 
+    #: Bodies stored by the planted write-method bug under /dav/. Bounded,
+    #: because a probe is allowed to be enthusiastic and a lab is not a
+    #: place to discover an unbounded dict.
+    _DAV_MAX_FILES = 64
+    _DAV_MAX_BYTES = 64 * 1024
+
+    def _dav_name(self, path: str) -> str:
+        """The stored key for a /dav/ path, or "" when it is not one."""
+        if not path.startswith("/dav/"):
+            return ""
+        name = path[len("/dav/"):]
+        return name if name and "/" not in name else ""
+
     def do_OPTIONS(self):
         self.send_response(200)
+        # /dav/ answers the SAME Allow as everything else - no write verb -
+        # and honours PUT and DELETE anyway. That disagreement is the bug:
+        # verb tampering is an endpoint accepting a method it does not
+        # advertise, and `verify_method_effect` says so in those terms
+        # (`unadvertised = advertised is not None and method not in
+        # str(advertised).upper()`).
+        #
+        # An earlier draft of this endpoint ADVERTISED PUT, and the class
+        # correctly refused to grade it: a REST resource honouring PUT on
+        # its own path is not a finding, which the synthetic test for this
+        # class already says in as many words. Advertising it would have
+        # made the lab teach the wrong thing.
         self.send_header("Allow", "GET, POST, OPTIONS, TRACE")
         origin = self.headers.get("Origin")
         if origin:
@@ -1292,6 +1330,45 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
             self.send_header("Access-Control-Allow-Methods",
                              "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Credentials", "true")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_PUT(self):
+        name = self._dav_name(urllib.parse.urlparse(self.path).path)
+        # The body is read BEFORE any early return. A handler that answers
+        # without draining leaves the bytes in the socket, and the next
+        # request on a keep-alive connection parses them as its request
+        # line - so the following TRACE came back without the header it
+        # echoes and the whole `method` class dropped to `unproven`. Two
+        # tests caught it; neither was looking for a desync.
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            length = 0
+        length = max(0, min(length, self._DAV_MAX_BYTES + 1))
+        body = self.rfile.read(length) if length > 0 else b""
+        if not name:
+            self._send(405, "<html><body>method not allowed</body></html>")
+            return
+        if len(body) > self._DAV_MAX_BYTES:
+            self._send(413, "<html><body>too large</body></html>")
+            return
+        store = type(self)._dav
+        if name not in store and len(store) >= self._DAV_MAX_FILES:
+            self._send(507, "<html><body>store full</body></html>")
+            return
+        store[name] = body
+        self.send_response(201)
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def do_DELETE(self):
+        name = self._dav_name(urllib.parse.urlparse(self.path).path)
+        if not name:
+            self._send(405, "<html><body>method not allowed</body></html>")
+            return
+        type(self)._dav.pop(name, None)
+        self.send_response(204)
         self.send_header("Content-Length", "0")
         self.end_headers()
 
@@ -1319,6 +1396,7 @@ def make_server(port: int = 0, workdir: str = ""):
     Handler._registered = []
     Handler._pp = {}
     Handler._usercfg = {"theme": "dark", "lang": "en"}
+    Handler._dav = {}
     os.makedirs(WWW, exist_ok=True)
     os.makedirs(os.path.join(FAKEFS, "etc"), exist_ok=True)
     os.makedirs(os.path.join(FAKEFS, "windows"), exist_ok=True)

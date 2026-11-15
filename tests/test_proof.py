@@ -1263,47 +1263,29 @@ def test_a_mere_status_difference_is_not_a_method_finding():
     assert "a method the endpoint should refuse was honoured" in verdict.missing
 
 
-def test_probe_method_puts_its_canary_in_the_bytes_it_writes():
-    """The read-back check tested nothing before this.
-
-    `put_verified` looked for the canary FILENAME in the GET response body,
-    but the body written was the fixed string "argus method probe" - so a
-    server that stored the file correctly returned bytes the check could not
-    recognise, and a PUT that really landed read as unverified.
-    """
-    import inspect
-    from argus.tools import probes
-    src = inspect.getsource(probes.probe_method)
-    # A source assertion, and LOAD-BEARING rather than lazy - measured,
-    # because this repo has recorded the opposite shape (a grep that passes
-    # while the behaviour is broken) and the obvious move was to delete this
-    # as redundant with the proving table. It is not redundant:
-    #
-    #   - Planting `body="argus method probe"` (canary removed) fails THIS
-    #     test and leaves `test_the_probe_collects_what_its_class_requires
-    #     [probe_method-method]` PASSING.
-    #   - It passes because `method` has TWO routes to `proven` and the
-    #     table only needs one honest quote to reach it: with the PUT
-    #     canary gone the class still proved via TRACE -
-    #     "argustr1n6b6pwk was sent as a request header and came back in
-    #     the body". A class with two proof routes cannot be pinned by a
-    #     table that asks whether SOME quote grades.
-    #   - And the write route is not merely unpinned, it never runs against
-    #     the lab at all. `probe_method` gates its PUT on
-    #     `if "PUT" in allow.upper()`, and the lab's `/files/` answers
-    #     OPTIONS without advertising PUT - measured, the only exchanges a
-    #     run records there are `OPTIONS /files/` and `TRACE /files/`.
-    #
-    # So the verifier side of the write route has the synthetic coverage in
-    # `test_method_is_proven_by_an_effect_not_by_a_status`, the probe side
-    # has this grep, and nothing drives the two together. Closing that
-    # needs a lab endpoint whose `Allow` lists PUT and which stores the
-    # body - which changes what `probe_method` sends in every proving-table
-    # run, so it is named here rather than done as a side effect.
-    assert 'body=f"argus method probe {canary}"' in src
-    assert '_marker("argusput")' in src, \
-        "the canary must match proof.NONCE_RE for the verifier to tie it back"
-    assert proof.NONCE_RE.search("argusput" + "a1b2c3d4")
+# `test_probe_method_puts_its_canary_in_the_bytes_it_writes` stood here and
+# is gone, which is worth a note rather than a silent deletion.
+#
+# It asserted two substrings of `probe_method`'s source - the literal
+# `body=f"argus method probe {canary}"` and `_marker("argusput")` - and an
+# hour before this it was KEPT deliberately, with a measurement saying so:
+# removing the canary failed it and left the proving table green, because
+# `method` proves through TRACE and the write route never ran against the
+# lab at all.
+#
+# Making that route run is what retired it. `tests/test_lab.py::
+# test_the_write_route_of_the_method_class_is_reachable_end_to_end` drives
+# `probe_method` against `/dav/` - an endpoint that answers
+# `Allow: GET, POST, OPTIONS, TRACE` and honours PUT anyway - and requires
+# the PUT/read-back pair to grade `proven` on its OWN citation, with the
+# TRACE exchange excluded. Removing the canary from the written body now
+# fails that test too: no nonce in `wrote` means `carried` is empty and
+# the effect check cannot pass.
+#
+# So the grep is redundant, and it over-constrains what it duplicates: it
+# fails on a reflow, and on moving the canary anywhere that still grades.
+# The reason it was kept is in this repo's history; the reason it is gone
+# is that the reason expired.
 
 
 _UPLOAD_NONCE = "argusupl9f3a"

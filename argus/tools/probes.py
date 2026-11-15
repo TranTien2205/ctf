@@ -928,13 +928,46 @@ def probe_method(ctx: Context, url: str) -> dict:
     out = {"options_id": r["request_id"], "status": r["status"], "allow": allow}
     dangerous = [m for m in ("PUT", "DELETE", "TRACE", "CONNECT")
                  if m in allow.upper()]
-    if "PUT" in allow.upper():
+    # The PUT is sent WHETHER OR NOT `Allow` advertises it, and that is the
+    # whole test. Gated on `if "PUT" in allow.upper()`, this route could
+    # never produce evidence that grades: `verify_method_effect` counts a
+    # write method only when the endpoint should have refused it -
+    # `unadvertised = advertised is not None and method not in
+    # str(advertised).upper()` - so the probe sent PUT exactly when the
+    # verifier would not count it, and never when it would. Measured: the
+    # write route was unreachable end to end, and the class could only ever
+    # be proven through TRACE.
+    #
+    # That is the shape AGENTS.md names - "the probe announced a signal
+    # whose evidence could never grade, because nobody read the requirement
+    # while writing it" - and the fix it prescribes is to collect what the
+    # requirement names.
+    #
+    # An advertised PUT that succeeds is still not a finding and still must
+    # not be: a REST resource honouring PUT on its own path is the service
+    # working. The verifier decides that, from the recorded `Allow`; the
+    # probe's job is to produce the pair either way. The canary file is
+    # written to a path that did not exist and is DELETEd below, which is
+    # what this probe already did on the advertised branch.
+    if True:
         canary = _marker("argusput")
         # The canary goes in the BODY, not only the path. `put_verified` used
         # to look for the filename in the GET response, which a server that
         # stored the file correctly would never return - so a PUT that really
         # landed read as unverified. The proof is "the bytes I wrote came
         # back", and that needs the bytes to be identifiable.
+        # OPTIONS on the PATH THIS WILL WRITE TO, not only on the
+        # collection. `verify_method_effect` reads the advertised methods
+        # from an exchange with the SAME endpoint shape as the write -
+        # `if allow and _endpoint_shape(other) == _endpoint_shape(a)` - and
+        # `/dav/` and `/dav/<canary>.txt` are different shapes, so an
+        # OPTIONS on the collection left `advertised` None, `unadvertised`
+        # False, and the write unable to count as a method the endpoint
+        # should refuse. Measured: with the collection's OPTIONS alone the
+        # write pair graded `unproven` on both checks even against an
+        # endpoint that honoured an unadvertised PUT.
+        ctx.client.send("OPTIONS", url.rstrip("/") + f"/{canary}.txt",
+                        tool="probe_method", note="options on the write path")
         p = ctx.client.send("PUT", url.rstrip("/") + f"/{canary}.txt",
                             body=f"argus method probe {canary}",
                             tool="probe_method", note="PUT canary")
