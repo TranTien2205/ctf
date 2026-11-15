@@ -1189,9 +1189,19 @@ def verify_operator_injection(claim: Claim, spec: "ProofSpec") -> list[dict]:
         # listing that endpoint answers anyway graded `nosqli` proven
         # through this branch even after the refusal allowlist closed the
         # other one. A broken control proves nothing either way.
+        # `_resource_key`, not `_endpoint_shape`: the shape collapses record
+        # ids on purpose, so a control on a DIFFERENT record counted - and
+        # its 404 then counted as the refusal this class turns into access.
+        # Measured: `POST /api/user/1 {"id":{"$ne":null}}` answered 200 with
+        # a document, plus `POST /api/user/99999 {"id":"99999"}` answering
+        # 404 because that record does not exist, graded `nosqli` proven on
+        # "r2 was refused 404 and r1 answered 200". The 404 had nothing to
+        # do with the operator. Third instance of one helper answering two
+        # questions whose conservative directions are opposite; see
+        # `_resource_key`, which carries the first.
         controls = [e for e in claim.exchanges
                     if entry is not None and e is not entry
-                    and _endpoint_shape(e) == _endpoint_shape(entry)
+                    and _resource_key(e) == _resource_key(entry)
                     and _answered(e) and status_of(e) < 500
                     and not NOSQL_OP_RE.search(req_text(e))] if entry else []
         # The control has to have been REFUSED, not broken. This read
@@ -1649,6 +1659,14 @@ def verify_unkeyed_input(claim: Claim, spec: "ProofSpec") -> list[dict]:
         served = bool(victim) and bool(claim.excerpt) \
             and claim.excerpt in resp_body(victim) \
             and claim.excerpt not in req_text(victim)
+        # `_endpoint_shape` here, deliberately, unlike the control filter in
+        # `verify_operator_injection` and the read pair in
+        # `verify_state_change`: for an unkeyed cache the marker crossing
+        # from one request into ANOTHER record's response is stronger
+        # evidence, not weaker - it is a wider blast radius for the same
+        # poisoning. The thing this check rules out is a value that appears
+        # elsewhere on the site, and the excerpt also has to be absent from
+        # the victim's own request. Collapsing ids was checked and kept.
         same = bool(poisoner) and bool(victim) and \
             _endpoint_shape(poisoner) == _endpoint_shape(victim)
         p_at = when.get(id(poisoner)) if poisoner is not None else None

@@ -338,6 +338,37 @@ def test_sqli_quoting_the_error_fails_the_row_check():
     assert "rows returned, not an error message" in verdict.missing
 
 
+def test_nosqli_refuses_a_control_on_a_different_record():
+    """A 404 for a record that does not exist is not a refusal of the operator.
+
+    The control filter asked `_endpoint_shape`, which collapses record ids
+    on purpose so that idor stays provable. Measured: `POST /api/user/1
+    {"id":{"$ne":null}}` answered 200 with a document, plus `POST
+    /api/user/99999 {"id":"99999"}` answering 404 because that record is
+    not there, graded `nosqli` proven on "r2 was refused 404 and r1
+    answered 200". The 404 had nothing to do with the operator - it is what
+    that endpoint says about any missing id.
+
+    Found by grepping the callers of a helper whose own docstring explains
+    why it is lenient. It had three, and two were asking the strict
+    question.
+    """
+    witness = ex("r1", "http://t.local/api/user/1",
+                 '[{"_id": "507f1f77bcf86cd799439011", "user": "admin"}]',
+                 method="POST", req_body='{"id":{"$ne":null}}')
+    other_record = ex("r2", "http://t.local/api/user/99999", "not found", 404,
+                      method="POST", req_body='{"id":"99999"}')
+    v = proof.grade("nosqli", '"user": "admin"', [witness, other_record])
+    assert v.grade != "proven", v.explain()
+    assert "the operator changed what the store answered" in v.missing
+
+    # the same record, without the operator, still proves
+    same_record = ex("r3", "http://t.local/api/user/1", "not found", 404,
+                     method="POST", req_body='{"id":"1"}')
+    assert proof.grade("nosqli", '"user": "admin"',
+                       [witness, same_record]).grade == "proven"
+
+
 def test_nosqli_needs_no_fingerprint():
     """No @@version read is required - but a control IS, because a JSON API
     returning documents is doing its job. The operator has to have changed

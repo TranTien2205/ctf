@@ -4110,12 +4110,37 @@ The lab answers `{"data": {}}` to any non-introspection query, so no lab
 endpoint drives that second half, which is why nothing noticed. Driving it
 needs a lab endpoint that answers a data query - recorded, not built.
 
+### A control on a different record is not a control
+Found by grepping the callers of a helper whose own docstring explains why
+it is lenient. `_endpoint_shape` collapses record ids deliberately -
+without that, idor is unprovable on any API whose ids are not integers -
+and it had three callers asking the strict question instead.
+
+- `verify_state_change`'s read pair, fixed above.
+- `verify_operator_injection`'s control filter. Measured: `POST
+  /api/user/1 {"id":{"$ne":null}}` answered 200 with a document, plus `POST
+  /api/user/99999 {"id":"99999"}` answering 404 because that record is not
+  there, graded `nosqli` **proven** on "r2 was refused 404 and r1 answered
+  200". The 404 is what that endpoint says about any missing id; it had
+  nothing to do with the operator. The filter now uses `_resource_key`, and
+  a control on the same record without the operator still proves.
+- `verify_unkeyed_input`'s poisoner/victim pair, checked and **kept
+  lenient**, with the reason now written next to it: for an unkeyed cache
+  the marker crossing into ANOTHER record's response is a wider blast
+  radius for the same poisoning, not weaker evidence, and the excerpt also
+  has to be absent from the victim's own request.
+
+The same collapsing is correct in one of the three and wrong in two, which
+is why the question has to be asked per caller rather than globally. Third
+instance this session of one helper answering two questions whose
+conservative directions are opposite.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 722 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 723 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
