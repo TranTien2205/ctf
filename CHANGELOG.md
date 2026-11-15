@@ -4257,12 +4257,41 @@ URL), `probe_lockout` (the credential-field pattern and the series floor),
 `/debug` against a floor that wants a credential-shaped secret) and
 `probe_ppoll`/`probe_cache` (the unkeyed-input floor).
 
+### The probe could be asked for fewer attempts than its class accepts
+`probe_lockout` clamped `tries` with `_ival(tries, 10, 3, 15)` while
+`verify_no_throttle` needs `_LOCKOUT_FLOOR` (5) attempts before "never
+refused" means anything. So an agent asking for a gentle 4 got a run the
+probe reported as a finding - "no lockout or rate limit after 4 failed
+attempts - online password guessing is possible" - and the class could
+never grade. Measured against `/login2`, the endpoint the VULNERABLE row
+drives: tries=3 and tries=4 grade `unproven` on "only N authentication
+attempt(s) on one endpoint - send at least 5", tries=5 and tries=10 grade
+`proven`. The lower bound is the class's constant now, imported the way
+`latency_ramp` already was - that sharing happened because the probe used
+to measure the same ramp with its own derived quantity, and the COUNT was
+left behind when the ramp moved.
+
+Two measurement errors of my own on the way to that, both worth recording
+because each would have become a false finding:
+
+- I first drove `probe_lockout` at `/login`, where the lab answers 200
+  "Unknown user." to a bogus name, and read "10 attempts but only 0 failed"
+  as a defect. `/login` is not the row's endpoint; `/login2` answers 401
+  and the class grades `proven` there. The endpoint was wrong, not the
+  code.
+- The first version of the test asserted `_ival`'s own clamping and the
+  probe's call-site string. Planting the defect back failed only the
+  source-grep half: the behavioural lines tested a generic clamp and never
+  reached the probe. It drives the probe and counts what was actually sent
+  now, and the plant fails on "asked for 3 tries and the probe sent 3,
+  below the 5 its own class needs".
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 731 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 732 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

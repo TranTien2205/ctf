@@ -670,6 +670,40 @@ def test_every_redirect_shape_the_lab_plants_is_gradeable(endpoint, shape,
         f"verdict can be recorded for")
 
 
+def test_probe_lockout_sends_at_least_what_its_class_needs(lab_url, ctx):
+    """The probe's floor was 3 and the class's floor is 5.
+
+    `_ival(tries, 10, 3, 15)` accepted 3 and 4 while `verify_no_throttle`
+    needs `_LOCKOUT_FLOOR` attempts before "never refused" means anything.
+    Measured against /login2, the endpoint the VULNERABLE row drives:
+    tries=3 and tries=4 graded `unproven` on "only N authentication
+    attempt(s) on one endpoint - send at least 5", while the probe's own
+    verdict still read "no lockout or rate limit after 4 failed attempts -
+    online password guessing is possible". tries=5 and tries=10 graded
+    `proven`.
+
+    `latency_ramp` was already shared from `proof` for exactly this reason -
+    the probe used to test the same ramp with its own derived quantity - and
+    the COUNT was left behind when the ramp moved.
+
+    Driven, not grepped: a first version of this asserted `_ival`'s own
+    clamping and the probe's call-site string, and the behavioural half
+    passed with the defect planted back because it never reached the probe.
+    """
+    from argus.proof import _LOCKOUT_FLOOR
+
+    before = len(_exchanges(ctx.session))
+    probes.probe_lockout(ctx, lab_url + "/login2", "username=x&password=y",
+                         tries=3)
+    entries = _exchanges(ctx.session)[before:]
+    assert len(entries) >= _LOCKOUT_FLOOR, (
+        f"asked for 3 tries and the probe sent {len(entries)}, below the "
+        f"{_LOCKOUT_FLOOR} its own class needs - the evidence cannot grade")
+    grade, missing = _best_grade("lockout", entries)
+    assert grade == "proven", (
+        f"the probe's own run grades {grade} (missing {missing})")
+
+
 def test_every_driven_probe_exists_and_maps_to_a_real_class():
     from argus.tools import registry
     known = {t["name"] for t in registry.TOOL_SCHEMAS}

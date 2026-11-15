@@ -485,6 +485,7 @@ _CMDI_SEPARATORS = [
 from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
 from ..proof import _overlaps                        # noqa: E402
 from ..proof import latency_ramp as _latency_ramp    # noqa: E402
+from ..proof import _LOCKOUT_FLOOR              # noqa: E402
 from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
 from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
 from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
@@ -1480,7 +1481,20 @@ def probe_lockout(ctx: Context, url: str, data: str,
     means throttling exists; N identical failures means password guessing
     is unthrottled - a standard report line. Kept deliberately small so it
     cannot itself be a brute-force run."""
-    tries = _ival(tries, 10, 3, 15)
+    # the lower bound is the CLASS's floor, not a number chosen here.
+    # `_ival(tries, 10, 3, 15)` accepted 3 and 4 while `verify_no_throttle`
+    # needs `_LOCKOUT_FLOOR` (5) attempts before "never refused" means
+    # anything - so an agent asking for a gentle 4 tries got a run this
+    # probe reported as a finding ("no lockout or rate limit after 4 failed
+    # attempts - online password guessing is possible") and the class could
+    # never grade. Measured against the lab's /login2, the endpoint the
+    # proving table drives: tries=3 and tries=4 grade `unproven` on "send
+    # at least 5", tries=5 and tries=10 grade `proven`.
+    #
+    # `latency_ramp` was already shared from `proof` for exactly this
+    # reason - the probe used to test the same ramp with its own derived
+    # quantity - and the COUNT was left behind when the ramp moved.
+    tries = _ival(tries, 10, _LOCKOUT_FLOOR, 15)
     bogus_u = _marker("lk")
     results = []
     for i in range(tries):
