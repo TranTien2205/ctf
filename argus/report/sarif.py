@@ -143,8 +143,14 @@ def render_sarif(session: Session, extra: dict | None = None) -> Path:
             "results": results,
             "invocations": [{
                 "executionSuccessful": not _run_error,
-                "startTimeUtc": time.strftime(
-                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(session.started)),
+                # Omitted rather than faked when there is no stamp: a
+                # consumer can see an absent `startTimeUtc`, and cannot see
+                # that `1970-01-01T00:00:00Z` means "meta.json had no start
+                # time". `markdown.py` has guarded this for a while; this
+                # file and html.py did not.
+                **({"startTimeUtc": time.strftime(
+                    "%Y-%m-%dT%H:%M:%SZ", time.gmtime(session.started))}
+                   if session.started and session.started > 0 else {}),
                 **({"toolExecutionNotifications": [{
                     "level": "error",
                     "message": {"text":

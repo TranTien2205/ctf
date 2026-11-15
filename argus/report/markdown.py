@@ -43,6 +43,19 @@ def _code(text: str) -> str:
     return f"`{text}`" if "`" not in str(text) else f"`` {text} ``"
 
 
+def _h(value) -> str:
+    """HTML-escape a value going into one of report.md's raw HTML elements.
+
+    Markdown's fenced blocks are safe - a viewer does not parse their
+    contents - but `<details><summary>` is an element this renderer opens
+    itself, and what goes inside it IS parsed. Quotes included, because the
+    value lands in element content that a viewer may be re-serialising into
+    an attribute elsewhere.
+    """
+    import html as _html
+    return _html.escape(str("" if value is None else value), quote=True)
+
+
 def _join_list(v, empty: str) -> str:
     """', '.join over operator-editable meta.json values - a non-list
     must not crash or spew per-character output."""
@@ -238,14 +251,16 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         if first_ts and session.started else None
 
     meta = {}
+    meta_read = False
     mp = session.dir / "meta.json"
     if mp.exists():
         try:
             meta = json.loads(mp.read_text(encoding="utf-8"))
+            meta_read = True
         except Exception:
             meta = {}
         if not isinstance(meta, dict):
-            meta = {}
+            meta, meta_read = {}, False
     lines = [
         f"# Penetration Test Report - {session.id}",
         "",
@@ -327,13 +342,36 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "",
         "## Engagement constraints",
         "",
-        f"- **Scope hosts:** {_join_list(meta.get('scope'), '(target only)')}",
-        f"- **Excluded paths:** {_join_list(meta.get('exclude_paths'), 'none')}",
+        # Every one of these falls back to a definite NEGATIVE - "(target
+        # only)", "none", "no", "no", "all" - and `argus report` needs only
+        # transcript.jsonl, so it renders happily with meta.json absent.
+        # Measured on a real demo session: with meta.json deleted this block
+        # is identical to the one rendered with it present, except for the
+        # budgets degrading to `?`. A run constrained by a scope list, an
+        # exclusion and a tool subset re-renders as unrestricted, and
+        # "TLS verify: no" / "Tool surface: all" are claims about how the
+        # engagement was CONDUCTED - wrong in the direction of a broader,
+        # less careful test than was run, or for scope a narrower one than
+        # was authorised. The only existing signal was a stderr line at
+        # render time; the re-render then re-seals and `argus verify`
+        # prints OK and exits 0.
+        #
+        # So the absence is stated where the claims would have gone. An
+        # empty-but-present meta.json still reads as "(target only)",
+        # because that file recording no scope IS the claim that none was
+        # set.
+        *( ["- **Engagement constraints are not on record for this "
+            "session:** `meta.json` is missing or unreadable, so the scope "
+            "list, exclusions, budgets, proxy, TLS and tool surface below "
+            "cannot be stated. They are NOT defaults - they are unknown."]
+           if not meta_read else []),
+        f"- **Scope hosts:** {_join_list(meta.get('scope'), '(target only)') if meta_read else 'not recorded'}",
+        f"- **Excluded paths:** {_join_list(meta.get('exclude_paths'), 'none') if meta_read else 'not recorded'}",
         f"- **Budgets:** {meta.get('max_turns', '?')} turns, "
         f"{meta.get('max_requests', '?')} requests, {meta.get('rate_rps', '?')} rps",
-        f"- **Proxy:** {'yes' if meta.get('proxy') else 'no'} · "
-        f"**TLS verify:** {'yes' if meta.get('tls_verify') else 'no'}",
-        f"- **Tool surface:** {_tool_surface(meta)}",
+        f"- **Proxy:** {('yes' if meta.get('proxy') else 'no') if meta_read else 'not recorded'} · "
+        f"**TLS verify:** {('yes' if meta.get('tls_verify') else 'no') if meta_read else 'not recorded'}",
+        f"- **Tool surface:** {_tool_surface(meta) if meta_read else 'not recorded'}",
         "",
     ]
 
@@ -386,8 +424,21 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                 + ["", _excerpt(resp.get("body", ""),
                                 f["evidence_excerpt"])[:1500]])
             lines += [
-                f"<details><summary>Transcript {rid}: {req.get('method')} "
-                f"{req.get('url')} -> {resp.get('status')}</summary>",
+                # `_h` because this is a raw HTML element THIS renderer
+                # opens, and report.md cannot be rendered with raw HTML
+                # disabled - its own `<details>` blocks and the notes
+                # appendix depend on it, so any viewer that shows these
+                # collapsible sections also parses whatever the target put
+                # in the URL. The target chooses those bytes: the crawler
+                # follows its hrefs and the probes build URLs from its
+                # parameter names. Driven end to end, a loopback target
+                # serving `<a href='/p?x="><script>alert(document.domain)'
+                # ...>` produced a live `<script>` tag inside this
+                # `<summary>`. report.html escapes the same value with
+                # `_esc`; this file had no equivalent.
+                f"<details><summary>Transcript {_h(rid)}: "
+                f"{_h(req.get('method'))} {_h(req.get('url'))} -> "
+                f"{_h(resp.get('status'))}</summary>",
                 "",
                 _fence(block) + "http",
                 block,

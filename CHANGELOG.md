@@ -3378,12 +3378,60 @@ honestly listed `jwt_forge: 5`.
   faithful record of a real run made by the code that produced it, it
   still verifies, and no document quotes the number.
 
+### Three more things the artifacts stated without measuring
+
+- **report.md emitted the target's bytes into an HTML element it opens
+  itself.** The `<details><summary>Transcript ...` line interpolated the
+  recorded method, id and URL raw. report.md cannot be rendered with raw
+  HTML disabled - its own collapsible transcript sections and its notes
+  appendix depend on it - so any viewer that shows those also parses
+  whatever the target put in the URL, and the target chooses those bytes:
+  the crawler follows its hrefs and the probes build URLs from its
+  parameter names. Driven end to end, a loopback target serving
+  `<a href='/p?x="><script>alert(document.domain)...'>` produced a live
+  `<script>` tag inside that `<summary>`. report.html escaped the same
+  value with `_esc`, so the artifact opened in a browser was safe and the
+  one read on a forge was not.
+
+  The neighbouring defences were already right and the test now pins them
+  too: `_fence` widens for a backtick run in a body and `_code` widens an
+  inline span when a URL contains a backtick, so the endpoint line renders
+  as ``` `` ...`<img ...>`... `` ``` and does not break out. The
+  `<summary>` was the only gap, which is why this is three lines and not a
+  rewrite.
+- **Two artifacts dated a session to 1970.** `started` is 0.0 when
+  meta.json is missing, corrupt or stampless. `markdown.py` guards that and
+  prints "unknown (this session's meta.json carries no start time)";
+  html.py and sarif.py did not, so the same session read
+  `1969-12-31 19:00:00` in one and `1970-01-01T00:00:00Z` in the other -
+  local time in one, UTC in the other, so the two did not even agree. The
+  date is what an authorisation reviewer checks against the window the
+  engagement was authorised for. SARIF now OMITS the key rather than
+  faking it: a consumer can see an absent `startTimeUtc` and cannot see
+  that 1970 means "no stamp".
+- **The engagement-constraints block asserted five configuration facts
+  from a file it never read.** Scope, exclusions, proxy, TLS verify and
+  tool surface all fell back to definite negatives - "(target only)",
+  "none", "no", "no", "all" - and `argus report` needs only
+  transcript.jsonl. Measured on a real demo session: with meta.json deleted
+  the block was identical to the one rendered with it present, except for
+  the budgets degrading to `?`. A run constrained by a scope list, an
+  exclusion and a tool subset re-rendered as unrestricted. "TLS verify: no"
+  and "Tool surface: all" are claims about how the engagement was
+  CONDUCTED, wrong in the direction of a broader, less careful test than
+  was run - or, for scope, a narrower one than was authorised - and the
+  only signal was a stderr line at render time, after which the re-render
+  re-seals and `argus verify` prints OK and exits 0. Both renderers now
+  state the absence where the claims would have gone. A present-but-empty
+  meta.json still reads "(target only)", because that file recording no
+  scope IS the claim that none was set.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 689 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 692 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

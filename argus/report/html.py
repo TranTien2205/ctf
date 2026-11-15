@@ -69,6 +69,26 @@ def _esc(s) -> str:
     return html.escape(str(s or ""))
 
 
+def _started_text(session: Session) -> str:
+    """The start time, or a value a reader can tell is absent.
+
+    `session.started` is 0.0 on a reopen whose meta.json is missing,
+    corrupt or lacks the stamp. `markdown.py` guards that and prints
+    "unknown (this session's meta.json carries no start time)"; this file
+    and `sarif.py` did not, so the same session dated itself
+    `1969-12-31 19:00:00` here and `1970-01-01T00:00:00Z` there, over a
+    report carrying six real findings. The date is what an authorisation
+    reviewer checks against the window the engagement was authorised for,
+    and a 1970 stamp is not a missing value a consumer can detect - it is a
+    definite wrong answer, in local time here and UTC there, so the two
+    artifacts did not even agree with each other.
+    """
+    if session.started and session.started > 0:
+        return time.strftime('%Y-%m-%d %H:%M:%S',
+                             time.localtime(session.started))
+    return "unknown (this session's meta.json carries no start time)"
+
+
 def _judge_html(f: dict) -> str:
     """What cross-verification decided, in the artifact the client reads.
 
@@ -203,24 +223,36 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             f"{_judge_html(f)}{_proof_html(f)}</div>")
 
     meta = {}
+    meta_read = False
     mp = session.dir / "meta.json"
     if mp.is_file():
         try:
             import json as _j
             meta = _j.loads(mp.read_text(encoding="utf-8"))
+            meta_read = True
         except Exception:
             meta = {}
         if not isinstance(meta, dict):
-            meta = {}
+            meta, meta_read = {}, False
     from .markdown import _join_list
+    # Same fallbacks-to-negatives as markdown.py had: see the long note
+    # there. "TLS verify: no" and "Tool surface: all" are claims about how
+    # the engagement was conducted, and a missing meta.json makes them
+    # wrongly in the direction of a broader test than was run.
+    _unk = "not recorded"
     constraints = (
-        f"<p><b>Scope hosts:</b> {_esc(_join_list(meta.get('scope'), '(target only)'))}<br>"
-        f"<b>Excluded paths:</b> {_esc(_join_list(meta.get('exclude_paths'), 'none'))}<br>"
+        ("<p style=\"border-left:6px solid #e67e22;background:#fdf6ec;"
+         "padding:.6rem .9rem\"><b>Engagement constraints are not on "
+         "record for this session:</b> <code>meta.json</code> is missing "
+         "or unreadable, so the values below are unknown rather than "
+         "defaults.</p>" if not meta_read else "")
+        + f"<p><b>Scope hosts:</b> {_esc(_join_list(meta.get('scope'), '(target only)') if meta_read else _unk)}<br>"
+        f"<b>Excluded paths:</b> {_esc(_join_list(meta.get('exclude_paths'), 'none') if meta_read else _unk)}<br>"
         f"<b>Budgets:</b> {_esc(meta.get('max_turns','?'))} turns, "
         f"{_esc(meta.get('max_requests','?'))} requests, {_esc(meta.get('rate_rps','?'))} rps<br>"
-        f"<b>Proxy:</b> {'yes' if meta.get('proxy') else 'no'} · "
-        f"<b>TLS verify:</b> {'yes' if meta.get('tls_verify') else 'no'}<br>"
-        f"<b>Tool surface:</b> {_esc(_tool_surface(meta))}</p>")
+        f"<b>Proxy:</b> {('yes' if meta.get('proxy') else 'no') if meta_read else _unk} · "
+        f"<b>TLS verify:</b> {('yes' if meta.get('tls_verify') else 'no') if meta_read else _unk}<br>"
+        f"<b>Tool surface:</b> {_esc(_tool_surface(meta) if meta_read else _unk)}</p>")
 
     ep_rows = "".join(f"<tr><td><code>{_esc(e)}</code></td></tr>"
                       for e in coverage["endpoints"])
@@ -244,7 +276,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 <h1>Penetration Test Report</h1>
 {banner}
 <p class="meta"><b>Session:</b> {_esc(session.id)}<br>
-<b>Date:</b> {_esc(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started)))}<br>
+<b>Date:</b> {_esc(_started_text(session))}<br>
 <b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session.requests_sent} &nbsp; <b>Argus:</b> {_esc(str(meta.get('argus_version') or __version__))}{('<br><b>Operator:</b> ' + _esc(meta['operator'])) if meta.get('operator') else ''}</p>
 <h2>Executive summary</h2>
 <p>{_esc(summary) or '<i>No agent summary recorded.</i>'}</p>

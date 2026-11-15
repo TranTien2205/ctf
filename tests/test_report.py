@@ -530,3 +530,148 @@ def test_requests_sent_counts_requests_and_agrees_with_its_own_table(tmp_path):
     assert "jwt_forge" not in by_tool, (
         "docs/EXPERIMENTS.md documents this table as wire requests per "
         "tool, 'shows where budget went' - an offline tool spends none")
+
+
+def test_the_target_does_not_choose_bytes_in_report_md_s_own_html(tmp_path):
+    """report.md opens `<details><summary>` itself, and that IS parsed.
+
+    Markdown fences and code spans are already defended here: `_fence`
+    widens for a backtick run in the body and `_code` widens the span when
+    a URL contains a backtick. The `<summary>` line had neither, and it is
+    a raw HTML element - report.md cannot be rendered with raw HTML
+    disabled, because its own collapsible transcript sections and its notes
+    appendix depend on it, so any viewer that shows those also parses
+    whatever the target put in the URL. The target chooses those bytes: the
+    crawler follows its hrefs and the probes build URLs from its parameter
+    names.
+
+    report.html escapes the same value with `_esc`. This file had no
+    equivalent, so the one artifact a reader opens in a browser was safe
+    and the one they read on a forge was not.
+    """
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+
+    nasty = ('http://127.0.0.1:9/p?x="><script>alert(document.domain)'
+             '</script>&b=1')
+    cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                 session_dir=tmp_path)
+    s = Session(tmp_path, cfg.target, {})
+    rid = s.record_exchange(
+        "crawl", {"method": "GET", "url": nasty, "headers": {}, "body": None},
+        {"status": 200, "headers": {}, "body": "root:x:0:0",
+         "elapsed_ms": 2.0})
+    s.add_finding(title="t", severity="high", category="sqli", url=nasty,
+                  evidence_ids=[rid], evidence_excerpt="root:x:0:0",
+                  description="d", remediation="r")
+    render_report(s, cfg, summary="", extra={})
+    md = (Path(s.dir) / "report.md").read_text(encoding="utf-8")
+
+    summaries = [l for l in md.splitlines() if "<summary>" in l]
+    assert summaries, "no transcript details block was rendered"
+    for line in summaries:
+        assert "<script>" not in line, f"live script tag in a <summary>: {line}"
+        assert "&lt;script&gt;" in line or "script" not in line, line
+
+    # the neighbouring defences must still hold, so a later "simplification"
+    # cannot trade one for the other
+    backtick = "http://127.0.0.1:9/p?x=`<img src=x onerror=alert(1)>`"
+    s2 = Session(tmp_path / "two", cfg.target, {})
+    rid2 = s2.record_exchange(
+        "crawl", {"method": "GET", "url": backtick, "headers": {},
+                  "body": None},
+        {"status": 200, "headers": {}, "body": "root:x:0:0",
+         "elapsed_ms": 2.0})
+    s2.add_finding(title="t", severity="high", category="sqli", url=backtick,
+                   evidence_ids=[rid2], evidence_excerpt="root:x:0:0",
+                   description="d", remediation="r")
+    render_report(s2, cfg, summary="", extra={})
+    md2 = (Path(s2.dir) / "report.md").read_text(encoding="utf-8")
+    endpoint = [l for l in md2.splitlines() if "**Endpoint:**" in l][0]
+    assert endpoint.count("``") >= 2, (
+        f"a backtick in the URL broke out of the code span: {endpoint}")
+
+
+def test_no_artifact_dates_a_session_to_1970(tmp_path):
+    """`started` is 0.0 when meta.json is missing, corrupt or stampless.
+
+    `markdown.py` guards it and prints "unknown (this session's meta.json
+    carries no start time)". `html.py` and `sarif.py` did not, so the same
+    session dated itself `1969-12-31 19:00:00` in one artifact and
+    `1970-01-01T00:00:00Z` in another - local time in one, UTC in the
+    other, so the two did not even agree. The date is the field an
+    authorisation reviewer checks against the window the engagement was
+    authorised for, and a 1970 stamp is not a missing value a consumer can
+    detect; it is a definite wrong answer.
+    """
+    import json
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+
+    cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                 session_dir=tmp_path)
+    s = Session(tmp_path, cfg.target, {})
+    s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://127.0.0.1:9/", "headers": {},
+         "body": None},
+        {"status": 200, "headers": {}, "body": "ok", "elapsed_ms": 1.0})
+    s.started = 0.0
+    render_report(s, cfg, summary="", extra={})
+    d = Path(s.dir)
+
+    md = (d / "report.md").read_text(encoding="utf-8")
+    html = (d / "report.html").read_text(encoding="utf-8")
+    sarif = json.loads((d / "report.sarif").read_text(encoding="utf-8"))
+    for name, text in (("report.md", md), ("report.html", html)):
+        assert "1970" not in text and "1969" not in text, \
+            f"{name} dates the session to the epoch"
+        assert "carries no start time" in text, \
+            f"{name} does not say the start time is unknown"
+    inv = sarif["runs"][0]["invocations"][0]
+    assert "startTimeUtc" not in inv, (
+        "SARIF should omit a stamp it does not have, not invent one: "
+        f"{inv.get('startTimeUtc')}")
+
+
+def test_constraints_are_not_asserted_from_a_file_that_was_not_read(tmp_path):
+    """"TLS verify: no" and "Tool surface: all" are claims, not defaults.
+
+    Every value in the constraints block fell back to a definite NEGATIVE,
+    and `argus report` needs only transcript.jsonl, so it renders happily
+    with meta.json absent. Measured on a real demo session: with meta.json
+    deleted the block was identical to the one rendered with it present
+    except for the budgets degrading to `?`. A run constrained by a scope
+    list, an exclusion and a tool subset re-rendered as unrestricted -
+    wrong in the direction of a broader, less careful test than was run,
+    or for scope a narrower one than was authorised. The re-render then
+    re-seals and `argus verify` prints OK and exits 0.
+    """
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+
+    cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                 session_dir=tmp_path)
+    s = Session(tmp_path, cfg.target, {})
+    s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://127.0.0.1:9/", "headers": {},
+         "body": None},
+        {"status": 200, "headers": {}, "body": "ok", "elapsed_ms": 1.0})
+    (Path(s.dir) / "meta.json").unlink(missing_ok=True)
+    render_report(s, cfg, summary="", extra={})
+    d = Path(s.dir)
+    md = (d / "report.md").read_text(encoding="utf-8")
+    html = (d / "report.html").read_text(encoding="utf-8")
+
+    for name, text in (("report.md", md), ("report.html", html)):
+        assert "not on record for this session" in text, \
+            f"{name} states constraints from a meta.json it never read"
+        assert "not recorded" in text, name
+    assert "Tool surface:** all" not in md and "(target only)" not in md, md
