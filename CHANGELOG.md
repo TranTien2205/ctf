@@ -3677,12 +3677,59 @@ real path now.
   returning False the coercion is inert, and it is kept to stop one
   specific mistake recurring rather than because a test can see it.
 
+### Re-reading the sweep's own refusals
+
+The 38 confirmed findings are closed. The adversarial verifiers were told
+to default to `refuted: true` when they could not decide, so a false
+refusal is expected by construction - and all 19 refusals begin with
+"REPRODUCES". They were refused on consequence, on intent, or on
+reachability, not on the mechanism. Two of them were worth re-reading, and
+one of those was worth acting on twice.
+
+- **A quote had to be contiguous in the joined evidence text, not in any
+  part of it.** `_evidence_text_of_entry` built
+  `"\n".join(headers-JSON, each "k: v" line, body)` and the gate tested
+  containment against the join, so `"x-injected: yes\n<html>hello"` - half
+  a header line and the start of the body - was "a verbatim substring of a
+  cited response" while being a substring of no part of one.
+
+  The refusal was right that this is not a false positive: `_echo_check`
+  matches against `resp_body` alone, sits in every class's veto tuple, and
+  a straddle swept across all 29 classes grades
+  `{'unproven': 28, 'refused': 1}`. It was wrong that nothing follows. The
+  grade is a different claim from the gate's: `findings_bad` is what
+  `argus verify` and an `argus report` re-render use to decide whether a
+  quote still verifies, and "N findings re-validated" is a statement about
+  the EXCERPT. Containment is per part now, and the fix is free - a body
+  quote, a wire-style `k: v` line and a fragment of the headers JSON each
+  match a part exactly as they matched the join.
+- **A rate the table knew was wrong, recorded instead of applied.**
+  `models.json`'s entry for claude-haiku-5-5 read "0.10/0.50 per MTok for
+  prompts up to 100K tokens and 0.50/2.50 above it - this table holds one
+  pair, so a long-prompt run under-reports by 5x". Measured on the real
+  `Model.cost`, 200K in and 1K out: $0.020500 against $0.102500, exactly
+  5.00x.
+
+  The refusal was "already known and recorded", and it is - in the note
+  and in this file. But recording a wrong number in a note is not the same
+  as not printing it: the note reaches a reader of models.json, the figure
+  reaches the operator reading a cost in report.md. The schema holds
+  `tiers` now and the entry carries the published pair, so the 200K run
+  prices at $0.102500. The threshold is on the PROMPT - fresh input plus
+  cache reads plus cache writes - which is a choice, so it is stated in
+  the code and asserted in the test: counting `tokens_in` alone would put
+  a cache-heavy run in the cheap tier on a prompt that was not cheap.
+
+Checked and left alone: selftest's "the default model is priced and
+current" check is not vacuous - planting a deprecated default and an
+unlisted one both drop it to 157/158.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 705 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 707 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

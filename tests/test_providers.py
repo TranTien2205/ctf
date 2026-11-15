@@ -840,3 +840,53 @@ def test_a_superseded_model_is_still_chosen_when_its_heir_is_unusable():
     # drop the model that names it
     assert "claude-opus-9-9" not in keys
     assert old.superseded_by not in keys
+
+
+def test_a_tiered_rate_is_applied_and_not_just_noted():
+    """The table held one price pair and its own note said what that costs.
+
+    `models.json`'s entry for claude-haiku-5-5 read: "0.10/0.50 per MTok
+    for prompts up to 100K tokens and 0.50/2.50 above it - this table holds
+    one pair, so a long-prompt run under-reports by 5x". Measured on the
+    real `Model.cost`, 200K in and 1K out: $0.020500 against $0.102500 at
+    the published above-100K rate, exactly 5.00x.
+
+    Recording a wrong number in a note is not the same as not printing it.
+    The note reaches a reader of models.json; the figure reaches the
+    operator reading a cost in report.md, and this package's position is
+    that a printed number is a measurement.
+
+    The threshold is on the PROMPT - fresh input plus cache reads plus
+    cache writes - which is a choice, so it is asserted: counting
+    `tokens_in` alone would put a cache-heavy run in the cheap tier on a
+    prompt that was not cheap.
+    """
+    haiku = models.get("claude-haiku-5-5")
+    assert haiku is not None and haiku.tiers, (
+        "the tier the note describes is not in the table")
+
+    # up to 100K is the cheap pair; "up to" includes the boundary
+    assert haiku.cost(80_000, 1_000) == pytest.approx(
+        (80_000 * 0.1 + 1_000 * 0.5) / 1e6)
+    assert haiku.cost(100_000, 1_000) == pytest.approx(
+        (100_000 * 0.1 + 1_000 * 0.5) / 1e6)
+
+    # above it, the published pair - and this is the 5x that was printed
+    assert haiku.cost(200_000, 1_000) == pytest.approx(
+        (200_000 * 0.5 + 1_000 * 2.5) / 1e6), (
+        f"a 200K-prompt run prices at {haiku.cost(200_000, 1_000)}")
+    assert haiku.cost(200_000, 1_000) == pytest.approx(
+        5.0 * ((200_000 * 0.1 + 1_000 * 0.5) / 1e6))
+
+    # a prompt that is large because it was CACHED is still a large prompt
+    cached = haiku.cost(10_000, 1_000, cache_read=190_000)
+    assert cached == pytest.approx(
+        (10_000 * 0.5 + 190_000 * 0.5 * haiku.CACHE_READ_MULTIPLIER
+         + 1_000 * 2.5) / 1e6), cached
+
+    # a model with no tier is untouched by any of this
+    sonnet = models.get("claude-sonnet-5-5")
+    assert not sonnet.tiers
+    assert sonnet.cost(200_000, 1_000) == pytest.approx(
+        (200_000 * sonnet.usd_per_mtok_in
+         + 1_000 * sonnet.usd_per_mtok_out) / 1e6)

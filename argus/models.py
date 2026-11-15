@@ -47,6 +47,20 @@ class Model:
     roles: list[str] = field(default_factory=list)
     allow_insecure_base: bool = False
     note: str = ""
+    #: Rate pairs that apply above a prompt size, highest threshold last.
+    #: `[{"above_prompt_tokens": 100000, "usd_per_mtok_in": 0.5,
+    #:    "usd_per_mtok_out": 2.5}]`
+    #:
+    #: The table held ONE pair and `models.json`'s own note said what that
+    #: costs: "0.10/0.50 per MTok for prompts up to 100K tokens and
+    #: 0.50/2.50 above it - this table holds one pair, so a long-prompt run
+    #: under-reports by 5x". Measured on the real `Model.cost`, 200K in and
+    #: 1K out on claude-haiku-5-5: $0.020500 against $0.102500 at the
+    #: published above-100K rate, exactly 5.00x. Recording a wrong number
+    #: in a note is not the same as not printing it, and this package's
+    #: position is that a printed figure is a measurement.
+    tiers: list[dict] = field(default_factory=list)
+
     #: The published successor, when this model has one. A successor
     #: relation, not a capability ranking: role selection drops a model whose
     #: successor this machine can call, so a cost policy cannot reach past
@@ -77,12 +91,29 @@ class Model:
             except (TypeError, ValueError):
                 return 0
 
-        rate_in = self.usd_per_mtok_in
+        # The PROMPT decides the tier, and the prompt is everything the
+        # model was given: fresh input plus what it read from cache plus
+        # what it wrote to cache. That is the reading of "prompts up to
+        # 100K tokens", and it is stated here because it is a choice -
+        # counting `tokens_in` alone would put a cache-heavy run in the
+        # cheap tier on a prompt that was not cheap.
+        prompt = _n(tokens_in) + _n(cache_read) + _n(cache_write)
+        rate_in, rate_out = self.usd_per_mtok_in, self.usd_per_mtok_out
+        for tier in self.tiers or []:
+            if not isinstance(tier, dict):
+                continue
+            try:
+                above = int(tier.get("above_prompt_tokens") or 0)
+            except (TypeError, ValueError):
+                continue
+            if above and prompt > above:
+                rate_in = float(tier.get("usd_per_mtok_in") or rate_in)
+                rate_out = float(tier.get("usd_per_mtok_out") or rate_out)
         return round(
             (_n(tokens_in) * rate_in
              + _n(cache_read) * rate_in * self.CACHE_READ_MULTIPLIER
              + _n(cache_write) * rate_in * self.CACHE_WRITE_MULTIPLIER
-             + _n(tokens_out) * self.usd_per_mtok_out) / 1e6, 6)
+             + _n(tokens_out) * rate_out) / 1e6, 6)
 
     def credential(self) -> str:
         for name in self.api_key_env:
@@ -121,6 +152,13 @@ def known() -> dict[str, Model]:
             roles=[str(r) for r in (merged.get("roles") or [])],
             allow_insecure_base=bool(merged.get("allow_insecure_base")),
             note=str(merged.get("note") or ""),
+            # Validated here rather than trusted: models.json is a data file
+            # an operator can edit, and a malformed tier must not crash the
+            # price or silently apply. A row missing either rate keeps the
+            # base pair for that side, which `cost` already handles.
+            tiers=[dict(x) for x in (merged.get("tiers") or [])
+                   if isinstance(x, dict)
+                   and str(x.get("above_prompt_tokens") or "").isdigit()],
             superseded_by=str(merged.get("superseded_by") or ""),
         )
     return out

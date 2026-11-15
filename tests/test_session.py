@@ -510,3 +510,66 @@ def test_two_legal_spellings_of_one_url_are_one_finding(tmp_path):
         assert _finding_key("sqli", a) != _finding_key("sqli", b), (a, b)
     # an unparseable url keeps a stable key rather than crashing dedup
     assert _finding_key("sqli", "http://[bad")[0] == "sqli"
+
+
+def test_a_quote_must_be_contiguous_in_ONE_part_of_the_response(tmp_path):
+    """The citable texts were joined, so a quote could straddle two of them.
+
+    `_evidence_text_of_entry` built `"\\n".join(headers-JSON, each "k: v"
+    line, body)` and the gate tested the excerpt against the join - so
+    `"x-injected: yes\\n<html>hello"`, half a header line and the start of
+    the body, was "a verbatim substring of a cited response" while being a
+    substring of no part of one, and was printed under "Proof (verbatim
+    excerpt)".
+
+    The proof matrix already caught it: `_echo_check` matches against
+    `resp_body` alone and is in every class's veto tuple, and a straddle
+    swept across all 29 classes grades `{'unproven': 28, 'refused': 1}`. So
+    this was never a route to a `proven` finding, and it is why this is a
+    gate fix and not a false-positive fix.
+
+    It still matters, because the grade is a different claim from this one.
+    `findings_bad` is what `argus verify` and an `argus report` re-render
+    use to decide whether a finding's quote still verifies, and "N findings
+    re-validated" is a statement about the EXCERPT.
+
+    The second half is what makes the fix free: a body quote, a wire-style
+    `k: v` line and a fragment of the headers JSON each match a part
+    exactly as they matched the join. Only text spanning a boundary stops
+    matching, and no response produces such text contiguously.
+    """
+    import pytest
+
+    from argus.session import Session, findings_bad, _excerpt_in_entry
+
+    s = Session(tmp_path, "http://t.test", {})
+    rid = s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://t.test/x", "headers": {},
+         "body": None},
+        {"status": 200,
+         "headers": {"set-cookie": "s=1", "x-injected": "yes"},
+         "body": "<html>hello</html>", "elapsed_ms": 1.0})
+    entry = s._transcript[rid]
+
+    # every legitimate quotation form a finding uses
+    for quote in ("<html>hello</html>",          # body
+                  "hello",                        # part of the body
+                  "x-injected: yes",              # wire-style header line
+                  '"x-injected": "yes"'):         # the JSON the model saw
+        assert _excerpt_in_entry(quote, entry), quote
+
+    for straddle in ("x-injected: yes\n<html>hello",
+                     '"x-injected": "yes"}\nset-cookie: s=1',
+                     "set-cookie: s=1\nx-injected: yes"):
+        assert not _excerpt_in_entry(straddle, entry), (
+            f"{straddle!r} is contiguous in no part of the response")
+        with pytest.raises(ValueError, match="verbatim substring"):
+            s.add_finding(title="t", severity="high", category="crlf",
+                          url="http://t.test/x", evidence_ids=[rid],
+                          evidence_excerpt=straddle, description="d",
+                          remediation="r")
+        # ...and the forensic re-validation `argus verify` runs says so too
+        assert findings_bad(s._transcript, [{
+            "id": "F01", "severity": "high", "evidence_ids": [rid],
+            "evidence_excerpt": straddle}]) == ["F01"], straddle

@@ -62,7 +62,14 @@
         "ANTHROPIC_AUTH_TOKEN",
         "CLAUDE_CODE_OAUTH_TOKEN"
       ],
-      "note": "current Haiku. 0.10/0.50 per MTok for prompts up to 100K tokens and 0.50/2.50 above it - this table holds one pair, so a long-prompt run under-reports by 5x. Published 2026-11-03"
+      "note": "current Haiku. 0.10/0.50 per MTok for prompts up to 100K tokens and 0.50/2.50 above it, both now in `tiers` - this table held one pair and a long-prompt run under-reported by 5x. Published 2026-11-03",
+      "tiers": [
+        {
+          "above_prompt_tokens": 100000,
+          "usd_per_mtok_in": 0.5,
+          "usd_per_mtok_out": 2.5
+        }
+      ]
     },
     "claude-sonnet-4-5": {
       "provider": "anthropic",

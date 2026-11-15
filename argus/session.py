@@ -370,15 +370,38 @@ def findings_bad(entries: dict, findings: list) -> list[str]:
                  for r in ids]
         if f.get("severity") not in SEVERITIES or \
                 not excerpt or not cited or None in cited or \
-                not any(excerpt in _evidence_text_of_entry(e)
-                        for e in cited):
+                not any(_excerpt_in_entry(excerpt, e) for e in cited):
             bad.append(f.get("id", "?"))
     return bad
 
 
-def _evidence_text_of_entry(entry: dict | None) -> str:
+def _evidence_parts_of_entry(entry: dict | None) -> list[str]:
+    """The citable texts of one entry, SEPARATELY.
+
+    They used to be joined with newlines and the excerpt tested against the
+    join, so a quote could straddle two of them - contiguous in the joined
+    string and a substring of no part of the response. Measured:
+    `"x-injected: yes\n<html>hello"`, built from a header line and the start
+    of the body, passed the gate and was printed under "Proof (verbatim
+    excerpt)".
+
+    The proof matrix catches it - `_echo_check` matches the excerpt against
+    `resp_body` alone, is in every class's veto tuple, and swept across all
+    29 classes a straddle grades `{'unproven': 28, 'refused': 1}` - so this
+    was never a route to a `proven` finding. But the grade is a different
+    claim from this one. `findings_bad` is what `argus verify` and a
+    `argus report` re-render use to decide whether a finding's quote still
+    verifies, and "N findings re-validated" is a statement about the
+    EXCERPT. A splice must not pass it.
+
+    Checking per part costs no legitimate quote: a body quote, a wire-style
+    `k: v` line and a fragment of the headers JSON were each measured to
+    match a part exactly as they matched the join. Only text spanning a
+    boundary stops matching, and no response ever produced such text
+    contiguously.
+    """
     if not isinstance(entry, dict):
-        return ""
+        return []
     resp = entry.get("response") or {}
     body = resp.get("body") if isinstance(resp, dict) else None
     # response headers carry the proof for header-class findings (CRLF
@@ -393,7 +416,17 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
         parts.append(json.dumps(hdrs, ensure_ascii=False))
         parts.extend(f"{k}: {v}" for k, v in hdrs.items())
     parts.append(str(body or "") or str(entry.get("output") or ""))
-    return "\n".join(p for p in parts if p)
+    return [p for p in parts if p]
+
+
+def _excerpt_in_entry(excerpt: str, entry: dict | None) -> bool:
+    """Is this quote a verbatim substring of ONE citable text of this entry?"""
+    return any(excerpt in part for part in _evidence_parts_of_entry(entry))
+
+
+def _evidence_text_of_entry(entry: dict | None) -> str:
+    """The same texts joined, for DISPLAY only - never for containment."""
+    return "\n".join(_evidence_parts_of_entry(entry))
 
 
 _GRADE_RANK = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
@@ -1044,8 +1077,8 @@ class Session:
             # contain the same bytes. The proving exchange is the one just
             # sent, not the first one that ever matched.
             matches = [r for r in reversed(list(transcript_snapshot))
-                       if excerpt in self._evidence_text_of(
-                           transcript_snapshot.get(r))]
+                       if _excerpt_in_entry(
+                           excerpt, transcript_snapshot.get(r))]
             # Prefer a real request/response over a non-HTTP event. The most
             # recent match can be a scanner's output line, and citing that
             # fails the proof matrix's wire check for every class - so a
@@ -1062,8 +1095,8 @@ class Session:
         unknown = [r for r in evidence_ids if r not in transcript_snapshot]
         if unknown:
             raise ValueError(f"unknown evidence request ids: {unknown}")
-        if not any(excerpt in self._evidence_text_of(
-                transcript_snapshot.get(r)) for r in evidence_ids):
+        if not any(_excerpt_in_entry(excerpt, transcript_snapshot.get(r))
+                   for r in evidence_ids):
             raise ValueError(
                 "evidence_excerpt is not a verbatim substring of any cited response"
             )
