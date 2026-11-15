@@ -4202,12 +4202,67 @@ silently go uncovered. Redacting more REQUEST headers cannot cost a
 finding: evidence text covers response headers, bodies and event output,
 never request headers, which is the invariant recorded at the set itself.
 
+### Payloads two classes could not see, found by sweeping probe against gate
+Generalising the deserialize finding: for every probe, does the request-side
+check that gates its class recognise the payloads the probe scores as hits?
+Swept all 27 probes; 18 mismatches claimed, and these are the ones that
+survived being reproduced here by hand.
+
+- **Two of the five template families `probe_ssti` sends were invisible to
+  the only gate into their class.** Every opener in `TEMPLATE_MATH_RE` was
+  two characters, and measured over `probes._SSTI_TEMPLATES`:
+  `{{41234+5678}}` matched, `${41234+5678}` matched, `${{41234+5678}}`
+  matched, while **`<%= 41234+5678 %>` (erb/ejs) and `{41234+5678}`
+  (smarty) matched nothing**. That pattern is the only route into
+  `verify_template_eval` - an exchange whose request it does not match is
+  `continue`d past before anything looks at the response - so against a
+  Rails, Express or Smarty target the probe sent the payload, the engine
+  computed the sum, the probe scored the hit, and both required checks
+  failed: `unproven`, not even candidate. The single-brace opener is last
+  in the alternation so the two-character ones still win at the same
+  position, and it cannot carry a proof alone: the verifier still requires
+  the PRODUCT in the response and refuses it when it equals either operand.
+  A test reads the probe's real family list, so a family added on one side
+  only fails the suite.
+- **`Origin: null` read as the site's own origin, in two classes.** A
+  sandboxed iframe, a `data:` URL and a local file all send it, and
+  `urlparse("null").hostname` is `""`, so `bool(o_host) and o_host != host`
+  came out False in both `verify_cors` and `verify_websocket_channel` - and
+  the CORS detail said it out loud: "the reflected origin is the site's own
+  - that is an allowlist working". `probe_cors` sends it deliberately; its
+  docstring calls the sandboxed-iframe case "trivially exploitable" and it
+  scores the hit as "null origin trusted WITH credentials". So the probe
+  reported it as a headline finding and neither class could grade it. Now
+  one shared `_origin_is_foreign` for both callers, because two copies of
+  that test is how they came to disagree with the probe in the same way.
+  The site's own origin is still an allowlist working.
+
+Also measured, and the sweep's claims were WRONG: three of its surviving
+findings said `SERIALIZED_RE` still cannot see the php-object, Json.NET and
+raw-Marshal payloads. Driven against the live lab, all ten match on the real
+recorded `req_text` - r2 through r11, each with its matching substring
+printed. Those agents had conflated "the lab does not EXECUTE this payload"
+with "the gate cannot SEE it"; the gate sees every one, and the lab
+correctly answers a parser error. One fixture of my own was unfaithful in
+the same measurement: a bare `+` written into a test URL is turned into a
+SPACE by `req_text`'s own `unquote_plus`, so the operator vanished. The real
+probe sends `%2B` and the recorded text is right; the test builds its URLs
+with `urlencode` now and says why.
+
+Not triaged, recorded with their shapes: the sweep's remaining claims
+against `probe_xxe` (an SSRF-via-XXE payload asking for a URL rather than a
+file), `probe_idor` (an object id shifted in a POST body rather than the
+URL), `probe_lockout` (the credential-field pattern and the series floor),
+`probe_smuggle` (the TE.CL veto), `probe_disclosure` (`/.git/HEAD` and
+`/debug` against a floor that wants a credential-shaped secret) and
+`probe_ppoll`/`probe_cache` (the unkeyed-input floor).
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 728 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 731 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

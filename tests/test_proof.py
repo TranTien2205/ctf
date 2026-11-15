@@ -5,6 +5,7 @@ evidence is easy; a gate that refuses a plausible-looking claim is the whole
 point, and the case that proves it is a benign page that happens to contain
 the right-looking string.
 """
+import copy
 import re
 import itertools
 import sys
@@ -541,6 +542,85 @@ def test_lfi_accepts_the_natural_control_for_an_absolute_path():
     # and a control the target never answered is not one
     dead = ex("r3", "http://t.local/download?file=/etc/nope", "", 0)
     assert proof.grade("lfi", "root:x:0:0", [hit, dead]).grade != "proven"
+
+
+def test_every_template_family_probe_ssti_sends_can_be_graded():
+    """Two of the five had no two-character opener, so the gate was blind.
+
+    `TEMPLATE_MATH_RE` is the ONLY route into `verify_template_eval` - an
+    exchange whose request it does not match is `continue`d past before
+    anything looks at the response - and every opener in it was two
+    characters. Measured over the probe's own family list:
+
+        jinja2/twig          {{41234+5678}}        matched
+        erb/ejs              <%= 41234+5678 %>     NOTHING
+        freemarker/velocity  ${41234+5678}         matched
+        thymeleaf/spring     ${{41234+5678}}       matched
+        smarty               {41234+5678}          NOTHING
+
+    So against an ERB/EJS target (Rails, Express) or a Smarty one (PHP) the
+    probe sent the payload, the engine computed the sum, the probe scored
+    the hit, and both required checks failed - `unproven`, not even
+    candidate.
+
+    This reads the probe's real list, the way the deserialize payload test
+    does, so a family added to one side and not the other fails here.
+    """
+    from argus.tools.probes import _SSTI_TEMPLATES
+
+    missed = []
+    for family, tpl in _SSTI_TEMPLATES:
+        payload = tpl % (41234, 5678)
+        m = proof.TEMPLATE_MATH_RE.search(payload)
+        if not m:
+            missed.append((family, payload))
+            continue
+        # and the operands have to come back out in the right groups, or the
+        # product the verifier computes is not the one the engine computed
+        assert (m.group(2), m.group(3), m.group(4)) == ("41234", "+", "5678"), \
+            (family, m.groups())
+    assert not missed, (
+        f"probe_ssti sends {len(missed)} family/families whose expression the "
+        f"only gate into this class cannot see: {missed}")
+
+    # the opener stays specific: these are not template expressions
+    for benign in ('{"a":1}', "Showing 4 results", "{1}", "x <% y %>",
+                   '{"id": 41234}', "range(1,10)", "{{brand}}"):
+        assert proof.TEMPLATE_MATH_RE.search(benign) is None, benign
+
+
+def test_ssti_grades_an_erb_and_a_smarty_hit():
+    """The behavioural half: a rendered sum from each of the two.
+
+    The lab is Python, so no lab endpoint renders ERB or Smarty - these are
+    the citations an operator would bring back from one that does.
+    """
+    import urllib.parse
+
+    def url(payload):
+        # urlencoded, the way `_send` puts a payload in a query string: the
+        # `+` operator rides as %2B, and `req_text`'s own `unquote_plus`
+        # restores it. Writing a bare `+` into the fixture instead makes
+        # `unquote_plus` turn it into a SPACE, and the operator disappears -
+        # measured, and the reason this test is built from urlencode rather
+        # than an f-string.
+        return "http://t.local/p?" + urllib.parse.urlencode({"n": payload})
+
+    for opener, closer in (("<%= ", " %>"), ("{", "}")):
+        first = ex("r1", url(f"{opener}41234+5678{closer}"),
+                   "<html><body>46912</body></html>")
+        second = ex("r2", url(f"{opener}91000+9000{closer}"),
+                    "<html><body>100000</body></html>")
+        v = proof.grade("ssti", "46912", [first, second])
+        assert v.grade == "proven", (opener, v.explain())
+    # and an echo is still an echo, not an evaluation
+    echoed = ex("r3", url("<%= 41234+5678 %>"),
+                "<html><body><%= 41234+5678 %></body></html>")
+    v = proof.grade("ssti", "<%= 41234+5678 %>", [echoed])
+    assert v.grade != "proven"
+    assert "returned the expression unchanged" in next(
+        c["detail"] for c in v.checks
+        if c["check"] == "expression evaluated, not echoed")
 
 
 def test_ssti_needs_two_operand_pairs():
@@ -2569,6 +2649,59 @@ def _ws_frame(rid, url, sent, got, *, rode):
             "request": {"method": "WSFRAME", "url": url, "headers": {},
                         "body": sent, "on_handshake": rode},
             "response": {"status": 101, "headers": {}, "body": got}}
+
+
+def test_a_reflected_null_origin_is_foreign_in_both_classes():
+    """`Origin: null` is owned by nobody, and both classes read it as ours.
+
+    A sandboxed iframe, a `data:` URL and a local file all send
+    `Origin: null`. `urlparse("null").hostname` is `""`, so
+    `bool(o_host) and o_host != host` came out False in BOTH
+    `verify_cors` and `verify_websocket_channel` - and the CORS detail said
+    it out loud: "the reflected origin is the site's own - that is an
+    allowlist working".
+
+    `probe_cors` sends it deliberately. Its docstring calls the
+    sandboxed-iframe case "trivially exploitable" and it scores the hit as
+    "null origin trusted WITH credentials - exploitable from any sandboxed
+    iframe". So the probe reported it as a headline finding and neither
+    class could grade it.
+    """
+    assert proof._origin_is_foreign("null", "t.local")
+    assert proof._origin_is_foreign("NULL", "t.local")
+    assert proof._origin_is_foreign("https://evil.test", "t.local")
+    # and the site's own origin is still not a finding
+    assert not proof._origin_is_foreign("http://t.local", "t.local")
+    assert not proof._origin_is_foreign("http://T.LOCAL", "t.local")
+    assert not proof._origin_is_foreign("", "t.local")
+
+    leak = {"id": "c1", "ts": 1,
+            "request": {"method": "GET", "url": "http://t.local/api/me",
+                        "headers": {"Origin": "null"}, "body": None},
+            "response": {"status": 200,
+                         "headers": {"Access-Control-Allow-Origin": "null",
+                                     "Access-Control-Allow-Credentials":
+                                         "true"},
+                         "body": '{"role":"admin","email":"a@t.local"}'}}
+    v = proof.grade("cors", '"role":"admin"', [leak])
+    assert v.grade == "proven", v.explain()
+    # the same shape with the site's own origin is an allowlist working
+    own = copy.deepcopy(leak)
+    own["request"]["headers"]["Origin"] = "http://t.local"
+    own["response"]["headers"]["Access-Control-Allow-Origin"] = \
+        "http://t.local"
+    v = proof.grade("cors", '"role":"admin"', [own])
+    assert v.grade != "proven"
+    assert "the site's own" in next(
+        c["detail"] for c in v.checks
+        if c["check"] == "a foreign probe origin is reflected")
+
+    # and a websocket handshake accepted for a null origin is foreign too
+    shake = _ws_handshake("n1", "http://t.local/ws", "null")
+    frame = _ws_frame("n2", "http://t.local/ws", "arguswsab12 x",
+                      "echo: arguswsab12 x", rode="n1")
+    v = proof.grade("websocket", "echo: arguswsab12 x", [shake, frame])
+    assert v.grade == "proven", v.explain()
 
 
 def test_websocket_is_proven_by_a_cross_origin_channel_that_answers():

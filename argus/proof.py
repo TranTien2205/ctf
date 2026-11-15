@@ -276,10 +276,35 @@ SECRET_RE = re.compile(
     r"(?:api[_-]?key|secret[_-]?key|access[_-]?key|client[_-]?secret|password|"
     r"passwd|db[_-]?pass|token)\s*[:=]\s*\S{6,})")
 
-# {{7*7}} / ${7*7} / #{7*7} / {{ 7 * 7 }} - the arithmetic form is the one a
-# reflection cannot fake: the product has to be computed by the engine.
+# {{7*7}} / ${7*7} / #{7*7} / {{ 7 * 7 }} / <%= 7*7 %> / {7*7} - the
+# arithmetic form is the one a reflection cannot fake: the product has to be
+# computed by the engine.
+#
+# Every opener here was two characters, and `probe_ssti` sends five template
+# families (`probes._SSTI_TEMPLATES`). Two of them do not have a two-character
+# opener, so this pattern could not see them:
+#
+#     jinja2/twig          {{41234+5678}}        matched
+#     erb/ejs              <%= 41234+5678 %>     NOTHING
+#     freemarker/velocity  ${41234+5678}         matched
+#     thymeleaf/spring     ${{41234+5678}}       matched
+#     smarty               {41234+5678}          NOTHING
+#
+# This pattern is the ONLY route into `verify_template_eval` - an exchange
+# whose request it does not match is `continue`d past before anything looks
+# at the response - so against an ERB/EJS target (Rails, Express) or a Smarty
+# one (PHP) the probe sent the payload, the engine computed the sum, the probe
+# scored the hit, and both required checks failed: `unproven`, not even
+# candidate. The same shape as the five deserialize payloads this pattern's
+# neighbour could not see.
+#
+# The single-brace opener is last in the alternation so the two-character ones
+# still win at the same position, and it cannot stand on its own as evidence:
+# the verifier then requires the PRODUCT in the response and refuses it when
+# it equals either operand.
 TEMPLATE_MATH_RE = re.compile(
-    r"(\{\{|\$\{|#\{|\{%|\*\{)\s*(\d{1,6})\s*([*+])\s*(\d{1,6})\s*(\}\}|\}|%\})")
+    r"(\{\{|\$\{|#\{|\{%|\*\{|<%=|\{)\s*(\d{1,6})\s*([*+])\s*"
+    r"(\d{1,6})\s*(\}\}|%\}|%>|\})")
 
 # An object reference is not always an integer. Matching only digits made
 # idor unprovable on every API that uses uuids or opaque ids, which is most of
@@ -655,6 +680,36 @@ def _req_headers(entry: dict) -> dict:
 # Used only to separate events whose `ts` collided at the recorder's
 # millisecond rounding - see `_ordering`.
 _ID_SEQ_RE = re.compile(r"(\d+)$")
+
+
+def _origin_is_foreign(origin: str, host: str) -> bool:
+    """Is this `Origin` one the target does not own?
+
+    `null` is a third answer and both callers read it as the second. A
+    sandboxed iframe, a `data:` URL and a local file all send
+    `Origin: null`, and `urlparse("null").hostname` is `""` - so
+    `bool(o_host) and o_host != host` came out False and a target that
+    reflects `null` into `Access-Control-Allow-Origin` with credentials, or
+    completes a WebSocket handshake for it, read as SAME origin. The CORS
+    detail then said so out loud: "the reflected origin is the site's own -
+    that is an allowlist working".
+
+    It is owned by nobody, which is not the site's own. `probe_cors` sends
+    it deliberately - its docstring calls the sandboxed-iframe case
+    "trivially exploitable" and it scores the hit as "null origin trusted
+    WITH credentials" - so the probe reported it as a headline finding and
+    neither class could grade it.
+
+    One helper for both callers, because two copies of this test is how the
+    two of them came to disagree with the probe in the same way.
+    """
+    value = str(origin or "").strip()
+    if not value:
+        return False
+    if value.lower() == "null":
+        return True
+    o_host = (urllib.parse.urlparse(value).hostname or "").lower()
+    return bool(o_host) and o_host != str(host or "").strip().lower()
 
 
 def _resource_key(entry: dict) -> str:
@@ -1810,8 +1865,7 @@ def verify_cors(claim: Claim, spec: "ProofSpec") -> list[dict]:
         host = (urllib.parse.urlparse(
             str(_req(entry).get("url") or "")).hostname or "") \
             if entry else ""
-        o_host = urllib.parse.urlparse(origin).hostname or "" if origin else ""
-        foreign = bool(o_host) and o_host.lower() != host.lower()
+        foreign = _origin_is_foreign(origin, host)
         reflects = bool(allow) and bool(origin) and allow.strip() == origin.strip()
         creds = header_of(entry, "Access-Control-Allow-Credentials") \
             .strip().lower() == "true" if entry else False
@@ -3070,11 +3124,10 @@ def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
                    "Origin says nothing about whether a foreign page could "
                    "make it")
             continue
-        o_host = (urllib.parse.urlparse(str(origin)).hostname or "").lower()
         t_host = (urllib.parse.urlparse(
             str(_req(entry).get("url") or "")).hostname
             or "").lower()
-        if o_host and t_host and o_host != t_host:
+        if _origin_is_foreign(origin, t_host):
             foreign_all.append((entry, origin))
             continue
         why = (f"{entry.get('id')} sent Origin {origin} on a channel at "
