@@ -74,7 +74,15 @@ def _coverage(session: Session) -> dict:
         if not isinstance(e, dict) or e.get("kind") == "artifacts_digest":
             continue  # the seal is bookkeeping, not exercised surface
         tool = str(e.get("tool") or e.get("kind") or "?")
-        tools[tool] = tools.get(tool, 0) + 1
+        # Only exchanges, under a column headed "Requests" and documented
+        # in docs/EXPERIMENTS.md as "wire requests per tool - shows where
+        # budget went". It counted every RECORD, so `jwt_forge`, which
+        # mints a token offline and opens no socket, appeared with a
+        # request count - and the table then disagreed with the total
+        # printed above it in the other direction. Budget is wire
+        # requests, so a tool that spends none contributes none.
+        if isinstance(e.get("response"), dict):
+            tools[tool] = tools.get(tool, 0) + 1
         if tool.startswith("probe_"):
             probes.add(tool)
         req = e.get("request")
@@ -254,7 +262,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         # the build that produced the session - falls back to this
         # renderer's on old artifacts without a stamp
         f"- **Argus version:** {meta.get('argus_version') or __version__}",
-        f"- **Requests sent:** {session._seq}",
+        f"- **Requests sent:** {session.requests_sent}",
         "",
         # The run's terminal error, above everything else, because every
         # number below it describes a run that may not have happened. A
@@ -476,7 +484,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         # and then re-seal, so the delivered artifact was worse than the
         # original and digest-valid.
         "agent_summary": summary or "",
-        "requests": session._seq,
+        "requests": session.requests_sent,
         # null, not a number: a reader of summary.json must be able to tell
         # "the run took no measurable time" from "nothing recorded when it
         # began"

@@ -333,6 +333,13 @@ class TeamRun:
         try:
             while True:
                 time.sleep(0.5)
+                # `_seq` ON PURPOSE, and not `requests_sent`. This is a
+                # watchdog on total work, not the "requests sent" figure the
+                # report prints - those readers were wrong and are fixed;
+                # this one bounds records, which is the quantity that grows
+                # when a team loops on offline tools. Narrowing it to HTTP
+                # would make it fire strictly later, which is a loosened
+                # safety bound traded for a tidier name.
                 if self.session._seq >= total_req_cap or \
                         time.monotonic() >= deadline:
                     self.board.stop.set()
@@ -412,7 +419,7 @@ class TeamRun:
             "mode": "team",
             "session_dir": str(self.session.dir),
             "agents": self.board.agents(),
-            "requests": self.session._seq,
+            "requests": self.session.requests_sent,
             "findings": len(self.session.findings),
             "report": str(report_path),
             "llm_calls": calls,

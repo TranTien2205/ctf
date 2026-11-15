@@ -471,3 +471,62 @@ def test_a_dispute_reaches_every_artifact_not_just_report_md(tmp_path):
     assert p["argus-class-disputed"] == "disclosure"
     assert p["argus-severity-claimed"] == "critical"
     assert "DISPUTED" in res["message"]["text"]
+
+
+def test_requests_sent_counts_requests_and_agrees_with_its_own_table(tmp_path):
+    """Every reader printing "requests sent" read the RECORD counter.
+
+    `_seq` is shared: `record_event` increments it too, under the same
+    lock, because the id sequence has to be authoritative over the whole
+    transcript. So a scanner run (two events), an `mcp_call`, a
+    `jwt_forge`, an `exploit_run`, a `cross_verification` and the
+    `artifacts_digest` seal all counted as traffic to the target - while
+    the enforced HTTP counter, `GuardedClient.sent`, was reported nowhere.
+
+    Measured: one request plus five offline `jwt_forge` calls gave
+    `client.sent == 1` and "Requests sent: 6". The repo's own committed
+    reference artifact carries it - 66 entries, 64 with a response,
+    `summary.json` saying 65 - and that file is left alone, because it is
+    a faithful record of a real run made by the code that produced it and
+    re-sealing it would not make the run any different.
+
+    The second assertion is the one that would have caught this without
+    anyone measuring: the total and the per-tool table are computed
+    separately, and they disagreed in opposite directions. `requests` is
+    now derived from the transcript, so the two cannot drift.
+    """
+    import json
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+
+    cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                 session_dir=tmp_path)
+    s = Session(tmp_path, cfg.target, {})
+    for i in range(2):
+        s.record_exchange(
+            "http_request",
+            {"method": "GET", "url": f"http://127.0.0.1:9/{i}",
+             "headers": {}, "body": None},
+            {"status": 200, "headers": {}, "body": "ok", "elapsed_ms": 1.0})
+    for _ in range(4):                       # offline: no socket opened
+        s.record_event("jwt_forge", {"claims_set": {"role": "admin"}})
+
+    assert s._seq == 6 and s.requests_sent == 2, (s._seq, s.requests_sent)
+    render_report(s, cfg, summary="", extra={})
+    d = Path(s.dir)
+    summary = json.loads((d / "summary.json").read_text(encoding="utf-8"))
+    assert summary["requests"] == 2, summary["requests"]
+    assert "- **Requests sent:** 2" in (d / "report.md").read_text(
+        encoding="utf-8")
+    assert "<b>Requests:</b> 2" in (d / "report.html").read_text(
+        encoding="utf-8")
+
+    by_tool = summary["coverage"]["requests_by_tool"]
+    assert sum(by_tool.values()) == summary["requests"], (
+        f"the total says {summary['requests']} and the per-tool table it "
+        f"is printed beside sums to {sum(by_tool.values())}: {by_tool}")
+    assert "jwt_forge" not in by_tool, (
+        "docs/EXPERIMENTS.md documents this table as wire requests per "
+        "tool, 'shows where budget went' - an offline tool spends none")

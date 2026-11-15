@@ -363,7 +363,7 @@ class AgentLoop:
         return {
             "session_dir": str(self.session.dir),
             "turns": turns,
-            "requests": self.session._seq,
+            "requests": self.session.requests_sent,
             "findings": len(self.session.findings),
             "report": report_path,
             "model": self.cfg.model,

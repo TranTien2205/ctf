@@ -245,7 +245,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 {banner}
 <p class="meta"><b>Session:</b> {_esc(session.id)}<br>
 <b>Date:</b> {_esc(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started)))}<br>
-<b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session._seq} &nbsp; <b>Argus:</b> {_esc(str(meta.get('argus_version') or __version__))}{('<br><b>Operator:</b> ' + _esc(meta['operator'])) if meta.get('operator') else ''}</p>
+<b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session.requests_sent} &nbsp; <b>Argus:</b> {_esc(str(meta.get('argus_version') or __version__))}{('<br><b>Operator:</b> ' + _esc(meta['operator'])) if meta.get('operator') else ''}</p>
 <h2>Executive summary</h2>
 <p>{_esc(summary) or '<i>No agent summary recorded.</i>'}</p>
 <table><tr><th>Severity</th><th>Count</th></tr>{sev_rows}</table>

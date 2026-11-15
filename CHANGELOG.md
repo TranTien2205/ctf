@@ -3340,12 +3340,50 @@ about a target that had just locked the account in the same transcript.
   instrument was the defect, and the first of the four caught by planting
   rather than shipped.
 
+### "Requests sent" was the record counter, in every reader that printed it
+
+`_seq` is shared: `record_event` increments it too, under the same lock,
+because the id sequence has to be authoritative over the whole transcript.
+Every reader printing "requests sent" read it - report.md, report.html,
+summary.json, the loop's own status line and the team summary - so a
+scanner run (two events), an `mcp_call`, a `jwt_forge`, an `exploit_run`,
+a `cross_verification` and the `artifacts_digest` seal all counted as
+traffic to the target. The enforced HTTP counter, `GuardedClient.sent`,
+was reported nowhere.
+
+Measured: one request plus five offline `jwt_forge` calls gave
+`client.sent == 1` and "Requests sent: 6" - a sixfold overstatement with
+zero extra bytes on the wire, printed directly above a per-tool table that
+honestly listed `jwt_forge: 5`.
+
+- `Session.requests_sent` counts transcript entries carrying a response,
+  DERIVED rather than stored. A counter would need restoring on every path
+  that rebuilds a session, and there are two - `_reopen` and the hand-built
+  one in `cli.py` - so the next one added would have been wrong and silent.
+  `_seq` is itself restored there from the maximum id, which is not the
+  number of entries once any were dropped.
+- `coverage.requests_by_tool` counted every record too, under a column
+  headed "Requests" and documented in docs/EXPERIMENTS.md as "wire
+  requests per tool - shows where budget went". It counts exchanges now,
+  so the table sums to the total it sits beside, and a tool that spends no
+  budget contributes none. That agreement is the assertion that would have
+  caught this without anyone measuring: two separately computed figures
+  that disagreed in opposite directions.
+- The coordinator's watchdog keeps reading `_seq` ON PURPOSE. It bounds
+  total work, not the figure anyone reads, and narrowing it to HTTP would
+  make it fire strictly later - a loosened safety bound traded for a
+  tidier name.
+- The committed `docs/sample-session` carries the old figure: 66 entries,
+  64 with a response, `summary.json` saying 65. It is left alone. It is a
+  faithful record of a real run made by the code that produced it, it
+  still verifies, and no document quotes the number.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 688 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 689 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

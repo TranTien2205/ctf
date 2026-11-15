@@ -732,6 +732,35 @@ class Session:
                   f"{len(self.findings)} prior findings)")
 
     @property
+    def requests_sent(self) -> int:
+        """HTTP exchanges recorded - which is what "requests sent" means.
+
+        Every reader printing that label read `self._seq`, and `_seq` is
+        the shared RECORD counter: `record_event` increments it too, under
+        the same lock, because the id sequence has to be authoritative over
+        the whole transcript. So a scanner run (`external_cmd` +
+        `external_result`), an `mcp_call`, a `jwt_forge`, an
+        `exploit_run`, a `cross_verification` and the `artifacts_digest`
+        seal all counted as traffic to the target. Measured: one
+        `http_request` plus five offline `jwt_forge` calls gave
+        `client.sent == 1` and a report saying "Requests sent: 6" - a six-
+        fold overstatement with zero extra bytes on the wire, printed
+        directly above a per-tool table that honestly listed `jwt_forge: 5`.
+        The repo's own committed reference artifact has it: 66 entries, 64
+        carrying a response, `summary.json` saying 65.
+
+        DERIVED from the transcript rather than counted into a field. A
+        stored counter needs restoring on every path that rebuilds a
+        session, and there are two - `Session._reopen` and the hand-built
+        one in `cli.py` - so the next path added would have been wrong and
+        silent. `_seq` itself is restored there from the maximum id, which
+        is not even the number of entries when any were dropped.
+        """
+        return sum(1 for e in self._transcript.values()
+                   if isinstance(e, dict)
+                   and isinstance(e.get("response"), dict))
+
+    @property
     def transcript_path(self) -> Path:
         return self.dir / "transcript.jsonl"
 
