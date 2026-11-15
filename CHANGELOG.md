@@ -3037,6 +3037,22 @@ it was unfaithful in one nameable respect.
   `'unproven' == 'proven'`.
 - `race` is back in the proving table - 28 of the 29 classes now driven in
   the proving direction, `dos` alone excluded, by construction.
+Confirmed on the platform rather than locally, which the standing
+instruction required. A throwaway `agent-race-diag` branch printed what
+each runner records. Windows 3.10.11: `monotonic()` is `GetTickCount64()`
+with a delivered tick of 15.0000ms; the burst recorded `elapsed_ms: 156.0`
+six times and both serial controls recorded `elapsed_ms: 0.0` with window
+`(0.0, 0.0)`. The same recording graded `proven` with the fix and
+`unproven` / `['no evidence']` without it, in one run - the platform
+planted the defect back itself. 5/5 proven in each of the three Windows
+jobs that used to fail; all 11 jobs green with the row in the table.
+Windows 3.13.17 for contrast: `QueryPerformanceCounter()`, 0.0001ms.
+
+It also corrected one figure: `time()` on those runners delivers a 1.75ms
+tick, not the 15.6ms `get_clock_info().resolution` claims for it. `ts` was
+never the coarse clock there, so the simulation that coarsened `ts` was
+coarsening the only clock on the box that was already fine.
+
 - What this does NOT fix: a loaded runner that serialises the burst. The 8s
   barrier in `/redeem` makes that unlikely and the first assertion would
   report it (six 200s against one coupon cannot happen without

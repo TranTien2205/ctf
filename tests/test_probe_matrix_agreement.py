@@ -351,6 +351,28 @@ VULNERABLE = [
     # assertion passes and this one fails, something about the RECORD is
     # still wrong and the windows need printing again. Delete the entry and
     # say so. Do not add a conditional skip.
+    #
+    # CONFIRMED ON THE PLATFORM, which is what the standing instruction was
+    # asking for. A throwaway `agent-race-diag` branch ran this same drive
+    # five times in every job and printed what each runner RECORDED.
+    # Windows 3.10.11: `monotonic(): impl=GetTickCount64()`, delivered tick
+    # 15.0000ms. The burst recorded `elapsed_ms: 156.0` six times - a clean
+    # multiple of that tick - and both serial controls recorded
+    # `elapsed_ms: 0.0`, window `(0.0, 0.0)`, `start_old=0.0`. Same run,
+    # same recording, graded twice: `proven` with `_window_start` and
+    # `unproven` / `['no evidence']` without it. The platform planted the
+    # defect back itself and reported the symptom those three jobs
+    # reported. 5/5 proven on each Windows job that used to fail, and all
+    # 11 jobs green with this row in the table.
+    #
+    # One correction the platform made to the reasoning above: `time()` on
+    # those runners is `GetSystemTimeAsFileTime()` with a DELIVERED tick of
+    # 1.75ms, not the 15.6ms its own `get_clock_info().resolution` claims.
+    # So `ts` was never the coarse clock there - the simulation that
+    # coarsened `ts` was coarsening the one clock on the box that was
+    # already fine, which is why it could not reproduce anything. Windows
+    # 3.13.17 for contrast: `QueryPerformanceCounter()`, delivered tick
+    # 0.0001ms.
     ("probe_race", "race", _drive_race),
 ]
 
