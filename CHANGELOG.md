@@ -3469,12 +3469,51 @@ honestly listed `jwt_forge: 5`.
   now, and the guard drops an entry it cannot match so nothing reports an
   exclusion it is not enforcing.
 
+### The evidence store's two gaps: a dedup key half-canonicalised, and a seal nothing compared against
+
+- **One bug, two findings, because the model spelled the port.**
+  `record_finding`'s contract is "same bug class + endpoint + params dedups
+  to one finding", and the class side is keyed on `proof.canonical` so two
+  spellings of a class collapse. The endpoint side used the raw netloc, so
+  `http://shop.example/p?id=1` and `http://shop.example:80/p?id=1` - the
+  same URI under RFC 3986 6.2.3 - keyed differently and both were recorded.
+  `url` is free text ("Affected endpoint") that the model types. Measured:
+  F01 and F02, `summary.json` counting `{'high': 2}`, report.md printing
+  `| High | 2 |` over two cards for one bug - a severity count a client
+  reads, inflated by a port number.
+
+  Only the normalisations RFC 3986 calls equivalent: scheme and host case,
+  and an elided default port. A trailing slash is not one of them and a
+  relative URL has no authority to normalise against, so neither is merged
+  - over-merging would hide a second real finding, which is worse than the
+  duplicate it prevents. The SCHEME stays out of the key, which is
+  pre-existing rather than overlooked: the old netloc carried no scheme
+  either, so http and https already keyed the same. Measured while making
+  this change and left alone, because a target redirecting http to https
+  would otherwise produce two findings for one bug.
+- **A file added after sealing was invisible.** The seal enumerates a
+  whitelist resolved at seal time - `glob("agent*.log")` among it - and
+  `verify_transcript` only iterated the names it recorded, so nothing ever
+  compared the directory against the seal. A file created afterwards was
+  invisible INCLUDING one matching that glob exactly: an `agent-ghost.log`
+  dropped into a sealed session verified clean under a human line reading
+  "artifacts sealed" that names nothing. Only `--json` ever printed the
+  covered set.
+
+  Reported, not failed. `ok` means the chain is intact and the sealed bytes
+  still match, and an addition breaks neither - an operator may
+  legitimately leave a screenshot beside the run. What it must not do is
+  pass unmentioned while wearing the name of covered output. Measured on a
+  real `argus demo`: the directory holds exactly the sealed files plus
+  transcript.jsonl, which the hash chain covers instead, so the check has
+  no legitimate occupant to cry wolf over.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 695 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 697 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

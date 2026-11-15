@@ -258,6 +258,30 @@ def verify_transcript(sdir: Path, seal_key: str = "") -> dict:
                 mismatched.append(name)
         if mismatched:
             out["artifact_mismatch"] = mismatched
+        # ...and a file that was ADDED after sealing. The seal enumerates a
+        # whitelist resolved at seal time - `self.dir.glob("agent*.log")`
+        # among it - and this loop only iterated the names recorded in it,
+        # so nothing ever compared the directory against the seal. A file
+        # created afterwards was invisible, INCLUDING one matching that
+        # glob exactly: an `agent-ghost.log` dropped into a sealed session
+        # verified clean, `ok` True, over a human line reading "artifacts
+        # sealed" that names nothing.
+        #
+        # Reported, not failed. `ok` means the chain is intact and the
+        # sealed bytes still match, and an added file breaks neither - an
+        # operator may legitimately drop a screenshot or a note beside the
+        # run. What it must not do is pass unmentioned while wearing the
+        # name of covered output. Measured on a real `argus demo`: the
+        # directory holds exactly the eight sealed files plus
+        # transcript.jsonl, which the hash chain covers instead, so this
+        # has no legitimate occupant to cry wolf over.
+        try:
+            present = {p.name for p in Path(sdir).iterdir() if p.is_file()}
+        except OSError:
+            present = set()
+        added = sorted(present - set(files_dig) - {"transcript.jsonl"})
+        if added:
+            out["unsealed_additions"] = added
     return out
 
 
@@ -375,6 +399,9 @@ def _evidence_text_of_entry(entry: dict | None) -> str:
 _GRADE_RANK = {"proven": 3, "candidate": 2, "unproven": 1, "refused": 0}
 
 
+_DEFAULT_PORTS = {"http": 80, "https": 443, "ws": 80, "wss": 443}
+
+
 def _finding_key(category: str, url: str) -> tuple:
     """Dedup key: same bug class on the same endpoint+params is one finding."""
     cat = re.sub(r"[^a-z0-9]", "", str(category or "").lower())
@@ -386,7 +413,38 @@ def _finding_key(category: str, url: str) -> tuple:
         # than crashing dedup/diff on a tampered or mangled url
         return (cat, "", url, ())
     params = tuple(sorted(k for k, _ in urllib.parse.parse_qsl(p.query)))
-    return (cat, p.netloc.lower(), p.path or "/", params)
+    # The class half is canonicalised and the endpoint half was not, so one
+    # bug on one endpoint was recorded TWICE whenever the model spelled the
+    # URL the other legal way. `http://shop.example/p?id=1` and
+    # `http://shop.example:80/p?id=1` are the same URI under RFC 3986
+    # 6.2.3, and `https`/`:443` likewise - and `url` is free text ("Affected
+    # endpoint") that the model types, so both spellings occur. Measured:
+    # two findings F01 and F02, `summary.json` counting `{'high': 2}`, and
+    # `report.md` printing `| High | 2 |` over two cards for one bug.
+    #
+    # Only the normalisations RFC 3986 calls equivalent: scheme and host
+    # case, and an elided default port. A trailing slash is NOT one of them
+    # - `/p` and `/p/` are different paths - and a relative `/p?id=1` has no
+    # authority to normalise against, so neither is merged here. Over-
+    # merging would hide a second real finding, which is worse than the
+    # duplicate it would prevent.
+    #
+    # The SCHEME stays out of the key, which is pre-existing and deliberate
+    # rather than overlooked: the old key was the netloc, which carries no
+    # scheme either, so `http://h/p` and `https://h/p` already keyed the
+    # same. Measured while making this change, and left alone. On one host
+    # and path those are nearly always one application, and a target that
+    # redirects http to https would otherwise produce two findings for one
+    # bug - the very duplicate this is fixing. If a scheme ever needs to
+    # split a finding, it is a deliberate change with its own test, not a
+    # side effect of normalising a port.
+    host = (p.hostname or "").lower().rstrip(".")
+    port = p.port
+    if port is not None and port != _DEFAULT_PORTS.get(p.scheme.lower()):
+        host = f"{host}:{port}"
+    elif not host and p.netloc:
+        host = p.netloc.lower()
+    return (cat, host, p.path or "/", params)
 
 
 # Audit-grade reports carry standard identifiers; the category the model

@@ -675,3 +675,55 @@ def test_constraints_are_not_asserted_from_a_file_that_was_not_read(tmp_path):
             f"{name} states constraints from a meta.json it never read"
         assert "not recorded" in text, name
     assert "Tool surface:** all" not in md and "(target only)" not in md, md
+
+
+def test_a_file_added_after_sealing_is_named(tmp_path, capsys):
+    """The seal covered a whitelist and nothing compared the directory to it.
+
+    `seal_artifacts` enumerates the files at seal time -
+    `self.dir.glob("agent*.log")` among them - and `verify_transcript` only
+    iterated the names it recorded. So a file created afterwards was
+    invisible, INCLUDING one matching that glob exactly: an
+    `agent-ghost.log` dropped into a sealed session verified clean, `ok`
+    True, under a human line reading "artifacts sealed" that names nothing.
+    Only `--json` ever printed the covered set.
+
+    Reported rather than failed, and deliberately: `ok` means the chain is
+    intact and the sealed bytes still match, and an addition breaks
+    neither - an operator may legitimately leave a screenshot beside the
+    run. What it must not do is pass unmentioned while wearing the name of
+    covered output. Measured on a real `argus demo`, the directory holds
+    exactly the sealed files plus transcript.jsonl, which the hash chain
+    covers instead - so this check has no legitimate occupant to cry wolf
+    over.
+    """
+    from argus.cli import main
+    from argus.session import verify_transcript
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(p for p in tmp_path.iterdir() if p.is_dir())
+
+    clean = verify_transcript(sdir)
+    # `chained`, not `ok`: `ok` is computed by the CLI for its --json
+    # output, and `verify_transcript` does not return it
+    assert clean["chained"] and clean.get("sealed")
+    assert not clean.get("unsealed_additions"), (
+        "a freshly sealed session must have nothing to report: "
+        f"{clean.get('unsealed_additions')}")
+    # transcript.jsonl is covered by the chain, not the artifact digest, so
+    # it must not be reported as an addition
+    assert "transcript.jsonl" not in (clean.get("unsealed_additions") or [])
+
+    (sdir / "agent-ghost.log").write_text("ghost", encoding="utf-8")
+    after = verify_transcript(sdir)
+    assert after.get("unsealed_additions") == ["agent-ghost.log"], after
+    # the chain and the sealed bytes are untouched, so this is a note
+    assert after["chained"] and not after.get("artifact_mismatch")
+
+    capsys.readouterr()
+    assert main(["verify", str(sdir)]) == 0
+    out = capsys.readouterr()
+    assert "agent-ghost.log" in out.err, (
+        "the human output said 'artifacts sealed' and named nothing: "
+        f"{out.out!r} / {out.err!r}")
+    assert "added after sealing" in out.err, out.err

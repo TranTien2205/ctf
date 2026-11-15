@@ -324,6 +324,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"warning: {v['artifact_mismatch']} edited since the "
                   "run was sealed - constraints/findings may not reflect "
                   "the original run (run 'argus verify')", file=sys.stderr)
+        if v.get("unsealed_additions"):
+            print(f"warning: {v['unsealed_additions']} were added after the "
+                  "run was sealed and are covered by no digest - they are "
+                  "not part of the sealed record", file=sys.stderr)
         bad = findings_bad(session._transcript, session.findings)
         if bad:
             print(f"warning: findings {bad} fail evidence re-validation - "
@@ -686,6 +690,16 @@ def main(argv: list[str] | None = None) -> int:
                 if res.get("resumed_by") else "]"
         print(f"OK: {res['entries']} chained entries verified{anchored}"
               f"{fchk}{sealed}{prod}")
+        # An addition does not break the chain or the sealed bytes, so it
+        # does not change this exit code - but "artifacts sealed" names
+        # nothing, so a file added afterwards used to pass unmentioned
+        # while wearing the name of covered output.
+        if res.get("unsealed_additions"):
+            print(f"note: {', '.join(res['unsealed_additions'])} "
+                  f"{'was' if len(res['unsealed_additions']) == 1 else 'were'}"
+                  " added after sealing and "
+                  f"{'is' if len(res['unsealed_additions']) == 1 else 'are'}"
+                  " covered by no digest", file=sys.stderr)
         return 0
 
     if args.cmd == "check":

@@ -451,3 +451,62 @@ def test_a_hand_edited_findings_file_cannot_reach_dedup_as_a_scalar(tmp_path):
 
     # 3. and the renderers stay safe by sanitizing, not by trusting the load
     assert len(sanitized_findings(s3.findings)) == 1
+
+
+def test_two_legal_spellings_of_one_url_are_one_finding(tmp_path):
+    """The class half of the dedup key was canonicalised; the endpoint was not.
+
+    `record_finding`'s contract is "same bug class + endpoint + params
+    dedups to one finding", and the class side is keyed on
+    `proof.canonical` so two spellings of a class collapse. The endpoint
+    side used the raw netloc, so `http://shop.example/p?id=1` and
+    `http://shop.example:80/p?id=1` - the same URI under RFC 3986 6.2.3 -
+    keyed differently and both were recorded. `url` is free text
+    ("Affected endpoint") that the model types, so both spellings occur.
+
+    Measured before the fix: F01 and F02, `summary.json` counting
+    `{'high': 2}`, and report.md printing `| High | 2 |` over two cards for
+    one bug - severity counts a client reads, inflated by a port number.
+
+    The second half of this test is the one that matters: only the
+    normalisations RFC 3986 calls equivalent. Over-merging would hide a
+    second real finding, which is worse than the duplicate it prevents.
+    """
+    from argus.session import Session, _finding_key
+
+    s = Session(tmp_path, "http://shop.example", {})
+    rid = s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://shop.example/p?id=1",
+         "headers": {}, "body": None},
+        {"status": 200, "headers": {}, "body": "root:x:0:0",
+         "elapsed_ms": 1.0})
+    first = s.add_finding(
+        title="SQLi in id", severity="high", category="sqli",
+        url="http://shop.example/p?id=1", evidence_ids=[rid],
+        evidence_excerpt="root:x:0:0", description="d", remediation="r")
+    assert first.get("id") == "F01", first
+    # the same bug, spelled with the default port: refused as a duplicate
+    import pytest
+    with pytest.raises(ValueError, match="duplicate of F01"):
+        s.add_finding(
+            title="SQLi in id", severity="high", category="sqli",
+            url="http://shop.example:80/p?id=1", evidence_ids=[rid],
+            evidence_excerpt="root:x:0:0", description="d", remediation="r")
+    assert len(s.findings) == 1, (
+        "one bug on one endpoint was recorded twice because the model "
+        f"spelled the port: {[f['id'] for f in s.findings]}")
+
+    # equivalent under RFC 3986 6.2.3 - scheme/host case, default port
+    for a, b in (("http://h.example/p?id=1", "http://h.example:80/p?id=1"),
+                 ("https://h.example/p?id=1", "https://h.example:443/p?id=1"),
+                 ("http://H.Example/p?id=1", "http://h.example./p?id=1")):
+        assert _finding_key("sqli", a) == _finding_key("sqli", b), (a, b)
+    # NOT equivalent, and merging any of these would hide a finding
+    for a, b in (("http://h.example/p?id=1", "http://h.example:8080/p?id=1"),
+                 ("http://h.example/p", "http://h.example/p/"),
+                 ("http://h.example/p?id=1", "http://other.example/p?id=1"),
+                 ("http://h.example/p?id=1", "http://h.example/p?name=1")):
+        assert _finding_key("sqli", a) != _finding_key("sqli", b), (a, b)
+    # an unparseable url keeps a stable key rather than crashing dedup
+    assert _finding_key("sqli", "http://[bad")[0] == "sqli"
