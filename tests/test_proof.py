@@ -147,6 +147,35 @@ def test_rce_timing_only_is_not_proof():
     assert proof.grade("rce", "PING ok", [blind]).grade == "unproven"
 
 
+def test_every_payload_probe_deserialize_sends_can_satisfy_the_floor():
+    """The probe may not send a payload the floor pattern cannot see.
+
+    "a serialized payload was sent" is this class's FLOOR - fail it and the
+    class is refused outright - and it is decided by `SERIALIZED_RE` over
+    the request text. Five of the ten payloads `probe_deserialize` sends
+    were invisible to it, the node-serialize marker among them: the
+    alternation was `$$ND\\b`, the real payload is `_$$ND_FUNC$$_`, and the
+    character after `ND` is a word character, so the boundary never
+    matched. A real hit on any of those five could not be graded at all.
+
+    `tests/test_probe_matrix_agreement.py` cannot see this: it asks whether
+    SOME quote from a run against the lab reaches the ceiling, and the lab
+    executes the yaml payload, which always matched. This reads the probe's
+    own list, so adding a payload the pattern does not know fails here.
+    """
+    from argus.tools.probes import _DESER_PAYLOADS
+    missed = [name for name, body in _DESER_PAYLOADS
+              if not proof.SERIALIZED_RE.search(
+                  body.replace("{nonce}", "argusab12"))]
+    assert not missed, (
+        f"{len(missed)} of {len(_DESER_PAYLOADS)} payloads this probe sends "
+        f"cannot satisfy the class floor: {missed}")
+    # the pattern stays specific: these are not serialized payloads
+    for benign in ("The $$NDA report", "GET /search?q=gAInsurance",
+                   'data={"type":"x"}', "username=admin&password=x"):
+        assert not proof.SERIALIZED_RE.search(benign), benign
+
+
 def test_deserialize_declares_a_gadget_not_a_shell_separator():
     """Sharing rce's "a benign command was sent" made deserialize unprovable:
     a serialized payload carries its command inside the gadget."""
@@ -194,6 +223,74 @@ def test_sqli_dump_without_a_fingerprint_is_a_candidate():
     verdict = proof.grade("sqli", "admin - s3cr3t", [SQLI_DUMP])
     assert verdict.grade == "candidate"
     assert verdict.missing == ["data store fingerprinted"]
+
+
+def test_sqli_refuses_a_reflected_query_as_its_own_fingerprint():
+    """The engine name coming back out of the query is not a fingerprint.
+
+    Measured against the lab's `/search` - the reflected-XSS endpoint, which
+    touches no database at all. ONE request carrying the engine name and a
+    table in the query string, quoted with the page's own boilerplate, used
+    to grade `proven` on all six checks: `DBMS_RE` found `sqlite_version` in
+    the RESPONSE because the response was the request, `TABLE_RE` found
+    `users` in the request, and nothing ever asked whether the body held
+    rows. The echo veto does not cover this - it guards the excerpt, and the
+    excerpt was furniture.
+    """
+    reflected = ex("r1", "http://t.local/search?q=sqlite_version%20SELECT%20"
+                         "x%20FROM%20users",
+                   "<html><body>Results for: sqlite_version SELECT x FROM "
+                   "users</body></html>")
+    verdict = proof.grade("sqli", "Results for:", [reflected])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "data store fingerprinted" in verdict.missing
+    detail = next(c["detail"] for c in verdict.checks
+                  if c["check"] == "data store fingerprinted")
+    assert "the request coming back" in detail, detail
+
+
+def test_sqli_wants_the_fingerprint_on_the_endpoint_the_rows_came_from():
+    """A real banner about a DIFFERENT resource is not this resource's.
+
+    Second measured false proof of the same shape: a genuine
+    `sqlite3.OperationalError` from `/item?id=1'` plus the `/search`
+    reflection above. The fingerprint was true - and true about `/item`,
+    while the rows were quoted from an endpoint with no store behind it.
+    The fingerprint stays a set-wide check, because one `@@version` read
+    and then the extraction is the documented workflow; it is now set-wide
+    over the endpoint the read is on.
+    """
+    reflected = ex("r2", "http://t.local/search?q=SELECT%20x%20FROM%20users",
+                   "<html><body>Results for: SELECT x FROM users</body></html>")
+    verdict = proof.grade("sqli", "Results for:", [SQLI_FP, reflected])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "data store fingerprinted" in verdict.missing
+    # and the honest pairing, on one endpoint, is untouched
+    assert proof.grade("sqli", "admin - s3cr3t",
+                       [SQLI_FP, SQLI_DUMP]).grade == "proven"
+
+
+def test_extraction_and_graphql_do_not_count_an_unanswered_exchange():
+    """`status_of(e) < 400` is also true of 0, which is a transport failure.
+
+    Latent, not reachable: `GuardedClient` records a failed send as status 0
+    with an EMPTY body, so `quoted` fails before `answered` is consulted.
+    Fixed where it is written rather than left standing because it happens
+    to be unreachable - the module has `_answered` for exactly this, and
+    four of its six status tests bound the range below while these two did
+    not. The fixtures below carry a body a real status-0 entry would not,
+    which is what makes the guard observable at all.
+    """
+    dead = ex("r1", "http://t.local/item?id=1%27%20UNION%20SELECT%20u,p%20"
+                    "FROM%20users",
+              "<ul><li>admin - s3cr3t</li></ul>", status=0)
+    verdict = proof.grade("sqli", "admin - s3cr3t", [SQLI_FP, dead])
+    assert verdict.grade != "proven", verdict.explain()
+    assert "rows returned, not an error message" in verdict.missing
+    dead_gql = ex("r2", "http://t.local/graphql", '{"data": {"users": "x"}}',
+                  status=0, method="POST",
+                  req_body='{"query": "{__schema {types {name}}}"}')
+    assert proof.grade("graphql", '"users": "x"', [dead_gql]).grade != "proven"
 
 
 def test_sqli_quoting_the_error_fails_the_row_check():
@@ -2894,6 +2991,41 @@ def test_csrf_refuses_two_different_pages_as_the_change():
     ]
     v = proof.grade("csrf", "email: evil@attacker", same)
     assert v.grade == "proven", v.missing
+
+
+def test_csrf_refuses_two_records_of_one_collection_as_the_change():
+    """The test above stopped one step short of the shape that reproduces.
+
+    `/home` vs `/about` have different paths, so `_endpoint_shape` already
+    separated them. `/api/user/1` and `/api/user/2` it collapses, on
+    purpose - without that, idor is unprovable on any API whose ids are not
+    integers. So reading one record before the write and a DIFFERENT record
+    after it satisfied "the state changed between two reads". Measured on
+    the lab: GET /api/user/1, a cross-origin POST to /api/config - which
+    never touches /api/user - then GET /api/user/2, quoting
+    `"username": "alice"`. Six checks, six PASS. Nothing changed; alice was
+    always user 2.
+    """
+    foreign = {"Origin": "https://evil.example"}
+    siblings = [
+        _ex("r1", "GET", "http://lab/api/user/1", '{"username": "admin"}', ts=1),
+        _ex("r2", "POST", "http://lab/api/config", "ok", ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/api/user/2", '{"username": "alice"}', ts=3),
+    ]
+    v = proof.grade("csrf", '"username": "alice"', siblings)
+    assert v.grade != "proven", v.checks
+    assert "the state changed between two reads" in v.missing
+    # the SAME record before and after still proves, ids and all
+    same = [
+        _ex("r1", "GET", "http://lab/api/user/1", '{"email": "old@x"}', ts=1),
+        _ex("r2", "POST", "http://lab/api/user/1", "ok", ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/api/user/1", '{"email": "evil@a"}', ts=3),
+    ]
+    assert proof.grade("csrf", '"email": "evil@a"', same).grade == "proven"
+    # and idor, which needs the opposite answer about the same two URLs,
+    # still compares them as one endpoint
+    assert proof._endpoint_shape(siblings[0]) == proof._endpoint_shape(siblings[2])
+    assert proof._resource_key(siblings[0]) != proof._resource_key(siblings[2])
 
 
 def test_csrf_ordering_is_fail_closed_without_timestamps():

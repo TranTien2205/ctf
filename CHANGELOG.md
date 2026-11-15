@@ -3930,12 +3930,81 @@ on that plant too, so the grep is redundant and over-constrains what it
 duplicates. The reason it was kept expired, and the note where it stood
 says so.
 
+### The proof gate graded three classes on evidence that did not prove them
+A route audit of every multi-branch verifier - "which branches does the lab
+exercise, which are unreachable, which are merely untested" - returned four
+false proofs. Each was reproduced against the live lab before being touched,
+and each fix was planted back and required to produce the named symptom.
+
+- **`sqli` graded `proven` on a page with no database behind it.** The
+  fingerprint check scanned the whole cited set and was tied to nothing, so
+  ONE request - `GET /search?q=sqlite_version SELECT x FROM users` against
+  the lab's reflected-XSS search box - passed all six checks: `DBMS_RE`
+  found `sqlite_version` in the RESPONSE because the response was the
+  request coming back, `TABLE_RE` found `users` in the request, the quote
+  was the page's own `Results for:`, and nothing ever asked whether the body
+  held rows. A genuine `sqlite3.OperationalError` from `/item?id=1'` plus
+  that same reflection graded `proven` too: the banner was real, and real
+  about a different endpoint. The banner is now suppressed when the request
+  carries it - the suppression written three lines below for `records` and
+  not for `banner` - and has to be on the endpoint the rows come from. The
+  honest pairing is untouched: the probe's own run still grades `proven`,
+  `data store fingerprinted | sqlite3.OperationalError in r2`, and
+  `argus verify docs/sample-session` still re-validates all 6 findings.
+  `verify_operator_injection` was split out of this function to escape this
+  exact shape and its docstring has said so since; the rule had been applied
+  to one of the two places it is true.
+- **`csrf` graded `proven` with nothing changed.** The before/after pair
+  required "the SAME resource" and asked `_endpoint_shape`, which collapses
+  record ids on purpose - without that, idor is unprovable on any API whose
+  ids are not integers. So GET `/api/user/1`, a cross-origin POST to
+  `/api/config` which never touches `/api/user`, then GET `/api/user/2`,
+  quoting `"username": "alice"`: six checks, six PASS, "absent in r1 before
+  the write, present in r3 after it". Alice was always user 2. New
+  `_resource_key` keeps the ids; `_endpoint_shape` still answers the idor
+  question about the same two URLs, and a test pins both answers.
+- **Half the payloads `probe_deserialize` sends could not satisfy the
+  class's floor.** `SERIALIZED_RE` gates "a serialized payload was sent",
+  and 5 of 10 were invisible to it - including the probe's own
+  node-serialize payload, because the alternation was `$$ND\b` while the
+  real marker is `_$$ND_FUNC$$_`, so the character after `ND` is a word
+  character. Also missing: the base64 pickle and Ruby Marshal magics while
+  the Java one was present, the raw Marshal magic, and `$type` - Json.NET
+  type resolution, the common real .NET vector - while three .NET gadget
+  NAMES were there. Both base64 prefixes are derived from the bytes:
+  b64(`\x80\x04\x95`) = `gASV`, b64(`\x04\x08o:`) = `BAhvOg`. The
+  payload list is now the module constant `probes._DESER_PAYLOADS` and a
+  test grades the real list against the real pattern, so a payload the
+  pattern does not know fails the suite. The agreement table could not see
+  this: it asks whether SOME quote reaches the ceiling, and the lab
+  executes the yaml payload, which always matched.
+- **Two status tests counted an exchange the target never answered.**
+  `status_of(e) < 400` is also true of 0, which is how `GuardedClient`
+  records a transport failure; four of the six status tests in `proof.py`
+  bound the range below with `200 <=` and `verify_data_extraction` and
+  `verify_graphql` did not. Latent, not reachable - the same branch records
+  an empty body, so the excerpt check fails first - and fixed where it is
+  written rather than left standing because it happens to be unreachable.
+  The first attempt at this dropped the `bool(entry)` guard every other
+  status site in the module opens with, and `_witness` hands `build` a
+  `None` candidate when nothing is cited:
+  `test_no_spec_declares_a_check_its_verifier_never_emits` caught the
+  AttributeError.
+
+Still open and measured, not closed: the route audit's 37 verify agents died
+on DNS, so its remaining claims are unverified. Confirmed by hand and not yet
+fixed - the lab plants a client-side open redirect at `/jsredirect` that the
+probe reports ("open redirect (client-side, via meta-refresh/JS)") and no
+verifier can grade, because `verify_off_origin_redirect` reads the `Location`
+header only; `/safedirect`'s protocol-relative `//host` bypass grades
+`proven` when driven by hand but neither agreement table drives it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 711 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 716 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

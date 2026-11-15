@@ -79,10 +79,37 @@ NONCE_RE = re.compile(r"(?i)\bargus[a-z0-9]{4,24}\b")
 # A deserialization payload carries its command inside a gadget, not after a
 # shell separator - so `deserialize` inherited a declaration check it could
 # never pass, and the class was unprovable by construction.
+#
+# This pattern gates "a serialized payload was sent", which is the class's
+# FLOOR: fail it and the class is refused outright. Measured against the ten
+# payloads `probe_deserialize` actually sends (`probes._DESER_PAYLOADS`, which
+# is a module constant so a test can check them against this pattern rather
+# than against a copy of them): FIVE were invisible to it.
+#
+# * `$$ND\b` could not match the probe's own node-serialize payload. The real
+#   marker is `_$$ND_FUNC$$_`, so the character after `ND` is `_` - a word
+#   character - and the boundary never matched. `$$ND_FUNC` is also tighter:
+#   `$$ND` alone matched `The $$NDA report`.
+# * the base64 pickle and Ruby Marshal magics had no alternation at all,
+#   though the Java one (`rO0AB`) did. Both prefixes here are derived from
+#   the bytes, not guessed: b64(`\x80\x04\x95`) = `gASV` and
+#   b64(`\x80\x05\x95`) = `gAWV` (proto 4 and 5; proto 2 is `gAI`, three
+#   characters, which matched `gAInsurance` and is left out), and
+#   b64(`\x04\x08o:`) = `BAhvOg`. The raw Marshal magic had none either.
+# * `$type` - Json.NET type resolution, the common real .NET vector - was
+#   missing while three .NET GADGET names were present.
+#
+# `BAh...` can also match a legacy Rails Marshal session cookie echoed back
+# in our own request. That is a true statement about the bytes, it is the
+# floor and not the proof, and the class still needs the identity line and
+# this probe's nonce - so it is recorded here rather than traded for the
+# vector.
 SERIALIZED_RE = re.compile(
     r"(?i)(!!python/(?:object|name)|!!ruby/object|cos\nsystem|c__builtin__"
     r"|__reduce__|cPickle|O:\d+:[\"']|a:\d+:\{|rO0AB|aced0005"
-    r"|\$\$ND\b|ObjectDataProvider|BinaryFormatter|TypeConfuseDelegate"
+    r"|\$\$ND_FUNC|gA(?:SV|WV)|BAh[ovi\[{IF\"]|\x04\x08[o:iI\[{\"]"
+    r"|\"\$type\"\s*:"
+    r"|ObjectDataProvider|BinaryFormatter|TypeConfuseDelegate"
     r"|__proto__\s*[\":]|constructor\s*\[\s*[\"']prototype"
     r"|yaml\.(?:unsafe_)?load\s*\()")
 
@@ -630,6 +657,33 @@ def _req_headers(entry: dict) -> dict:
 _ID_SEQ_RE = re.compile(r"(\d+)$")
 
 
+def _resource_key(entry: dict) -> str:
+    """The exact resource, ids intact - the OTHER question about a URL.
+
+    `_endpoint_shape` collapses `/api/user/1` and `/api/user/2` into one
+    endpoint deliberately: without that, idor is unprovable on any API whose
+    ids are not integers, and comparing an id to a sibling id is the whole
+    proof. "Did this resource change between two reads" is the opposite
+    question with the opposite conservative direction - two records of one
+    collection are two resources - and `verify_state_change` asked it with
+    the collapsing helper.
+
+    Measured on the lab: GET `/api/user/1` (admin), a cross-origin POST to
+    `/api/config` - a different resource entirely, which never touches
+    `/api/user` - then GET `/api/user/2`, quoting `"username": "alice"`.
+    Six checks, six PASS, `csrf` proven, detail "absent in r1 before the
+    write, present in r3 after it". Nothing changed: alice was always user
+    2. The comment on that pair already said "the two reads have to be of
+    the SAME resource" and reached for the helper that says they are.
+    """
+    url = str(_req(entry).get("url") or "")
+    parsed = urllib.parse.urlparse(url)
+    host = (parsed.hostname or "").lower()
+    port = f":{parsed.port}" if parsed.port else ""
+    query = tuple(sorted(urllib.parse.parse_qsl(parsed.query)))
+    return f"{host}{port}{parsed.path or '/'}{query}"
+
+
 def _ordering(exchanges: list) -> dict:
     """Recorded time per cited exchange, for checks that need before/after.
 
@@ -913,16 +967,65 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
     exchange: a request that names a table and a response that returns rows
     from it. Scoring them separately let a claim pair an unrelated SQL-shaped
     request with any row-looking text elsewhere.
+
+    "Set-wide" cost this class two false proofs, both measured against the
+    lab's `/search` - the reflected-XSS endpoint, which touches no database
+    at all (vulnapp.py: `self._send(body=f"...Results for: {q}...")`).
+
+    * ONE request. `GET /search?q=sqlite_version SELECT x FROM users` has
+      the engine name and the table in the query string, and `/search`
+      hands both back. `DBMS_RE` then found `sqlite_version` in the
+      RESPONSE - the request coming back - `TABLE_RE` found `users` in the
+      request, and the quote was the page's own `Results for:`. Six checks,
+      six PASS, `proven`, no database anywhere in it. The echo veto
+      ("the target produced the quoted bytes") does not catch this: it
+      guards the EXCERPT, and the excerpt was boilerplate, not the echo.
+      The suppression three lines below - a match the request also carries
+      is the payload coming back - was already written for `records` and
+      not for `banner`.
+    * TWO endpoints. A genuine `sqlite3.OperationalError` from `/item?id=1'`
+      plus that same `/search` reflection also graded `proven`. The banner
+      was real; it was real about a DIFFERENT endpoint. A fingerprint from
+      one resource says nothing about whether another one has a store
+      behind it, so the banner has to share an endpoint with the read it is
+      offered as the fingerprint for.
+
+    Both are the shape `verify_operator_injection` was split out of this
+    function to escape - "a public listing graded proven the moment somebody
+    pointed a probe at it" - and its docstring has said so since. The rule
+    was applied to one of the two places it is true.
     """
     checks = []
     if spec.fingerprint:
-        banner = next((DBMS_RE.search(resp_text(e)) for e in claim.exchanges
-                       if DBMS_RE.search(resp_text(e))), None)
-        checks.append(_check("data store fingerprinted", banner is not None,
-                             banner.group(0)[:80] if banner else
-                             "no engine named in any cited response; read "
-                             "@@version / version() / sqlite_version() once, or "
-                             "cite the error that names it"))
+        # the endpoints the cited set offers as reads; the fingerprint has to
+        # be about one of them. Empty means no cited request names a table,
+        # and then "the query named its target" is already failing - the
+        # fallback only decides what that claim's detail says.
+        read_shapes = {_endpoint_shape(e) for e in claim.exchanges
+                       if TABLE_RE.search(req_text(e))}
+        banner, banner_rid, echoed = None, "?", None
+        for entry in claim.exchanges:
+            hit = DBMS_RE.search(resp_text(entry))
+            if hit is None:
+                continue
+            if hit.group(0) in req_text(entry):
+                # the engine name came back out of the request that carried
+                # it in: a reflection, not a fingerprint
+                echoed = echoed or (hit, entry.get("id", "?"))
+                continue
+            if read_shapes and _endpoint_shape(entry) not in read_shapes:
+                continue
+            banner, banner_rid = hit, entry.get("id", "?")
+            break
+        checks.append(_check(
+            "data store fingerprinted", banner is not None,
+            f"{banner.group(0)[:80]} in {banner_rid}" if banner else
+            (f"{echoed[0].group(0)[:40]} in {echoed[1]} is the request coming "
+             "back, not an engine naming itself - a page that reflects your "
+             "query is not a store answering it" if echoed else
+             "no engine named in any cited response ON THE ENDPOINT the rows "
+             "come from; read @@version / version() / sqlite_version() there, "
+             "or cite the error that names it")))
 
     def build(entry: dict | None) -> list[dict]:
         out = []
@@ -965,7 +1068,14 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
         is_error = bool(claim.excerpt) and (
             bool(DBMS_RE.search(claim.excerpt))
             or bool(REFUSAL_RE.search(claim.excerpt)))
-        answered = bool(entry) and status_of(entry) < 400
+        # `_answered`, not `status_of(...) < 400`: a transport failure is
+        # recorded as status 0, which is also < 400. Four of the six status
+        # tests in this module bound it below with `200 <=` and this one did
+        # not. Latent rather than reachable - the same branch records an
+        # empty body, so `quoted` fails first - and fixed where it is
+        # written, not where it happens to be unreachable.
+        answered = bool(entry) and _answered(entry) \
+            and status_of(entry) < 400
         enough = bool(named) and (spec.fingerprint or records is not None)
         out.append(_check(
             "rows returned, not an error message",
@@ -1670,8 +1780,15 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
         # fetched before it was the proof - read /home, write, read /about,
         # quote /about. `verify_unkeyed_input` already required the same
         # resource for exactly this reason.
+        #
+        # `_resource_key`, not `_endpoint_shape`: the shape collapses record
+        # ids on purpose, so reading one record before the write and a
+        # DIFFERENT record of the same collection after it satisfied this -
+        # see `_resource_key`, which carries the measurement. The test above
+        # covered /home vs /about, where the paths differ, and stopped one
+        # step short of /api/user/1 vs /api/user/2, where they do not.
         pair = next(((b, a) for a in after for b in before
-                     if _endpoint_shape(b) == _endpoint_shape(a)), None)
+                     if _resource_key(b) == _resource_key(a)), None)
         before, after = ([pair[0]], [pair[1]]) if pair else ([], [])
         landed = bool(entry) and 200 <= status_of(entry) < 400
         return [
@@ -1933,7 +2050,10 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
         rid = (entry or {}).get("id", "?")
         asked = bool(entry) and bool(
             re.search(r"(?i)__schema|__type|\bquery\s*\{|\bmutation\s*\{", request))
-        answered = bool(entry) and status_of(entry) < 400
+        # status 0 is a transport failure, and it is also < 400 - see the
+        # note in `verify_data_extraction`
+        answered = bool(entry) and _answered(entry) \
+            and status_of(entry) < 400
         # an `errors` array with no `data` is the endpoint declining, and a
         # 404 plus "introspection is disabled" used to grade `proven`
         declined = bool(re.search(r'(?i)"errors"\s*:\s*\[', body)) and not \
