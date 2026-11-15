@@ -499,6 +499,50 @@ def test_lfi_needs_a_sentinel_and_a_control():
     assert proof.grade("lfi", "root:x:0:0", [blog]).grade == "unproven"
 
 
+def test_lfi_control_must_be_the_same_reader():
+    """A page on another endpoint is no control for this one.
+
+    `control` was any cited exchange with a traversal-shaped request and no
+    sentinel, anywhere in the set, so a 200 on `/search` served as the
+    control for a read on `/download` - and the one thing a control exists
+    to rule out went unruled: that the sentinel is part of THIS page
+    whatever you ask it for. A file-manager page documenting `/etc/passwd`
+    is the realistic shape, and the first version of this verifier was
+    fixed for exactly that with a blog post.
+    """
+    reader = ex("r1", "http://t.local/download?file=../../etc/passwd",
+                "<p>example: root:x:0:0:root:/root:/bin/bash</p>")
+    elsewhere = ex("r2", "http://t.local/search?q=../../etc/passwd",
+                   "<html>Results for: ../../etc/passwd</html>")
+    v = proof.grade("lfi", "root:x:0:0", [reader, elsewhere])
+    assert v.grade != "proven", v.explain()
+    assert "negative control recorded" in v.missing
+    # the same reader with another path IS the control
+    same = ex("r3", "http://t.local/download?file=../../etc/nope", "not found",
+              404)
+    assert proof.grade("lfi", "root:x:0:0", [reader, same]).grade == "proven"
+
+
+def test_lfi_accepts_the_natural_control_for_an_absolute_path():
+    """`/etc/nope` is not traversal-shaped, and it is the honest control.
+
+    The control had to match TRAVERSAL_RE itself, which the witness
+    `/download?file=/etc/passwd` does - through the known-path list - and
+    `/download?file=/etc/nope` does not. So citing a real absolute-path read
+    with its own 404 graded `candidate` and the operator had no way to tell
+    which half was missing. On the same reader, any answered response
+    without the sentinel makes the point.
+    """
+    hit = ex("r1", "http://t.local/download?file=/etc/passwd",
+             "root:x:0:0:root:/root:/bin/bash\n")
+    nope = ex("r2", "http://t.local/download?file=/etc/nope", "not found", 404)
+    assert proof.TRAVERSAL_RE.search("/etc/nope") is None
+    assert proof.grade("lfi", "root:x:0:0", [hit, nope]).grade == "proven"
+    # and a control the target never answered is not one
+    dead = ex("r3", "http://t.local/download?file=/etc/nope", "", 0)
+    assert proof.grade("lfi", "root:x:0:0", [hit, dead]).grade != "proven"
+
+
 def test_ssti_needs_two_operand_pairs():
     """One product can be a coincidence in the page: `{{2*2}}` plus "Showing 4
     results" graded proven. Two different pairs cannot both land by accident.
@@ -3205,6 +3249,39 @@ def test_a_schemeless_location_stays_on_origin():
     assert proof._redirect_host("//example.org/x") == "example.org"
     assert proof._redirect_host("https://example.org/x") == "example.org"
     assert proof._redirect_host("javascript:alert(1)") == "javascript:"
+
+
+def test_csrf_refuses_a_before_read_the_target_never_answered():
+    """"It was not there before" is trivially true of a read that timed out.
+
+    `GuardedClient` records a transport failure as status 0 with an empty
+    body and an `error` naming the exception, so `claim.excerpt not in
+    resp_body(e)` held for an exchange that observed nothing - and the
+    detail said "absent in r1 before the write" about it. Measured: a read
+    recording `ReadTimeout: timed out`, a cross-origin POST, and a
+    successful read after it graded `csrf` **proven**. A single flaky
+    timeout before the write was the whole proof of a state change.
+
+    `_answered` exists in this module for exactly this, and its own
+    docstring says "an exchange the target never answered was evidence like
+    any other". It had been applied to some callers and not to this one.
+    """
+    foreign = {"Origin": "https://evil.example"}
+    dead = _ex("r1", "GET", "http://lab/profile", "", ts=1, status=0)
+    dead["response"]["error"] = "ReadTimeout: timed out"
+    exchanges = [
+        dead,
+        _ex("r2", "POST", "http://lab/profile", "ok", ts=2, headers=foreign),
+        _ex("r3", "GET", "http://lab/profile", "email: evil@attacker", ts=3),
+    ]
+    v = proof.grade("csrf", "email: evil@attacker", exchanges)
+    assert v.grade != "proven", v.explain()
+    assert "the state changed between two reads" in v.missing
+
+    # the same shape with a read that ANSWERED, and did not carry it, proves
+    exchanges[0] = _ex("r1", "GET", "http://lab/profile", "email: old@x", ts=1)
+    assert proof.grade("csrf", "email: evil@attacker",
+                       exchanges).grade == "proven"
 
 
 def test_csrf_refuses_two_records_of_one_collection_as_the_change():

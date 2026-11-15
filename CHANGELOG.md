@@ -4135,12 +4135,48 @@ is why the question has to be asked per caller rather than globally. Third
 instance this session of one helper answering two questions whose
 conservative directions are opposite.
 
+### Two more reads that were cited as evidence of something they never saw
+Same family as the control fixes above, in the two verifiers whose proof is
+a contrast.
+
+- **A `before` read that TIMED OUT proved a state change.** "The excerpt
+  was not there before" is trivially true of a read that returned nothing,
+  and `GuardedClient` records a transport failure as status 0 with an empty
+  body. Measured: a read recording `ReadTimeout: timed out`, a cross-origin
+  POST, and a successful read after it graded `csrf` **proven**, with the
+  detail "absent in r1 before the write, present in r3 after it" about an
+  exchange that observed nothing at all. A single flaky timeout before the
+  write was the whole proof. `_answered` guards it now - on that side only,
+  because `after` requires the excerpt to BE in the body, which a status-0
+  entry cannot satisfy, so a guard there would be one no test could tell
+  from its absence.
+- **`verify_file_read`'s control was not required to be the reader.** It
+  was any cited exchange whose request was traversal-shaped and whose body
+  lacked a sentinel, anywhere in the set, so a 200 on `/search` served as
+  the control for a read on `/download`. That leaves unruled the one thing
+  a control exists to rule out - the docstring's own words, "so the
+  sentinel is shown to come from the file and not from the page" - because
+  a page on another endpoint says nothing about this one. The realistic
+  shape is a file-manager page that documents `/etc/passwd`; the first
+  version of this verifier was fixed for exactly that, with a blog post,
+  and the control was that fix scoped to the citation instead of to the
+  reader. Here `_endpoint_shape` IS the right question, unlike in the three
+  callers corrected above: `/download?file=X` and `/download?file=Y` are
+  one reader with two paths, which is the contrast itself.
+- **And the same edit closes a false negative.** The control had to match
+  `TRAVERSAL_RE` itself. An absolute-path witness does - `/etc/passwd` is
+  in the known-path list - while its honest control `/etc/nope` matches
+  nothing, so citing a real read with its own 404 graded `candidate` and
+  nothing said which half was missing. On the same reader, any answered
+  response without the sentinel makes the point, including the harmless
+  baseline the probe already sends.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 723 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 726 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

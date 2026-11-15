@@ -1274,19 +1274,45 @@ def verify_file_read(claim: Claim, spec: "ProofSpec") -> list[dict]:
     graded `candidate` for lfi. The sentinel also has to be absent from the
     request, or an attacker who posts the passwd line gets it echoed back.
     """
-    control = None
-    for entry in claim.exchanges:
-        body = resp_body(entry)
-        if not any(pat.search(body) for _, pat in FILE_SENTINELS) \
-                and TRAVERSAL_RE.search(req_text(entry)):
-            control = control or entry
-
     def build(entry: dict | None) -> list[dict]:
         out = []
         request = req_text(entry) if entry else ""
         body = resp_body(entry) if entry else ""
         rid = (entry or {}).get("id", "?")
         asked = bool(entry) and bool(TRAVERSAL_RE.search(request))
+        # The control has to be the SAME reader, asked for another path. It
+        # was any cited exchange whose request was traversal-shaped and
+        # whose body lacked a sentinel, ANYWHERE in the set - so a 200 on an
+        # unrelated endpoint qualified, and the one thing a control exists
+        # to rule out went unruled: that the sentinel is part of THIS page
+        # for any input. The docstring has always said what it is for - "so
+        # the sentinel is shown to come from the file and not from the page"
+        # - and a page on another endpoint shows nothing about this one. The
+        # first version of this verifier graded a blog quoting `root:x:0:0`
+        # as a read; the control was that fix, and it was scoped to the
+        # whole citation rather than to the reader.
+        #
+        # `_endpoint_shape` IS the right question here, unlike the three
+        # callers corrected elsewhere in this file: `/download?file=X` and
+        # `/download?file=Y` are one reader with two paths, which is exactly
+        # the contrast, while `/search?q=...` is a different endpoint and no
+        # control for it.
+        #
+        # And the control no longer has to be traversal-shaped itself. That
+        # requirement refused the natural control for an absolute-path
+        # witness: `/download?file=/etc/passwd` matches TRAVERSAL_RE through
+        # the known-path list, and `/download?file=/etc/nope` matches
+        # nothing, so citing an honest hit with its honest 404 graded
+        # `candidate`. On the same reader, any answered response without the
+        # sentinel makes the point - including the harmless baseline the
+        # probe already sends.
+        control = next(
+            (e for e in claim.exchanges
+             if entry is not None and e is not entry
+             and _endpoint_shape(e) == _endpoint_shape(entry)
+             and _answered(e)
+             and not any(pat.search(resp_body(e))
+                         for _, pat in FILE_SENTINELS)), None)
         hit = None
         for label, pattern in FILE_SENTINELS:
             m = pattern.search(body) if entry else None
@@ -1836,8 +1862,23 @@ def verify_state_change(claim: Claim, spec: "ProofSpec") -> list[dict]:
                  if bool(claim.excerpt) and claim.excerpt in resp_body(e)
                  and write_at is not None
                  and when.get(id(e), write_at) > write_at]
+        # `_answered`, because "the excerpt was not there before" is
+        # trivially true of a read that returned nothing. `GuardedClient`
+        # records a transport failure as status 0 with an EMPTY body, so a
+        # timed-out GET satisfied the absence this check is built on, and
+        # the detail then said "absent in r1 before the write" about an
+        # exchange that observed nothing at all. Measured: a read that
+        # recorded `ReadTimeout: timed out`, a cross-origin POST, and a
+        # successful read after it graded `csrf` proven. One flaky timeout
+        # before the write was the whole proof.
+        #
+        # Only on this side. `after` requires the excerpt to BE in the body,
+        # which a status-0 entry cannot satisfy because that branch records
+        # no body - so an `_answered` there would be a guard no test could
+        # tell from its absence, which this file already refuses to add.
         before = [e for e in reads
-                  if (not claim.excerpt or claim.excerpt not in resp_body(e))
+                  if _answered(e)
+                  and (not claim.excerpt or claim.excerpt not in resp_body(e))
                   and write_at is not None
                   and when.get(id(e), write_at) < write_at]
         # ...and the two reads have to be of the SAME resource. "State
