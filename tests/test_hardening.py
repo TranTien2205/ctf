@@ -399,6 +399,51 @@ def test_header_name_whitespace_does_not_defeat_redaction():
         "Content-Length": "6"}
 
 
+def test_every_header_the_matrix_calls_a_credential_is_redacted():
+    """Two lists about the same thing, and they disagreed about `api-key`.
+
+    `proof._CREDENTIAL_HEADERS` names the headers a request can present a
+    credential in. `httpclient._SENSITIVE_REQ_HEADERS` decides two separate
+    things about a header: whether its value is redacted before the
+    transcript is written, and - through `credential_fingerprints`, which
+    gates on the same set - whether a digest is recorded for it. `api-key`
+    was in the first list and not the second, while `x-api-key` was in
+    both.
+
+    Measured, both halves: `API-Key: sk-live-...` persisted to
+    transcript.jsonl verbatim, and no digest was recorded for it, so
+    `verify_token_forgery` - which links a mint to the request that carried
+    it by that digest - could not correlate a forgery sent in that header
+    at all.
+
+    This asserts the real lists against each other, so the next header
+    added to either one cannot silently fail to be covered.
+    """
+    from argus.httpclient import _SENSITIVE_REQ_HEADERS
+    from argus.proof import _CREDENTIAL_HEADERS
+
+    missing = sorted(set(_CREDENTIAL_HEADERS) - _SENSITIVE_REQ_HEADERS)
+    assert not missing, (
+        f"the proof matrix counts {missing} as a credential, and nothing "
+        "redacts the value or records a digest for it")
+
+
+def test_a_credential_in_api_key_is_redacted_and_fingerprinted():
+    """The behavioural half of the test above, through the real recorder."""
+    from argus.httpclient import (_REDACTED, _redact_headers,
+                                  credential_fingerprints)
+
+    secret = "sk-live-NOTAREAL-0ab1c2d3e4f5"
+    for name in ("API-Key", "Api-Key", "apikey", "X-Api-Key"):
+        out = _redact_headers({name: secret}, set())
+        assert secret not in str(out), (name, out)
+        assert _REDACTED in str(out), (name, out)
+        # and a digest, or there is nothing for the matrix to correlate on
+        fp = credential_fingerprints({name: secret})
+        assert fp.get(name.lower()), (name, fp)
+        assert secret not in str(fp)
+
+
 def test_a_cookie_part_with_no_equals_is_redacted_whole():
     """Found by the case above being more adversarial than its own fix.
 

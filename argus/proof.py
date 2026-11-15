@@ -896,13 +896,20 @@ def _credential_fp(entry) -> set:
     return {str(v) for v in fp.values()} if isinstance(fp, dict) else set()
 
 
+# Hoisted out of `_credential` so a test can hold it against
+# `httpclient._SENSITIVE_REQ_HEADERS`, which decides both what is redacted
+# in the artifact and what gets a digest to correlate on. Every name here
+# must be in that set, and `api-key` was not: see the comment on it.
+_CREDENTIAL_HEADERS = ("authorization", "cookie", "x-api-key",
+                       "x-auth-token", "api-key", "x-access-token")
+
+
 def _credential(entry: dict) -> str:
     """The credential a request presented, as one comparable string. Empty when
     it presented none."""
     parts = []
     for key, value in _req_headers(entry).items():
-        if str(key).lower() in ("authorization", "cookie", "x-api-key",
-                                "x-auth-token", "api-key", "x-access-token"):
+        if str(key).lower() in _CREDENTIAL_HEADERS:
             parts.append(f"{str(key).lower()}={value}")
     return "|".join(sorted(parts))
 

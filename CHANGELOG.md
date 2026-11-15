@@ -4171,12 +4171,43 @@ a contrast.
   response without the sentinel makes the point, including the harmless
   baseline the probe already sends.
 
+### A credential in `API-Key:` was written to the transcript verbatim
+Two lists describe the same thing and disagreed about one header.
+`proof._CREDENTIAL_HEADERS` names the headers a request can present a
+credential in, and has included `api-key` all along.
+`httpclient._SENSITIVE_REQ_HEADERS` had `x-api-key` and not `api-key`, and
+it decides two separate things: whether a value is redacted before the
+transcript is written, and - through `credential_fingerprints`, which gates
+on the same set - whether a digest is recorded for it.
+
+Both halves measured through the real recorder:
+
+- `API-Key: sk-live-...` persisted to `transcript.jsonl` **verbatim**,
+  while the same secret in `X-Api-Key` was redacted. That file is the
+  hash-chained artifact an operator hands to a client, so the leak is
+  sealed in rather than merely present. Re-measured after the fix: the
+  secret appears 0 times on disk, where it appeared once.
+- no digest was recorded for that header either, and
+  `verify_token_forgery` links a mint to the request that carried it BY
+  that digest - the mechanism whose missing half is described at
+  `credential_fingerprints`. A forgery sent in `api-key` could not be
+  correlated at all, so the class's second check was unreachable through
+  that header.
+
+One set, both consequences; `apikey` went in beside it, since it is the
+same header as many APIs spell it. `_credential`'s list is now the module
+constant `proof._CREDENTIAL_HEADERS` and a test asserts the subset
+invariant against the real lists, so a header added to either one cannot
+silently go uncovered. Redacting more REQUEST headers cannot cost a
+finding: evidence text covers response headers, bodies and event output,
+never request headers, which is the invariant recorded at the set itself.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 726 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 728 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

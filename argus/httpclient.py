@@ -69,8 +69,22 @@ class _NoCloseFile:
 # output - never request headers - so this redaction cannot break a
 # finding. Names stay visible - the audit still shows the request was
 # authenticated.
+# `api-key`/`apikey` without the `x-` prefix were missing while `x-api-key`
+# was here, and `proof._CREDENTIAL_HEADERS` has counted `api-key` as a
+# credential all along - so the two lists disagreed about the same header.
+# Measured, both halves of the disagreement:
+#   * `API-Key: sk-live-...` persisted to transcript.jsonl VERBATIM while
+#     the same secret in `X-Api-Key` was redacted. The transcript is the
+#     hash-chained artifact an operator hands to a client.
+#   * `credential_fingerprints` gates on this same set, so no digest was
+#     recorded for that header either - and `verify_token_forgery` links a
+#     mint to the request that carried it BY that digest. A forgery sent in
+#     `api-key` could not be correlated at all.
+# One set, both consequences. `tests/test_hardening.py` now asserts the
+# subset invariant against the real lists, so they cannot drift again.
 _SENSITIVE_REQ_HEADERS = {
     "authorization", "proxy-authorization", "cookie", "x-api-key",
+    "api-key", "apikey",
     "x-auth-token", "x-access-token", "x-csrf-token", "x-xsrf-token",
     "x-session-token", "x-amz-security-token",
 }
