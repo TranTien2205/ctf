@@ -4027,6 +4027,42 @@ it, and no verdict can be recorded for it.
   not a table row, because every row's first element has to name a tool in
   the registry and these are extra endpoints for one tool.
 
+### A cross-origin handshake and an answer from a different socket
+`verify_websocket_channel` tied the frame to the handshake with
+`_endpoint_shape`, which is the same URL and nothing more - so a
+cross-origin handshake that framed nothing paired with an answered frame
+from a DIFFERENT connection, and the verdict said "the channel answered a
+message" about a channel that never carried it. Measured: two
+`probe_websocket` runs against the lab's `/ws`, citing run 1's handshake
+with run 2's frame, graded `websocket` **proven** on "argusws4v1faio8 sent
+and returned on r4".
+
+Nothing in the record could tell the two halves of one socket apart: the
+frame carried the same URL as its handshake and nothing else, though
+`send_ws` has always known both exchange ids and returned them to its
+caller. It now stamps the frame with its handshake's id (`on_handshake`, a
+recorder field, not a wire header) and the verifier requires the frame to
+have ridden the handshake whose Origin the claim rests on. The failing
+detail names the pair: "r4 rode r3, not r1 - the frame has to be on the
+same socket as the cross-origin handshake, not merely the same URL".
+
+Two consequences, both deliberate:
+
+- a frame recording no handshake cannot be correlated and does not pass, so
+  a transcript written before this field existed reaches `candidate` here
+  rather than `proven`. The detail says to re-run the probe on this build.
+  No shipped artifact is affected - `docs/sample-session` has no websocket
+  finding, and `argus verify` still re-validates all 6 of its findings.
+- the Origin search now collects every foreign handshake instead of
+  stopping at the first. It stopped at the first and then looked for a
+  frame, so one foreign handshake that framed nothing hid a second one that
+  did.
+
+`_ws_frame` in the tests takes `rode` as a required keyword-only argument,
+for the reason `_ex` takes `ts`: a real frame always carries one, and a
+fixture without it is not the shape the recorder writes. Defaulting it to
+the handshake id would have hidden the requirement it exists for.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

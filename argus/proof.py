@@ -2976,7 +2976,7 @@ def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
          "of the key it sent - a 101 without the challenge is middleware or "
          "a mock, not a WebSocket endpoint")))
 
-    foreign, why = None, ""
+    foreign_all, why = [], ""
     for entry in handshakes:
         origin = next((v for k, v in _req_headers(entry).items()
                        if k.lower() == "origin"), "")
@@ -2990,40 +2990,63 @@ def verify_websocket_channel(claim: Claim, spec: "ProofSpec") -> list[dict]:
             str(_req(entry).get("url") or "")).hostname
             or "").lower()
         if o_host and t_host and o_host != t_host:
-            foreign = (entry, origin)
-            break
+            foreign_all.append((entry, origin))
+            continue
         why = (f"{entry.get('id')} sent Origin {origin} on a channel at "
                f"{t_host} - a same-origin handshake is the endpoint working")
-    checks.append(_check(
-        "accepted from an origin the target does not own",
-        foreign is not None,
-        f"Origin {foreign[1]} accepted on {foreign[0].get('id')}"
-        if foreign else (why or "no handshake to check an Origin on")))
 
-    answered, detail = None, "no frame on record"
-    if foreign is not None:
-        shape = _endpoint_shape(foreign[0])
+    # The frame has to have ridden THE handshake whose Origin this claim
+    # rests on. It was matched by `_endpoint_shape`, which is the same URL
+    # and nothing more, so a cross-origin handshake that framed nothing
+    # paired with an answered frame from a different socket - and the
+    # verdict then said "the channel answered a message" about a channel
+    # that never carried it. Measured on the lab: two probe_websocket runs
+    # against /ws, citing run 1's handshake with run 2's frame, graded
+    # `proven` on "argusws4v1faio8 sent and returned on r4". `send_ws`
+    # stamps the frame with its handshake's exchange id; a frame that does
+    # not carry one cannot be correlated and does not pass, which also
+    # means a transcript written before that field existed grades
+    # `candidate` here rather than `proven`.
+    pair, detail = None, "no frame on record"
+    for hs_entry, origin in foreign_all:
+        hid = str(hs_entry.get("id") or "")
         for entry in exchanges:
             if _method_of(entry) != "WSFRAME":
                 continue
-            if _endpoint_shape(entry) != shape:
-                detail = (f"{entry.get('id')} is a frame on a different "
-                          "endpoint than the handshake")
+            rode = str(_req(entry).get("on_handshake") or "")
+            if not rode:
+                detail = (f"{entry.get('id')} does not record which handshake "
+                          "it rode, so it cannot be tied to the cross-origin "
+                          "one - re-run the probe on this build")
+                continue
+            if rode != hid:
+                detail = (f"{entry.get('id')} rode {rode}, not {hid} - the "
+                          "frame has to be on the same socket as the "
+                          "cross-origin handshake, not merely the same URL")
                 continue
             sent = str((_req(entry).get("body") or ""))
             got = resp_body(entry)
             back = [m.group(0) for m in NONCE_RE.finditer(sent)
                     if m.group(0) in got]
             if back:
-                answered = (entry, back[0])
+                pair = (hs_entry, origin, entry, back[0])
                 break
             detail = (f"{entry.get('id')} carries no probe nonce that its own "
                       "frame sent - without one the answer cannot be tied to "
                       "this channel")
+        if pair:
+            break
+    foreign = ((pair[0], pair[1]) if pair else
+               (foreign_all[0] if foreign_all else None))
     checks.append(_check(
-        "the channel answered a message", answered is not None,
-        f"{answered[1]} sent and returned on {answered[0].get('id')}"
-        if answered else detail))
+        "accepted from an origin the target does not own",
+        foreign is not None,
+        f"Origin {foreign[1]} accepted on {foreign[0].get('id')}"
+        if foreign else (why or "no handshake to check an Origin on")))
+    checks.append(_check(
+        "the channel answered a message", pair is not None,
+        f"{pair[3]} sent and returned on {pair[2].get('id')}, which rode "
+        f"{pair[0].get('id')}" if pair else detail))
     return checks
 
 

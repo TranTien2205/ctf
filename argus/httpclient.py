@@ -790,8 +790,18 @@ class GuardedClient:
             # is truncated to _WS_MAX_FRAME, and recording the untruncated
             # message would put something in the transcript that never went
             # on the wire
+            # `on_handshake` is not a wire field - it is the exchange id of
+            # the 101 this frame rode, and nothing else in the record ties
+            # the two halves of one socket together: the frame carries the
+            # same URL as the handshake and nothing more. `proof` matched
+            # them by endpoint shape until this existed, so a cross-origin
+            # handshake that framed nothing paired with an answered frame
+            # from a DIFFERENT socket and graded the channel open. Measured
+            # on the lab: two probe_websocket runs against /ws, citing run
+            # 1's handshake with run 2's frame, graded `websocket` proven.
             request={"method": "WSFRAME", "url": url, "headers": {},
-                     "body": payload.decode("utf-8", "replace")},
+                     "body": payload.decode("utf-8", "replace"),
+                     "on_handshake": out.get("handshake_id") or ""},
             response={"status": 101 if reply else 0, "headers": {},
                       "body": reply,
                       "elapsed_ms": round(

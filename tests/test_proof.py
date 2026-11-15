@@ -2406,10 +2406,17 @@ def _ws_handshake(rid, url, origin, key="KcNOB35svW/4TfvzJHyc2w==",
                          "body": ""}}
 
 
-def _ws_frame(rid, url, sent, got):
+def _ws_frame(rid, url, sent, got, *, rode):
+    """A recorded frame, with the handshake it rode.
+
+    `rode` is keyword-only and has no default for the same reason `ts` does
+    not: a real frame always carries one - `send_ws` stamps it - and a
+    fixture without it is not the shape the recorder writes. Defaulting it
+    to the handshake id would have hidden the requirement this exists for.
+    """
     return {"id": rid,
             "request": {"method": "WSFRAME", "url": url, "headers": {},
-                        "body": sent},
+                        "body": sent, "on_handshake": rode},
             "response": {"status": 101, "headers": {}, "body": got}}
 
 
@@ -2423,7 +2430,7 @@ def test_websocket_is_proven_by_a_cross_origin_channel_that_answers():
     url = "http://t.local/ws"
     shake = _ws_handshake("w1", url, "https://argus-probe.invalid")
     frame = _ws_frame("w2", url, "arguswsab12 argus-probe",
-                      "echo: arguswsab12 argus-probe")
+                      "echo: arguswsab12 argus-probe", rode="w1")
     assert proof.grade("websocket", "echo: arguswsab12 argus-probe",
                        [shake, frame]).grade == "proven"
 
@@ -2439,7 +2446,8 @@ def test_a_websocket_handshake_alone_is_not_a_hijackable_channel():
 def test_a_same_origin_websocket_is_the_endpoint_working():
     url = "http://t.local/ws"
     shake = _ws_handshake("w4", url, "http://t.local")
-    frame = _ws_frame("w5", url, "arguswsab12 x", "echo: arguswsab12 x")
+    frame = _ws_frame("w5", url, "arguswsab12 x", "echo: arguswsab12 x",
+                      rode="w4")
     verdict = proof.grade("websocket", "echo: arguswsab12 x", [shake, frame])
     assert verdict.grade != "proven"
     assert "accepted from an origin the target does not own" in verdict.missing
@@ -2449,7 +2457,8 @@ def test_a_101_without_the_rfc_challenge_is_not_a_websocket_endpoint():
     url = "http://t.local/ws"
     fake = _ws_handshake("w6", url, "https://argus-probe.invalid",
                          accept="not-the-right-token")
-    frame = _ws_frame("w7", url, "arguswsab12 x", "echo: arguswsab12 x")
+    frame = _ws_frame("w7", url, "arguswsab12 x", "echo: arguswsab12 x",
+                      rode="w6")
     verdict = proof.grade("websocket", "echo: arguswsab12 x", [fake, frame])
     assert verdict.grade != "proven"
     assert "the handshake completed the RFC 6455 challenge" in verdict.missing
@@ -2459,19 +2468,56 @@ def test_a_websocket_answer_must_carry_a_nonce_the_frame_sent():
     url = "http://t.local/ws"
     shake = _ws_handshake("w8", url, "https://argus-probe.invalid")
     # the channel said something, but nothing tying it to our frame
-    frame = _ws_frame("w9", url, "hello", "welcome to the chat")
+    frame = _ws_frame("w9", url, "hello", "welcome to the chat", rode="w8")
     verdict = proof.grade("websocket", "welcome to the chat", [shake, frame])
     assert verdict.grade != "proven"
     assert "the channel answered a message" in verdict.missing
 
 
-def test_a_websocket_frame_on_another_endpoint_does_not_count():
+def test_a_websocket_frame_from_another_connection_does_not_count():
+    """A frame on another socket, which is also another endpoint.
+
+    This asked only about the endpoint, which `_endpoint_shape` answered -
+    and that let a frame on the SAME url but a different socket through. A
+    frame cannot ride a handshake and reach a different url, so the faithful
+    fixture for "another endpoint" is also another handshake, and the check
+    is now which handshake it rode.
+    """
     shake = _ws_handshake("wa", "http://t.local/ws",
                           "https://argus-probe.invalid")
     frame = _ws_frame("wb", "http://t.local/other-ws",
-                      "arguswsab12 x", "echo: arguswsab12 x")
+                      "arguswsab12 x", "echo: arguswsab12 x", rode="wz")
     verdict = proof.grade("websocket", "echo: arguswsab12 x", [shake, frame])
     assert verdict.grade != "proven"
+
+    # the shape that reproduced: the SAME url, a different socket. Two
+    # probe_websocket runs against the lab's /ws, citing run 1's handshake
+    # with run 2's frame, graded `proven` on "argusws4v1faio8 sent and
+    # returned on r4" - a verdict about a channel that never carried it.
+    run1 = _ws_handshake("x1", "http://t.local/ws",
+                         "https://argus-probe.invalid")
+    run2_frame = _ws_frame("x4", "http://t.local/ws", "arguswsab12 x",
+                           "echo: arguswsab12 x", rode="x3")
+    v = proof.grade("websocket", "echo: arguswsab12 x", [run1, run2_frame])
+    assert v.grade != "proven", v.explain()
+    assert "the channel answered a message" in v.missing
+    detail = next(c["detail"] for c in v.checks
+                  if c["check"] == "the channel answered a message")
+    assert "rode x3, not x1" in detail, detail
+
+    # and a frame that records no handshake at all cannot be correlated
+    legacy = {"id": "y2", "request": {"method": "WSFRAME",
+                                      "url": "http://t.local/ws",
+                                      "headers": {}, "body": "arguswsab12 x"},
+              "response": {"status": 101, "headers": {},
+                           "body": "echo: arguswsab12 x"}}
+    v = proof.grade("websocket", "echo: arguswsab12 x",
+                    [_ws_handshake("y1", "http://t.local/ws",
+                                   "https://argus-probe.invalid"), legacy])
+    assert v.grade != "proven"
+    assert "does not record which handshake it rode" in next(
+        c["detail"] for c in v.checks
+        if c["check"] == "the channel answered a message")
 
 
 def test_a_refused_upgrade_proves_nothing():
