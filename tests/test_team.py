@@ -575,3 +575,62 @@ def test_max_workers_counts_workers_not_lead(tmp_path, lab_url):
     assert "spawned" in first                       # lead not counted
     second = team._spawn_guarded("exploit", "t")
     assert "max_workers" in second.get("error", "")
+
+
+def test_an_empty_tool_grant_refuses_everything_not_nothing(tmp_path):
+    """`frozenset()` is falsy, and `dispatch` reads None as "no restriction".
+
+    `AgentLoop.__init__` built the enforced grant as
+    `frozenset(allowed) if allowed else None`, so a card granting NO tools
+    advertised zero schemas and permitted all 56. The sibling line in
+    `mcpserver.py` is already spelled the fail-closed way
+    (`None if allowed is None else frozenset(allowed) - WITHHELD`), so the
+    package carried both versions of the same decision - which is why this
+    is asserted on the LOOP rather than on `dispatch`. A first version of
+    this check built a Context by hand with `allowed=frozenset()` and
+    proved only that `dispatch` was already correct; the conversion that
+    was wrong happens before the Context exists.
+
+    And two more falsy-empty reads in the same constructor: meta.json
+    recorded `"tools": "all"` for an empty grant, which the report then
+    prints as the engagement's tool surface, and `build_system` was called
+    without `allowed` at all - so on the single-agent `--tools` path the
+    delivered prompt instructed tools the dispatcher refuses by name. That
+    function's own docstring says "Pass it. A prompt that instructs a tool
+    the role cannot call spends the agent's turn on a refusal and, worse,
+    tells it the engagement works in a way it does not."
+    """
+    import json
+    from pathlib import Path
+
+    from argus.config import Config
+    from argus.loop import AgentLoop
+
+    class _LLM:
+        def complete(self, *a, **k):
+            return {"content": []}
+
+    def build(allowed, name):
+        cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                     session_dir=tmp_path / name, api_key="x")
+        return AgentLoop(cfg, llm=_LLM(), allowed=allowed)
+
+    unrestricted = build(None, "none")
+    assert unrestricted.ctx.allowed is None
+    assert json.loads((Path(unrestricted.session.dir) / "meta.json")
+                      .read_text(encoding="utf-8"))["tools"] == "all"
+    assert "YOUR TOOLS" not in unrestricted.system
+
+    empty = build(frozenset(), "empty")
+    assert empty.ctx.allowed == frozenset(), (
+        "an empty grant became None, which dispatch reads as unrestricted")
+    assert json.loads((Path(empty.session.dir) / "meta.json")
+                      .read_text(encoding="utf-8"))["tools"] == []
+    assert "YOUR TOOLS" in empty.system
+
+    subset = build(frozenset({"http_request", "probe_sqli",
+                              "record_finding"}), "subset")
+    assert subset.ctx.allowed == frozenset(
+        {"http_request", "probe_sqli", "record_finding"})
+    assert "YOUR TOOLS" in subset.system, (
+        "the single-agent --tools prompt did not say which tools it has")

@@ -108,7 +108,10 @@ class AgentLoop:
             "max_requests": cfg.max_requests, "rate_rps": cfg.rate_rps,
             "exclude_paths": cfg.exclude_paths, "proxy": bool(cfg.proxy),
             "tls_verify": cfg.tls_verify,
-            "tools": sorted(allowed) if allowed else "all",
+            # same falsy-empty bug as the grant below, one line apart:
+            # an empty grant recorded "all" in meta.json, which the report
+            # then prints as the tool surface of the engagement
+            "tools": "all" if allowed is None else sorted(allowed),
             "require_proof": cfg.require_proof,
             "chain_keyed": bool(cfg.seal_key),
         }, resume=Path(cfg.resume) if cfg.resume else None,
@@ -137,10 +140,26 @@ class AgentLoop:
             cfg=cfg, scope=self.scope, session=self.session,
             client=client, skills_dir=skills_dir,
             board=board, mcp=mcp, agent_name=agent_name, role=role,
-            allowed=frozenset(allowed) if allowed else None,
+            # `None if allowed is None else frozenset(allowed)`, not
+            # `frozenset(allowed) if allowed else None`. `dispatch` reads
+            # `ctx.allowed is None` as "no restriction", and an empty
+            # frozenset is FALSY - so a card granting no tools advertised
+            # zero schemas and permitted all 56. The sibling line in
+            # `mcpserver.py` is already spelled the fail-closed way, so the
+            # package carried both versions of the same decision.
+            allowed=None if allowed is None else frozenset(allowed),
         )
         self.llm = llm or make_client(cfg)
-        self.system = system or build_system(cfg, self.scope)
+        # `allowed=` passed through. Without it the single-agent
+        # `--tools` path produced the full prompt: measured with
+        # `--tools http_request,probe_sqli,record_finding`, the delivered
+        # system prompt instructed 8 tools the dispatcher refuses BY NAME -
+        # `next_action` among them - and `"YOUR TOOLS" in loop.system` was
+        # False. The agent spends turns being refused for following its own
+        # instructions. `build_system` already takes the argument and
+        # produces the disclaimer; `cli.py` constructs the loop with
+        # `allowed=` and no `system=`, so this line was the whole gap.
+        self.system = system or build_system(cfg, self.scope, allowed=allowed)
         self.seed = seed or build_seed(cfg)
         if getattr(self.session, "resumed", False) and seed is None \
                 and self.session.findings:

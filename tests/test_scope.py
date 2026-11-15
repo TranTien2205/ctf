@@ -637,3 +637,120 @@ def test_ipv4_mapped_ipv6_was_not_the_gap():
         assert _ip_private(ipaddress.ip_address(text)), text
     for text in ("8.8.8.8", "93.184.216.34", "2606:4700::1111"):
         assert not _ip_private(ipaddress.ip_address(text)), text
+
+
+def test_a_bundled_poc_does_not_follow_the_target_off_scope():
+    """`run_exploit` checks the argv; the PoC then chose its own host.
+
+    The scripts under `argus/resources/exploits/` run as subprocesses with
+    no ScopeGuard, no rate limiter and no transcript, and
+    `urllib.request.urlopen` follows up to ten redirects by default,
+    re-attaching the original headers to each new host. So an in-scope
+    target answering `302 -> http://other/` moved the PoC onto a host the
+    guard refuses, with its forged credential attached, while the recorded
+    `exploit_run` event still named the in-scope argument and carried no
+    trace of the host that produced the bytes.
+
+    Measured before the fix: the second server received
+    `Authorization: Bearer <forged>` and the PoC exited 0, printing the
+    body as proof.
+    """
+    import http.server
+    import socketserver
+    import subprocess
+    import sys
+    import threading
+    from pathlib import Path
+
+    seen = {}
+
+    class _Final(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen["auth"] = self.headers.get("Authorization")
+            body = b'{"user":"admin","role":"admin"}'
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    final = socketserver.TCPServer(("127.0.0.1", 0), _Final)
+    fport = final.server_address[1]
+
+    class _Redirect(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(302)
+            self.send_header("Location", f"http://127.0.0.1:{fport}/api/me")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    redirect = socketserver.TCPServer(("127.0.0.1", 0), _Redirect)
+    rport = redirect.server_address[1]
+    threading.Thread(target=final.serve_forever, daemon=True).start()
+    threading.Thread(target=redirect.serve_forever, daemon=True).start()
+    try:
+        poc = (Path(__file__).resolve().parent.parent / "argus" / "resources"
+               / "exploits" / "lab-jwt-forge" / "exploit.py")
+        out = subprocess.run([sys.executable, str(poc),
+                              f"http://127.0.0.1:{rport}"],
+                             capture_output=True, text=True, timeout=60)
+    finally:
+        final.shutdown()
+        redirect.shutdown()
+
+    assert seen.get("auth") is None, (
+        "the forged credential followed the target's redirect to a host "
+        "the scope guard never saw")
+    assert out.returncode != 0, out.stdout
+    assert "not following a redirect" in out.stdout, out.stdout
+    assert str(fport) in out.stdout, (
+        "the PoC must name the host it refused to follow: " + out.stdout)
+
+
+def test_an_exclusion_that_excludes_nothing_is_refused_not_discarded():
+    """`--exclude /` was stored, reported, and enforced against nothing.
+
+    `ScopeGuard` keeps `p.rstrip("/")` and its enforcement loop skips a
+    falsy prefix, so `/` and `//` became `""`. The entry excluded nothing
+    while `exclude_paths` stayed truthy as `['']`, `describe()` printed
+    "excluded paths: " with an empty value, and the operator's original `/`
+    survived into meta.json for the report to print as an enforced
+    restriction. Every other malformed value in `load_config` raises; this
+    one was silent, and silently not enforcing a no-go area is the worst
+    direction for this flag to fail in.
+    """
+    import argparse
+    import tempfile
+
+    import pytest
+
+    from argus.config import load_config
+    from argus.scope import ScopeGuard
+
+    def _args(exclude):
+        return argparse.Namespace(
+            api_key="k", auth_token=None, header_file=None, header=[],
+            scope=[], exclude=list(exclude), target="http://127.0.0.1:1",
+            model=None, max_turns=1, max_requests=1, max_time=1, rate=0,
+            goal="", operator="", proxy="", llm_max_tokens=1,
+            mcp_config=None, resume=None, allow_private=True,
+            tls_verify=False, no_external=False, quiet=True,
+            session_dir=tempfile.mkdtemp(), tools="")
+
+    for bad in ("/", "//", "///"):
+        with pytest.raises(SystemExit, match="exclude"):
+            load_config(_args([bad]))
+    # a real path is still accepted, and still normalised
+    cfg = load_config(_args(["admin/", "/logout"]))
+    assert cfg.exclude_paths == ["/admin/", "/logout"], cfg.exclude_paths
+
+    # and a guard built directly - tests, cli.py, the team plane - drops an
+    # entry it cannot match rather than reporting one it is not enforcing
+    g = ScopeGuard("http://t.test", allow_private=True,
+                   exclude_paths=["/", "//", "/admin"])
+    assert g.exclude_paths == ["/admin"], g.exclude_paths
+    assert "excluded paths: /admin" in g.describe(), g.describe()

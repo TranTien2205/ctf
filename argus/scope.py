@@ -118,7 +118,15 @@ class ScopeGuard:
         self.allowed_hosts = {parsed.hostname.lower().rstrip(".")}
         for host in extra_hosts or []:
             self.allowed_hosts.add(host.lower().rstrip("."))
-        self.exclude_paths = [p.rstrip("/") for p in (exclude_paths or [])]
+        # Empties dropped rather than kept as `''`: the enforcement loop
+        # below skips a falsy prefix, so a kept empty is an exclusion that
+        # matches nothing while `describe()` and meta.json still list one.
+        # `config.py` now refuses `--exclude /` outright; this is for every
+        # other caller, since `ScopeGuard` is constructed directly in tests,
+        # in `cli.py` and in the team plane.
+        self.exclude_paths = [q for q in
+                              (p.rstrip("/") for p in (exclude_paths or []))
+                              if q]
         self.include_subdomains = include_subdomains
         # Labs run on loopback; if the target is private, private stays allowed
         # for this session. Otherwise it must be explicitly requested.

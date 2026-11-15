@@ -395,7 +395,22 @@ def load_config(args) -> Config:
         p = p.strip()
         if not p:
             continue
-        exclude_paths.append(p if p.startswith("/") else "/" + p)
+        p = p if p.startswith("/") else "/" + p
+        # `ScopeGuard` stores `p.rstrip("/")` and its enforcement loop skips
+        # a falsy prefix, so `--exclude /` and `--exclude //` became `""`
+        # and excluded NOTHING - while `exclude_paths` stayed truthy as
+        # `['']`, `describe()` printed "excluded paths: " with an empty
+        # value, and the operator's original `/` survived into meta.json for
+        # the report to print as an enforced restriction. Every other
+        # malformed value in this function raises; this one was silent, and
+        # silently not enforcing a no-go area is the worst direction for
+        # this flag to fail in.
+        if not p.rstrip("/"):
+            raise SystemExit(
+                f"--exclude {p!r}: excluding the root would exclude the "
+                "whole target, and it was being discarded instead - drop "
+                "the flag, or name a path under it")
+        exclude_paths.append(p)
 
     import math
     # non-finite floats slip past '< 0' comparisons (nan < 0 is False) and

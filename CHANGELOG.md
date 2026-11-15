@@ -3426,12 +3426,55 @@ honestly listed `jwt_forge: 5`.
   meta.json still reads "(target only)", because that file recording no
   scope IS the claim that none was set.
 
+### Four guards that held for the value they were given and nothing after it
+
+- **A bundled PoC followed the target off scope, with the credential.**
+  `run_exploit` scope-checks the argv and then runs the script as a
+  subprocess - no ScopeGuard, no rate limiter, no transcript - and
+  `urllib.request.urlopen` follows up to ten redirects by default,
+  re-attaching the original headers to each new host. So the TARGET chose
+  the final host. Measured: an in-scope server answering
+  `302 -> http://127.0.0.1:<other>/api/me`, and that second port received
+  `Authorization: Bearer <forged>` while the PoC exited 0 and printed the
+  body as proof, with the `exploit_run` event naming only the in-scope
+  argument. Both bundled PoCs now refuse to follow a redirect and name the
+  host they would not follow; a PoC that needs a second hop has to be
+  given that host, so the guard sees it.
+- **An empty tool grant permitted all 56 tools.** `AgentLoop.__init__`
+  built it as `frozenset(allowed) if allowed else None` and `dispatch`
+  reads `None` as "no restriction", so a card granting nothing advertised
+  zero schemas and refused nothing. `mcpserver.py` already spells the same
+  decision fail-closed, so the package carried both versions of it. The
+  first version of the test for this built a Context by hand and proved
+  only that `dispatch` was already correct - the conversion that was wrong
+  happens before the Context exists, so the test now drives `AgentLoop`.
+- **Two more falsy-empty reads in the same constructor.** meta.json
+  recorded `"tools": "all"` for an empty grant, which the report prints as
+  the engagement's tool surface; and `build_system` was called without
+  `allowed` at all, so on the single-agent `--tools` path the delivered
+  prompt instructed tools the dispatcher refuses by name. Measured with a
+  three-tool grant: 8 instructed tools were refusable and
+  `"YOUR TOOLS" in loop.system` was False. That function's own docstring
+  says "Pass it. A prompt that instructs a tool the role cannot call
+  spends the agent's turn on a refusal and, worse, tells it the engagement
+  works in a way it does not."
+- **`--exclude /` was stored, reported, and enforced against nothing.**
+  `ScopeGuard` keeps `p.rstrip("/")` and skips a falsy prefix, so `/` and
+  `//` became `""`: the entry excluded nothing while `exclude_paths`
+  stayed truthy as `['']`, `describe()` printed "excluded paths: " with an
+  empty value, and the operator's `/` survived into meta.json for the
+  report to print as an enforced restriction. Every other malformed value
+  in `load_config` raises; this one was silent, and silently not enforcing
+  a no-go area is the worst direction for this flag to fail in. It raises
+  now, and the guard drops an entry it cannot match so nothing reports an
+  exclusion it is not enforcing.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 692 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 695 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
