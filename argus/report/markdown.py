@@ -307,11 +307,29 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                      f"{_cost.get('basis', 'no price available')}")
         else:
             _tok = extra.get("llm_tokens") or {}
+            # `unpriced` is read HERE too, not only on the None branch. A
+            # team total is the sum of the agents that could be priced, and
+            # this branch printed it as the run's cost while ignoring the
+            # list naming the ones that could not - so a reader saw a
+            # definite figure with nothing saying it was partial.
+            #
+            # The sweep refused this as a state no run can reach, which was
+            # true of the live tree at the time: it needed an agent whose
+            # MODEL is absent from the table, and the spawn path cannot
+            # produce one. Making a crashed worker unpriced earlier in this
+            # stretch - because pricing its missing tokens at $0.00 was
+            # worse - is what made it reachable, so the refusal was correct
+            # and is now out of date. A fix that creates the precondition
+            # for another finding has to close it too.
+            _unpriced = _cost.get("unpriced") or []
+            _partial = (f" - PARTIAL: {len(_unpriced)} agent(s) could not "
+                        f"be priced ({', '.join(str(u) for u in _unpriced)})"
+                        if isinstance(_unpriced, list) and _unpriced else "")
             _line = (
                 f"- **Model cost:** ${_usd:.4f} USD "
                 f"({_tok.get('in', 0)} in / {_tok.get('out', 0)} out / "
                 f"{_tok.get('cache_read', 0)} cache-read tokens, "
-                f"model table v{_cost.get('table_version', 0)})")
+                f"model table v{_cost.get('table_version', 0)}){_partial}")
         lines.insert(7 if meta.get("operator") else 6, _line)
     lines += [
         "| Severity | Count |",

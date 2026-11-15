@@ -3846,12 +3846,43 @@ Closing it needs a lab endpoint whose `Allow` lists PUT and which stores
 the body, which changes what `probe_method` sends in every proving-table
 run - so it is named rather than done as a side effect.
 
+### A fix that created the precondition for another finding
+
+The sweep refused "a team report prints the priced subset's total as the
+run's cost" on reachability: the state needs an agent that cannot be
+priced BESIDE agents that can, and it got there with an agent whose MODEL
+is absent from `models.json`, which the real spawn path cannot produce.
+That refusal was correct about the tree it was written against.
+
+It is out of date because of a fix in this same stretch. Making a crashed
+worker UNPRICED - because pricing its missing `llm_tokens` at
+`spec.cost(0, 0)` = $0.00 and counting it toward `priced` was worse - is
+exactly how a run reaches "one agent unpriced, the others priced". A
+worker raising is ordinary.
+
+And the renderer's behaviour was already measured by the refusal itself:
+"does report.md mention the unpriced agent at all? False". The cost line
+read `unpriced` only on the branch where there is no figure at all, so
+with a figure present a reader saw a definite number and nothing saying it
+covered part of the run.
+
+The figure now carries the disclosure where the figure is:
+
+    - **Model cost:** $0.0140 USD (200000 in / 7000 out / 0 cache-read
+      tokens, model table v2) - PARTIAL: 1 agent(s) could not be priced
+      (exploit-1 (no token record: RuntimeError: boom))
+
+A fully priced run is unchanged, and the no-figure branch still names its
+reason. The lesson is the one worth keeping: a fix that creates the
+precondition for another finding has to close that one too, and a refusal
+on reachability expires the moment the reachability changes.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 709 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 710 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

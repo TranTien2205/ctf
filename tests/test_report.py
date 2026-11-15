@@ -795,3 +795,53 @@ def test_a_reseal_over_a_mismatch_survives_the_reseal(tmp_path, capsys):
     out = capsys.readouterr()
     assert "re-sealed while" in out.err and "findings.json" in out.err, (
         f"`argus verify` did not name it: {out.out!r} / {out.err!r}")
+
+
+def test_a_partial_team_total_says_it_is_partial(tmp_path):
+    """A team total is the sum of the agents that COULD be priced.
+
+    The cost line printed it as the run's cost and read `unpriced` only on
+    the branch where there is no figure at all - so a reader saw a definite
+    number with nothing saying it covered part of the run.
+
+    The sweep refused this as a state no run can reach, and that was true
+    of the tree at the time: it needed an agent whose MODEL is absent from
+    the table, which the spawn path cannot produce. Making a crashed worker
+    unpriced earlier in this stretch - because pricing its missing tokens
+    at $0.00 was worse - is what made it reachable. A fix that creates the
+    precondition for another finding has to close it too, which is the
+    whole reason this test exists.
+    """
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+
+    def cost_line(cost, name):
+        cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                     session_dir=tmp_path / name)
+        s = Session(tmp_path / name, cfg.target, {})
+        render_report(s, cfg, summary="", extra={
+            "llm_cost": cost,
+            "llm_tokens": {"in": 200_000, "out": 7_000, "cache_read": 0}})
+        return next(l for l in (Path(s.dir) / "report.md")
+                    .read_text(encoding="utf-8").splitlines()
+                    if "Model cost" in l)
+
+    whole = cost_line({"usd": 0.014, "table_version": 2, "unpriced": []},
+                      "whole")
+    assert "$0.0140 USD" in whole and "PARTIAL" not in whole, whole
+
+    partial = cost_line(
+        {"usd": 0.014, "table_version": 2,
+         "unpriced": ["exploit-1 (no token record: RuntimeError: boom)"]},
+        "partial")
+    assert "$0.0140 USD" in partial, partial
+    assert "PARTIAL" in partial, (
+        "the priced subset's total was printed as the run's cost with "
+        f"nothing saying so: {partial}")
+    assert "exploit-1" in partial, partial
+
+    # and the no-figure branch still names its reason, as before
+    none_line = cost_line({"usd": None, "basis": "nothing to price"}, "none")
+    assert "not priced - nothing to price" in none_line, none_line
