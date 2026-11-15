@@ -31,10 +31,25 @@ mcp.json
 #
 # `knowledge/` is deliberately NOT here: it is committed on branch ctf-v3,
 # so the author does keep it.
-challenges/
-cache/
-solved/
-tools/
+# ...and ANCHORED, every one of them. A pattern without a leading slash
+# matches a directory of that name at ANY depth, so bare `tools/` matched
+# `argus/tools/` - the whole tool layer: registry.py, probes.py,
+# analysis.py, web.py, team.py, mcp_tools.py, _subproc.py, __init__.py.
+# Those eight are tracked, so they stayed in the repo, and nothing broke.
+# The damage was prospective and silent: a NEW module under argus/tools/
+# is refused by `git add`, skipped by `git add -A`, and not listed by
+# `git status` either - while AGENTS.md tells a contributor that every tool
+# must be registered in `tools/registry.py`. A registry importing a module
+# that was never committed breaks a fresh clone and the wheel, and says
+# nothing at commit time. `/*.tar.gz` below was already anchored; these
+# were not. The conventional patterns at the top of this file are left
+# unanchored on purpose - `selftest.py` now refuses ANY ignored tracked
+# file and any ignored new path under the package, so a future collision
+# of that kind is caught by the gate rather than by a broken clone.
+/challenges/
+/cache/
+/solved/
+/tools/
 /*.tar.gz
 
 # Baseline experiment output (docs/EXPERIMENTS.md writes exp/single-$i,

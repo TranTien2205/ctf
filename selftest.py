@@ -1117,6 +1117,83 @@ def _doc_consistency() -> None:
           f"{sorted(oversized)[:6]} - an archive or a megabyte of binary in "
           "the history can only be removed by rewriting it")
 
+    # 7b. nothing the package needs is ignored by `.gitignore`.
+    #
+    #     Found the hard way: `tools/` in `.gitignore`, written for a local
+    #     19 MB `tools/ghidra-dist/`, has no leading slash - so it matched
+    #     `argus/tools/`, all eight modules of the tool layer. They were
+    #     already tracked, so `.gitignore` did not untrack them and nothing
+    #     broke. What it did was make the next file added there invisible:
+    #     `git add` refuses it, `git add -A` skips it, and `git status` does
+    #     not list it, while AGENTS.md tells a contributor every tool must
+    #     be registered in `tools/registry.py`. A committed registry
+    #     importing an uncommitted module fails on a fresh clone and in the
+    #     wheel, and says nothing at the moment the mistake is made.
+    #
+    #     Two questions, because one does not cover the other. A tracked
+    #     file that is ignored is today's state. A NEW path under a package
+    #     directory is tomorrow's: after the rule is anchored, the first
+    #     check passes forever while a later bare `cache/` or `build/`
+    #     would still swallow a new `argus/cache/`. The probe filename
+    #     never exists on disk, which is what `--no-index` is for.
+    #
+    #     And a CONTROL, because the first draft of this check was vacuous
+    #     and passed with the defect planted back. `git check-ignore
+    #     --stdin` reads NEWLINE-separated paths unless `-z` is given; it
+    #     was handed NUL-joined bytes without it, so git saw one enormous
+    #     path, matched nothing, exited 1, and both checks read that as
+    #     "nothing is ignored". They would have passed in either state.
+    #     So one path that MUST be ignored goes in with the rest, and if it
+    #     does not come back the checks report the instrument instead of
+    #     agreeing: a question whose only possible answer is yes is not a
+    #     question.
+    _CONTROL = "__pycache__/_selftest_ignore_control.pyc"
+    ignored_tracked, ignored_new, probed, instrument = [], [], [], ""
+    if tracked:
+        pkg_dirs = sorted({str(Path(n).parent) for n in tracked
+                           if n.startswith(("argus/", "tests/", "docs/"))}
+                          | {"argus", "tests", "docs", "."})
+        probed = [f"{d}/_selftest_ignore_probe.py" if d != "."
+                  else "_selftest_ignore_probe.py" for d in pkg_dirs]
+        asked = tracked + probed + [_CONTROL]
+        try:
+            res = _sub.run(
+                ["git", "check-ignore", "--no-index", "-z", "--stdin"],
+                cwd=ROOT, capture_output=True, timeout=30,
+                input="\0".join(asked).encode() + b"\0")
+            if res.returncode in (0, 1):
+                hit = {n for n in res.stdout.decode(
+                    "utf-8", "replace").split("\0") if n}
+                if _CONTROL not in hit:
+                    instrument = (
+                        f"`git check-ignore` did not report {_CONTROL} as "
+                        "ignored, and `__pycache__/` is in .gitignore - so "
+                        "this call is not answering the question and a pass "
+                        "here would mean nothing")
+                ignored_tracked = sorted(hit & set(tracked))
+                ignored_new = sorted(hit & set(probed))
+            else:
+                instrument = (f"`git check-ignore` exited "
+                              f"{res.returncode}")
+        except (OSError, _sub.SubprocessError) as exc:
+            instrument = f"`git check-ignore` did not run: {exc!r}"
+    else:
+        instrument = "no tracked files listed, so nothing was examined"
+    check(f"no tracked file is ignored by .gitignore "
+          f"({len(tracked)} examined)",
+          not instrument and not ignored_tracked,
+          instrument or
+          f"{ignored_tracked[:6]} - tracked and ignored at once, so the "
+          "next edit to a sibling is refused by `git add` and invisible to "
+          "`git status`")
+    check(f"a new file in a package directory is not ignored "
+          f"({len(probed)} directories probed)",
+          not instrument and bool(probed) and not ignored_new,
+          instrument or
+          f"{ignored_new[:6]} - a pattern with no leading slash matches at "
+          "any depth, so a new module here would be silently left out of "
+          "the commit")
+
     # 8. a methodology module that teaches a class names the tool that
     #    drives it.
     #

@@ -3059,6 +3059,49 @@ coarsening the only clock on the box that was already fine.
   concurrency), but it is a different failure from the one diagnosed here
   and it is not addressed.
 
+### A gitignore rule that hid the tool layer, and a check that passed by not working
+
+`.gitignore` carried `tools/` for a local 19 MB `tools/ghidra-dist/`. A
+pattern with no leading slash matches a directory of that name at ANY
+depth, so it also matched **`argus/tools/`** - the whole tool layer:
+`registry.py`, `probes.py`, `analysis.py`, `web.py`, `team.py`,
+`mcp_tools.py`, `_subproc.py`, `__init__.py`. All eight are tracked, so
+`.gitignore` never untracked them and nothing was broken.
+
+The damage was prospective and silent. Measured both ways on a real new
+file at `argus/tools/_claim_check.py`: with the rule as shipped,
+`git status` in porcelain form over `argus/tools/` prints **nothing**,
+and `git add -A`
+stages everything else and skips it; with the rule anchored it appears as
+`??` and adds normally. Meanwhile AGENTS.md tells a contributor that every
+tool must be registered in `tools/registry.py`, and
+`skills/extending-argus/SKILL.md` walks them through adding one. A
+committed registry importing a module that was never committed fails on a
+fresh clone and in the wheel, and says nothing at the moment the mistake
+is made. `/*.tar.gz` in the same block was already anchored; these four
+were not.
+
+- `/challenges/`, `/cache/`, `/solved/`, `/tools/` anchored. The
+  conventional patterns at the top of the file are deliberately left
+  unanchored, because the gate now covers that whole class.
+- Two checks in `selftest.py`: no tracked file is ignored, and a new file
+  in any package directory is not ignored. Two questions, because after
+  the fix the first passes forever while a later bare `cache/` or
+  `build/` would still swallow a new `argus/cache/`; the second probes a
+  filename that never exists on disk, which is what git's no-index mode
+  is for.
+- **The first draft of those checks was vacuous and passed with the defect
+  planted back.** `git check-ignore` reads NEWLINE-separated paths from
+  standard input unless `-z` is given, and it was handed NUL-joined bytes
+  without it - so
+  git saw one enormous path, matched nothing, exited 1, and both checks
+  read that as "nothing is ignored". They would have passed in either
+  state. They now send one path that MUST be ignored along with the rest
+  and report the instrument instead of agreeing when it does not come
+  back: with `-z` removed, both fail with "this call is not answering the
+  question and a pass here would mean nothing". That is the third time this
+  stretch that the instrument was the defect.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
@@ -3071,7 +3114,7 @@ the documentation gate exists to catch - and it caught it.
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 158 offline checks, including a documentation
+- `python selftest.py`: 160 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
