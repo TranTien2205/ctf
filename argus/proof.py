@@ -2096,8 +2096,27 @@ def verify_graphql(claim: Claim, spec: "ProofSpec") -> list[dict]:
         request = req_text(entry) if entry else ""
         body = resp_body(entry) if entry else ""
         rid = (entry or {}).get("id", "?")
+        # The envelope, not just the bare selection. `{"query": "{users{id
+        # email}}"}` is how every GraphQL client on earth sends a query, and
+        # `\bquery\s*\{` cannot match it: the character after `query` is a
+        # quote. So "a GraphQL query was sent" said no to a request that
+        # plainly sent one, which put the class's SECOND half - "or a query
+        # returning records outside scope" - out of reach through the
+        # standard transport, because `records` is gated on `asked`.
+        # Measured on three real shapes, including one with `variables` and
+        # one with `operationName`: asked=False on all three.
+        #
+        # The value has to look like a selection or an operation. Matching
+        # `"query":` alone would have graded every search API that names its
+        # parameter `query` - `{"query": "shoes"}`, and Elasticsearch's
+        # `{"query": {"match": ...}}` - as having sent a GraphQL query, and
+        # `records` would then have done the rest on any JSON listing.
+        # Measured: all three of those stay False.
         asked = bool(entry) and bool(
-            re.search(r"(?i)__schema|__type|\bquery\s*\{|\bmutation\s*\{", request))
+            re.search(r"(?i)__schema|__type|\bquery\s*\{|\bmutation\s*\{"
+                      r"|\"query\"\s*:\s*\"\s*"
+                      r"(?:\{|query\b|mutation\b|subscription\b|fragment\b)",
+                      request))
         # status 0 is a transport failure, and it is also < 400 - see the
         # note in `verify_data_extraction`
         answered = bool(entry) and _answered(entry) \

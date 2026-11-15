@@ -270,6 +270,46 @@ def test_sqli_wants_the_fingerprint_on_the_endpoint_the_rows_came_from():
                        [SQLI_FP, SQLI_DUMP]).grade == "proven"
 
 
+def test_graphql_sees_the_transport_every_client_actually_uses():
+    """`{"query": "{users{email}}"}` is a GraphQL query being sent.
+
+    The check read `\\bquery\\s*\\{`, which needs `query` followed by
+    whitespace and a brace - and in the JSON envelope the next character is a
+    quote. Introspection still matched, via `__schema`, so the class's first
+    half worked and its second half - "or a query returning records outside
+    scope" - could not be reached at all through the standard transport:
+    `records` is gated on `asked`. Measured on three real shapes, one with
+    `variables` and one with `operationName`.
+
+    Found by auditing the routes of each check rather than its grades. The
+    lab's `/graphql` answers `{"data": {}}` to anything that is not
+    introspection, so no lab endpoint drives this half and nothing noticed.
+    """
+    def asked_of(body):
+        entry = ex("g1", "http://t.local/graphql", '{"data": {"users": [1]}}',
+                   method="POST", req_body=body)
+        return next(c["ok"] for c in proof.grade("graphql", "x", [entry]).checks
+                    if c["check"] == "a GraphQL query was sent")
+
+    for body in ('{"query": "{users{id email role}}"}',
+                 '{"query":"{me{email}}","variables":{}}',
+                 '{"operationName":null,"query":"{users{email}}"}',
+                 '{"query": "mutation { delete(id:1) }"}'):
+        assert asked_of(body), body
+    # a search API that happens to name its parameter `query` has not sent a
+    # GraphQL query, and `records` would otherwise grade any JSON listing
+    for body in ('{"query": "shoes", "page": 2}',
+                 '{"query": {"match": {"title": "red"}}}'):
+        assert not asked_of(body), body
+
+    # end to end: a data query answered with records now reaches the class
+    data = ex("g2", "http://t.local/graphql",
+              '{"data": {"users": [{"email": "admin@t.local"}]}}',
+              method="POST", req_body='{"query": "{users{email}}"}')
+    assert proof.grade("graphql", '"email": "admin@t.local"',
+                       [data]).grade == "proven"
+
+
 def test_extraction_and_graphql_do_not_count_an_unanswered_exchange():
     """`status_of(e) < 400` is also true of 0, which is a transport failure.
 
@@ -373,6 +413,42 @@ def test_sqli_flags_an_oversized_dump():
 
 
 # --- file read, template, differential --------------------------------------
+
+def test_the_percent_encoded_traversal_branches_are_not_dead():
+    """A route audit called these three unreachable. They are the ladder.
+
+    `req_text` runs `unquote_plus` once over the whole request, so the
+    audit's reasoning was that a `%2e%2e` in the URL is gone by the time the
+    regex sees it - and for a SINGLY encoded payload that is exactly right:
+    `?file=%2e%2e/etc/passwd` arrives as `../etc/passwd` and matches the
+    plain `..[/\\]` branch instead. The conclusion does not follow, because
+    one `unquote_plus` of a DOUBLY encoded payload leaves `%2e%2e` standing,
+    and double encoding is the reason a traversal pattern carries that
+    alternation at all: it is what gets past a filter that decodes once.
+
+    Each branch fires one encoding layer deeper than the last. Measured,
+    which is what this test keeps on record - deleting them as dead would
+    have removed the only route by which a double-encoded traversal is
+    recognised at all.
+    """
+    def match(raw):
+        entry = {"request": {"method": "GET",
+                             "url": "http://t.local/d?file=" + raw,
+                             "headers": {}, "body": ""}}
+        hit = proof.TRAVERSAL_RE.search(proof.req_text(entry))
+        return hit.group(0) if hit else None
+
+    # single encoding unquotes to the plain form - the audit's measurement,
+    # and it is correct
+    assert match("%2e%2e/etc/passwd") == "../"
+    assert match("..%2fetc/passwd") == "../"
+    # one layer deeper, each branch it called dead is the one that fires
+    assert match("%252e%252e/etc/passwd") == "%2e%2e"
+    assert match("..%252fetc/passwd") == "..%2f"
+    assert match("%25252e%25252e/x") == "%252e"
+    # and the backslash form of the same ladder
+    assert match("%252e%252e%255cwin.ini") == "%2e%2e"
+
 
 def test_lfi_needs_a_sentinel_and_a_control():
     hit = ex("r10", "http://t.local/download?file=../../etc/passwd",

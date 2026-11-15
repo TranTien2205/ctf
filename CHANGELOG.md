@@ -4063,12 +4063,59 @@ for the reason `_ex` takes `ts`: a real frame always carries one, and a
 fixture without it is not the shape the recorder writes. Defaulting it to
 the handshake id would have hidden the requirement it exists for.
 
+### Two audit findings that were wrong, and the one under them that was not
+The route audit classified branches as EXERCISED, UNTESTED or UNREACHABLE.
+Three UNREACHABLE claims were checked by hand before anything was deleted,
+and two of them were wrong in a way that would have cost real coverage.
+
+- **The percent-encoded traversal branches are live.** `req_text` unquotes
+  once, so the audit's reasoning was that `%2e%2e` never reaches
+  `TRAVERSAL_RE` - and for a singly encoded payload that is exactly right:
+  `?file=%2e%2e/etc/passwd` arrives as `../etc/passwd` and matches the plain
+  branch instead. The conclusion does not follow. One unquote of a DOUBLY
+  encoded payload leaves `%2e%2e` standing, which is the whole reason the
+  alternation exists - it is what gets past a filter that decodes once.
+  Measured, each branch firing one layer deeper than the last:
+  `%252e%252e/etc/passwd` matches `%2e%2e`, `..%252fetc` matches `..%2f`,
+  `%25252e%25252e/x` matches `%252e`. A test pins the ladder with the
+  measurement next to it, because the next reader of that audit would
+  delete three live branches.
+- **`/graphql-strict`'s ungradeable suggestion leak is recorded as
+  deliberate.** The lab plants "introspection disabled BUT did you mean
+  still leaks schema names", `graphql_introspect` reports it, and no route
+  grades it - which reads like the `verify_method_effect` write route and is
+  not. `/graphql-strict` is the CLEAN row of the proving table, so the suite
+  asserts that driving it does NOT reach proven: introspection refused is a
+  lead for the operator to follow, not a proof of this class. Measured, both
+  reasons it cannot grade: the suggestion response is `asked=False` and
+  `declined=True`. Adding a route would have broken the row that records the
+  decision.
+- **Under the second one, a real false negative.** `asked` matched
+  `\bquery\s*\{`, which needs `query` followed by whitespace and a brace -
+  and in `{"query": "{users{id email role}}"}`, which is how every GraphQL
+  client sends a query, the next character is a quote. Introspection still
+  matched via `__schema`, so the class's first half worked and its second -
+  "or a query returning records outside scope" - was unreachable through
+  the standard transport, because `records` is gated on `asked`. Measured
+  False on three real shapes, one with `variables` and one with
+  `operationName`. The pattern now matches the envelope only when the value
+  is a selection or an operation: matching `"query":` alone would have
+  graded every search API that names its parameter `query`, and
+  Elasticsearch's `{"query": {"match": ...}}`, as having sent a GraphQL
+  query - and `records` would then have done the rest on any JSON listing.
+  All three stay False, and both graphql rows of the proving table still
+  grade as before.
+
+The lab answers `{"data": {}}` to any non-introspection query, so no lab
+endpoint drives that second half, which is why nothing noticed. Driving it
+needs a lab endpoint that answers a data query - recorded, not built.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 720 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 722 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
