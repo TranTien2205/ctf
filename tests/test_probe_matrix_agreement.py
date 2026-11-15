@@ -637,6 +637,39 @@ def test_the_matrix_refuses_a_probe_run_on_a_clean_endpoint(
         f"  missing: {missing}")
 
 
+@pytest.mark.parametrize("endpoint,shape", [
+    ("/safedirect", "protocol-relative //host, past a filter that allows it"),
+    ("/jsredirect", "meta refresh, no Location header at all"),
+])
+def test_every_redirect_shape_the_lab_plants_is_gradeable(endpoint, shape,
+                                                          lab_url, ctx):
+    """The lab plants three redirect shapes and the table above drives one.
+
+    Not table rows: every row's first element has to name a tool in the
+    registry, and these are extra ENDPOINTS for one tool. `/redirect` is the
+    row; `/safedirect` and `/jsredirect` are the two the lab plants and
+    nothing drove, which is how both stayed invisible through two sweeps.
+    `/jsredirect` could not be graded at all before `_redirect_destination`
+    read the body - `probe_redirect` reported "open redirect (client-side,
+    via meta-refresh/JS)" and the best honest quote over the whole run came
+    back `unproven`, because both of the class's checks read the Location
+    header and nothing else.
+    """
+    before = len(_exchanges(ctx.session))
+    out = probes.probe_redirect(ctx, lab_url + endpoint + "?next=/", "next")
+    entries = _exchanges(ctx.session)[before:]
+    assert entries, f"{endpoint} recorded no exchange"
+    assert "open redirect" in str(out.get("verdict", "")).lower(), (
+        f"{endpoint} plants {shape} and the probe no longer reports it: "
+        f"{out.get('verdict')!r}")
+    grade, missing = _best_grade("redirect", entries)
+    assert grade == "proven", (
+        f"{endpoint} plants {shape}, probe_redirect reports it as "
+        f"{out.get('verdict')!r}, and the matrix grades it {grade} "
+        f"(missing {missing}) - a planted bug the probe finds and no "
+        f"verdict can be recorded for")
+
+
 def test_every_driven_probe_exists_and_maps_to_a_real_class():
     from argus.tools import registry
     known = {t["name"] for t in registry.TOOL_SCHEMAS}

@@ -791,6 +791,39 @@ def _path_of(entry: dict) -> str:
     return urllib.parse.urlparse(url).path or "/"
 
 
+# A redirect does not need a Location header to send a browser off origin:
+# a meta refresh or a `location.href=` does it from the body. The lab plants
+# one at `/jsredirect` ("client-side open redirect: no Location header at
+# all"), `probe_redirect` reports it ("open redirect (client-side, via
+# meta-refresh/JS)") - and this class could not grade it, because both of its
+# checks read the Location header and nothing else. Measured: the best honest
+# quote over the whole probe run against `/jsredirect` graded `unproven`,
+# while `/redirect` and `/safedirect` both graded `proven`. The lab planted a
+# bug, the probe found it, and no verdict could be recorded for it.
+CLIENT_REDIRECT_RE = re.compile(
+    r"(?is)(?:<meta[^>]+http-equiv\s*=\s*[\"']?refresh[\"']?[^>]*?"
+    r"content\s*=\s*[\"'][^\"']*?url\s*=\s*([^\"'>\s]+)"
+    r"|location(?:\s*\.\s*(?:href|replace)\s*(?:=|\()|\s*=)"
+    r"\s*[\"']([^\"']+)[\"'])")
+
+
+def _redirect_destination(entry: dict) -> tuple[str, str]:
+    """Where this response sends a browser, and how it says so.
+
+    The Location header first, because it is the server-side redirect and the
+    only one `_redirect_host` was written for. Failing that, the body: a meta
+    refresh or a script assigning `location`. Returns the raw destination and
+    a word for the route, so a detail line can say which one was read.
+    """
+    loc = header_of(entry, "Location") if entry else ""
+    if loc:
+        return loc, "Location"
+    hit = CLIENT_REDIRECT_RE.search(resp_body(entry)) if entry else None
+    if hit:
+        return (hit.group(1) or hit.group(2) or ""), "the body"
+    return "", ""
+
+
 def _redirect_host(location: str) -> str:
     """The host a Location header actually sends the browser to, or "" when it
     stays on the current origin.
@@ -814,9 +847,17 @@ def _redirect_host(location: str) -> str:
     parsed = urllib.parse.urlparse(value)
     if parsed.scheme and parsed.netloc:
         return parsed.hostname or ""
-    if parsed.scheme or value.startswith("/") or not parsed.netloc:
-        return ""
-    return urllib.parse.urlparse("http://" + value).hostname or ""
+    # Anything left is schemeless with no netloc - `example.org/path`,
+    # `?next=1`, `#frag`. `urlparse` populates netloc only for a value
+    # starting `//` or carrying a scheme, and both branches above already
+    # took those, so this is every remaining input. It returns "" and that
+    # is also the right answer: a schemeless value is a relative reference,
+    # which a browser resolves against the current origin, so
+    # `Location: example.org/path` goes to `/example.org/path` HERE and
+    # leaves nothing. A line after this one used to read the value as the
+    # host `example.org`; it could not run for any input, and if it had it
+    # would have graded an in-origin hop as an open redirect.
+    return ""
 
 
 def _endpoint_shape(entry: dict) -> str:
@@ -1532,22 +1573,28 @@ def verify_token_forgery(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
 
 def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
-    """A 3xx Location off origin, carrying a destination the request supplied.
+    """A redirect off origin, carrying a destination the request supplied.
 
     An apex-to-www redirect is off origin too, and used to grade as the
     finding. What makes it open redirect is that the destination came from the
     request.
+
+    Not necessarily a 3xx, and not necessarily a header: a meta refresh or a
+    `location.href=` in the body sends the browser just as far. See
+    `_redirect_destination`, which carries the measurement - the lab plants
+    that shape, the probe reports it, and this verifier used to read the
+    Location header and nothing else.
     """
     def build(pair) -> list[dict]:
         off, control = (pair if pair else (None, None))
-        loc = header_of(off, "Location") if off else ""
+        loc, via = _redirect_destination(off) if off else ("", "")
         host = _redirect_host(loc)
         req_host = (urllib.parse.urlparse(
             str(_req(off).get("url") or "")).hostname or "") \
             if off else ""
         foreign = bool(host) and host.lower() != req_host.lower()
         supplied = foreign and host.lower() in req_text(off).lower()
-        c_loc = header_of(control, "Location") if control else ""
+        c_loc, _c_via = _redirect_destination(control) if control else ("", "")
         c_host = _redirect_host(c_loc)
         in_origin = bool(control) and bool(c_loc) and (
             not c_host or c_host.lower() == (urllib.parse.urlparse(
@@ -1556,7 +1603,8 @@ def verify_off_origin_redirect(claim: Claim, spec: "ProofSpec") -> list[dict]:
         return [
             _check("the Location points off origin, to a host we supplied",
                    supplied,
-                   f"{loc[:120]} in {off.get('id')}" if supplied else
+                   f"{loc[:110]} in {off.get('id')}, via {via}"
+                   if supplied else
                    (f"{loc[:80]} leaves the origin but that host is not in the "
                     "request - an apex-to-www hop is not an open redirect"
                     if foreign else

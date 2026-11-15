@@ -2993,6 +2993,67 @@ def test_csrf_refuses_two_different_pages_as_the_change():
     assert v.grade == "proven", v.missing
 
 
+def test_redirect_grades_the_client_side_hop_the_lab_plants():
+    """No Location header is still a redirect, and the lab plants one.
+
+    `/jsredirect` answers 200 with `<meta http-equiv=refresh>` carrying the
+    destination from the query - vulnapp.py calls it "client-side open
+    redirect: no Location header at all" - and `probe_redirect` reports it
+    as "open redirect (client-side, via meta-refresh/JS)". Both checks here
+    read `header_of(entry, "Location")`, so the shape the lab plants and the
+    probe finds could not be graded at all: measured over the whole probe
+    run against `/jsredirect`, the best honest quote graded `unproven`,
+    while `/redirect` and `/safedirect` both graded `proven`.
+
+    The "host we supplied" requirement is what keeps this from grading every
+    page with a CDN in a script tag: the destination has to be in OUR
+    request.
+    """
+    meta = ("<html><head><meta http-equiv='refresh' content='0;url="
+            "{dest}'></head><body>client-side-hop</body></html>")
+    off = _ex("r1", "GET", "http://lab/jsredirect?next=https://example.org/c",
+              meta.format(dest="https://example.org/c"), ts=1)
+    control = _ex("r2", "GET", "http://lab/jsredirect?next=/argus-control",
+                  meta.format(dest="/argus-control"), ts=2)
+    v = proof.grade("open-redirect", "client-side-hop", [off, control])
+    assert v.grade == "proven", v.explain()
+    detail = next(c["detail"] for c in v.checks
+                  if c["check"].startswith("the Location points off origin"))
+    assert "via the body" in detail, detail
+
+    # a host the page carries but the request did not is not an open redirect
+    hardcoded = _ex("r3", "GET", "http://lab/jsredirect?next=/x",
+                    meta.format(dest="https://cdn.vendor.test/lib.js"), ts=3)
+    assert proof.grade("open-redirect", "client-side-hop",
+                       [hardcoded, control]).grade != "proven"
+
+
+def test_a_schemeless_location_stays_on_origin():
+    """`Location: example.org/path` is a relative reference, not a host.
+
+    A browser resolves it against the current origin, so it goes to
+    `/example.org/path` HERE, and "" is the right answer.
+
+    This does NOT guard the line that was deleted from `_redirect_host`, and
+    putting that line back does not fail it - measured, and that is the
+    evidence the line was dead. `urlparse` populates `netloc` only for a
+    value starting `//` or carrying a scheme, and both branches above the
+    deleted one already took those, so its own guard fired for every input
+    that reached it. What this pins is the ANSWER, which nothing asserted:
+    had the line been reachable it would have read `example.org` as the host
+    and graded an in-origin hop as an open redirect, so the next person to
+    read that dead code and make it run has a test telling them which way
+    it goes.
+    """
+    for value in ("example.org/argus-canary", "example.org", "EXAMPLE.ORG",
+                  "1.2.3.4/x", "?next=1", "#frag"):
+        assert proof._redirect_host(value) == "", value
+    # the routes that DO leave the origin still do
+    assert proof._redirect_host("//example.org/x") == "example.org"
+    assert proof._redirect_host("https://example.org/x") == "example.org"
+    assert proof._redirect_host("javascript:alert(1)") == "javascript:"
+
+
 def test_csrf_refuses_two_records_of_one_collection_as_the_change():
     """The test above stopped one step short of the shape that reproduces.
 

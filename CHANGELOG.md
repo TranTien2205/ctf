@@ -3992,19 +3992,47 @@ and each fix was planted back and required to produce the named symptom.
   AttributeError.
 
 Still open and measured, not closed: the route audit's 37 verify agents died
-on DNS, so its remaining claims are unverified. Confirmed by hand and not yet
-fixed - the lab plants a client-side open redirect at `/jsredirect` that the
-probe reports ("open redirect (client-side, via meta-refresh/JS)") and no
-verifier can grade, because `verify_off_origin_redirect` reads the `Location`
-header only; `/safedirect`'s protocol-relative `//host` bypass grades
-`proven` when driven by hand but neither agreement table drives it.
+on DNS, so its remaining claims are unverified.
+
+### A redirect does not need a Location header to leave the origin
+Follow-through on the audit finding above, which is the same shape as the
+`verify_method_effect` write route: the lab plants a bug, the probe reports
+it, and no verdict can be recorded for it.
+
+- `/jsredirect` answers 200 with `<meta http-equiv=refresh>` carrying the
+  destination from the query - vulnapp.py calls it "client-side open
+  redirect: no Location header at all" - and `probe_redirect` reports it as
+  "open redirect (client-side, via meta-refresh/JS)". Both of the class's
+  checks read `header_of(entry, "Location")`, so the best honest quote over
+  the whole probe run graded `unproven` while `/redirect` and `/safedirect`
+  graded `proven`. New `_redirect_destination` reads the header first and
+  the body second - a meta refresh or a script assigning `location` - and
+  the detail line says which route it took. The "host we supplied"
+  requirement is what keeps this from grading every page with a CDN in a
+  script tag; a hardcoded vendor host in the same shape still does not
+  grade.
+- `_redirect_host` ended with a line that read a schemeless value as a host.
+  It could not run for any input: `urlparse` populates `netloc` only for a
+  value starting `//` or carrying a scheme, and both branches above it
+  already took those, so its own guard fired for everything that reached it.
+  Measured over 12 Location shapes. Had it run it would have been a false
+  positive - `Location: example.org/path` is a relative reference, which a
+  browser resolves against the current origin - so the line is gone and a
+  test pins the answer instead. Putting the line back does NOT fail that
+  test, which is the evidence it was dead; the test says so.
+- The lab plants three redirect shapes and the proving table drove one.
+  `/safedirect` (protocol-relative `//host`, past a filter that allows it)
+  and `/jsredirect` are now driven by a test in the same module, which
+  asserts the probe still reports each shape AND that the matrix grades it -
+  not a table row, because every row's first element has to name a tool in
+  the registry and these are extra endpoints for one tool.
 
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 716 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 720 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
