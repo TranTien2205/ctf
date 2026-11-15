@@ -22,7 +22,13 @@ def _url_args(value) -> list[str]:
     """Collect http(s)-URL strings anywhere inside an arguments object."""
     found = []
     if isinstance(value, str):
-        if value.startswith(("http://", "https://")):
+        # `.lower()` on the TEST, not on the value: the string handed to
+        # the scope guard has to be the one the server will fetch. A URL
+        # scheme is case-insensitive, and this is the only gate between an
+        # MCP argument and a fetch-type server's own socket - measured,
+        # `HTTP://evil.test/x` was collected by nobody and checked by
+        # nobody, while `ScopeGuard.check` refuses it when asked.
+        if value.lower().startswith(("http://", "https://")):
             found.append(value)
     elif isinstance(value, dict):
         for v in value.values():

@@ -243,11 +243,15 @@ def _validate_proxy(proxy: str) -> str:
     which is not an Argus dependency."""
     if not proxy:
         return ""
-    if proxy.startswith(("socks4://", "socks5://")):
+    # Scheme comparisons are case-folded here for the same reason as in
+    # `analysis._URL_RE`, though both of these already failed CLOSED: an
+    # `HTTPS://` proxy was rejected as "expected http:// or https://"
+    # and a `SOCKS5://` one got that message instead of the socksio one.
+    if proxy.lower().startswith(("socks4://", "socks5://")):
         raise SystemExit(
             f"--proxy {proxy}: SOCKS needs httpx[socks] (socksio) - "
             "not an Argus dependency; use an http:// proxy")
-    if not proxy.startswith(("http://", "https://")):
+    if not proxy.lower().startswith(("http://", "https://")):
         raise SystemExit(
             f"--proxy {proxy!r}: expected http:// or https:// URL")
     return proxy

@@ -252,6 +252,54 @@ def test_external_args_scope_scan(ctx):
     ok("--top-ports 5000")               # port arg - not a host
 
 
+def test_the_arg_scan_is_as_wide_as_the_tool_it_guards(ctx):
+    """Whatever curl will dial, this scan has to hand to the guard.
+
+    `ScopeGuard.check` is not the defect in either case below - asked, it
+    refuses all of these. The defect is that it was never asked, because
+    the code deciding WHAT to ask about was narrower than the binary that
+    receives the argument string.
+
+    1. `_URL_RE` was case-sensitive while the token loop's "already
+       handled above" skip was `(?i)`, so `HTTP://` was handled by neither.
+    2. An `os.sep in tok` skip exempted every token containing a
+       separator, and `host:port/path` is a URL curl accepts with no
+       scheme. Measured with curl 8.x: `HTTP://127.0.0.1:1/`,
+       `HTTPS://127.0.0.1:1/` and `127.0.0.1:1/path` all reach
+       `(7) Failed to connect`, which is curl reporting that it parsed the
+       argument and dialled it.
+
+    The second half of this test is the half that matters: a scan tightened
+    until it refuses ordinary tool arguments gets switched off by whoever
+    hits it next.
+    """
+    from argus.tools.analysis import _args_scope_check
+    import pytest
+    from argus.scope import ScopeError
+
+    for hostile in ("http://evil.example/x",      # the covered form
+                    "HTTP://evil.example/x",      # case-sensitive finder
+                    "HTTPS://evil.example/x",
+                    "HtTp://evil.example/x",
+                    "evil.example/path",          # scheme-less, with a path
+                    "evil.example:8080/path",     # ...and a port
+                    "EVIL.example/x"):
+        with pytest.raises(ScopeError):
+            _args_scope_check(ctx, hostile)
+
+    # ...and every one of these is an argument a real run sends.
+    for benign in ("-w /usr/share/wordlists/common.txt",
+                   "-w wordlists/common.txt",
+                   "-iL targets.txt",
+                   "-oN /tmp/out.txt",
+                   "-p 80,443",
+                   "--top-ports 5000",
+                   "-u http://127.0.0.1/FUZZ",
+                   "-H 'User-Agent: argus/1.0'",
+                   "--data-urlencode q=1"):
+        _args_scope_check(ctx, benign)
+
+
 def test_external_args_scope_scan_host_spellings(ctx):
     """Single-label and non-canonical IP spellings are targets too:
     'nmap localhost' scans the agent host, and nmap parses 127.1 /

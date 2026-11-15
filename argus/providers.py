@@ -170,7 +170,8 @@ class OpenAICompatClient:
                  allow_insecure_base: bool = False, temperature: float = 0.2):
         if not api_base:
             raise LLMError(f"model {model!r} has no api_base in models.json")
-        if not api_base.startswith("https://") and not allow_insecure_base:
+        if not api_base.lower().startswith("https://") \
+                and not allow_insecure_base:
             # a key over plaintext is a leaked key; a loopback dev server
             # declares itself in the table instead of being guessed at here
             raise LLMError(

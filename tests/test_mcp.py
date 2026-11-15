@@ -154,6 +154,19 @@ def test_mcp_call_scope_blocks_foreign_url(ctx, tmp_path):
             ctx, "fake", "echo",
             {"opts": {"url": "https://evil.example/"}})
         assert "error" in out2 and "scope" in out2["error"]
+        # An uppercase scheme is the same URL. `_url_args` tested
+        # `value.startswith(("http://", "https://"))`, so `HTTP://` was
+        # collected by nobody and checked by nobody, while the server would
+        # fetch it exactly as it fetches the lowercase form - this gate is
+        # the only thing between an MCP argument and that server's own
+        # socket. The scope guard refuses it when asked; it was not asked.
+        for spelling in ("HTTP://evil.example/fetch",
+                         "HTTPS://evil.example/fetch",
+                         "HtTpS://evil.example/fetch"):
+            blocked = mcp_tools.mcp_call(ctx, "fake", "echo",
+                                         {"url": spelling})
+            assert "error" in blocked and "scope" in blocked["error"], \
+                f"{spelling} crossed into the server process: {blocked}"
         # in-scope URL args pass the gate (the fake server doesn't fetch)
         out3 = mcp_tools.mcp_call(
             ctx, "fake", "echo", {"url": "http://127.0.0.1/x"})

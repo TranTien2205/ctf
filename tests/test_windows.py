@@ -110,12 +110,28 @@ def test_windows_semantics():
     assert_ok("a bare hostname beside it is still scope-checked",
               any("evil.example" in c for c in checked), f"{checked}")
 
-    # What this does NOT pin, measured rather than assumed: deleting the
-    # `os.sep in tok` skip from `_args_scope_check` leaves both assertions
-    # passing, because `_hostish_token` rejects every token containing a
-    # separator. That skip is defence in depth and the second guard does
-    # the work. Removing the hostname check instead DOES fail the second
-    # assertion, which is how the two were told apart.
+    # WRONG, and corrected here rather than quietly deleted. This note read:
+    #
+    #   "deleting the `os.sep in tok` skip leaves both assertions passing,
+    #    because `_hostish_token` rejects every token containing a
+    #    separator. That skip is defence in depth and the second guard does
+    #    the work."
+    #
+    # Both measurements in it were right. The conclusion did not follow.
+    # These two assertions are about a PATH token, and the skip's effect on
+    # a path token is indeed indistinguishable - which says nothing about
+    # its effect on every other token carrying a separator. The token that
+    # distinguishes it is `evil.example:8080/path`: a URL curl accepts with
+    # no scheme, exempted by that skip, and dialled. Measured with
+    # curl 8.x - `127.0.0.1:1/path` reaches `(7) Failed to connect`, which
+    # is curl saying it parsed the argument and tried.
+    #
+    # "No test I have distinguishes these" is not "nothing distinguishes
+    # these", and writing the first down as the second is how the skip
+    # survived a sweep. The skip is now a path test rather than a separator
+    # test, and `tests/test_scope.py::test_the_arg_scan_is_as_wide_as_the_
+    # tool_it_guards` covers both directions - including that an ordinary
+    # `-w wordlists/common.txt` is still not a target.
 
     # posix hosts keep posix splitting
     toks2 = analysis._split_args("-iL targets.txt /etc/hosts evil.example")

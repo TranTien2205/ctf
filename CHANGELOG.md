@@ -3102,12 +3102,63 @@ were not.
   question and a pass here would mean nothing". That is the third time this
   stretch that the instrument was the defect.
 
+### The guard was never asked: three finders narrower than their consumers
+
+A fresh eight-plane sweep of the parts the last one did not cover. These
+three are one defect: `ScopeGuard.check` is not wrong in any of them -
+asked, it refuses every form below - but the code deciding WHAT to ask
+about was narrower than the thing that receives the value.
+
+- `analysis._URL_RE` was case-sensitive while the token loop beside it
+  skipped anything matching `(?i)https?://` as "already handled above".
+  With a case-sensitive finder, an uppercase scheme was handled by
+  neither. Measured: `_args_scope_check` refused `http://evil.test/x` and
+  PASSED `HTTP://evil.test/x`, while the guard refuses both. A URL scheme
+  is case-insensitive by RFC 3986, and curl dials either spelling - with
+  curl 8.x, `HTTP://127.0.0.1:1/` reaches `(7) Failed to connect`, which
+  is curl reporting it parsed the argument and tried.
+- The same scan skipped every token containing a path separator, and
+  `host:port/path` is a URL curl accepts with no scheme at all. Measured:
+  `evil.test:8080/path` passed the scan; curl dials it. Splitting the path
+  off is not the same as deleting the skip - deleting it recovers
+  `evil.test` from `evil.test:8080/path` by accident of the colon while
+  leaving `evil.test/path` intact, because the host classifier rejects
+  anything with a slash in it.
+- `mcp_tools._url_args` collected URL arguments with a case-sensitive
+  scheme test, and it is the only gate between an MCP argument and a
+  fetch-type server's own socket. An uppercase scheme was collected by
+  nobody and checked by nobody; the test now shows the fake server
+  echoing the out-of-scope URL back when the fix is removed.
+- Two more of the shape, both already failing CLOSED, so wrong messages
+  rather than holes: an uppercase-scheme model `api_base` was refused as
+  "over plaintext", and an uppercase-scheme proxy got "expected http:// or
+  https://" while an uppercase SOCKS one got that message instead of the
+  socksio one.
+
+And a correction to this repo's own record. `tests/test_windows.py`
+carried a note concluding that the separator skip was "defence in depth"
+because deleting it changed no assertion there. Both measurements in that
+note were right and the conclusion did not follow: those assertions are
+about a path token, where the skip's effect genuinely is
+indistinguishable, which says nothing about the other tokens that carry a
+separator. "No test I have distinguishes these" is not "nothing
+distinguishes these", and writing the first down as the second is how the
+skip survived a sweep. The note now says so, next to the token that
+distinguishes it.
+
+The new test asserts both directions, and the second direction is the one
+that matters: a scan tightened until it refuses ordinary tool arguments is
+a scan the next person switches off. Nine real argument strings - wordlist
+paths absolute and relative, target-list files, output paths, port lists,
+a header value - still pass, because the host classifier makes a
+single-label token prove it resolves before anyone calls it a target.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 677 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 678 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

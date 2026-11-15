@@ -352,7 +352,16 @@ def record_finding(ctx: Context, title: str, severity: str, category: str,
 # ---------------------------------------------------------------- external
 
 _ALLOWED_TOOLS = {"sqlmap", "nuclei", "nmap", "ffuf", "curl"}
-_URL_RE = re.compile(r"https?://[^\s'\"]+")
+# `(?i)` because the SKIP that trusts this finder is `(?i)` too, and the
+# two disagreeing is a hole: `_args_scope_check` hands every `_URL_RE` hit
+# to the scope guard, then walks the tokens and skips anything matching
+# `(?i)https?://` as "already handled above". With a case-sensitive finder,
+# `HTTP://` was handled by neither. Measured: `_args_scope_check` refuses
+# `http://evil.test/x` and PASSES `HTTP://evil.test/x`, while
+# `ScopeGuard.check` refuses both - so the guard was never asked. A URL
+# scheme is case-insensitive by RFC 3986 and curl dials `HTTP://host/`
+# exactly as it dials `http://host/`.
+_URL_RE = re.compile(r"(?i)https?://[^\s'\"]+")
 _HOST_RE = re.compile(
     r"(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}|"
     r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(?:/\d{1,2})?")
@@ -451,7 +460,32 @@ def _args_scope_check(ctx: Context, args: str) -> None:
             if not re.match(r"(?i)https?://", tok):
                 ctx.scope.check(tok)
             continue
-        if tok.startswith("-") or Path(tok).exists() or os.sep in tok:
+        if tok.startswith("-") or Path(tok).exists():
+            continue
+        # `host/path` and `host:port/path` are URLs curl accepts with no
+        # scheme, so the AUTHORITY is what has to be checked. An
+        # `os.sep in tok` skip stood here and exempted exactly that shape -
+        # measured, this scan PASSED `evil.test:8080/path` and curl dialled
+        # it. `tests/test_windows.py` recorded that deleting the skip
+        # changed no assertion and called it defence in depth that no token
+        # could distinguish; that was wrong, and this is the token.
+        #
+        # Splitting the path off is not the same as deleting the skip.
+        # `host_part = tok.split(":")[0]` recovers `evil.test` from
+        # `evil.test:8080/path` by accident of the colon, but leaves
+        # `evil.test/path` intact, and `_hostish_token` rejects anything
+        # with a slash in it - so that form would still have passed.
+        #
+        # A real filesystem path still skips: it is anchored, or it exists,
+        # or its head is not a host, because `_hostish_token` makes a
+        # single label prove it RESOLVES. `wordlists/common.txt` asks the
+        # resolver about `wordlists` and gets no, which is also why this
+        # cannot be tightened into refusing ordinary tool arguments.
+        if tok.startswith(("/", "./", "../", "~")) or \
+                re.match(r"(?i)^[a-z]:[\\/]", tok):
+            continue
+        tok = re.split(r"[/\\]", tok, maxsplit=1)[0]
+        if not tok:
             continue
         host_part = tok.split(":")[0]
         if tok.count(":") >= 2 or tok.startswith("["):
