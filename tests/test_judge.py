@@ -538,3 +538,44 @@ def test_scrub_catches_url_credentials_inside_prose():
         "no creds: http://10.0.0.5:8080/app")
     assert _scrub("mailto style a@b.c and a plain @ sign") == (
         "mailto style a@b.c and a plain @ sign")
+
+
+def test_a_credential_does_not_survive_its_own_redaction():
+    """`_scrub` preserved three credential shapes and appended a marker.
+
+    The substitution is `"".join(m.groups()) + _REDACTED`, so a pattern's
+    group is the part to KEEP - `(bearer\\s+)` keeps the scheme word and
+    drops the token. One pattern captured the WHOLE credential, so the
+    substitution preserved it and glued the marker on the end:
+
+        AKIAIOSFODNN7EXAMPLE  ->  AKIAIOSFODNN7EXAMPLE<redacted>
+
+    which is worse than no redaction, because it reads as redacted. This
+    is the one function in the package that deliberately sends engagement
+    data to a second vendor.
+    """
+    from argus.judge import _scrub
+    for secret, keep in (
+            ("AKIAIOSFODNN7EXAMPLE", "AKIA"),
+            ("ghp_16C7e42F292c6912E7710c838347Ae178B4a", "ghp_"),
+            ("sk-abcdefghijklmnopqrstuvwx", "sk-"),
+            ("eyJhbGciOiJIUzI1NiJ9.abcdefghij.signature", ""),
+    ):
+        out = _scrub(f"IDOR exposes {secret} on /x")
+        assert secret not in out, f"{secret!r} survived _scrub: {out!r}"
+        assert "redacted" in out, out
+        if keep:
+            assert keep in out, (
+                f"the credential TYPE is worth keeping: {out!r}")
+
+    # ...and the title is the field this goes through, which had no _scrub
+    case = judge.render_case(
+        {"id": "F01", "title": "IDOR exposes AKIAIOSFODNN7EXAMPLE",
+         "vuln_class": "sqli", "severity": "high", "url": "http://x/",
+         "grade": "proven", "proof": {}}, [])
+    assert "AKIAIOSFODNN7EXAMPLE" not in case, case[:300]
+
+    # prose that merely contains a prefix is not a credential
+    for plain in ("AKIA is a prefix", "the /admin endpoint returned 200",
+                  "SQL injection in the q parameter"):
+        assert _scrub(plain) == plain, _scrub(plain)

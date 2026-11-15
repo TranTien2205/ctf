@@ -286,3 +286,53 @@ def test_close_does_not_wait_for_a_lock_an_in_flight_call_holds():
     assert elapsed < 10, (
         f"close() waited {elapsed:.1f}s for a lock an in-flight call was "
         "holding - the shutdown is only bounded if this returns")
+
+
+def test_closing_a_server_kills_what_it_spawned_not_just_what_it_started():
+    """The `run_capped` orphan, one plane over.
+
+    `MCPClient.close` sent `terminate()` to the direct child and waited for
+    it. Anything that child spawned was reparented to init and kept
+    running - and an MCP server makes its own network requests outside
+    GuardedClient by design, which this module's docstring states as the
+    reason `mcp_call` scope-checks URL arguments at all. So an orphaned one
+    is a client with no scope guard, no rate limiter and no request budget,
+    whose traffic reaches no transcript, while the engagement's record says
+    the server was shut down.
+
+    Two things were wrong and the second is the subtle one. The server was
+    not started with `start_new_session=True`, so there was no group to
+    signal; and `close()` reaped the leader with `wait()` BEFORE asking for
+    its group, so even with a group `os.getpgid` would raise and signal
+    nobody. A graceful, successful shutdown left the whole tree running.
+
+    Measured before the fix with a stub that spawns a sleeper: the
+    grandchild survived `close()` and reported `PPid: 1`.
+    """
+    import os
+    import subprocess
+    import sys
+    import tempfile
+    import time
+    from pathlib import Path
+
+    import pytest
+
+    from argus.mcp import MCPClient
+
+    if os.name != "posix":
+        pytest.skip("process groups are POSIX; CI covers nt through the "
+                    "taskkill branch, which needs a real Windows runner")
+
+    marker = Path(tempfile.mkdtemp()) / "orphan-was-alive"
+    server = Path(__file__).parent / "orphan_mcp_server.py"
+    c = MCPClient("orphan", [sys.executable, str(server)],
+                  env={"ORPHAN_MARKER": str(marker)})
+    assert c.tools() == [], "the stub server did not complete a handshake"
+    c.close()
+
+    time.sleep(3.0)
+    assert not marker.exists(), (
+        "a process the MCP server spawned outlived close(): it still has "
+        "the target and no place in the transcript, while the run's record "
+        "says the server was shut down")

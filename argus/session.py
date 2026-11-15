@@ -785,7 +785,24 @@ class Session:
             if agent:
                 entry["agent"] = agent
             if note:
-                entry["note"] = note
+                # The one field on this entry written RAW. `req` and `resp`
+                # above both go through `_redact_obj`, and `note` is a
+                # declared parameter of the `http_request` schema - "One-line
+                # note stored with the transcript entry" - so its value is
+                # whatever the model types, and `httpclient.py` says
+                # `--secret` exists for exactly that: "login passwords posted
+                # in bodies, tokens the agent quotes".
+                #
+                # Measured on a session with one declared secret: the cookie
+                # and the request body on this same line persisted as
+                # `sid=<redacted>` and `pw=<redacted>`, while
+                # `note="logged in with SuperSecret123"` persisted verbatim
+                # into transcript.jsonl - the sealed, shippable artifact, and
+                # the one this package feeds into a judge prompt sent to a
+                # third-party provider. The same string, scrubbed one field to
+                # the left and kept one field to the right, is what makes this
+                # a gap rather than a policy.
+                entry["note"] = _redact_obj(note, self.secret_values)
             entry["chain"] = _chain(self._last_chain, entry,
                                     getattr(self, "seal_key", ""))
             # serialize BEFORE committing in-memory state: a non-JSON leaf
@@ -1041,9 +1058,26 @@ class Session:
                     "same bug class + endpoint is one finding. Re-record only "
                     "with evidence that grades higher - otherwise put the extra "
                     "evidence in note()")
+            # The model's free text, redacted on the way to disk. The
+            # excerpt was already safe and only INCIDENTALLY so: it must be a
+            # verbatim substring of an already-redacted recorded response, so
+            # a declared secret cannot match one. `title`, `description` and
+            # `remediation` carry no such constraint, and the model routinely
+            # writes observed values into them ("IDOR exposes token eyJ...").
+            #
+            # Measured with one declared secret: notes.md, agent.log and
+            # transcript.jsonl were clean while findings.json carried it
+            # verbatim - and findings.json is what report.md and summary.json
+            # are rendered from, which are the files that get emailed and
+            # filed. The redaction held for the three artifacts an auditor
+            # reads least.
+            def _r(value):
+                return _redact_obj(str(value or "").strip(),
+                                   self.secret_values)
+
             finding = {
                 "id": f"F{len(self.findings) + 1:02d}",
-                "title": str(title or "").strip(),
+                "title": _r(title),
                 "severity": severity,
                 "category": str(category or "").strip(),
                 "url": _redact_url(url),
@@ -1052,8 +1086,8 @@ class Session:
                 "vuln_class": vuln_class,
                 "grade": verdict.grade,
                 "proof": verdict.to_dict(),
-                "description": str(description or "").strip(),
-                "remediation": str(remediation or "").strip(),
+                "description": _r(description),
+                "remediation": _r(remediation),
                 "ts": round(time.time(), 3),
             }
             if agent:

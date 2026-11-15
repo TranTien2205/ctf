@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 
 
-def _kill_tree(proc: subprocess.Popen) -> None:
+def _kill_tree(proc: subprocess.Popen, pgid: int | None = None) -> None:
     """Kill the child AND anything it spawned.
 
     `subprocess.run(..., timeout=)` sends SIGKILL to the direct child only
@@ -38,7 +38,28 @@ def _kill_tree(proc: subprocess.Popen) -> None:
     """
     try:
         if os.name == "posix":
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            # `pgid` is for a caller that has already reaped the leader.
+            # `os.getpgid` needs a live pid, so a caller that waits first
+            # and asks second gets ProcessLookupError and signals nobody -
+            # which is how `MCPClient.close` left a whole tree running
+            # after a perfectly successful `terminate()` + `wait()`.
+            target = pgid if pgid is not None else os.getpgid(proc.pid)
+            # ...and never our OWN group. Every caller here starts its
+            # child with `start_new_session=True`, so the group holds the
+            # child's tree and nothing else - but that is one line away in
+            # a different file, and if the two ever part company this
+            # function SIGKILLs the agent that called it. Found by planting
+            # exactly that: with the session flag removed from
+            # `MCPClient._start`, `close()` took the whole pytest process
+            # down with it, exit 137. Falling through to `proc.kill()` is
+            # the behaviour this helper replaced, so the degraded path is
+            # no worse than not having it.
+            if target == os.getpgid(0):
+                raise RuntimeError(
+                    "refusing to signal our own process group: the child "
+                    "was not started in a session of its own, so the group "
+                    "contains this process")
+            os.killpg(target, signal.SIGKILL)
             return
         subprocess.run(["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,

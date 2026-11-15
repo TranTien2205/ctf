@@ -52,8 +52,24 @@ _SCRUB = (
     re.compile(r"(?i)\b(api[_-]?key|secret|token|password|passwd|pwd)"
                r"(\s*[=:]\s*)[\'\"]?[^\s\'\",;&]{8,}"),
     re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+"),
-    re.compile(r"\b(gh[pousr]_[A-Za-z0-9]{20,}|sk-[A-Za-z0-9]{16,}"
-               r"|AKIA[0-9A-Z]{12,})"),
+    # The group captures the part to KEEP, because the substitution below is
+    # `"".join(m.groups()) + _REDACTED`. Every other pattern here follows
+    # that convention - `(bearer\s+)` keeps the scheme word and drops the
+    # token. This one captured the WHOLE credential, so the substitution
+    # preserved it and glued a redaction marker onto the end:
+    #
+    #   AKIAIOSFODNN7EXAMPLE  ->  AKIAIOSFODNN7EXAMPLE<redacted>
+    #   ghp_16C7e42F292c...   ->  ghp_16C7e42F292c...<redacted>
+    #
+    # which is worse than no redaction, because it reads as redacted. This
+    # text is the one thing in the package deliberately sent to a SECOND
+    # vendor, and a GitHub token, an OpenAI key or an AWS access key id in a
+    # finding title left the machine intact with a marker attached.
+    # Splitting the prefix out restores the convention and keeps the one
+    # thing a reader wants - which KIND of credential was there.
+    re.compile(r"\b(gh[pousr]_)[A-Za-z0-9]{20,}"),
+    re.compile(r"\b(sk-)[A-Za-z0-9]{16,}"),
+    re.compile(r"\b(AKIA)[0-9A-Z]{12,}"),
 )
 
 
@@ -207,7 +223,15 @@ def render_case(finding: dict, entries: list[dict]) -> str:
     lines = [
         "## The finding",
         f"- id: {finding.get('id')}",
-        f"- title: {finding.get('title')}",
+        # `_scrub` here too. Every other free-text field in this block
+        # has it - url, excerpt, request line, bodies - and the title did
+        # not, while being the field the model controls most freely. This is
+        # the one function in the package that deliberately sends engagement
+        # data to a third-party vendor. A declared `--secret` is already gone
+        # by now (`add_finding` redacts it at store time), so what this
+        # catches is the credential SHAPES `_scrub` exists for: an `AKIA...`
+        # key or a `Bearer eyJ...` token the model quoted in a title.
+        f"- title: {_scrub(str(finding.get('title') or ''))}",
         f"- class: {klass}",
         f"- severity claimed: {finding.get('severity')}",
         f"- url: {_scrub(str(finding.get('url') or ''))}",

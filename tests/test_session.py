@@ -240,6 +240,64 @@ def test_declared_secrets_redacted_from_artifacts(tmp_path):
     assert "redacted" in blob  # marker present, bytes replaced
 
 
+def test_the_model_s_own_free_text_is_redacted_too(tmp_path):
+    """The gate held for every field the RECORDER writes, and no other.
+
+    The test above covers transcript bodies, event output, notes and
+    meta.json - which is exactly the set that was already redacted. Two
+    model-authored fields were not, and both persist:
+
+    - `record_exchange(note=...)`. `note` is a declared parameter of the
+      `http_request` schema ("One-line note stored with the transcript
+      entry"), so its value is whatever the model types. Measured: the
+      cookie and request body on the SAME transcript line persisted as
+      `sid=<redacted>` and `pw=<redacted>` while the note persisted
+      verbatim.
+    - `add_finding(title=..., description=..., remediation=...)`. The
+      excerpt was safe only incidentally - it must be a verbatim substring
+      of an already-redacted response, so a declared secret cannot match
+      one. The free text has no such constraint, and findings.json is what
+      report.md and summary.json are rendered from.
+
+    So the redaction held for the three artifacts an auditor reads least
+    and failed in the two that get emailed.
+    """
+    import json
+    from argus.session import Session
+    SECRET = "Sup3rSecret!"
+    s = Session(tmp_path, "http://t", {"goal": "x"}, secrets=[SECRET])
+    rid = s.record_exchange(
+        "http_request",
+        {"method": "GET", "url": "http://t/x",
+         "headers": {"cookie": f"sid={SECRET}"}, "body": f"pw={SECRET}"},
+        {"status": 200, "headers": {},
+         "body": "root:x:0:0:root:/root:/bin/bash", "elapsed_ms": 5.0},
+        note=f"logged in with {SECRET}")
+    out = s.add_finding(
+        title=f"IDOR exposes token {SECRET}", severity="high",
+        category="sqli", url="http://t/x", evidence_ids=[rid],
+        evidence_excerpt="root:x:0:0:root:/root:/bin/bash",
+        description=f"the password {SECRET} was accepted",
+        remediation=f"rotate {SECRET}")
+    assert out.get("id"), out
+
+    for name in ("transcript.jsonl", "findings.json", "notes.md",
+                 "meta.json"):
+        fp = s.dir / name
+        if fp.is_file():
+            assert SECRET not in fp.read_text(encoding="utf-8"), \
+                f"{name} carries a declared secret"
+
+    # and the marker is there, so this is redaction and not a dropped field
+    entry = json.loads(
+        (s.dir / "transcript.jsonl").read_text(encoding="utf-8")
+        .splitlines()[0])
+    assert "redacted" in entry["note"], entry["note"]
+    row = json.loads((s.dir / "findings.json").read_text(encoding="utf-8"))[0]
+    for field in ("title", "description", "remediation"):
+        assert "redacted" in row[field], (field, row[field])
+
+
 def test_secrets_below_min_len_ignored(tmp_path):
     """A 2-char 'secret' would shred innocent bytes across the whole
     transcript - load_config drops values under 4 chars."""

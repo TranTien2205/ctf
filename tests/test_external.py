@@ -93,3 +93,45 @@ def test_the_timeout_kills_what_the_tool_spawned_not_just_the_tool():
         "a process the timed-out tool spawned outlived the timeout: it "
         "still has the target, the unlinked stdout fd, and no place in "
         "the transcript")
+
+
+def test_kill_tree_refuses_to_kill_the_agent_itself():
+    """The degraded path has to degrade, not take the caller with it.
+
+    `_kill_tree` SIGKILLs a process GROUP, which is only safe because
+    every caller starts its child with `start_new_session=True` so the
+    group holds that child's tree and nothing else. That flag is one line
+    away in a different file from the signal, and if the two ever part
+    company the group being signalled is the agent's own.
+
+    Found by planting it: with the session flag removed from
+    `MCPClient._start`, `close()` killed the whole pytest process, exit
+    137 - no failure report, no output, just a dead runner, which is the
+    least debuggable way for a test suite to tell you something.
+
+    This test's assertion is that it reaches its own last line. A process
+    that dies here cannot report anything, so the guard is checked by
+    survival: the child must be dead and this process must not be.
+    """
+    import os
+    import subprocess
+    import sys
+
+    import pytest
+
+    if os.name != "posix":
+        pytest.skip("process groups are POSIX")
+
+    # deliberately NOT start_new_session: this child shares our group
+    proc = subprocess.Popen([sys.executable, "-c",
+                             "import time; time.sleep(30)"])
+    try:
+        assert os.getpgid(proc.pid) == os.getpgid(0), \
+            "this test is meaningless unless the child shares our group"
+        _subproc._kill_tree(proc)
+        proc.wait(timeout=10)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+    # reached only if `_kill_tree` did not signal the group we are in
+    assert proc.returncode is not None, "the child outlived _kill_tree"

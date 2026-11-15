@@ -694,6 +694,19 @@ _NOT_TOOLS = {
     # rejects a non-finite budget. It shares the `load_*` family with
     # load_skill and is not a tool.
     "load_config",
+    # the bounded subprocess runner behind run_external and run_exploit -
+    # `argus/tools/_subproc.py:76`, verified present and verified absent
+    # from TOOL_SCHEMAS before this line was added. It shares the `run_*`
+    # family with those two and is not itself callable by the model.
+    #
+    # Adding to this list is what I got wrong once already: `run_all` went
+    # in here with a comment calling it "this gate's own script", and no
+    # such script existed in this tree. The gate was right and the
+    # exemption was the wrong fix. The difference is checkable and was
+    # checked - `grep -rn "^def run_capped" argus/` finds it, and
+    # `run_capped in {t["name"] for t in TOOL_SCHEMAS}` is False - which is
+    # the standard every other entry here meets.
+    "run_capped",
 }
 
 

@@ -3232,12 +3232,80 @@ existing test covered.
   `level: none`, negative rank, and carries `argus-disputed` for a
   dashboard that wants to decide for itself.
 
+### The redaction held for every field the recorder writes, and no other
+
+`--secret` promises a value cannot persist. Measured on one session with
+one declared secret: notes.md, meta.json and agent.log were clean, and the
+two artifacts that get emailed were not.
+
+- `record_exchange(note=...)` wrote the note RAW. It is a declared
+  parameter of the `http_request` schema - "One-line note stored with the
+  transcript entry" - so the value is whatever the model types. On the same
+  transcript line, the cookie persisted as `sid=<redacted>` and the request
+  body as `pw=<redacted>`, while the note persisted verbatim. The same
+  string, scrubbed one field to the left and kept one field to the right.
+- `add_finding` stored `title`, `description` and `remediation` raw into
+  findings.json, which report.md and summary.json are rendered from. The
+  excerpt was safe only INCIDENTALLY: it must be a verbatim substring of an
+  already-redacted response, so a declared secret cannot match one. Free
+  text has no such constraint, and the model routinely writes observed
+  values into a title.
+- `judge.render_case` scrubbed the url, the excerpt, the request line and
+  both bodies, and interpolated the title raw - in the one function in the
+  package that deliberately sends engagement data to a second vendor.
+
+And a defence that preserved what it claimed to redact. `judge._scrub`
+substitutes `"".join(m.groups()) + <marker>`, so a pattern's group is the
+part to KEEP - `(bearer\s+)` keeps the scheme word and drops the token.
+One pattern captured the WHOLE credential:
+
+    AKIAIOSFODNN7EXAMPLE  ->  AKIAIOSFODNN7EXAMPLE<redacted>
+    ghp_16C7e42F292c...   ->  ghp_16C7e42F292c...<redacted>
+
+which is worse than no redaction, because it reads as redacted. Split into
+three patterns that keep only the type prefix, so a reader still learns
+which kind of credential was there. Found while verifying the title fix
+rather than from the sweep.
+
+### Closing an MCP server killed what it started, not what it spawned
+
+The `run_capped` orphan, one plane over, and the reasoning in
+`_kill_tree`'s docstring applies word for word: an orphan goes on talking
+to the target with no scope guard, no rate limiter and no request budget,
+nothing it does reaches the transcript, and the run's own record says the
+server was shut down. An MCP server makes its own requests outside
+GuardedClient BY DESIGN - that is the stated reason `mcp_call`
+scope-checks URL arguments at all.
+
+Two things were wrong and the second is the subtle one. The server was not
+started with `start_new_session=True`, so there was no group to signal; and
+`close()` reaped the leader with `wait()` before asking for its group, so
+even with a group `os.getpgid` would raise and signal nobody. A graceful,
+successful shutdown left the whole tree running. Measured with a stub
+server that spawns a sleeper: the grandchild survived `close()` and
+reported `PPid: 1`.
+
+- `_kill_tree` now takes a `pgid` captured while the leader was still
+  alive, and `MCPClient.close` captures it before terminating.
+- **And refuses to signal its own process group.** The plant for the first
+  half - removing the session flag - did not fail the test, it SIGKILLed
+  the pytest process, exit 137, with no failure report and no output: the
+  child shared the agent's group and `_kill_tree` sent SIGKILL to it. Every
+  caller sets that flag, but it is one line away in another file from the
+  signal, and if the two part company this helper kills the agent that
+  called it. It now falls through to `proc.kill()` instead, which is the
+  behaviour it replaced, so the degraded path is no worse than not having
+  the helper. `test_kill_tree_refuses_to_kill_the_agent_itself` asserts by
+  survival - a process that dies cannot report anything - and planting the
+  guard back away takes the runner down with exit 137, which is the least
+  debuggable way for a suite to tell you something.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 682 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 686 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

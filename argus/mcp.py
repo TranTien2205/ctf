@@ -98,9 +98,21 @@ class MCPClient:
                if not any(s in k.upper() for s in self._SECRET_RE)}
         env.update(self.env_extra)
         try:
+            # `start_new_session=True` on POSIX so this server leads its
+            # own process group and `close()` can signal the group as a
+            # unit. Without it, closing killed the direct child and left
+            # everything that child spawned running - reparented to init,
+            # still holding its network access, with nothing it does
+            # reaching the transcript. An MCP server makes its own requests
+            # outside GuardedClient by design (this module's own docstring
+            # says so), so an orphaned one is an unscoped, unrecorded,
+            # unbudgeted client that the engagement's record says was shut
+            # down. Measured with a stub server that spawns a sleeper: the
+            # grandchild survived `close()` and showed `PPid: 1`.
             self._proc = subprocess.Popen(
                 self.command, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL, env=env, bufsize=0)
+                stderr=subprocess.DEVNULL, env=env, bufsize=0,
+                **({"start_new_session": True} if os.name == "posix" else {}))
             self._reader = threading.Thread(target=self._reader_loop,
                                             daemon=True)
             self._reader.start()
@@ -232,15 +244,32 @@ class MCPClient:
         got = self._lock.acquire(timeout=2.0)
         try:
             proc = self._proc
-            if proc and proc.poll() is None:
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=3)
-                except Exception:
+            if proc:
+                # The group id has to be read BEFORE the leader is reaped:
+                # after `wait()` returns, `os.getpgid(proc.pid)` raises and
+                # the group goes unsignalled. That ordering is the whole
+                # defect - a graceful `terminate()` + `wait()` succeeded and
+                # the tree below it kept running.
+                pgid = None
+                if os.name == "posix":
                     try:
-                        proc.kill()
+                        pgid = os.getpgid(proc.pid)
                     except Exception:
-                        pass
+                        pgid = None
+                if proc.poll() is None:
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=3)
+                    except Exception:
+                        try:
+                            proc.kill()
+                        except Exception:
+                            pass
+                # ...and then the tree, whether or not the child went
+                # quietly. The child exiting says nothing about what it
+                # spawned.
+                from .tools._subproc import _kill_tree
+                _kill_tree(proc, pgid)
             self._proc = None
         finally:
             if got:
