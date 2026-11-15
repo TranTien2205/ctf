@@ -3300,12 +3300,52 @@ reported `PPid: 1`.
   guard back away takes the runner down with exit 137, which is the least
   debuggable way for a suite to tell you something.
 
+### Removing evidence can only make a negative universal easier
+
+The ledger is sold as the reader that cannot be talked round, "computed
+from recorded evidence, so it does not drift with the conversation". It
+originated a false positive by itself, with no model involved.
+
+Rule 1 cites a candidate plus its +-3 NEIGHBOURS on the same endpoint - a
+window added to bound cost after the whole-transcript version was measured
+at over five minutes. `lockout`'s requirement is "a counted series of at
+least five FAILED authentication attempts ... NONE of them refused", and
+that is a negative universal: every exchange the window drops can only
+help it pass. The window was a cost fix, and nothing re-checked the classes
+whose requirement has that shape.
+
+Measured against the live lab's `/login3`, which locks after five
+attempts. r1-r5 answered 200 "Invalid credentials." and r6 answered 429
+"Account locked - too many attempts". The window around r2 is r1..r5 and
+omits r6. The same excerpt graded `proven` against the window and
+`candidate` against all six, missing "none of them was refused" - and
+`argus next` told the operator to record "this target has no lockout"
+about a target that had just locked the account in the same transcript.
+
+- The window stays as a FILTER and the grade is confirmed against every
+  exchange recorded on that endpoint before anything is recommended. The
+  cost argument survives: only a candidate that already passed the cheap
+  window reaches the confirmation, so it runs at most once per call, where
+  the whole-transcript version graded every candidate that way.
+- `evidence_ids` is now the set the grade was computed from. It was
+  `[entry.id]` alone while `grade_if_recorded` came from a multi-exchange
+  citation, so for every class needing a pair or a series the promise was
+  unreachable with the evidence offered. An operator who cites exactly what
+  the ledger hands them now gets exactly what the ledger promised, and the
+  test asserts that by re-grading those ids.
+- The first version of that second test called the helper directly and read
+  the citation off its return value, so it never touched the line that
+  builds `evidence_ids` - putting the single-id citation back left it
+  green. It drives `next_action` now. Fourth time this stretch the
+  instrument was the defect, and the first of the four caught by planting
+  rather than shipped.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 686 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 688 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

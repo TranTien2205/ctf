@@ -334,14 +334,24 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
     unrecorded = _unrecorded_proof(exchanges, recorded, claimed_ids, max_scan,
                                    by_shape)
     if unrecorded is not None:
-        klass, entry, verdict = unrecorded
+        klass, entry, verdict, cited = unrecorded
+        # The ids handed over are the ones the grade was computed from. They
+        # used to be `[entry.id]` alone while `grade_if_recorded` came from
+        # a multi-exchange citation, so the promise was unreachable with the
+        # evidence offered: every class whose requirement needs a pair or a
+        # series grades lower on one entry than the number printed beside
+        # it. An operator who cites exactly what the ledger hands them must
+        # get exactly what the ledger promised.
+        ids = [str(e.get("id")) for e in cited if e.get("id")]
+        if str(entry.get("id")) not in ids:
+            ids.insert(0, str(entry.get("id")))
         return Action(
             "record_finding",
             f"request {entry.get('id')} already meets the proof requirement "
-            f"for {klass}, and no finding records it. Record it with that "
-            f"exchange cited before probing anything else.",
+            f"for {klass}, and no finding records it. Record it with the "
+            f"{len(ids)} cited exchange(s) before probing anything else.",
             target=_endpoint(entry), vuln_class=klass,
-            detail={"evidence_ids": [entry.get("id")],
+            detail={"evidence_ids": ids,
                     "requirement": verdict.requirement,
                     "grade_if_recorded": verdict.grade})
 
@@ -490,10 +500,40 @@ def _unrecorded_proof(exchanges: list[dict], recorded: set[str],
         # five minutes. The local window is the honest middle: it is what a
         # tester would cite, and it is O(1) per candidate.
         cited = _neighbours(entry, by_shape)
+        group = by_shape.get(proof._endpoint_shape(entry)) or [entry]
         for excerpt in _excerpts(proof.resp_body(entry)):
             verdict = proof.grade(klass, excerpt, cited)
-            if verdict.proven:
-                return klass, entry, verdict
+            if not verdict.proven:
+                continue
+            # The window is a FILTER, not the evidence. For a requirement
+            # that is a negative universal - lockout's is "a counted series
+            # of at least five FAILED attempts ... NONE of them refused" -
+            # removing exchanges is strictly favourable, so a window can
+            # only ever grade the same or higher than the full record. The
+            # window was introduced to bound cost (the whole-transcript
+            # version was measured at over five minutes) and nothing
+            # re-checked the classes whose requirement is a count.
+            #
+            # Measured against the live lab's `/login3`, which locks after
+            # five attempts: r1-r5 answered 200 "Invalid credentials." and
+            # r6 answered 429 "Account locked - too many attempts". The
+            # window around r2 is r1..r5 and omits r6. The SAME excerpt
+            # graded `proven` against the window and `candidate` against
+            # all six, missing `['none of them was refused']` - so the
+            # ledger, which is sold as the reader that cannot be talked
+            # round because it never saw the conversation, told the
+            # operator to record "this target has no lockout" about a
+            # target that had just locked the account.
+            #
+            # So: confirm against everything recorded on this endpoint
+            # before recommending. The cost argument survives because this
+            # runs at most once per call - only a candidate that already
+            # passed the cheap window gets here - while the whole-transcript
+            # version graded every candidate that way.
+            confirmed = proof.grade(klass, excerpt, group)
+            if not confirmed.proven:
+                continue
+            return klass, entry, confirmed, group
     return None
 
 

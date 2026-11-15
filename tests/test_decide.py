@@ -634,3 +634,109 @@ def test_the_proof_gap_action_carries_the_tool_chain():
     import inspect
     src = inspect.getsource(decide)
     assert '"tool_chain": list(CLASS_TOOL_CHAIN.get(klass, ()))' in src
+
+
+def _auth_attempt(rid, status, body, ts, url="http://t.test/login"):
+    """One recorded login attempt, shaped the way the lockout class reads it.
+
+    `_is_auth_attempt` needs a credential FIELD in the request text and
+    `_auth_failed` needs a failure word in a 2xx body, so a fixture without
+    both is not a series at all and grades `unproven` for a reason that has
+    nothing to do with what is being tested here.
+    """
+    return {"id": rid, "ts": ts, "tool": "probe_lockout",
+            "request": {"method": "POST", "url": url,
+                        "headers": {"host": "t.test"},
+                        "body": "username=admin&password=hunter2"},
+            "response": {"status": status, "headers": {}, "body": body,
+                         "elapsed_ms": 50.0}}
+
+
+_FAILED = "<html><body>Invalid credentials.</body></html>"
+_LOCKED = "<html><body>Account locked - too many attempts</body></html>"
+
+
+def test_the_ledger_confirms_against_everything_recorded_not_its_window():
+    """Removing evidence can only make a negative universal easier.
+
+    Rule 1 cites a candidate plus its +-3 NEIGHBOURS on the same endpoint,
+    a window added to bound cost after the whole-transcript version was
+    measured at over five minutes. `lockout`'s requirement is "a counted
+    series of at least five FAILED authentication attempts ... NONE of them
+    refused", which is a negative universal: every exchange the window
+    drops can only help it pass. Nothing re-checked the classes whose
+    requirement has that shape.
+
+    Measured against the live lab's `/login3`, which locks after five
+    attempts, and reproduced synthetically here: r1-r5 answer 200 "Invalid
+    credentials." and r6 answers 429 "Account locked". The window around r2
+    is r1..r5 and omits r6. The same excerpt grades `proven` against the
+    window and `candidate` against all six, missing "none of them was
+    refused" - so the ledger, the one reader that is supposed to be immune
+    to a tired model because it never saw the conversation, originated a
+    false positive by itself and told the operator to record "this target
+    has no lockout" about a target that had just locked the account.
+    """
+    from argus import decide, proof
+
+    rows = [_auth_attempt(f"r{i}", 200, _FAILED, 1000.0 + i)
+            for i in range(1, 6)]
+    rows.append(_auth_attempt("r6", 429, _LOCKED, 1006.0))
+    by_shape = {}
+    for e in rows:
+        by_shape.setdefault(proof._endpoint_shape(e), []).append(e)
+
+    # the gap itself, so a future change to _NEIGHBOURS cannot make this
+    # test pass for the wrong reason
+    window = decide._neighbours(rows[1], by_shape)
+    assert [e["id"] for e in window] == ["r1", "r2", "r3", "r4", "r5"]
+    assert proof.grade("lockout", _FAILED, window).grade == "proven"
+    full = proof.grade("lockout", _FAILED, rows)
+    assert full.grade != "proven" and "none of them was refused" in full.missing
+
+    assert decide._unrecorded_proof(rows, set(), set(), 150, by_shape) is None, \
+        "the ledger recommends recording `no lockout` against a target that " \
+        "answered 429 Account locked in the same transcript"
+
+
+def test_the_ledger_hands_over_the_evidence_its_promise_was_computed_from(
+        tmp_path):
+    """`grade_if_recorded` has to be reachable with the ids beside it.
+
+    The grade came from a multi-exchange citation and `evidence_ids` was
+    `[entry.id]` alone, so for every class whose requirement needs a pair
+    or a series the promise was unreachable with the evidence offered. An
+    operator who cites exactly what the ledger hands them must get exactly
+    what the ledger promised - that is the whole claim of a ledger
+    "computed from recorded evidence".
+    """
+    from argus import decide, proof
+
+    # a target with no lockout at all: six failures, nothing refused
+    rows = [_auth_attempt(f"r{i}", 200, _FAILED, 1000.0 + i)
+            for i in range(1, 7)]
+    by_shape = {}
+    for e in rows:
+        by_shape.setdefault(proof._endpoint_shape(e), []).append(e)
+
+    # Driven through `next_action`, which is where `evidence_ids` is built.
+    # A first version of this test called `_unrecorded_proof` directly and
+    # read `cited` off its return value - so it never touched the line it
+    # exists to pin, and putting the single-id citation back left it green.
+    action = decide.next_action(_session(tmp_path, entries=rows))
+    assert action.action == "record_finding", action
+    assert action.vuln_class == "lockout", action
+    promised = action.detail["grade_if_recorded"]
+    ids = [str(i) for i in action.detail["evidence_ids"]]
+    assert promised == "proven", action.detail
+
+    by_id = {str(e["id"]): e for e in rows}
+    regraded = proof.grade("lockout", _FAILED, [by_id[i] for i in ids])
+    assert regraded.grade == promised, (
+        f"the ledger promises {promised} and the ids it hands over "
+        f"({ids}) grade {regraded.grade}")
+    # and one entry alone does NOT reach it, which is what made the old
+    # single-id citation a false promise rather than a redundant one
+    alone = proof.grade("lockout", _FAILED, [rows[1]])
+    assert alone.grade != "proven", (
+        "if one entry were enough, there would have been nothing to fix")
