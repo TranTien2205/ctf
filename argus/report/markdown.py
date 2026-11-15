@@ -497,7 +497,7 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         pass  # html is a convenience; the markdown report is canonical
     try:
         from .sarif import render_sarif
-        render_sarif(session)
+        render_sarif(session, extra)
     except Exception:
         pass  # sarif is CI-integrations glue; never block the report
     return path

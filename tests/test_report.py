@@ -361,3 +361,113 @@ def test_a_session_with_no_start_stamp_reports_unknown_not_1970(tmp_path):
     healthy = (fdir / "report.md").read_text(encoding="utf-8")
     assert "- **Date:** unknown" not in healthy
     assert "- **Duration:** unknown" not in healthy
+
+
+def _rendered(tmp_path, *, error="", dispute=False):
+    """One rendered session, so three artifacts can be compared side by side."""
+    import json
+    from argus.config import Config
+    from argus.session import Session
+    from argus.report.markdown import render_report
+    from pathlib import Path
+    cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                 session_dir=tmp_path)
+    s = Session(tmp_path, cfg.target, meta={"t": True})
+    if dispute:
+        s.findings = [{
+            "id": "F01", "severity": "high", "title": "SQLi in q",
+            "category": "sqli", "url": "http://127.0.0.1:9/s",
+            "grade": "proven", "description": "d", "remediation": "r",
+            "evidence_excerpt": "root:x:0:0", "evidence_ids": [],
+            "vuln_class": "sqli", "proof": {"checks": []},
+            "disputed": True, "severity_claimed": "critical",
+            "class_disputed": "disclosure",
+            "judge": {"judge_model": "gpt-5-mini", "agrees": False,
+                      "reason": "only one response is cited",
+                      "missing": ["a benign-input control"]}}]
+    render_report(s, cfg, summary="",
+                  extra={"error": error} if error else {})
+    d = Path(s.dir)
+    return {
+        "md": (d / "report.md").read_text(encoding="utf-8"),
+        "html": (d / "report.html").read_text(encoding="utf-8"),
+        "sarif": json.loads((d / "report.sarif").read_text(encoding="utf-8")),
+    }
+
+
+def test_a_run_that_died_is_not_a_clean_assessment_in_ANY_artifact(tmp_path):
+    """"A dead run looks clean" was fixed in one reader out of three.
+
+    `render_html` took `extra` in its signature and read it nowhere in its
+    body, while `render_report` passed it in. Measured before this test
+    existed: the same session rendered with `extra["error"]` set exactly as
+    `loop.py` sets it, and without, produced two report.html files
+    IDENTICAL after normalising the session id and timestamps. The dead
+    run's page said "No findings recorded." and footered "every finding
+    cites verbatim response bytes verified against the recorded
+    transcript". report.md differed correctly by its banner.
+
+    `render_sarif` was worse: it was not even given `extra`, and wrote the
+    literal `executionSuccessful: True` on every render. A run that died on
+    authentication emitted that with `results: []`, which is the wire shape
+    of a scan that completed and found nothing - and GitHub code scanning,
+    Azure DevOps and most CI dashboards read exactly that field to tell
+    "scanned, clean" from "scan broke".
+
+    report.html is the file `test_report_html_is_self_contained` calls the
+    one handed to a reader, and SARIF is the one a pipeline gates on. Both
+    said the engagement was fine.
+    """
+    err = "Anthropic API error 401: invalid x-api-key"
+    dead = _rendered(tmp_path / "dead", error=err)
+    clean = _rendered(tmp_path / "clean")
+
+    for name in ("md", "html"):
+        assert dead[name] != clean[name], (
+            f"report.{name} renders a run that died identically to a clean "
+            "assessment")
+        assert "RUN DID NOT COMPLETE" in dead[name], \
+            f"report.{name} does not say the run died"
+    assert err in dead["html"], "report.html hides which error stopped the run"
+
+    inv = dead["sarif"]["runs"][0]["invocations"][0]
+    assert inv["executionSuccessful"] is False, \
+        "SARIF calls a run that died a successful scan"
+    notes = inv.get("toolExecutionNotifications") or []
+    assert notes and err in notes[0]["message"]["text"]
+    # ...and the clean one must still read as a clean, successful scan
+    ok = clean["sarif"]["runs"][0]["invocations"][0]
+    assert ok["executionSuccessful"] is True
+    assert not ok.get("toolExecutionNotifications")
+
+
+def test_a_dispute_reaches_every_artifact_not_just_report_md(tmp_path):
+    """Cross-verification exists so a disagreement reaches a human.
+
+    `apply_verdict` writes `judges`, `judge`, `disputed`,
+    `severity_claimed` and `class_disputed`. `_proof_html` read none of
+    them and neither did SARIF, so a `proven` finding a second model
+    disputed kept an unqualified green `PROOF: PROVEN` badge in the
+    client's page - no occurrence of "disput" anywhere in the file - and
+    `kind: fail` / `level: error` / `rank: 9.5` in SARIF, breaking the
+    build on a finding a second model read as a different class entirely.
+    A severity the judge lowered vanished the same way: the reduced value
+    shown with no record it had been claimed higher.
+    """
+    r = _rendered(tmp_path, dispute=True)
+    assert "DISPUTED" in r["md"].upper()
+    for token in ("DISPUTED", "gpt-5-mini", "critical", "disclosure",
+                  "only one response is cited"):
+        assert token in r["html"], f"report.html drops {token!r}"
+
+    res = r["sarif"]["runs"][0]["results"][0]
+    assert res["kind"] == "review", \
+        f"a disputed finding is still kind={res['kind']}"
+    assert res["level"] == "none" and res["rank"] < 0, \
+        "a disputed finding still breaks the build"
+    p = res["properties"]
+    assert p["argus-disputed"] is True
+    assert p["argus-judge-model"] == "gpt-5-mini"
+    assert p["argus-class-disputed"] == "disclosure"
+    assert p["argus-severity-claimed"] == "critical"
+    assert "DISPUTED" in res["message"]["text"]

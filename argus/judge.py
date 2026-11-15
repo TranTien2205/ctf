@@ -316,7 +316,26 @@ def parse_verdict(text: str, finding_id: str, judge_model: str) -> Verdict:
                        error="the judge returned no JSON object carrying "
                              "`agrees`; recorded as no verdict, not as assent",
                        reason=raw.strip()[:300])
-    if len({bool(d.get("agrees")) for d in found}) > 1:
+    # `_as_bool`, not `bool`. Twenty lines below, this module already says
+    # why: "`bool()` on the reply made a judge answering `"agrees": "false"`
+    # read as AGREEING - any non-empty string is truthy. Of all the ways to
+    # be wrong here that is the worst one." That fix landed on the value and
+    # not on this comparison, so the contradiction DETECTOR kept the
+    # coercion the value no longer used - a half-fix, and the half left
+    # behind is the one that decides whether a refusal is even seen.
+    #
+    # Measured against `parse_verdict`: a reply refusing in words and then
+    # restating the format - `{"agrees": "false", "reason": "only one
+    # response is cited"}` followed by `{"agrees": true}` - came back
+    # `agrees=True`, no error, carrying the refusal's own reason as the
+    # agreement's reason. Same for `"no"` and `"0"`, which is every spelling
+    # in `_FALSE`. With a real JSON `false` the contradiction fired, which
+    # is the only case the test above covered.
+    #
+    # `_as_bool` returns None for anything that is neither, and None is a
+    # distinct member of this set, so an unparseable answer beside a `true`
+    # is a contradiction too. That is the fail-closed direction: no verdict.
+    if len({_as_bool(d.get("agrees")) for d in found}) > 1:
         # A model that illustrated the format and then answered, and a model
         # that answered and then hedged, produce the same two objects in the
         # same order. Picking one would be a guess, and a guess that lands on

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ipaddress
 import posixpath
+import re
 import socket
 import urllib.parse
 
@@ -63,6 +64,39 @@ def _ip_private(ip: ipaddress.IPv4Address | ipaddress.IPv6Address) -> bool:
     """
     return (ip.is_private or ip.is_loopback or ip.is_link_local
             or ip.is_reserved or ip.is_multicast)
+
+
+def _collapse(path: str) -> str:
+    """Normalize a path the way a target will, duplicate separators included.
+
+    `posixpath.normpath` is POSIX-faithful about one thing that is wrong
+    here: a path beginning with EXACTLY two slashes is implementation-defined,
+    so normpath preserves it. `///admin` collapses to `/admin` and `//admin`
+    does not. Three exclusion bypasses came out of that single rule, and all
+    three are inside the threat model the comments in `check` already state:
+
+      `//admin`     normpath keeps it, so it matched no `/admin` rule;
+                    nginx and Apache merge duplicate slashes by default, so
+                    the request reaches the excluded resource
+      `/%2fadmin`   the unquote loop above turns it into `//admin`, and then
+                    the same rule applies. httpx sends `/%2fadmin` raw, so
+                    the decoding happens at the target
+      `/\\admin`     the backslash fold produces `//admin` too, which is the
+                    IIS case the fold exists for
+
+    Measured against this guard with `--exclude /admin`: `/admin`, `/ADMIN`,
+    `/x/../admin`, `/%61dmin`, `///admin` and `/%2F%2Fadmin` were all
+    refused, while those three were allowed. So the normalization was not
+    missing - it disagreed with itself about how many slashes mattered.
+
+    Collapsing runs of slashes before and after normpath is safe in the
+    direction this code already chose: over-blocking an operator-declared
+    no-go area is the error to prefer, and `/administrator` is still not
+    `/admin` because every comparison is `== prefix` or `prefix + "/"`.
+    """
+    collapsed = re.sub(r"/{2,}", "/", path)
+    collapsed = posixpath.normpath(collapsed)
+    return re.sub(r"/{2,}", "/", collapsed)
 
 
 class ScopeGuard:
@@ -129,7 +163,7 @@ class ScopeGuard:
             if dec == norm:
                 break
             norm = dec
-        norm = posixpath.normpath(norm)
+        norm = _collapse(norm)
         if not norm.startswith("/"):
             norm = "/" + norm
         # IIS-class targets fold case and treat '\' as a separator, so an
@@ -138,8 +172,7 @@ class ScopeGuard:
         # for an operator-declared no-go area.
         lowered = path.lower()
         norm_l = norm.lower()
-        folded = norm_l.replace("\\", "/")
-        folded = posixpath.normpath(folded)
+        folded = _collapse(norm_l.replace("\\", "/"))
         for prefix in self.exclude_paths:
             p = (prefix or "").lower()
             if p and (path == prefix or path.startswith(prefix + "/")

@@ -69,8 +69,78 @@ def _esc(s) -> str:
     return html.escape(str(s or ""))
 
 
+def _judge_html(f: dict) -> str:
+    """What cross-verification decided, in the artifact the client reads.
+
+    `judge.apply_verdict` writes five fields - `judges`, `judge`,
+    `disputed`, `severity_claimed`, `class_disputed` - and this renderer
+    read none of them. Measured by driving the sequence `argus judge`
+    performs: report.md printed "DISPUTED by cross-verification", while
+    report.html showed an unqualified green `PROOF: PROVEN` and contained
+    no occurrence of "disput" at all. A severity the judge lowered
+    vanished the same way: the reduced value was shown with no record that
+    it had ever been claimed higher.
+
+    Cross-verification exists so a second model's disagreement reaches a
+    human. In the one artifact handed to that human it reached nobody.
+    """
+    j = f.get("judge") if isinstance(f.get("judge"), dict) else {}
+    disputed = bool(f.get("disputed"))
+    claimed = f.get("severity_claimed")
+    klass = f.get("class_disputed")
+    if not (j or disputed or claimed or klass):
+        return ""
+    bits = []
+    if disputed:
+        bits.append("<b>DISPUTED by cross-verification</b>"
+                    + (f" ({_esc(j.get('judge_model') or '')})"
+                       if j.get("judge_model") else ""))
+    elif j:
+        bits.append("Cross-verification: "
+                    + ("agreed" if j.get("agrees") else "no verdict")
+                    + (f" ({_esc(j.get('judge_model') or '')})"
+                       if j.get("judge_model") else ""))
+    if j.get("reason"):
+        bits.append(f"Reason: <i>{_esc(str(j['reason'])[:600])}</i>")
+    miss = [str(m) for m in (j.get("missing") or [])]
+    if miss:
+        bits.append("Would settle it: "
+                    + ", ".join(_esc(m) for m in miss[:8]))
+    if klass:
+        bits.append(f"Class disputed: read as <code>{_esc(str(klass))}</code>")
+    if claimed:
+        bits.append(f"Severity was claimed <code>{_esc(str(claimed))}</code>"
+                    + (" (unrated before the judge)"
+                       if f.get("severity_was_unrated") else "")
+                    + f", shown as <code>{_esc(f.get('severity') or '')}</code>")
+    style = ("border-left:6px solid #c0392b;background:#fdf2f0"
+             if disputed else "border-left:6px solid #999;background:#f4f4f4")
+    return (f"<div style=\"{style};padding:.6rem .9rem;margin:.8rem 0\">"
+            + "<br>".join(bits) + "</div>")
+
+
 def render_html(session: Session, cfg: Config, summary: str = "",
                 extra: dict | None = None) -> Path:
+    # `extra` was in this signature and read nowhere in the body, while
+    # `markdown.render_report` passed it in. Measured: rendering the same
+    # session twice, once with `extra["error"]` set exactly as `loop.py`
+    # sets it and once without, produced two report.html files IDENTICAL
+    # after normalising the session id and timestamps - the dead run's page
+    # said "No findings recorded." and footered "every finding cites
+    # verbatim response bytes verified against the recorded transcript",
+    # with no mention of the failure. report.md differed correctly by its
+    # banner. The fix for "a dead run looks clean" landed in one of three
+    # readers, and the one it missed is the one the client is handed.
+    extra = dict(extra or {})
+    run_error = str(extra.get("error") or "").strip()
+    banner = (
+        "<div style=\"border:3px solid #7c1d1d;background:#fdecea;"
+        "padding:1rem 1.2rem;margin:1rem 0;border-radius:6px\">"
+        "<b style=\"color:#7c1d1d\">RUN DID NOT COMPLETE.</b> "
+        f"<code>{_esc(run_error)}</code><br>"
+        "Every figure on this page describes an incomplete run. Findings "
+        "may be missing because the run stopped, not because the target is "
+        "clean.</div>") if run_error else ""
     coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
@@ -116,6 +186,8 @@ def render_html(session: Session, cfg: Config, summary: str = "",
                f"{_GRADE_COLOR.get(f.get('grade', ''), '#999')}'>"
                f"PROOF: {_esc(f.get('grade', '')).upper()}</span> &nbsp; "
                if f.get("grade") else "")
+            + ("<span class='badge' style='background:#7c1d1d'>DISPUTED"
+               "</span> &nbsp; " if f.get("disputed") else "")
             + f"<b>Category:</b> {_esc(f['category'])} &nbsp; "
             f"<b>Endpoint:</b> <code>{_esc(f['url'])}</code>"
             + (f" &nbsp; <b>CVSS:</b> <code>{_esc(f['cvss'])}</code>"
@@ -128,7 +200,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
             f"<p><b>Proof (verbatim excerpt)</b></p>"
             f"<pre>{_esc(f['evidence_excerpt'][:1200])}</pre>"
             f"{ex}<p><b>Remediation</b><br>{_esc(f['remediation'])}</p>"
-            f"{_proof_html(f)}</div>")
+            f"{_judge_html(f)}{_proof_html(f)}</div>")
 
     meta = {}
     mp = session.dir / "meta.json"
@@ -170,6 +242,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 <title>Argus report - {_esc(session.id)}</title><style>{_CSS}</style></head>
 <body>
 <h1>Penetration Test Report</h1>
+{banner}
 <p class="meta"><b>Session:</b> {_esc(session.id)}<br>
 <b>Date:</b> {_esc(time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(session.started)))}<br>
 <b>Agent model:</b> {_esc(cfg.model)} &nbsp; <b>Requests:</b> {session._seq} &nbsp; <b>Argus:</b> {_esc(str(meta.get('argus_version') or __version__))}{('<br><b>Operator:</b> ' + _esc(meta['operator'])) if meta.get('operator') else ''}</p>

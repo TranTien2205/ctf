@@ -167,6 +167,40 @@ def test_two_contradicting_objects_are_no_verdict_rather_than_a_guess():
     assert "contradict" in verdict.error
 
 
+def test_a_refusal_in_WORDS_contradicts_a_later_true():
+    """The test above used real JSON booleans - the one case `bool()` got right.
+
+    `_FALSE = {"false", "no", "0"}` is in this module because a judge
+    answers in words, and every one of those words is truthy under
+    `bool()`. The contradiction detector used `bool()` while the value it
+    guards used `_as_bool`, so a reply that refused in words and then
+    restated the format was not seen as contradicting, the trailing `true`
+    was taken, and the recorded verdict read `"agrees": true` while
+    carrying the refusal's own reason.
+
+    That is the one failure this module names as the worst it can have:
+    "a guess landing on `agrees` manufactures assent". It did not even
+    guess - it did not notice there was a disagreement.
+    """
+    for word in ("false", "no", "0", "FALSE", "No"):
+        verdict = judge.judge_finding(
+            _LLM('{"agrees": "%s", "reason": "only one response is cited; '
+                 'no control shows the quote depended on the payload"}\n'
+                 'Format reminder: {"agrees": true}' % word),
+            FINDING, [ENTRY], "gpt-4.1")
+        assert verdict.agrees is False, (
+            f'`agrees: {word!r}` then `true` was recorded as agreement: '
+            f'{verdict}')
+        assert "contradict" in (verdict.error or ""), verdict
+
+    # and an answer that is neither, beside a `true`, is also no verdict
+    # rather than the `true` - None is its own member of that set
+    verdict = judge.judge_finding(
+        _LLM('{"agrees": "maybe", "reason": "unsure"}\n{"agrees": true}'),
+        FINDING, [ENTRY], "gpt-4.1")
+    assert verdict.agrees is False and verdict.error, verdict
+
+
 def test_two_agreeing_objects_resolve_to_the_fuller_one():
     verdict = judge.judge_finding(
         _LLM('First pass: {"agrees": false}\nFinal: '

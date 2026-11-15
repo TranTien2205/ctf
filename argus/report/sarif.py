@@ -24,13 +24,34 @@ _KIND = {"proven": "fail", "candidate": "review", "unproven": "review",
          "refused": "informational"}
 
 
-def render_sarif(session: Session) -> Path:
+def render_sarif(session: Session, extra: dict | None = None) -> Path:
+    """The machine contract. Two fields in it were invented on every render.
+
+    `executionSuccessful` was the literal `True`, and this function was not
+    even given the dict that carries a run's terminal error - markdown.py
+    called it with the session alone, so it had no way to know. A run that
+    died on authentication emitted `executionSuccessful: true` with
+    `results: []`, which is the exact wire shape of a scan that completed
+    and found nothing. GitHub code scanning, Azure DevOps and most CI
+    security dashboards read that field to tell "scanned, clean" from "scan
+    broke", so a pipeline wired to argus went green on an engagement that
+    sent one request because the key was wrong.
+
+    A disputed finding was invented the other way: `apply_verdict` records
+    `disputed`, and nothing here read it, so a `proven` row a second model
+    disagreed with kept `kind: fail`, `level: error` and `rank: 9.5` and
+    broke the build. A dispute cannot raise a finding's standing in this
+    system and it must not be silently dropped either, so it becomes
+    `kind: review` - SARIF's "a human should look" - and carries
+    `argus-disputed` for a dashboard that wants to decide for itself.
+    """
     sev_order = list(_LEVEL)
     grade_order = {"proven": 0, "candidate": 1, "unproven": 2, "refused": 3}
     findings = sorted(sanitized_findings(session.findings), key=lambda f: (
         grade_order.get(f.get("grade") or "", 0),
         sev_order.index(f.get("severity"))
         if f.get("severity") in sev_order else len(sev_order)))
+    _run_error = str((extra or {}).get("error") or "").strip()
     rules: dict[str, dict] = {}
     results = []
     for f in findings:
@@ -58,7 +79,14 @@ def render_sarif(session: Session) -> Path:
         kind = _KIND.get(grade, "review")
         verdict = f.get("proof") if isinstance(f.get("proof"), dict) else {}
         missing = [str(m) for m in (verdict.get("missing") or [])]
+        judged = f.get("judge") if isinstance(f.get("judge"), dict) else {}
+        disputed = bool(f.get("disputed"))
+        if disputed:
+            kind = "review"
         prefix = "" if kind == "fail" else f"[{grade.upper()}] "
+        if disputed:
+            who = str(judged.get("judge_model") or "a second model")
+            prefix = f"[DISPUTED by {who}, grade {grade.upper()}] "
         results.append({
             "ruleId": rule_id,
             "kind": kind,
@@ -79,6 +107,11 @@ def render_sarif(session: Session) -> Path:
             "properties": {
                 "argus-severity": f.get("severity", ""),
                 "argus-grade": grade,
+                "argus-disputed": disputed,
+                "argus-judge-model": str(judged.get("judge_model") or ""),
+                "argus-judge-reason": str(judged.get("reason") or "")[:500],
+                "argus-class-disputed": str(f.get("class_disputed") or ""),
+                "argus-severity-claimed": str(f.get("severity_claimed") or ""),
                 "argus-vuln-class": f.get("vuln_class", ""),
                 "argus-proof-requirement": str(verdict.get("requirement") or ""),
                 "argus-proof-missing": missing,
@@ -109,9 +142,14 @@ def render_sarif(session: Session) -> Path:
             }},
             "results": results,
             "invocations": [{
-                "executionSuccessful": True,
+                "executionSuccessful": not _run_error,
                 "startTimeUtc": time.strftime(
                     "%Y-%m-%dT%H:%M:%SZ", time.gmtime(session.started)),
+                **({"toolExecutionNotifications": [{
+                    "level": "error",
+                    "message": {"text":
+                                "RUN DID NOT COMPLETE: " + _run_error},
+                }]} if _run_error else {}),
             }],
         }],
     }

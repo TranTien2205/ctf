@@ -3153,12 +3153,91 @@ paths absolute and relative, target-list files, output paths, port lists,
 a header value - still pass, because the host classifier makes a
 single-label token prove it resolves before anyone calls it a target.
 
+### One slash too many was a different path
+
+`--exclude /admin` refused `/admin`, `/ADMIN`, `/x/../admin`, `/%61dmin`,
+`///admin` and `/%2F%2Fadmin`, and allowed `//admin`, `/%2fadmin` and
+`/\admin`. One rule behind all three: `posixpath.normpath` is
+POSIX-faithful about a path beginning with EXACTLY two slashes being
+implementation-defined, so it preserves `//admin` while collapsing
+`///admin` to `/admin`. The guard was refusing more slashes than it
+allowed - a normalization that disagreed with itself, not one that was
+missing.
+
+All three forms are inside the threat model the surrounding comments
+already state. `//admin` goes on the wire as-is and nginx and Apache merge
+duplicate slashes by default. httpx sends `/%2fadmin` raw
+(`raw_path=b'/%2fadmin'`), so the target decodes it and lands in the same
+place. `/\admin` is the IIS separator the case-and-backslash fold exists
+for, and that fold produced `//admin`, which the same rule then spared.
+
+- `scope._collapse` squeezes runs of separators before and after normpath.
+  Sixteen hostile spellings now refused, including `/%5cadmin`, which was
+  not in the report. Six legitimate paths still allowed, `/administrator`
+  among them, because every comparison is `== prefix` or `prefix + "/"`.
+- Over-blocking an operator-declared no-go area is the error this code
+  already chose to prefer, which is what makes collapsing safe here.
+
+### The judge's contradiction detector kept the coercion the value had dropped
+
+`judge.py` exists so that "a judge can lower a grade or dispute a finding.
+It can never raise one", and `_as_bool` exists because, in this module's
+own words, "`bool("false")` is True, which is how a judge that disagreed
+was recorded as agreeing". That fix landed on the value and not on the
+comparison twenty lines above it, so the contradiction DETECTOR still read
+`bool(d.get("agrees"))` - and the half left behind is the half that decides
+whether a refusal is noticed at all.
+
+Measured against `parse_verdict`: a reply refusing in words and then
+restating the format - `{"agrees": "false", "reason": "only one response is
+cited"}` followed by `{"agrees": true}` - came back `agrees=True`, no
+error, carrying the refusal's own reason as the agreement's reason. Same
+for `"no"` and `"0"`, which is every spelling in `_FALSE`. With a real JSON
+`false` the contradiction fired correctly, and that is the only case the
+existing test covered.
+
+- `_as_bool` in the detector. It returns None for anything that is neither,
+  and None is a distinct member of that set, so an unparseable answer
+  beside a `true` is a contradiction too - no verdict, which is the
+  fail-closed direction.
+
+### A dead run read as clean, and a dispute reached nobody, in two of three artifacts
+
+"A dead run looks clean" was fixed once in three readers.
+
+- `render_html` took `extra` in its signature and read it nowhere in its
+  body, while `render_report` passed it in. Measured: the same session
+  rendered with `extra["error"]` set exactly as `loop.py` sets it, and
+  without, produced two report.html files IDENTICAL after normalising the
+  session id and timestamps. The dead run's page said "No findings
+  recorded." and footered "every finding cites verbatim response bytes
+  verified against the recorded transcript". report.md differed correctly.
+  report.html is the file this suite calls the one handed to a reader.
+- `render_sarif` was not even given `extra` - `markdown.py` called it with
+  the session alone - and wrote the literal `executionSuccessful: True` on
+  every render. A run that died on authentication emitted that with
+  `results: []`, the wire shape of a scan that completed and found nothing.
+  GitHub code scanning, Azure DevOps and most CI dashboards read that field
+  to tell "scanned, clean" from "scan broke". It is now `not _run_error`,
+  with the error carried as a `toolExecutionNotifications` entry.
+- Neither renderer read any of the five fields `judge.apply_verdict`
+  writes. A `proven` finding a second model disputed kept an unqualified
+  green `PROOF: PROVEN` badge with no occurrence of "disput" anywhere in
+  the file, and `kind: fail` / `level: error` / `rank: 9.5` in SARIF -
+  breaking a build on a finding that model read as a different class. A
+  severity the judge lowered vanished the same way: the reduced value shown
+  with no record it had been claimed higher. HTML now carries a DISPUTED
+  badge and a block naming the judge, its reason, what would settle it, the
+  disputed class and the claimed severity; SARIF drops to `kind: review`,
+  `level: none`, negative rank, and carries `argus-disputed` for a
+  dashboard that wants to decide for itself.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 678 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 682 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

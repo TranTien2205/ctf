@@ -105,6 +105,44 @@ def test_excluded_path_iis_bypass_denied():
     g.check("https://target.example/administrator")  # no over-block
 
 
+def test_one_slash_too_many_is_not_a_different_path():
+    """Three bypasses, one rule: normpath preserves exactly two slashes.
+
+    `posixpath.normpath` is POSIX-faithful about a path beginning with
+    exactly two slashes being implementation-defined, so it leaves
+    `//admin` alone while collapsing `///admin` to `/admin`. The guard was
+    therefore refusing MORE slashes than it allowed, which is the shape of
+    a normalization that disagrees with itself rather than one that is
+    missing.
+
+    All three forms are inside the threat model the two tests above
+    already state. `//admin` goes on the wire as-is and nginx and Apache
+    merge duplicate slashes by default. `/%2fadmin` is sent raw by httpx -
+    `raw_path=b'/%2fadmin'` - so the target does the decoding and lands in
+    the same place. `/\\admin` is the IIS separator the fold above exists
+    for, and the fold produced `//admin`, which the same rule then spared.
+    """
+    g = ScopeGuard("https://target.example", exclude_paths=["/admin"],
+                   allow_private=False)
+    for u in ("https://target.example//admin",
+              "https://target.example//ADMIN",
+              "https://target.example/%2fadmin",
+              "https://target.example/%2Fadmin",
+              "https://target.example/\\admin",
+              "https://target.example/%5cadmin",
+              "https://target.example//admin/panel",
+              "https://target.example/x/..//admin"):
+        with pytest.raises(ScopeError, match="excluded"):
+            g.check(u)
+    # collapsing separators must not swallow a sibling, and over-blocking
+    # here would be a silent loss of coverage rather than a loud one
+    for u in ("https://target.example//administrator",
+              "https://target.example//admin-tools",
+              "https://target.example/x/admin",
+              "https://target.example//public"):
+        g.check(u)
+
+
 def test_private_refused_by_default():
     g = ScopeGuard("https://target.example", extra_hosts=["internal.example"],
                    allow_private=False)
