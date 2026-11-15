@@ -924,7 +924,11 @@ def main(argv: list[str] | None = None) -> int:
                 "ttf": s.get("time_to_first_finding_s"),
                 "duration_s": s.get("duration_s"),
                 "coverage": len(_eps) if isinstance(_eps, list) else 0,
-                "llm_calls": s.get("llm_calls", 0),
+                # NOT `s.get("llm_calls", 0)`. A missing key defaulted
+                # to zero folded a fabricated measurement into the median
+                # and, worse, made the all-or-nothing guard unable to fire -
+                # the value list looked complete. Absent is absent.
+                "llm_calls": s.get("llm_calls"),
                 "tokens": _tok if isinstance(_tok, dict) else {},
                 "cost": s.get("llm_cost")
                         if isinstance(s.get("llm_cost"), dict) else {},
@@ -1581,7 +1585,17 @@ _ARM_METRICS = (
 # time-to-first-finding. A guard written for one metric and not for its
 # two siblings is the half-fix this log keeps recording, and this time the
 # siblings were made nullable after the guard was written.
-_ARM_METRICS_ALL_OR_NOTHING = ("usd", "ttf", "duration_s")
+# A median is a claim about the arm, so a figure only SOME trials carry
+# cannot have one - it would be a median over a subset printed under the
+# arm's full N. The list held `usd` and not the quantities `usd` is computed
+# from: `_flatten` makes `tokens_in`, `tokens_out`, `cache_read` and
+# `cache_write` None the moment a trial's summary.json has no `llm_tokens`,
+# and one real command reaches that state - `argus report` on a session
+# whose summary.json is missing or unparseable takes the no-carry-forward
+# branch and rewrites it without those keys.
+_ARM_METRICS_ALL_OR_NOTHING = ("usd", "ttf", "duration_s", "llm_calls",
+                               "tokens_in", "tokens_out", "cache_read",
+                               "cache_write")
 
 
 def _arm_of(path) -> str:
@@ -1901,7 +1915,18 @@ def _cmd_judge(args) -> int:
                          ensure_ascii=False))
     else:
         for x in verdicts:
-            mark = "AGREES " if x.agrees else "DISPUTES"
+            # Three states, not two. `judge.apply_verdict` already says so -
+            # "A transport failure or an unparseable reply is NO VERDICT,
+            # which this module's own docstring says is not a dispute" - and
+            # it records `disputed` only when `not agrees and not error`.
+            # This accounting looked at `agrees` alone, which an error
+            # verdict sets to False, so an unreachable judge printed
+            # `DISPUTES F01` and summed into "0 agreed, 1 disputed" while
+            # findings.json carried no `disputed` flag and report.md said no
+            # verdict was obtained. The command exits 0, so nothing else
+            # told the operator the cross-verification had not happened.
+            mark = ("AGREES  " if x.agrees else
+                    "NO VERDICT" if x.error else "DISPUTES")
             print(f"{mark} {x.finding_id}: {x.reason or x.error}")
             if x.missing:
                 print(f"         would settle it: {'; '.join(x.missing)}")
@@ -1909,8 +1934,12 @@ def _cmd_judge(args) -> int:
         session.seal_artifacts()
     except OSError as exc:
         print(f"warning: re-seal failed: {exc}", file=sys.stderr)
-    disputed = sum(1 for x in verdicts if not x.agrees)
-    print(f"\n{len(verdicts) - disputed} agreed, {disputed} disputed. "
+    agreed = sum(1 for x in verdicts if x.agrees)
+    no_verdict = sum(1 for x in verdicts if not x.agrees and x.error)
+    disputed = len(verdicts) - agreed - no_verdict
+    tail = (f", {no_verdict} with NO VERDICT (the judge was not reached or "
+            "did not answer - that is not a dispute)" if no_verdict else "")
+    print(f"\n{agreed} agreed, {disputed} disputed{tail}. "
           f"Grades are unchanged: a judge cannot promote a finding.",
           file=sys.stderr)
     return 0

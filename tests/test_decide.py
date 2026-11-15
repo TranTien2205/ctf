@@ -740,3 +740,57 @@ def test_the_ledger_hands_over_the_evidence_its_promise_was_computed_from(
     alone = proof.grade("lockout", _FAILED, [rows[1]])
     assert alone.grade != "proven", (
         "if one entry were enough, there would have been nothing to fix")
+
+
+def test_rule_five_does_not_print_a_probe_call_count_it_cannot_measure():
+    """"about N probe calls" was a constant divided by a count.
+
+    `REQUESTS_PER_PROBE` is 12 for every probe. Measured against the lab,
+    requests recorded per single call: probe_reflection 1, probe_cmdi 3,
+    probe_redirect 3, probe_ssti 8, probe_lfi 8, probe_sqli 11,
+    probe_ssrf 11 - a 1-to-11 spread across 26 probes. So the printed
+    figure was wrong by up to 12x in either direction: at 61 recorded
+    probe_reflection requests, which on this lab is 61 calls, the ledger
+    printed "about 5 probe calls" and `probe_calls_allowed: 5`.
+
+    The transcript carries no call boundary - an entry has chain, id,
+    request, response, tool, ts - so a call count is not derivable from
+    the evidence at all. `requests_sent` and `budget_requests` are, and
+    they are what the operator needs. The budget constant stays a budget,
+    which is policy and not a measurement.
+    """
+    import tempfile
+    from pathlib import Path
+
+    from argus import decide
+    from argus.decide import PROBE_CLASS
+
+    # Rule 5 is below "probe a class this endpoint has not been probed for",
+    # so every class has to have been touched before it can fire - a first
+    # version of this test skipped instead, which asserts nothing.
+    rows, n = [], 0
+
+    def add(tool):
+        nonlocal n
+        n += 1
+        rows.append({
+            "id": f"r{n}", "ts": 1000.0 + n, "tool": tool,
+            "request": {"method": "GET", "url": "http://t.test/s?q=x",
+                        "headers": {}, "body": None},
+            "response": {"status": 200, "headers": {},
+                         "body": "nothing here", "elapsed_ms": 5.0}})
+
+    for tool in sorted(PROBE_CLASS):
+        add(tool)
+    for _ in range(decide.BUDGET_PER_CLASS + 1):
+        add("probe_reflection")
+
+    action = decide.next_action(
+        _session(Path(tempfile.mkdtemp()), entries=rows))
+    assert action.action == "park_and_switch", (action.action, action.why)
+    assert "probe calls" not in action.why, action.why
+    assert "probe_calls_allowed" not in (action.detail or {}), action.detail
+    # what IS derivable from the record: requests, and the budget in requests
+    assert str(action.detail["requests_sent"]) in action.why, action.why
+    assert str(decide.BUDGET_PER_CLASS) in action.why, action.why
+    assert action.detail["budget_requests"] == decide.BUDGET_PER_CLASS

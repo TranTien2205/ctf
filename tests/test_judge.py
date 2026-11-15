@@ -579,3 +579,57 @@ def test_a_credential_does_not_survive_its_own_redaction():
     for plain in ("AKIA is a prefix", "the /admin endpoint returned 200",
                   "SQL injection in the q parameter"):
         assert _scrub(plain) == plain, _scrub(plain)
+
+
+def test_an_unreachable_judge_is_reported_as_no_verdict_not_a_dispute(
+        tmp_path, monkeypatch, capsys):
+    """`argus judge` contradicted the artifact it had just written.
+
+    `apply_verdict` already distinguishes three states - "A transport
+    failure or an unparseable reply is NO VERDICT, which this module's own
+    docstring says is not a dispute" - and records `disputed` only when
+    `not agrees and not error`. The CLI's accounting looked at `agrees`
+    alone, which an error verdict sets to False, so an unreachable judge
+    printed `DISPUTES F01` and summed into "0 agreed, 1 disputed" while
+    findings.json carried no `disputed` flag and report.md said no verdict
+    was obtained. The command exits 0, so nothing else told the operator
+    that the cross-verification had not happened.
+    """
+    import json
+    import pathlib
+    import shutil
+    import types
+
+    src = (pathlib.Path(__file__).resolve().parent.parent / "docs"
+           / "sample-session")
+    sdir = tmp_path / "sess"
+    shutil.copytree(src, sdir)
+
+    class _Unreachable:
+        def chat(self, messages, tools, system):
+            raise RuntimeError("connection refused")
+
+    from argus import llm
+    monkeypatch.setattr(llm, "make_client", lambda cfg: _Unreachable())
+    monkeypatch.setattr(judge, "pick_judge", lambda author, policy="strong":
+                        types.SimpleNamespace(
+                            key="gpt-4.1", provider="openai",
+                            roles=["judge"], api_key_env=["OPENAI_API_KEY"],
+                            credential=lambda: "sk-x"))
+
+    from argus.cli import main
+    assert main(["judge", str(sdir), "--only", "F01"]) == 0
+    out = capsys.readouterr()
+
+    # the store's reading: no verdict, so no dispute flag
+    rows = json.loads((sdir / "findings.json").read_text(encoding="utf-8"))
+    first = next(r for r in rows if r["id"] == "F01")
+    assert not first.get("disputed"), (
+        "an unreachable judge marked the finding disputed")
+
+    # ...and the CLI must say the same thing the store does
+    printed = out.out + out.err
+    assert "DISPUTES F01" not in printed, printed
+    assert "NO VERDICT" in printed, printed
+    assert "1 disputed" not in printed, printed
+    assert "0 agreed, 0 disputed" in printed, printed

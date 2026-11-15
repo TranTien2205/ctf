@@ -3552,12 +3552,71 @@ honestly listed `jwt_forge: 5`.
   them for a bound none of them asked for. `min()` with the server value,
   so a server declaring a shorter timeout still wins.
 
+### Four numbers presented as measured
+
+- **A crashed team worker was priced at $0.00 and counted as priced.**
+  `_cost_breakdown`'s own rule is "every agent unpriced is not a free run:
+  it is an unknown one" - applied to an unknown MODEL and not to unknown
+  TOKENS. `_start_worker`'s crash handler stores
+  `{"error": ..., "turns": 0}` with no `llm_tokens`, so an empty dict
+  reached `spec.cost(0, 0)`, returned 0.0, incremented `priced` and was
+  filed as a priced line - and `priced` is what decides whether the team
+  total is a number at all. Whatever that worker spent before it raised is
+  still sitting unread on `loop.llm.input_tokens`, so the figure was not
+  merely unknown, it was known to be wrong.
+
+  The existing test asserted `out["usd"] == 0.0` for agents that reported
+  nothing, which encoded the defect rather than the property its name
+  describes. It asserts None now, with the reason in the test so a reader
+  can tell a correction from a convenience.
+- **`compare --by-arm` medianed token figures over a subset.** The
+  all-or-nothing guard held `usd` and not the quantities `usd` is computed
+  from: `_flatten` makes `tokens_in`, `tokens_out`, `cache_read` and
+  `cache_write` None the moment a trial's summary.json has no
+  `llm_tokens`, and one real command reaches that state - `argus report`
+  on a session whose summary.json is missing or unparseable takes the
+  no-carry-forward branch and rewrites it without those keys. `llm_calls`
+  was worse than unguarded: `s.get("llm_calls", 0)` defaulted a missing key
+  to zero, so a fabricated measurement entered the median AND the guard
+  could never fire, because the value list looked complete.
+- **`argus judge` counted a judge it never reached as a dispute.**
+  `apply_verdict` already distinguishes three states - "A transport failure
+  or an unparseable reply is NO VERDICT, which this module's own docstring
+  says is not a dispute" - and records `disputed` only when
+  `not agrees and not error`. The CLI looked at `agrees` alone, which an
+  error verdict sets to False, so an unreachable judge printed
+  `DISPUTES F01` and summed into "0 agreed, 1 disputed" while findings.json
+  carried no `disputed` flag and report.md said no verdict was obtained.
+  The command exits 0, so nothing else said the cross-verification had not
+  happened.
+- **"about N probe calls" was a constant divided by a count.**
+  `REQUESTS_PER_PROBE` is 12 for every probe; measured against the lab, one
+  call records probe_reflection 1, probe_cmdi 3, probe_redirect 3,
+  probe_ssti 8, probe_lfi 8, probe_sqli 11, probe_ssrf 11 - a 1-to-11
+  spread across 26 probes. At 61 recorded probe_reflection requests, which
+  on this lab is 61 calls, rule 5 printed "about 5 probe calls", and the
+  action's detail carried the same figure under a key of its own - both
+  named in `decide.py`, which the doc gate does not read, because the key
+  no longer exists to be named here. The transcript carries no call
+  boundary (an
+  entry has chain, id, request, response, tool, ts), so calls are not
+  derivable from the evidence at all. Both figures are gone; the message
+  names the requests and the budget, which are. The constant stays as a
+  budget, which is policy and not a measurement.
+
+Three of these four tests had to be fixed before they could fail. The
+by-arm one re-implemented `_values` locally and never touched the dict that
+creates the defaulted zero; the judge one asserted the CLI's SOURCE, which
+is the weak shape this log has recorded before; and the rule-5 one SKIPPED
+when a higher rule fired first, which asserts nothing. All three drive the
+real path now.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 699 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 703 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

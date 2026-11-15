@@ -151,7 +151,7 @@ class TeamRun:
             if not isinstance(res, dict):
                 continue
             tok = res.get("llm_tokens") if isinstance(
-                res.get("llm_tokens"), dict) else {}
+                res.get("llm_tokens"), dict) else None
             # a crashed worker has no result dict to name its model, so fall
             # back to what the role WOULD have used rather than to the team's
             model = str(res.get("model") or "")
@@ -161,6 +161,22 @@ class TeamRun:
             spec = models_mod.get(model)
             if spec is None:
                 unpriced.append(f"{name} ({model})")
+                per_agent[name] = {"model": model, "usd": None}
+                continue
+            # The rule above - "an agent whose model is not in the table
+            # contributes no number and says so, rather than contributing a
+            # zero that reads as free" - was applied to an unknown MODEL and
+            # not to unknown TOKENS. `_start_worker`'s crash handler stores
+            # `{"error": ..., "turns": 0}` with no `llm_tokens`, so `tok`
+            # was `{}`, `spec.cost(0, 0, ...)` returned 0.0, and the agent
+            # was filed as a PRICED $0.00 line and counted toward `priced` -
+            # which is also what decides whether the team total is None.
+            # Whatever that worker spent before it raised is still sitting
+            # on `loop.llm.input_tokens` and is never read, so the figure is
+            # not merely unknown, it is known to be wrong.
+            if tok is None:
+                unpriced.append(f"{name} (no token record: "
+                                f"{str(res.get('error') or 'crashed')[:60]})")
                 per_agent[name] = {"model": model, "usd": None}
                 continue
             usd = spec.cost(tok.get("in", 0), tok.get("out", 0),

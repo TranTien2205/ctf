@@ -558,11 +558,56 @@ def test_the_team_cost_breakdown_names_a_model_per_agent():
 
 
 def test_an_agent_that_reported_nothing_does_not_break_the_breakdown():
+    """The property is that it does not raise. The total is NOT 0.00.
+
+    This asserted `out["usd"] == 0.0`, which encoded the defect rather than
+    the property its name describes. `_cost_breakdown`'s own rule is "every
+    agent unpriced is not a free run: it is an unknown one, and the
+    single-agent path already reports None for it" - and that rule was
+    applied to an unknown MODEL and not to unknown TOKENS. A crashed
+    worker's result dict is `{"error": ..., "turns": 0}` with no
+    `llm_tokens`, so an empty token dict was priced at `spec.cost(0, 0)` =
+    0.0, counted toward `priced`, and filed as a priced $0.00 line -
+    while whatever it spent before raising was still sitting unread on
+    `loop.llm.input_tokens`. So the figure was not merely unknown, it was
+    known to be wrong.
+
+    `recon-1` here is exactly that shape: a dict with no token record. One
+    agent, nothing measured, total unknown.
+    """
     team = _team(_role_cfg(role_models=False))
     team._results = {"lead": None, "recon-1": {}, "exploit-1": "crashed"}
     out = team._cost_breakdown()
-    assert out["usd"] == 0.0
+    assert out["usd"] is None, (
+        "a run whose only reporting agent recorded no tokens is unknown, "
+        "not free")
+    assert out["per_agent"]["recon-1"]["usd"] is None
+    assert any("no token record" in u for u in out["unpriced"]), out["unpriced"]
+    # the "does not break" half, which is what this test is named for
     assert out["per_agent"]["recon-1"]["model"] == "claude-sonnet-4-5"
+
+
+def test_a_crashed_worker_is_unpriced_and_the_priced_ones_still_total():
+    """A crash must not drag the total to None either - it is one agent.
+
+    `priced` decides whether the team total is a number at all, so the
+    crashed worker must be excluded from the price WITHOUT erasing the
+    agents that did report. Driven with the exact dict
+    `_start_worker`'s crash handler stores.
+    """
+    team = _team(_role_cfg(role_models=False))
+    team._results = {
+        "lead": {"model": "claude-opus-4-5",
+                 "llm_tokens": {"in": 100_000, "out": 10_000,
+                                "cache_read": 0}},
+        "exploit-1": {"error": "RuntimeError: boom", "turns": 0},
+    }
+    out = team._cost_breakdown()
+    assert out["per_agent"]["exploit-1"]["usd"] is None
+    assert any("exploit-1" in u and "no token record" in u
+               for u in out["unpriced"]), out["unpriced"]
+    assert out["usd"] == pytest.approx(
+        models.get("claude-opus-4-5").cost(100_000, 10_000)), out["usd"]
 
 
 # --- the credential must never be the wrong provider's -------------------

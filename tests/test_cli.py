@@ -316,7 +316,7 @@ def test_both_demo_paths_match_what_the_evaluation_doc_claims(tmp_path):
 
 
 def _fake_session(root, arm, trial, *, proven, requests=10, usd=0.5,
-                  summary=True, ttf=0.5, duration_s=3.0):
+                  summary=True, ttf=0.5, duration_s=3.0, tokens=True):
     """A session dir in the layout docs/EXPERIMENTS.md lays out.
 
     `exp/<arm>-<trial>/<session>`: the arm is the parent directory with the
@@ -336,10 +336,14 @@ def _fake_session(root, arm, trial, *, proven, requests=10, usd=0.5,
             # that caught `--by-arm` reporting a median over a subset
             "time_to_first_finding_s": ttf,
             "coverage": {"endpoints": ["/a", "/b"]},
-            "llm_calls": 4,
-            "llm_tokens": {"in": 100, "out": 20,
-                           "cache_read": 0, "cache_write": 0},
-            "llm_cost": {"usd": usd},
+            # `tokens=False` is the shape `argus report` leaves behind on
+            # a session whose summary.json was missing or unparseable: the
+            # no-carry-forward branch rewrites it with no `llm_calls`, no
+            # `llm_tokens` and no `llm_cost`.
+            **({"llm_calls": 4,
+                "llm_tokens": {"in": 100, "out": 20,
+                               "cache_read": 0, "cache_write": 0},
+                "llm_cost": {"usd": usd}} if tokens else {}),
         }), encoding="utf-8")
     return sdir
 
@@ -644,3 +648,52 @@ def test_the_shipped_sample_session_still_verifies():
     assert code == 0, text
     assert "OK:" in text, text
     assert "findings re-validated" in text, text
+
+
+def test_by_arm_will_not_median_a_token_figure_only_some_trials_have(
+        tmp_path, monkeypatch, capsys):
+    """The guard listed `usd` and not the quantities `usd` is computed from.
+
+    `_flatten` makes `tokens_in`, `tokens_out`, `cache_read` and
+    `cache_write` None the moment a trial's summary.json has no
+    `llm_tokens`, and one real command reaches that state: `argus report`
+    on a session whose summary.json is missing or unparseable takes the
+    no-carry-forward branch and rewrites it without those keys. A median
+    over the trials that happen to have a figure, printed under the arm's
+    full N, is a claim about the arm that was measured on a subset.
+
+    `llm_calls` was worse than unguarded: `s.get("llm_calls", 0)`
+    defaulted a missing key to zero, so a fabricated measurement went into
+    the median AND the all-or-nothing guard could never fire, because the
+    value list looked complete.
+    """
+    # Driven through the real command. A first version of this asserted
+    # the contents of `_ARM_METRICS_ALL_OR_NOTHING` and then re-implemented
+    # `_values` locally, so it never touched `_summ`'s dict - and putting
+    # `s.get("llm_calls", 0)` back left it green, because the defaulted
+    # zero is created there.
+    _fake_session(tmp_path, "single", 1, proven=1)
+    _fake_session(tmp_path, "single", 2, proven=1)
+    _fake_session(tmp_path, "single", 3, proven=1, tokens=False)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    out = capsys.readouterr().out
+
+    for label in ("llm calls", "tokens in", "tokens out",
+                  "cache read tokens", "cache write tokens", "cost (usd)"):
+        line = next(ln for ln in out.splitlines() if ln.startswith(label))
+        value = line[len(label):].strip()
+        assert value == "-", (
+            f"{label} reported {value!r} as the arm's median while only 2 "
+            f"of its 3 trials carry the figure")
+
+    # ...and an arm where every trial carries them still reports
+    import shutil
+    shutil.rmtree(tmp_path / "single-3")
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    out2 = capsys.readouterr().out
+    calls = next(ln for ln in out2.splitlines() if ln.startswith("llm calls"))
+    assert "4" in calls, calls

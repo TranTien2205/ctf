@@ -103,6 +103,16 @@ _FIRST_PASS = ("probe_sqli", "probe_reflection", "probe_cmdi", "probe_ssti",
 # eleven - so a single call spent 220% of the budget and rule 5 recommended
 # parking a class nobody had finished trying. The system prompt's guidance is
 # ~5 probe calls, so the budget is that many calls' worth of requests.
+#
+# 12 is a BUDGETING figure and not a measurement of any probe, which is why
+# nothing printed to an operator divides by it any more. Measured against
+# the lab, requests recorded per single call: probe_reflection 1, probe_cmdi
+# 3, probe_redirect 3, probe_ssti 8, probe_lfi 8, probe_sqli 11, probe_ssrf
+# 11 - a 1-to-11 spread across 26 probes. So this budget is between 5 and 60
+# calls depending on the probe, and a call count derived from it was wrong by
+# up to 12x in either direction. The transcript carries no call boundary (an
+# entry has chain, id, request, response, tool, ts), so the honest answer is
+# that calls are not derivable from the record at all - only requests are.
 REQUESTS_PER_PROBE = 12
 PROBE_CALLS_PER_CLASS = 5
 BUDGET_PER_CLASS = REQUESTS_PER_PROBE * PROBE_CALLS_PER_CLASS
@@ -423,13 +433,28 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
         endpoint, klass, n = spent[0]
         return Action(
             "park_and_switch",
-            f"{klass} on {endpoint} has taken {n} requests - about "
-            f"{n // REQUESTS_PER_PROBE} probe calls - and recorded no "
-            "finding. Say in notes.md what was ruled out and what would "
-            "revive it, then open a different class.",
+            # "about N probe calls" is gone, and so is
+            # `probe_calls_allowed`. Both divided the recorded request count
+            # by `REQUESTS_PER_PROBE`, which is 12 for every probe - and
+            # measured against the lab one call records probe_reflection 1,
+            # probe_cmdi 3, probe_redirect 3, probe_ssti 8, probe_lfi 8,
+            # probe_sqli 11, probe_ssrf 11. So the figure was wrong by up to
+            # 12x in either direction: at 61 recorded probe_reflection
+            # requests, which on this lab is 61 calls, the ledger printed
+            # "about 5 probe calls".
+            #
+            # The transcript carries no call-boundary field - an entry has
+            # chain, id, request, response, tool, ts - so a call count is
+            # not derivable from the evidence at all. `requests_sent` and
+            # `budget_requests` both are, and they are what the operator
+            # needs to see. `BUDGET_PER_CLASS` stays as a budget, which is a
+            # policy constant and not a measurement.
+            f"{klass} on {endpoint} has taken {n} of its "
+            f"{BUDGET_PER_CLASS}-request budget and recorded no finding. "
+            "Say in notes.md what was ruled out and what would revive it, "
+            "then open a different class.",
             target=endpoint, vuln_class=klass,
             detail={"requests_sent": n, "budget_requests": BUDGET_PER_CLASS,
-                    "probe_calls_allowed": PROBE_CALLS_PER_CLASS,
                     "classes_untried": _untried(surface, counts, endpoint)})
 
     # Rule 6 - findings exist and are proven, but nothing has widened the
