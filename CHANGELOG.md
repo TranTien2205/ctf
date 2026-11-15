@@ -3724,12 +3724,45 @@ Checked and left alone: selftest's "the default model is priced and
 current" check is not vacuous - planting a deprecated default and an
 unlisted one both drop it to 157/158.
 
+### "Unpriced is not free" was written once and applied to one input
+
+A third refusal, re-read and acted on - and the third instance of one
+shape, which is worth naming.
+
+`AgentLoop._cost_stats` says it: "A cost that cannot be traced to a price
+someone can check is a made-up number, so an unlisted model reports
+`usd: null` and says so rather than guessing a rate." `TeamRun`'s version
+says the same thing: "every agent unpriced is not a free run: it is an
+unknown one." Both applied it to an unlisted MODEL and neither applied it
+to absent TOKENS - so
+
+- a crashed team worker, whose result dict carries no `llm_tokens`, was
+  priced at `spec.cost(0, 0)` = $0.00 and counted toward `priced` (fixed
+  earlier in this stretch), and
+- a single-agent run whose provider or gateway omitted `usage` reported
+  "Model cost: $0.0000 USD (0 in / 0 out / 0 cache-read tokens)".
+
+The second was refused by the sweep as "already known and recorded", and
+what is recorded is a different decision: commit 68ab807, "tolerate
+non-object JSON and non-int usage fields from gateways", made the parser
+not crash on a malformed `usage`. That is right, and it is not the same
+call as pricing the result. Measured on a plausible deliverable: 4 LLM
+calls, 3 wire requests, a written executive summary, `usage` omitted -
+`$0.0000 USD`, `error: null`, no banner, and `argus verify` printing OK.
+
+Calls-with-no-tokens is the signal rather than tokens alone, because a
+call always has input: a run that made no calls really is free and still
+reports `$0.00`. The report already had the branch for an unpriced run
+("naming the reason beats printing 0.00, which reads as free") and now
+reaches it: **Model cost:** not priced - 4 model call(s) reported no token
+usage.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 707 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 708 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

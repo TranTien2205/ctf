@@ -437,6 +437,26 @@ class AgentLoop:
             return {"usd": None, "model": self.cfg.model,
                     "table_version": models_mod.table_version(),
                     "basis": "model is not in models.json; no price to apply"}
+        # The same rule, applied to the other half of the inputs. The
+        # docstring above is about an unlisted MODEL; absent TOKENS produce
+        # a made-up number by the identical reasoning, and this path
+        # printed it as a measurement. A gateway that omits `usage` - which
+        # `llm.py` deliberately tolerates rather than crashing on, since
+        # commit 68ab807 - leaves every counter at zero, and a run with 4
+        # LLM calls, 3 wire requests and a written summary then reported
+        # "Model cost: $0.0000 USD (0 in / 0 out / 0 cache-read tokens)"
+        # with no error and a clean `argus verify`.
+        #
+        # Calls with no tokens is the signal, because a call always has
+        # input: zero calls really is zero cost, and that still reports 0.
+        calls = int(getattr(self.llm, "calls", 0) or 0)
+        if calls > 0 and not any(tokens.get(k) for k in
+                                 ("in", "out", "cache_read", "cache_write")):
+            return {"usd": None, "model": self.cfg.model,
+                    "table_version": models_mod.table_version(),
+                    "basis": f"{calls} model call(s) reported no token usage, "
+                             "so there is nothing to price - the provider or "
+                             "gateway omitted `usage`"}
         return {
             "usd": spec.cost(tokens["in"], tokens["out"],
                              cache_read=tokens["cache_read"],

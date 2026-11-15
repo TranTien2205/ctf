@@ -285,3 +285,55 @@ def test_the_wall_clock_budget_bounds_the_batch_not_just_the_turn(
     assert took < 30.0, (
         f"the run took {took:.1f}s against a 1.0s budget; before this was "
         "bounded it took 72.4s")
+
+
+def test_calls_with_no_token_usage_are_not_a_free_run(tmp_path):
+    """`_cost_stats`'s own rule, applied to the other half of its inputs.
+
+    Its docstring says "A cost that cannot be traced to a price someone can
+    check is a made-up number, so an unlisted model reports `usd: null` and
+    says so rather than guessing a rate" - and applied that to an unlisted
+    MODEL only. Absent TOKENS produce a made-up number by the identical
+    reasoning, and this path printed it as a measurement.
+
+    `llm.py` deliberately tolerates a provider or gateway that omits
+    `usage` rather than crashing on it (commit 68ab807, "tolerate
+    non-object JSON and non-int usage fields from gateways"). That is the
+    right call and it is not the same decision as pricing the result: a run
+    with 4 LLM calls, 3 wire requests and a written executive summary
+    reported "Model cost: $0.0000 USD (0 in / 0 out / 0 cache-read
+    tokens)", with no error, no banner, and `argus verify` printing OK.
+
+    Calls-with-no-tokens is the signal rather than tokens alone, because a
+    call always has input: zero calls really is a zero cost, and still
+    reports one.
+    """
+    class _LLM:
+        def __init__(self, calls, tokens_in):
+            self.calls = calls
+            self.input_tokens = tokens_in
+            self.output_tokens = 0
+            self.cache_read_tokens = 0
+            self.cache_write_tokens = 0
+
+        def chat(self, messages, tools, system):
+            return {"content": []}
+
+    def stats(calls, tokens_in, name):
+        cfg = Config(target="http://127.0.0.1:9", allow_private=True,
+                     session_dir=tmp_path / name, api_key="x")
+        return AgentLoop(cfg, llm=_LLM(calls, tokens_in),
+                         quiet=True)._cost_stats()
+
+    silent = stats(4, 0, "silent")
+    assert silent["usd"] is None, (
+        f"4 calls that reported no usage priced at {silent['usd']}")
+    assert "no token usage" in silent["basis"], silent["basis"]
+
+    # a run that really did report usage is priced as before
+    priced = stats(4, 62_674, "priced")
+    assert priced["usd"] and priced["usd"] > 0, priced
+
+    # ...and a run that made no calls at all is genuinely free
+    free = stats(0, 0, "free")
+    assert free["usd"] == 0.0, free
