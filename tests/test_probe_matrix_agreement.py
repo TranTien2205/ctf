@@ -103,6 +103,17 @@ in full rather than described.
 Two directions, and no reading of the probe's prose - a verdict is English and
 this asserts against evidence:
 
+What this table CANNOT pin, measured rather than assumed: a class with
+more than one route to `proven` is satisfied by either of them. `method`
+has two - a PUT whose bytes a later GET returns, and a TRACE that echoes a
+request header - and removing the PUT canary from `probe_method` leaves
+this row passing on the TRACE route alone. Worse for that particular
+class, the PUT route never runs here at all: the probe gates it on
+`if "PUT" in allow.upper()` and the lab's `/files/` does not advertise
+PUT, so a run records only `OPTIONS /files/` and `TRACE /files/`. The
+probe-side guard for the write route is a source assertion in
+`tests/test_proof.py`, which says so at its own site.
+
 * **VULNERABLE** - the lab really has this bug at this endpoint, so some
   honest quote from what the probe recorded must reach `proven` (or the
   class's ceiling). A probe that cannot get there is not collecting what the

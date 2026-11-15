@@ -3798,6 +3798,54 @@ The test's first version set `severity = "critical"` on a finding that was
 already critical, wrote identical bytes back, and asserted a mismatch that
 never happened - caught because it failed unplanted.
 
+### Two source-grep tests replaced, and four kept for a measured reason
+
+A fifth refusal re-read: "both tests guarding the SARIF unknown-grade
+default assert a substring of the function's source". The refusal proved
+the behaviour IS guarded - it mutated `sarif.py` at source level and both
+tests failed - so the central claim was false. What it did not address is
+that there are six `inspect.getsource` assertions in `tests/test_proof.py`,
+and this repo has already recorded that shape as weak: a grep passes while
+the behaviour is broken in a way that keeps the substring.
+
+**Two were replaced.** `test_sarif_never_defaults_an_unknown_grade_to_a_
+build_break` was two lines and a substring assertion - the same substring
+the test above it asserted, so a duplicate of a source grep rather than a
+second check of anything. Both now render SARIF over hand-built findings
+and assert the rows: an unrecognised grade (absent, empty, `"bogus"`, None,
+7, a list) must come out `kind: review`, `level: none`, negative rank.
+
+Writing it behaviourally found something the grep could not. A first draft
+listed `"PROVEN"` among the unknown grades and FAILED, because `sarif.py`
+reads `str(...).strip().lower()`: case and surrounding space are folded, so
+`"PROVEN"`, `" Proven "` and `"\tproven\n"` are the proven grade and
+render as `fail`. That folding was asserted nowhere. Both behaviours are
+pinned now, and both plants fire.
+
+**Four were kept, and the reason is measured.** The obvious next move was
+to delete the rest as redundant with the proving table, which drives every
+probe against the live lab. Planting says otherwise. Removing the canary
+from `probe_method`'s written body fails its source assertion and leaves
+`test_the_probe_collects_what_its_class_requires[probe_method-method]`
+PASSING - because `method` has two routes to `proven` and the table needs
+only one honest quote to reach it, so the class still proved via TRACE:
+"argustr1n6b6pwk was sent as a request header and came back in the body".
+
+And the write route is not merely unpinned there - it never runs against
+the lab. `probe_method` gates its PUT on `if "PUT" in allow.upper()`, and
+the lab's `/files/` answers OPTIONS without advertising PUT: the only
+exchanges a run records are `OPTIONS /files/` and `TRACE /files/`. So the
+verifier side of that route has synthetic coverage, the probe side has a
+grep, and nothing drives the two together.
+
+Both facts are written at their own sites - beside the grep, so it is not
+deleted as redundant, and in the proving table's docstring, because "a
+class with two proof routes cannot be pinned by a table that asks whether
+SOME quote grades" is a limit of that table and not of this one class.
+Closing it needs a lab endpoint whose `Allow` lists PUT and which stores
+the body, which changes what `probe_method` sends in every proving-table
+run - so it is named rather than done as a side effect.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

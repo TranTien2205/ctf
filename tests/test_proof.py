@@ -1077,16 +1077,54 @@ def test_auto_resolution_prefers_an_exchange_over_an_event(tmp_path):
     assert event not in f["evidence_ids"]
 
 
+def _sarif_rows(tmp_path, *findings):
+    """Render SARIF over hand-built findings and return the result rows.
+
+    `render_sarif` reads three things off a session - `findings`, `dir` and
+    `started` - so a namespace with those three renders without building a
+    run. That is what lets this assert the BEHAVIOUR instead of the source.
+    """
+    import json
+    import types
+
+    from argus.report.sarif import render_sarif
+
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    session = types.SimpleNamespace(findings=list(findings), dir=tmp_path,
+                                    started=1_700_000_000.0)
+    path = render_sarif(session)
+    doc = json.loads(path.read_text(encoding="utf-8"))
+    return doc["runs"][0]["results"]
+
+
+def _finding(grade, fid="F01"):
+    return {"id": fid, "severity": "critical", "title": "t",
+            "category": "sqli", "url": "http://t.test/x", "grade": grade,
+            "description": "d", "remediation": "r",
+            "evidence_excerpt": "root:x:0:0", "evidence_ids": [],
+            "vuln_class": "sqli", "proof": {}}
+
+
 def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
     """_KIND defaulted to "fail", so an ungraded legacy row - or a row whose
-    grade was edited to something unrecognized - broke a CI build."""
+    grade was edited to something unrecognized - broke a CI build.
+
+    The mapping is asserted directly and so is the RENDERED row. This test
+    used to check `'_KIND.get(grade, "review")' in src` for the default,
+    which is the shape this repo has already recorded as weak: a change
+    that keeps the substring and breaks the behaviour passes it. The
+    default now has to survive a render.
+    """
     from argus.report.sarif import _KIND
     assert _KIND.get("candidate") == "review"
     assert _KIND.get("proven") == "fail"
-    import inspect
-    from argus.report import sarif
-    src = inspect.getsource(sarif.render_sarif)
-    assert '_KIND.get(grade, "review")' in src
+
+    rows = _sarif_rows(tmp_path / "s", _finding("proven", "F01"),
+                       _finding("candidate", "F02"))
+    by_id = {r["partialFingerprints"]["argus/finding"]: r for r in rows}
+    assert by_id["F01"]["kind"] == "fail"
+    assert by_id["F02"]["kind"] == "review"
+    assert by_id["F02"]["level"] == "none" and by_id["F02"]["rank"] < 0
 
 
 # --- coverage, measured rather than assumed ---------------------------------
@@ -1236,6 +1274,32 @@ def test_probe_method_puts_its_canary_in_the_bytes_it_writes():
     import inspect
     from argus.tools import probes
     src = inspect.getsource(probes.probe_method)
+    # A source assertion, and LOAD-BEARING rather than lazy - measured,
+    # because this repo has recorded the opposite shape (a grep that passes
+    # while the behaviour is broken) and the obvious move was to delete this
+    # as redundant with the proving table. It is not redundant:
+    #
+    #   - Planting `body="argus method probe"` (canary removed) fails THIS
+    #     test and leaves `test_the_probe_collects_what_its_class_requires
+    #     [probe_method-method]` PASSING.
+    #   - It passes because `method` has TWO routes to `proven` and the
+    #     table only needs one honest quote to reach it: with the PUT
+    #     canary gone the class still proved via TRACE -
+    #     "argustr1n6b6pwk was sent as a request header and came back in
+    #     the body". A class with two proof routes cannot be pinned by a
+    #     table that asks whether SOME quote grades.
+    #   - And the write route is not merely unpinned, it never runs against
+    #     the lab at all. `probe_method` gates its PUT on
+    #     `if "PUT" in allow.upper()`, and the lab's `/files/` answers
+    #     OPTIONS without advertising PUT - measured, the only exchanges a
+    #     run records there are `OPTIONS /files/` and `TRACE /files/`.
+    #
+    # So the verifier side of the write route has the synthetic coverage in
+    # `test_method_is_proven_by_an_effect_not_by_a_status`, the probe side
+    # has this grep, and nothing drives the two together. Closing that
+    # needs a lab endpoint whose `Allow` lists PUT and which stores the
+    # body - which changes what `probe_method` sends in every proving-table
+    # run, so it is named here rather than done as a side effect.
     assert 'body=f"argus method probe {canary}"' in src
     assert '_marker("argusput")' in src, \
         "the canary must match proof.NONCE_RE for the verifier to tie it back"
@@ -1946,11 +2010,38 @@ def test_a_grade_stripped_with_its_proof_block_is_still_detected(tmp_path):
     assert findings_overgraded({rid: s.get_exchange(rid)}, legacy) == []
 
 
-def test_sarif_never_defaults_an_unknown_grade_to_a_build_break():
-    import inspect
-    from argus.report import sarif
-    src = inspect.getsource(sarif.render_sarif)
-    assert '_KIND.get(grade, "review")' in src
+def test_sarif_never_defaults_an_unknown_grade_to_a_build_break(tmp_path):
+    """Every grade the mapping does not know renders as review, not fail.
+
+    This test was two lines and a substring assertion - the same substring
+    the test above asserted, so it was a duplicate of a source grep rather
+    than a second check of anything. It drives `render_sarif` now, over the
+    grades a legacy row or a hand-edited findings.json actually produces:
+    absent, empty, a word nobody ships, and a non-string.
+
+    "Breaking a build on a thing we do not know about is worse than
+    understating it" is the rule in `sarif.py`; this is where it is
+    checked.
+    """
+    for n, grade in enumerate(("", "ungraded", "bogus", None, 7, [])):
+        row = _sarif_rows(tmp_path / f"unknown{n}", _finding(grade))[0]
+        assert row["kind"] == "review", (grade, row["kind"])
+        assert row["level"] == "none", (grade, row["level"])
+        assert row["rank"] < 0, (grade, row["rank"])
+        # ...and the reader is told which grade it was, not left guessing
+        assert "[" in row["message"]["text"], (grade, row["message"])
+
+    # A KNOWN grade spelled differently is not an unknown one, and the
+    # behavioural version of this test is what established that: a first
+    # draft listed "PROVEN" among the unknowns and failed, because
+    # `sarif.py` reads `str(...).strip().lower()`. Case and surrounding
+    # space are folded, which is right and was asserted nowhere - the
+    # source grep it replaced could not have told me either way.
+    for spelling in ("proven", "PROVEN", " Proven ", "\tproven\n"):
+        row = _sarif_rows(tmp_path / f"fold{abs(hash(spelling)) % 9999}",
+                          _finding(spelling))[0]
+        assert row["kind"] == "fail", (spelling, row["kind"])
+        assert row["level"] == "error", (spelling, row["level"])
 
 
 # --- what the chain does and does not prove ---------------------------------
