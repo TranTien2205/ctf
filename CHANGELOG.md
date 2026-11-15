@@ -3508,12 +3508,56 @@ honestly listed `jwt_forge: 5`.
   transcript.jsonl, which the hash chain covers instead, so the check has
   no legitimate occupant to cry wolf over.
 
+### Two bounds applied one statement too late
+
+- **The frame cap fired after buffering the thing it bounds.** `serve()`
+  read `for line in self._in` and then checked `len(line) > _MAX_FRAME`.
+  Iterating lines must finish buffering the whole newline-free run before
+  `len` can be evaluated - and the comment above that check had the
+  reasoning exactly right ("a host that sends megabytes without one buffers
+  all of it") while the code did that very thing. Measured on the real
+  `argus mcp-serve`, peak VmHWM against newline-free input, both ways:
+
+  | input | before | after |
+  | --- | --- | --- |
+  | 8 MiB | 65,096 kB | 60,880 kB |
+  | 64 MiB | 179,912 kB | 69,012 kB |
+  | 192 MiB | 345,752 kB | 68,728 kB |
+
+  `readline(limit)` is the primitive for this - it stops at a newline OR at
+  `limit` characters. A fixed-size `read(n)` would be the wrong fix for the
+  same reason it was wrong two bounds away in `httpclient`: it blocks until
+  it has n characters, which would stall a line-oriented protocol between
+  frames.
+
+  The existing cap test feeds `"x" * (_MAX_FRAME + 1) + "\n"` through an
+  `io.StringIO` that already holds the whole string, so it asserts the
+  error wording and cannot see the memory. The new one hands the server a
+  stream that GENERATES lazily and records the largest string it was ever
+  given; with the old reader it reports being handed 67,108,865 characters
+  for a 4,194,304 byte cap.
+
+  And the test double had to be fixed first: `_Pipe` implemented only
+  `__iter__`, which is what the old loop used, so it was modelling the
+  implementation rather than the stream contract. A real `sys.stdin` has
+  `readline`; now so does the double.
+- **`mcp_call`'s timeout bounded only the second half of what it did.**
+  `_start()` is lazy, so the first call on a server also runs `initialize`
+  - and that RPC used `self.timeout_s`, the per-server value, which
+  `MCPManager` accepts up to 600s. Measured against a server that starts
+  and never writes: `timeout_s=5` returned after 30.0s with the default
+  config and after 45.0s with a declared `timeout_s: 45`. Worse than one
+  slow call, because `_start()` runs inside `self._lock` and the manager is
+  shared by every worker thread, so one caller's handshake blocks all of
+  them for a bound none of them asked for. `min()` with the server value,
+  so a server declaring a shorter timeout still wins.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 697 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 699 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

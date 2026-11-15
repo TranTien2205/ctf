@@ -28,6 +28,24 @@ class _Pipe:
         while self.inbox:
             yield self.inbox.pop(0)
 
+    def readline(self, limit=-1):
+        """What `sys.stdin` offers, because that is what `serve()` reads.
+
+        This double implemented only `__iter__`, which is what the old
+        `for line in self._in` loop used - so it was modelling the
+        implementation rather than the stream contract, and the frame cap
+        could not be applied before the memory was spent without first
+        changing every test that uses this class. A real text stream stops
+        at a newline OR at `limit` characters; so does this.
+        """
+        if not self.inbox:
+            return ""
+        line = self.inbox[0]
+        if limit is not None and limit >= 0 and len(line) > limit:
+            self.inbox[0] = line[limit:]
+            return line[:limit]
+        return self.inbox.pop(0)
+
     def write(self, text):
         self.outbox.append(text)
 
@@ -525,3 +543,127 @@ def test_a_malformed_frame_does_not_kill_the_server(tmp_path):
                                      "method": "tools/list"}) + "\n")
     assert rc == 0
     assert any("result" in r for r in replies), replies
+
+
+def test_the_frame_cap_is_applied_before_the_memory_is_spent(tmp_path):
+    """The cap fired after buffering the thing it exists to bound.
+
+    `serve()` read `for line in self._in` and then checked
+    `len(line) > _MAX_FRAME`. Iterating lines must finish buffering the
+    whole newline-free run before `len` can be evaluated, so the check ran
+    only once the memory was already allocated - and the comment above it
+    had the reasoning exactly right ("a host that sends megabytes without
+    one buffers all of it") while the code did that very thing.
+
+    Measured on the real `argus mcp-serve`, peak VmHWM against newline-free
+    input, both ways:
+
+        input     before       after
+         8 MiB     65,096 kB   60,880 kB
+        64 MiB    179,912 kB   69,012 kB
+       192 MiB    345,752 kB   68,728 kB
+
+    The existing cap test above feeds `"x" * (_MAX_FRAME + 1) + "\\n"`
+    through an `io.StringIO` that already holds the whole string, so it
+    asserts the error message and cannot see this. This one gives the
+    server a stream that GENERATES bytes lazily and records the largest
+    string it ever handed over - which is the property, not the wording.
+
+    The fake implements `__next__` the way a real text stream does, by
+    building the entire newline-free run, so the old code is not merely
+    unasserted here: it fails.
+    """
+    import io
+    import json as _json
+
+    from argus.config import Config
+    from argus.mcpserver import _MAX_FRAME, ArgusMCPServer
+
+    class _LazyStream:
+        """An endless newline-free run, then one valid frame, then EOF."""
+
+        def __init__(self, junk_chars, tail):
+            self.left = junk_chars
+            self.tail = tail
+            self.biggest = 0
+
+        def _take(self, n):
+            if self.left:
+                take = min(n, self.left)
+                self.left -= take
+                return self._seen("x" * take)
+            if self.tail:
+                nl = self.tail.find("\n")
+                cut = min(n, (nl + 1) if nl >= 0 else len(self.tail))
+                out, self.tail = self.tail[:cut], self.tail[cut:]
+                return self._seen(out)
+            return ""
+
+        def _seen(self, chunk):
+            self.biggest = max(self.biggest, len(chunk))
+            return chunk
+
+        def readline(self, limit=-1):
+            if limit is None or limit < 0:
+                limit = self.left + len(self.tail) + 1
+            return self._take(limit)
+
+        def __iter__(self):
+            return self
+
+        def __next__(self):
+            # what a real text stream does: buffer to the newline
+            parts = []
+            while True:
+                chunk = self._take(1 << 16)
+                if not chunk:
+                    break
+                parts.append(chunk)
+                if chunk.endswith("\n"):
+                    break
+            if not parts:
+                raise StopIteration
+            whole = "".join(parts)
+            self.biggest = max(self.biggest, len(whole))
+            return whole
+
+        def read(self, n=-1):
+            return self._take(n if n and n > 0 else 1 << 16)
+
+    init = _json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                        "params": {"protocolVersion": "2024-11-05"}}) + "\n"
+    good = _json.dumps({"jsonrpc": "2.0", "id": 2,
+                        "method": "tools/list"}) + "\n"
+    junk = 16 * _MAX_FRAME          # four times the cap, newline-free
+    stream = _LazyStream(junk, "\n" + good)
+    # the handshake has to go through the same stream, so prepend it
+    stream.tail = ""
+    stream.left = junk
+    stream.tail = "\n" + good
+    pre = io.StringIO(init)
+
+    class _Chained(_LazyStream):
+        def _take(self, n):
+            head = pre.read(n)
+            if head:
+                return self._seen(head)
+            return super()._take(n)
+
+    chained = _Chained(junk, "\n" + good)
+    out = io.StringIO()
+    srv = ArgusMCPServer(Config(target="http://127.0.0.1:1/",
+                                allow_private=True, session_dir=tmp_path),
+                         stdin=chained, stdout=out)
+    assert srv.serve() == 0
+    replies = [_json.loads(l) for l in out.getvalue().splitlines()
+               if l.strip()]
+
+    assert chained.biggest <= _MAX_FRAME + 1, (
+        f"the server was handed a {chained.biggest} character string for a "
+        f"{_MAX_FRAME} byte cap - the bound was applied after the memory "
+        "was spent")
+    errors = [r["error"]["message"] for r in replies if "error" in r]
+    assert any("frame exceeds" in e for e in errors), replies
+    # ...and the frame AFTER the oversized one is still served, so the
+    # discard did not eat the stream
+    assert any(r.get("id") == 2 and "result" in r for r in replies), replies

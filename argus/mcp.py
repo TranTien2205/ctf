@@ -89,7 +89,7 @@ class MCPClient:
     _SECRET_RE = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL",
                   "CREDS")
 
-    def _start(self) -> None:
+    def _start(self, timeout: float | None = None) -> None:
         if self._proc is not None and self._proc.poll() is None:
             return
         self._proc = None
@@ -116,7 +116,7 @@ class MCPClient:
             self._reader = threading.Thread(target=self._reader_loop,
                                             daemon=True)
             self._reader.start()
-            self._initialize()
+            self._initialize(timeout)
         except Exception:
             # never leave a half-started server around - next call retries
             try:
@@ -192,12 +192,14 @@ class MCPClient:
         result = resp.get("result")
         return result if isinstance(result, dict) else {}
 
-    def _initialize(self) -> None:
+    def _initialize(self, timeout: float | None = None) -> None:
         self._rpc("initialize", {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
             "clientInfo": CLIENT_INFO,
-        }, timeout=self.timeout_s)
+        }, timeout=min(self.timeout_s,
+                       timeout if timeout and timeout > 0
+                       else self.timeout_s))
         self._write({"jsonrpc": "2.0", "method": "notifications/initialized"})
 
     # ------------------------------------------------------------ interface
@@ -213,8 +215,26 @@ class MCPClient:
             return self._tools
 
     def call(self, tool: str, arguments: dict, timeout_s: float) -> dict:
+        """The CALLER's bound covers the handshake too.
+
+        `_start()` is lazy, so the first `call` on a server also runs
+        `initialize` - and that RPC used `self.timeout_s`, the per-server
+        value, which `MCPManager` accepts up to 600s. So `mcp_call`'s own
+        `timeout_s` bounded only the second half of what it did. Measured
+        against a server that starts and never writes: `timeout_s=5`
+        returned after 30.0s with the default config, after 45.0s with a
+        declared `timeout_s: 45`, and the manager accepts a declared 99999
+        as 600.0.
+
+        It is worse than one slow call, because `_start()` runs INSIDE
+        `self._lock` and the manager is shared by every worker thread: one
+        caller's handshake blocks all of them for a bound none of them
+        asked for. `min()` with the server value, so a server declaring a
+        SHORTER timeout still wins - this tightens the caller's bound onto
+        the handshake and never loosens the server's.
+        """
         with self._lock:
-            self._start()
+            self._start(timeout_s)
             return self._rpc("tools/call", {
                 "name": tool, "arguments": arguments or {},
             }, timeout=timeout_s)

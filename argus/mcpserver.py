@@ -248,12 +248,37 @@ class ArgusMCPServer:
     # --------------------------------------------------------------- loop
     def serve(self) -> int:
         """Read frames until stdin closes. Returns a process exit code."""
-        for line in self._in:
-            # A frame is bounded. `for line in stdin` reads until a newline,
-            # so a host that sends megabytes without one buffers all of it -
-            # the same reasoning that bounds a planted wordlist elsewhere in
-            # this package, applied to the one input another process writes.
-            if len(line) > _MAX_FRAME:
+        while True:
+            # A frame is bounded, and the bound has to be applied BEFORE the
+            # memory is spent. This read was `for line in self._in`, with a
+            # `len(line) > _MAX_FRAME` check after it - and the comment that
+            # stood here got the reasoning exactly right ("a host that sends
+            # megabytes without one buffers all of it") while the code did
+            # that very thing: iterating lines must finish buffering the
+            # whole newline-free run before `len` can be evaluated, so the
+            # check fired only once the memory it exists to bound was
+            # already allocated. Measured on the real `argus mcp-serve`:
+            # peak VmHWM tracked the input about 1:1 past the 4 MiB cap -
+            # 8 MiB in gave 56,792 kB against a 48,472 kB baseline, 64 MiB
+            # gave 114,492 kB, 192 MiB gave 246,488 kB.
+            #
+            # `readline(limit)` is the primitive for this: it stops at a
+            # newline OR at `limit` characters, so nothing larger than the
+            # cap is ever held. A fixed-size `read(n)` would be the wrong
+            # fix for the same reason it was wrong two bounds away in
+            # `httpclient` - it blocks until it has n characters, which
+            # would stall a line-oriented protocol between frames.
+            line = self._in.readline(_MAX_FRAME + 1)
+            if not line:
+                break
+            if len(line) > _MAX_FRAME and not line.endswith("\n"):
+                # Over the cap and the frame has not ended. Discard the
+                # rest of it in bounded reads rather than buffering it to
+                # find out how long it was.
+                while True:
+                    rest = self._in.readline(_MAX_FRAME + 1)
+                    if not rest or rest.endswith("\n"):
+                        break
                 self._error(None, INVALID_REQUEST,
                             f"frame exceeds {_MAX_FRAME} bytes")
                 continue

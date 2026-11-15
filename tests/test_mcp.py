@@ -336,3 +336,50 @@ def test_closing_a_server_kills_what_it_spawned_not_just_what_it_started():
         "a process the MCP server spawned outlived close(): it still has "
         "the target and no place in the transcript, while the run's record "
         "says the server was shut down")
+
+
+def test_the_callers_timeout_covers_the_lazy_handshake_too():
+    """`mcp_call(timeout_s=...)` bounded only the second half of what it did.
+
+    `_start()` is lazy, so the first `call` on a server also performs
+    `initialize` - and that RPC used `self.timeout_s`, the per-server
+    value, which `MCPManager` accepts up to 600s. Measured against a server
+    that starts and never writes: `timeout_s=5` returned after 30.0s with
+    the default config and after 45.0s with a declared `timeout_s: 45`.
+
+    It is worse than one slow call. `_start()` runs inside `self._lock` and
+    the manager is shared by every worker thread, so one caller's handshake
+    blocks all of them for a bound none of them asked for - the same lock
+    `close()` was already changed not to wait on unconditionally.
+
+    `min()` with the server value, so a server declaring a SHORTER timeout
+    still wins: this tightens the caller's bound onto the handshake and
+    never loosens the server's.
+    """
+    import os
+    import sys
+    import time
+    from pathlib import Path
+
+    import pytest
+
+    from argus.mcp import MCPClient
+
+    if os.name != "posix":
+        pytest.skip("timing assertion needs a predictable process start")
+
+    server = Path(__file__).parent / "mute_mcp_server.py"
+    for declared in (30.0, 45.0):
+        client = MCPClient("mute", [sys.executable, str(server)],
+                           timeout_s=declared)
+        started = time.monotonic()
+        try:
+            with pytest.raises(Exception):
+                client.call("anything", {}, timeout_s=2)
+        finally:
+            took = time.monotonic() - started
+            client.close()
+        assert took < 10.0, (
+            f"a server declaring {declared}s outlasted the caller's 2s "
+            f"bound by returning after {took:.1f}s - the handshake was "
+            "timed against the server's value, not the caller's")
