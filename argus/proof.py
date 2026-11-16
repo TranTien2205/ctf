@@ -309,9 +309,14 @@ TEMPLATE_MATH_RE = re.compile(
 # An object reference is not always an integer. Matching only digits made
 # idor unprovable on every API that uses uuids or opaque ids, which is most of
 # them.
+#
+# Nor is it always in the URL. This matched `name=value` only, so a reference
+# in a JSON body - `{"order": 5}`, which is how most APIs of the last decade
+# take one - was not a reference at all. See `_object_refs`, which carries the
+# measurement.
 OBJECT_REF_RE = re.compile(
-    r"(?i)(?:^|[/?&])(?:id|uid|user_?id|order|account|doc|object|num|pk|ref|"
-    r"key|guid|uuid)=([\w.-]{1,64})"
+    r"(?i)(?:^|[/?&{,\s])[\"']?(?:id|uid|user_?id|order|account|doc|object|"
+    r"num|pk|ref|key|guid|uuid)[\"']?\s*[=:]\s*[\"']?([\w.-]{1,64})"
     r"|/(\d{1,12}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
     r"|[0-9a-f]{24,64})(?=/|$|\?)")
 
@@ -970,10 +975,35 @@ def _credential(entry: dict) -> str:
 
 
 def _object_refs(entry: dict) -> set[str]:
-    url = str(_req(entry).get("url") or "")
+    """The object references a request carries - in the URL AND in the body.
+
+    It read the URL only, and `probe_idor` has a body mode its own docstring
+    advertises: "or inside a POST body template when `data` is given". The
+    lab plants exactly that shape - `POST /api/order`, "IDOR in a JSON body
+    ({"order": N} served)" - and the two of them agreed while the gate saw
+    nothing. Measured: the probe drives it correctly, four exchanges
+    returning `"owner": "user-5"`, `"user-6"`, `"user-4"`, `"user-0"`, and
+    reports "idor candidate: neighboring object ids return 200 with
+    different content". The class capped at `candidate`, missing exactly
+    "two distinct object references on one endpoint", because this returned
+    `set()` for every one of the four.
+
+    Reading the body cannot loosen the check it feeds: `verify_differential`
+    requires the ref sets of TWO cited exchanges to be non-empty and
+    different, so no single request can carry the pair by itself.
+    """
+    req = _req(entry)
     refs = set()
-    for m in OBJECT_REF_RE.finditer(url):
-        refs.add(m.group(1) or m.group(2))
+    # Each string on its own, NOT joined. The path branch ends
+    # `(?=/|$|\?)`, and the first version of this concatenated url and body
+    # with a space - which put a trailing space after `/api/user/1`, so `$`
+    # no longer matched and EVERY url-mode reference disappeared. Two
+    # long-standing tests caught it: the pagination one and the opaque-id
+    # one both dropped from `proven` to `candidate`. A bound defeated by
+    # something the caller introduced.
+    for text in (str(req.get("url") or ""), str(req.get("body") or "")):
+        for m in OBJECT_REF_RE.finditer(text):
+            refs.add(m.group(1) or m.group(2))
     return {r for r in refs if r}
 
 

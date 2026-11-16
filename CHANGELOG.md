@@ -4319,12 +4319,41 @@ credential field, so the dead-target test for `probe_lockout` was asserting
 target that answers nothing, so it passes a credential body now rather than
 letting the placeholder change the subject.
 
+### An object reference could not ride in a request body
+The `verify_method_effect` shape again: the lab plants it, the probe finds
+it, and no verdict could be recorded for it.
+
+`probe_idor`'s own docstring advertises the mode - "or inside a POST body
+template when `data` is given" - and the lab's header documents the
+endpoint it plants: "POST /api/order  IDOR in a JSON body ({"order": N}
+served)". Measured: the probe drives it correctly, four exchanges returning
+`"owner": "user-5"`, `"user-6"`, `"user-4"` and `"user-0"` - plainly
+another subject's data - and reports "idor candidate: neighboring object
+ids return 200 with different content". The class capped at `candidate`,
+missing exactly "two distinct object references on one endpoint", because
+`_object_refs` read the URL only and returned `set()` for all four, and
+`OBJECT_REF_RE` matched `name=value` and never JSON's `"order": 5`.
+
+Both halves were needed and both are planted back. Widening cannot loosen
+the check it feeds: `verify_differential` requires the ref sets of TWO
+cited exchanges to be non-empty and different, so no single request can
+carry the pair by itself. The pattern stays a FIELD matcher - `identity=`,
+`"orders":`, `"total":` and `x=1` all still yield nothing.
+
+The first version of the fix broke two long-standing tests, and they were
+right: it concatenated url and body with a space, which put a trailing
+space after `/api/user/1`, and the path branch ends `(?=/|$|\?)` - so `$`
+no longer matched and EVERY url-mode reference disappeared. The pagination
+test and the opaque-id test both dropped from `proven` to `candidate`. A
+bound defeated by something the caller introduced; the two strings are
+scanned separately now.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 734 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 735 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

@@ -751,6 +751,37 @@ def test_a_pw_field_is_a_credential_field():
         assert not proof._CREDENTIAL_FIELD_RE.search(body), body
 
 
+def test_an_object_reference_in_a_json_body_is_gradeable(lab_url, ctx):
+    """The lab plants a body-mode IDOR and nothing could grade it.
+
+    `probe_idor`'s own docstring advertises the mode - "or inside a POST
+    body template when `data` is given" - and the lab's header documents
+    the endpoint: "POST /api/order  IDOR in a JSON body ({"order": N}
+    served)". Measured: the probe drives it correctly, four exchanges
+    returning `"owner": "user-5"`, `"user-6"`, `"user-4"` and `"user-0"`,
+    and reports "idor candidate: neighboring object ids return 200 with
+    different content". The class capped at `candidate`, missing exactly
+    "two distinct object references on one endpoint", because
+    `_object_refs` read the URL only and returned `set()` for all four, and
+    `OBJECT_REF_RE` matched `name=value` and never JSON's `"order": 5`.
+
+    This is the shape `verify_method_effect`'s write route had: lab plants
+    it, probe finds it, no verdict can be recorded for it.
+    """
+    before = len(_exchanges(ctx.session))
+    out = probes.probe_idor(ctx, lab_url + "/api/order", method="POST",
+                            data='{"order": 5}')
+    entries = _exchanges(ctx.session)[before:]
+    assert entries, out
+    assert "idor" in str(out.get("verdict", "")).lower(), out
+    refs = [proof._object_refs(e) for e in entries]
+    assert all(refs), f"the body-mode ids are invisible: {refs}"
+    grade, missing = _best_grade("idor", entries)
+    assert grade == "proven", (
+        f"the lab plants this, the probe reports it, and the matrix grades "
+        f"{grade} (missing {missing})")
+
+
 def test_every_driven_probe_exists_and_maps_to_a_real_class():
     from argus.tools import registry
     known = {t["name"] for t in registry.TOOL_SCHEMAS}
