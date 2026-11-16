@@ -4578,6 +4578,51 @@ could not be proven because the evidence never arrived in a gradeable shape.
   extraction is requested. The capability was there; it was not wired to
   the thing that needs it.
 
+### The presentation page named three commands that do not exist
+
+The evidence pack carries `presentation.html`, an interactive page written
+for a reader outside the project. Writing it, three commands went onto the
+page from memory rather than from a run: an "open" subcommand, which has
+never existed; the real `check` subcommand given a class argument and a
+quote argument, neither of which it takes - it checks API connectivity; and
+an `argus proof sqli` transcript whose text did not match the real one. All
+three are now the output of running the command.
+
+The reason none of them was caught is the part worth keeping. The doc gate
+checks that documentation names only things that exist - and its file set
+was markdown-only, so an HTML page escaped every check in it, the same way
+`docs/VERIFICATION.md` escaped by being the one `docs/*.md` outside the
+hand-written list. A page that invents a command is precisely the defect
+this gate exists for, and it was the document most likely to be read by
+someone who cannot check the claim themselves.
+
+`_html_as_doc_text` translates the page's two command-carrying shapes -
+`<code>` and the terminal block - into the backticks and fenced blocks the
+existing rules already read, instead of adding a second set of rules that
+could drift from the first. Prose outside those two elements stays prose,
+so Vietnamese text reading "argus chay o day" is not mistaken for a
+subcommand claim, which is the lesson the markdown version had already
+learned. The globs that derive the gated set now cover
+`docs/nckh-evidence/*.md` and `*.html`, so the next file added there cannot
+escape the same way.
+
+Turning it on failed immediately on a real defect: the evidence pack shipped
+a script whose name began with the probe-tool prefix, which reads as a
+claim about a registered tool of that name. Renamed to
+`thirdparty_probes.py`.
+
+Each of the three defect shapes was then planted back into the page and
+watched being named - the
+missing subcommand, an invented one, and an unregistered probe-shaped
+identifier, each reported against `presentation.html` - because a check
+that has only ever been seen passing is not yet known to be a check. Two
+earlier attempts to plant proved nothing: the anchor they matched on
+occurred twice, the assertion stopped them, and the run they produced was
+of an unmodified file.
+
+No new check was added, so the selftest count is still 160; the existing
+checks simply reach further.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

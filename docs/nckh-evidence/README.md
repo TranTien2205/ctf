@@ -8,7 +8,7 @@ quán, không phải ước lượng.
 
 | File | Dùng để làm gì |
 |---|---|
-| **`presentation.html`** | Trang trình bày trực quan, **tương tác được** — mở bằng trình duyệt. Bấm vào từng chuỗi bằng chứng để thấy cổng chứng minh chấp nhận hay từ chối, và vì sao. Dành cho cả người hướng dẫn. |
+| **`presentation.html`** | Trang trình bày trực quan, **tương tác được** — mở thẳng bằng trình duyệt, không cần máy chủ. Mục 02 cho bấm vào từng chuỗi bằng chứng để thấy khối `proof` thật mà cổng ghi ra và kết luận thay đổi theo; mục 03 có nút chuyển số liệu trước/sau khi sửa lỗi. Dành cho cả người hướng dẫn. |
 | **`RESULTS.md`** | Báo cáo đầy đủ: đã kiểm thử gì, số liệu, kết luận, lỗi đã sửa, phương hướng. |
 | `results.json` / `results.txt` | Số liệu thô của bảng kết quả (8 ca đo). |
 | `recording/argus-remote-exploit.cast` | Bản ghi phiên khai thác tự động, phát lại bằng `asciinema play`. `.log` là bản văn bản thuần cùng nội dung. |
@@ -60,7 +60,7 @@ cổng chứng minh lại siết thêm, các hồ sơ này cũng phải tạo l�
 
 - `measure_all.py` — sinh bảng 8 ca đo trong `results.json`
 - `evidence_thirdparty.py` — sinh hồ sơ niêm phong cho DVWA và bWAPP
-- `probe_thirdparty.py` — chạy probe trên cả ba app bên thứ ba và in kết quả
+- `thirdparty_probes.py` — chạy probe trên cả ba app bên thứ ba và in kết quả
 - `demo.sh` + `show_proof.py` — kịch bản đã dùng để quay bản ghi
 
 Các script này **chỉ định endpoint bằng tay** — đó là việc mà LLM sẽ làm khi

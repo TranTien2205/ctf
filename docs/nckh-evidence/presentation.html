@@ -1,326 +1,518 @@
-<title>Argus — Cổng chứng minh</title>
-<meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NCKH — Argus: cổng chứng minh cho agent kiểm thử web</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap">
 <style>
-  /* Layout: một cột, prose hẹp để đọc, băng rộng cho phần tương tác và bảng */
-  :root {
-    --paper: #f4f5f7;  --card: #ffffff;   --ink: #16191f;
-    --muted: #5d6572;  --line: #d9dde4;   --accent: #2a4a8f;
-    --proven: #0d6e56; --cand: #8a5a00;   --unproven: #9a3226;
-    --proven-bg: #e4f3ee; --cand-bg: #fbf0da; --unproven-bg: #fae8e5;
-    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-  }
-  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-    --paper: #12151a; --card: #1a1e25; --ink: #e8eaee; --muted: #9aa3b2;
-    --line: #2b313b; --accent: #8aa8e8;
-    --proven: #5fd3b2; --cand: #e0ab52; --unproven: #f0897c;
-    --proven-bg: #10322a; --cand-bg: #322611; --unproven-bg: #331c19;
-    color-scheme: dark; } }
-  :root[data-theme="dark"] {
-    --paper: #12151a; --card: #1a1e25; --ink: #e8eaee; --muted: #9aa3b2;
-    --line: #2b313b; --accent: #8aa8e8;
-    --proven: #5fd3b2; --cand: #e0ab52; --unproven: #f0897c;
-    --proven-bg: #10322a; --cand-bg: #322611; --unproven-bg: #331c19;
-    color-scheme: dark; }
-
-  body { background: var(--paper); color: var(--ink); font-family: var(--sans);
-         line-height: 1.6; }
-  .wrap { max-width: 860px; margin: 0 auto;
-          padding-left: max(16px, env(safe-area-inset-left, 0px));
-          padding-right: max(16px, env(safe-area-inset-right, 0px));
-          padding-block: 0; }
-  h1, h2, h3 { font-weight: 600; text-wrap: balance; letter-spacing: -0.015em;
-               line-height: 1.22; margin: 0; }
-  h1 { font-size: clamp(1.75rem, 5vw, 2.6rem); font-weight: 700; }
-  h2 { font-size: clamp(1.25rem, 3.4vw, 1.6rem); margin-top: 2.6rem; }
-  h3 { font-size: 1.02rem; font-weight: 600; }
-  p { margin: 0.7rem 0; max-width: 68ch; }
-  .lede { font-size: 1.08rem; color: var(--muted); max-width: 62ch; }
-  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em;
-             text-transform: uppercase; color: var(--accent); font-weight: 600; }
-  code, .mono { font-family: var(--mono); font-size: 0.86em; }
-  header { padding-block: 2.4rem 1.4rem; border-bottom: 1px solid var(--line); }
-
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-           gap: 1px; background: var(--line); border: 1px solid var(--line);
-           margin-top: 1.6rem; }
-  .stat { background: var(--card); padding: 0.85rem 0.95rem; min-width: 0; }
-  .stat b { display: block; font-family: var(--mono); font-size: 1.5rem;
-            font-weight: 600; font-variant-numeric: tabular-nums; }
-  .stat span { font-size: 0.78rem; color: var(--muted); }
-
-  .chain { display: flex; flex-direction: column; gap: 2px; margin: 1.3rem 0; }
-  .step { display: grid; grid-template-columns: 2.1rem 1fr; gap: 0.85rem;
-          background: var(--card); border: 1px solid var(--line);
-          padding: 0.8rem 0.95rem; align-items: start; }
-  .step.gate { border-color: var(--accent); border-width: 2px; }
-  .step .n { font-family: var(--mono); font-weight: 600; color: var(--accent);
-             font-size: 0.95rem; }
-  .step p { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--muted); max-width: none; }
-  .step .f { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); }
-
-  .picker { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.1rem 0; }
-  .picker button { font-family: var(--mono); font-size: 0.8rem; cursor: pointer;
-    background: var(--card); color: var(--ink); border: 1px solid var(--line);
-    padding: 0.55rem 0.7rem; border-radius: 2px; text-align: left; min-width: 0;
-    max-width: 100%; overflow-wrap: anywhere; }
-  .picker button[aria-pressed="true"] { border-color: var(--accent);
-    box-shadow: inset 0 0 0 1px var(--accent); font-weight: 500; }
-  .picker button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  .verdict { border: 1px solid var(--line); background: var(--card); margin-top: 1rem; }
-  .verdict-head { padding: 0.9rem 1rem; border-bottom: 1px solid var(--line); }
-  .badge { display: inline-block; font-family: var(--mono); font-weight: 600;
-           font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
-           padding: 0.22rem 0.5rem; border-radius: 2px; }
-  .badge.proven { background: var(--proven-bg); color: var(--proven); }
-  .badge.candidate { background: var(--cand-bg); color: var(--cand); }
-  .badge.unproven { background: var(--unproven-bg); color: var(--unproven); }
-  .why { font-size: 0.88rem; color: var(--muted); margin-top: 0.5rem; }
-  .checks { list-style: none; margin: 0; padding: 0; }
-  .checks li { display: grid; grid-template-columns: 1.6rem 1fr; gap: 0.6rem;
-               padding: 0.6rem 1rem; border-top: 1px solid var(--line);
-               font-size: 0.87rem; align-items: start; }
-  .checks li:first-child { border-top: 0; }
-  .checks .mark { font-family: var(--mono); font-weight: 600; }
-  .checks .ok .mark { color: var(--proven); }
-  .checks .no .mark { color: var(--unproven); }
-  .checks .name { font-family: var(--mono); font-size: 0.8rem; min-width: 0;
-                  overflow-wrap: anywhere; }
-  .checks .det { color: var(--muted); font-size: 0.8rem; display: block;
-                 margin-top: 0.15rem; overflow-wrap: anywhere; }
-  .checks li.adv { opacity: 0.72; }
-
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line); margin: 1.1rem 0; }
-  table { border-collapse: collapse; width: 100%; background: var(--card);
-          font-size: 0.87rem; }
-  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
-           white-space: nowrap; }
-  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em;
-       color: var(--muted); font-weight: 600; }
-  tr:last-child td { border-bottom: 0; }
-  td.ev { font-family: var(--mono); font-size: 0.76rem; white-space: normal;
-          overflow-wrap: anywhere; min-width: 14ch; }
-  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
-
-  .toggle { display: inline-flex; gap: 0; border: 1px solid var(--line);
-            border-radius: 2px; overflow: hidden; margin: 0.6rem 0 0; }
-  .toggle button { font-family: var(--mono); font-size: 0.76rem; cursor: pointer;
-    background: var(--card); color: var(--muted); border: 0; padding: 0.4rem 0.75rem; }
-  .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
-  .toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-
-  .fix { border-left: 3px solid var(--line); padding: 0 0 0 0.95rem; margin: 1.1rem 0; }
-  .fix.bad { border-left-color: var(--unproven); }
-  .fix h3 { font-size: 0.96rem; }
-  .fix p { font-size: 0.9rem; margin: 0.35rem 0; }
-  .note { background: var(--card); border: 1px solid var(--line);
-          border-left: 3px solid var(--cand); padding: 0.9rem 1rem; margin: 1.2rem 0; }
-  .note p { margin: 0.3rem 0; font-size: 0.92rem; }
-  footer { margin-top: 3rem; padding-block: 1.4rem 2.4rem;
-           border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; }
-  @media (prefers-reduced-motion: no-preference) {
-    .verdict, .checks li { transition: border-color 120ms ease; }
-  }
+:root{
+  --bg:#0b0f14; --panel:#11161d; --panel2:#151c25; --line:#232c38;
+  --txt:#dfe6ee; --dim:#8b98a8; --red:#ff5c5c; --cyan:#4fd1e0;
+  --grn:#5ad18b; --amber:#f5b83d; --purp:#b48cff;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15px/1.65 'Segoe UI',system-ui,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:48px 24px 80px}
+h1{font-size:34px;line-height:1.25;letter-spacing:-.5px}
+h2{font-size:22px;margin:56px 0 18px;padding-top:18px;border-top:1px solid var(--line)}
+h2 .num{color:var(--red);font-family:var(--mono);margin-right:10px}
+h3{font-size:16px;color:var(--cyan);margin:26px 0 10px}
+p,li{color:var(--txt)}
+.dim{color:var(--dim)}
+.hero{padding:28px 0 8px}
+.tag{display:inline-block;font:600 11px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--red);border:1px solid var(--red);border-radius:4px;padding:6px 10px;margin-bottom:14px}
+.sub{color:var(--dim);margin-top:12px;max-width:760px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:760px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:14px 0}
+.card h4{font:600 13px var(--mono);color:var(--cyan);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px}
+.kv{font:13px var(--mono);color:var(--dim)}
+.kv b{color:var(--txt);font-weight:600}
+.term{background:#0a0e13;border:1px solid var(--line);border-radius:8px;padding:14px 16px;
+  font:12.5px/1.7 var(--mono);overflow-x:auto;margin:12px 0;white-space:pre-wrap;word-break:break-word}
+.term .c{color:#5f6b7a}
+.term .p{color:var(--purp)}
+.term .g{color:var(--grn)}
+.term .r{color:var(--red)}
+.term .y{color:var(--amber)}
+.term .b{color:var(--cyan)}
+.badge{display:inline-block;font:600 11px var(--mono);border-radius:4px;padding:3px 8px;margin:2px 4px 2px 0}
+.b-red{background:#3a1a1c;color:#ff9c9c;border:1px solid #6b2f33}
+.b-cyan{background:#12333a;color:#7fe3ee;border:1px solid #1f5560}
+.b-grn{background:#14301f;color:#8fe7b2;border:1px solid #245c3d}
+.b-amb{background:#36290f;color:#f7cd7e;border:1px solid #6b541e}
+.b-pur{background:#241a3a;color:#cdb3ff;border:1px solid #46316e}
+table{width:100%;border-collapse:collapse;font-size:13.5px;margin:10px 0}
+th{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);
+  text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid #1a222c;vertical-align:top}
+td.mono,.mono{font-family:var(--mono);font-size:12.5px}
+.ok{color:var(--grn)} .bad{color:var(--red)} .warn{color:var(--amber)}
+.tablewrap{overflow-x:auto}
+.chain{position:relative;margin:26px 0 0 12px;padding-left:44px;border-left:2px solid var(--line)}
+.stage{position:relative;margin:0 0 34px}
+.stage::before{content:attr(data-n);position:absolute;left:-58px;top:2px;width:36px;height:36px;
+  border-radius:50%;background:var(--panel2);border:2px solid var(--red);color:var(--red);
+  font:700 15px/32px var(--mono);text-align:center}
+.stage.done::before{border-color:var(--grn);color:var(--grn)}
+.stage.gate::before{border-color:var(--cyan);color:var(--cyan)}
+.stage h4{font-size:17px;margin-bottom:2px}
+.stage .sub2{color:var(--dim);font-size:13px;margin-bottom:8px}
+.note{border-left:3px solid var(--amber);background:#1c1810;padding:10px 14px;border-radius:0 8px 8px 0;
+  font-size:13.5px;margin:12px 0;color:#e8d9b5}
+.note.grn{border-color:var(--grn);background:#0f1c14;color:#b9e8cd}
+.note.red{border-color:var(--red);background:#1f1214;color:#f2bebe}
+.note.cyan{border-color:var(--cyan);background:#0e1f23;color:#b6e7ef}
+svg{display:block;max-width:100%;height:auto}
+.legend{font:11.5px var(--mono);fill:#8b98a8}
+ul.tight li{margin:5px 0 5px 18px}
+.checklist li{list-style:none;margin:6px 0 6px 4px}
+.checklist li::before{content:"☐";color:var(--dim);margin-right:8px}
+.checklist li.y::before{content:"☑";color:var(--grn)}
+.checklist li.n::before{content:"☒";color:var(--red)}
+footer{margin-top:70px;padding-top:18px;border-top:1px solid var(--line);color:var(--dim);font-size:12.5px}
+.pill-row{margin:8px 0}
+.picker{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 4px}
+.picker button{font:600 11.5px var(--mono);cursor:pointer;background:var(--panel2);color:var(--dim);
+  border:1px solid var(--line);border-radius:4px;padding:7px 10px;text-align:left;
+  max-width:100%;overflow-wrap:anywhere}
+.picker button:hover{color:var(--txt);border-color:#2f3b4a}
+.picker button[aria-pressed="true"]{border-color:var(--cyan);color:var(--cyan);background:#12333a}
+.picker button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;margin:4px 0 10px}
+.toggle button{font:600 11.5px var(--mono);cursor:pointer;background:var(--panel2);color:var(--dim);
+  border:0;padding:7px 12px}
+.toggle button[aria-pressed="true"]{background:#12333a;color:var(--cyan)}
+.toggle button:focus-visible{outline:2px solid var(--cyan);outline-offset:-2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 </style>
-
+</head>
+<body>
 <div class="wrap">
-<header>
-  <div class="eyebrow">Nghiên cứu khoa học · 2026-11-16</div>
-  <h1>Argus — agent kiểm thử xâm nhập web có cổng chứng minh</h1>
-  <p class="lede">Một agent tự động tìm lỗ hổng web, nhưng <strong>không được phép
-  ghi nhận lỗ hổng nào mà không có bằng chứng</strong>: chuỗi byte nguyên văn do
-  chính máy mục tiêu trả về, nằm trong transcript đã băm chuỗi, và thoả yêu cầu
-  riêng của từng lớp lỗ hổng. Đo trên bốn ứng dụng, ba trong số đó do người khác viết.</p>
-  <div class="stats">
-    <div class="stat"><b>4</b><span>ứng dụng mục tiêu</span></div>
-    <div class="stat"><b>7/8</b><span>ca đạt mức chứng minh tối đa</span></div>
-    <div class="stat"><b>29</b><span>lớp lỗ hổng có yêu cầu riêng</span></div>
-    <div class="stat"><b>745</b><span>test tự động</span></div>
-    <div class="stat"><b>74</b><span>request cho cả phép đo</span></div>
+
+<!-- ============================ HERO ============================ -->
+<div class="hero">
+  <div class="tag">Nghiên cứu khoa học · Argus · Đo ngày 2026-11-16</div>
+  <h1>Agent kiểm thử web không được phép<br>ghi lỗ hổng mà <span style="color:var(--red)">không có bằng chứng</span></h1>
+  <p class="sub">Đóng góp của đề tài không phải là thêm một công cụ quét. Nó là một
+  <b>cổng chứng minh</b>: mỗi kết luận phải trích được chuỗi byte nguyên văn do chính
+  máy mục tiêu trả về, nằm trong transcript đã băm chuỗi, và thoả yêu cầu riêng của
+  từng lớp lỗ hổng. Không đạt thì kết luận bị hạ cấp và báo cáo nói rõ thiếu điều kiện nào.</p>
+  <div class="pill-row">
+    <span class="badge b-red">Mục tiêu: Ubuntu 22.04 · 192.168.223.221</span>
+    <span class="badge b-cyan">4 ứng dụng · 3 của bên thứ ba</span>
+    <span class="badge b-grn">7/8 ca đạt mức chứng minh tối đa</span>
+    <span class="badge b-amb">745 test · 160/160 selftest</span>
   </div>
-</header>
+  <div class="note cyan" style="margin-top:16px">Mọi số và mọi chuỗi bằng chứng trong
+  trang này lấy từ <b>một lần đo nhất quán</b> ngày 2026-11-16, không phải ví dụ minh
+  hoạ. Hồ sơ niêm phong kèm theo kiểm tra lại được bằng <code>python -m argus verify</code>.</div>
+</div>
 
-<h2>Vấn đề: công cụ quét thường “báo” chứ không “chứng minh”</h2>
-<p>Một scanner nói “có SQL injection ở tham số <code>id</code>”. Người đọc báo cáo
-không có cách nào biết điều đó đúng hay sai, ngoài việc tự kiểm tra lại. Phần lớn
-thời gian của một kỳ kiểm thử bị tiêu vào việc loại bỏ báo động sai.</p>
-<p>Argus đảo ngược mặc định đó: <strong>kết luận phải đi kèm bằng chứng, và bằng
-chứng phải tự chứng minh được.</strong> Mỗi lớp lỗ hổng có một yêu cầu cụ thể —
-ví dụ RCE phải là output của lệnh <code>id</code> kèm một mã ngẫu nhiên chỉ probe
-này biết; SQLi phải là dữ liệu thật trong một bảng được nêu tên. Không đạt thì
-kết luận bị hạ xuống <em>candidate</em> và báo cáo nói rõ thiếu điều kiện nào.</p>
+<!-- ============================ 00 SÂN CHƠI ============================ -->
+<h2><span class="num">00</span>Sân chơi — hai máy riêng biệt, bốn ứng dụng mục tiêu</h2>
+<p class="dim">Máy tấn công và máy mục tiêu là hai máy ảo khác nhau trên mạng LAN riêng.
+Điều này quan trọng: một agent tấn công <code>127.0.0.1</code> và một agent tấn công máy
+khác chạy cùng một đoạn mã, nhưng chỉ cái thứ hai là bằng chứng rằng hệ thống hoạt động
+qua mạng.</p>
 
-<h2>Hệ thống chạy như thế nào</h2>
+<svg viewBox="0 0 1000 300" xmlns="http://www.w3.org/2000/svg" style="margin:18px 0">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L8,4.5 L0,9 Z" fill="#ff5c5c"/>
+    </marker>
+  </defs>
+  <rect x="20" y="20" width="300" height="260" rx="10" fill="#10161f" stroke="#232c38"/>
+  <text x="34" y="44" class="legend" fill="#ff5c5c">MÁY TẤN CÔNG</text>
+  <rect x="45" y="70" width="250" height="78" rx="8" fill="#151c25" stroke="#ff5c5c" stroke-width="1.6"/>
+  <text x="60" y="96" fill="#dfe6ee" font-family="JetBrains Mono,Consolas,monospace" font-size="12.5">Kali · 192.168.223.216</text>
+  <text x="60" y="116" fill="#8b98a8" font-family="JetBrains Mono,Consolas,monospace" font-size="11">argus chạy ở đây</text>
+  <text x="60" y="134" fill="#8b98a8" font-family="JetBrains Mono,Consolas,monospace" font-size="11">56 tool · 27 probe · 29 lớp</text>
+  <text x="45" y="185" fill="#8b98a8" font-family="JetBrains Mono,Consolas,monospace" font-size="11">Phạm vi do người dùng đặt.</text>
+  <text x="45" y="203" fill="#8b98a8" font-family="JetBrains Mono,Consolas,monospace" font-size="11">Model không bao giờ được</text>
+  <text x="45" y="221" fill="#ff5c5c" font-family="JetBrains Mono,Consolas,monospace" font-size="11">mở rộng phạm vi.</text>
+
+  <line x1="320" y1="110" x2="610" y2="110" stroke="#ff5c5c" stroke-width="1.8" marker-end="url(#arr)"/>
+  <text x="400" y="100" class="legend" fill="#ff5c5c">HTTP qua LAN · 1–4 ms</text>
+  <text x="400" y="132" class="legend">mọi request đi qua đúng một client</text>
+
+  <rect x="610" y="20" width="370" height="260" rx="10" fill="#10161f" stroke="#232c38"/>
+  <text x="624" y="44" class="legend" fill="#4fd1e0">MÁY MỤC TIÊU · Ubuntu 22.04.4 LTS</text>
+  <g font-family="JetBrains Mono,Consolas,monospace" font-size="12">
+    <rect x="630" y="62" width="330" height="40" rx="6" fill="#151c25" stroke="#245c3d"/>
+    <text x="644" y="80" fill="#dfe6ee">argus-lab :8777</text>
+    <text x="644" y="95" fill="#8b98a8" font-size="10.5">tự viết · 29 lớp lỗ + nhóm đối chứng</text>
+    <rect x="630" y="112" width="330" height="40" rx="6" fill="#151c25" stroke="#1f5560"/>
+    <text x="644" y="130" fill="#dfe6ee">OWASP Juice Shop :3000</text>
+    <text x="644" y="145" fill="#8b98a8" font-size="10.5">118 challenge · có scoreboard máy đọc được</text>
+    <rect x="630" y="162" width="330" height="40" rx="6" fill="#151c25" stroke="#1f5560"/>
+    <text x="644" y="180" fill="#dfe6ee">bWAPP :8080</text>
+    <text x="644" y="195" fill="#8b98a8" font-size="10.5">bên thứ ba · đăng nhập bee/bug</text>
+    <rect x="630" y="212" width="330" height="40" rx="6" fill="#151c25" stroke="#1f5560"/>
+    <text x="644" y="230" fill="#dfe6ee">DVWA :8081</text>
+    <text x="644" y="245" fill="#8b98a8" font-size="10.5">bên thứ ba · đăng nhập admin/password</text>
+  </g>
+</svg>
+
+<div class="note">Ba trong bốn ứng dụng <b>do người khác viết</b>. Đó không phải chi tiết
+phụ: lab tự viết do cùng người viết công cụ nên thừa hưởng đúng điểm mù của người đó —
+mục 04 cho thấy bộ mục tiêu bên thứ ba tìm ra sáu lỗi mà lab tự viết không thể tìm được.</div>
+
+<!-- ============================ 01 CHUỖI ============================ -->
+<h2><span class="num">01</span>Chuỗi thi hành — bảy bước, bước 6 là đóng góp của đề tài</h2>
+<p class="dim">Toàn bộ thiết kế tồn tại để ép một điều: <b>không thể ghi một kết luận nếu
+những byte chứng minh nó chưa có trong transcript.</b> Bảy bước dưới đây là đường đi
+của một lần chạy thật.</p>
+
 <div class="chain">
-  <div class="step"><div class="n">1</div><div><h3>Người dùng đặt mục tiêu và phạm vi</h3>
-    <p>Model <em>không bao giờ</em> được mở rộng phạm vi. Mọi request ngoài phạm vi
-    bị từ chối trước khi gửi đi byte nào.</p><div class="f">scope.py</div></div></div>
-  <div class="step"><div class="n">2</div><div><h3>LLM quyết định bước tiếp theo</h3>
-    <p>Gọi công cụ qua giao thức tool-use. Có chế độ một agent và chế độ nhóm
-    (một agent điều phối nhiều worker chuyên trách).</p><div class="f">llm.py · decide.py · team/board.py</div></div></div>
-  <div class="step"><div class="n">3</div><div><h3>Công cụ thực thi</h3>
-    <p>56 công cụ: trinh sát, 27 probe (mỗi lớp lỗ hổng một probe), gọi
-    sqlmap/nuclei/nmap, và gọi MCP server bên ngoài.</p><div class="f">tools/registry.py</div></div></div>
-  <div class="step"><div class="n">4</div><div><h3>Một đường ra duy nhất</h3>
-    <p>Mọi request đi qua đúng một client: kiểm phạm vi, giới hạn tốc độ, hạn mức
-    request, che credential theo tên header.</p><div class="f">httpclient.py</div></div></div>
-  <div class="step"><div class="n">5</div><div><h3>Ghi lại, băm chuỗi</h3>
-    <p>Transcript sha256 móc nối nhau, đầu chuỗi neo trong file tổng kết. Sửa một
-    byte là phát hiện được.</p><div class="f">session.py</div></div></div>
-  <div class="step gate"><div class="n">6</div><div><h3>Cổng chứng minh — phần đóng góp chính</h3>
-    <p>Khi agent muốn ghi một finding, cổng này chấm bằng chứng. Thử ngay bên dưới.</p>
-    <div class="f">proof.py · 29 lớp</div></div></div>
-  <div class="step"><div class="n">7</div><div><h3>Hồ sơ niêm phong</h3>
-    <p>Báo cáo, findings, transcript — tất cả được niêm phong bằng digest.
-    <code>argus verify</code> đi lại cả chuỗi <em>và chấm lại từng finding</em>:
-    tự nâng kết luận bằng tay sẽ bị báo <code>TAMPERED</code>.</p><div class="f">session.py · judge.py</div></div></div>
+
+<div class="stage done" data-n="1">
+  <h4>Người dùng đặt mục tiêu và phạm vi <span class="badge b-cyan">scope.py</span></h4>
+  <div class="sub2">Model không bao giờ được mở rộng phạm vi. Request ngoài phạm vi bị
+  từ chối <b>trước khi</b> gửi đi byte nào.</div>
+  <div class="term"><span class="p">$</span> argus run http://192.168.223.221:8777 --scope 192.168.223.221
+<span class="c">← --scope là danh sách host được phép. Mọi request tới host khác bị</span>
+<span class="c">  httpclient.py từ chối trước khi mở socket, kể cả khi model yêu cầu.</span></div>
 </div>
 
-<h2>Thử cổng chứng minh</h2>
-<p>Đây là dữ liệu thật từ một lần chạy trên <strong>bWAPP</strong> — một ứng dụng
-dạy bảo mật của bên thứ ba, đặt trên máy Ubuntu riêng. Probe đã khai thác thành
-công SQL injection ở tham số <code>title</code>. Câu hỏi còn lại: <em>chuỗi nào
-mới thực sự chứng minh được điều đó?</em> Bấm thử từng chuỗi.</p>
+<div class="stage done" data-n="2">
+  <h4>LLM chọn nước đi tiếp theo <span class="badge b-cyan">llm.py · decide.py</span></h4>
+  <div class="sub2">Hai chế độ: một agent, hoặc một nhóm gồm agent điều phối và các worker
+  chuyên trách. Ngoài ra <code>argus next</code> tính nước đi <b>từ bằng chứng đã ghi</b>
+  thay vì từ hội thoại, nên lời khuyên không trôi theo ngữ cảnh.</div>
+  <div class="term"><span class="p">$</span> argus next docs/nckh-evidence/sealed-sessions/bwapp
+<span class="b">NEXT: probe</span>  target=http://192.168.223.221:8080/commandi.php vuln_class=sqli tool=probe_sqli
+<span class="y">why:</span> http://192.168.223.221:8080/commandi.php has been probed, but not for
+     sqli. `argus proof sqli` says what that class needs; collect it on the
+     first pass.
+  params: ["form", "target"]
+  classes_tried: ["rce"]
+<span class="c">← tính từ bằng chứng ĐÃ GHI, không từ hội thoại, nên lời khuyên không trôi theo ngữ cảnh</span></div>
+</div>
+
+<div class="stage done" data-n="3">
+  <h4>Công cụ thực thi <span class="badge b-cyan">tools/registry.py</span></h4>
+  <div class="sub2">56 công cụ, phân quyền theo vai: trinh sát, 27 probe (mỗi lớp lỗ hổng
+  một probe), gọi sqlmap/nuclei/nmap, và gọi MCP server bên ngoài. Argus cũng <b>tự phục
+  vụ</b> công cụ của mình qua <code>argus mcp-serve</code>.</div>
+</div>
+
+<div class="stage done" data-n="4">
+  <h4>Một đường ra duy nhất <span class="badge b-cyan">httpclient.py</span></h4>
+  <div class="sub2">Mọi request — không trừ cái nào — đi qua đúng một client: kiểm phạm vi,
+  giới hạn tốc độ, hạn mức request, che credential theo tên header.</div>
+  <div class="note red" style="margin:8px 0">Che credential là <b>theo tên header</b> chứ
+  không theo giá trị: <code>authorization</code>, <code>cookie</code>, <code>api-key</code>,
+  <code>apikey</code>, <code>x-api-key</code>… Che theo giá trị sẽ trượt ngay khi mục tiêu
+  dùng một tên header lạ.</div>
+</div>
+
+<div class="stage done" data-n="5">
+  <h4>Ghi lại và băm chuỗi <span class="badge b-cyan">session.py</span></h4>
+  <div class="sub2">Mỗi entry mang sha256 của entry trước; đầu chuỗi neo trong
+  <code>summary.json</code>. Sửa một byte là phát hiện được.</div>
+  <div class="term"><span class="p">$</span> python -m argus verify docs/nckh-evidence/sealed-sessions/bwapp
+<span class="g">OK: 24 chained entries verified anchored to summary.json,</span>
+<span class="g">    2 findings re-validated, artifacts sealed [produced by argus 1.0.0]</span></div>
+</div>
+
+<div class="stage gate" data-n="6">
+  <h4>CỔNG CHỨNG MINH <span class="badge b-pur">proof.py · 29 lớp</span></h4>
+  <div class="sub2">Khi agent muốn ghi một finding, cổng này chấm bằng chứng đã nêu. Đây
+  là phần đóng góp của đề tài — mục 02 cho bấm thử trên dữ liệu thật.</div>
+  <div class="term"><span class="p">$</span> argus proof sqli
+<span class="b">sqli - proof requirement</span>
+
+  the DBMS fingerprint plus at least one row from a named table, bounded to
+  what proves the read
+
+  checks that must pass:
+    <span class="g">-</span> data store fingerprinted
+    <span class="g">-</span> the query named its target
+    <span class="g">-</span> the rows are not what the page serves anyway   <span class="c">← thêm sau khi bWAPP phá cổng</span>
+    <span class="g">-</span> rows returned, not an error message
+
+  <span class="y">Five rows is a proof. A full dump is an incident.</span>
+<span class="c">← đọc yêu cầu TRƯỚC khi probe, để thu đúng thứ cần ngay lượt đầu</span></div>
+</div>
+
+<div class="stage done" data-n="7">
+  <h4>Hồ sơ niêm phong <span class="badge b-cyan">session.py · judge.py</span></h4>
+  <div class="sub2">Báo cáo, findings, transcript đều niêm phong bằng digest.
+  <code>argus verify</code> đi lại cả chuỗi <b>và chấm lại từng finding</b>. Một model thứ
+  hai (<code>judge.py</code>) soát lại, và nó <b>chỉ có thể hạ cấp</b>, không bao giờ nâng.</div>
+  <div class="term"><span class="c"># thử tự nâng grade trong findings.json rồi verify lại:</span>
+<span class="r">TAMPERED: F01 claims grade 'proven' but its cited evidence supports 'candidate'</span>
+<span class="r">          unmet: the rows are not what the page serves anyway</span></div>
+</div>
+
+</div>
+
+<!-- ============================ 02 CỔNG — TƯƠNG TÁC ============================ -->
+<h2><span class="num">02</span>Bấm thử cổng chứng minh — dữ liệu thật từ bWAPP</h2>
+<p>Probe đã khai thác <b>thành công</b> SQL injection ở tham số <code>title</code> của
+<code>sqli_1.php</code> trên bWAPP. Việc khai thác là thật trong cả bốn trường hợp dưới
+đây. Câu hỏi còn lại là câu hỏi mà đề tài đặt ra: <b>chuỗi nào mới thực sự chứng
+minh được điều đó?</b></p>
+<p class="dim">Chọn một chuỗi bằng chứng — trang sẽ in ra đúng 8 check mà cổng chạy, và
+kết luận nó cho.</p>
+
 <div class="picker" id="picker" role="group" aria-label="Chọn chuỗi bằng chứng"></div>
-<div class="verdict" id="verdict" aria-live="polite"></div>
-<p class="why" style="margin-top:0.9rem">Check cuối cùng là <em>khuyến cáo</em>,
-không phải điều kiện: nó nhắc rằng lần chạy này nêu 20 exchange nên việc ghép cặp
-bị chặn ở 16. Kết luận không phụ thuộc vào nó.</p>
+<div id="verdict" aria-live="polite"></div>
 
-<div class="note">
-  <p><strong>Ba chuỗi bị từ chối đều là bằng chứng “gần đúng”.</strong>
-  <code>&lt;!DOCTYPE html&gt;</code> là khung trang, có trong mọi response.
-  <code>statements</code> là một từ trong chính câu báo lỗi của database — tức UNION
-  đã <em>thất bại</em>. Còn <code>bee</code> <em>là</em> tên đăng nhập thật trong
-  bảng <code>users</code>, nhưng bWAPP in sẵn “Welcome bee” ở thanh điều hướng, nên
-  nó không phân biệt được “đọc được dữ liệu” với “trang vẫn luôn hiện thế”.</p>
-  <p>Chỉ hash mật khẩu là duy nhất cho lần đọc đó — và đó là chuỗi duy nhất được
-  chấm <code>proven</code>.</p>
+<div class="note" style="margin-top:14px">Check thứ 8 là <b>khuyến cáo</b>, không phải điều
+kiện: nó nhắc rằng lần chạy này nêu 20 exchange nên việc ghép cặp bị chặn ở 16. Kết luận
+không phụ thuộc vào nó — và việc cổng vẫn <i>báo</i> ra là có chủ ý.</div>
+
+<div class="grid2" style="margin-top:14px">
+  <div class="card">
+    <h4>Ba chuỗi bị từ chối đều là bằng chứng "gần đúng"</h4>
+    <p style="font-size:13.5px"><code class="mono">&lt;!DOCTYPE html&gt;</code> là khung
+    trang — có trong <b>mọi</b> response, kể cả response không injection.</p>
+    <p style="font-size:13.5px"><code class="mono">statements</code> là một từ trong chính
+    câu báo lỗi của database. Tức UNION đã <b>thất bại</b>, và byte "chứng minh" lại là
+    bằng chứng của sự thất bại đó.</p>
+    <p style="font-size:13.5px"><code class="mono">bee</code> <b>là</b> tên đăng nhập thật
+    trong bảng <code>users</code> — nhưng bWAPP in sẵn "Welcome bee" ở thanh điều hướng.
+    Nên nó không phân biệt được "đọc được dữ liệu" với "trang vẫn luôn hiện thế".</p>
+  </div>
+  <div class="card">
+    <h4>Vì sao ca "bee" là ca quan trọng nhất</h4>
+    <p style="font-size:13.5px">Hai ca đầu dễ thấy là sai. Ca <code class="mono">bee</code>
+    thì <b>không</b>: nó là dữ liệu thật, lấy từ đúng bảng được nêu tên, bởi một payload
+    thật sự chạy.</p>
+    <p style="font-size:13.5px">Nó vẫn bị hạ cấp, vì tiêu chuẩn của cổng không phải
+    "byte này có thật không" mà <b>"byte này có phân biệt được hai khả năng không"</b>.
+    Đó là chỗ đề tài khác với một scanner.</p>
+    <div class="note grn" style="margin-top:10px">Chỉ hash mật khẩu là duy nhất cho lần
+    đọc đó — và đó là chuỗi duy nhất được chấm <b>proven</b>.</div>
+  </div>
 </div>
 
-<h2>Số liệu đo được</h2>
+<!-- ============================ 03 SỐ LIỆU ============================ -->
+<h2><span class="num">03</span>Số liệu đo — 8 ca, 4 ứng dụng, 74 request</h2>
 <div class="toggle" role="group" aria-label="Chọn mốc đo">
-  <button type="button" id="btn-after" aria-pressed="true">Sau khi sửa lỗi</button>
-  <button type="button" id="btn-before" aria-pressed="false">Trước khi sửa</button>
+  <button type="button" id="btn-after" aria-pressed="true">SAU khi sửa lỗi</button>
+  <button type="button" id="btn-before" aria-pressed="false">TRƯỚC khi sửa</button>
 </div>
 <div class="tablewrap">
   <table id="results"><thead><tr>
     <th>Ứng dụng</th><th>Lớp</th><th>Req</th><th>Kết quả</th><th>Bằng chứng được trích</th>
   </tr></thead><tbody></tbody></table>
 </div>
-<p id="summary" class="why"></p>
+<p id="summary" class="dim" style="font-size:13.5px"></p>
 
-<h2>Sáu lỗi mà bộ mục tiêu bên thứ ba phơi ra</h2>
-<p>Trước đây hệ thống chỉ được đo trên lab tự viết. Một buổi cài bWAPP, DVWA và
-Juice Shop lên máy riêng đã tìm ra sáu lỗi mà lab tự viết <strong>không thể</strong>
-tìm được — vì lab do cùng người viết công cụ nên thừa hưởng đúng điểm mù của người đó.</p>
-
-<div class="fix bad"><h3>1 · Cổng chấm <code>proven</code> trên khung trang</h3>
-<p>Quote <code>&lt;!DOCTYPE html&gt;</code> làm lớp <code>sqli</code> đạt proven,
-trong khi UNION đã thất bại. Sửa: bắt buộc có <em>control</em> — một request cùng
-endpoint không chứa tên bảng, và body của nó không chứa chuỗi được trích.</p></div>
-
-<div class="fix bad"><h3>2 · Cổng chấm <code>proven</code> trên một từ của câu báo lỗi</h3>
-<p>Lọt qua cả bản sửa số 1, vì câu lỗi do chính injection gây ra cũng “vắng trong
-baseline”. Sửa: byte nằm <em>bên trong</em> câu báo thất bại thì không phải dữ liệu.</p></div>
-
-<div class="fix bad"><h3>3 · Finding RCE trích byte vô nghĩa</h3>
-<p>Việc thực thi lệnh là thật, nhưng chuỗi được trích là <code>DOCTYPE</code> ở
-3/3 ca. Sửa: excerpt phải chứa chính dòng identity. Sau đó: <code>uid=1000(lab)</code>,
-<code>uid=33(www-data)</code>.</p></div>
-
-<div class="fix"><h3>4 · Probe không nhận ngữ cảnh <code>LIKE</code></h3>
-<p>bWAPP chèn tham số vào <code>WHERE title LIKE '%…%'</code>. Probe chỉ biết hai
-ngữ cảnh. Thêm họ thứ ba, và họ nào <em>liệt kê được số cột</em> thì thắng.</p></div>
-
-<div class="fix"><h3>5 · Tín hiệu lỗi bị đánh bại bởi một trang <em>nhắc đến</em> database</h3>
-<p>Trang bWAPP có chữ <code>SQLite</code> trong phần khung, nên mọi payload đều bị
-coi là “gây lỗi” — kể cả response giống baseline từng byte. Sửa: tín hiệu thất bại
-phải là <em>vi phân</em> so với baseline, không phải khớp một mẫu.</p></div>
-
-<div class="fix"><h3>6 · Việc dò số cột không được nối với phần cần nó</h3>
-<p>Phần trích dữ liệu đã biết đệm <code>NULL</code> theo số cột dò được, nhưng việc
-dò lại là tuỳ chọn — nên mặc định nó dựng UNION 2 cột cho một SELECT 7 cột.</p></div>
-
-<p>Điểm chung của cả sáu, đáng đưa vào báo cáo: <strong>dùng giá trị tuyệt đối ở
-nơi cần vi phân.</strong> Khung trang có trong mọi response; chữ <code>SQLite</code>
-có cả trong baseline; một từ của câu lỗi cũng “vắng trong baseline”. Mỗi lần, câu
-trả lời đúng là so với một đối chứng chứ không phải khớp một mẫu.</p>
-
-<h2>Điều chưa làm được</h2>
-<div class="note">
-  <p><strong>Chưa có lần chạy nào do LLM tự điều khiển đầu-cuối.</strong> Toàn bộ
-  thành phần đã dựng và có 71 unit test, nhưng mọi session hiện có đều do script
-  điều khiển (<code>model: scripted-demo</code>). Đường LLM đã thử thật và nhận lỗi
-  từ API: <em>“Third-party apps now draw from your extra usage”</em> —
-  <code>llm_calls: 0</code>.</p>
-  <p>Đây là giới hạn hạn mức tài khoản, đã đo được chứ không phỏng đoán. Nạp hạn
-  mức là mở được đồng thời tiêu chí <code>user → LLM → MCP → tool</code> và chương
-  thực nghiệm. Mọi request HTTP và mọi byte bằng chứng ở trên đều là thật; chỉ tầng
-  quyết định là script.</p>
+<div class="grid3" style="margin-top:16px">
+  <div class="card">
+    <h4>Mức cải thiện</h4>
+    <div class="kv"><b>6/8 → 7/8</b> ca đạt mức chứng minh tối đa của lớp</div>
+    <div class="kv" style="margin-top:6px"><b>58 → 74</b> request (nhiều hơn vì phải dò số cột)</div>
+  </div>
+  <div class="card">
+    <h4>Chất lượng bằng chứng</h4>
+    <div class="kv">trước: <span class="bad mono">DOCTYPE</span> · <span class="bad mono">127.0.0.1:</span> · <span class="bad mono">status</span></div>
+    <div class="kv" style="margin-top:6px">sau: <span class="ok mono">uid=33(www-data)</span> · <span class="ok mono">5f4dcc3b…</span></div>
+  </div>
+  <div class="card">
+    <h4>Bộ gate của repo</h4>
+    <div class="kv"><b>745</b> test · <b>160/160</b> selftest</div>
+    <div class="kv" style="margin-top:6px"><b>11</b> job CI — 2 OS × 5 bản Python + 1 job wheel</div>
+  </div>
 </div>
-<p>Hai lớp bị giới hạn có lý do ghi rõ: <code>xss</code> dừng ở <em>candidate</em>
-vì gói này không có browser để chứng minh script thực sự chạy; <code>ssrf</code>
-dừng ở <em>candidate</em> vì không có collector ngoài băng. <code>dos</code> bị từ
-chối theo chính sách của dự án.</p>
 
-<h2>Bước tiếp theo</h2>
-<p>Thứ tự theo giá trị cho luận điểm nghiên cứu, không theo độ dễ:</p>
-<ol>
-  <li><strong>Nạp hạn mức rồi chạy bộ baseline</strong> — một việc, mở hai khoảng trống.</li>
-  <li><strong>Đo bằng đối chứng độc lập.</strong> Juice Shop có
-  <code>GET /api/Challenges</code> trả về 118 challenge kèm cờ đã giải — chính ứng
-  dụng mục tiêu xác nhận, không phải công cụ tự khai. Hiện đã giải 1.</li>
-  <li><strong>So báo động sai với <code>sqlmap</code> và <code>nuclei</code></strong>
-  trên cùng mục tiêu. Luận điểm của đề tài là cổng chứng minh giảm báo sai, nên đó
-  là con số đáng đo nhất.</li>
-</ol>
+<div class="note red">Hai ca <span class="mono">candidate</span> không phải thất bại —
+chúng <b>đúng mức tối đa mà lớp đó cho phép</b> trong gói này, và lý do được ghi vào
+hồ sơ: <code>xss</code> cần một browser để chứng minh script thật sự chạy (gói này không
+có), <code>ssrf</code> cần collector ngoài băng. Lớp <code>dos</code> bị <b>từ chối theo
+chính sách</b> của dự án, không phải vì không làm được.</div>
+
+<!-- ============================ 04 SÁU LỖI ============================ -->
+<h2><span class="num">04</span>Sáu lỗi mà bộ mục tiêu bên thứ ba phơi ra</h2>
+<p class="dim">Trước đây hệ thống chỉ được đo trên lab tự viết. Một buổi cài bWAPP, DVWA
+và Juice Shop lên máy riêng đã tìm ra sáu lỗi mà lab tự viết <b>không thể</b> tìm được —
+vì lab do cùng người viết công cụ nên nó thừa hưởng đúng điểm mù của người đó.</p>
+
+<div class="grid2">
+  <div class="card">
+    <h4><span class="bad">01</span> · Cổng chấm proven trên khung trang</h4>
+    <p style="font-size:13.5px">Quote <code class="mono">&lt;!DOCTYPE html&gt;</code> làm
+    lớp <code>sqli</code> đạt <b>proven</b>, trong khi UNION đã thất bại.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> bắt buộc có <i>control</i> —
+    một request cùng endpoint không chứa tên bảng, và body của nó không chứa chuỗi được trích.</div>
+  </div>
+  <div class="card">
+    <h4><span class="bad">02</span> · Cổng chấm proven trên một từ của câu báo lỗi</h4>
+    <p style="font-size:13.5px">Lọt qua <b>cả bản sửa 01</b>, vì câu lỗi do chính injection
+    gây ra cũng "vắng trong baseline" một cách hợp lệ.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> byte nằm <i>bên trong</i> câu
+    báo thất bại của DBMS thì không phải dữ liệu.</div>
+  </div>
+  <div class="card">
+    <h4><span class="bad">03</span> · Finding RCE trích byte vô nghĩa</h4>
+    <p style="font-size:13.5px">Việc thực thi lệnh là <b>thật</b>, nhưng chuỗi được trích là
+    <code class="mono">DOCTYPE</code> ở <b>3/3</b> ca. Kết luận đúng, bằng chứng vô dụng.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> excerpt phải chứa chính dòng
+    identity. Sau đó: <code class="mono">uid=1000(lab)</code>,
+    <code class="mono">uid=33(www-data)</code>.</div>
+  </div>
+  <div class="card">
+    <h4><span class="warn">04</span> · Probe không nhận ngữ cảnh LIKE</h4>
+    <p style="font-size:13.5px">bWAPP chèn tham số vào
+    <code class="mono">WHERE title LIKE '%…%'</code>. Probe chỉ biết hai ngữ cảnh.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> thêm họ thứ ba, và họ nào
+    <i>liệt kê được số cột</i> thì thắng — không đoán, để kết quả tự chọn.</div>
+  </div>
+  <div class="card">
+    <h4><span class="warn">05</span> · Tín hiệu lỗi bị một trang <i>nhắc đến</i> DB đánh bại</h4>
+    <p style="font-size:13.5px">Trang bWAPP có chữ <code class="mono">SQLite</code> trong
+    phần khung, nên <b>mọi</b> payload bị coi là "gây lỗi" — kể cả response giống baseline
+    từng byte.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> tín hiệu thất bại phải là
+    <i>vi phân</i> so với baseline, không phải khớp một mẫu.</div>
+  </div>
+  <div class="card">
+    <h4><span class="warn">06</span> · Việc dò số cột không nối với phần cần nó</h4>
+    <p style="font-size:13.5px">Phần trích dữ liệu đã biết đệm <code class="mono">NULL</code>
+    theo số cột dò được — nhưng việc dò lại là <b>tuỳ chọn</b>, nên mặc định nó dựng UNION
+    2 cột cho một SELECT 7 cột.</p>
+    <div class="note grn" style="margin-top:8px"><b>Sửa:</b> đã có <code>extract_table</code>
+    thì bắt buộc dò trước.</div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:16px"><b>Điểm chung của cả sáu — đáng đưa vào báo
+cáo:</b> dùng <b>giá trị tuyệt đối</b> ở nơi cần một <b>vi phân</b>. Khung trang có trong
+mọi response; chữ <code class="mono">SQLite</code> có cả trong baseline; một từ của câu lỗi
+cũng "vắng trong baseline". Mỗi lần, câu trả lời đúng là <i>so với một đối chứng</i> chứ
+không phải khớp một mẫu. Đó là một phát hiện về phương pháp, không phải sáu lỗi rời rạc.</div>
+
+<!-- ============================ 05 CHƯA LÀM ĐƯỢC ============================ -->
+<h2><span class="num">05</span>Điều chưa làm được — phải khai báo trung thực</h2>
+
+<div class="note red"><b>Chưa có lần chạy nào do LLM tự điều khiển đầu-cuối.</b>
+Toàn bộ thành phần đã dựng và có 71 unit test, nhưng <b>mọi</b> session hiện có đều do
+script điều khiển. Hồ sơ ghi <code class="mono">model: scripted-demo</code> hoặc
+<code class="mono">model: probe-driver</code> — và chúng ghi như vậy chính là để không
+ai nhầm.</div>
+
+<div class="term"><span class="c"># đường LLM đã thử THẬT và nhận lỗi từ API:</span>
+<span class="p">$</span> argus run http://192.168.223.221:8777 --model claude-opus-5
+<span class="r">[!] LLM error: Third-party apps now draw from your extra usage</span>
+<span class="y">llm_calls: 0</span>   <span class="c">← đây là số đo, không phải phỏng đoán</span></div>
+
+<p>Đây là giới hạn <b>hạn mức tài khoản</b>, không phải lỗi kiến trúc — và nói rõ điều đó
+quan trọng hơn là che nó đi. Nạp hạn mức là mở được <b>đồng thời</b> tiêu chí
+<code class="mono">user → LLM → MCP → tool</code> mà thầy yêu cầu, và chương thực nghiệm
+của báo cáo.</p>
+<p class="dim">Cần phân biệt rạch ròi khi trình bày: mọi request HTTP, mọi payload và mọi
+byte bằng chứng ở trên <b>đều là thật</b>, thu từ máy mục tiêu qua mạng LAN. Chỉ <b>tầng
+quyết định thứ tự công cụ</b> là script. Nói cách khác, phần đã chứng minh là <i>cổng
+chứng minh và tầng công cụ</i>; phần chưa chứng minh là <i>năng lực tự điều hướng</i>.</p>
+
+<ul class="checklist" style="margin-top:12px">
+  <li class="y">Tầng công cụ — 56 tool, chạy thật qua LAN tới 4 ứng dụng</li>
+  <li class="y">Cổng chứng minh — 29 lớp, 745 test, phá được rồi sửa được</li>
+  <li class="y">Niêm phong và kiểm tra lại — 4 hồ sơ <code>argus verify</code> sạch</li>
+  <li class="y">Giao thức MCP — argus vừa gọi được MCP ngoài, vừa tự phục vụ tool của mình</li>
+  <li class="n">LLM tự điều khiển đầu-cuối — <b>chặn ở hạn mức tài khoản</b></li>
+  <li class="n">Bộ 10 baseline — chờ cùng một việc trên</li>
+  <li class="n">So báo động sai với sqlmap / nuclei trên cùng mục tiêu</li>
+</ul>
+
+<!-- ============================ 06 BƯỚC TIẾP ============================ -->
+<h2><span class="num">06</span>Bước tiếp theo — xếp theo giá trị cho luận điểm, không theo độ dễ</h2>
+
+<div class="card">
+  <h4>01 · Nạp hạn mức rồi chạy bộ baseline</h4>
+  <p style="font-size:13.5px">Một việc, mở hai khoảng trống: tiêu chí
+  <code class="mono">user → LLM → MCP → tool</code> và chương thực nghiệm. Đây là việc
+  <b>duy nhất</b> hiện đang chặn, và nó không phải việc lập trình.</p>
+</div>
+
+<div class="card">
+  <h4>02 · Đo bằng đối chứng độc lập, không phải tự khai</h4>
+  <p style="font-size:13.5px">Juice Shop có <code class="mono">GET /api/Challenges</code>
+  trả về <b>118</b> challenge kèm cờ đã giải. Đó là <b>chính ứng dụng mục tiêu xác nhận</b>,
+  không phải công cụ tự báo cáo về mình — loại số liệu khó bác nhất trong một báo cáo.</p>
+  <div class="term"><span class="p">$</span> curl -s http://192.168.223.221:3000/api/Challenges | jq '[.data[]|select(.solved)]|length'
+<span class="g">1</span>   <span class="c">← đã giải: "Error Handling". Mẫu số 118 do mục tiêu cung cấp, không do ta đặt.</span></div>
+</div>
+
+<div class="card">
+  <h4>03 · So báo động sai với sqlmap và nuclei trên cùng mục tiêu</h4>
+  <p style="font-size:13.5px">Luận điểm của đề tài là <b>cổng chứng minh làm giảm báo động
+  sai</b>. Vậy con số đáng đo nhất không phải "tìm được bao nhiêu lỗ" mà <b>"bao nhiêu kết
+  luận sai bị chặn lại"</b> so với một công cụ không có cổng. Argus đã gọi được cả hai công
+  cụ đó qua <code>run_external</code>, nên phép so này là việc chạy chứ không phải việc dựng.</p>
+</div>
+
+<div class="note cyan"><b>Một lưu ý về phương pháp cho chương bàn luận:</b> sáu lỗi ở mục 04
+đều do <i>mục tiêu của người khác</i> tìm ra, không phải do thêm test vào lab của mình.
+Điều này gợi ý rằng với loại hệ thống này, <b>một bộ mục tiêu độc lập có giá trị chẩn đoán
+cao hơn một bộ test tự viết</b> — vì bộ test tự viết chỉ kiểm được những khả năng mà người
+viết đã nghĩ ra.</div>
 
 <footer>
-  <p>Số liệu thô, hồ sơ niêm phong, bản ghi phiên khai thác và script đo đều nằm
-  cùng thư mục này trong repo: <code class="mono">docs/nckh-evidence/</code>.
-  Kiểm tra lại hồ sơ bằng <code class="mono">python -m argus verify &lt;thư mục&gt;</code>.</p>
+  <b>Hồ sơ và số liệu</b> — tất cả nằm trong repo tại <code class="mono">docs/nckh-evidence/</code>:
+  báo cáo đầy đủ (<code class="mono">RESULTS.md</code>), số liệu thô
+  (<code class="mono">results.json</code>), 4 hồ sơ niêm phong
+  (<code class="mono">sealed-sessions/</code>), bản ghi phiên khai thác
+  (<code class="mono">recording/</code>, phát bằng <code class="mono">asciinema play</code>),
+  và các script đo <i>đúng bản đã dùng</i> (<code class="mono">tools/</code>).<br><br>
+  Kiểm tra lại bất kỳ hồ sơ nào:
+  <code class="mono">python -m argus verify docs/nckh-evidence/sealed-sessions/bwapp</code><br>
+  Phạm vi và uỷ quyền: <code class="mono">docs/nckh-evidence/AUTHORIZATION.txt</code>.
+  Toàn bộ khai thác diễn ra trên máy ảo trong mạng LAN riêng, không có tương tác nào với
+  hệ thống của bên thứ ba.<br><br>
+  <span class="dim">Đo ngày 2026-11-16 · argus 1.0.0 · Python 3.14 · thư viện chuẩn, không phụ thuộc pip</span>
 </footer>
-</div>
 
+</div>
 <script>
+// Dữ liệu dưới đây là output THẬT của cổng chứng minh trên bWAPP sqli_1.php,
+// và có thể chứa `<` (chuỗi `<!DOCTYPE html>` là một trong các ca), nên mọi
+// giá trị nội suy vào innerHTML đều phải escape.
 const GATE = [{"quote": "6885858486f31043e5839c735d99457f045affd0", "why": "Hash SHA1 mật khẩu của user bee, lấy từ bảng users", "grade": "proven", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r20"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": true, "detail": "6885858486f31043e5839c735d99457f045affd0 in r20 and in no control"}, {"name": "rows returned, not an error message", "ok": true, "detail": "quoted from r20"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "<!DOCTYPE html>", "why": "Khung HTML — có trong mọi response của trang", "grade": "candidate", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r1"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "statements", "why": "Một từ trong câu 'The used SELECT statements have a different number of columns'", "grade": "unproven", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": false, "detail": "the quoted bytes are in no cited response"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "bee", "why": "Tên đăng nhập thật trong bảng users — nhưng bWAPP in 'Welcome bee' ở navbar", "grade": "candidate", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r1"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}];
-const WHY = {
-  "proven": "Đạt — bằng chứng thoả toàn bộ yêu cầu của lớp sqli.",
-  "candidate": "Chưa đạt — có tín hiệu thật, nhưng thiếu điều kiện được nêu tên bên dưới.",
-  "unproven": "Không đạt — chuỗi này không nằm trong response nào được nêu."
-};
-// Dữ liệu dưới đây là output thật của công cụ và có thể chứa `<`
-// (chuỗi `<!DOCTYPE html>` là một trong các ca demo), nên mọi giá trị
-// nội suy vào innerHTML đều phải được escape.
 const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({
-  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+const VERD = {
+  proven:    {cls:"b-grn", txt:"PROVEN",    why:"Đạt — thoả toàn bộ điều kiện của lớp sqli."},
+  candidate: {cls:"b-amb", txt:"CANDIDATE", why:"Chưa đạt — có tín hiệu thật, nhưng thiếu điều kiện được nêu tên."},
+  unproven:  {cls:"b-red", txt:"UNPROVEN",  why:"Không đạt — chuỗi này không nằm trong response nào được nêu."}
+};
 const picker = document.getElementById("picker");
-const verdict = document.getElementById("verdict");
+const out = document.getElementById("verdict");
 function render(i) {
-  const c = GATE[i];
-  [...picker.children].forEach((b, j) =>
-    b.setAttribute("aria-pressed", String(j === i)));
-  const rows = c.checks.map((k, idx) => `
-    <li class="${k.ok ? "ok" : "no"}${idx === c.checks.length - 1 ? " adv" : ""}">
-      <span class="mark" aria-hidden="true">${k.ok ? "✔" : "✕"}</span>
-      <span class="name">${esc(k.name)}<span class="sr">${k.ok ? " — đạt" : " — không đạt"}</span>
-        ${k.detail ? `<span class="det">${esc(k.detail)}</span>` : ""}</span>
-    </li>`).join("");
-  verdict.innerHTML = `
-    <div class="verdict-head">
-      <span class="badge ${esc(c.grade)}">${esc(c.grade)}</span>
-      <div class="why">${esc(WHY[c.grade] || "")} <em>${esc(c.why)}</em></div>
-    </div>
-    <ul class="checks">${rows}</ul>`;
+  const c = GATE[i], v = VERD[c.grade] || VERD.candidate;
+  [...picker.children].forEach((b, j) => b.setAttribute("aria-pressed", String(j === i)));
+  const lines = c.checks.map((k, idx) => {
+    const last = idx === c.checks.length - 1;
+    const mark = k.ok ? '<span class="g">[PASS]</span>' : '<span class="r">[FAIL]</span>';
+    const nm = k.ok ? esc(k.name) : '<span class="y">' + esc(k.name) + '</span>';
+    const det = k.detail ? '\n         <span class="c">' + esc(k.detail) + '</span>' : "";
+    const adv = last ? ' <span class="c">(khuyến cáo)</span>' : "";
+    return "  " + mark + " " + nm + adv + det;
+  }).join("\n");
+  out.innerHTML =
+    '<div class="term"><span class="c"># khối "proof" mà cổng ghi vào findings.json cho quote này</span>' +
+    '\n<span class="b">vuln_class:</span> sqli   <span class="b">quote:</span> ' + esc(JSON.stringify(c.quote)) +
+    '\n<span class="b">requirement:</span> <span class="c">the DBMS fingerprint plus at least one row from a named' +
+    '\n             table, bounded to what proves the read</span>' +
+    '\n\n<span class="b">checks:</span>\n' + lines +
+    '\n\n  <span class="b">verdict:</span> <span class="' + (c.grade === "proven" ? "g" : c.grade === "unproven" ? "r" : "y") +
+    '">' + esc(c.grade) + '</span>  <span class="c">' + esc(c.why) + '</span></div>' +
+    '<div class="note ' + (c.grade === "proven" ? "grn" : c.grade === "unproven" ? "red" : "") + '">' +
+    '<span class="badge ' + v.cls + '">' + v.txt + '</span> ' + esc(v.why) + '</div>';
 }
 GATE.forEach((c, i) => {
   const b = document.createElement("button");
   b.type = "button";
   b.setAttribute("aria-pressed", "false");
-  b.textContent = c.quote.length > 44 ? c.quote.slice(0, 44) + "…" : c.quote;
+  b.textContent = c.quote.length > 42 ? c.quote.slice(0, 42) + "…" : c.quote;
   b.addEventListener("click", () => render(i));
   picker.appendChild(b);
 });
@@ -328,34 +520,36 @@ render(0);
 
 const RESULTS = {
   after: { rows: [
-    ["argus-lab", "sqli", 15, "proven", "$s3cr3t-admin-pw"],
-    ["argus-lab", "rce", 3, "proven", "uid=1000(lab)"],
-    ["DVWA", "sqli", 15, "proven", "5f4dcc3b5aa765d61d8327deb882cf99"],
-    ["DVWA", "rce", 3, "proven", "uid=33(www-data)"],
-    ["DVWA", "xss", 1, "candidate", "đúng mức tối đa của lớp — không có browser"],
-    ["bWAPP", "sqli", 20, "proven", "6885858486f31043e5839c735d99457f045affd0"],
-    ["bWAPP", "rce", 3, "proven", "uid=33(www-data)"],
-    ["Juice Shop", "sqli", 14, "candidate", "chỉ error-based, chưa trích được bảng"]],
-    note: "7/8 ca đạt mức tối đa của lớp · 74 request. Hai hash là mật khẩu thật trong bảng users của DVWA (MD5) và bWAPP (SHA1); uid= là danh tính tiến trình web server trên máy mục tiêu, kèm nonce của probe." },
+    ["argus-lab","sqli",15,"proven","admin - $s3cr3t-admin-pw"],
+    ["argus-lab","rce",3,"proven","uid=1000(lab)"],
+    ["DVWA","sqli",15,"proven","5f4dcc3b5aa765d61d8327deb882cf99"],
+    ["DVWA","rce",3,"proven","uid=33(www-data)"],
+    ["DVWA","xss",1,"candidate","đúng mức tối đa của lớp — gói này không có browser"],
+    ["bWAPP","sqli",20,"proven","6885858486f31043e5839c735d99457f045affd0"],
+    ["bWAPP","rce",3,"proven","uid=33(www-data)"],
+    ["Juice Shop","sqli",14,"candidate","chỉ error-based, chưa trích được bảng"]],
+    note: "7/8 ca đạt mức tối đa của lớp · 74 request. Hai hash là mật khẩu thật trong bảng users của DVWA (MD5 của \"password\") và bWAPP (SHA1). Chuỗi uid= là danh tính tiến trình web server trên máy mục tiêu, kèm nonce của probe để buộc output vào đúng lần gọi đó." },
   before: { rows: [
-    ["argus-lab", "sqli", 12, "proven", "$s3cr3t-admin-pw"],
-    ["argus-lab", "rce", 3, "proven", "127.0.0.1:"],
-    ["DVWA", "sqli", 12, "proven", "5f4dcc3b5aa765d61d8327deb882cf99"],
-    ["DVWA", "rce", 3, "proven", "DOCTYPE"],
-    ["DVWA", "xss", 1, "candidate", "đúng mức tối đa của lớp"],
-    ["bWAPP", "sqli", 12, "candidate", "DOCTYPE"],
-    ["bWAPP", "rce", 3, "proven", "DOCTYPE"],
-    ["Juice Shop", "sqli", 12, "candidate", "status"]],
-    note: "6/8 ca đạt mức tối đa · 58 request. Kết luận đúng ở phần lớn ca, nhưng bằng chứng được trích thì vô nghĩa — đó chính là lỗi số 3." }
+    ["argus-lab","sqli",12,"proven","$s3cr3t-admin-pw"],
+    ["argus-lab","rce",3,"proven","127.0.0.1:"],
+    ["DVWA","sqli",12,"proven","5f4dcc3b5aa765d61d8327deb882cf99"],
+    ["DVWA","rce",3,"proven","DOCTYPE"],
+    ["DVWA","xss",1,"candidate","đúng mức tối đa của lớp"],
+    ["bWAPP","sqli",12,"candidate","DOCTYPE"],
+    ["bWAPP","rce",3,"proven","DOCTYPE"],
+    ["Juice Shop","sqli",12,"candidate","status"]],
+    note: "6/8 ca đạt mức tối đa · 58 request. Đáng chú ý: kết luận đúng ở phần lớn ca, nhưng bằng chứng được trích thì vô nghĩa — DOCTYPE, 127.0.0.1:, status. Đó chính là lỗi 03, và nó cho thấy \"tìm đúng lỗ\" với \"chứng minh được\" là hai việc khác nhau." }
 };
 const tbody = document.querySelector("#results tbody");
 const summary = document.getElementById("summary");
+const BCLS = {proven:"b-grn", candidate:"b-amb", unproven:"b-red"};
 function show(which) {
   const d = RESULTS[which];
-  tbody.innerHTML = d.rows.map(r => `<tr>
-    <td>${esc(r[0])}</td><td class="mono">${esc(r[1])}</td><td class="num">${esc(r[2])}</td>
-    <td><span class="badge ${esc(r[3])}">${esc(r[3])}</span></td>
-    <td class="ev">${esc(r[4])}</td></tr>`).join("");
+  tbody.innerHTML = d.rows.map(r => '<tr><td>' + esc(r[0]) + '</td>' +
+    '<td class="mono">' + esc(r[1]) + '</td>' +
+    '<td class="mono">' + esc(r[2]) + '</td>' +
+    '<td><span class="badge ' + (BCLS[r[3]] || "b-amb") + '">' + esc(r[3]) + '</span></td>' +
+    '<td class="mono">' + esc(r[4]) + '</td></tr>').join("");
   summary.textContent = d.note;
   document.getElementById("btn-after").setAttribute("aria-pressed", String(which === "after"));
   document.getElementById("btn-before").setAttribute("aria-pressed", String(which === "before"));
@@ -364,4 +558,5 @@ document.getElementById("btn-after").addEventListener("click", () => show("after
 document.getElementById("btn-before").addEventListener("click", () => show("before"));
 show("after");
 </script>
-<style>.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}</style>
+</body>
+</html>

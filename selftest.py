@@ -635,6 +635,31 @@ def _doc_selftest_count() -> None:
           f"{total}")
 
 
+def _html_as_doc_text(raw: str) -> str:
+    """A presentation page makes the same claims a README does.
+
+    The checks below read commands out of backticks and fenced blocks. An
+    HTML page writes those same two shapes as `<code>` and as a terminal
+    block, so translate the page into the shapes the existing rules already
+    read, rather than writing a second set of rules that can drift from the
+    first. Prose outside those two elements stays prose, exactly as it does
+    in markdown - `argus ch...` inside a sentence is not a claim about a
+    subcommand, and treating it as one would make this check cry wolf the
+    way the markdown version already learned not to.
+    """
+    import html as _h
+    import re as _re2
+
+    def _plain(fragment: str) -> str:
+        return _h.unescape(_re2.sub(r"<[^>]+>", "", fragment))
+
+    parts = ["```\n" + _plain(b) + "\n```" for b in
+             _re2.findall(r'<div class="term">(.*?)</div>', raw, _re2.S)]
+    parts += ["`" + _plain(c) + "`" for c in
+              _re2.findall(r"<code[^>]*>(.*?)</code>", raw, _re2.S)]
+    return "\n".join(parts)
+
+
 # --- documentation names only things that exist ---------------------------
 #
 # This project's claim is that it does not invent endpoints, versions or
@@ -654,6 +679,17 @@ _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
               # whole purpose is to let a reader check a claim rather than
               # take it was the one document nothing checked.
               "docs/VERIFICATION.md",
+              # The evidence pack is the document an OUTSIDE reader checks
+              # first, and its presentation page names commands in `<code>`
+              # and in terminal blocks rather than in backticks and fences.
+              # Three commands that do not exist reached that page because
+              # the gated set was markdown-only: `argus open`, `argus check
+              # --class`, and a `--quote` flag. A page that invents a command
+              # is the exact defect this gate exists for, so the page is
+              # gated now and `_html_as_doc_text` feeds it in.
+              "docs/nckh-evidence/README.md",
+              "docs/nckh-evidence/RESULTS.md",
+              "docs/nckh-evidence/presentation.html",
               "lab/README.md", "argus/skills/INDEX.md",
               "argus/resources/exploits/README.md",
               "argus/resources/wordlists/README.md",
@@ -721,7 +757,9 @@ def _doc_consistency() -> None:
     for name in _DOC_FILES:
         fp = ROOT / name
         if fp.is_file():
-            texts[name] = fp.read_text(encoding="utf-8")
+            raw = fp.read_text(encoding="utf-8")
+            texts[name] = (_html_as_doc_text(raw)
+                           if name.endswith(".html") else raw)
     # every methodology module as well: load_skill puts these in front of the
     # model, so a tool it names has to exist
     for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
@@ -738,6 +776,7 @@ def _doc_consistency() -> None:
     #     already globbed into `texts` above and is not listed here.
     on_disk = set()
     for pattern in ("docs/*.md", "*.md", "lab/*.md",
+                    "docs/nckh-evidence/*.md", "docs/nckh-evidence/*.html",
                     "argus/team/roles/*.md", "argus/resources/*/README.md"):
         on_disk |= {p.relative_to(ROOT).as_posix()
                     for p in sorted(ROOT.glob(pattern)) if p.is_file()}
