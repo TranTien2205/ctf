@@ -76,6 +76,16 @@ WINIDENT_WEAK_RE = re.compile(
 # in both the request and the response" passed for free on every page that
 # echoes a parameter, so `?host=aaaaaa` was a valid nonce.
 NONCE_RE = re.compile(r"(?i)\bargus[a-z0-9]{4,24}\b")
+# The regex above answers "did the target echo an argus nonce", where loose
+# is the safe direction: a missed echo weakens a proof, a spurious one does
+# not create one. The callback check asks the opposite-facing question -
+# "is this hit the one our payload caused" - and there a spurious match
+# WOULD create a proof, because `arguslab` or `argusdemo` appearing in a URL
+# would read as a nonce. So that check matches the exact shape
+# `collector.new_nonce` emits, imported rather than restated, because two
+# spellings of one concept is how a gate and the thing it grades drift
+# apart.
+from argus.collector import NONCE_RE as _COLLECTOR_NONCE_RE
 # A deserialization payload carries its command inside a gadget, not after a
 # shell separator - so `deserialize` inherited a declaration check it could
 # never pass, and the class was unprovable by construction.
@@ -1030,8 +1040,17 @@ def _object_refs(entry: dict) -> set[str]:
 
 
 def _ceiling_reason(spec: "ProofSpec") -> str:
-    """Why a class cannot be settled here, for the verdict to carry."""
-    return (spec.notes or spec.requirement or
+    """Why a class cannot be settled here, for the verdict to carry.
+
+    `cap_reason` comes first, and it did not used to. The field exists to
+    say why a class is held down, `argus proof <class>` printed it, and the
+    verdict - the string that travels in the sealed artifact, to a reader
+    who cannot run the CLI - carried `requirement` instead. So the two
+    places answering "why is this capped" answered differently, and the
+    artifact got the vaguer one: what the class WOULD need, rather than
+    what this system lacks.
+    """
+    return (spec.cap_reason or spec.notes or spec.requirement or
             "this system cannot settle this class")
 
 
@@ -2184,6 +2203,172 @@ def verify_secret_leak(claim: Claim, spec: "ProofSpec") -> list[dict]:
     ]
 
 
+def verify_oob_callback(claim: Claim, spec: "ProofSpec") -> list[dict]:
+    """SSRF: the difference the bytes show, plus the request the target made.
+
+    The old requirement measured only the difference between an internal
+    and an external URL, and said so honestly - a difference is consistent
+    with the target fetching the URL, and also with it timing out
+    differently, so it stopped at `candidate`.
+
+    The callback settles it, and here it must come from ANOTHER MACHINE.
+    That is the one case where "the probe called its own collector" is
+    checkable rather than merely trusted: a hit from loopback, when the
+    target is a different host, did not come from the target. `xss` cannot
+    require this - the browser runs here - which is why the two classes
+    get different sentences rather than one shared one.
+    """
+    checks = list(verify_generic(claim, spec))
+    callback = _callback_check("the target reached a collector we control",
+                               claim, absent=_no_callback_reason(spec),
+                               require_remote=True)
+    return [*checks, callback]
+
+
+def _no_callback_reason(spec: "ProofSpec") -> str:
+    """Why no callback is cited - and the two answers are different.
+
+    The tool being absent is a fact about this machine that installing
+    something changes. The tool being present and no callback arriving is
+    a fact about the target: the payload did not execute. A single
+    sentence covering both would tell a reader to go install a tool they
+    already have, or to believe a finding is unprovable here when it was
+    just not proven.
+    """
+    # The first sentence has to be about THIS class. An ssrf verdict that
+    # opens by talking about reflection sends its reader to look for the
+    # wrong thing, and the reader of a failed check is exactly the person
+    # who does not yet know which thing is missing.
+    base = {
+        "xss": ("no callback carrying a probe nonce is cited. Reflection is "
+                "visible in the bytes; execution is not."),
+        "ssrf": ("no callback carrying a probe nonce is cited. A difference "
+                 "between an internal and an external URL is consistent "
+                 "with the target fetching one of them, and also with it "
+                 "failing differently."),
+    }.get(spec.vuln_class,
+          "no callback carrying a probe nonce is cited.")
+    if not spec.needs_tool:
+        return base + (" Cite the hit a payload caused, or leave this a "
+                       "candidate and say so in the report.")
+    from argus.tools import browser
+    if browser.available():
+        return base + (f" `{spec.needs_tool}` IS installed here, so this is "
+                       "a statement about the target, not about this "
+                       "machine: drive it at the reflecting URL with a "
+                       "payload that calls an argus collector. If it still "
+                       "does not call back, the payload did not execute.")
+    return base + " " + browser.why_unavailable()
+
+
+def _peer_is_remote(peer: str) -> bool:
+    """Whether a recorded source address is some machine other than this one.
+
+    Shares `collector.witness_is_remote` rather than restating the loopback
+    forms, because "which addresses are this machine" answered twice is how
+    a gate and the thing it grades come to disagree.
+    """
+    from argus.collector import witness_is_remote
+    return witness_is_remote({"peer": peer})
+
+
+def _callback_nonces(entry: dict) -> set:
+    """Nonces visible in an entry, wherever they are.
+
+    A callback can carry its nonce in the path, in a query string or in a
+    POST body, and a payload carries it inside the URL it tells the target
+    to fetch. One scan over the whole text finds it in every one of those
+    places, instead of three accessors that each miss the case the others
+    cover.
+    """
+    text = req_text(entry) + " " + resp_body(entry)
+    return {m.group(0) for m in _COLLECTOR_NONCE_RE.finditer(text)}
+
+
+def _callback_check(name: str, claim: Claim, absent: str,
+                    require_remote: bool = False) -> dict:
+    """An inbound hit carrying a nonce that an earlier request sent out.
+
+    Four conditions, and each exists because dropping it admits something
+    that proves nothing:
+
+    `direction == "inbound"` - without it, a request this package SENT to
+    its own collector reads exactly like a hit the collector RECEIVED, and
+    a payload that never executed would grade the same as one that did.
+
+    The same nonce in an outbound request - a hit with a nonce nobody sent
+    is a hit from somewhere else. The pair is what makes it a consequence.
+
+    The hit after the request - compared with `>`, so a hit stamped in the
+    same millisecond as the request does not count as following it. The
+    conservative direction for "did these overlap" is the opposite of the
+    conservative direction for "which came first", and this is the second
+    question.
+
+    `require_remote`, for the classes where the target is another machine:
+    a loopback hit is then this process reaching its own collector. It is
+    the one condition here that does not rest on trusting argus's own
+    probes, so the classes that can ask for it do.
+
+    Every failing path reports the reason for the pair that got FURTHEST,
+    not for the last one examined. An early draft returned on the first
+    pair that failed the remote test and would have called a run unproven
+    while a genuine remote callback sat later in the same citation.
+    """
+    inbound, outbound = [], []
+    for entry in claim.exchanges:
+        nonces = _callback_nonces(entry)
+        if not nonces:
+            continue
+        if str(_req(entry).get("direction", "")).lower() == "inbound":
+            inbound.append((entry, nonces))
+        else:
+            outbound.append((entry, nonces))
+    if not inbound:
+        return _check(name, False, absent)
+
+    paired = False      # some hit matched some request's nonce
+    ordered = False     # ...and arrived after it
+    near_miss = ""      # the furthest failure, for the detail
+    for hit, hit_nonces in inbound:
+        for sent, sent_nonces in outbound:
+            shared = hit_nonces & sent_nonces
+            if not shared:
+                continue
+            paired = True
+            if _window_start(hit) <= _window_start(sent):
+                continue
+            ordered = True
+            peer = str(_req(hit).get("peer") or "")
+            if require_remote and not _peer_is_remote(peer):
+                near_miss = (
+                    f"the callback in {hit.get('id')} came from "
+                    f"{peer or 'an unrecorded address'}, which is this "
+                    "machine. For this class the target is another host, so "
+                    "a loopback hit is this process reaching its own "
+                    "collector - and that is the one case this gate can "
+                    "tell apart rather than take on trust")
+                continue
+            nonce = sorted(shared)[0]
+            return _check(name, True,
+                          f"{nonce} left in {sent.get('id')} and came back "
+                          f"to the collector in {hit.get('id')}"
+                          + (f" from {peer}" if require_remote and peer else ""))
+    if near_miss:
+        return _check(name, False, near_miss)
+    if not paired:
+        return _check(name, False,
+                      "a callback is cited, but no cited request ever sent "
+                      "that nonce - a hit nobody caused proves nothing about "
+                      "this payload")
+    if not ordered:
+        return _check(name, False,
+                      "the cited callback does not follow the request that "
+                      "sent its nonce - a hit that did not come after the "
+                      "payload is not a consequence of it")
+    return _check(name, False, absent)
+
+
 def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Reflection is checkable from the bytes; execution is not.
 
@@ -2213,10 +2398,8 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
                      "the quoted bytes carry no raw < > \" ' and so cannot break "
                      "out of their context, or they are in no cited HTML "
                      "response")),
-        _check("a real browser executed it", False,
-               "this system has no browser, so execution is not provable here. "
-               "Drive one over mcp_call and cite the nonce it reports, or leave "
-               "this a candidate and say so in the report"),
+        _callback_check("a real browser executed it", claim,
+                        absent=_no_callback_reason(spec)),
     ]
 
 
@@ -3597,6 +3780,13 @@ class ProofSpec:
     # documents and drifted from the matrix twice while classes came off the
     # list, so it is a field now and the doc gate counts it.
     cap_reason: str = ""
+    # The external tool whose ABSENCE keeps this class below `proven` here.
+    # Different from `ceiling`, and the difference is the point: a ceiling
+    # is a lid held whatever the evidence says, while this is a fact about
+    # the machine that can stop being true by installing something. A class
+    # naming a tool is not capped - it is unequipped, and a reader of the
+    # verdict should be told which.
+    needs_tool: str = ""
     declares: str = "command"
     advisories: tuple[str, ...] = ()
     # xss, prototype pollution and crlf are proven BY the reflection, so the
@@ -3872,8 +4062,16 @@ for _s in [
               "probe nonce",
               ("payload reflected unencoded into HTML",
                "a real browser executed it"),
-              verify_browser_execution, ceiling="candidate",
-              cap_reason="no browser ships with this package",
+              verify_browser_execution, needs_tool="agent-browser",
+              # The ceiling was a lid: `candidate` whatever the evidence
+              # said, because no browser shipped here. A browser still does
+              # not ship here - but one can now be DRIVEN, and when it is,
+              # the payload calls back to `argus/collector.py` and the hit
+              # is recorded like any other exchange. So the lid comes off
+              # and the evidence carries the weight: with no callback cited
+              # `_grade` returns `candidate` on reflection alone, which is
+              # exactly what the lid used to produce, and the reason now
+              # names what is missing instead of what this package lacks.
               aliases=("reflected-xss", "stored-xss", "dom-xss",
                        "reflection"),
               reflection_is_the_finding=True),
@@ -3915,12 +4113,16 @@ for _s in [
               aliases=("info-disclosure", "infodisclosure", "information-disclosure",
                        "secret-exposure", "source-leak", "credential-leak")),
     ProofSpec("ssrf", "a callback at a collector we control carrying the probe "
-              "nonce, or a response only the internal network could give. This "
-              "system has no collector, so it measures the difference and stops "
-              "at a candidate",
-              ("the excerpt discriminates against a control",), verify_generic,
-              ceiling="candidate",
-              cap_reason="no out-of-band collector the target can reach",
+              "nonce, arriving FROM THE TARGET. A difference between an "
+              "internal and an external URL is the floor: it is consistent "
+              "with the target fetching one of them and also with it failing "
+              "differently, so on its own it is a candidate. The callback has "
+              "to come from another machine - from loopback it is this "
+              "process reaching its own collector",
+              ("the excerpt discriminates against a control",
+               "the target reached a collector we control"),
+              verify_oob_callback,
+              floor=("the excerpt discriminates against a control",),
               aliases=("server-side-request-forgery", "blind-ssrf")),
     ProofSpec("enum", "the same request giving two different answers for a "
               "known and an unknown account, each observed more than once",

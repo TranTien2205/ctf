@@ -376,11 +376,21 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
         klass = proof.normalize(str(finding.get("vuln_class") or ""))
         if not missing:
             continue
-        # A class capped at `candidate` cannot be closed by more probing, so
-        # recommending it forever starves every rule below this one. `argus
-        # proof <class>` says why the cap is there; the ledger should move on.
+        # A gap that probing cannot close starves every rule below this one
+        # if it is recommended forever. `argus proof <class>` says why.
+        #
+        # There are TWO ways a class is in that state and this tested one.
+        # The ceiling was the obvious one, and it is now empty - `xss` and
+        # `ssrf` both came off when `argus/collector.py` gave their
+        # payloads somewhere to call back to. The other is a class the
+        # matrix REFUSES, and `dos` has always been one: no ceiling, so the
+        # condition above never saw it, and the ledger would send an
+        # operator to close a gap whose whole point is that it stays open.
+        # The emptying is what exposed it; the defect predates it.
         spec = proof.spec_for(klass)
         if spec is not None and spec.ceiling and grade == spec.ceiling:
+            continue
+        if spec is not None and spec.verifier is proof.verify_refused:
             continue
         return Action(
             "close_proof_gap",

@@ -444,9 +444,18 @@ always sends `X-Cache: MISS` would otherwise satisfy the second one for a
 payload that happened to name `X-Cache`. `probe_crlf` now sends the control
 first, because the requirement is unanswerable without it.
 
-**`xss` and `ssrf` are capped for a real reason.** The first needs a browser to
-execute the payload and the second needs an out-of-band collector the target
-can reach; this system has neither. (`ppoll` was listed here and should not
+**`xss` and `ssrf` were capped for a real reason, and are not any more.**
+Both needed the same thing. Each could see half its evidence in the bytes and
+neither could see the other half, which in both cases is a request the
+payload causes when it actually runs: a browser fetching a URL the script
+names, a target fetching a URL it was told to. `argus/collector.py` is a
+listener that records what reaches it, and the gate grades the hit rather
+than a tool's account of itself - which is the whole reason the browser is
+not simply ASKED whether its script ran. Neither class is free, though:
+`xss` needs `agent-browser` on PATH (an external tool, like sqlmap, declared
+on the spec as `needs_tool`), and `ssrf` needs its callback to arrive from
+another machine, because a loopback hit is this process reaching its own
+collector. (`ppoll` was listed here and should not
 have been: it is **not** capped. Its server-side half - a property only the
 polluting request sent, read back by a request that did not send it - is
 provable from the transcript and `verify_unkeyed_input` proves it. Only the

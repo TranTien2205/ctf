@@ -128,15 +128,26 @@ proven count, not the total.
   are the recall denominator — and split each by grade. A class found but
   left a candidate is a partial result; say so rather than scoring it as a
   hit or discarding it.
-- **Three classes cannot reach `proven` in this system**, and the number is
-  derivable rather than stated: `xss` needs a browser to execute the payload
-  and `ssrf` needs an out-of-band collector the target can reach - neither
-  ships here - and `dos` is refused outright, because its proof is the damage.
-  Score those as found-as-candidate and state the ceiling in the table: a
-  recall figure that counts them in the denominator while they can only ever
-  be candidates measures the system's honesty as if it were the agent's
-  failure. `python -m argus proof <class>` prints each one's requirement, says
-  whether it is capped, and says why.
+- **One class cannot reach `proven` in this system**, and the number is
+  derivable rather than stated: `dos` is refused outright, because its proof
+  is the damage, and no component changes that. Score it as
+  found-as-candidate and state the ceiling in the table: a recall figure
+  that counts it in the denominator while it can only ever be a candidate
+  measures the system's honesty as if it were the agent's failure.
+  `python -m argus proof <class>` prints each one's requirement, says whether
+  it is capped, and says why.
+- **`xss` and `ssrf` are no longer capped, and the reason they both moved at
+  once is worth the denominator's attention.** Both were held at `candidate`
+  for want of the same missing component. Each could see half its evidence in
+  the bytes - a payload reflected, a response that differed - and neither
+  could see the other half, which in both cases is a REQUEST the payload
+  causes when it really runs. `argus/collector.py` is where such a request
+  now arrives. Neither is capped, but neither is free either: `xss` needs
+  `agent-browser` on PATH, and `ssrf` needs a target that is a different
+  machine, since a callback from loopback is this process reaching its own
+  collector. Report which of those held, because `candidate` from an
+  unequipped run and `candidate` from a payload that did not execute are the
+  same grade for opposite reasons.
 
   This list was nine. `enum`, `lockout`, `crlf`, `method`, `upload`, `race`,
   `websocket` and `smuggle` came off it: in each case the stated limit

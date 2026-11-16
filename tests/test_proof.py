@@ -1245,9 +1245,21 @@ def test_difference_only_classes_cannot_reach_proven():
     # missing client rather than a missing verifier: `GuardedClient.send_ws`
     # frames now, so the handshake AND the answered message are both on
     # record and both checkable.
-    # ssrf is the only one left on `verify_generic`, and its cap is the
-    # missing out-of-band collector rather than a missing verifier
-    for name in ("ssrf",):
+    # ssrf left this set last, and it is the reason the set is empty: its
+    # cap WAS the missing out-of-band collector, and `argus/collector.py`
+    # is that collector. The class now requires a callback from the target
+    # on top of the difference, so two unrelated pages reach `candidate`
+    # through the floor and no further - which is what the loop below
+    # asserts for every class still graded by `verify_generic`.
+    difference_only = sorted(
+        sp.vuln_class for sp in
+        {x.vuln_class: x for x in proof.MATRIX.values()}.values()
+        if sp.verifier is proof.verify_generic)
+    assert difference_only == [], (
+        f"{difference_only} are graded by the difference alone. A new one "
+        "needs its own entry here, because `_discriminates` is true of any "
+        "two pages on any site")
+    for name in difference_only:
         v = proof.grade(name, "Page A unique", [a, b])
         assert v.grade == "candidate", f"{name} graded {v.grade}"
         assert proof.spec_for(name).ceiling == "candidate"
@@ -1568,8 +1580,17 @@ def test_sarif_does_not_promote_an_unknown_grade_to_a_failure(tmp_path):
 # --- coverage, measured rather than assumed ---------------------------------
 
 CANNOT_BE_PROVEN_HERE = {
-    "xss": "no browser",
-    "ssrf": "no collector",
+    # `xss` and `ssrf` came off this list together, and for one reason:
+    # both were capped for want of the SAME missing component. Each could
+    # see its half of the evidence in the bytes - a payload reflected, a
+    # response that differed - and neither could see the other half, which
+    # in both cases is a REQUEST the payload causes when it really runs.
+    # `argus/collector.py` is where such a request now arrives, and the
+    # gate grades the hit rather than a tool's account of itself.
+    #
+    # What is left here is the one entry that is not about equipment.
+    # `dos` is refused by construction and no component changes that:
+    # the proof of a denial of service is the denial.
     "dos": "refused by construction",
 }
 
@@ -2284,11 +2305,42 @@ def test_a_capped_candidate_says_the_cap_held_it():
     and the two mean entirely different things."""
     a = ex("h1", "http://t.local/a", "<html>baseline</html>")
     b = ex("h2", "http://t.local/b", "<html>the difference</html>")
-    v = proof.grade("ssrf", "the difference", [a, b])
-    assert v.grade == "candidate"
-    assert v.capped and "collector" in v.capped
+    # `ssrf` used to be the example here. NO SHIPPED CLASS IS CAPPED NOW -
+    # both entries came off when `argus/collector.py` gave their payloads
+    # somewhere to call back to - so the mechanism is exercised against a
+    # spec constructed here rather than against a real class pretending to
+    # be held down. Testing it through a live class would mean keeping one
+    # capped to have something to test, which is backwards; deleting the
+    # mechanism instead would mean the next class that genuinely cannot be
+    # settled here has nowhere to say so.
+    # The verifier passes on purpose: what is under test is the CLAMP, so
+    # the evidence has to grade `proven` before the ceiling can be shown to
+    # hold it down. A verifier that fails would make this pass for the
+    # wrong reason, which is how a test of a lid ends up testing a latch.
+    made_up = proof.ProofSpec(
+        "xss", "a requirement this test does not care about",
+        ("the evidence satisfies this test's stand-in verifier",),
+        lambda claim, spec: [proof._check(
+            "the evidence satisfies this test's stand-in verifier", True, "")],
+        ceiling="candidate",
+        cap_reason="constructed by this test, not shipped")
+    v = made_up.verify(proof.Claim("the difference", [a, b]))
+    raw_without_lid = proof.ProofSpec(
+        "xss", made_up.requirement, made_up.required, made_up.verifier)
+    assert raw_without_lid.verify(
+        proof.Claim("the difference", [a, b])).grade == "proven", \
+        "the clamp cannot be observed unless the evidence would otherwise pass"
+    assert v.grade == "candidate", v.explain()
+    assert v.capped and "constructed by this test" in v.capped
     assert any("settled by this system" in m for m in v.missing)
     assert "capped_by_this_system" in v.to_dict()
+    # And the former example now reaches candidate through the FLOOR, with
+    # nothing claiming a cap held it - the distinction this test exists for,
+    # read the other way round.
+    free = proof.grade("ssrf", "the difference", [a, b])
+    assert free.grade == "candidate", free.explain()
+    assert not free.capped, free.capped
+    assert not any("settled by this system" in m for m in free.missing)
 
 
 def test_grading_is_bounded_in_the_number_of_cited_exchanges():
@@ -2593,13 +2645,17 @@ def test_the_capped_set_is_exactly_what_the_docs_claim():
     capped = {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
     refused = {s.vuln_class for s in proof.MATRIX.values()
                if s.verifier is proof.verify_refused}
-    assert capped == {"xss", "ssrf"}, capped
+    # Empty, and the emptying is the claim. `xss` and `ssrf` were the two
+    # entries, both capped for want of the SAME component: each could see
+    # half its evidence in the bytes and neither could see the other half,
+    # which in both cases is a request the payload causes when it really
+    # runs. `argus/collector.py` is where such a request now arrives.
+    assert capped == set(), capped
     assert refused == {"dos"}, refused
     # `verify_generic` is `_discriminates` alone, which is what "no verifier
-    # written yet" looks like. ssrf shares it for a different reason: the
-    # evidence it would need is an out-of-band hit this package cannot see,
-    # so writing a verifier would not help.
-    assert {"ssrf"} == {
+    # written yet" looks like. ssrf was the last class on it, for a reason
+    # that stopped being true, so the set is empty too.
+    assert set() == {
         s.vuln_class for s in proof.MATRIX.values()
         if s.verifier is proof.verify_generic}
     assert proof.spec_for("xss").verifier is not proof.verify_generic, \
@@ -2638,8 +2694,12 @@ def test_the_unimplemented_caps_are_exactly_the_generic_verifier_ones():
     generic = {s.vuln_class for s in specs
                if s.verifier is proof.verify_generic}
     assert unimplemented <= generic
-    assert generic - unimplemented == {"ssrf"}
-    assert proof.spec_for("ssrf").cap_reason != proof.CAP_UNIMPLEMENTED
+    # `ssrf` was the last entry here, held by a reason labour could not fix:
+    # no out-of-band collector. That stopped being true when one was built,
+    # so the class moved to `verify_oob_callback` and this set emptied. A
+    # class arriving on `verify_generic` again is the difference standing in
+    # for a proof, and needs its own argument rather than this precedent.
+    assert generic - unimplemented == set(), sorted(generic - unimplemented)
 
 
 def test_a_capped_class_says_so_when_printed():
@@ -2648,9 +2708,7 @@ def test_a_capped_class_says_so_when_printed():
     import io
     import contextlib
     from argus.cli import main
-    for klass, expect in (("xss", "no browser ships"),
-                          ("ssrf", "out-of-band collector"),
-                          ("dos", "REFUSED")):
+    for klass, expect in (("dos", "REFUSED"),):
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             main(["proof", klass])
@@ -4201,8 +4259,6 @@ _ORDER_FREE = {
                             "same response",
     "verify_operator_injection": "a payload response and its control; "
                                  "neither causes the other",
-    "verify_browser_execution": "the execution record and the response it "
-                                "belongs to are one observation",
     "verify_websocket_channel": "frames inside one connection, already in "
                                 "protocol order",
     "verify_generic": "says only that a difference is on record",
@@ -4275,7 +4331,14 @@ def test_every_verifier_either_orders_its_pair_or_says_why_not():
     unclassified = []
     for name in verifiers:
         body = inspect.getsource(getattr(proof, name))
-        orders = "_ordering(" in body or "_follows(" in body
+        # `_callback_check` compares `_window_start(hit)` against
+        # `_window_start(sent)` - a verifier delegating to it orders its
+        # pair just as surely as one calling `_ordering` inline. Without
+        # this clause the check would have demanded that a verifier which
+        # DOES order be listed as order-free, which is the one answer that
+        # is simply false.
+        orders = ("_ordering(" in body or "_follows(" in body
+                  or "_callback_check(" in body)
         if orders and name in _ORDER_FREE:
             unclassified.append(f"{name} orders but is listed as order-free")
         elif not orders and name not in _ORDER_FREE:
@@ -4778,3 +4841,230 @@ def test_the_credential_digest_has_three_states_not_two():
     accepted_check = [c for c in bare.checks
                       if "forged credential was accepted" in str(c["check"])]
     assert accepted_check and not accepted_check[0]["ok"], bare.checks
+
+
+# --- xss: the lid comes off, the evidence takes the weight ------------------
+#
+# `xss` was held at `candidate` by a ceiling whatever the evidence said,
+# because no browser shipped here. One still does not ship - but one can be
+# driven, and a payload that executes calls back to `argus/collector.py`,
+# where the hit is recorded like any other exchange. These tests pin both
+# directions: what the callback now buys, and the four ways a callback
+# that proves nothing is refused.
+
+_CB_NONCE = "argus9e65f74ab50966d3"
+_CB_URL = f"http://127.0.0.1:35657/{_CB_NONCE}"
+_XSS_EXCERPT = f"<script>fetch('{_CB_URL}')</script>"
+
+
+def _xss_payload(rid="r1", ts=1000.0):
+    """The request that reflected the payload, and the HTML that carried it."""
+    return {
+        "id": rid, "ts": ts, "tool": "probe_xss",
+        "request": {"method": "GET",
+                    "url": f"http://t/s?q={_XSS_EXCERPT}",
+                    "headers": {}, "body": None},
+        "response": {"status": 200,
+                     "headers": {"content-type": "text/html; charset=utf-8"},
+                     "body": f"<h1>Results for {_XSS_EXCERPT}</h1>"},
+    }
+
+
+def _xss_callback(rid="r2", ts=1002.0, direction="inbound",
+                  peer="127.0.0.1", nonce=_CB_NONCE):
+    return {
+        "id": rid, "ts": ts, "tool": "collector",
+        "request": {"direction": direction, "method": "GET",
+                    "url": f"http://127.0.0.1:35657/{nonce}",
+                    "headers": {}, "body": "", "peer": peer},
+        "response": {"status": 204, "headers": {"content-length": "0"},
+                     "body": ""},
+    }
+
+
+def test_xss_is_proven_by_a_callback_the_payload_caused():
+    """Measured against a real browser before it was written.
+
+    Two pages, both carrying the nonce in the bytes they return: one
+    inserting the payload into the DOM, one entity-encoding it. Driving
+    `agent-browser` at them produced one callback and zero. Reflection
+    cannot tell those pages apart - both reflect - so reflection alone is
+    what `candidate` is for, and the callback is what the grade turns on.
+    """
+    v = proof.grade("xss", _XSS_EXCERPT, [_xss_payload(), _xss_callback()])
+    assert v.grade == "proven", v.explain()
+    executed = [c for c in v.checks
+                if c["check"] == "a real browser executed it"]
+    assert executed and executed[0]["ok"], v.checks
+    assert _CB_NONCE in executed[0]["detail"], executed
+    assert "r1" in executed[0]["detail"] and "r2" in executed[0]["detail"], \
+        "the detail has to name the pair, or a reader cannot check it"
+
+
+def test_xss_on_reflection_alone_is_still_a_candidate():
+    """What the ceiling used to produce, now produced by the evidence.
+
+    The grade is the same as before the lid came off; what changed is the
+    reason, which now names what is missing instead of what this package
+    lacks.
+    """
+    v = proof.grade("xss", _XSS_EXCERPT, [_xss_payload()])
+    assert v.grade == "candidate", v.explain()
+    executed = [c for c in v.checks
+                if c["check"] == "a real browser executed it"][0]
+    assert not executed["ok"]
+    assert "no callback" in executed["detail"], executed
+    assert "has no browser" not in executed["detail"], \
+        "the old reason was about this package; the new one is about the cite"
+
+
+def test_xss_refuses_a_callback_this_package_sent_itself():
+    """The attack the `direction` field exists to stop.
+
+    Without it, a request argus SENT to its own collector is an entry with
+    a `request` key carrying the nonce - indistinguishable from a hit the
+    collector RECEIVED. A payload that never executed would then grade
+    exactly like one that did.
+    """
+    v = proof.grade("xss", _XSS_EXCERPT,
+                    [_xss_payload(), _xss_callback(direction="outbound")])
+    assert v.grade == "candidate", v.explain()
+    executed = [c for c in v.checks
+                if c["check"] == "a real browser executed it"][0]
+    assert not executed["ok"], executed
+
+
+def test_xss_refuses_a_callback_that_did_not_follow_the_payload():
+    """A hit before the request cannot be a consequence of it."""
+    v = proof.grade("xss", _XSS_EXCERPT,
+                    [_xss_payload(ts=1000.0), _xss_callback(ts=999.0)])
+    assert v.grade == "candidate", v.explain()
+    executed = [c for c in v.checks
+                if c["check"] == "a real browser executed it"][0]
+    assert "does not follow" in executed["detail"], executed
+
+
+def test_xss_refuses_a_callback_stamped_at_the_same_instant():
+    """`>` not `>=`, and the asymmetry is the point.
+
+    For "did these two overlap" the conservative reading of an equal stamp
+    is that they did. For "which came first" it is that neither has been
+    shown to. This is the second question.
+    """
+    v = proof.grade("xss", _XSS_EXCERPT,
+                    [_xss_payload(ts=1000.0), _xss_callback(ts=1000.0)])
+    assert v.grade == "candidate", v.explain()
+
+
+def test_xss_refuses_a_callback_carrying_a_nonce_nobody_sent():
+    """A hit with an unrelated nonce is a hit from somewhere else."""
+    other = "argus0000111122223333"
+    v = proof.grade("xss", _XSS_EXCERPT,
+                    [_xss_payload(), _xss_callback(nonce=other)])
+    assert v.grade == "candidate", v.explain()
+    executed = [c for c in v.checks
+                if c["check"] == "a real browser executed it"][0]
+    assert not executed["ok"], executed
+
+
+def test_collector_nonce_shape_is_not_the_loose_echo_regex():
+    """One concept, one definition - and the right one of the two.
+
+    `proof.NONCE_RE` answers "did the target echo an argus nonce", where a
+    loose match is the safe direction. The callback check faces the other
+    way: a spurious match would CREATE a proof, so a word like `arguslab`
+    appearing in a URL must not read as a nonce.
+    """
+    from argus.collector import NONCE_RE, new_nonce
+    assert NONCE_RE.fullmatch(new_nonce()), new_nonce()
+    for not_a_nonce in ("arguslab", "argusdemo", "argus", "argusXYZ"):
+        assert not NONCE_RE.fullmatch(not_a_nonce), not_a_nonce
+        assert proof.NONCE_RE.search(not_a_nonce) or len(not_a_nonce) < 9, (
+            "the loose regex is meant to be loose; if it stops matching "
+            "these, the comment explaining why there are two is stale")
+
+
+# --- ssrf: the difference is the floor, the callback is the proof -----------
+
+def _ssrf_sent(nonce, rid="r1", ts=1000.0):
+    return {"id": rid, "ts": ts, "tool": "probe_ssrf",
+            "request": {"method": "GET",
+                        "url": f"http://t/fetch?u=http://10.0.0.9:1234/{nonce}",
+                        "headers": {}},
+            "response": {"status": 200,
+                         "headers": {"content-type": "text/html"},
+                         "body": "INTERNAL-ONLY-BANNER"}}
+
+
+def _ssrf_control(rid="r2", ts=1000.5):
+    return {"id": rid, "ts": ts, "tool": "probe_ssrf",
+            "request": {"method": "GET",
+                        "url": "http://t/fetch?u=http://example.com/",
+                        "headers": {}},
+            "response": {"status": 200,
+                         "headers": {"content-type": "text/html"},
+                         "body": "nothing here"}}
+
+
+def _ssrf_hit(nonce, peer, rid="r3", ts=1002.0, direction="inbound"):
+    return {"id": rid, "ts": ts, "tool": "collector",
+            "request": {"direction": direction, "method": "GET",
+                        "url": f"http://10.0.0.9:1234/{nonce}",
+                        "headers": {}, "body": "", "peer": peer},
+            "response": {"status": 204, "headers": {}, "body": ""}}
+
+
+def test_ssrf_is_proven_by_a_callback_from_the_target():
+    """`ssrf` came off CANNOT_BE_PROVEN_HERE, and this is what replaced it."""
+    from argus.collector import new_nonce
+    n = new_nonce()
+    v = proof.grade("ssrf", "INTERNAL-ONLY-BANNER",
+                    [_ssrf_sent(n), _ssrf_control(), _ssrf_hit(n, "192.168.223.221")])
+    assert v.grade == "proven", v.explain()
+    reached = [c for c in v.checks
+               if c["check"] == "the target reached a collector we control"][0]
+    assert reached["ok"] and "192.168.223.221" in reached["detail"], reached
+
+
+def test_ssrf_refuses_a_callback_from_this_machine():
+    """The condition that does NOT rest on trusting argus's own probes.
+
+    For `xss` the browser runs here, so a loopback hit is expected and the
+    class cannot ask for more. For `ssrf` the target is another host, so a
+    loopback hit is this process reaching its own collector - the one case
+    where "the probe called itself" is checkable rather than assumed, so
+    the class that can demand it does.
+    """
+    from argus.collector import new_nonce
+    n = new_nonce()
+    v = proof.grade("ssrf", "INTERNAL-ONLY-BANNER",
+                    [_ssrf_sent(n), _ssrf_control(), _ssrf_hit(n, "127.0.0.1")])
+    assert v.grade == "candidate", v.explain()
+    reached = [c for c in v.checks
+               if c["check"] == "the target reached a collector we control"][0]
+    assert "which is this machine" in reached["detail"], reached
+
+
+def test_ssrf_on_the_difference_alone_is_a_candidate():
+    """What the cap used to produce, now produced by the floor."""
+    from argus.collector import new_nonce
+    v = proof.grade("ssrf", "INTERNAL-ONLY-BANNER",
+                    [_ssrf_sent(new_nonce()), _ssrf_control()])
+    assert v.grade == "candidate", v.explain()
+    assert not v.capped, "the class is not capped any more; the floor held it"
+
+
+def test_a_remote_callback_later_in_the_citation_still_counts():
+    """The failing path reports the pair that got furthest, not the last one.
+
+    An early draft returned on the first pair that failed the remote test,
+    so a genuine callback sitting after a loopback one in the same citation
+    would have been graded away unseen.
+    """
+    from argus.collector import new_nonce
+    n = new_nonce()
+    v = proof.grade("ssrf", "INTERNAL-ONLY-BANNER", [
+        _ssrf_sent(n), _ssrf_control(),
+        _ssrf_hit(n, "127.0.0.1", rid="r3", ts=1002.0),
+        _ssrf_hit(n, "192.168.223.221", rid="r4", ts=1003.0)])
+    assert v.grade == "proven", v.explain()

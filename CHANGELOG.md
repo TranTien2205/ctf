@@ -4623,12 +4623,91 @@ of an unmodified file.
 No new check was added, so the selftest count is still 160; the existing
 checks simply reach further.
 
+### The two capped classes were capped for one missing thing
+
+`xss` and `ssrf` were the only classes the matrix held at `candidate`
+whatever the evidence said. Their cap reasons read as different problems -
+"no browser ships with this package", "no out-of-band collector the target
+can reach" - and they were the same problem. Each class could see half its
+evidence in the bytes: a payload reflected unencoded, a response that
+differed from a control. Neither could see the other half, which in both
+cases is a REQUEST the payload causes when it actually runs.
+
+`argus/collector.py` is a listener that records what reaches it. Not what
+the browser says about itself: the obvious design, and the one the code's
+own comment suggested, was to drive a browser and cite the nonce it
+reports - but that answer reaches the gate through the probe, and a
+probe's account of its own success is the thing `record_finding` refuses
+for every other class. So the payload is written to DO something instead,
+and the hit arrives on a socket this package owns. It is the arrangement
+`id; echo <nonce>` already uses.
+
+Four conditions, each refusing a way of proving nothing. `direction ==
+"inbound"`, because without it a request argus SENT to its own collector
+is an entry with a `request` key carrying the nonce, indistinguishable
+from a hit RECEIVED. The same nonce in an outbound request, because a hit
+nobody caused is a hit from somewhere else. The hit AFTER that request,
+compared with `>`, because an equal stamp has not shown which came first -
+the opposite of the conservative direction for "did these overlap", which
+is a different question. And for `ssrf` only, arriving from another
+machine: the one condition here that does not rest on trusting argus's own
+probes, so the class that can demand it does. `xss` cannot - the browser
+runs here - and says so in its own words rather than borrowing that claim.
+
+Measured before any of it was written: two pages carrying the same nonce
+in the bytes they return, one inserting the payload into the DOM and one
+entity-encoding it. Driving `agent-browser` produced one callback and
+zero. Reflection cannot separate those pages. End to end against the lab,
+`xss` grades `proven` on a quote of the reflected payload, with the detail
+naming the request and the hit.
+
+`ceiling` is replaced by `needs_tool` for this, and the difference is the
+point: a ceiling is a lid held whatever the evidence says, while a tool is
+a fact about the machine that installing something changes. The verdict
+now separates "`agent-browser` is not on PATH" from "it IS installed, so
+this is a statement about the target" - the same grade for opposite
+reasons, which used to share one sentence.
+
+THREE OLDER DEFECTS the emptying exposed, none caused by it:
+
+`_ceiling_reason` never read `cap_reason`. The field exists to say why a
+class is held down and `argus proof <class>` printed it, while the verdict
+- the string sealed into the artifact, read by someone who cannot run the
+CLI - carried `requirement`: what the class would need, rather than what
+this system lacks.
+
+`decide.py` identified "a gap probing cannot close" by `ceiling` alone.
+There are two ways to be in that state, and the class that genuinely never
+closes is `dos`, which is refused and has no ceiling - so the ledger would
+send an operator to close a gap whose whole purpose is to stay open. One
+concept, two mechanisms, and the missing member looked like nothing at all
+until the other mechanism emptied.
+
+`test_every_verifier_either_orders_its_pair_or_says_why_not` detected
+ordering by searching a verifier's own source for `_ordering(`. The new
+verifier orders inside a helper, so the check demanded it be declared
+order-free - the one answer that is simply false. The detector was fixed,
+not the answer. In the other direction the same test caught
+`verify_browser_execution` still listed as order-free, correct when its
+second check was a hardcoded `False` and wrong once it compared timestamps.
+
+The probe drives the browser itself now, on by default, because the
+opposite default is how the class spent its life at `candidate`: the
+equipment existed and nothing reached for it. An early draft of that
+navigated to the bare endpoint - `_send` returns no URL to read back - so
+the browser loaded `/search` with no payload on it, reported success, and
+the probe concluded "reflected but did not execute" about a page it had
+never visited. A confident negative is the worst shape of wrong.
+
+Capped classes: 3 to 1, and the one left is not about equipment. 755
+tests, selftest 160/160.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 745 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 755 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

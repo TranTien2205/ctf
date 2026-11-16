@@ -154,12 +154,31 @@ def test_a_candidate_in_a_capped_class_does_not_starve_the_ledger(tmp_path):
         [{"id": "F01", "vuln_class": "xss", "grade": "candidate",
           "url": "http://t/search?q=cat", "evidence_ids": ["r1"],
           "proof": {"missing": ["a real browser executed it"]}}])
-    action = decide.next_action(sdir)
-    assert action.action != "close_proof_gap", action.render()
-    # and an UNcapped candidate still does produce the gap
     from argus import proof
-    assert proof.spec_for("xss").ceiling == "candidate"
-    assert proof.spec_for("sqli").ceiling == ""
+    # `xss` is NOT capped any more - `argus/collector.py` gave its payload
+    # somewhere to call back to - so the ledger should now send the
+    # operator to close this gap, which is the opposite of what this test
+    # originally asserted and is correct for the same reason: a gap that
+    # CAN be closed by probing should be recommended, and one that cannot
+    # should not. The condition is the cap, not the class.
+    assert proof.spec_for("xss").ceiling == "", \
+        "this test's premise is that xss became closable"
+    action = decide.next_action(sdir)
+    assert action.action == "close_proof_gap", action.render()
+    assert "a real browser executed it" in action.render()
+
+    # The guard itself still has to work, so it is exercised against a
+    # class that really cannot be closed. No shipped class is capped now,
+    # so `dos` - refused by construction - stands in for the state the
+    # rule is about: evidence that more probing will never improve.
+    refused_dir = _session(
+        tmp_path / "refused",
+        [_exchange("r1", "http://t/slow")],
+        [{"id": "F01", "vuln_class": "dos", "grade": "candidate",
+          "url": "http://t/slow", "evidence_ids": ["r1"],
+          "proof": {"missing": ["class is provable by this system"]}}])
+    refused_action = decide.next_action(refused_dir)
+    assert refused_action.action != "close_proof_gap", refused_action.render()
 
 
 def test_a_proven_finding_is_not_a_gap(tmp_path):
