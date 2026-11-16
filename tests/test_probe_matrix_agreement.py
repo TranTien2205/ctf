@@ -490,6 +490,19 @@ CLEAN = [
     ("jwt_forge", "jwt", lambda c, b: _drive_jwt(c, b, forge=False)),
     # `/search` parses nothing, so a gadget gets no parser error and no
     # execution - the distinction `deserialize` rests on
+    # Three classes had a proving row and no clean one. Measured against
+    # these endpoints before the rows were added: idor `unproven`, upload
+    # `unproven`, xfh `candidate` - each below its ceiling, which is what
+    # this table asserts. Two of the three probes still REPORT something,
+    # which is the point: `probe_idor` says "neighboring object ids return
+    # 200 with different content" about /item, where the differing content
+    # is two products and no subject, and the class refuses it.
+    ("probe_idor", "idor",
+     lambda c, b: probes.probe_idor(c, b + "/item?id=1")),
+    ("probe_upload", "upload",
+     lambda c, b: probes.probe_upload(c, b + "/api/register")),
+    ("probe_xfh", "xfh",
+     lambda c, b: probes.probe_xfh(c, b + "/search?q=widget")),
     ("probe_deserialize", "deserialize",
      lambda c, b: probes.probe_deserialize(c, b + "/search?q=x", "q")),
 ]
@@ -796,6 +809,46 @@ def test_every_driven_probe_exists_and_maps_to_a_real_class():
             f"{name} is driven as {klass!r} but decide.PROBE_CLASS says "
             f"{PROBE_CLASS.get(name)!r} and the class's tool chain is "
             f"{list(chain)}")
+
+
+# Why a class driven in the proving direction has no clean row. The lab
+# plants these three GLOBALLY, so no endpoint on it is a clean one - checked
+# by driving each probe at a candidate and reading why `proven` came back:
+NO_CLEAN_ROW = {
+    "cors": "vulnapp.py reflects the request Origin plus "
+            "Access-Control-Allow-Credentials: true on EVERY response, so "
+            "there is no endpoint here with a correct allowlist",
+    "method": "do_TRACE answers on every path, so every endpoint is a "
+              "cross-site-tracing finding and none is a clean one",
+    "disclosure": "probe_disclosure scans the ORIGIN, not the path it is "
+                  "given, and this lab serves /.env and /.git/HEAD there",
+}
+
+
+def test_every_proving_class_has_a_clean_row_or_a_recorded_reason():
+    """The clean direction is the one that catches a false positive.
+
+    It is also the one that silently lagged: 28 classes were driven in the
+    proving direction and 22 in the clean one, and
+    `test_both_directions_are_exercised_for_the_classes_that_have_both`
+    pins a ten-class MINIMUM rather than completeness, so the other six were
+    invisible. The defects found in this stretch were mostly false proofs,
+    which is exactly what a missing clean row cannot catch.
+
+    Three of the six are driven now - idor at /item, upload at
+    /api/register, xfh at /search - each measured below its ceiling before
+    its row was added. The other three are in `NO_CLEAN_ROW` with the
+    measurement that explains them. A new class needs one or the other.
+    """
+    vulnerable = {k for _, k, _ in VULNERABLE}
+    clean = {k for _, k, _ in CLEAN}
+    unexplained = vulnerable - clean - set(NO_CLEAN_ROW) - NOT_DRIVEN
+    assert not unexplained, (
+        f"{sorted(unexplained)} are driven against a vulnerable endpoint and "
+        "never against a clean one, and no reason is recorded - a class with "
+        "no clean row is a class whose false positives nothing here catches")
+    assert set(NO_CLEAN_ROW) <= vulnerable, \
+        sorted(set(NO_CLEAN_ROW) - vulnerable)
 
 
 def test_both_directions_are_exercised_for_the_classes_that_have_both():

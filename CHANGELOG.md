@@ -4369,12 +4369,56 @@ test and the opaque-id test both dropped from `proven` to `candidate`. A
 bound defeated by something the caller introduced; the two strings are
 scanned separately now.
 
+### Six classes had no clean row, and nothing said so
+The clean direction of the proving table is the one that catches a FALSE
+POSITIVE - its own header says it: "The same probes where the lab has no
+such bug. `proven` here would be the verifier accepting something it should
+refuse." It is also the direction that silently lagged. Re-deriving the
+coverage per class: 28 of the 29 classes are driven against a vulnerable
+endpoint (`dos` is recorded in `NOT_DRIVEN`) and only 22 against a clean
+one, because `test_both_directions_are_exercised_for_the_classes_that_have_both`
+pins a TEN-class minimum rather than completeness. The defects found in this
+stretch were mostly false proofs, which is exactly what a missing clean row
+cannot catch.
+
+Three of the six are driven now, each measured below its ceiling before its
+row was added: `idor` at `/item?id=1` (`unproven`), `upload` at
+`/api/register` (`unproven`), `xfh` at `/search?q=widget` (`candidate`).
+Two of those probes still report something, which is the point -
+`probe_idor` says "neighboring object ids return 200 with different
+content" about `/item`, where the differing content is two products and no
+subject, and the class refuses it.
+
+The other three cannot have a clean row on this lab, and the reason is
+measured rather than assumed - each was found by driving the probe at a
+candidate endpoint and reading why `proven` came back:
+
+- **`cors`**: the lab reflects the request `Origin` plus
+  `Access-Control-Allow-Credentials: true` on EVERY response, so no
+  endpoint here has a correct allowlist.
+- **`method`**: `do_TRACE` answers on every path, so every endpoint is a
+  cross-site-tracing finding and none is clean.
+- **`disclosure`**: `probe_disclosure` scans the ORIGIN rather than the
+  path it is given (`root = f"{p.scheme}://{p.netloc}"`), and this lab
+  serves `/.env` and `/.git/HEAD` at that origin.
+
+They are in a `NO_CLEAN_ROW` map carrying those sentences, and a new test
+holds the two tables to it: a class driven in the proving direction with no
+clean row and no recorded reason fails the suite. Both halves are planted
+back - removing the `xfh` row and removing the `cors` reason each produce
+the named failure.
+
+Worth recording that all three of those "no clean endpoint" answers first
+looked like false positives in my own measurement, and each was my endpoint
+choice rather than a defect. Driving a probe at an endpoint that is not
+actually clean produces exactly the output a real false positive would.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 735 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 739 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
