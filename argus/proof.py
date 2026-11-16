@@ -1197,6 +1197,41 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
                 "$oid, or a JSON array of objects) - an operator in the "
                 "request proves a payload was sent, not that a store "
                 "answered it"))
+        # The rows have to be rows this endpoint does not serve anyway.
+        #
+        # For a document store that is `records` above. For SQL there is no
+        # document shape to look for - the lab's own dump renders
+        # `<li>admin - $s3cr3t-admin-pw</li>`, which RECORD_RE does not match
+        # and should not - so the differential has to be a control: the same
+        # endpoint, WITHOUT a table in the request.
+        #
+        # This was considered when the echo and endpoint correlations above
+        # were added, and deferred as a narrow residual. bWAPP showed it is
+        # not narrow. Measured against `sqli_1.php`, a mainstream teaching
+        # app: the quote `<!DOCTYPE html>` graded `sqli` PROVEN on
+        # "data store fingerprinted | 5.5.9-1ubuntu in r1", "the query named
+        # its target | users in r12" and "rows returned | quoted from r12" -
+        # while r12's only new line was "Error: The used SELECT statements
+        # have a different number of columns". The UNION had FAILED. Nothing
+        # asked whether the quoted bytes were data or page furniture, and
+        # furniture is in every response the endpoint sends.
+        controls = [e for e in claim.exchanges
+                    if entry is not None and e is not entry
+                    and _endpoint_shape(e) == _endpoint_shape(entry)
+                    and _answered(e) and status_of(e) < 500
+                    and not TABLE_RE.search(req_text(e))] if entry else []
+        fresh = bool(claim.excerpt) and bool(controls) and all(
+            claim.excerpt not in resp_body(c) for c in controls)
+        if spec.fingerprint:
+            out.append(_check(
+                "the rows are not what the page serves anyway", fresh,
+                f"{claim.excerpt[:40]} in {rid} and in no control" if fresh
+                else ("quote the rows, not the page" if not claim.excerpt else
+                      "no control cited: a request to the same endpoint "
+                      "WITHOUT a table in it is what separates a read from "
+                      "the page's own furniture" if not controls else
+                      f"{controls[0].get('id')} carries the quoted bytes too "
+                      "- that is what this endpoint sends whatever you ask")))
         quoted = bool(claim.excerpt) and claim.excerpt in body
         is_error = bool(claim.excerpt) and (
             bool(DBMS_RE.search(claim.excerpt))
@@ -1209,7 +1244,8 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
         # written, not where it happens to be unreachable.
         answered = bool(entry) and _answered(entry) \
             and status_of(entry) < 400
-        enough = bool(named) and (spec.fingerprint or records is not None)
+        enough = bool(named) and (fresh if spec.fingerprint
+                                  else records is not None)
         out.append(_check(
             "rows returned, not an error message",
             enough and quoted and not is_error and answered,
@@ -1219,6 +1255,8 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
              f"{rid} answered {status_of(entry)} - the store refused the query"
              if enough and quoted and not answered else
              f"the quoted bytes are not in {rid}" if enough and not quoted else
+             "the quoted bytes are in a control too - see the check above"
+             if named and spec.fingerprint and not fresh else
              "the exchange the rows are quoted from returned no document "
              "shape" if named else
              "the exchange the rows are quoted from never named a table")))
@@ -1226,7 +1264,9 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
 
     required = ["the query named its target",
                 "rows returned, not an error message"]
-    if not spec.fingerprint:
+    if spec.fingerprint:
+        required.insert(1, "the rows are not what the page serves anyway")
+    else:
         required.insert(1, "documents came back, not the payload")
     checks += _witness(claim.exchanges or [None], build, tuple(required))
     rows = claim.excerpt.count("\n") + 1 if claim.excerpt else 0
@@ -3558,6 +3598,7 @@ RCE_REQUIRED = ("a benign command was sent", "identity output returned by the ta
                 "the probe nonce came back in the output")
 RCE_VETO = ("proof command stayed benign",)
 SQLI_REQUIRED = ("data store fingerprinted", "the query named its target",
+                 "the rows are not what the page serves anyway",
                  "rows returned, not an error message")
 # Not a veto and not a requirement. The bug is real either way; taking more
 # than the proof is a conduct problem, so it is reported rather than graded -

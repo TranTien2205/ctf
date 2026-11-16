@@ -1207,7 +1207,14 @@ def _demo(args) -> int:
         out = _last(messages)
         ids = out.get("request_ids") or {}
         extract = out.get("extract") or {}
-        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        # The BASELINE goes in the citation too, not just the error and the
+        # dump. `sqli` requires a control on the same endpoint without a
+        # table in it, because otherwise the quoted "rows" can be the page's
+        # own furniture - measured on bWAPP, where `<!DOCTYPE html>` graded
+        # proven while the UNION had actually failed. The baseline is what
+        # the probe already sent first, so citing it costs nothing.
+        cited = [i for i in (ids.get("base"), ids.get("quote"),
+                             extract.get("request_id")) if i]
         return {"text": "Error channel named the engine; the bounded UNION read "
                         "returned rows. Both go in the citation - the class "
                         "needs the engine AND the data.",
@@ -1428,7 +1435,14 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
         out = _demo_last(messages)
         ids = out.get("request_ids") or {}
         extract = out.get("extract") or {}
-        cited = [i for i in (ids.get("quote"), extract.get("request_id")) if i]
+        # The BASELINE goes in the citation too, not just the error and the
+        # dump. `sqli` requires a control on the same endpoint without a
+        # table in it, because otherwise the quoted "rows" can be the page's
+        # own furniture - measured on bWAPP, where `<!DOCTYPE html>` graded
+        # proven while the UNION had actually failed. The baseline is what
+        # the probe already sent first, so citing it costs nothing.
+        cited = [i for i in (ids.get("base"), ids.get("quote"),
+                             extract.get("request_id")) if i]
         return {"tool_calls": [_t("e3", "record_finding",
             title="SQL injection in /item id parameter", severity="critical",
             category="sqli", url=base + "/item?id=1", evidence_ids=cited,

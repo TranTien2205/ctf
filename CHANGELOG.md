@@ -4472,12 +4472,65 @@ Both halves are planted back: hardcoding the bind fails the loopback test,
 and ignoring `--target` fails the demo test with the locally spawned port
 beside the requested one.
 
+### bWAPP graded `proven` on `<!DOCTYPE html>` while its UNION had failed
+A residual this file recorded earlier as "narrow" and left open. It is not
+narrow, and a third-party application found it within minutes of being
+installed - which is the argument for testing against applications this
+project did not write.
+
+Measured against bWAPP's `sqli_1.php`, with the quote `<!DOCTYPE html>`:
+
+```
+PASS data store fingerprinted      | 5.5.9-1ubuntu in r1
+PASS the query named its target    | users in r12
+PASS rows returned                 | quoted from r12
+GRADE: proven
+```
+
+The banner was genuine (a real MySQL version, on the same endpoint, not
+echoed - so the two correlations added earlier both held). The request did
+name `users`. And the only line r12 carried that the baseline did not was
+*"Error: The used SELECT statements have a different number of columns"*:
+the UNION had FAILED and nothing was extracted. Nothing asked whether the
+quoted bytes were data or the page's own furniture, and furniture is in
+every response an endpoint sends.
+
+The fix is the control the nosqli half has required since it was split out
+of this verifier: a cited exchange on the same endpoint, answered, whose
+request carries no table, whose body does NOT contain the quoted bytes. The
+check is named - "the rows are not what the page serves anyway" - so the
+operator reads the reason rather than inferring it, and it is in
+`SQLI_REQUIRED`, so `missing` names it too. The FAIL branch of "rows
+returned" was also saying "returned no document shape", which is a nosqli
+sentence that tells a SQL operator nothing; it now says the quoted bytes
+are in a control too.
+
+What it cost, and why that is the right trade:
+
+- `docs/sample-session` had to be regenerated, because F01 cited only the
+  500 error and the dump: a 500 is not a control (`status_of(e) < 500`),
+  so the finding read as overgraded and `argus verify` said TAMPERED. The
+  demo's citation now includes the BASELINE the probe already sends first,
+  which is what an agent should cite anyway, and both demo paths were
+  changed, not one.
+- Seven existing tests cited sqli evidence with no baseline. Each grew one,
+  and they are more faithful for it: `probe_sqli` sends the baseline first
+  in every real run, so a fixture without it was never the shape the
+  recorder writes.
+- A real probe run needs nothing added: the probe's own quote-error
+  exchange is already a valid control - same endpoint, no table, answered -
+  which a test now records so nobody adds a redundant request for it.
+
+Planted back two ways: `fresh = True` returns bWAPP's boilerplate to
+`proven` on the real recorded transcript, and fails the unit test that
+carries that transcript's shape.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 744 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 745 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

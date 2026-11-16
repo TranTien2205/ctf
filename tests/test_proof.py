@@ -200,6 +200,12 @@ def test_deserialize_declares_a_gadget_not_a_shell_separator():
 
 # --- sqli -------------------------------------------------------------------
 
+# The baseline: `/item?id=1` with no payload, which `probe_sqli` sends
+# first and which the class needs as its control - without one, the quoted
+# "rows" could be the page's own furniture. See
+# `test_sqli_refuses_the_page_furniture_as_its_rows`.
+SQLI_BASE = ex("r5", "http://t.local/item?id=1",
+               "<ul><li>widget - $9.99</li></ul>")
 SQLI_FP = ex("r6", "http://t.local/item?id=1%27",
              "sqlite3.OperationalError: unrecognized token", 500)
 SQLI_DUMP = ex("r7", "http://t.local/item?id=1%27%20UNION%20SELECT%20"
@@ -208,7 +214,7 @@ SQLI_DUMP = ex("r7", "http://t.local/item?id=1%27%20UNION%20SELECT%20"
 
 
 def test_sqli_proven_by_fingerprint_plus_row():
-    verdict = proof.grade("sqli", "admin - s3cr3t", [SQLI_FP, SQLI_DUMP])
+    verdict = proof.grade("sqli", "admin - s3cr3t", [SQLI_BASE, SQLI_FP, SQLI_DUMP])
     assert verdict.grade == "proven", verdict.explain()
 
 
@@ -223,7 +229,66 @@ def test_sqli_error_only_is_a_candidate():
 def test_sqli_dump_without_a_fingerprint_is_a_candidate():
     verdict = proof.grade("sqli", "admin - s3cr3t", [SQLI_DUMP])
     assert verdict.grade == "candidate"
-    assert verdict.missing == ["data store fingerprinted"]
+    # a lone dump is missing its control as well as its fingerprint: nothing
+    # cited shows the page does not carry those bytes anyway
+    assert verdict.missing == ["data store fingerprinted",
+                               "the rows are not what the page serves anyway",
+                               "rows returned, not an error message"]
+
+
+def test_sqli_refuses_the_page_furniture_as_its_rows():
+    """Found on bWAPP, a mainstream teaching app, not on a fixture.
+
+    The quote `<!DOCTYPE html>` graded `sqli` **proven** against
+    `sqli_1.php`: "data store fingerprinted | 5.5.9-1ubuntu in r1" (a
+    genuine MySQL banner, on the same endpoint), "the query named its
+    target | users in r12", "rows returned | quoted from r12". And r12's
+    only line the baseline did not already have was *"Error: The used
+    SELECT statements have a different number of columns"* - the UNION had
+    FAILED. Nothing asked whether the quoted bytes were data or page
+    furniture, and furniture is in every response the endpoint sends.
+
+    This hole was seen when the echo and endpoint correlations were added
+    to this verifier and deferred as a narrow residual. It is not narrow:
+    any app that shows its engine version somewhere and renders a common
+    wrapper has it. The control the nosqli half has required all along is
+    required here too now.
+    """
+    wrapper = "<!DOCTYPE html>\n<html><body><table>"
+    baseline = ex("b1", "http://t.local/sqli_1.php?title=x&action=search",
+                  wrapper + "<tr><td>Iron Man</td></tr></table></body></html>")
+    banner = ex("b2", "http://t.local/sqli_1.php?title=x%27&action=search",
+                wrapper + "error: 5.5.9-1ubuntu5 MySQL</body></html>", 200)
+    failed_union = ex(
+        "b3", "http://t.local/sqli_1.php?title=x%27+UNION+SELECT+login,"
+              "password+FROM+users--+-&action=search",
+        wrapper + "Error: The used SELECT statements have a different "
+                  "number of columns</body></html>")
+    v = proof.grade("sqli", "<!DOCTYPE html>", [baseline, banner, failed_union])
+    assert v.grade != "proven", v.explain()
+    assert "the rows are not what the page serves anyway" in v.missing
+    detail = next(c["detail"] for c in v.checks
+                  if c["check"] == "the rows are not what the page serves anyway")
+    assert "carries the quoted bytes too" in detail, detail
+
+    # the honest direction: a row the baseline does not carry
+    real = ex("b4", "http://t.local/sqli_1.php?title=x%27+UNION+SELECT+login,"
+                    "password+FROM+users--+-&action=search",
+              wrapper + "<tr><td>bee</td><td>bug</td></tr></table></body></html>")
+    assert proof.grade("sqli", "<tr><td>bee</td><td>bug</td></tr>",
+                       [baseline, banner, real]).grade == "proven"
+
+    # With the dump alone and nothing to compare it against, the class says
+    # so rather than guessing. Note which exchange does NOT need adding: the
+    # probe's own quote-error request is already a control - same endpoint,
+    # no table in it, answered - so a real probe run carries one for free.
+    v = proof.grade("sqli", "<tr><td>bee</td><td>bug</td></tr>", [real])
+    assert v.grade != "proven"
+    assert "no control cited" in next(
+        c["detail"] for c in v.checks
+        if c["check"] == "the rows are not what the page serves anyway")
+    assert proof.grade("sqli", "<tr><td>bee</td><td>bug</td></tr>",
+                       [banner, real]).grade == "proven"
 
 
 def test_sqli_refuses_a_reflected_query_as_its_own_fingerprint():
@@ -268,7 +333,7 @@ def test_sqli_wants_the_fingerprint_on_the_endpoint_the_rows_came_from():
     assert "data store fingerprinted" in verdict.missing
     # and the honest pairing, on one endpoint, is untouched
     assert proof.grade("sqli", "admin - s3cr3t",
-                       [SQLI_FP, SQLI_DUMP]).grade == "proven"
+                       [SQLI_BASE, SQLI_FP, SQLI_DUMP]).grade == "proven"
 
 
 def test_graphql_sees_the_transport_every_client_actually_uses():
@@ -335,7 +400,8 @@ def test_extraction_and_graphql_do_not_count_an_unanswered_exchange():
 
 
 def test_sqli_quoting_the_error_fails_the_row_check():
-    verdict = proof.grade("sqli", "sqlite3.OperationalError", [SQLI_FP, SQLI_DUMP])
+    verdict = proof.grade("sqli", "sqlite3.OperationalError",
+                          [SQLI_BASE, SQLI_FP, SQLI_DUMP])
     assert "rows returned, not an error message" in verdict.missing
 
 
@@ -439,7 +505,7 @@ def test_sqli_flags_an_oversized_dump():
     rows = "\n".join(f"<li>user{i} - pw{i}</li>" for i in range(40))
     big = ex("r9", "http://t.local/item?id=1%27%20UNION%20SELECT%20a,b%20FROM%20users",
              rows)
-    verdict = proof.grade("sqli", rows, [SQLI_FP, big])
+    verdict = proof.grade("sqli", rows, [SQLI_BASE, SQLI_FP, big])
     assert any(c["check"] == "extraction stayed minimal" and not c["ok"]
                for c in verdict.checks)
 
@@ -804,6 +870,13 @@ def test_finding_carries_its_grade(tmp_path):
 
 def test_better_evidence_upgrades_in_place(tmp_path):
     s = _sess(tmp_path)
+    # the baseline first, the way the probe sends it: `sqli` needs a control
+    # on the same endpoint without a table in it, or the quoted rows could be
+    # the page's own furniture
+    r0 = s.record_exchange("probe_sqli",
+                           {"method": "GET", "url": "http://t.local/item?id=1"},
+                           {"status": 200, "headers": {},
+                            "body": "<li>widget - $9.99</li>"})
     r1 = s.record_exchange("probe_sqli",
                            {"method": "GET", "url": "http://t.local/item?id=1'"},
                            {"status": 500, "headers": {},
@@ -816,7 +889,8 @@ def test_better_evidence_upgrades_in_place(tmp_path):
                                  "username,password FROM users LIMIT 5-- -"},
         {"status": 200, "headers": {}, "body": "<li>admin - s3cr3t</li>"})
     f = s.add_finding("sqli", "critical", "sqli", "http://t.local/item?id=1",
-                      [r1, r2], "admin - s3cr3t", "dumped", "bind params")
+                      [r0, r1, r2], "admin - s3cr3t", "dumped",
+                      "bind params")
     assert f["id"] == "F01" and f["grade"] == "proven"
     assert f["upgraded_from"] == "candidate"
     assert f["severity"] == "critical"
@@ -853,6 +927,13 @@ def test_require_proof_refuses_a_candidate(tmp_path):
 
 def test_require_proof_accepts_what_is_proven(tmp_path):
     s = _sess(tmp_path, require_proof=True)
+    # the baseline first, the way the probe sends it: `sqli` needs a control
+    # on the same endpoint without a table in it, or the quoted rows could be
+    # the page's own furniture
+    r0 = s.record_exchange("probe_sqli",
+                           {"method": "GET", "url": "http://t.local/item?id=1"},
+                           {"status": 200, "headers": {},
+                            "body": "<li>widget - $9.99</li>"})
     r1 = s.record_exchange("probe_sqli",
                            {"method": "GET", "url": "http://t.local/item?id=1'"},
                            {"status": 500, "headers": {},
@@ -863,7 +944,7 @@ def test_require_proof_accepts_what_is_proven(tmp_path):
                                  "FROM users LIMIT 5-- -"},
         {"status": 200, "headers": {}, "body": "<li>admin - s3cr3t</li>"})
     f = s.add_finding("sqli", "critical", "sqli", "http://t.local/item?id=1",
-                      [r1, r2], "admin - s3cr3t", "d", "r")
+                      [r0, r1, r2], "admin - s3cr3t", "d", "r")
     assert f["grade"] == "proven"
 
 
@@ -1326,6 +1407,10 @@ def test_upgrade_keeps_the_original_timestamp_and_the_new_metadata(tmp_path):
     upgrade time and discarded the upgrading author's cvss and agent."""
     import time
     s = _sess(tmp_path)
+    r0 = s.record_exchange("probe_sqli",
+                           {"method": "GET", "url": "http://t.local/i?id=1"},
+                           {"status": 200, "headers": {},
+                            "body": "<li>widget - $9.99</li>"})
     r1 = s.record_exchange("probe_sqli",
                            {"method": "GET", "url": "http://t.local/i?id=1'"},
                            {"status": 500, "headers": {},
@@ -1355,7 +1440,7 @@ def test_upgrade_keeps_the_original_timestamp_and_the_new_metadata(tmp_path):
                                  "FROM users LIMIT 5-- -"},
         {"status": 200, "headers": {}, "body": "<li>admin - s3cr3t</li>"})
     up = s.add_finding(
-        "sqli", "critical", "sqli", "http://t.local/i?id=1", [r1, r2],
+        "sqli", "critical", "sqli", "http://t.local/i?id=1", [r0, r1, r2],
         "admin - s3cr3t", "dumped", "bind", agent="exploit-2",
         cvss="CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H")
     assert up["grade"] == "proven"

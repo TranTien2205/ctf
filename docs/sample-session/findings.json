@@ -4,8 +4,9 @@
     "title": "SQL injection in /item id parameter",
     "severity": "critical",
     "category": "sqli",
-    "url": "http://127.0.0.1:40523/item?id=1",
+    "url": "http://127.0.0.1:44939/item?id=1",
     "evidence_ids": [
+      "r1",
       "r2",
       "r15"
     ],
@@ -30,12 +31,17 @@
         {
           "check": "data store fingerprinted",
           "ok": true,
-          "detail": "sqlite3.OperationalError"
+          "detail": "sqlite3.OperationalError in r2"
         },
         {
           "check": "the query named its target",
           "ok": true,
           "detail": "users in r15"
+        },
+        {
+          "check": "the rows are not what the page serves anyway",
+          "ok": true,
+          "detail": "admin - $s3cr3t-admin-pw in r15 and in no control"
         },
         {
           "check": "rows returned, not an error message",
@@ -51,7 +57,7 @@
     },
     "description": "id is interpolated into the query string. The quote probe returns a raw sqlite error; a UNION SELECT limited to five rows returns credentials from the users table.",
     "remediation": "Use parameterized queries.",
-    "ts": 1794556100.573,
+    "ts": 1794799098.048,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
     "cwe": "CWE-89",
@@ -62,7 +68,7 @@
     "title": "OS command injection in /ping host parameter",
     "severity": "critical",
     "category": "rce",
-    "url": "http://127.0.0.1:40523/ping?host=127.0.0.1",
+    "url": "http://127.0.0.1:44939/ping?host=127.0.0.1",
     "evidence_ids": [
       "r18"
     ],
@@ -97,7 +103,7 @@
         {
           "check": "the probe nonce came back in the output",
           "ok": true,
-          "detail": "'argus2q9y0t5r' in r18"
+          "detail": "'argusduvor2lu' in r18"
         },
         {
           "check": "proof command stayed benign",
@@ -108,7 +114,7 @@
     },
     "description": "host is concatenated into a shell command. `id; echo <nonce>` returns the server's own identity line and the nonce, so the output is computed by the target and not reflected.",
     "remediation": "Never pass request data to a shell; exec with an argv list and validate the host as an address.",
-    "ts": 1794556100.729,
+    "ts": 1794799098.202,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
     "cwe": "CWE-78",
@@ -119,7 +125,7 @@
     "title": "Reflected XSS in /search q parameter",
     "severity": "medium",
     "category": "xss",
-    "url": "http://127.0.0.1:40523/search?q=x",
+    "url": "http://127.0.0.1:44939/search?q=x",
     "evidence_ids": [
       "r19"
     ],
@@ -158,7 +164,7 @@
     },
     "description": "Canary chars < > \" ' reflect unescaped in an html context. Execution is not shown here - this engagement had no browser, so the class stays a candidate.",
     "remediation": "Output-encode by context; add CSP.",
-    "ts": 1794556100.78,
+    "ts": 1794799098.25,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
     "cwe": "CWE-79",
@@ -169,7 +175,7 @@
     "title": "IDOR: /api/user/<id> serves any user object",
     "severity": "high",
     "category": "idor",
-    "url": "http://127.0.0.1:40523/api/user/2",
+    "url": "http://127.0.0.1:44939/api/user/2",
     "evidence_ids": [
       "r20",
       "r22"
@@ -216,7 +222,7 @@
     },
     "description": "Object ids are not checked against the caller. Reading id 2 returns alice; reading id 1 returns the admin record, with no credential distinguishing the two requests.",
     "remediation": "Enforce per-object ownership checks.",
-    "ts": 1794556100.973,
+    "ts": 1794799098.434,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
     "cwe": "CWE-639",
@@ -227,7 +233,7 @@
     "title": "Exposed /.env and /.git/HEAD at web root",
     "severity": "medium",
     "category": "info-disclosure",
-    "url": "http://127.0.0.1:40523/.env",
+    "url": "http://127.0.0.1:44939/.env",
     "evidence_ids": [
       "r27"
     ],
@@ -263,7 +269,7 @@
     },
     "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
     "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
-    "ts": 1794556102.734,
+    "ts": 1794799100.15,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
     "cwe": "CWE-200",
@@ -274,7 +280,7 @@
     "title": "JWT weak secret: forged admin token accepted",
     "severity": "critical",
     "category": "jwt",
-    "url": "http://127.0.0.1:40523/api/me",
+    "url": "http://127.0.0.1:44939/api/me",
     "evidence_ids": [
       "r64",
       "r63",
@@ -301,7 +307,7 @@
         {
           "check": "this system minted the credential",
           "ok": true,
-          "detail": "jwt_forge r62 set ['role', 'user'], echoed 'admin'"
+          "detail": "jwt_forge r62 set ['role', 'user'], echoed 'admin', and r63 carried that token"
         },
         {
           "check": "a forged credential was accepted",
@@ -317,7 +323,7 @@
     },
     "description": "The session JWT verifies against the dictionary secret 'secret123'. A token forged offline with role=admin is accepted and its claims echoed back; the same request with a broken signature is refused with 401, so the endpoint does verify - against a guessable key.",
     "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
-    "ts": 1794556102.841,
+    "ts": 1794799100.246,
     "agent": "agent",
     "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
     "cwe": "CWE-347",
