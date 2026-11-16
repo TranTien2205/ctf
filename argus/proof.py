@@ -2322,8 +2322,13 @@ def verify_oracle(claim: Claim, spec: "ProofSpec") -> list[dict]:
 # A credential field, which is what makes a request an authentication
 # ATTEMPT rather than a page view. Checked on the request, because a lockout
 # policy is about what the caller tried, not about what the page looks like.
+# `pw` was missing beside `pwd` and `pass`. It is an ordinary field name -
+# this repo's own lab fixtures use it (`{"user": "admin", "pw": "hunter2"}`)
+# - and a target whose login field is spelled that way could not have a
+# lockout finding graded at all: `_is_auth_attempt` reads this pattern and
+# nothing else, so every attempt fell out of the series.
 _CREDENTIAL_FIELD_RE = re.compile(
-    r"(?i)(?:^|[?&{\"'\s,])(?:password|passwd|pwd|pass|otp|passcode|"
+    r"(?i)(?:^|[?&{\"'\s,])(?:password|passwd|pwd|pw|pass|otp|passcode|"
     r"secret|pin|mfa|totp)(?:[\"']?\s*[=:])")
 _AUTH_FAIL_RE = re.compile(
     r"(?i)invalid|incorrect|failed|denied|unauthori[sz]ed|bad credentials|"

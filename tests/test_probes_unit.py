@@ -381,7 +381,12 @@ def test_no_probe_reports_a_finding_against_a_target_that_answers_nothing():
     # "no " and passes, while asserting the thing the class exists to
     # assert. So the probe that was actually wrong gets its own line, which
     # is also what makes the fix testable at all.
-    lockout = _drive("probe_lockout", _Dead())
+    # `data` carries a credential field, because `_drive`'s placeholder
+    # ("q=1") does not and `probe_lockout` now says so instead of counting
+    # failed logins it never attempted. This test's subject is a target that
+    # answers nothing, so the body must not change the subject.
+    _creds = "username=x&password=y"
+    lockout = _drive("probe_lockout", _Dead(), data=_creds)
     assert "unthrottled" not in lockout, lockout
     assert "none of them answered" in lockout, lockout
 
@@ -397,7 +402,7 @@ def test_no_probe_reports_a_finding_against_a_target_that_answers_nothing():
                         "request_id": f"r{self.n}", "elapsed_ms": 120.0}
             return self._dead()
 
-    half = _drive("probe_lockout", _SixThenNothing())
+    half = _drive("probe_lockout", _SixThenNothing(), data=_creds)
     assert "after 6 failed attempts" in half, half
     assert "got no answer" in half, half
 

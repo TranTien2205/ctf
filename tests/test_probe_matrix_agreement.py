@@ -704,6 +704,53 @@ def test_probe_lockout_sends_at_least_what_its_class_needs(lab_url, ctx):
         f"the probe's own run grades {grade} (missing {missing})")
 
 
+def test_probe_lockout_does_not_claim_logins_it_never_attempted(lab_url, ctx):
+    """Six requests that send no password are not six failed logins.
+
+    `data` is the caller's body template and the only place a credential
+    field comes from. With `data="username=x"` the probe reported "no
+    lockout or rate limit after 6 failed attempts - online password
+    guessing is unthrottled" while `verify_no_throttle` counted ZERO
+    authentication attempts and graded `unproven`: "no cited request
+    carries a credential field". Measured both ways against /login2.
+
+    The probe already had this correction one branch over, for attempts
+    that got no answer, with the rule written out: "A caveat under a wrong
+    headline is still a wrong headline."
+    """
+    for data, should_claim in (("username=x&password=y", True),
+                               ("username=x", False),
+                               ("user=x&pw=y", True)):
+        before = len(_exchanges(ctx.session))
+        out = probes.probe_lockout(ctx, lab_url + "/login2", data, tries=6)
+        entries = _exchanges(ctx.session)[before:]
+        verdict = str(out.get("verdict", ""))
+        graded = _best_grade("lockout", entries)[0]
+        if should_claim:
+            assert graded == "proven", (data, graded, verdict)
+        else:
+            assert "failed attempts" not in verdict, (data, verdict)
+            assert "no credential field" in verdict, (data, verdict)
+            # and the class agrees there is nothing to grade
+            assert graded != "proven", (data, graded)
+
+
+def test_a_pw_field_is_a_credential_field():
+    """`pw` was missing beside `pwd` and `pass`.
+
+    An ordinary field name - this repo's own lab fixtures use it - and
+    `_is_auth_attempt` reads `_CREDENTIAL_FIELD_RE` and nothing else, so a
+    target whose login field is spelled that way had every attempt fall out
+    of the series and could not have a lockout finding graded at all.
+    """
+    for body in ("user=x&pw=y", '{"user":"x","pw":"y"}', "pw=y",
+                 "username=x&password=y", "u=x&pwd=y"):
+        assert proof._CREDENTIAL_FIELD_RE.search(body), body
+    # and it stays a FIELD, not any occurrence of those letters
+    for body in ("username=pwx", "showpw", "a=pwned", "pwd_hint=abc"):
+        assert not proof._CREDENTIAL_FIELD_RE.search(body), body
+
+
 def test_every_driven_probe_exists_and_maps_to_a_real_class():
     from argus.tools import registry
     known = {t["name"] for t in registry.TOOL_SCHEMAS}

@@ -486,6 +486,7 @@ from ..proof import IDENTITY_RE as _CMDI_IDENT_RE          # noqa: E402
 from ..proof import _overlaps                        # noqa: E402
 from ..proof import latency_ramp as _latency_ramp    # noqa: E402
 from ..proof import _LOCKOUT_FLOOR              # noqa: E402
+from ..proof import _CREDENTIAL_FIELD_RE        # noqa: E402
 from ..proof import WINIDENT_RE as _CMDI_WINIDENT_RE       # noqa: E402
 from ..proof import NONCE_RE as _CMDI_NONCE_RE             # noqa: E402
 from ..proof import ACTIVE_CTYPE_RE as _UPLOAD_ACTIVE_RE   # noqa: E402
@@ -1552,6 +1553,23 @@ def probe_lockout(ctx: Context, url: str, data: str,
         f"no answer from the target: {len(results)} attempts, none of them "
         "answered - nothing here says whether this endpoint throttles"
         if not _answered else
+        # The same correction as the branch above, for the other way these
+        # attempts can fail to be attempts: a `data` body that carries no
+        # credential field. With `data="username=x"` this read "no lockout
+        # or rate limit after 6 failed attempts - online password guessing
+        # is unthrottled" while `verify_no_throttle` counted ZERO
+        # authentication attempts and graded `unproven` - "no cited request
+        # carries a credential field". Six requests that sent no password
+        # are not six failed logins, and by the rule written one branch up,
+        # a caveat under a wrong headline is still a wrong headline.
+        #
+        # The pattern is the class's own, imported, so the probe's idea of
+        # a credential field cannot drift from the one that grades it.
+        f"{len(results)} attempts sent, but the body carries no credential "
+        "field (password, pass, pwd, pw, otp, passcode) - requests that "
+        "send no password are not failed logins, and nothing here says "
+        "whether this endpoint throttles authentication"
+        if not _CREDENTIAL_FIELD_RE.search(str(data or "")) else
         f"no lockout or rate limit after {len(_answered)} failed attempts - "
         "online password guessing is unthrottled"
         + ("" if len(_answered) == len(results) else

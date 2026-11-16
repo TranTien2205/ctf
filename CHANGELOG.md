@@ -4286,12 +4286,45 @@ because each would have become a false finding:
   now, and the plant fails on "asked for 3 tries and the probe sent 3,
   below the 5 its own class needs".
 
+### Six requests that send no password are not six failed logins
+Two more in `probe_lockout`'s neighbourhood, both measured against
+`/login2`, the endpoint the VULNERABLE row drives.
+
+- **The probe claimed logins it never attempted.** `data` is the caller's
+  body template and the only place a credential field comes from. With
+  `data="username=x"` the probe reported "no lockout or rate limit after 6
+  failed attempts - online password guessing is unthrottled" while
+  `verify_no_throttle` counted ZERO authentication attempts and graded
+  `unproven`: "no cited request carries a credential field". The probe
+  already had this correction one branch over, for attempts that got no
+  answer, with the rule written out there - "A caveat under a wrong
+  headline is still a wrong headline" - and the credential-less case was
+  the other way the same thing can happen. It names it now, and the
+  pattern it tests with is the class's own, imported, so the probe's idea
+  of a credential field cannot drift from the one that grades it.
+- **`pw` was not a credential field.** It sits beside `pwd` and `pass` in
+  every real login form, and this repo's own lab fixtures use it
+  (`{"user": "admin", "pw": "hunter2"}`). `_is_auth_attempt` reads
+  `_CREDENTIAL_FIELD_RE` and nothing else, so a target spelling its field
+  that way had every attempt fall out of the series: measured,
+  `user=x&pw=y` gave 0 recognised attempts out of 6 and the class could not
+  grade a lockout finding at all. It stays a FIELD and not any occurrence
+  of those letters - `username=pwx`, `showpw`, `a=pwned` and `pwd_hint=`
+  all still fail to match.
+
+One fixture of the existing suite was unfaithful in the same way mine was:
+`_drive` hands every probe the placeholder body `q=1`, which carries no
+credential field, so the dead-target test for `probe_lockout` was asserting
+"after 6 failed attempts" on a run that sent no password. Its subject is a
+target that answers nothing, so it passes a credential body now rather than
+letting the placeholder change the subject.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 732 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 734 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
