@@ -4702,12 +4702,64 @@ never visited. A confident negative is the worst shape of wrong.
 Capped classes: 3 to 1, and the one left is not about equipment. 755
 tests, selftest 160/160.
 
+### Every coverage figure counted what ran; none said what came back empty
+
+`requests_by_tool`, `endpoints`, `probes` - three tallies of what the run
+DID, and nothing answering the question a reader of a report actually has,
+which is what was looked for and not settled. A probe that runs and finds
+nothing had no way to be reported, so it vanished, and a report could say
+"six findings" about a run where fourteen other things were tried with
+nobody able to say what happened to them. The data was all recorded. The
+subtraction was missing.
+
+`open_proof_gaps` is that subtraction, sealed into `summary.json` with the
+rest of the coverage block and rendered as its own section.
+
+The first run of it returned 41, and most were not gaps: a disclosure
+probe fetching `/wp-config.php~` and getting a 404 has its answer. Which
+exposed the real hole - every field on a ProofSpec describes what PROVES a
+class and none describes what RULES IT OUT, and that is the half false
+negatives come from. `ruled_out_by` is that field. It defaults to empty,
+meaning "a negative settles nothing here", because a blind sqli looks
+exactly like no sqli; only `disclosure` and `idor` can name one, since
+both ask whether a thing is served and 401/403/404 answers that. All of
+the probe's responses have to satisfy it, not any: one 404 among several
+200s says the target declined one path, not that the question is closed.
+41 became 3.
+
+Turning it on found a defect in the session this package SHIPS as its
+example. The demo's disclosure finding was titled `Exposed /.env and
+/.git/HEAD at web root` and cited one exchange, for `/.env`. The exchange
+showing `/.git/HEAD` returning 200 was never cited - a report asserting
+something its own evidence did not carry, which is the defect this whole
+package exists to prevent, sitting in its own sample. The proof gate did
+not catch it because the gate grades the EXCERPT against cited exchanges
+and the title is prose that nothing compares to the citation. The title
+now claims only `/.env`, and `/.git/HEAD` appears in the gap list, which
+is the true statement: the sweep touched it and nothing settled it.
+
+Two measurement defects on the way, both mine, both overstating. A probe
+walking `/api/user/1..3` against a finding naming `/api/user/2` reported
+two gaps that were one endpoint already settled - fixed by reusing
+`_endpoint_shape`, which collapses identifiers. And a finding settles
+every endpoint it CITES, not only the one in its `url` field; counting the
+name alone was what reported `/.git/HEAD` in the first place, and both
+halves of that turned out to be worth knowing.
+
+The section says three different sentences for three different states: a
+class whose negative would settle it but did not, a class where no
+negative ever settles it, and nothing left open at all. Collapsing those
+into one line would put "we checked and it is fine" and "we checked and
+cannot tell" under the same words.
+
+761 tests, selftest 160/160.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 755 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 761 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

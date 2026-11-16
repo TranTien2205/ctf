@@ -1,5 +1,5 @@
 {
-  "session": "20261115-221817-127.0.0.1",
+  "session": "20261116-043207-127.0.0.1",
   "argus_version": "1.0.0",
   "findings": [
     {
@@ -7,7 +7,7 @@
       "title": "SQL injection in /item id parameter",
       "severity": "critical",
       "category": "sqli",
-      "url": "http://127.0.0.1:44939/item?id=1",
+      "url": "http://127.0.0.1:43673/item?id=1",
       "evidence_ids": [
         "r1",
         "r2",
@@ -61,7 +61,7 @@
       },
       "description": "id is interpolated into the query string. The quote probe returns a raw sqlite error; a UNION SELECT limited to five rows returns credentials from the users table.",
       "remediation": "Use parameterized queries.",
-      "ts": 1794799098.048,
+      "ts": 1794821528.046,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-89",
@@ -72,7 +72,7 @@
       "title": "OS command injection in /ping host parameter",
       "severity": "critical",
       "category": "rce",
-      "url": "http://127.0.0.1:44939/ping?host=127.0.0.1",
+      "url": "http://127.0.0.1:43673/ping?host=127.0.0.1",
       "evidence_ids": [
         "r18"
       ],
@@ -105,9 +105,14 @@
             "detail": "'uid=1000(kali)' in r18"
           },
           {
+            "check": "the quoted bytes are the command output",
+            "ok": true,
+            "detail": "'uid=1000(kali)' carries the identity line"
+          },
+          {
             "check": "the probe nonce came back in the output",
             "ok": true,
-            "detail": "'argusduvor2lu' in r18"
+            "detail": "'argus9afhlg6f' in r18"
           },
           {
             "check": "proof command stayed benign",
@@ -119,7 +124,7 @@
       },
       "description": "host is concatenated into a shell command. `id; echo <nonce>` returns the server's own identity line and the nonce, so the output is computed by the target and not reflected.",
       "remediation": "Never pass request data to a shell; exec with an argv list and validate the host as an address.",
-      "ts": 1794799098.202,
+      "ts": 1794821528.194,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-78",
@@ -130,7 +135,7 @@
       "title": "JWT weak secret: forged admin token accepted",
       "severity": "critical",
       "category": "jwt",
-      "url": "http://127.0.0.1:44939/api/me",
+      "url": "http://127.0.0.1:43673/api/me",
       "evidence_ids": [
         "r64",
         "r63",
@@ -174,7 +179,7 @@
       },
       "description": "The session JWT verifies against the dictionary secret 'secret123'. A token forged offline with role=admin is accepted and its claims echoed back; the same request with a broken signature is refused with 401, so the endpoint does verify - against a guessable key.",
       "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
-      "ts": 1794799100.246,
+      "ts": 1794821530.258,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
       "cwe": "CWE-347",
@@ -185,7 +190,7 @@
       "title": "IDOR: /api/user/<id> serves any user object",
       "severity": "high",
       "category": "idor",
-      "url": "http://127.0.0.1:44939/api/user/2",
+      "url": "http://127.0.0.1:43673/api/user/2",
       "evidence_ids": [
         "r20",
         "r22"
@@ -233,7 +238,7 @@
       },
       "description": "Object ids are not checked against the caller. Reading id 2 returns alice; reading id 1 returns the admin record, with no credential distinguishing the two requests.",
       "remediation": "Enforce per-object ownership checks.",
-      "ts": 1794799098.434,
+      "ts": 1794821528.432,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-639",
@@ -241,10 +246,10 @@
     },
     {
       "id": "F05",
-      "title": "Exposed /.env and /.git/HEAD at web root",
+      "title": "Exposed /.env at web root",
       "severity": "medium",
       "category": "info-disclosure",
-      "url": "http://127.0.0.1:44939/.env",
+      "url": "http://127.0.0.1:43673/.env",
       "evidence_ids": [
         "r27"
       ],
@@ -281,7 +286,7 @@
       },
       "description": "Sensitive paths are served publicly - credentials and source-control metadata leak to anyone.",
       "remediation": "Deny dotfile/VCS paths at the web server; rotate exposed secrets.",
-      "ts": 1794799100.15,
+      "ts": 1794821530.157,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
       "cwe": "CWE-200",
@@ -292,7 +297,7 @@
       "title": "Reflected XSS in /search q parameter",
       "severity": "medium",
       "category": "xss",
-      "url": "http://127.0.0.1:44939/search?q=x",
+      "url": "http://127.0.0.1:43673/search?q=x",
       "evidence_ids": [
         "r19"
       ],
@@ -322,7 +327,7 @@
           {
             "check": "a real browser executed it",
             "ok": false,
-            "detail": "this system has no browser, so execution is not provable here. Drive one over mcp_call and cite the nonce it reports, or leave this a candidate and say so in the report"
+            "detail": "no callback carrying a probe nonce is cited. Reflection is visible in the bytes; execution is not. `agent-browser` is not on PATH. It is an external tool, like sqlmap and nuclei - `npm i -g agent-browser`, or set AGENT_BROWSER_BIN to a local install. Without it a reflected payload can be shown to reflect but not to execute."
           }
         ],
         "missing": [
@@ -331,7 +336,7 @@
       },
       "description": "Canary chars < > \" ' reflect unescaped in an html context. Execution is not shown here - this engagement had no browser, so the class stays a candidate.",
       "remediation": "Output-encode by context; add CSP.",
-      "ts": 1794799098.25,
+      "ts": 1794821528.245,
       "agent": "agent",
       "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
       "cwe": "CWE-79",
@@ -349,7 +354,7 @@
   },
   "agent_summary": "Demo run. Proven: SQL injection (engine named plus five rows from users), OS command injection (identity line with the probe nonce), IDOR across two principals, exposed secrets, and a forged JWT accepted against a rejected control. Candidate: reflected XSS - unescaped, but no browser executed it. Host-header reflection left as a lead.",
   "requests": 64,
-  "duration_s": 2.9,
+  "duration_s": 3.0,
   "time_to_first_finding_s": 0.7,
   "coverage": {
     "requests_by_tool": {
@@ -382,7 +387,7 @@
       "GET /api/user/1",
       "GET /api/user/2",
       "GET /api/user/3",
-      "GET /arg404kgkpnq4w",
+      "GET /arg404lsp11kfv",
       "GET /backup.zip",
       "GET /composer.json",
       "GET /console",
@@ -417,9 +422,26 @@
       "probe_reflection",
       "probe_sqli",
       "probe_xfh"
+    ],
+    "open_proof_gaps": [
+      {
+        "endpoint": "127.0.0.1/.git/HEAD",
+        "vuln_class": "disclosure",
+        "requests": 1
+      },
+      {
+        "endpoint": "127.0.0.1/debug",
+        "vuln_class": "disclosure",
+        "requests": 1
+      },
+      {
+        "endpoint": "127.0.0.1/reset",
+        "vuln_class": "xfh",
+        "requests": 1
+      }
     ]
   },
-  "transcript_chain_head": "a2d0a9743bda9d5f31569aae4ba12bb865aeefdf33ffeece2a21a6dbb0f0dc93",
+  "transcript_chain_head": "d20aa1b516810ca646e43e84da0625fac4ab97fcfbede348db39ca4d4344dc92",
   "mode": "single",
   "llm_calls": 17,
   "llm_tokens": {

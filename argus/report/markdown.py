@@ -75,9 +75,15 @@ def _tool_surface(meta: dict) -> str:
     return "all"
 
 
-def _coverage(session: Session) -> dict:
-    """What the run actually exercised - endpoints touched (method + path +
-    param names, values stripped), probe families run, requests per tool."""
+def _coverage(session: Session, findings: list | None = None) -> dict:
+    """What the run exercised, and what it looked for and did not settle.
+
+    Endpoints touched (method + path + param names, values stripped), probe
+    families run, requests per tool - and `open_proof_gaps`, which is the
+    only one of the four that is a subtraction rather than a tally. See
+    `_open_proof_gaps`: the others say what ran, and a reader of a report
+    wants to know what was looked for and came back empty.
+    """
     tools: dict[str, int] = {}
     endpoints: set[str] = set()
     probes: set[str] = set()
@@ -110,7 +116,90 @@ def _coverage(session: Session) -> dict:
                       + ("?" + "&".join(names) if names else ""))
     return {"requests_by_tool": dict(sorted(tools.items())),
             "endpoints": sorted(endpoints),
-            "probes": sorted(probes)}
+            "probes": sorted(probes),
+            "open_proof_gaps": _open_proof_gaps(entries, findings)}
+
+
+def _open_proof_gaps(entries, findings) -> list[dict]:
+    """Probes that ran and produced nothing, named rather than dropped.
+
+    Everything above this function counts what RAN: requests per tool,
+    endpoints touched, probes used. None of it answers the question a
+    reader of a report actually has, which is what was looked for and not
+    found - and the difference between "nothing was looked for" and
+    "something was looked for and came back empty" is the whole of a
+    coverage claim. The data for it was already here; nobody subtracted.
+
+    A probe run that produced no finding is not the same as a clean
+    endpoint. It is a candidate that was opened and never closed, and it
+    has exactly three honest ends: a finding, a recorded reason it is
+    ruled out, or this list. Dropping it silently is how a report comes to
+    say "6 findings" about a run where fourteen other things were tried
+    and nobody can say what happened to them.
+
+    Deliberately NOT a judgement about the target. A gap here says the
+    evidence does not settle the question, which is a statement about this
+    run - the same thing the proof matrix says when it grades `candidate`,
+    at the level of the whole engagement rather than one claim.
+    """
+    from argus.decide import PROBE_CLASS
+    from argus.proof import _endpoint_shape
+
+    def _shape(entry_or_url) -> str:
+        # `_endpoint_shape` collapses identifiers, so /api/user/1 and
+        # /api/user/3 are one endpoint. Without that, a probe that walked
+        # three ids and a finding that named one left two "gaps" that were
+        # the same endpoint already settled - the measurement inventing
+        # work rather than reporting it.
+        if isinstance(entry_or_url, dict):
+            return _endpoint_shape(entry_or_url)
+        return _endpoint_shape({"request": {"url": str(entry_or_url or "")}})
+
+    probed: dict[tuple, list] = {}
+    for e in entries:
+        if not isinstance(e, dict) or not isinstance(e.get("response"), dict):
+            continue
+        klass = PROBE_CLASS.get(str(e.get("tool") or ""))
+        if not klass:
+            continue
+        req = e.get("request")
+        if not isinstance(req, dict) or not req.get("url"):
+            continue
+        key = (_shape(e), klass)
+        if key[0]:
+            probed.setdefault(key, []).append(e)
+
+    # A finding settles every endpoint it CITES, not only the one named in
+    # its `url`. One disclosure finding covering `/.env` and `/.git/HEAD`
+    # named the first and cited both; counting only the name reported the
+    # second as unexamined, which is the opposite of true.
+    by_id = {str(e.get("id")): e for e in entries if isinstance(e, dict)}
+    settled = set()
+    for f in findings or ():
+        if not isinstance(f, dict):
+            continue
+        klass = str(f.get("vuln_class") or "")
+        if not klass:
+            continue
+        shapes = {_shape(str(f.get("url") or ""))}
+        for rid in f.get("evidence_ids") or ():
+            cited = by_id.get(str(rid))
+            if cited is not None:
+                shapes.add(_shape(cited))
+        settled |= {(sh, klass) for sh in shapes if sh}
+
+    from argus.proof import negative_settles, spec_for
+
+    gaps = []
+    for (shape, klass), runs in sorted(probed.items()):
+        if (shape, klass) in settled:
+            continue            # a finding settled it, either way
+        spec = spec_for(klass)
+        if spec is not None and negative_settles(spec, runs):
+            continue            # the matrix says this negative IS an answer
+        gaps.append({"endpoint": shape, "vuln_class": klass,
+                     "requests": len(runs)})
+    return gaps
 
 
 def _dur_text(session: Session) -> str:
@@ -235,10 +324,14 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         if isinstance(_old, dict):
             extra = {**{k: v for k, v in _old.items() if k not in _BASE},
                      **extra}
-    coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
                                      _SEV_ORDER.get(f["severity"], 99)))
+    # after `findings`, because an open gap is defined by its ABSENCE from
+    # them: a probe that ran and settled nothing. Computing coverage first
+    # would have to guess at that, and guessing is how the tally stayed a
+    # tally.
+    coverage = _coverage(session, findings)
     grades: dict[str, int] = {}
     for f in findings:
         grades[f.get("grade") or "ungraded"] = \
@@ -503,6 +596,40 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         lines.append(f"- _...and {len(coverage['endpoints']) - 80} more "
                      "(see summary.json)_")
     lines.append("")
+
+    # Everything above says what RAN. This says what was looked for and not
+    # settled, which is the half of a coverage claim a reader cannot get
+    # from a tally. A report that lists six findings and says nothing about
+    # the probes that came back empty is not describing its own coverage;
+    # it is describing its successes.
+    gaps = coverage.get("open_proof_gaps") or []
+    lines += ["", f"### Open proof gaps ({len(gaps)})", ""]
+    if not gaps:
+        lines += ["Every probe that ran either produced a finding or hit a "
+                  "class whose negative result settles it. Nothing was left "
+                  "open.", ""]
+    else:
+        lines += ["These were probed and neither proved nor ruled out. They "
+                  "are **not** clean results: a probe that found nothing is "
+                  "only evidence of absence for a class whose negative is "
+                  "conclusive, and the matrix names those explicitly "
+                  "(`ruled_out_by`). Everything else that came back empty "
+                  "is listed here rather than dropped.", "",
+                  "| Endpoint | Class | Requests | Why it is not an answer |",
+                  "|---|---|---|---|"]
+        from argus.proof import spec_for
+        for g in gaps[:60]:
+            spec = spec_for(str(g.get("vuln_class") or ""))
+            why = ("the matrix records no negative that settles this class"
+                   if spec is None or not spec.ruled_out_by
+                   else f"settled only by: {spec.ruled_out_by}")
+            lines.append(f"| {_code(str(g.get('endpoint')))} "
+                         f"| `{g.get('vuln_class')}` | {g.get('requests')} "
+                         f"| {why} |")
+        if len(gaps) > 60:
+            lines.append(f"| _...and {len(gaps) - 60} more_ | | | "
+                         "_see summary.json_ |")
+        lines.append("")
 
     lines += [
         "## Methodology",

@@ -1039,6 +1039,28 @@ def _object_refs(entry: dict) -> set[str]:
     return {r for r in refs if r}
 
 
+# The one negative that is conclusive on its own: the target refused to
+# serve the thing at all. A 404 to "is this file here" answers the
+# question; a 200 that merely looks unremarkable does not, which is why
+# this is a status rule and not a body rule.
+RULED_OUT_NOT_SERVED = "the endpoint does not serve it (401/403/404)"
+_NOT_SERVED_STATUSES = (401, 403, 404, 410)
+
+
+def negative_settles(spec: "ProofSpec", entries: list) -> bool:
+    """Whether these recorded responses rule the class out.
+
+    `entries` are the probe exchanges for one endpoint and one class. The
+    rule has to hold for ALL of them: one 404 among five 200s says the
+    target refused one path, not that the class is answered.
+    """
+    if spec.ruled_out_by != RULED_OUT_NOT_SERVED:
+        return False
+    answered = [e for e in entries if isinstance(e, dict)]
+    return bool(answered) and all(
+        status_of(e) in _NOT_SERVED_STATUSES for e in answered)
+
+
 def _ceiling_reason(spec: "ProofSpec") -> str:
     """Why a class cannot be settled here, for the verdict to carry.
 
@@ -3787,6 +3809,18 @@ class ProofSpec:
     # naming a tool is not capped - it is unequipped, and a reader of the
     # verdict should be told which.
     needs_tool: str = ""
+    # What a NEGATIVE result settles, which the matrix has never said.
+    # Every field above describes what proves the class; none describes
+    # what rules it out, and that is the half false negatives come from.
+    # A probe that ran and found nothing has three honest ends - a
+    # finding, a named reason it is ruled out, or an open gap - and with
+    # no field for the second, every empty run collapsed into silence.
+    #
+    # Empty is the conservative default and means "a negative does not
+    # settle this class": a blind sqli looks exactly like no sqli, so an
+    # unchanged response rules out nothing. Only classes whose negative is
+    # genuinely conclusive name one.
+    ruled_out_by: str = ""
     declares: str = "command"
     advisories: tuple[str, ...] = ()
     # xss, prototype pollution and crlf are proven BY the reflection, so the
@@ -3994,7 +4028,8 @@ for _s in [
               # two pages of a paginated list graded as a candidate.
               floor=("the data identifies a subject",),
               aliases=("bola", "authorization-bypass", "broken-access-control",
-                       "access-control")),
+                       "access-control"),
+              ruled_out_by=RULED_OUT_NOT_SERVED),
     ProofSpec("massassign", "a privileged field the caller sent, set on the "
               "server and shown set by a later read",
               ("a privileged field was sent and accepted",
@@ -4111,7 +4146,8 @@ for _s in [
               verify_secret_leak, floor=("a credential-shaped secret was observed",),
               # named explicitly so the rename cannot orphan it again
               aliases=("info-disclosure", "infodisclosure", "information-disclosure",
-                       "secret-exposure", "source-leak", "credential-leak")),
+                       "secret-exposure", "source-leak", "credential-leak"),
+              ruled_out_by=RULED_OUT_NOT_SERVED),
     ProofSpec("ssrf", "a callback at a collector we control carrying the probe "
               "nonce, arriving FROM THE TARGET. A difference between an "
               "internal and an external URL is the floor: it is consistent "

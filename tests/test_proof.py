@@ -5068,3 +5068,107 @@ def test_a_remote_callback_later_in_the_citation_still_counts():
         _ssrf_hit(n, "127.0.0.1", rid="r3", ts=1002.0),
         _ssrf_hit(n, "192.168.223.221", rid="r4", ts=1003.0)])
     assert v.grade == "proven", v.explain()
+
+
+# --- open proof gaps: what was looked for and not settled -------------------
+#
+# Every coverage figure argus produced was a tally of what RAN. None
+# answered what a reader of a report actually asks: what was looked for and
+# came back empty. The data was all recorded; nobody subtracted. These pin
+# the subtraction, and the three ways a probe run ends.
+
+def _probe_entry(rid, url, tool, status=200, body="nothing", ts=1.0):
+    return {"id": rid, "ts": ts, "tool": tool,
+            "request": {"method": "GET", "url": url, "headers": {}},
+            "response": {"status": status,
+                         "headers": {"content-type": "text/html"},
+                         "body": body}}
+
+
+def _gaps(entries, findings):
+    from argus.report.markdown import _open_proof_gaps
+    return _open_proof_gaps(entries, findings)
+
+
+def test_a_probe_that_found_nothing_is_a_gap_not_a_clean_result():
+    """The failure mode this exists to prevent.
+
+    A probe runs, finds nothing, and vanishes. The report then says "six
+    findings" about a run where other things were tried and nobody can say
+    what happened to them. Missing evidence is missing evidence; it is not
+    evidence of absence.
+    """
+    gaps = _gaps([_probe_entry("r1", "http://t/search?q=1", "probe_sqli")], [])
+    assert len(gaps) == 1, gaps
+    assert gaps[0]["vuln_class"] == "sqli", gaps
+
+
+def test_a_class_whose_negative_is_conclusive_is_not_a_gap():
+    """`disclosure` asks whether a path is served. A 404 answers it.
+
+    This is the half the matrix never had: every field on a ProofSpec
+    described what PROVES the class, and none described what rules it out.
+    """
+    served = [_probe_entry("r1", "http://t/.env", "probe_disclosure",
+                           status=404, body="not found")]
+    assert _gaps(served, []) == [], _gaps(served, [])
+
+
+def test_one_404_among_served_paths_does_not_settle_the_endpoint():
+    """All of them, not any of them.
+
+    One refusal among several 200s says the target declined one path, not
+    that the question is answered - and `any()` here would have read a
+    single 404 as a clean sweep.
+    """
+    mixed = [_probe_entry("r1", "http://t/a", "probe_disclosure", status=404),
+             _probe_entry("r2", "http://t/a", "probe_disclosure", status=200)]
+    assert len(_gaps(mixed, [])) == 1, _gaps(mixed, [])
+
+
+def test_a_finding_settles_every_endpoint_it_cites_not_just_its_url():
+    """Found by running it: one finding, two paths, one of them reported
+    as unexamined.
+
+    The demo's disclosure finding was titled `Exposed /.env and /.git/HEAD`
+    and cited only the `/.env` exchange. Counting the `url` alone called
+    `/.git/HEAD` a gap; counting the citation calls it settled. Both halves
+    of that turned out to be worth knowing - the title was narrowed to what
+    it cites, because a report asserting what its evidence does not carry
+    is the defect this package exists to prevent.
+    """
+    entries = [_probe_entry("r1", "http://t/.env", "probe_disclosure",
+                            body="SECRET=1"),
+               _probe_entry("r2", "http://t/.git/HEAD", "probe_disclosure",
+                            body="ref: refs/heads/main")]
+    finding = {"vuln_class": "disclosure", "url": "http://t/.env",
+               "evidence_ids": ["r1", "r2"]}
+    assert _gaps(entries, [finding]) == [], _gaps(entries, [finding])
+    # ...and citing only one leaves the other open, which is the honest read
+    narrow = {"vuln_class": "disclosure", "url": "http://t/.env",
+              "evidence_ids": ["r1"]}
+    left = _gaps(entries, [narrow])
+    assert len(left) == 1 and "/.git/HEAD" in left[0]["endpoint"], left
+
+
+def test_ids_in_a_path_do_not_split_one_endpoint_into_several_gaps():
+    """A probe walking /api/user/1..3 against a finding naming /api/user/2.
+
+    Measured: it reported two gaps that were the same endpoint, already
+    settled - the measurement inventing work rather than reporting it.
+    """
+    entries = [_probe_entry(f"r{i}", f"http://t/api/user/{i}", "probe_idor",
+                            body="{}") for i in (1, 2, 3)]
+    finding = {"vuln_class": "idor", "url": "http://t/api/user/2",
+               "evidence_ids": ["r2"]}
+    assert _gaps(entries, [finding]) == [], _gaps(entries, [finding])
+
+
+def test_only_classes_with_a_conclusive_negative_declare_one():
+    """The default is "a negative settles nothing", and it has to stay that
+    way: a blind sqli looks exactly like no sqli."""
+    named = {n for n in proof.classes() if proof.spec_for(n).ruled_out_by}
+    assert named == {"disclosure", "idor"}, sorted(named)
+    for n in ("sqli", "rce", "ssti", "xxe", "deserialize"):
+        assert not proof.spec_for(n).ruled_out_by, \
+            f"{n} claims a negative settles it - a blind instance of it does not"

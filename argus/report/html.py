@@ -161,10 +161,14 @@ def render_html(session: Session, cfg: Config, summary: str = "",
         "Every figure on this page describes an incomplete run. Findings "
         "may be missing because the run stopped, not because the target is "
         "clean.</div>") if run_error else ""
-    coverage = _coverage(session)
     findings = sorted(sanitized_findings(session.findings),
                       key=lambda f: (_GRADE_ORDER.get(f.get("grade", ""), 9),
                                      _SEV_ORDER.get(f["severity"], 99)))
+    # after `findings`, because an open gap is defined by its ABSENCE from
+    # them: a probe that ran and settled nothing. Computing coverage first
+    # would have to guess at that, and guessing is how the tally stayed a
+    # tally.
+    coverage = _coverage(session, findings)
     counts: dict[str, int] = {}
     grades: dict[str, int] = {}
     for f in findings:

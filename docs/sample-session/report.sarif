@@ -79,7 +79,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/item?id=1"
+                  "uri": "http://127.0.0.1:43673/item?id=1"
                 }
               }
             }
@@ -125,7 +125,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/ping?host=127.0.0.1"
+                  "uri": "http://127.0.0.1:43673/ping?host=127.0.0.1"
                 }
               }
             }
@@ -169,7 +169,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/api/me"
+                  "uri": "http://127.0.0.1:43673/api/me"
                 }
               }
             }
@@ -215,7 +215,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/api/user/2"
+                  "uri": "http://127.0.0.1:43673/api/user/2"
                 }
               }
             }
@@ -254,13 +254,13 @@
           "level": "warning",
           "rank": 5.5,
           "message": {
-            "text": "Exposed /.env and /.git/HEAD at web root - Sensitive paths are served publicly - credentials and source-control metadata leak to anyone."
+            "text": "Exposed /.env at web root - Sensitive paths are served publicly - credentials and source-control metadata leak to anyone."
           },
           "locations": [
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/.env"
+                  "uri": "http://127.0.0.1:43673/.env"
                 }
               }
             }
@@ -304,7 +304,7 @@
             {
               "physicalLocation": {
                 "artifactLocation": {
-                  "uri": "http://127.0.0.1:44939/search?q=x"
+                  "uri": "http://127.0.0.1:43673/search?q=x"
                 }
               }
             }
@@ -342,7 +342,7 @@
       "invocations": [
         {
           "executionSuccessful": true,
-          "startTimeUtc": "2026-11-16T03:18:17Z"
+          "startTimeUtc": "2026-11-16T09:32:07Z"
         }
       ]
     }

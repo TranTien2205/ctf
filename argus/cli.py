@@ -1346,7 +1346,15 @@ def _demo(args) -> int:
         {"tool_calls": [_t(8, "probe_disclosure", url=base)],
          "text": "Sensitive-artifact sweep before finishing."},
         {"tool_calls": [_t(9, "record_finding",
-                         title="Exposed /.env and /.git/HEAD at web root",
+                         # Only `/.env` is cited, so only `/.env` is
+                         # claimed. The title used to name `/.git/HEAD`
+                         # too, and the exchange showing it 200 was never
+                         # cited - a report asserting something its own
+                         # evidence did not carry, in the session this
+                         # package ships as its example. The open-proof-gap
+                         # list found it, and `/.git/HEAD` belongs there
+                         # until something cites it.
+                         title="Exposed /.env at web root",
                          severity="medium", category="info-disclosure",
                          url=base + "/.env",
                          evidence_excerpt="SECRET_KEY=lab-secret-0123",
@@ -1582,8 +1590,7 @@ def _demo_team(cfg, base, _t, args, ScriptedClient,
             _team_idor_finding,
             {"tool_calls": [_t("e8", "probe_disclosure", url=base)]},
             {"tool_calls": [_t("e9", "record_finding",
-                              title="Exposed /.env and /.git/HEAD at web "
-                                    "root",
+                              title="Exposed /.env at web root",
                               severity="medium", category="info-disclosure",
                               url=base + "/.env",
                               evidence_excerpt="SECRET_KEY=lab-secret-0123",
