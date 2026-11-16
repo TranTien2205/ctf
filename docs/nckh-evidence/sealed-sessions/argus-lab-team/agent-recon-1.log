@@ -1,0 +1,11 @@
+[01:50:41] session 20261116-015041-192.168.223.221 -> http://192.168.223.221:8777
+[01:50:41] agent: Mapping stack and surface for the exploit workers.
+[01:50:41] tool fingerprint {"url": "http://192.168.223.221:8777"}
+[01:50:42]   -> {"result": {"request_id": "r1", "status": 200, "headers": {"server": "LabVuln/1.0 Python/3.10.12", "date": "Mon, 16 Nov 2026 06:50:42 GMT", "content-type": "text/html; charset=utf-8", "x-powered-by": "LabVuln/1.0", "content-length": "599"}, "stack_hints": ["server: LabVuln/1.0 Python/3.10.12", "x-po
+[01:50:42] tool crawl {"url": "http://192.168.223.221:8777", "depth": 1, "max_pages": 10}
+[01:50:42]   -> {"result": {"pages_crawled": 7, "pages": [{"url": "http://192.168.223.221:8777", "status": 200, "depth": 0, "request_id": "r8", "params": [], "title": "LabShop"}, {"url": "http://192.168.223.221:8777/item?id=1", "status": 200, "depth": 1, "request_id": "r10", "params": ["id"], "title": ""}, {"url": 
+[01:50:42] tool note {"text": "Python http.server lab; /item, /search, /api/user exposed."}
+[01:50:42]   -> {"result": {"ok": true}}
+[01:50:42] tool finish {"summary": "Surface mapped; leads seeded."}
+[01:50:42]   -> {"result": {"finished": true, "stats": {"requests": 20, "findings": 0, "elapsed_s": 0.5}}}
+[01:50:42] done in 2 turns; findings=0

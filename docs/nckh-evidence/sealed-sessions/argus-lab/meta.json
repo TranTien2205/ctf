@@ -1,0 +1,19 @@
+{
+  "id": "20261116-015037-192.168.223.221",
+  "target": "http://192.168.223.221:8777",
+  "started": 1794811837.4569588,
+  "argus_version": "1.0.0",
+  "model": "scripted-demo",
+  "goal": "",
+  "operator": "",
+  "scope": [],
+  "max_turns": 16,
+  "max_requests": 400,
+  "rate_rps": 0,
+  "exclude_paths": [],
+  "proxy": false,
+  "tls_verify": false,
+  "tools": "all",
+  "require_proof": false,
+  "chain_keyed": false
+}

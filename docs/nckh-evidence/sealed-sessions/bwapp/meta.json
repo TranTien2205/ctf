@@ -1,0 +1,9 @@
+{
+  "id": "20261116-015301-192.168.223.221",
+  "target": "http://192.168.223.221:8080",
+  "started": 1794811981.9511654,
+  "argus_version": "1.0.0",
+  "model": "probe-driver",
+  "target_app": "bwapp",
+  "note": "endpoints named by the operator; probes, grading and report by argus"
+}

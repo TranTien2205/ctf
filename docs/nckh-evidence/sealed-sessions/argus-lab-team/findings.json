@@ -1,0 +1,337 @@
+[
+  {
+    "id": "F01",
+    "title": "SQL injection in /item id parameter",
+    "severity": "critical",
+    "category": "sqli",
+    "url": "http://192.168.223.221:8777/item?id=1",
+    "evidence_ids": [
+      "r2",
+      "r3",
+      "r25"
+    ],
+    "evidence_excerpt": "admin - $s3cr3t-admin-pw",
+    "vuln_class": "sqli",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "sqli",
+      "grade": "proven",
+      "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r25"
+        },
+        {
+          "check": "data store fingerprinted",
+          "ok": true,
+          "detail": "sqlite3.OperationalError in r3"
+        },
+        {
+          "check": "the query named its target",
+          "ok": true,
+          "detail": "users in r25"
+        },
+        {
+          "check": "the rows are not what the page serves anyway",
+          "ok": true,
+          "detail": "admin - $s3cr3t-admin-pw in r25 and in no control"
+        },
+        {
+          "check": "rows returned, not an error message",
+          "ok": true,
+          "detail": "quoted from r25"
+        },
+        {
+          "check": "extraction stayed minimal",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    "description": "id is interpolated into the query; a UNION read limited to five rows returns users.username and users.password.",
+    "remediation": "Use parameterized queries.",
+    "ts": 1794811842.614,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-89",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F02",
+    "title": "OS command injection in /ping host parameter",
+    "severity": "critical",
+    "category": "rce",
+    "url": "http://192.168.223.221:8777/ping?host=127.0.0.1",
+    "evidence_ids": [
+      "r28"
+    ],
+    "evidence_excerpt": "uid=1000(lab)",
+    "vuln_class": "rce",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "rce",
+      "grade": "proven",
+      "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r28"
+        },
+        {
+          "check": "a benign command was sent",
+          "ok": true,
+          "detail": "exchange r28"
+        },
+        {
+          "check": "identity output returned by the target",
+          "ok": true,
+          "detail": "'uid=1000(lab)' in r28"
+        },
+        {
+          "check": "the quoted bytes are the command output",
+          "ok": true,
+          "detail": "'uid=1000(lab)' carries the identity line"
+        },
+        {
+          "check": "the probe nonce came back in the output",
+          "ok": true,
+          "detail": "'argus9nqzg1rk' in r28"
+        },
+        {
+          "check": "proof command stayed benign",
+          "ok": true,
+          "detail": ""
+        }
+      ]
+    },
+    "description": "`id; echo <nonce>` returns the server's identity line and the nonce - computed by the target.",
+    "remediation": "Exec with an argv list; validate the host.",
+    "ts": 1794811842.774,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-78",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F03",
+    "title": "Reflected XSS in /search q parameter",
+    "severity": "medium",
+    "category": "xss",
+    "url": "http://192.168.223.221:8777/search?q=x",
+    "evidence_ids": [
+      "r29"
+    ],
+    "evidence_excerpt": "<>'\"&=/",
+    "vuln_class": "xss",
+    "grade": "candidate",
+    "proof": {
+      "vuln_class": "xss",
+      "grade": "candidate",
+      "requirement": "a headless browser executing the payload and reporting the probe nonce",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "payload reflected unencoded into HTML",
+          "ok": true,
+          "detail": "'<>\"\\'' survived into r29"
+        },
+        {
+          "check": "a real browser executed it",
+          "ok": false,
+          "detail": "this system has no browser, so execution is not provable here. Drive one over mcp_call and cite the nonce it reports, or leave this a candidate and say so in the report"
+        }
+      ],
+      "missing": [
+        "a real browser executed it"
+      ]
+    },
+    "description": "Canary chars reflect unescaped in html context.",
+    "remediation": "Output-encode by context; add CSP.",
+    "ts": 1794811842.832,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+    "cwe": "CWE-79",
+    "owasp": "A03 Injection"
+  },
+  {
+    "id": "F04",
+    "title": "IDOR: /api/user/<id> serves any user",
+    "severity": "high",
+    "category": "idor",
+    "url": "http://192.168.223.221:8777/api/user/2",
+    "evidence_ids": [
+      "r30",
+      "r32"
+    ],
+    "evidence_excerpt": "\"username\": \"admin\"",
+    "vuln_class": "idor",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "idor",
+      "grade": "proven",
+      "requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r32"
+        },
+        {
+          "check": "two distinct object references on one endpoint",
+          "ok": true,
+          "detail": "['2'] vs ['1'] on 192.168.223.221/api/user/{id}"
+        },
+        {
+          "check": "another subject's data returned",
+          "ok": true,
+          "detail": "present in r32, absent from r30"
+        },
+        {
+          "check": "the data identifies a subject",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the caller was not entitled to it",
+          "ok": true,
+          "detail": "no credential was presented and subject data came back"
+        }
+      ]
+    },
+    "description": "Reading id 2 returns alice, reading id 1 returns the admin record, with no credential telling the two requests apart.",
+    "remediation": "Enforce per-object ownership checks.",
+    "ts": 1794811843.03,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-639",
+    "owasp": "A01 Broken Access Control"
+  },
+  {
+    "id": "F05",
+    "title": "Exposed /.env and /.git/HEAD at web root",
+    "severity": "medium",
+    "category": "info-disclosure",
+    "url": "http://192.168.223.221:8777/.env",
+    "evidence_ids": [
+      "r37"
+    ],
+    "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
+    "vuln_class": "disclosure",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "disclosure",
+      "grade": "proven",
+      "requirement": "the credential or source observed in a response, quoted as the bytes that leaked",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r37"
+        },
+        {
+          "check": "a credential-shaped secret was observed",
+          "ok": true,
+          "detail": "SECRET_KEY=lab-secret-01..."
+        },
+        {
+          "check": "it came from a response, not from the request",
+          "ok": true,
+          "detail": "in r37"
+        }
+      ]
+    },
+    "description": "Sensitive paths served publicly - credentials and VCS metadata leak.",
+    "remediation": "Deny dotfile/VCS paths; rotate exposed secrets.",
+    "ts": 1794811844.903,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+    "cwe": "CWE-200",
+    "owasp": "A01 Broken Access Control"
+  },
+  {
+    "id": "F06",
+    "title": "JWT weak secret: forged admin token accepted",
+    "severity": "critical",
+    "category": "jwt",
+    "url": "http://192.168.223.221:8777/api/me",
+    "evidence_ids": [
+      "r75",
+      "r74",
+      "r73"
+    ],
+    "evidence_excerpt": "\"role\": \"admin\"",
+    "vuln_class": "jwt",
+    "grade": "proven",
+    "proof": {
+      "vuln_class": "jwt",
+      "grade": "proven",
+      "requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint",
+      "checks": [
+        {
+          "check": "proof read from the wire",
+          "ok": true,
+          "detail": ""
+        },
+        {
+          "check": "the target produced the quoted bytes",
+          "ok": true,
+          "detail": "from r74"
+        },
+        {
+          "check": "this system minted the credential",
+          "ok": true,
+          "detail": "jwt_forge r73 set ['role', 'user'], echoed 'admin', and r74 carried that token"
+        },
+        {
+          "check": "a forged credential was accepted",
+          "ok": true,
+          "detail": "192.168.223.221/api/me returned 200 with a credential"
+        },
+        {
+          "check": "the same endpoint refuses another credential",
+          "ok": true,
+          "detail": "192.168.223.221/api/me answered 401 to a credentialed request"
+        }
+      ]
+    },
+    "description": "The secret 'secret123' is dictionary-weak: a forged admin token is accepted, while the same request with a broken signature is refused 401.",
+    "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
+    "ts": 1794811845.057,
+    "agent": "exploit-1",
+    "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+    "cwe": "CWE-347",
+    "owasp": "A02 Cryptographic Failures"
+  }
+]

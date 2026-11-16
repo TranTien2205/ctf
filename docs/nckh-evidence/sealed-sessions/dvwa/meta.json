@@ -1,0 +1,9 @@
+{
+  "id": "20261116-015058-192.168.223.221",
+  "target": "http://192.168.223.221:8081",
+  "started": 1794811858.8226292,
+  "argus_version": "1.0.0",
+  "model": "probe-driver",
+  "target_app": "dvwa",
+  "note": "endpoints named by the operator; probes, grading and report by argus"
+}

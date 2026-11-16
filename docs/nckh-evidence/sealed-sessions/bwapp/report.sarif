@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Argus",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/TranTien2205/ctf",
+          "rules": [
+            {
+              "id": "CWE-89",
+              "name": "sqli",
+              "shortDescription": {
+                "text": "sqli"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html"
+            },
+            {
+              "id": "CWE-78",
+              "name": "rce",
+              "shortDescription": {
+                "text": "rce"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/78.html"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-89",
+          "kind": "fail",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "SQL injection in sqli_1.php title parameter - SQL injection via the `title` parameter: the engine names itself and a bounded UNION read returns rows from `users`."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8080"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F01",
+            "argus/category": "sqli"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "sqli",
+            "argus-proof-requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "",
+            "cwe": "CWE-89",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r1",
+              "r2",
+              "r3",
+              "r4",
+              "r5",
+              "r6",
+              "r7",
+              "r8",
+              "r9",
+              "r10",
+              "r11",
+              "r12",
+              "r13",
+              "r14",
+              "r15",
+              "r16",
+              "r17",
+              "r18",
+              "r19",
+              "r20"
+            ],
+            "evidence_excerpt": "6885858486f31043e5839c735d99457f045affd0",
+            "remediation": "Use parameterised queries.",
+            "agent": "agent"
+          }
+        },
+        {
+          "ruleId": "CWE-78",
+          "kind": "fail",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "OS command injection in commandi.php target parameter - The `target` field reaches a shell: `id` output came back with this probe's own nonce."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8080"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F02",
+            "argus/category": "rce"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "rce",
+            "argus-proof-requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "",
+            "cwe": "CWE-78",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r21",
+              "r22",
+              "r23"
+            ],
+            "evidence_excerpt": "uid=33(www-data)",
+            "remediation": "Never pass request values to a shell.",
+            "agent": "agent"
+          }
+        }
+      ],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "startTimeUtc": "2026-11-16T06:53:01Z"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,182 @@
+{
+  "session": "20261116-015058-192.168.223.221",
+  "argus_version": "1.0.0",
+  "findings": [
+    {
+      "id": "F01",
+      "title": "SQL injection in /vulnerabilities/sqli id parameter",
+      "severity": "critical",
+      "category": "sqli",
+      "url": "http://192.168.223.221:8081",
+      "evidence_ids": [
+        "r1",
+        "r2",
+        "r3",
+        "r4",
+        "r5",
+        "r6",
+        "r7",
+        "r8",
+        "r9",
+        "r10",
+        "r11",
+        "r12",
+        "r13",
+        "r14",
+        "r15"
+      ],
+      "evidence_excerpt": "5f4dcc3b5aa765d61d8327deb882cf99",
+      "vuln_class": "sqli",
+      "grade": "proven",
+      "proof": {
+        "vuln_class": "sqli",
+        "grade": "proven",
+        "requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+        "checks": [
+          {
+            "check": "proof read from the wire",
+            "ok": true,
+            "detail": ""
+          },
+          {
+            "check": "the target produced the quoted bytes",
+            "ok": true,
+            "detail": "from r15"
+          },
+          {
+            "check": "data store fingerprinted",
+            "ok": true,
+            "detail": "You have an error in your SQL syntax in r2"
+          },
+          {
+            "check": "the query named its target",
+            "ok": true,
+            "detail": "users in r15"
+          },
+          {
+            "check": "the rows are not what the page serves anyway",
+            "ok": true,
+            "detail": "5f4dcc3b5aa765d61d8327deb882cf99 in r15 and in no control"
+          },
+          {
+            "check": "rows returned, not an error message",
+            "ok": true,
+            "detail": "quoted from r15"
+          },
+          {
+            "check": "extraction stayed minimal",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "missing": []
+      },
+      "description": "SQL injection via the `id` parameter: the DBMS names itself in the error channel and a bounded UNION read returns rows from `users`.",
+      "remediation": "Use parameterised queries; never concatenate request values into SQL.",
+      "ts": 1794811970.7,
+      "agent": "agent",
+      "cwe": "CWE-89",
+      "owasp": "A03 Injection",
+      "cvss": ""
+    },
+    {
+      "id": "F02",
+      "title": "OS command injection in /vulnerabilities/exec ip parameter",
+      "severity": "critical",
+      "category": "rce",
+      "url": "http://192.168.223.221:8081",
+      "evidence_ids": [
+        "r16",
+        "r17",
+        "r18"
+      ],
+      "evidence_excerpt": "uid=33(www-data)",
+      "vuln_class": "rce",
+      "grade": "proven",
+      "proof": {
+        "vuln_class": "rce",
+        "grade": "proven",
+        "requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+        "checks": [
+          {
+            "check": "proof read from the wire",
+            "ok": true,
+            "detail": ""
+          },
+          {
+            "check": "the target produced the quoted bytes",
+            "ok": true,
+            "detail": "from r18"
+          },
+          {
+            "check": "a benign command was sent",
+            "ok": true,
+            "detail": "exchange r18"
+          },
+          {
+            "check": "identity output returned by the target",
+            "ok": true,
+            "detail": "'uid=33(www-data)' in r18"
+          },
+          {
+            "check": "the quoted bytes are the command output",
+            "ok": true,
+            "detail": "'uid=33(www-data)' carries the identity line"
+          },
+          {
+            "check": "the probe nonce came back in the output",
+            "ok": true,
+            "detail": "'arguspaobml3w' in r18"
+          },
+          {
+            "check": "proof command stayed benign",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "missing": []
+      },
+      "description": "The `ip` field reaches a shell: `id` output came back with this probe's own nonce, proving execution rather than reflection.",
+      "remediation": "Never pass request values to a shell; use argv and an allowlist.",
+      "ts": 1794811981.929,
+      "agent": "agent",
+      "cwe": "CWE-78",
+      "owasp": "A03 Injection",
+      "cvss": ""
+    }
+  ],
+  "counts": {
+    "critical": 2
+  },
+  "grades": {
+    "proven": 2
+  },
+  "agent_summary": "Probe-driven run: the operator named the endpoints; the probes, the evidence gate and this report are the system's own.",
+  "requests": 18,
+  "duration_s": 123.1,
+  "time_to_first_finding_s": 111.9,
+  "coverage": {
+    "requests_by_tool": {
+      "probe_cmdi": 3,
+      "probe_sqli": 15
+    },
+    "endpoints": [
+      "GET /vulnerabilities/sqli/?Submit&id",
+      "POST /vulnerabilities/exec/"
+    ],
+    "probes": [
+      "probe_cmdi",
+      "probe_sqli"
+    ]
+  },
+  "transcript_chain_head": "e24aa0a9aa3fbf5582f3b45f0cb3428e51f240e8d853c0ee38f57d998d2007b0",
+  "sealed": [
+    "findings.json",
+    "meta.json",
+    "notes.md",
+    "report.html",
+    "report.md",
+    "report.sarif",
+    "summary.json"
+  ]
+}

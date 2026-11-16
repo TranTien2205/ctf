@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Argus",
+          "version": "1.0.0",
+          "informationUri": "https://github.com/TranTien2205/ctf",
+          "rules": [
+            {
+              "id": "CWE-89",
+              "name": "sqli",
+              "shortDescription": {
+                "text": "sqli"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/89.html"
+            },
+            {
+              "id": "CWE-78",
+              "name": "rce",
+              "shortDescription": {
+                "text": "rce"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/78.html"
+            },
+            {
+              "id": "CWE-347",
+              "name": "jwt",
+              "shortDescription": {
+                "text": "jwt"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/347.html"
+            },
+            {
+              "id": "CWE-639",
+              "name": "idor",
+              "shortDescription": {
+                "text": "idor"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/639.html"
+            },
+            {
+              "id": "CWE-200",
+              "name": "info-disclosure",
+              "shortDescription": {
+                "text": "info-disclosure"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/200.html"
+            },
+            {
+              "id": "CWE-79",
+              "name": "xss",
+              "shortDescription": {
+                "text": "xss"
+              },
+              "properties": {},
+              "helpUri": "https://cwe.mitre.org/data/definitions/79.html"
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "CWE-89",
+          "kind": "fail",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "SQL injection in /item id parameter - id is interpolated into the query; a UNION read limited to five rows returns users.username and users.password."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/item?id=1"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F01",
+            "argus/category": "sqli"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "sqli",
+            "argus-proof-requirement": "the DBMS fingerprint plus at least one row from a named table, bounded to what proves the read",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+            "cwe": "CWE-89",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r2",
+              "r3",
+              "r25"
+            ],
+            "evidence_excerpt": "admin - $s3cr3t-admin-pw",
+            "remediation": "Use parameterized queries.",
+            "agent": "exploit-1"
+          }
+        },
+        {
+          "ruleId": "CWE-78",
+          "kind": "fail",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "OS command injection in /ping host parameter - `id; echo <nonce>` returns the server's identity line and the nonce - computed by the target."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/ping?host=127.0.0.1"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F02",
+            "argus/category": "rce"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "rce",
+            "argus-proof-requirement": "the output of `id; echo <nonce>` returned by the target, with the nonce tying the output to the probe",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+            "cwe": "CWE-78",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r28"
+            ],
+            "evidence_excerpt": "uid=1000(lab)",
+            "remediation": "Exec with an argv list; validate the host.",
+            "agent": "exploit-1"
+          }
+        },
+        {
+          "ruleId": "CWE-347",
+          "kind": "fail",
+          "level": "error",
+          "rank": 9.5,
+          "message": {
+            "text": "JWT weak secret: forged admin token accepted - The secret 'secret123' is dictionary-weak: a forged admin token is accepted, while the same request with a broken signature is refused 401."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/api/me"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F06",
+            "argus/category": "jwt"
+          },
+          "properties": {
+            "argus-severity": "critical",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "jwt",
+            "argus-proof-requirement": "a credential this system minted, accepted on a privileged resource with its claims echoed back, and another credential refused on the same endpoint",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+            "cwe": "CWE-347",
+            "owasp": "A02 Cryptographic Failures",
+            "evidence_ids": [
+              "r75",
+              "r74",
+              "r73"
+            ],
+            "evidence_excerpt": "\"role\": \"admin\"",
+            "remediation": "Rotate to a high-entropy secret; prefer asymmetric signing.",
+            "agent": "exploit-1"
+          }
+        },
+        {
+          "ruleId": "CWE-639",
+          "kind": "fail",
+          "level": "error",
+          "rank": 8.0,
+          "message": {
+            "text": "IDOR: /api/user/<id> serves any user - Reading id 2 returns alice, reading id 1 returns the admin record, with no credential telling the two requests apart."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/api/user/2"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F04",
+            "argus/category": "idor"
+          },
+          "properties": {
+            "argus-severity": "high",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "idor",
+            "argus-proof-requirement": "one actor reaching another's subject on the same endpoint, with subject-identifying data and nothing entitling the caller to it",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "cwe": "CWE-639",
+            "owasp": "A01 Broken Access Control",
+            "evidence_ids": [
+              "r30",
+              "r32"
+            ],
+            "evidence_excerpt": "\"username\": \"admin\"",
+            "remediation": "Enforce per-object ownership checks.",
+            "agent": "exploit-1"
+          }
+        },
+        {
+          "ruleId": "CWE-200",
+          "kind": "fail",
+          "level": "warning",
+          "rank": 5.5,
+          "message": {
+            "text": "Exposed /.env and /.git/HEAD at web root - Sensitive paths served publicly - credentials and VCS metadata leak."
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/.env"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F05",
+            "argus/category": "info-disclosure"
+          },
+          "properties": {
+            "argus-severity": "medium",
+            "argus-grade": "proven",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "disclosure",
+            "argus-proof-requirement": "the credential or source observed in a response, quoted as the bytes that leaked",
+            "argus-proof-missing": [],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+            "cwe": "CWE-200",
+            "owasp": "A01 Broken Access Control",
+            "evidence_ids": [
+              "r37"
+            ],
+            "evidence_excerpt": "SECRET_KEY=lab-secret-0123",
+            "remediation": "Deny dotfile/VCS paths; rotate exposed secrets.",
+            "agent": "exploit-1"
+          }
+        },
+        {
+          "ruleId": "CWE-79",
+          "kind": "review",
+          "level": "none",
+          "rank": -1.0,
+          "message": {
+            "text": "[CANDIDATE] Reflected XSS in /search q parameter - Canary chars reflect unescaped in html context. [unmet proof checks: a real browser executed it]"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "http://192.168.223.221:8777/search?q=x"
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "argus/finding": "F03",
+            "argus/category": "xss"
+          },
+          "properties": {
+            "argus-severity": "medium",
+            "argus-grade": "candidate",
+            "argus-disputed": false,
+            "argus-judge-model": "",
+            "argus-judge-reason": "",
+            "argus-class-disputed": "",
+            "argus-severity-claimed": "",
+            "argus-vuln-class": "xss",
+            "argus-proof-requirement": "a headless browser executing the payload and reporting the probe nonce",
+            "argus-proof-missing": [
+              "a real browser executed it"
+            ],
+            "argus-proof-advisories": [],
+            "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N",
+            "cwe": "CWE-79",
+            "owasp": "A03 Injection",
+            "evidence_ids": [
+              "r29"
+            ],
+            "evidence_excerpt": "<>'\"&=/",
+            "remediation": "Output-encode by context; add CSP.",
+            "agent": "exploit-1"
+          }
+        }
+      ],
+      "invocations": [
+        {
+          "executionSuccessful": true,
+          "startTimeUtc": "2026-11-16T06:50:41Z"
+        }
+      ]
+    }
+  ]
+}

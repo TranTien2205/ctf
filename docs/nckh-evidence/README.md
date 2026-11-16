@@ -29,23 +29,30 @@ Phạm vi và uỷ quyền: `AUTHORIZATION.txt`.
 
 ## Hồ sơ niêm phong — kiểm tra lại được
 
-`sessions/` giữ bốn hồ sơ phiên hoàn chỉnh. Mỗi hồ sơ có transcript băm chuỗi,
+`sealed-sessions/` giữ bốn hồ sơ phiên hoàn chỉnh. Mỗi hồ sơ có transcript băm chuỗi,
 findings kèm khối `proof` liệt kê từng điều kiện, và báo cáo ở ba định dạng.
 Kiểm tra lại bất kỳ hồ sơ nào:
 
 ```bash
-python -m argus verify docs/nckh-evidence/sessions/dvwa
+python -m argus verify docs/nckh-evidence/sealed-sessions/dvwa
 ```
 
 Lệnh này đi lại cả chuỗi băm **và chấm lại từng finding**: nếu ai sửa một byte
 trong transcript, hoặc tự nâng `grade` trong `findings.json`, nó báo `TAMPERED`.
 
+Cả bốn hồ sơ ở đây đã được **tạo lại** sau khi các lỗi ở mục 4 của `RESULTS.md`
+được sửa. Bản tạo trước đó báo `TAMPERED` ngay khi luật siết lại — cụ thể là
+`F01 claims grade 'proven' but its cited evidence supports 'candidate'`. Đó
+chính là tính chất mà mục 3.4 của báo cáo nêu: bằng chứng cũ không được miễn
+trừ khi tiêu chuẩn chặt hơn, và nó áp cả vào hồ sơ của chính dự án. Nếu sau này
+cổng chứng minh lại siết thêm, các hồ sơ này cũng phải tạo lại chứ không sửa tay.
+
 | Hồ sơ | Nội dung |
 |---|---|
-| `sessions/argus-lab/` | 6 finding / 64 request, chế độ một agent |
-| `sessions/argus-lab-team/` | 6 finding / 74 request, chế độ lead + worker |
-| `sessions/dvwa/` | SQLi và command injection trên DVWA, cả hai `proven` |
-| `sessions/bwapp/` | SQLi và command injection trên bWAPP, cả hai `proven` |
+| `sealed-sessions/argus-lab/` | 6 finding / 64 request, chế độ một agent |
+| `sealed-sessions/argus-lab-team/` | 6 finding / 74 request, chế độ lead + worker |
+| `sealed-sessions/dvwa/` | SQLi và command injection trên DVWA, cả hai `proven` |
+| `sealed-sessions/bwapp/` | SQLi và command injection trên bWAPP, cả hai `proven` |
 
 ## Script đo — chạy lại được
 
