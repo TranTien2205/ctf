@@ -4249,13 +4249,34 @@ SPACE by `req_text`'s own `unquote_plus`, so the operator vanished. The real
 probe sends `%2B` and the recorded text is right; the test builds its URLs
 with `urlencode` now and says why.
 
-Not triaged, recorded with their shapes: the sweep's remaining claims
-against `probe_xxe` (an SSRF-via-XXE payload asking for a URL rather than a
-file), `probe_idor` (an object id shifted in a POST body rather than the
-URL), `probe_lockout` (the credential-field pattern and the series floor),
-`probe_smuggle` (the TE.CL veto), `probe_disclosure` (`/.git/HEAD` and
-`/debug` against a floor that wants a credential-shaped secret) and
-`probe_ppoll`/`probe_cache` (the unkeyed-input floor).
+All of the sweep's remaining claims have since been triaged by hand. Four
+were real and are fixed in the commits that follow - `probe_idor`'s body
+mode, `probe_lockout`'s series floor and credential-field pattern, and the
+two template families. **Six were refuted by measurement**, and the pattern
+in how they were wrong is worth more than the claims were:
+
+- `probe_xxe`: the SSRF-via-XXE payload asks for a URL, not a file, so the
+  `xxe` gate correctly does not see it - and the probe's own run grades
+  `proven` anyway on the file-read marker it scored. The SSRF direction is
+  capped at `candidate` by a recorded decision (`cap_reason: no
+  out-of-band collector the target can reach`).
+- `probe_disclosure`: `/.git/HEAD` is not a credential, which is the class
+  floor working as designed; the probe's run grades `proven` on `/.env`.
+- `probe_smuggle` and `probe_ppoll`: both grade `proven` on their own runs.
+- `probe_cache`: graded `proven` by its own row all along. My measurement
+  helper did not offer the quote the class needs, which
+  `tests/test_probe_matrix_agreement.py` already documents - "`ppoll` and
+  `cache` both reach `proven` on `<marker>` and `unproven` on the line
+  containing it".
+
+Every one of those six was a true observation about a PAYLOAD with no
+consequence for the CLASS. The sweep asked "can this payload satisfy the
+gate?" when the question that decides a defect is "can the probe's own run
+reach the class ceiling?" - a payload the gate cannot see only matters when
+no other route in the same run carries the proof. The three
+`SERIALIZED_RE` claims noted above failed the same way, in the other
+direction: they read "the lab does not EXECUTE this payload" as "the gate
+cannot SEE it".
 
 ### The probe could be asked for fewer attempts than its class accepts
 `probe_lockout` clamped `tries` with `_ival(tries, 10, 3, 15)` while
