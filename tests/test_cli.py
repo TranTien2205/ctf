@@ -697,3 +697,44 @@ def test_by_arm_will_not_median_a_token_figure_only_some_trials_have(
     out2 = capsys.readouterr().out
     calls = next(ln for ln in out2.splitlines() if ln.startswith("llm calls"))
     assert "4" in calls, calls
+
+def test_demo_runs_against_a_target_someone_else_started(tmp_path):
+    """`argus demo --target` is how the pipeline gets demonstrated remotely.
+
+    Without it the demo always stood up its own loopback lab, so there was
+    no way to record the pipeline working against a SEPARATE machine - which
+    is what the evaluation evidence needs. Driven here against a lab this
+    test starts itself: the session's recorded target has to be the one
+    passed in, not a locally spawned one.
+    """
+    import threading
+    import vulnapp
+    from argus import cli
+
+    srv = vulnapp.make_server(0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}"
+    try:
+        rc = cli.main(["demo", "--target", base, "--quiet",
+                       "--session-dir", str(tmp_path)])
+    finally:
+        srv.shutdown()
+    assert rc == 0
+    sessions = [p for p in tmp_path.iterdir() if p.is_dir()]
+    assert len(sessions) == 1, sessions
+    meta = json.loads((sessions[0] / "meta.json").read_text(encoding="utf-8"))
+    assert meta["target"] == base, meta["target"]
+    findings = json.loads(
+        (sessions[0] / "findings.json").read_text(encoding="utf-8"))
+    assert [f for f in findings if f["vuln_class"] == "rce"
+            and f["grade"] == "proven"], "no proven rce against the target"
+
+
+def test_demo_says_so_when_the_target_is_not_reachable(tmp_path, capsys):
+    """An unreachable `--target` is an operator error, not a traceback."""
+    from argus import cli
+
+    rc = cli.main(["demo", "--target", "http://127.0.0.1:1", "--quiet",
+                   "--session-dir", str(tmp_path)])
+    assert rc == 2
+    assert "cannot reach" in capsys.readouterr().err

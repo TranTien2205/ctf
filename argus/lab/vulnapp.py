@@ -1427,7 +1427,7 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
         self.wfile.write(body.encode())
 
 
-def make_server(port: int = 0, workdir: str = ""):
+def make_server(port: int = 0, workdir: str = "", host: str = "127.0.0.1"):
     global WWW, FAKEFS
     root = workdir or tempfile.mkdtemp(prefix="argus-lab-")
     WWW = os.path.join(root, "www")
@@ -1453,7 +1453,22 @@ def make_server(port: int = 0, workdir: str = ""):
     with open(os.path.join(FAKEFS, "etc", "passwd"), "w") as fh:
         fh.write("root:x:0:0:root:/root:/bin/bash\n"
                  "daemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n")
-    srv = _LabServer(("127.0.0.1", port), Handler)
+    # The default stays loopback, which is what every test and the whole
+    # CI matrix wants: a deliberately vulnerable app with a command
+    # executor should not be reachable by accident.
+    #
+    # `host` exists because the evaluation chapter needs the lab on a
+    # SEPARATE machine - an agent attacking 127.0.0.1 and an agent
+    # attacking another host are the same code path, but only the second
+    # one is evidence that the system works over a network. Pass an
+    # interface address deliberately, on a lab network you control.
+    #
+    # What is exposed when you do: the injectable `/ping` runs argv
+    # through `_EXEC_ALLOW` (id, whoami, uname, hostname, pwd, echo, and
+    # `cat` confined to a fake tree by `_within_root`), never through a
+    # shell, with a 3-second timeout and at most `_EXEC_MAX_SEGMENTS`
+    # commands per request. That is the whole of the "RCE".
+    srv = _LabServer((host, port), Handler)
     return srv
 
 
@@ -1471,8 +1486,11 @@ class _LabServer(ThreadingHTTPServer):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
-    srv = make_server(port)
-    print(f"lab vulnerable app on http://127.0.0.1:{srv.server_address[1]}")
+    # second argument: the interface to bind. Loopback unless asked.
+    host = sys.argv[2] if len(sys.argv) > 2 else "127.0.0.1"
+    srv = make_server(port, host=host)
+    print(f"lab vulnerable app on http://{srv.server_address[0]}:"
+          f"{srv.server_address[1]}", flush=True)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

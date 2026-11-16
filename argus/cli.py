@@ -231,6 +231,11 @@ def main(argv: list[str] | None = None) -> int:
     p_demo.add_argument("--team", action="store_true",
                         help="run the demo through the lead/worker pipeline")
     p_demo.add_argument("--quiet", action="store_true")
+    p_demo.add_argument("--target", default="",
+                        help="run against an ALREADY RUNNING lab at this URL "
+                             "instead of starting a local one - for "
+                             "demonstrating against a separate machine "
+                             "(python -m argus.lab.vulnapp PORT BIND there)")
 
     args = parser.parse_args(argv)
 
@@ -1156,9 +1161,26 @@ def _demo(args) -> int:
     from .llm import ScriptedClient
     from .config import Config
 
-    srv = vulnapp.make_server(0)
-    base = f"http://127.0.0.1:{srv.server_address[1]}"
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    # `--target` runs the same scripted sequence against a lab someone else
+    # started, which is the only way this demo can show the pipeline working
+    # against a SEPARATE machine. The evaluation chapter needs that: an agent
+    # attacking 127.0.0.1 and an agent attacking another host are the same
+    # code path, and only the second is evidence that it works over a
+    # network. Start the lab there with
+    # `python3 vulnapp.py 8777 <its-ip>` and pass its URL here.
+    srv = None
+    base = str(getattr(args, "target", "") or "").rstrip("/")
+    if base:
+        import urllib.request as _probe
+        try:
+            _probe.urlopen(base + "/", timeout=5).read(64)
+        except OSError as exc:
+            print(f"demo: cannot reach {base}: {exc}", file=sys.stderr)
+            return 2
+    else:
+        srv = vulnapp.make_server(0)
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
 
     # The lab JWT embeds a live iat, so the token/forged strings must be
     # captured at demo setup and embedded literally into the script. This
@@ -1364,7 +1386,8 @@ def _demo(args) -> int:
     else:
         result = AgentLoop(cfg, llm=ScriptedClient(script),
                            quiet=args.quiet).run()
-    srv.shutdown()
+    if srv is not None:
+        srv.shutdown()
     print("\n=== demo complete ===")
     fpath = Path(result["session_dir"]) / "findings.json"
     if fpath.exists():

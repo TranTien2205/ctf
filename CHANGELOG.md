@@ -4444,12 +4444,40 @@ rather than the path it is given, so no path on a server that serves
 `dos` remains the one class driven in neither direction, recorded in
 `NOT_DRIVEN` as it already was.
 
+### The lab and the demo can now be pointed at a separate machine
+The evaluation chapter needs the target on another host. An agent attacking
+127.0.0.1 and an agent attacking another machine are the same code path, and
+only the second is evidence that the system works over a network - so until
+this, every artifact the project could produce was a loopback one.
+
+- `make_server` takes a `host`. The default stays `127.0.0.1`, which is what
+  every test and the whole CI matrix wants: a deliberately vulnerable app
+  with a command executor should not become reachable by accident. The bind
+  comment enumerates what IS exposed when you opt in - `/ping` runs argv
+  through `_EXEC_ALLOW` (`id`, `whoami`, `uname`, `hostname`, `pwd`, `echo`,
+  and `cat` confined to a fake tree by `_within_root`), never a shell, 3s
+  timeout, at most `_EXEC_MAX_SEGMENTS` commands per request.
+- `argus demo --target URL` runs the same scripted sequence against a lab
+  someone else started instead of spawning one. An unreachable target is an
+  operator error with a message, not a traceback.
+
+Measured against a real second machine (Ubuntu 22.04.4, Python 3.10.12, on
+its own LAN address): 6 findings over 64 requests, 5 `proven`, and
+`argus verify` reporting "66 chained entries verified ... 6 findings
+re-validated, artifacts sealed". The `rce` excerpt is `uid=1000(lab)` - the
+TARGET's identity rather than the attacker's, which a loopback run cannot
+demonstrate and which is the point of the parameter.
+
+Both halves are planted back: hardcoding the bind fails the loopback test,
+and ignoring `--target` fails the demo test with the locally spawned port
+beside the requested one.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 741 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 744 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

@@ -1146,3 +1146,30 @@ def test_the_dav_endpoint_cleans_up_after_the_probe(lab_url, ctx):
                            tool="http_request", note="canary removed?")
     assert gone["status"] == 404, (
         f"the probe left {canary}.txt behind: {gone['status']}")
+
+
+def test_the_lab_binds_loopback_unless_asked_otherwise():
+    """A deliberately vulnerable app must not become reachable by accident.
+
+    `make_server` hardcoded `("127.0.0.1", port)`, which is the right default
+    and made the lab impossible to deploy to a separate machine - and the
+    evaluation chapter needs exactly that, because an agent attacking
+    127.0.0.1 and an agent attacking another host are the same code path
+    while only the second is evidence that the system works over a network.
+
+    So the bind is a parameter now, and this pins both halves: the default
+    stays loopback, and an explicit interface is honoured.
+    """
+    import vulnapp
+
+    srv = vulnapp.make_server(0)
+    try:
+        assert srv.server_address[0] == "127.0.0.1"
+    finally:
+        srv.server_close()
+
+    srv = vulnapp.make_server(0, host="0.0.0.0")
+    try:
+        assert srv.server_address[0] == "0.0.0.0"
+    finally:
+        srv.server_close()
