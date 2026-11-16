@@ -271,6 +271,31 @@ def test_sqli_refuses_the_page_furniture_as_its_rows():
                   if c["check"] == "the rows are not what the page serves anyway")
     assert "carries the quoted bytes too" in detail, detail
 
+    # The SECOND quote bWAPP offered, and the second hole. `statements` is a
+    # word of "Error: The used SELECT statements have a different number of
+    # columns" - absent from the baseline, so it passed the control
+    # requirement above and graded proven while the UNION had failed.
+    # `is_error` could not catch it: that tests the excerpt, and the excerpt
+    # was one word of the sentence. Bytes INSIDE the failure message are not
+    # rows, and the FAIL text has to say which of the two reasons applied.
+    v = proof.grade("sqli", "statements", [baseline, banner, failed_union])
+    assert v.grade != "proven", v.explain()
+    reason = next(c["detail"] for c in v.checks
+                  if c["check"] == "the rows are not what the page serves anyway")
+    assert "inside the message saying the query FAILED" in reason, reason
+
+    # A body-wide error test was tried first and refused DVWA's genuine
+    # dump, whose page footer carries "Disabled" for unrelated reasons. The
+    # rule is positional, so a real row on a page that also carries a
+    # failure sentence elsewhere still proves.
+    mixed = ex("b5", "http://t.local/sqli_1.php?title=x%27+UNION+SELECT+login,"
+                     "password+FROM+users--+-&action=search",
+               wrapper + "<tr><td>bee</td><td>bug</td></tr>"
+               "<p>PHP function allow_url_include: Disabled</p>"
+               "<p>Unknown column 'zz' in 'field list'</p></body></html>")
+    assert proof.grade("sqli", "<tr><td>bee</td><td>bug</td></tr>",
+                       [baseline, banner, mixed]).grade == "proven"
+
     # the honest direction: a row the baseline does not carry
     real = ex("b4", "http://t.local/sqli_1.php?title=x%27+UNION+SELECT+login,"
                     "password+FROM+users--+-&action=search",

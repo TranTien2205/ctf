@@ -1,0 +1,190 @@
+[
+ {
+  "quote": "6885858486f31043e5839c735d99457f045affd0",
+  "why": "Hash SHA1 mật khẩu của user bee, lấy từ bảng users",
+  "grade": "proven",
+  "checks": [
+   {
+    "name": "proof read from the wire",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the target produced the quoted bytes",
+    "ok": true,
+    "detail": "from r20"
+   },
+   {
+    "name": "data store fingerprinted",
+    "ok": true,
+    "detail": "5.5.9-1ubuntu in r1"
+   },
+   {
+    "name": "the query named its target",
+    "ok": true,
+    "detail": "users in r20"
+   },
+   {
+    "name": "the rows are not what the page serves anyway",
+    "ok": true,
+    "detail": "6885858486f31043e5839c735d99457f045affd0 in r20 and in no control"
+   },
+   {
+    "name": "rows returned, not an error message",
+    "ok": true,
+    "detail": "quoted from r20"
+   },
+   {
+    "name": "extraction stayed minimal",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the citation is small enough to grade whole",
+    "ok": false,
+    "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"
+   }
+  ]
+ },
+ {
+  "quote": "<!DOCTYPE html>",
+  "why": "Khung HTML — có trong mọi response của trang",
+  "grade": "candidate",
+  "checks": [
+   {
+    "name": "proof read from the wire",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the target produced the quoted bytes",
+    "ok": true,
+    "detail": "from r1"
+   },
+   {
+    "name": "data store fingerprinted",
+    "ok": true,
+    "detail": "5.5.9-1ubuntu in r1"
+   },
+   {
+    "name": "the query named its target",
+    "ok": true,
+    "detail": "users in r20"
+   },
+   {
+    "name": "the rows are not what the page serves anyway",
+    "ok": false,
+    "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"
+   },
+   {
+    "name": "rows returned, not an error message",
+    "ok": false,
+    "detail": "the quoted bytes are in a control too - see the check above"
+   },
+   {
+    "name": "extraction stayed minimal",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the citation is small enough to grade whole",
+    "ok": false,
+    "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"
+   }
+  ]
+ },
+ {
+  "quote": "statements",
+  "why": "Một từ trong câu 'The used SELECT statements have a different number of columns'",
+  "grade": "unproven",
+  "checks": [
+   {
+    "name": "proof read from the wire",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the target produced the quoted bytes",
+    "ok": false,
+    "detail": "the quoted bytes are in no cited response"
+   },
+   {
+    "name": "data store fingerprinted",
+    "ok": true,
+    "detail": "5.5.9-1ubuntu in r1"
+   },
+   {
+    "name": "the query named its target",
+    "ok": true,
+    "detail": "users in r20"
+   },
+   {
+    "name": "the rows are not what the page serves anyway",
+    "ok": false,
+    "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"
+   },
+   {
+    "name": "rows returned, not an error message",
+    "ok": false,
+    "detail": "the quoted bytes are in a control too - see the check above"
+   },
+   {
+    "name": "extraction stayed minimal",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the citation is small enough to grade whole",
+    "ok": false,
+    "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"
+   }
+  ]
+ },
+ {
+  "quote": "bee",
+  "why": "Tên đăng nhập thật trong bảng users — nhưng bWAPP in 'Welcome bee' ở navbar",
+  "grade": "candidate",
+  "checks": [
+   {
+    "name": "proof read from the wire",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the target produced the quoted bytes",
+    "ok": true,
+    "detail": "from r1"
+   },
+   {
+    "name": "data store fingerprinted",
+    "ok": true,
+    "detail": "5.5.9-1ubuntu in r1"
+   },
+   {
+    "name": "the query named its target",
+    "ok": true,
+    "detail": "users in r20"
+   },
+   {
+    "name": "the rows are not what the page serves anyway",
+    "ok": false,
+    "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"
+   },
+   {
+    "name": "rows returned, not an error message",
+    "ok": false,
+    "detail": "the quoted bytes are in a control too - see the check above"
+   },
+   {
+    "name": "extraction stayed minimal",
+    "ok": true,
+    "detail": ""
+   },
+   {
+    "name": "the citation is small enough to grade whole",
+    "ok": false,
+    "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"
+   }
+  ]
+ }
+]

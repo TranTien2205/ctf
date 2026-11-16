@@ -4525,6 +4525,59 @@ Planted back two ways: `fresh = True` returns bWAPP's boilerplate to
 `proven` on the real recorded transcript, and fails the unit test that
 carries that transcript's shape.
 
+### Three limitations the third-party targets exposed, in the probe this time
+The `sqli` gate fixes above were about the VERDICT. Measuring the same four
+targets end to end exposed three in the PROBE, each one a false negative:
+the target was vulnerable, the probe's own output said so, and the class
+could not be proven because the evidence never arrived in a gradeable shape.
+
+- **The quoted bytes for an execution class were not required to BE the
+  output.** Every check in `verify_command_output` is about the EXCHANGE,
+  so the excerpt only had to be real bytes from some cited response. The
+  best quote this system's own chooser found was `DOCTYPE` on DVWA and
+  bWAPP and `127.0.0.1:` on the lab - meaningless in 3 of 3 rce cases,
+  while the execution was real every time. It is the supervisor-facing
+  half of the class ("the evidence must be the output of a harmless
+  command such as `id`"), and a report quoting a doctype does not show it.
+  New required check, "the quoted bytes are the command output"; after it,
+  the three quotes are `uid=1000(lab)`, `uid=33(www-data)`,
+  `uid=33(www-data)`.
+
+  That fix caused a regression of its own and it is worth recording:
+  putting the name in `required` changed which exchange `_witness` SELECTED,
+  and the two-exchange rce attack (a request that sent `id` and got nothing,
+  plus an unrelated debug page printing an identity line) moved from
+  `unproven` to `candidate`, because the debug page now outscored the
+  request. The excerpt check is a property of the CITATION rather than of
+  any one exchange, so it stays in `spec.required` and is kept out of the
+  tuple `_witness` scores on.
+
+- **`probe_sqli` knew two injection contexts and bWAPP is in a third.** Its
+  `title` parameter is interpolated into `WHERE title LIKE '%...%'`, where
+  neither `1'` nor `1` opens a statement boundary the way the probe
+  expects. A third family, `argus%'`, is tried after the first two, and the
+  one that ENUMERATES wins - a family that fails at n=1 has not found a
+  boundary, it has found that this is not its context. The extraction's
+  prefix follows whichever family enumerated.
+
+- **And the enumeration was being defeated by a page that merely MENTIONS a
+  database.** `SQL_ERRORS` recognises an engine naming itself, which is
+  what an error page does and also what bWAPP's search chrome does: it
+  carries the word "SQLite". So `ORDER BY 1` scored as a failure on a
+  response **byte-identical to the baseline** - measured, similarity 1.000 -
+  the enumeration aborted at n=1, `out["union"]["columns"]` came back 0,
+  and the extraction silently fell back to the two columns the caller
+  named and built a two-column UNION against a seven-column SELECT. The
+  signal is a DIFFERENCE from the baseline now, the way every other
+  differential in that file already was: an error pattern that matches the
+  baseline too cannot be this request's failure. With that, the
+  enumeration finds 7 and the extraction returns bWAPP's `bee`/`bug`.
+
+  The column discovery also ran only when the caller asked for it, while
+  the extraction below depends on its result - so it now runs whenever an
+  extraction is requested. The capability was there; it was not wired to
+  the thing that needs it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

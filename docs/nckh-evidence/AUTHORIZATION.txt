@@ -1,0 +1,21 @@
+AUTHORISATION NOTE - argus lab engagement
+=========================================
+Target      : http://192.168.223.221:8777  (lab-virtual-machine, Ubuntu 22.04.4 LTS)
+Scope       : that host and port only. No other host on 192.168.223.0/24.
+Authorised by: the project owner (NCKH student, operator of both VMs), who
+              supplied the target address and the lab account credentials
+              for this purpose.
+Purpose     : NCKH evaluation evidence - demonstrate the agent's probe and
+              proof pipeline against a target on a SEPARATE machine, for
+              submission to the supervisor.
+Window      : 2026-11-16, this session.
+Target owner: the same project owner. Both the attacker VM (Kali,
+              192.168.223.216) and the target VM are the owner's own,
+              on a private VMware network with no route to anything else.
+What is on the target: argus/lab/vulnapp.py, a deliberately vulnerable
+              teaching app installed by us at ~/argus-lab/ and started by
+              ~/argus-lab/start.sh. Stop it with ~/argus-lab/stop.sh.
+Bounds observed: no denial of service, no persistence, no lateral movement,
+              no credential dumping, no exfiltration. Code execution is
+              demonstrated with `id` and stops there, per the repository's
+              own policy in CLAUDE.md / SECURITY.md.

@@ -74,93 +74,74 @@ one stays a `candidate` and the report says why.
 
 ### System diagram
 
+The chain the whole design exists to enforce: **a finding cannot be recorded
+unless the bytes that prove it are already in the transcript.**
+
 ```
-                    ┌──────────────────────────────────────────┐
-                    │                OPERATOR                  │
-                    │   argus run <target> | argus team <t>    │
-                    └─────────────────────┬────────────────────┘
-                                          │
-┌─────────────────────────────────────────▼─────────────────────┐
-│                  LLM LAYER (Claude tool_use)                  │
-│                                                               │
-│   run mode:                                                   │
-│   ┌─────────────────────────────────────────────────────┐     │
-│   │ single AgentLoop: think -> tool_call -> observe     │     │
-│   └─────────────────────────────────────────────────────┘     │
-│                                                               │
-│   team mode:                                                  │
-│   ┌──────────┐  spawn/steer  ┌─────────┐                      │
-│   │   LEAD   │──────────────▶│ workers │                      │
-│   │strategist│◀────board─────┤ recon   │                      │
-│   └──────────┘   requests    │ exploit │                      │
-│                              │ report  │                      │
-│                              └────┬────┘                      │
-└───────────────────────────────────┼───────────────────────────┘
-              emit_lead             │          pull_leads
-        ┌───────────────────────────▼───────────────────────────┐
-        │         SHARED BLACKBOARD  (team/board.py)            │
-        │  LeadQueue: typed + deduped + prioritized leads       │
-        │  notes · agent status · spawn requests · findings     │
-        └───────────────────────────┬───────────────────────────┘
-                                    │ dispatch (role-gated)
-        ┌───────────────────────────▼───────────────────────────┐
-        │              TOOL LAYER  (tools/registry.py)          │
-        │                                                       │
-        │  web.py      http_request · crawl · js_recon ·        │
-        │              fingerprint · graphql_introspect         │
-        │  probes.py   sqli · nosqli · cmdi · time · ssti ·     │
-        │              lfi · redirect · cors · method ·         │
-        │              reflection ·                             │
-        │              idor · ssrf · xxe · csrf · xfh ·         │
-        │              upload · race · deserialize · cache ·    │
-        │              ppoll · smuggle · disclosure · websocket │
-        │              crlf · enum · lockout · massassign       │
-        │  analysis.py jwt_decode · jwt_forge · load_skill ·    │
-        │              notes · record_finding · run_external ·  │
-        │              read_response · finish                   │
-        │  mcp_tools.py  mcp_list · mcp_call (external servers) │
-        │  team.py     emit_lead · pull_leads · board ·         │
-        │              spawn_worker · wordlist_fuzz ·           │
-        │              run_exploit                              │
-        └───────────────────────────┬───────────────────────────┘
-                                    │ every request funnels through
-        ┌───────────────────────────▼───────────────────────────┐
-        │            GuardedClient  (httpclient.py)             │
-        │  ┌─────────────┐ ┌──────────────┐ ┌────────────────┐  │
-        │  │ ScopeGuard  │ │ RateLimiter  │ │  Transcript    │  │
-        │  │ (fail-      │ │ (shared rps) │ │  recording     │  │
-        │  │  closed)    │ │              │ │                │  │
-        │  └─────────────┘ └──────────────┘ └────────────────┘  │
-        └───────────────────────────┬───────────────────────────┘
+ OPERATOR  ── target + scope + budget ──▶  argus run <t>   |   argus team <t>
+   │                                        (one agent)        (lead + workers)
+   │  the model can NEVER widen scope; scope.py refuses before any byte is sent
+   ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│ 1. DECIDE          llm.py / providers.py  ── the model picks the next move│
+│                    decide.py  ── `argus next` computes it from RECORDED   │
+│                                  evidence instead, so advice cannot drift │
+│    team mode only: team/board.py  typed + deduped lead queue between the  │
+│                    lead strategist and role-specialized workers           │
+└───────────────────────────────────┬───────────────────────────────────────┘
+                                    │ tool_use
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ 2. TOOLS           tools/registry.py  ── 56 tools, role-gated             │
+│    web.py        recon: http_request, crawl, js_recon, fingerprint …      │
+│    probes.py     27 probes, one per bug class (sqli, cmdi, idor, xxe …)   │
+│    analysis.py   jwt_decode/forge, run_external (sqlmap|nuclei|nmap|ffuf) │
+│    mcp_tools.py  mcp_list / mcp_call ──▶ EXTERNAL MCP SERVERS             │
+│                  (argus also SERVES its own tools: argus mcp-serve)       │
+└───────────────────────────────────┬───────────────────────────────────────┘
+                                    │ every single request, no exceptions
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ 3. ONE SOCKET OWNER   httpclient.py GuardedClient                         │
+│    ScopeGuard (fail-closed, re-checked per redirect hop) · RateLimiter ·  │
+│    request budget · secret redaction by header name                       │
+└───────────────────────────────────┬───────────────────────────────────────┘
                                     ▼
-                          TARGET (in-scope only)
+                         TARGET  (in scope only)
+                                    │ request + response
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ 4. RECORD          session.py  ── the only write path                     │
+│    transcript.jsonl, sha256 hash-chained, head anchored in summary.json   │
+└───────────────────────────────────┬───────────────────────────────────────┘
                                     │
-        ┌───────────────────────────▼───────────────────────────┐
-        │   SESSION OUTPUT  (sessions/<ts>-<host>/)             │
-        │   transcript.jsonl · findings.json · notes.md ·       │
-        │   report.md/.html · summary.json · agent.log          │
-        └───────────────────────────────────────────────────────┘
+            record_finding(category, evidence_ids, excerpt, …)
+                                    │
+╔═══════════════════════════════════▼═══════════════════════════════════════╗
+║ 5. THE PROOF GATE   proof.py  ── 29 classes, graded against ONE witness   ║
+║                                                                           ║
+║    the excerpt must be verbatim bytes of a cited RESPONSE, and must not   ║
+║    be the request echoed back, and the class's own requirement must hold  ║
+║    on that evidence:                                                      ║
+║       rce   the output of `id` plus this probe's nonce, command benign    ║
+║       sqli  the engine named itself, a table named in the request, rows   ║
+║             the same endpoint does not serve without the payload          ║
+║                                                                           ║
+║      proven ─ requirement met        candidate ─ real signal, check named ║
+║    unproven ─ nothing cited fits     refused   ─ not provable here (dos)  ║
+╚═══════════════════════════════════╦═══════════════════════════════════════╝
+                                    │ only `proven` passes --require-proof
+┌───────────────────────────────────▼───────────────────────────────────────┐
+│ 6. SEALED OUTPUT   sessions/<ts>-<host>/                                  │
+│    findings.json · report.md/.html/.sarif · notes.md · agent.log          │
+│    artifacts_digest sealed into the chain, so a later edit is detectable  │
+│                                                                           │
+│    `argus verify <dir>` re-walks the chain AND re-grades every finding:   │
+│    raising a grade by hand reports TAMPERED                               │
+│                                                                           │
+│    judge.py ── a second model family reviews the report and can only ever │
+│                LOWER a grade, never raise one                             │
+└───────────────────────────────────────────────────────────────────────────┘
 
-        ┌───────────────────────────────────────────────────────┐
-        │   PROOF MATRIX  (proof.py) — at record_finding time   │
-        │   29 classes, each with a requirement read from the   │
-        │   cited request AND response:                         │
-        │     proven    the class artifact and its control      │
-        │     candidate a real signal, a named check missing    │
-        │     unproven  nothing cited meets the requirement     │
-        │     refused   not provable here (dos)                 │
-        │   `argus proof <class>` prints one. --require-proof   │
-        │   refuses anything below proven.                      │
-        └───────────────────────────────────────────────────────┘
-
-        ┌───────────────────────────────────────────────────────┐
-        │   RESOURCES (extend without code changes)             │
-        │   <cwd>/resources/wordlists/*.txt   -> wordlist_fuzz  │
-        │   <cwd>/resources/exploits/<id>/    -> run_exploit    │
-        │   (bundled defaults: argus/resources/; cwd overrides) │
-        │     manifest.json + script    (scope-checked,         │
-        │                               timeout, proof_marker)  │
-        └───────────────────────────────────────────────────────┘
+ extend without code changes:  <cwd>/resources/wordlists/*.txt -> wordlist_fuzz
+                               <cwd>/resources/exploits/<id>/  -> run_exploit
 ```
 
 ### Data flow — a request never escapes the guardrails

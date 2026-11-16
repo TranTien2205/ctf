@@ -1,0 +1,12 @@
+app         class reqs grade      ceil       ok  quote
+--------------------------------------------------------------------------------------------------------
+argus-lab   sqli    15 proven     proven     Y   '$s3cr3t-admin-pw'
+argus-lab   rce      3 proven     proven     Y   'uid=1000(lab)'
+DVWA        sqli    15 proven     proven     Y   '5f4dcc3b5aa765d61d8327deb882cf99'
+DVWA        rce      3 proven     proven     Y   'uid=33(www-data)'
+DVWA        xss      1 candidate  candidate  Y   '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML'
+bWAPP       sqli    20 proven     proven     Y   '6885858486f31043e5839c735d99457f045affd0'
+bWAPP       rce      3 proven     proven     Y   'uid=33(www-data)'
+Juice Shop  sqli    14 candidate  proven     n   'status'
+
+7/8 cases reached the class ceiling; 74 requests total

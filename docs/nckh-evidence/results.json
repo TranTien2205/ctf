@@ -1,0 +1,104 @@
+[
+  {
+    "app": "argus-lab",
+    "class": "sqli",
+    "label": "SQLi /item",
+    "requests": 15,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "$s3cr3t-admin-pw",
+    "missing": [],
+    "verdict": "error-based candidate (xpath exfil - extracted value echoed in the err"
+  },
+  {
+    "app": "argus-lab",
+    "class": "rce",
+    "label": "cmdi /ping",
+    "requests": 3,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "uid=1000(lab)",
+    "missing": [],
+    "verdict": "command output returned: uid=1000(lab) with the probe nonce, via semic"
+  },
+  {
+    "app": "DVWA",
+    "class": "sqli",
+    "label": "SQLi /vulnerabilities/sqli",
+    "requests": 15,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "5f4dcc3b5aa765d61d8327deb882cf99",
+    "missing": [],
+    "verdict": "error-based candidate (xpath exfil - extracted value echoed in the err"
+  },
+  {
+    "app": "DVWA",
+    "class": "rce",
+    "label": "cmdi /vulnerabilities/exec",
+    "requests": 3,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "uid=33(www-data)",
+    "missing": [],
+    "verdict": "command output returned: uid=33(www-data) with the probe nonce, via se"
+  },
+  {
+    "app": "DVWA",
+    "class": "xss",
+    "label": "reflected XSS /xss_r",
+    "requests": 1,
+    "grade": "candidate",
+    "ceiling": "candidate",
+    "at_ceiling": true,
+    "quote": "<!DOCTYPE html PUBLIC \"-//W3C//DTD XHTML 1.0 Strict//EN\" \"ht",
+    "missing": [
+      "a real browser executed it"
+    ],
+    "verdict": "reflected"
+  },
+  {
+    "app": "bWAPP",
+    "class": "sqli",
+    "label": "SQLi /sqli_1.php",
+    "requests": 20,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "6885858486f31043e5839c735d99457f045affd0",
+    "missing": [],
+    "verdict": "error-based candidate (xpath exfil - extracted value echoed in the err"
+  },
+  {
+    "app": "bWAPP",
+    "class": "rce",
+    "label": "cmdi /commandi.php",
+    "requests": 3,
+    "grade": "proven",
+    "ceiling": "proven",
+    "at_ceiling": true,
+    "quote": "uid=33(www-data)",
+    "missing": [],
+    "verdict": "command output returned: uid=33(www-data) with the probe nonce, via se"
+  },
+  {
+    "app": "Juice Shop",
+    "class": "sqli",
+    "label": "SQLi /rest/products/search",
+    "requests": 14,
+    "grade": "candidate",
+    "ceiling": "proven",
+    "at_ceiling": false,
+    "quote": "status",
+    "missing": [
+      "data store fingerprinted",
+      "the rows are not what the page serves anyway",
+      "rows returned, not an error message"
+    ],
+    "verdict": "error-based candidate"
+  }
+]

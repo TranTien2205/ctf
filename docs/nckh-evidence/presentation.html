@@ -1,0 +1,367 @@
+<title>Argus — Cổng chứng minh</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Layout: một cột, prose hẹp để đọc, băng rộng cho phần tương tác và bảng */
+  :root {
+    --paper: #f4f5f7;  --card: #ffffff;   --ink: #16191f;
+    --muted: #5d6572;  --line: #d9dde4;   --accent: #2a4a8f;
+    --proven: #0d6e56; --cand: #8a5a00;   --unproven: #9a3226;
+    --proven-bg: #e4f3ee; --cand-bg: #fbf0da; --unproven-bg: #fae8e5;
+    --sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --paper: #12151a; --card: #1a1e25; --ink: #e8eaee; --muted: #9aa3b2;
+    --line: #2b313b; --accent: #8aa8e8;
+    --proven: #5fd3b2; --cand: #e0ab52; --unproven: #f0897c;
+    --proven-bg: #10322a; --cand-bg: #322611; --unproven-bg: #331c19;
+    color-scheme: dark; } }
+  :root[data-theme="dark"] {
+    --paper: #12151a; --card: #1a1e25; --ink: #e8eaee; --muted: #9aa3b2;
+    --line: #2b313b; --accent: #8aa8e8;
+    --proven: #5fd3b2; --cand: #e0ab52; --unproven: #f0897c;
+    --proven-bg: #10322a; --cand-bg: #322611; --unproven-bg: #331c19;
+    color-scheme: dark; }
+
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans);
+         line-height: 1.6; }
+  .wrap { max-width: 860px; margin: 0 auto;
+          padding-left: max(16px, env(safe-area-inset-left, 0px));
+          padding-right: max(16px, env(safe-area-inset-right, 0px));
+          padding-block: 0; }
+  h1, h2, h3 { font-weight: 600; text-wrap: balance; letter-spacing: -0.015em;
+               line-height: 1.22; margin: 0; }
+  h1 { font-size: clamp(1.75rem, 5vw, 2.6rem); font-weight: 700; }
+  h2 { font-size: clamp(1.25rem, 3.4vw, 1.6rem); margin-top: 2.6rem; }
+  h3 { font-size: 1.02rem; font-weight: 600; }
+  p { margin: 0.7rem 0; max-width: 68ch; }
+  .lede { font-size: 1.08rem; color: var(--muted); max-width: 62ch; }
+  .eyebrow { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.1em;
+             text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  header { padding-block: 2.4rem 1.4rem; border-bottom: 1px solid var(--line); }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+           gap: 1px; background: var(--line); border: 1px solid var(--line);
+           margin-top: 1.6rem; }
+  .stat { background: var(--card); padding: 0.85rem 0.95rem; min-width: 0; }
+  .stat b { display: block; font-family: var(--mono); font-size: 1.5rem;
+            font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 0.78rem; color: var(--muted); }
+
+  .chain { display: flex; flex-direction: column; gap: 2px; margin: 1.3rem 0; }
+  .step { display: grid; grid-template-columns: 2.1rem 1fr; gap: 0.85rem;
+          background: var(--card); border: 1px solid var(--line);
+          padding: 0.8rem 0.95rem; align-items: start; }
+  .step.gate { border-color: var(--accent); border-width: 2px; }
+  .step .n { font-family: var(--mono); font-weight: 600; color: var(--accent);
+             font-size: 0.95rem; }
+  .step p { margin: 0.2rem 0 0; font-size: 0.9rem; color: var(--muted); max-width: none; }
+  .step .f { font-family: var(--mono); font-size: 0.76rem; color: var(--accent); }
+
+  .picker { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1.1rem 0; }
+  .picker button { font-family: var(--mono); font-size: 0.8rem; cursor: pointer;
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    padding: 0.55rem 0.7rem; border-radius: 2px; text-align: left; min-width: 0;
+    max-width: 100%; overflow-wrap: anywhere; }
+  .picker button[aria-pressed="true"] { border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent); font-weight: 500; }
+  .picker button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .verdict { border: 1px solid var(--line); background: var(--card); margin-top: 1rem; }
+  .verdict-head { padding: 0.9rem 1rem; border-bottom: 1px solid var(--line); }
+  .badge { display: inline-block; font-family: var(--mono); font-weight: 600;
+           font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase;
+           padding: 0.22rem 0.5rem; border-radius: 2px; }
+  .badge.proven { background: var(--proven-bg); color: var(--proven); }
+  .badge.candidate { background: var(--cand-bg); color: var(--cand); }
+  .badge.unproven { background: var(--unproven-bg); color: var(--unproven); }
+  .why { font-size: 0.88rem; color: var(--muted); margin-top: 0.5rem; }
+  .checks { list-style: none; margin: 0; padding: 0; }
+  .checks li { display: grid; grid-template-columns: 1.6rem 1fr; gap: 0.6rem;
+               padding: 0.6rem 1rem; border-top: 1px solid var(--line);
+               font-size: 0.87rem; align-items: start; }
+  .checks li:first-child { border-top: 0; }
+  .checks .mark { font-family: var(--mono); font-weight: 600; }
+  .checks .ok .mark { color: var(--proven); }
+  .checks .no .mark { color: var(--unproven); }
+  .checks .name { font-family: var(--mono); font-size: 0.8rem; min-width: 0;
+                  overflow-wrap: anywhere; }
+  .checks .det { color: var(--muted); font-size: 0.8rem; display: block;
+                 margin-top: 0.15rem; overflow-wrap: anywhere; }
+  .checks li.adv { opacity: 0.72; }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); margin: 1.1rem 0; }
+  table { border-collapse: collapse; width: 100%; background: var(--card);
+          font-size: 0.87rem; }
+  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line);
+           white-space: nowrap; }
+  th { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em;
+       color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.ev { font-family: var(--mono); font-size: 0.76rem; white-space: normal;
+          overflow-wrap: anywhere; min-width: 14ch; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+  .toggle { display: inline-flex; gap: 0; border: 1px solid var(--line);
+            border-radius: 2px; overflow: hidden; margin: 0.6rem 0 0; }
+  .toggle button { font-family: var(--mono); font-size: 0.76rem; cursor: pointer;
+    background: var(--card); color: var(--muted); border: 0; padding: 0.4rem 0.75rem; }
+  .toggle button[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+  .toggle button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+  .fix { border-left: 3px solid var(--line); padding: 0 0 0 0.95rem; margin: 1.1rem 0; }
+  .fix.bad { border-left-color: var(--unproven); }
+  .fix h3 { font-size: 0.96rem; }
+  .fix p { font-size: 0.9rem; margin: 0.35rem 0; }
+  .note { background: var(--card); border: 1px solid var(--line);
+          border-left: 3px solid var(--cand); padding: 0.9rem 1rem; margin: 1.2rem 0; }
+  .note p { margin: 0.3rem 0; font-size: 0.92rem; }
+  footer { margin-top: 3rem; padding-block: 1.4rem 2.4rem;
+           border-top: 1px solid var(--line); color: var(--muted); font-size: 0.85rem; }
+  @media (prefers-reduced-motion: no-preference) {
+    .verdict, .checks li { transition: border-color 120ms ease; }
+  }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">Nghiên cứu khoa học · 2026-11-16</div>
+  <h1>Argus — agent kiểm thử xâm nhập web có cổng chứng minh</h1>
+  <p class="lede">Một agent tự động tìm lỗ hổng web, nhưng <strong>không được phép
+  ghi nhận lỗ hổng nào mà không có bằng chứng</strong>: chuỗi byte nguyên văn do
+  chính máy mục tiêu trả về, nằm trong transcript đã băm chuỗi, và thoả yêu cầu
+  riêng của từng lớp lỗ hổng. Đo trên bốn ứng dụng, ba trong số đó do người khác viết.</p>
+  <div class="stats">
+    <div class="stat"><b>4</b><span>ứng dụng mục tiêu</span></div>
+    <div class="stat"><b>7/8</b><span>ca đạt mức chứng minh tối đa</span></div>
+    <div class="stat"><b>29</b><span>lớp lỗ hổng có yêu cầu riêng</span></div>
+    <div class="stat"><b>745</b><span>test tự động</span></div>
+    <div class="stat"><b>74</b><span>request cho cả phép đo</span></div>
+  </div>
+</header>
+
+<h2>Vấn đề: công cụ quét thường “báo” chứ không “chứng minh”</h2>
+<p>Một scanner nói “có SQL injection ở tham số <code>id</code>”. Người đọc báo cáo
+không có cách nào biết điều đó đúng hay sai, ngoài việc tự kiểm tra lại. Phần lớn
+thời gian của một kỳ kiểm thử bị tiêu vào việc loại bỏ báo động sai.</p>
+<p>Argus đảo ngược mặc định đó: <strong>kết luận phải đi kèm bằng chứng, và bằng
+chứng phải tự chứng minh được.</strong> Mỗi lớp lỗ hổng có một yêu cầu cụ thể —
+ví dụ RCE phải là output của lệnh <code>id</code> kèm một mã ngẫu nhiên chỉ probe
+này biết; SQLi phải là dữ liệu thật trong một bảng được nêu tên. Không đạt thì
+kết luận bị hạ xuống <em>candidate</em> và báo cáo nói rõ thiếu điều kiện nào.</p>
+
+<h2>Hệ thống chạy như thế nào</h2>
+<div class="chain">
+  <div class="step"><div class="n">1</div><div><h3>Người dùng đặt mục tiêu và phạm vi</h3>
+    <p>Model <em>không bao giờ</em> được mở rộng phạm vi. Mọi request ngoài phạm vi
+    bị từ chối trước khi gửi đi byte nào.</p><div class="f">scope.py</div></div></div>
+  <div class="step"><div class="n">2</div><div><h3>LLM quyết định bước tiếp theo</h3>
+    <p>Gọi công cụ qua giao thức tool-use. Có chế độ một agent và chế độ nhóm
+    (một agent điều phối nhiều worker chuyên trách).</p><div class="f">llm.py · decide.py · team/board.py</div></div></div>
+  <div class="step"><div class="n">3</div><div><h3>Công cụ thực thi</h3>
+    <p>56 công cụ: trinh sát, 27 probe (mỗi lớp lỗ hổng một probe), gọi
+    sqlmap/nuclei/nmap, và gọi MCP server bên ngoài.</p><div class="f">tools/registry.py</div></div></div>
+  <div class="step"><div class="n">4</div><div><h3>Một đường ra duy nhất</h3>
+    <p>Mọi request đi qua đúng một client: kiểm phạm vi, giới hạn tốc độ, hạn mức
+    request, che credential theo tên header.</p><div class="f">httpclient.py</div></div></div>
+  <div class="step"><div class="n">5</div><div><h3>Ghi lại, băm chuỗi</h3>
+    <p>Transcript sha256 móc nối nhau, đầu chuỗi neo trong file tổng kết. Sửa một
+    byte là phát hiện được.</p><div class="f">session.py</div></div></div>
+  <div class="step gate"><div class="n">6</div><div><h3>Cổng chứng minh — phần đóng góp chính</h3>
+    <p>Khi agent muốn ghi một finding, cổng này chấm bằng chứng. Thử ngay bên dưới.</p>
+    <div class="f">proof.py · 29 lớp</div></div></div>
+  <div class="step"><div class="n">7</div><div><h3>Hồ sơ niêm phong</h3>
+    <p>Báo cáo, findings, transcript — tất cả được niêm phong bằng digest.
+    <code>argus verify</code> đi lại cả chuỗi <em>và chấm lại từng finding</em>:
+    tự nâng kết luận bằng tay sẽ bị báo <code>TAMPERED</code>.</p><div class="f">session.py · judge.py</div></div></div>
+</div>
+
+<h2>Thử cổng chứng minh</h2>
+<p>Đây là dữ liệu thật từ một lần chạy trên <strong>bWAPP</strong> — một ứng dụng
+dạy bảo mật của bên thứ ba, đặt trên máy Ubuntu riêng. Probe đã khai thác thành
+công SQL injection ở tham số <code>title</code>. Câu hỏi còn lại: <em>chuỗi nào
+mới thực sự chứng minh được điều đó?</em> Bấm thử từng chuỗi.</p>
+<div class="picker" id="picker" role="group" aria-label="Chọn chuỗi bằng chứng"></div>
+<div class="verdict" id="verdict" aria-live="polite"></div>
+<p class="why" style="margin-top:0.9rem">Check cuối cùng là <em>khuyến cáo</em>,
+không phải điều kiện: nó nhắc rằng lần chạy này nêu 20 exchange nên việc ghép cặp
+bị chặn ở 16. Kết luận không phụ thuộc vào nó.</p>
+
+<div class="note">
+  <p><strong>Ba chuỗi bị từ chối đều là bằng chứng “gần đúng”.</strong>
+  <code>&lt;!DOCTYPE html&gt;</code> là khung trang, có trong mọi response.
+  <code>statements</code> là một từ trong chính câu báo lỗi của database — tức UNION
+  đã <em>thất bại</em>. Còn <code>bee</code> <em>là</em> tên đăng nhập thật trong
+  bảng <code>users</code>, nhưng bWAPP in sẵn “Welcome bee” ở thanh điều hướng, nên
+  nó không phân biệt được “đọc được dữ liệu” với “trang vẫn luôn hiện thế”.</p>
+  <p>Chỉ hash mật khẩu là duy nhất cho lần đọc đó — và đó là chuỗi duy nhất được
+  chấm <code>proven</code>.</p>
+</div>
+
+<h2>Số liệu đo được</h2>
+<div class="toggle" role="group" aria-label="Chọn mốc đo">
+  <button type="button" id="btn-after" aria-pressed="true">Sau khi sửa lỗi</button>
+  <button type="button" id="btn-before" aria-pressed="false">Trước khi sửa</button>
+</div>
+<div class="tablewrap">
+  <table id="results"><thead><tr>
+    <th>Ứng dụng</th><th>Lớp</th><th>Req</th><th>Kết quả</th><th>Bằng chứng được trích</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+<p id="summary" class="why"></p>
+
+<h2>Sáu lỗi mà bộ mục tiêu bên thứ ba phơi ra</h2>
+<p>Trước đây hệ thống chỉ được đo trên lab tự viết. Một buổi cài bWAPP, DVWA và
+Juice Shop lên máy riêng đã tìm ra sáu lỗi mà lab tự viết <strong>không thể</strong>
+tìm được — vì lab do cùng người viết công cụ nên thừa hưởng đúng điểm mù của người đó.</p>
+
+<div class="fix bad"><h3>1 · Cổng chấm <code>proven</code> trên khung trang</h3>
+<p>Quote <code>&lt;!DOCTYPE html&gt;</code> làm lớp <code>sqli</code> đạt proven,
+trong khi UNION đã thất bại. Sửa: bắt buộc có <em>control</em> — một request cùng
+endpoint không chứa tên bảng, và body của nó không chứa chuỗi được trích.</p></div>
+
+<div class="fix bad"><h3>2 · Cổng chấm <code>proven</code> trên một từ của câu báo lỗi</h3>
+<p>Lọt qua cả bản sửa số 1, vì câu lỗi do chính injection gây ra cũng “vắng trong
+baseline”. Sửa: byte nằm <em>bên trong</em> câu báo thất bại thì không phải dữ liệu.</p></div>
+
+<div class="fix bad"><h3>3 · Finding RCE trích byte vô nghĩa</h3>
+<p>Việc thực thi lệnh là thật, nhưng chuỗi được trích là <code>DOCTYPE</code> ở
+3/3 ca. Sửa: excerpt phải chứa chính dòng identity. Sau đó: <code>uid=1000(lab)</code>,
+<code>uid=33(www-data)</code>.</p></div>
+
+<div class="fix"><h3>4 · Probe không nhận ngữ cảnh <code>LIKE</code></h3>
+<p>bWAPP chèn tham số vào <code>WHERE title LIKE '%…%'</code>. Probe chỉ biết hai
+ngữ cảnh. Thêm họ thứ ba, và họ nào <em>liệt kê được số cột</em> thì thắng.</p></div>
+
+<div class="fix"><h3>5 · Tín hiệu lỗi bị đánh bại bởi một trang <em>nhắc đến</em> database</h3>
+<p>Trang bWAPP có chữ <code>SQLite</code> trong phần khung, nên mọi payload đều bị
+coi là “gây lỗi” — kể cả response giống baseline từng byte. Sửa: tín hiệu thất bại
+phải là <em>vi phân</em> so với baseline, không phải khớp một mẫu.</p></div>
+
+<div class="fix"><h3>6 · Việc dò số cột không được nối với phần cần nó</h3>
+<p>Phần trích dữ liệu đã biết đệm <code>NULL</code> theo số cột dò được, nhưng việc
+dò lại là tuỳ chọn — nên mặc định nó dựng UNION 2 cột cho một SELECT 7 cột.</p></div>
+
+<p>Điểm chung của cả sáu, đáng đưa vào báo cáo: <strong>dùng giá trị tuyệt đối ở
+nơi cần vi phân.</strong> Khung trang có trong mọi response; chữ <code>SQLite</code>
+có cả trong baseline; một từ của câu lỗi cũng “vắng trong baseline”. Mỗi lần, câu
+trả lời đúng là so với một đối chứng chứ không phải khớp một mẫu.</p>
+
+<h2>Điều chưa làm được</h2>
+<div class="note">
+  <p><strong>Chưa có lần chạy nào do LLM tự điều khiển đầu-cuối.</strong> Toàn bộ
+  thành phần đã dựng và có 71 unit test, nhưng mọi session hiện có đều do script
+  điều khiển (<code>model: scripted-demo</code>). Đường LLM đã thử thật và nhận lỗi
+  từ API: <em>“Third-party apps now draw from your extra usage”</em> —
+  <code>llm_calls: 0</code>.</p>
+  <p>Đây là giới hạn hạn mức tài khoản, đã đo được chứ không phỏng đoán. Nạp hạn
+  mức là mở được đồng thời tiêu chí <code>user → LLM → MCP → tool</code> và chương
+  thực nghiệm. Mọi request HTTP và mọi byte bằng chứng ở trên đều là thật; chỉ tầng
+  quyết định là script.</p>
+</div>
+<p>Hai lớp bị giới hạn có lý do ghi rõ: <code>xss</code> dừng ở <em>candidate</em>
+vì gói này không có browser để chứng minh script thực sự chạy; <code>ssrf</code>
+dừng ở <em>candidate</em> vì không có collector ngoài băng. <code>dos</code> bị từ
+chối theo chính sách của dự án.</p>
+
+<h2>Bước tiếp theo</h2>
+<p>Thứ tự theo giá trị cho luận điểm nghiên cứu, không theo độ dễ:</p>
+<ol>
+  <li><strong>Nạp hạn mức rồi chạy bộ baseline</strong> — một việc, mở hai khoảng trống.</li>
+  <li><strong>Đo bằng đối chứng độc lập.</strong> Juice Shop có
+  <code>GET /api/Challenges</code> trả về 118 challenge kèm cờ đã giải — chính ứng
+  dụng mục tiêu xác nhận, không phải công cụ tự khai. Hiện đã giải 1.</li>
+  <li><strong>So báo động sai với <code>sqlmap</code> và <code>nuclei</code></strong>
+  trên cùng mục tiêu. Luận điểm của đề tài là cổng chứng minh giảm báo sai, nên đó
+  là con số đáng đo nhất.</li>
+</ol>
+
+<footer>
+  <p>Số liệu thô, hồ sơ niêm phong, bản ghi phiên khai thác và script đo đều nằm
+  cùng thư mục này trong repo: <code class="mono">docs/nckh-evidence/</code>.
+  Kiểm tra lại hồ sơ bằng <code class="mono">python -m argus verify &lt;thư mục&gt;</code>.</p>
+</footer>
+</div>
+
+<script>
+const GATE = [{"quote": "6885858486f31043e5839c735d99457f045affd0", "why": "Hash SHA1 mật khẩu của user bee, lấy từ bảng users", "grade": "proven", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r20"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": true, "detail": "6885858486f31043e5839c735d99457f045affd0 in r20 and in no control"}, {"name": "rows returned, not an error message", "ok": true, "detail": "quoted from r20"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "<!DOCTYPE html>", "why": "Khung HTML — có trong mọi response của trang", "grade": "candidate", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r1"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "statements", "why": "Một từ trong câu 'The used SELECT statements have a different number of columns'", "grade": "unproven", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": false, "detail": "the quoted bytes are in no cited response"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}, {"quote": "bee", "why": "Tên đăng nhập thật trong bảng users — nhưng bWAPP in 'Welcome bee' ở navbar", "grade": "candidate", "checks": [{"name": "proof read from the wire", "ok": true, "detail": ""}, {"name": "the target produced the quoted bytes", "ok": true, "detail": "from r1"}, {"name": "data store fingerprinted", "ok": true, "detail": "5.5.9-1ubuntu in r1"}, {"name": "the query named its target", "ok": true, "detail": "users in r20"}, {"name": "the rows are not what the page serves anyway", "ok": false, "detail": "r1 carries the quoted bytes too - that is what this endpoint sends whatever you ask"}, {"name": "rows returned, not an error message", "ok": false, "detail": "the quoted bytes are in a control too - see the check above"}, {"name": "extraction stayed minimal", "ok": true, "detail": ""}, {"name": "the citation is small enough to grade whole", "ok": false, "detail": "20 exchanges cited; the first 16 were paired. A contrast needs two exchanges - cite the pair that proves it"}]}];
+const WHY = {
+  "proven": "Đạt — bằng chứng thoả toàn bộ yêu cầu của lớp sqli.",
+  "candidate": "Chưa đạt — có tín hiệu thật, nhưng thiếu điều kiện được nêu tên bên dưới.",
+  "unproven": "Không đạt — chuỗi này không nằm trong response nào được nêu."
+};
+// Dữ liệu dưới đây là output thật của công cụ và có thể chứa `<`
+// (chuỗi `<!DOCTYPE html>` là một trong các ca demo), nên mọi giá trị
+// nội suy vào innerHTML đều phải được escape.
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (ch) => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+const picker = document.getElementById("picker");
+const verdict = document.getElementById("verdict");
+function render(i) {
+  const c = GATE[i];
+  [...picker.children].forEach((b, j) =>
+    b.setAttribute("aria-pressed", String(j === i)));
+  const rows = c.checks.map((k, idx) => `
+    <li class="${k.ok ? "ok" : "no"}${idx === c.checks.length - 1 ? " adv" : ""}">
+      <span class="mark" aria-hidden="true">${k.ok ? "✔" : "✕"}</span>
+      <span class="name">${esc(k.name)}<span class="sr">${k.ok ? " — đạt" : " — không đạt"}</span>
+        ${k.detail ? `<span class="det">${esc(k.detail)}</span>` : ""}</span>
+    </li>`).join("");
+  verdict.innerHTML = `
+    <div class="verdict-head">
+      <span class="badge ${esc(c.grade)}">${esc(c.grade)}</span>
+      <div class="why">${esc(WHY[c.grade] || "")} <em>${esc(c.why)}</em></div>
+    </div>
+    <ul class="checks">${rows}</ul>`;
+}
+GATE.forEach((c, i) => {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.setAttribute("aria-pressed", "false");
+  b.textContent = c.quote.length > 44 ? c.quote.slice(0, 44) + "…" : c.quote;
+  b.addEventListener("click", () => render(i));
+  picker.appendChild(b);
+});
+render(0);
+
+const RESULTS = {
+  after: { rows: [
+    ["argus-lab", "sqli", 15, "proven", "$s3cr3t-admin-pw"],
+    ["argus-lab", "rce", 3, "proven", "uid=1000(lab)"],
+    ["DVWA", "sqli", 15, "proven", "5f4dcc3b5aa765d61d8327deb882cf99"],
+    ["DVWA", "rce", 3, "proven", "uid=33(www-data)"],
+    ["DVWA", "xss", 1, "candidate", "đúng mức tối đa của lớp — không có browser"],
+    ["bWAPP", "sqli", 20, "proven", "6885858486f31043e5839c735d99457f045affd0"],
+    ["bWAPP", "rce", 3, "proven", "uid=33(www-data)"],
+    ["Juice Shop", "sqli", 14, "candidate", "chỉ error-based, chưa trích được bảng"]],
+    note: "7/8 ca đạt mức tối đa của lớp · 74 request. Hai hash là mật khẩu thật trong bảng users của DVWA (MD5) và bWAPP (SHA1); uid= là danh tính tiến trình web server trên máy mục tiêu, kèm nonce của probe." },
+  before: { rows: [
+    ["argus-lab", "sqli", 12, "proven", "$s3cr3t-admin-pw"],
+    ["argus-lab", "rce", 3, "proven", "127.0.0.1:"],
+    ["DVWA", "sqli", 12, "proven", "5f4dcc3b5aa765d61d8327deb882cf99"],
+    ["DVWA", "rce", 3, "proven", "DOCTYPE"],
+    ["DVWA", "xss", 1, "candidate", "đúng mức tối đa của lớp"],
+    ["bWAPP", "sqli", 12, "candidate", "DOCTYPE"],
+    ["bWAPP", "rce", 3, "proven", "DOCTYPE"],
+    ["Juice Shop", "sqli", 12, "candidate", "status"]],
+    note: "6/8 ca đạt mức tối đa · 58 request. Kết luận đúng ở phần lớn ca, nhưng bằng chứng được trích thì vô nghĩa — đó chính là lỗi số 3." }
+};
+const tbody = document.querySelector("#results tbody");
+const summary = document.getElementById("summary");
+function show(which) {
+  const d = RESULTS[which];
+  tbody.innerHTML = d.rows.map(r => `<tr>
+    <td>${esc(r[0])}</td><td class="mono">${esc(r[1])}</td><td class="num">${esc(r[2])}</td>
+    <td><span class="badge ${esc(r[3])}">${esc(r[3])}</span></td>
+    <td class="ev">${esc(r[4])}</td></tr>`).join("");
+  summary.textContent = d.note;
+  document.getElementById("btn-after").setAttribute("aria-pressed", String(which === "after"));
+  document.getElementById("btn-before").setAttribute("aria-pressed", String(which === "before"));
+}
+document.getElementById("btn-after").addEventListener("click", () => show("after"));
+document.getElementById("btn-before").addEventListener("click", () => show("before"));
+show("after");
+</script>
+<style>.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}</style>

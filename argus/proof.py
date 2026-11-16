@@ -199,6 +199,28 @@ DBMS_RE = re.compile(
 # became "mail from bob" and named the table `bob`. An ordinary search box
 # satisfied the check, and sqli graded `proven` on a target with no injection
 # in it. Measured against /search?q=mail+from+bob.
+# What a data store says when the injected query FAILED. Not the same thing
+# as DBMS_RE, which recognises the engine naming itself and is evidence FOR
+# the class: these are the sentences that say the read did not happen.
+#
+# Needed because the control requirement below is satisfied by any bytes the
+# injected response carries and the baseline does not - and a failure message
+# the injection CAUSED is exactly that. Measured on bWAPP: the quote
+# `statements`, a word from "Error: The used SELECT statements have a
+# different number of columns", passed the control and graded `sqli` proven
+# while the UNION had failed. `is_error` could not catch it, because it tests
+# the excerpt and the excerpt was one word of the sentence.
+#
+# The rule is narrow on purpose: bytes INSIDE the failure sentence are not
+# rows. A body-wide error test was tried first and refused DVWA's genuine
+# dump, whose page footer carries the word "Disabled" for unrelated reasons.
+DBMS_FAILED_RE = re.compile(
+    r"(?i)(the used select statements have a different number of "
+    r"(?:columns|terms)|operand should contain \d+ column"
+    r"|order by term out of range|unknown column '[^']*' in 'field list'"
+    r"|unrecognized token|syntax error at or near|incorrect syntax near)"
+    r"[^<\n]{0,120}")
+
 TABLE_RE = re.compile(
     r"(?i)(?:union[\s/*]+(?:all[\s/*]+)?select\b[\s\S]{0,400}?\bfrom\s+"
     r"[`\"\[]?([a-z_][a-z0-9_.]*)"
@@ -1068,6 +1090,31 @@ def verify_command_output(claim: Claim, spec: "ProofSpec") -> list[dict]:
              "no uid=N(...) or whoami line in this response. Echoing `id` back "
              "as text does not produce one")))
 
+        # The quoted bytes have to BE the output, not merely come from a
+        # response that also contained it. Every check above is about the
+        # EXCHANGE; the excerpt only had to be real bytes from some cited
+        # response, so a finding could claim command execution and quote
+        # `DOCTYPE`. Measured across four targets: the best quote this
+        # system's own quote-chooser found was `DOCTYPE` on DVWA and bWAPP
+        # and `127.0.0.1:` on the lab - meaningless in 3 of 3 rce cases,
+        # while the execution itself was real every time.
+        #
+        # It is the supervisor-facing half of the class: "the evidence must
+        # be the output of a harmless command such as `id`". A report whose
+        # rce finding quotes a doctype does not show that, whatever its
+        # checks say. The sample session already quoted `uid=1000(kali)`,
+        # so the honest citation is unaffected.
+        shown = bool(claim.excerpt) and hit is not None and not reflected and (
+            hit.group(0).strip() in claim.excerpt
+            or claim.excerpt.strip() in hit.group(0))
+        checks.append(_check(
+            "the quoted bytes are the command output", shown,
+            f"{claim.excerpt.strip()[:48]!r} carries the identity line"
+            if shown else
+            ("quote the identity line itself" if not claim.excerpt else
+             f"the quoted bytes are not the identity output - quote "
+             f"{hit.group(0).strip()[:36]!r}" if hit and not reflected else
+             "no identity output to quote")))
         # The nonce this system sends, in the same exchange, both ways.
         nonce = None
         if entry:
@@ -1088,7 +1135,17 @@ def verify_command_output(claim: Claim, spec: "ProofSpec") -> list[dict]:
             f"{destructive} sent more than a read - the evidence is void"))
         return checks
 
-    return _witness(claim.exchanges or [None], build, spec.required)
+    # `_witness` scores candidates on the names it is given, and "the quoted
+    # bytes are the command output" is a property of the CITATION rather
+    # than of any one exchange - so letting it score witnesses changed which
+    # exchange got reported: the two-exchange attack (a request that sent
+    # `id` and got nothing, plus an unrelated debug page printing an
+    # identity line) moved from `unproven` to `candidate`, because the debug
+    # page now outscored the request. It stays in `spec.required`, so the
+    # grade still needs it; it is kept out of the selection.
+    return _witness(claim.exchanges or [None], build,
+                    tuple(n for n in spec.required
+                          if n != "the quoted bytes are the command output"))
 
 
 def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
@@ -1220,13 +1277,45 @@ def verify_data_extraction(claim: Claim, spec: "ProofSpec") -> list[dict]:
                     and _endpoint_shape(e) == _endpoint_shape(entry)
                     and _answered(e) and status_of(e) < 500
                     and not TABLE_RE.search(req_text(e))] if entry else []
-        fresh = bool(claim.excerpt) and bool(controls) and all(
-            claim.excerpt not in resp_body(c) for c in controls)
+        # `claim.excerpt in body` as well as absent-from-every-control: the
+        # claim is "these bytes are in THIS response and in no control", and
+        # without the first half the check passed on a witness that did not
+        # carry the quote at all - which let that witness outscore the real
+        # one in `_witness` and made the reported detail name the wrong
+        # exchange ("statements in b1 and in no control", where b1 was the
+        # baseline).
+        fresh = (bool(claim.excerpt) and claim.excerpt in body
+                 and bool(controls)
+                 and all(claim.excerpt not in resp_body(c) for c in controls))
+        # ...and the bytes must not come from INSIDE the sentence that says
+        # the query failed. See DBMS_FAILED_RE, which carries the bWAPP
+        # measurement: every occurrence of the excerpt falling within a
+        # failure message means the differential is the error the injection
+        # caused, not a row it returned.
+        # tracked separately from `fresh`, so the FAIL text can state the
+        # reason that actually disqualified the quote instead of the first
+        # one that happens to apply
+        in_failure = False
+        if fresh and entry is not None:
+            spans = [m.span() for m in DBMS_FAILED_RE.finditer(body)]
+            if spans:
+                at, in_failure = body.find(claim.excerpt), True
+                while at != -1:
+                    end = at + len(claim.excerpt)
+                    if not any(a <= at and end <= b for a, b in spans):
+                        in_failure = False
+                        break
+                    at = body.find(claim.excerpt, at + 1)
+            if in_failure:
+                fresh = False
         if spec.fingerprint:
             out.append(_check(
                 "the rows are not what the page serves anyway", fresh,
                 f"{claim.excerpt[:40]} in {rid} and in no control" if fresh
                 else ("quote the rows, not the page" if not claim.excerpt else
+                      "those bytes are inside the message saying the query "
+                      "FAILED - that is the error the injection caused, not "
+                      "a row it returned" if in_failure else
                       "no control cited: a request to the same endpoint "
                       "WITHOUT a table in it is what separates a read from "
                       "the page's own furniture" if not controls else
@@ -3595,6 +3684,7 @@ class Verdict:
 
 
 RCE_REQUIRED = ("a benign command was sent", "identity output returned by the target",
+                "the quoted bytes are the command output",
                 "the probe nonce came back in the output")
 RCE_VETO = ("proof command stayed benign",)
 SQLI_REQUIRED = ("data store fingerprinted", "the query named its target",
@@ -3606,6 +3696,7 @@ SQLI_REQUIRED = ("data store fingerprinted", "the query named its target",
 EXTRACTION_ADVISORY = ("extraction stayed minimal",)
 DESERIALIZE_REQUIRED = ("a serialized payload was sent",
                         "identity output returned by the target",
+                        "the quoted bytes are the command output",
                         "the probe nonce came back in the output")
 EXTRACTION_REQUIRED = ("the query named its target",
                        "rows returned, not an error message")
