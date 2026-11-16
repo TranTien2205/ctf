@@ -33,6 +33,8 @@ per Argus probe family so the agent can be exercised end-to-end offline:
     GET+POST /api/config       prototype pollution (__proto__ merge)
     POST /api/config2          proto pollution via constructor.prototype
     GET  /api/data             CORS: reflects Origin + credentials
+    GET  /cors-strict          CORS done right (own origin only) - clean twin
+    GET  /method-strict        refuses TRACE and write verbs - clean twin
     GET  /api/me               JWT (HS256, weak secret 'secret123')
     GET  /token?user=          issues a JWT
     GET  /.git/HEAD, /.env, /debug  info disclosure
@@ -327,7 +329,17 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("X-Powered-By", "LabVuln/1.0")
         origin = self.headers.get("Origin")
-        if origin:
+        if origin and self._cors_strict():
+            # the clean twin: an allowlist that answers with its OWN origin
+            # whatever you send. `verify_cors` asks `allow == origin`, so a
+            # foreign Origin never matches and the class refuses - which is
+            # what a CLEAN row for this class has to be able to drive. Until
+            # this existed the reflection below was unconditional, so EVERY
+            # endpoint on this lab was a cors finding and the class had no
+            # clean row at all (tests/test_probe_matrix_agreement.py).
+            self.send_header("Access-Control-Allow-Origin", self._own_origin())
+            self.send_header("Access-Control-Allow-Credentials", "true")
+        elif origin:
             # deliberately broken CORS: reflect any origin, allow credentials
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Access-Control-Allow-Credentials", "true")
@@ -336,6 +348,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
+
+    def _cors_strict(self) -> bool:
+        """Is this one of the paths with a working allowlist?"""
+        return urllib.parse.urlparse(self.path).path.startswith("/cors-strict")
+
+    def _own_origin(self) -> str:
+        host = self.headers.get("Host") or f"127.0.0.1:{self.server.server_address[1]}"
+        return f"http://{host}"
 
     def _params(self):
         q = urllib.parse.urlparse(self.path).query
@@ -679,6 +699,17 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self._send(404, json.dumps({"error": "no such user"}),
                            ctype="application/json")
+
+        elif path == "/cors-strict":
+            # same data as /api/data, behind an allowlist that works
+            self._send(body=json.dumps({"balance": 9000, "tier": "gold"}),
+                       ctype="application/json")
+
+        elif path == "/method-strict":
+            # a page that refuses TRACE and every write verb: the clean twin
+            # for the `method` class
+            self._send(body="<html><body>strict method handling"
+                            "</body></html>")
 
         elif path == "/api/data":
             self._send(body=json.dumps({"balance": 9000, "tier": "gold"}),
@@ -1326,7 +1357,12 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
         self.send_header("Allow", "GET, POST, OPTIONS, TRACE")
         origin = self.headers.get("Origin")
         if origin:
-            self.send_header("Access-Control-Allow-Origin", origin)
+            # the preflight has to agree with `_send`, or `probe_cors`
+            # reports "preflight reflects foreign origin WITH credentials"
+            # on the clean path and the row that drives it means nothing
+            self.send_header("Access-Control-Allow-Origin",
+                             self._own_origin() if self._cors_strict()
+                             else origin)
             self.send_header("Access-Control-Allow-Methods",
                              "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Credentials", "true")
@@ -1375,6 +1411,14 @@ const ws = new WebSocket('ws://127.0.0.1:9999/feed');
     def do_TRACE(self):
         # planted cross-site tracing vuln: TRACE echoes request headers
         # back - leaks HttpOnly cookies/auth headers to a reading XSS
+        #
+        # ...except on /method-strict, which refuses it. This handler
+        # answered every path, so every endpoint on the lab was a
+        # cross-site-tracing finding and the `method` class had no clean row
+        # to drive at all (tests/test_probe_matrix_agreement.py).
+        if urllib.parse.urlparse(self.path).path.startswith("/method-strict"):
+            self._send(405, "<html><body>method not allowed</body></html>")
+            return
         body = "".join(f"{k}: {v}\n" for k, v in self.headers.items())
         self.send_response(200)
         self.send_header("Content-Type", "message/http")

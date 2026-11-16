@@ -499,6 +499,18 @@ CLEAN = [
     # is two products and no subject, and the class refuses it.
     ("probe_idor", "idor",
      lambda c, b: probes.probe_idor(c, b + "/item?id=1")),
+    # The lab planted cors and TRACE GLOBALLY - every response reflected the
+    # Origin, every path answered TRACE - so neither class had an endpoint
+    # that could be a clean row. Two twins exist now, in the lab's own
+    # `-strict` idiom: /cors-strict answers with its OWN origin whatever you
+    # send, /method-strict refuses TRACE and the write verbs. Measured
+    # before the rows were added: cors `unproven` ("no cors issue"), method
+    # `unproven` - and the vulnerable rows still grade `proven`, which is
+    # the half of this that a clean twin can quietly break.
+    ("probe_cors", "cors",
+     lambda c, b: probes.probe_cors(c, b + "/cors-strict")),
+    ("probe_method", "method",
+     lambda c, b: probes.probe_method(c, b + "/method-strict")),
     ("probe_upload", "upload",
      lambda c, b: probes.probe_upload(c, b + "/api/register")),
     ("probe_xfh", "xfh",
@@ -815,13 +827,15 @@ def test_every_driven_probe_exists_and_maps_to_a_real_class():
 # plants these three GLOBALLY, so no endpoint on it is a clean one - checked
 # by driving each probe at a candidate and reading why `proven` came back:
 NO_CLEAN_ROW = {
-    "cors": "vulnapp.py reflects the request Origin plus "
-            "Access-Control-Allow-Credentials: true on EVERY response, so "
-            "there is no endpoint here with a correct allowlist",
-    "method": "do_TRACE answers on every path, so every endpoint is a "
-              "cross-site-tracing finding and none is a clean one",
+    # `cors` and `method` were here too, because the lab planted both
+    # globally - every response reflected the Origin, every path answered
+    # TRACE. That was a property of the lab, not of the classes, so the lab
+    # grew /cors-strict and /method-strict and both are driven above.
+    # `disclosure` is different in kind: the probe is origin-scoped by
+    # design, so no path on one server can be its clean twin.
     "disclosure": "probe_disclosure scans the ORIGIN, not the path it is "
-                  "given, and this lab serves /.env and /.git/HEAD there",
+                  "given (`root = f'{p.scheme}://{p.netloc}'`), so no path "
+                  "on a lab that serves /.env at its root is a clean one",
 }
 
 
@@ -835,10 +849,13 @@ def test_every_proving_class_has_a_clean_row_or_a_recorded_reason():
     invisible. The defects found in this stretch were mostly false proofs,
     which is exactly what a missing clean row cannot catch.
 
-    Three of the six are driven now - idor at /item, upload at
-    /api/register, xfh at /search - each measured below its ceiling before
-    its row was added. The other three are in `NO_CLEAN_ROW` with the
-    measurement that explains them. A new class needs one or the other.
+    Five of the six are driven now - idor at /item, upload at
+    /api/register, xfh at /search, and cors and method at the two `-strict`
+    twins the lab grew for them - each measured below its ceiling before
+    its row was added. Only `disclosure` is left in `NO_CLEAN_ROW`, and for
+    a reason that is about the probe rather than the lab: it scans the
+    origin, so no path on one server can be its clean twin. A new class
+    needs a clean row or a recorded reason.
     """
     vulnerable = {k for _, k, _ in VULNERABLE}
     clean = {k for _, k, _ in CLEAN}

@@ -4413,12 +4413,43 @@ looked like false positives in my own measurement, and each was my endpoint
 choice rather than a defect. Driving a probe at an endpoint that is not
 actually clean produces exactly the output a real false positive would.
 
+### Two of those three "cannot" answers were about the lab, not the class
+The section above said `cors` and `method` could not have a clean row
+because the lab plants both globally - every response reflected the request
+`Origin`, every path answered `TRACE`. That was true, and it was a fact
+about the LAB rather than about either class, which makes it something to
+fix rather than to record. Both now have a clean twin in the lab's own
+`-strict` idiom, beside `/ws-strict` and `/graphql-strict`:
+
+- **`/cors-strict`** serves the same data as `/api/data` behind an
+  allowlist that works: it answers with its OWN origin whatever you send.
+  `verify_cors` asks `allow == origin`, so a foreign `Origin` never
+  matches. `do_OPTIONS` had to learn the same rule, or `probe_cors` reports
+  "preflight reflects foreign origin WITH credentials" on the clean path and
+  the row driving it means nothing.
+- **`/method-strict`** refuses `TRACE` with a 405 and takes no write verb.
+
+Measured before the rows were added: `probe_cors` against `/cors-strict`
+grades `unproven` and says "no cors issue"; `probe_method` against
+`/method-strict` grades `unproven` and just lists the methods. And the
+vulnerable rows still grade `proven` - that is the half a clean twin can
+quietly break, so it was measured in the same run. Planting each twin back
+fails the clean row with the module's own sentence: "That is the verifier
+accepting something it should refuse."
+
+`NO_CLEAN_ROW` is down to one entry, and it is the one whose reason is
+about the probe rather than the lab: `probe_disclosure` scans the ORIGIN
+rather than the path it is given, so no path on a server that serves
+`/.env` at its root can be its clean twin. Five of the six gaps closed;
+`dos` remains the one class driven in neither direction, recorded in
+`NOT_DRIVEN` as it already was.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 739 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 741 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
