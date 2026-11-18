@@ -2043,8 +2043,8 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
       "skill_tokens": 1354,
-      "depth_files": 5,
-      "depth_tokens": 4306,
+      "depth_files": 57,
+      "depth_tokens": 101960,
       "use_when": [
         "a probe or source read produced this class's signal: pollute one harmless property, then read it back through a path that should not have it",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate, htb-tornadoservice-bot-csrf-class-pollution, htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
