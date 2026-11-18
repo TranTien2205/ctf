@@ -774,8 +774,15 @@ def main(argv: list[str] | None = None) -> int:
                   "itself. Save one with --save next time, before the run.")
         print(f"  argus called proven    : {out['proven_findings']} "
               f"({', '.join(out['proven_classes']) or 'none'})")
-        print(f"  challenges matched     : {out['newly_solved_matched']}"
-              f"/{len(out['newly_solved'])} of those newly solved")
+        n_new = len(out["newly_solved"])
+        n_held = len(out["withheld_but_corroborated"])
+        # Labelled by WHICH claim was matched. The first version said
+        # "challenges matched: 0/2" while two challenges were corroborated
+        # at `candidate`, so a reader saw no agreement where there was
+        # agreement the gate had deliberately not called proof.
+        print(f"  matched a proven claim : {out['newly_solved_matched']}/{n_new}")
+        if n_held:
+            print(f"  matched a withheld one : {n_held}/{n_new}")
         if out["claims_made"]:
             print(f"  claims corroborated    : at most "
                   f"{out['claims_corroborated_upper_bound']}/{out['claims_made']} "
@@ -788,6 +795,12 @@ def main(argv: list[str] | None = None) -> int:
         for ch in out["confirmed_approx"]:
             print(f"  CONFIRMED (approx)     : {ch['key']} "
                   f"[{ch['category']}] <- argus {', '.join(ch['argus_classes'])}")
+        for ch in out["withheld_but_corroborated"]:
+            print(f"  WITHHELD, corroborated : {ch['key']} "
+                  f"[{ch['category']}] <- argus graded "
+                  f"{', '.join(ch['argus_classes'])} as candidate")
+            print("      (agreement at the channel level; the gate held "
+                  "`proven` back on a stated shortfall, which is not a miss)")
         for ch in out["unclaimed"]:
             print(f"  target solved, unclaimed: {ch['key']} [{ch['category']}]")
         print(f"\n  {out['caveat']}")

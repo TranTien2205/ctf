@@ -290,3 +290,59 @@ def test_an_uncorroborated_claim_is_not_called_a_false_positive():
     assert "not a false positive" in low
     for word in ("wrong", "invalid", "false finding"):
         assert word not in low
+
+
+# --------------------- a withheld grade is not the same fact as silence
+
+def test_a_candidate_grade_is_not_reported_as_a_claim_argus_never_made():
+    """MEASURED end to end against the live target, and this is the case the
+    experiment was run to find.
+
+    A real SQLi authentication bypass (`jim@juice-sh.op'--` on
+    `/rest/user/login`: 401 for the control, 200 for the payload) flipped
+    `loginJimChallenge`. The proof gate graded the class `candidate`, and it
+    was RIGHT to: the sqli requirement is "the DBMS fingerprint plus at
+    least one row from a named table", and the gate's own reason was "a
+    boolean differential proves the channel, not the read". A bypass proves
+    the channel and reads no rows.
+
+    With only `proven` counted as a claim, that pair came out `unclaimed` -
+    "the target solved a challenge argus claimed nothing for" - which a
+    report would quote as a bug argus missed. argus found it, graded it
+    `candidate`, and named the three checks it fell short of. Scoring the
+    gate's deliberate strictness as a miss is the opposite of what an
+    independent oracle is for.
+    """
+    before = G.read_scoreboard(_FakeClient(_board()), "http://t.test/")
+    after = G.read_scoreboard(_FakeClient(_board(solved_keys={"ch1"})),
+                              "http://t.test/")       # ch1 is Injection
+
+    withheld = G.correlate(before, after,
+                           [{"grade": "candidate", "vuln_class": "sqli"}])
+    assert [c["key"] for c in withheld["withheld_but_corroborated"]] == ["ch1"]
+    assert withheld["confirmed_approx"] == [], "candidate is not confirmation"
+    assert withheld["unclaimed"] == [], "and it is not silence either"
+    assert withheld["withheld_but_corroborated"][0]["argus_grade"] == "candidate"
+
+    # the three cases must stay distinguishable
+    proven = G.correlate(before, after,
+                         [{"grade": "proven", "vuln_class": "sqli"}])
+    silent = G.correlate(before, after, [])
+    assert [c["key"] for c in proven["confirmed_approx"]] == ["ch1"]
+    assert proven["withheld_but_corroborated"] == []
+    assert [c["key"] for c in silent["unclaimed"]] == ["ch1"]
+    assert silent["withheld_but_corroborated"] == []
+
+
+def test_a_proven_claim_outranks_a_candidate_one_for_the_same_challenge():
+    """A run that graded one class `proven` and another `candidate` for the
+    same category reports the challenge once, under the stronger grade."""
+    before = G.read_scoreboard(_FakeClient(_board()), "http://t.test/")
+    after = G.read_scoreboard(_FakeClient(_board(solved_keys={"ch1"})),
+                              "http://t.test/")
+    out = G.correlate(before, after, [
+        {"grade": "proven", "vuln_class": "sqli"},
+        {"grade": "candidate", "vuln_class": "rce"},   # same Injection hints
+    ])
+    assert [c["key"] for c in out["confirmed_approx"]] == ["ch1"]
+    assert out["withheld_but_corroborated"] == [], "no double-counting"

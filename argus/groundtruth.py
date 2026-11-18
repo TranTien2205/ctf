@@ -173,13 +173,35 @@ def correlate(before: Scoreboard, after: Scoreboard,
     gained = newly_solved(before, after)
     proven = [f for f in findings or () if str(f.get("grade", "")).lower() == "proven"]
     claimed_classes = {str(f.get("vuln_class", "")).lower() for f in proven}
+    # MEASURED, and this is why the third bucket exists. A real SQLi
+    # authentication bypass flipped `loginJimChallenge`, and the proof gate
+    # graded the class `candidate` - correctly, because the sqli requirement
+    # is "the DBMS fingerprint plus at least one row from a named table" and
+    # the gate's own reason was "a boolean differential proves the channel,
+    # not the read". The bypass proves the channel and reads no rows.
+    #
+    # With only `proven` considered a claim, that pair came out as
+    # `unclaimed` - "the target solved a challenge argus claimed nothing
+    # for" - which a report would quote as a bug argus missed. argus found
+    # it, graded it `candidate`, and named the three checks it was short of.
+    # A withheld grade is a DIFFERENT fact from silence, and conflating them
+    # scores the gate's deliberate strictness as a miss.
+    withheld_classes = {str(f.get("vuln_class", "")).lower()
+                        for f in findings or ()
+                        if str(f.get("grade", "")).lower() == "candidate"}
 
-    confirmed, unmapped = [], []
+    confirmed, withheld, unmapped = [], [], []
     for ch in gained:
-        hints = CATEGORY_HINTS.get(ch.get("category") or "", ())
-        hit = sorted(claimed_classes & set(hints))
-        (confirmed if hit else unmapped).append(
-            {**ch, "argus_classes": hit})
+        hints = set(CATEGORY_HINTS.get(ch.get("category") or "", ()))
+        hit = sorted(claimed_classes & hints)
+        near = sorted(withheld_classes & hints)
+        if hit:
+            confirmed.append({**ch, "argus_classes": hit})
+        elif near:
+            withheld.append({**ch, "argus_classes": near,
+                             "argus_grade": "candidate"})
+        else:
+            unmapped.append({**ch, "argus_classes": []})
 
     # THE THIRD QUADRANT. Target solved + argus claimed is `confirmed`;
     # target solved + argus silent is `unclaimed`; and a claim the board
@@ -228,9 +250,13 @@ def correlate(before: Scoreboard, after: Scoreboard,
         # "Confirmed" is as strong as the category mapping, which is
         # approximate - the challenge keys are listed so a reader can check.
         "confirmed_approx": confirmed,
-        # The target recorded a solve argus claimed nothing for. Either the
-        # run tripped it blind, or the mapping is too narrow. Both are worth
-        # a human look, and neither is a failure of the gate.
+        # The board corroborates a class argus graded `candidate`. This is
+        # AGREEMENT, at the channel level, with the gate withholding `proven`
+        # on a stated shortfall - not a miss, and not a confirmation either.
+        "withheld_but_corroborated": withheld,
+        # The target recorded a solve argus said nothing about at any grade.
+        # Either the run tripped it blind, or the mapping is too narrow. Both
+        # are worth a human look, and neither is a failure of the gate.
         "unclaimed": unmapped,
         "proven_findings": len(proven),
         "proven_classes": sorted(claimed_classes),

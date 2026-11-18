@@ -5193,12 +5193,57 @@ Three classes in the same Injection group were left alone on purpose, and
 their own names say why: "User Credentials", "NoSQL Exfiltration", "NoSQL
 DoS". CLAUDE.md refuses all three.
 
+### The gate and the oracle disagreed, and the gate was right
+
+The experiment the whole design points at: when the proof gate says
+`proven`, does the target agree - and when it says less, was it right to?
+
+`jim@juice-sh.op'--` on `/rest/user/login` against the lab's Juice Shop:
+401 for the control, 200 for the payload. The board flipped
+`loginJimChallenge`. The gate graded the class **`candidate`**.
+
+A disagreement between the instrument and independent ground truth, and the
+first instinct - that the gate is too strict - was wrong. The sqli
+requirement is "the DBMS fingerprint plus at least one row from a named
+table, bounded to what proves the read", and the three failing checks named
+themselves: no engine named, no cited request carrying SQL that names a
+table, and the rows never quoted from an exchange that named one. The gate's
+own detail said it in one line: **"a boolean differential proves the
+channel, not the read"**. An authentication bypass proves the channel and
+reads no rows, so `candidate` is the correct grade for what was actually
+done, and Juice Shop's challenge is "log in as Jim", which is a different
+claim. Two instruments measuring different things, agreeing about the world.
+
+That the gate could be resolved in one step rather than argued about is
+worth noting on its own: the failing checks carried their reasons, so the
+question "is this a false negative" had an answer in the output.
+
+AND IT EXPOSED THE FOURTH BUCKET. With only `proven` counted as a claim,
+that pair came out `unclaimed` - "the target solved a challenge argus
+claimed nothing for". A report quoting that number would say the oracle
+found a bug argus missed. argus found it, graded it `candidate`, and named
+the three checks it was short of. A withheld grade is a DIFFERENT FACT from
+silence, and conflating them scores the gate's deliberate strictness as a
+miss, which is the opposite of what an independent oracle is for.
+
+`withheld_but_corroborated` reports it now: agreement at the channel level,
+with the gate holding `proven` back on a stated shortfall. The three cases
+are distinguishable - a proven claim confirms, a candidate claim is
+corroborated-but-withheld, silence is unclaimed - and a proven claim
+outranks a candidate one for the same challenge so nothing is counted twice.
+
+THE SUMMARY LINE NEEDED THE SAME CARE. It read "challenges matched: 0/2"
+while two challenges were corroborated at `candidate`, so a reader saw no
+agreement where there was agreement the gate had deliberately not called
+proof. It is labelled by which claim was matched now: 0/2 proven, 2/2
+withheld.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1030 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1032 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
