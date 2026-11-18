@@ -1541,8 +1541,8 @@
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
       "skill_tokens": 1924,
-      "depth_files": 5,
-      "depth_tokens": 11455,
+      "depth_files": 43,
+      "depth_tokens": 101422,
       "use_when": [
         "a probe or source read produced this class's signal: decode and read the token before modifying anything; the weakness is usually visible in the header or the claims",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
