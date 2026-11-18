@@ -1927,8 +1927,8 @@
         "htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
       ],
       "skill_tokens": 1077,
-      "depth_files": 31,
-      "depth_tokens": 28511,
+      "depth_files": 59,
+      "depth_tokens": 94238,
       "use_when": [
         "a probe or source read produced this class's signal: send the filter pinned to an object you created, with every write field omitted, and read what comes back",
         "a chain card already proves this class here: htb-secnotes-mongoose-rename-prototype-pollution-local-gate"
