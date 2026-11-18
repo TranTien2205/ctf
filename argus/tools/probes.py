@@ -124,6 +124,34 @@ def _similarity(a: str, b: str) -> float:
 
 # ---------------------------------------------------------------------------
 
+def _client_cookie_header(client) -> str:
+    """The client's session as a `Cookie` header value, or "".
+
+    `GuardedClient` keeps cookies in the httpx client it wraps, not in any
+    header dict of its own, so a caller that wants to hand the session to
+    another process has to read the jar. Tried in order and tolerantly: an
+    attribute name is not a contract, and a probe must not raise because an
+    internal moved.
+    """
+    for attr in ("_client", "client", "_http"):
+        inner = getattr(client, attr, None)
+        jar = getattr(inner, "cookies", None)
+        if jar is None:
+            continue
+        try:
+            pairs = [(str(k), str(v)) for k, v in dict(jar).items()]
+        except Exception:                                  # pragma: no cover
+            continue
+        if pairs:
+            return "; ".join(f"{k}={v}" for k, v in pairs)
+    # The old path, kept as a fallback rather than deleted: a caller that
+    # really did set a Cookie header still works.
+    for key, value in (getattr(client, "_default_headers", {}) or {}).items():
+        if str(key).lower() == "cookie":
+            return str(value)
+    return ""
+
+
 def _prove_execution(ctx: Context, url: str, param: str, method: str,
                      data: str | None) -> dict:
     """Make the payload call home, and record the call.
@@ -164,12 +192,20 @@ def _prove_execution(ctx: Context, url: str, param: str, method: str,
         # with none. Driving it at an authenticated page without one lands
         # on a login screen, nothing executes, and the result reads as
         # "the payload did not run" when the browser never saw the page.
-        # Take the session from the client that is already using it.
-        cookie = ""
-        for key, value in (getattr(ctx.client, "_default_headers", {}) or {}).items():
-            if str(key).lower() == "cookie":
-                cookie = str(value)
-                break
+        # Take the session from the client that is already using it - and
+        # from where the client ACTUALLY keeps it.
+        #
+        # MEASURED: this read `_default_headers`, which is `{}` after a
+        # login, while the session lives in the underlying httpx client's
+        # COOKIE JAR (`PHPSESSID`, `security_level` after a bWAPP login).
+        # So the transfer never fired, the browser visited bWAPP's
+        # authenticated XSS page with no session, landed on the login
+        # screen, and the result read `executed: False` - which is exactly
+        # the false negative the comment above was written to prevent. The
+        # fix was looked for in the wrong place because the fact that the
+        # client holds a jar is documented and the fact that
+        # `_default_headers` does not hold it was not.
+        cookie = _client_cookie_header(ctx.client)
         cookie_result = (_browser.set_cookies(cookie, url) if cookie
                          else {"set": 0, "reason": "the probe holds no session"})
         shapes = {}

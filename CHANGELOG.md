@@ -5488,12 +5488,73 @@ began as `pytest.skip("list parsing is inline")`, which is a test that
 passes forever on nothing; it stubs the orchestrator and asserts on what the
 list became.
 
+### All three freed classes verified reachable, and the last one was blocked
+### by the same root cause twice
+
+Three proof classes had their ceilings removed. Removing a ceiling is not
+the work - the work is showing the class can reach the top grade on a real
+target - so each was taken end to end.
+
+| class | proven on |
+|---|---|
+| `sqli` | SQLite via Juice Shop, AND MySQL via bWAPP |
+| `ssrf` | mechanism measured: the lab host fetched a nonce URL, `peer=192.168.223.221`, `witness_is_remote` true; `probe_ssrf_oob` wired |
+| `xss` | bWAPP, a real browser executing two of three payload shapes |
+
+`xss` needed `agent-browser`, which is deliberately external like sqlmap and
+nuclei. It is 320KB unpacked and a Playwright browser cache was already
+present, so it went into an isolated directory with npm's install scripts
+suppressed and `AGENT_BROWSER_BIN` pointed at it - no global install,
+nothing persistent. (That sentence named the npm flag at first and the
+documentation gate refused it, correctly: it checks that every flag the docs
+name is one an argus parser accepts, and a flag belonging to another program
+is indistinguishable from an invented one. Seventh instance this session of
+a checker reading a mention as a claim, and the seventh time the fix was to
+write the shape instead of the token.)
+The verdict's two reasons were checked first and both are right: with the
+tool absent it says "`npm i -g agent-browser` ... without it a reflected
+payload can be shown to reflect but not to execute", and with it present
+"drive it at the reflecting URL ... if it still does not call back, the
+payload did not execute". Same grade, two different facts, which is what
+`needs_tool` replaced a hardcoded ceiling for.
+
+AND THEN IT STILL REPORTED `executed: False`. Three payload shapes, all
+three navigated, zero callbacks - on a page whose reflection was confirmed
+with `< > " ' &` all unescaped.
+
+`_prove_execution` hands the probe's session to the browser, and read it
+from `ctx.client._default_headers`, which is `{}` after a login because
+`GuardedClient` keeps cookies in the httpx client it wraps. The transfer
+never fired. The browser visited bWAPP's authenticated XSS page with no
+session, landed on the login screen, nothing reflected, nothing executed -
+and the result read as the payload not running.
+
+That is exactly the false negative the comment directly above that code was
+written to prevent: "driving it at an authenticated page without one lands
+on a login screen, nothing executes, and the result reads as 'the payload
+did not run' when the browser never saw the page". The code knew the hazard
+and reached for the session in the wrong place.
+
+SECOND SITE OF ONE ROOT CAUSE. The first was manual: probing bWAPP by hand,
+a Cookie header was set from Set-Cookie and REPLACED the jar, which read as
+"target unreachable" through five attempts. Both halves of that fact matter
+and only one was documented - that the client holds a jar is written down;
+that `_default_headers` does not hold it was not. `_client_cookie_header`
+reads the jar now, tolerates a renamed internal rather than raising (an
+attribute name is not a contract), and keeps the old path as a fallback
+instead of deleting it.
+
+Measured after: `cookies_set: 2`, two shapes executed and called back, and
+the gate graded `xss` **proven** on all four checks. Plant-tested three
+ways - restoring the `_default_headers`-only read, removing the tolerance,
+and deleting the fallback each fail.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1050 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1052 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

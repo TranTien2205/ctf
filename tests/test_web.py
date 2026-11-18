@@ -1484,3 +1484,84 @@ def test_the_client_holds_the_session_and_an_explicit_cookie_replaces_it():
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+def test_the_session_handed_to_another_process_comes_from_the_jar():
+    """The second site of one root cause, and the expensive one.
+
+    `_prove_execution` hands the probe's session to the browser so a
+    reflected payload is driven at the page that reflected it. It read
+    `ctx.client._default_headers` for a Cookie - which is `{}` after a
+    login, because `GuardedClient` keeps cookies in the httpx client it
+    wraps. So the transfer never fired, the browser visited an
+    authenticated page with no session, landed on the login screen, and the
+    result read `executed: False`.
+
+    That is exactly the false negative the comment above the code was
+    written to prevent, and it made the `xss` class unprovable on any
+    authenticated target. MEASURED on bWAPP: before the fix, three payload
+    shapes navigated and zero called back; after it, `cookies_set: 2`, two
+    shapes executed, and the gate graded the class `proven` on all four
+    checks.
+    """
+    import http.server
+    import tempfile
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Set-Cookie", "SID=abc; path=/")
+            self.send_header("Set-Cookie", "lvl=0; path=/")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        from argus.httpclient import GuardedClient
+        from argus.ratelimit import RateLimiter
+        from argus.scope import ScopeGuard
+        from argus.session import Session
+        from argus.tools.probes import _client_cookie_header
+
+        scope = ScopeGuard(base, allow_private=True)
+        sess = Session(Path(tempfile.mkdtemp()), base, {"model": "t"})
+        cl = GuardedClient(scope, sess, RateLimiter(0.0), max_requests=6)
+
+        assert _client_cookie_header(cl) == "", "nothing to hand over yet"
+        cl.send("GET", base + "/login")
+        header = _client_cookie_header(cl)
+        assert "SID=abc" in header and "lvl=0" in header, header
+        # ...and NOT from _default_headers, which is where it used to look
+        assert not (getattr(cl, "_default_headers", None) or {}), \
+            "the fixture must reproduce the empty header dict"
+    finally:
+        srv.shutdown()
+        srv.server_close()
+
+
+def test_the_cookie_reader_tolerates_a_renamed_internal():
+    """An attribute name is not a contract. A probe must not raise because
+    an internal moved - it must report no session, which the caller already
+    handles as "the probe holds no session"."""
+    from argus.tools.probes import _client_cookie_header
+
+    class Odd:
+        pass
+
+    assert _client_cookie_header(Odd()) == ""
+
+    class Broken:
+        class _client:
+            cookies = object()          # not dict()-able
+    assert _client_cookie_header(Broken()) == ""
+
+    class Legacy:
+        _default_headers = {"Cookie": "SID=legacy"}
+    assert _client_cookie_header(Legacy()) == "SID=legacy", \
+        "the old path stays as a fallback rather than being deleted"
