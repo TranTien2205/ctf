@@ -4764,7 +4764,7 @@ negative ever settles it, and nothing left open at all. Collapsing those
 into one line would put "we checked and it is fine" and "we checked and
 cannot tell" under the same words.
 
-762 tests, selftest 163/163.
+762 tests, selftest 164/164.
 
 ### xss proved itself on the DOCTYPE, and the first two fixes were both wrong
 
@@ -4849,7 +4849,7 @@ Three scenarios pinned: refused everywhere (every endpoint an untested
 gap, marked), absent everywhere (404 is an answer, settled), and a refusal
 among answers (not blanket-blocked, so the 403 is the control working).
 
-1021 tests, selftest 163/163.
+1021 tests, selftest 164/164.
 
 ### The hybrid fan-out was 1500 lines nothing could reach
 
@@ -4922,7 +4922,7 @@ impose, over the 24 class modules. Planted back, it fails; removed, it
 passes. The scan found exactly one card wrong, which is the number that
 matters: the check was written because one had already drifted, and it had.
 
-1021 tests, selftest 163/163.
+1021 tests, selftest 164/164.
 
 ### An oracle argus cannot write
 
@@ -5672,12 +5672,49 @@ moment was also wrong: the gate's failure looked like a plant that had not
 been restored, and the plant had been restored. The gate was reading this
 file.)
 
+### Two more reverse directions: one real gap, one audit that over-reported
+
+The same question applied to the two remaining one-way checks.
+
+**Every flag is documented.** Every other flag in this tree already was, so
+the norm is the project's rather than one imposed here - and the first thing
+the check found was `--app` on `argus groundtruth`, added in the same session
+and written up nowhere. Documented, and the check holds it: a flag a parser
+accepts and no gated document names now fails. `--help` and `--version` are
+exempt because argparse supplies them.
+
+**Every gradeable class is taught by some card** - and this audit
+over-reported before it was right, the second time in this session that an
+audit's negative verdicts were its unreliable half.
+
+Asking only whether a card's STEM resolves to the class flagged six. Five of
+them are taught by a card with a different name, which `load_skill` already
+knows: `_also_taught` derives the extra classes from the driving tools a
+module names, through the same tool-to-class mapping the ledger uses for
+evidence attribution. `auth-enum` teaches `enum`, `auth-session` teaches
+`lockout`, `jwt` and `massassign`, and `triage` teaches `method` - and that
+function's own docstring names those five, because it was written for
+exactly this gap on the runtime side.
+
+Counting the way the runtime counts, only `dos` has no card, and `dos` has
+no required checks either, which is how a refused-by-construction class
+looks. So the real answer is no gap, and the result is the invariant: a
+class added with no card at all, by name or by driving tool, fails instead
+of handing an agent a requirement with no methodology behind it. The five
+that depend on `_also_taught` are also asserted BY NAME, so the mechanism
+cannot quietly stop working and leave the check green - planted by making
+that function return nothing, which fails.
+
+Two audits, one real finding, and the finding was mine from earlier the same
+day. That is the argument for the reverse direction rather than for trusting
+whoever added the thing.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1054 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1055 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
@@ -5685,7 +5722,7 @@ the documentation gate exists to catch - and it caught it.
   fix carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 163 offline checks, including a documentation
+- `python selftest.py`: 164 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

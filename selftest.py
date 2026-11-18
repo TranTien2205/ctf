@@ -938,6 +938,18 @@ def _doc_consistency() -> None:
             # own flags, and a flag belonging to another program is
             # indistinguishable from an invented one without it.
             doc_flags |= found
+    # The reverse, same reasoning as the subcommand pair above. Every other
+    # flag in this tree is already documented, so the norm is the project's
+    # and not one imposed here - the first thing this found was `--app` on
+    # `argus groundtruth`, added in the same session and written up nowhere.
+    undocumented_flags = sorted(
+        f for f in real_flags
+        if f not in ("--help", "--version") and f not in joined)
+    check(f"every flag is documented ({len(real_flags)})",
+          not undocumented_flags,
+          f"{undocumented_flags} are accepted by a parser and named in no "
+          "gated document")
+
     invented = sorted(doc_flags - real_flags)
     check(f"docs name only real flags ({len(real_flags)})", not invented,
           f"{invented} accepted by no parser")

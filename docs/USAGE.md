@@ -662,6 +662,11 @@ juice-shop scoreboard: http://juice.shop:3000/api/Challenges
   argus called proven    : 2 (rce, sqli)
 ```
 
+`--app` picks which scoreboard shape to read; `juice-shop` is the default and
+the only one known so far, and an unknown name is refused with the list
+rather than guessed at. Adding another is a data change: a path and the
+shape of what it returns.
+
 Without `--before` it says so in words instead of printing a zero, because a
 missing input and a measured zero are different facts.
 

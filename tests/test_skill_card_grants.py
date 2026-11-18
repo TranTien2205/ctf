@@ -653,3 +653,52 @@ def test_the_proof_shaped_capability_is_still_there():
         "the measurement-not-value shape the card already had must stay"
     assert "document.cookie.length" in xss, \
         "cookie reachability is provable from its size"
+
+
+def test_every_gradeable_class_is_taught_by_some_card():
+    """The reverse of "every card names a real class", and it has to use the
+    runtime's own mechanism or it over-reports.
+
+    MEASURED: a first pass asked only whether a card's STEM resolves to the
+    class and flagged six - `enum`, `jwt`, `lockout`, `massassign`, `method`
+    and `dos`. Five of those are taught by a card with a different name,
+    which `load_skill` already knows: `_also_taught` derives the extra
+    classes from the driving tools a module names, through the same
+    tool->class mapping the ledger uses. `auth-enum` teaches `enum`,
+    `auth-session` teaches `lockout`, `jwt` and `massassign`, `triage`
+    teaches `method`. Counting that way, the real answer is that only `dos`
+    has no card - and `dos` has no required checks either, which is how a
+    refused-by-construction class looks.
+
+    So this is the invariant rather than a fix: a class added with no card
+    at all, by name or by driving tool, fails here instead of handing an
+    agent a requirement with no methodology behind it.
+    """
+    from argus.tools.analysis import _also_taught
+
+    covered: dict[str, list[str]] = {}
+    for path in sorted(SKILLS.glob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        spec = proof.module_spec(path.stem)
+        own = spec.vuln_class if spec else ""
+        if own:
+            covered.setdefault(own, []).append(path.stem)
+        for extra in _also_taught(read(path), own):
+            covered.setdefault(extra, []).append(f"{path.stem} (also)")
+
+    uncovered = [c for c in sorted(proof.classes())
+                 if c not in covered and proof.spec_for(c).required]
+    assert not uncovered, (
+        f"{uncovered} are gradeable classes no skill card teaches, by name "
+        "or through a driving tool - an agent loading for them gets a proof "
+        "requirement and no methodology")
+
+    # and the five that depend on `_also_taught` are asserted by name, so
+    # the mechanism cannot quietly stop working and leave this green
+    for klass, teacher in (("enum", "auth-enum"), ("lockout", "auth-session"),
+                           ("jwt", "auth-session"), ("massassign", "auth-session"),
+                           ("method", "triage")):
+        assert any(t.startswith(teacher) for t in covered.get(klass, [])), (
+            f"{klass} is no longer reached through {teacher}; "
+            f"covered by {covered.get(klass)}")
