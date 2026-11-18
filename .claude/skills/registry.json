@@ -1817,8 +1817,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 1068,
-      "depth_files": 7,
-      "depth_tokens": 3485,
+      "depth_files": 47,
+      "depth_tokens": 88950,
       "use_when": [
         "a probe or source read produced this class's signal: create an object as one identity, then request its identifier as a second identity"
       ],

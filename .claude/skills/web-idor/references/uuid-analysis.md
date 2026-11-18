@@ -1,90 +1,158 @@
-# IDOR - UUID Analysis
+# UUID / opaque-id analysis — when the id isn't sequential
 
-## UUID Version Identification
+The id is a UUID, ObjectId, Snowflake, nanoid, ULID, hash, or opaque
+token — not enumerable. The attack surface is *predictability* and
+*leak*.
+
+---
+
+## 1. The format table
+
+| Format | Shape | Predictable? |
+|---|---|---|
+| UUID v1 | `xxxxxxxx-xxxx-1xxx-...` | time+node — yes, if you know created_at+MAC |
+| UUID v3/v5 | `...-3xxx`/`...-5xxx` | name+ns hash — yes, recomputable |
+| UUID v4 | `...-4xxx-...-[89ab]xxx` | random — no sweep; need the leak |
+| ObjectId | 24-hex | 4B ts + 5B rand + 3B counter — partially |
+| Snowflake | 19-digit | ts + worker + seq — partially |
+| ULID | 26-char crockford | ts + rand — partially |
+| nanoid | 21-char | random — no |
+| CUID | `c...` | counter+ts — partially |
+| b64 `Type:id` | `VXNlcjo0Mg==` | decodes to `User:42` — yes |
+| hash-of-X | `md5(email)` | recomputable — yes |
+| opaque token | random | no — need the leak |
+| KSUID | 27-char | ts + rand |
+| UUID v6/v7 | `...-6xxx`/`-7xxx` | ts-ordered — partially |
+| xid | 20-char | ts + machine + counter |
+
+## 2. The UUID v1 — time+node
+
+`xxxxxxxx-xxxx-1xxx-yxxx-xxxxxxxxxxxx` — the layout is
+`time_low-time_mid-time_hi-version-node`. The `node` is often the MAC;
+`time_*` is the creation time. Predict: recompute the UUID for a known
+`created_at` + the app's MAC (from a known UUID's node field).
+
+The MAC leaks in a UUID the app hands you — same node → same machine.
+
+## 3. The UUID v3/v5 — name+ns
+
+`uuid5(namespace, name)` — recomputable if you know the namespace and
+the name (admin's email, the username). Compute `uuid5(NAMESPACE,
+'admin')` and request it.
+
+## 4. The ObjectId — timestamp+rand+counter
+
 ```
-UUID format: xxxxxxxx-xxxx-Vxxx-Nxxx-xxxxxxxxxxxx
-V = version digit (position 15, 13th hex char after removing dashes)
-N = variant bits
+4B timestamp | 5B random (process+machine) | 3B counter
 ```
 
-## UUID v1 (Time-Based - PREDICTABLE)
-```
-Structure: time_low-time_mid-time_hi_and_version-clock_seq-node
-Contains: timestamp + MAC address (node)
+The timestamp is the creation epoch (predictable from `created_at`);
+the 5B random is per-process (constant across the app); the 3B counter
+increments. Two ObjectIds generated in the same second differ only in
+the counter — enumerate the counter.
 
-# If you know approximate creation time and MAC/node ID pattern,
-# you can predict/brute-force other UUID v1 values
-
-# Python: decode timestamp from UUID v1
-import uuid
-u = uuid.UUID('550e8400-e29b-11d4-a716-446655440000')
-print(u.time)  # 100-nanosecond intervals since UUID epoch (1582-10-15)
-```
-
-### UUID v1 Brute Force (if node/MAC is fixed for the server)
 ```python
-import uuid
-import time
-
-# If you know the node (MAC-derived) and approximate timestamp,
-# enumerate nearby timestamps to guess valid UUIDs
-node = 0x446655440000  # extracted from a known UUID
-for offset in range(-1000, 1000):
-    fake_time = int(time.time() * 1e7) + offset
-    # Construct UUID v1 manually with known node and clock_seq
+# given a known ObjectId for a target created_at, enumerate the counter
+target_ts = int(created_at)               # the 4B prefix
+known_rand = known_id[8:20]               # the 5B process-random
+for counter in range(0, 0x1000000):       # 3B counter
+    candidate = f"{target_ts:08x}{known_rand}{counter:06x}"
 ```
 
-## UUID v4 (Random - THEORETICALLY SAFE, check RNG quality)
+The space is 16.7M — big but not hopeless for a bounded sweep.
+
+## 5. The Snowflake — ts+worker+seq
+
 ```
-Fully random except version/variant bits (122 bits of randomness)
-Not brute-forceable if properly generated (2^122 space)
-
-# BUT: check if the underlying RNG is weak/predictable
-# (e.g., Math.random() in old JS instead of crypto.randomUUID())
-```
-
-## UUID v3/v5 (Namespace + Name Hash - DETERMINISTIC)
-```
-UUID = MD5(v3) or SHA1(v5) of (namespace + name)
-
-# If namespace is known/default and name is guessable (e.g., username, email, sequential ID)
-# You can COMPUTE the UUID directly without brute force
-
-import uuid
-namespace = uuid.NAMESPACE_DNS  # or custom namespace UUID
-predicted = uuid.uuid5(namespace, "victim@example.com")
-print(predicted)
+41B timestamp (ms since epoch) | 10B worker | 12B sequence
 ```
 
-### Common Namespace UUIDs to Test
-```
-NAMESPACE_DNS  = 6ba7b810-9dad-11d1-80b4-00c04fd430c8
-NAMESPACE_URL  = 6ba7b811-9dad-11d1-80b4-00c04fd430c8
-NAMESPACE_OID  = 6ba7b812-9dad-11d1-80b4-00c04fd430c8
-NAMESPACE_X500 = 6ba7b814-9dad-11d1-80b4-00c04fd430c8
+The timestamp is predictable; worker+seq small. Two ids in the same ms
+differ only in the 12B seq.
+
+## 6. The ULID — ts+rand
+
+`01HXXXXXXXXXXXXXXXXXXXXXXX` — the first 10 chars are the ms timestamp
+(crockford), the last 16 are random. Same-ms ids differ only in the rand
+— the rand is the sweep space.
+
+## 7. The b64 `Type:id` — the Relay shape
+
+`VXNlcjo0Mg==` decodes to `User:42` — the b64 is the encoding, not the
+id. Decode → change `42`→`1` → re-encode → request.
+
+```bash
+echo 'VXNlcjo0Mg==' | base64 -d          # User:42
+echo -n 'User:1' | base64                 # VXNlcjox
 ```
 
-## Identifying UUID Version from a Sample
+## 8. The hash-of-name — recomputable
+
+`id = md5(email)` / `sha1(username)` / `sha256(name)` / `uuid5(ns,name)`:
+
 ```python
-import uuid
-u = uuid.UUID('a-sample-uuid-value-here')
-print(u.version)  # 1, 3, 4, or 5
+import hashlib, uuid
+# recompute the admin's id
+hashlib.md5(b'admin@target.tld').hexdigest()
+hashlib.sha1(b'admin').hexdigest()
+uuid.uuid5(uuid.NAMESPACE_DNS, 'admin')
 ```
 
-## Testing Checklist
+A known seed (admin's email/name/handle) → recompute → request.
+
+## 9. The "the leak is the answer"
+
+The opaque id can't be swept — but it's *handed out*:
+
+- A collection endpoint leaks all ids (`GET /api/notes` returns the
+  `id` field of each).
+- A referer/location header carries it.
+- A share/public link embeds it.
+- A GraphQL `edges { node { id } }` dumps them.
+- A search/autocomplete returns them.
+- The front-end JS has a hardcoded list.
+- Another object references it (`order.user_id`, `note.parent_id`).
+
+The leak is the enumeration path for opaque ids.
+
+## 10. The "the id is a known-format" — predict
+
+If the format is `uuid5`, `ObjectId`, `Snowflake`, `b64 Type:id` —
+predict. If it's v4/nanoid — need the leak. Identify the version first:
+
 ```
-1. Collect several UUIDs from the app (your own account, test accounts, public data)
-2. Check version nibble - if 1 (time-based) or 3/5 (namespace-based), NOT safe from prediction
-3. For v1: attempt timestamp-based enumeration around known creation windows
-4. For v3/v5: try common namespaces + guessable names (email, username, sequential ID)
-5. For v4: check RNG source in client-side JS if UUIDs are generated client-side
+xxxxxxxx-xxxx-Vxxx-...
 ```
 
-## Tools
-```python
-# Quick UUID version checker script
-import sys, uuid
-for u in sys.argv[1:]:
-    parsed = uuid.UUID(u)
-    print(f"{u}: version={parsed.version}")
-```
+The `V` nibble names the version — `1`=time, `3`=md5-name, `4`=random,
+`5`=sha1-name, `6`=reordered-time, `7`=unix-ts, `8`=custom.
+
+## 11. The "the collision" shape
+
+UUIDv4 has 2^122 space — a birthday collision needs 2^61 — never.
+But a UUIDv1 generated by a *predictable* clock+MAC is enumerable.
+
+## 12. The "the clock skew" oracle
+
+UUID v1/v6/v7/`Snowflake`/`ULID` carry the timestamp — the skew between
+`Date:` and the embedded ts is a fingerprint (which server, which clock).
+
+## 13. The "the same-randomness" bug
+
+`id = uuid4()` but seeded with `random.seed(user_id)` — a flawed RNG
+makes the v4 predictable.
+
+## 14. The "the sequential inside" shape
+
+`id = b64(random16 + counter4)` — looks opaque but the tail is a
+counter. Decode → the counter is enumerable.
+
+## 15. The "the id is the flag" shape
+
+`id = flag{...}` or the flag's hash — the "id" IS the flag; the solve
+is finding the route that accepts it.
+
+## 16. The falsifier
+
+`id_sweep`/`recompute` over the predictable space → no hits → the id is
+truly random; the leak-source is the next surface.

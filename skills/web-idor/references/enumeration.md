@@ -1,79 +1,143 @@
-# IDOR - General Enumeration Techniques
+# Enumeration — mapping the id surface
 
-## Autorize/Burp Extension Approach
-```
-1. Login as User A (low priv), capture all requests in Burp
-2. Login as User B (victim/higher priv) in a second session
-3. Use Autorize extension: replay User A's requests with User B's session token missing/swapped
-4. Flag responses that return 200 + same data as authenticated response (bypass detected)
-```
+Before probing, map *every* identifier the app shows you — the URL, the
+body, the response, the headers, the token.
 
-## Manual Two-Account Testing Methodology
-```
-Setup: Create 2 accounts (User A, User B) at same privilege level, or 1 low + 1 admin
+---
 
-For each authenticated endpoint:
-1. As User A, note the object ID(s) returned (own profile ID, order ID, etc.)
-2. As User B, try accessing User A's object IDs using User B's session/token
-3. Compare: does User B get User A's data? (Horizontal IDOR)
-4. As User A (low-priv), try accessing admin-only endpoints (Vertical IDOR/privilege escalation)
-```
+## 1. The identifier inventory
 
-## Parameter Fuzzing for Hidden ID Fields
+As identity A, walk the app and record every id:
+
+| Where | Shape | Example |
+|---|---|---|
+| URL path | `/users/42` `/notes/1001` | numeric, uuid, slug |
+| URL query | `?id=42` `?user_id=1` `?doc=42` | numeric, name |
+| Body JSON | `{"id":42,"user_id":1}` | numeric, uuid |
+| Body form | `id=42&user_id=1` | numeric |
+| Response JSON | `{"id":42,"owner_id":1,"user_id":2}` | the object's own + its owner |
+| Response header | `Location: /notes/42` `X-User-Id: 1` | id in a header |
+| Set-Cookie | `uid=42` `user_id=1` `session_id=abc` | a cookie id |
+| JWT claim | `sub:42` `uid:1` `user_id:1` `role:admin` | a claim id |
+| GraphQL | `id:"VXNlcjo0Mg=="` `gid://...` `user(id:"...")` | b64 `Type:id` |
+| HTML attr | `data-user-id="42"` `data-id="42"` | embedded |
+| HTML link | `href="/users/42"` `src="/img/42.png"` | link ids |
+| HTML hidden | `<input type=hidden name=user_id value=42>` | hidden field |
+| JS source | `fetch('/api/users/'+id)` `user_id:42` | a call's param |
+| Filename | `report_42.pdf` `invoice_0042.pdf` | the id in the name |
+| Multipart | `filename="doc_42.pdf"` `name="user_id"` | the field/filename |
+| Referer | `Referer: /users/42` | the previous id |
+| ETag/Last-Mod | `ETag: "42"` | a weak id |
+| WebSocket | `{"type":"msg","user_id":42}` | the WS message id |
+| SSE | `data: {"id":42}` | the event id |
+| Redirect | `302 → /notes/42` | the created object's id |
+| Error | `error at /notes/42` `Object 42 not found` | the id in an error |
+| Log | `GET /users/42` in an exposed log | the leaked id |
+
+## 2. The response-scrape
+
+The app's own responses carry the ids — scrape them:
+
 ```bash
-# Try common ID parameter names even if not visible in normal flow
-?id=1 ?user_id=1 ?uid=1 ?account_id=1 ?profile_id=1 ?ref=1 ?doc_id=1
+# A's session — list A's objects, record each id
+curl -b a.cookies "$BASE/api/notes" | jq '.[] | .id'
+# the response's owner/user fields
+curl -b a.cookies "$BASE/api/notes/42" | jq '{id, owner_id, user_id}'
+# the hidden field
+curl -b a.cookies "$BASE/profile" | grep -oE 'data-user-id="[0-9]+"'
+# the JWT claim
+echo "$JWT" | cut -d. -f2 | base64 -d 2>/dev/null | jq '{sub,uid,user_id,role}'
 ```
 
-## Burp Intruder for Bulk Testing
+## 3. The "the app hands you the ids" leak
+
+- `GET /api/users` — a user-list leaks every `id`.
+- `GET /api/notes?all=true` — a collection leaks its objects' ids.
+- `GET /api/search?q=` — a search leaks matching ids.
+- `GET /api/autocomplete?q=` — an autocomplete leaks ids.
+- `GET /api/feed`/`/api/timeline` — the feed leaks other users' ids.
+- `GET /api/leaderboard` — the leaderboard's `user_id`/`rank`.
+- `GET /api/comments` — the comments' `author_id`.
+- `GET /api/likes`/`/api/reactions` — the reactors' `user_id`.
+- `GET /api/followers`/`/api/following` — the user ids.
+- `GET /api/team`/`/api/members` — the members' ids.
+- `GET /api/share/{token}` — a share's `object_id`/`owner_id`.
+- The GraphQL `edges { node { id } }` — every node id.
+- A `Location:` on create — the new object's id.
+- A `Content-Location:` — the canonical id.
+- An `ETag`/`Last-Modified` derived from the id.
+
+## 4. The "the id is in the front-end" leak
+
+- The bundle's hardcoded test ids.
+- A `data-*` attribute.
+- A comment `<!-- user_id=42 -->`.
+- A route `/users/:id` that builds the id from a source the JS controls.
+- The sourcemap's original source — `bundle_miner.py` recovers it.
+
+## 5. The "the id is in the error" leak
+
+- `Object 42 not found` — the error names the id.
+- `duplicate key id=42` — the constraint error.
+- `invalid id 'abc' (expected int)` — the format + the valid ids' shape.
+- A stack trace naming `user_id=42`.
+
+## 6. The "the id is in the log" leak
+
+- An exposed `/logs`, `/access.log`, `/debug/requests` — other users'
+  ids in the log lines.
+
+## 7. The "the id is in a link" leak
+
+- A `href="/users/42"` on a profile card.
+- A `src="/img/avatars/42.png"`.
+- A `href="/report/download/42"`.
+
+## 8. The "the id is in the WebSocket" leak
+
+- `{"type":"presence","user_id":42}` — a WS presence event.
+- `{"type":"msg","author_id":1}` — a chat message's author.
+
+## 9. The "the id is in the SSE" leak
+
+- `data: {"user_id":42,"event":"join"}` — a server-sent event.
+
+## 10. The "the id is in the Referer" leak
+
+- A `Referer: /users/42` header a request carries.
+
+## 11. The "the id is in the ETag" leak
+
+- `ETag: "42"` / `ETag: "user-42"` / `ETag: "object-42-v3"` — the ETag
+  derives from the id.
+
+## 12. The "the id is in the filename" leak
+
+- `report_42.pdf` / `invoice_0042.pdf` / `avatar_1.png` — the id is the
+  numeric part.
+
+## 13. The "the id is in the multipart" leak
+
+- `filename="doc_42.pdf"` — the uploaded filename carries the id.
+- `name="user_id"` `value="42"` — the form field.
+
+## 14. The inventory output
+
 ```
-1. Capture request with object ID as insertion point
-2. Set payload type to Numbers (sequential range) or list of known IDs
-3. Compare response length/status across all payloads
-4. Filter results showing 200 OK with substantive different content (not error page)
+location    | id           | format     | owner | carrier
+URL path    | /notes/42    | int        | A's   | path
+response    | "owner_id":1 | int        | user1 | body
+JWT claim   | sub=42       | int        | A     | token
+collection  | /api/users   | leaks ids  | any   | list
+graphql     | "VXNlcjo0Mg=="| b64 Type:id| node  | arg
+filename    | report_42.pdf| int-prefix | file  | path
 ```
 
-## Response Comparison Techniques
-```python
-import requests
+The inventory names every id, its format, and who owns it — the probe
+targets the owned ones.
 
-def test_idor(base_url, session_a_cookie, object_ids):
-    baseline_len = None
-    for obj_id in object_ids:
-        r = requests.get(f"{base_url}/api/object/{obj_id}",
-                         cookies={"session": session_a_cookie})
-        print(f"ID {obj_id}: status={r.status_code} len={len(r.text)}")
-```
+## 15. The "two-identity" shortlist
 
-## Blind IDOR Indicators (no direct data returned but action succeeds)
-```
-- Response time difference (object exists vs doesn't)
-- Different error messages ("not found" vs "forbidden" vs generic 500)
-- Side effects observable elsewhere (e.g., DELETE succeeds silently, verify by re-fetching)
-```
-
-## Encoded/Obfuscated ID Enumeration
-```python
-import base64
-# If ID appears base64 encoded
-for i in range(1, 100):
-    encoded = base64.b64encode(str(i).encode()).decode()
-    print(f"{i} -> {encoded}")
-
-# If ID is hashed (MD5 of sequential number - check via known samples)
-import hashlib
-for i in range(1, 100):
-    h = hashlib.md5(str(i).encode()).hexdigest()
-    print(f"{i} -> {h}")
-```
-
-## Checklist for Full Coverage
-```
-1. Test all CRUD operations (Create/Read/Update/Delete) for each object type
-2. Test both path-based (/users/123) and parameter-based (?id=123) references
-3. Test nested/related object access (user's orders, orders' line items)
-4. Test with completely unauthenticated request (no session at all)
-5. Test with expired/invalidated session token
-6. Test API and web UI separately - protections may differ
-7. Document exact request/response pairs as evidence for report
-```
+From the inventory, shortlist the ids that are *A's* (private, owned)
+— those are the probe targets for B. The public/unguarded ones aren't
+the proof.
