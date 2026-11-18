@@ -693,6 +693,18 @@ somebody reading only the list.
   a rejected initial spawn surfaces on stderr instead of vanishing, and
   `--max-workers 0` is refused outright (zero workers means no probe
   tools and no `record_finding` anywhere).
+- Methodology modules gain a second tier: the 27 entry skills stay small
+  (confirm/falsify/rate), and 8 `*-refs.md` depth references — ported
+  from the original ctf-v4 skill corpus — carry payload-level detail for
+  confirmed classes: per-DBMS SQLi extraction channels + file/OOB
+  escalation + WAF evasion, XSS context payload sets + exfil shapes, SSRF
+  parser-bypass table + cloud metadata + internal pivot, CL.TE/TE.CL
+  desync shapes + upgrade smuggling, deserialization magic-byte format
+  identification, SSTI engine flowchart + escapes, NoSQL operator and
+  aggregation-pipeline surface, and XXE content-type confusion +
+  parameter-entity exfil. Entry skills route to their refs file via a
+  "Route to depth" section; `test_skill_two_tier_wiring` locks the
+  INDEX/pointer wiring.
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it

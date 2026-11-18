@@ -203,7 +203,8 @@ CLI (argus run | argus team)
   │   ├── session.py     evidence store: transcript.jsonl + findings.json
   │   ├── proof.py       the proof matrix: 29 classes, what each must produce
   │   ├── mcpserver.py   argus AS an MCP server - `argus mcp-serve`
-  │   ├── skills/        27 loadable methodology modules (sqli, ssrf, idor…)
+  │   ├── skills/        35 loadable methodology modules (27 entries +
+  │   │                  8 `*-refs` depth references for confirmed classes)
   │   └── report/        report.md + .html + .sarif + summary.json,
   │                      CWE/OWASP mapped, evidence embedded
   │

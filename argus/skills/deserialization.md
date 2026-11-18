@@ -47,3 +47,8 @@ blob is integrity-protected and the verifier rejects any modification.
 RCE via gadget (benign proof): critical. File write/SSRF gadget: high.
 Deserialization confirmed but no reachable gadget shown: medium-high -
 document the primitive honestly.
+
+## Route to depth
+
+Serialized blob needs format identification (magic bytes), a safe probe, or
+per-language gadget notes: load `deserialization-refs`.

@@ -146,7 +146,9 @@ waste budget inside scope.
   `ctx.client.send` — then scope, rate limit and evidence are free.
 - New skill: drop `name.md` in `argus/skills/` + one row in `INDEX.md`. Name
   it after a proof-matrix class and `load_skill` attaches the requirement to
-  it automatically.
+  it automatically. Payload-level depth goes in `name-refs.md`, named by the
+  entry skill's "Route to depth" section — two tiers keep loaded context
+  small, and `-refs` modules resolve to the same class's requirement.
 - New proof class: a `ProofSpec` in `argus/proof.py` — a requirement
   sentence, the named checks, a verifier, and `floor`/`veto` where they
   apply. It needs a test in BOTH directions: an evidence set that must grade

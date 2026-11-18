@@ -59,6 +59,14 @@ def main() -> int:
     check("finding dedups same class+endpoint",
           _raises(ValueError, lambda: s.add_finding(
               "t2", "low", "x", "u", [rid], "root:x", "d", "r")))
+    # header-class findings cite their real proof - recorded response
+    # headers are part of the citable evidence text (CRLF, security hdrs)
+    hid = s.record_exchange("t", {},
+                            {"status": 200, "body": "",
+                             "headers": {"xcanary": "yes"}})
+    check("finding cites recorded response header",
+          _ok(lambda: s.add_finding(
+              "t", "low", "crlf", "u2", [hid], "xcanary: yes", "d", "r")))
 
     from argus.session import verify_transcript
     res = verify_transcript(s.dir)
