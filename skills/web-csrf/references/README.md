@@ -42,6 +42,7 @@ the gate you're measuring — never read them all.
 | `payload-dictionary.md` | ~250 categorized payloads |
 | `extended-corpus.md` | the deep payload/case library |
 | `multi-step-and-race.md` | chained writes and the timing shapes |
+| `method-override.md` | reaching PUT/DELETE writes through a POST form |
 | `content-type-carriers.md` | the deep parse-shape corpus per content-type |
 | `delivery-edge-cases.md` | the corner carriers and their traps |
 | `delivery-contexts.md` | where the CSRF page can live — external/data:/stored/subdomain |
