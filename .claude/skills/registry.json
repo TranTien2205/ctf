@@ -2183,9 +2183,9 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce",
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
-      "skill_tokens": 1535,
-      "depth_files": 6,
-      "depth_tokens": 6983,
+      "skill_tokens": 1779,
+      "depth_files": 42,
+      "depth_tokens": 106001,
       "use_when": [
         "a probe or source read produced this class's signal: one address you control, then the same request against an internal-only address, comparing status and timing",
         "a chain card already proves this class here: htb-red-island-ssrf-gopher-redis-lua-rce, htb-weather-app-ssrf-crlf-request-smuggling-upsert"

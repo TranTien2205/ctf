@@ -83,10 +83,25 @@ primitive, and the tell is the same interpolation you already found.
 Shares signals with: `../file-read-primitives/`, `../web-request-smuggling/`.
 Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time — the corpus is ~10k lines across
+35 modules; `references/README.md` is the navigation index. The
+entry-points:
 
-- `references/protocol-smuggling.md`
-- `references/cloud-metadata.md`
+- `references/README.md` — the full navigation, ordered by task
+- `references/detection.md` — the paired-probe + read-channel ladder
+- `references/url-parsing.md` — IP-encodings + parser differentials
+- `references/bypass.md` — check-type → bypass-family map
+- `references/whitelist-shapes.md` — allowlist bypasses
+- `references/protocol-smuggling.md` — the scheme table
+- `references/internal-services.md` — per-service chains
+- `references/cloud-metadata.md` — the metadata playbook
+- `references/gopher-deep.md` — the raw-TCP payload composition
+- `references/file-read.md` — the file:// map
+- `references/payload-dictionary.md` — the ~700-payload corpus
+- `references/ctf-shapes.md` — the 20 challenge-archetypes
+- `references/workflow.md` — the ordered probe-phases
+- `references/tooling.md` — the repo tools' verified flags
+- `references/cheatsheet.md` — the field-manual tables
 - `../ctf-web/server-side-advanced.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
