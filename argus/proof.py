@@ -195,6 +195,27 @@ NOSQL_OP_RE = re.compile(
 DBMS_RE = re.compile(
     r"(?i)("
     r"sqlite3?\.\w*error|sqlite_master|sqlite_version|sqlite version \d"
+    # MEASURED against a live SQLite target. `sqlite3?\.\w*error` catches the
+    # Python driver's `sqlite3.OperationalError`, and nothing caught
+    # `SQLITE_ERROR: near ")": syntax error` - the node/C driver form, and
+    # what OWASP Juice Shop returns. So on a real SQLite target the engine
+    # naming ITSELF in an error was unrecognised, while the one token that
+    # WAS recognised (`sqlite_master`) is one the attacker's own payload
+    # almost always carries - and the echo guard below correctly rejects it
+    # as a reflection. The net effect was that an error-channel fingerprint
+    # for SQLite could not be reached at all: six of seven checks passed and
+    # this one could not.
+    #
+    # This was written with a `(?!master\b|version\b)` lookahead to keep the
+    # two attacker-carried tokens out, and the lookahead was INERT: both are
+    # matched by their own alternatives above, so the alternation takes those
+    # first and the lookahead never decides anything. Measured by deleting
+    # it - 241 tests, no change. What actually protects here is the echo
+    # guard below, which vetoes any engine name that also appears in the
+    # request; the ordering is what makes `sqlite_master` reach it. Dead
+    # complexity that implies a protection it does not provide is the same
+    # defect as a comment that claims one, so it is gone.
+    r"|\bsqlite_[a-z]+\b"
     r"|you have an error in your sql syntax|mysql_fetch|mysqli?_|mariadb"
     r"|\b\d+\.\d+\.\d+-\d*(?:mariadb|log|ubuntu|debian|mysql|azure|aws)"
     r"|psycopg2?|pg::|postgresql|postgres\s+\d|org\.postgresql|pg_catalog"

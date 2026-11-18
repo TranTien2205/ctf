@@ -5341,3 +5341,66 @@ def test_blocked_and_unsettled_are_different_sentences():
                            "response": {"status": 200, "headers": {}, "body": "ok"}}]
     assert anything_got_through(answered)
     assert negative_settles(spec, refused, anything_got_through(answered))
+
+
+def test_the_node_driver_error_form_names_sqlite_too():
+    """MEASURED on a live SQLite target, and the oracle is what found it.
+
+    `DBMS_RE` had `sqlite3?\\.\\w*error`, which catches the Python driver's
+    `sqlite3.OperationalError`, and nothing caught `SQLITE_ERROR: near ")":
+    syntax error` - the node/C driver form, and what OWASP Juice Shop
+    returns. So on a real SQLite target the engine naming ITSELF in an error
+    was unrecognised, while the one token that WAS recognised,
+    `sqlite_master`, is one an attacker's own payload almost always carries,
+    and the echo guard correctly rejects that as a reflection.
+
+    The effect was a class that could not be proven on that engine through
+    the error channel at all: a UNION read of one schema row from
+    `/rest/products/search` passed six of seven checks, and this was the one
+    that could not pass. After the fix the same evidence grades `proven`.
+    """
+    # Three exchanges, because `proven` needs all three and the live run
+    # that measured this had all three: a benign control on the same
+    # endpoint, the error that makes the engine name itself, and the read.
+    # The first version of this fixture omitted the control and failed on
+    # "the rows are not what the page serves anyway" - the gate wanting a
+    # differential, which is correct, and the fixture being short of it.
+    control = ex("r0", "http://t.local/rest/products/search?q=apple",
+                 '{"status":"success","data":[{"id":1,"name":"Apple Juice"}]}')
+    err = ex("r1", "http://t.local/rest/products/search?q=x%27%29%29",
+             "Error: SQLITE_ERROR: near \")\": syntax error", 500)
+    rows = ex("r2", "http://t.local/rest/products/search?q=x%27%29%29UNION+"
+                    "SELECT+sql%2C2+FROM+sqlite_master+LIMIT+1--",
+              '{"status":"success","data":[{"id":"CREATE TABLE `Products` '
+              '(`id` INTEGER PRIMARY KEY)"}]}')
+    verdict = proof.grade("sqli", "CREATE TABLE `Products`",
+                          [control, err, rows])
+    assert verdict.grade == "proven", verdict.explain()
+    fp = next(c for c in verdict.checks
+              if c["check"] == "data store fingerprinted")
+    assert fp["ok"] and "SQLITE_ERROR" in fp["detail"], fp
+
+
+def test_the_new_sqlite_form_does_not_weaken_the_echo_guard():
+    """The negative lookahead is load-bearing. `sqlite_master` and
+    `sqlite_version` are the two SQLITE_-prefixed tokens an attacker's own
+    SQL carries, so they stay matched by their own alternatives and the echo
+    guard keeps vetoing them; every OTHER `sqlite_*` token names the engine
+    and appears in no payload.
+    """
+    reflected = ex("r1", "http://t.local/search?q=sqlite_master%20SELECT%20"
+                         "x%20FROM%20users",
+                   "<html><body>Results for: sqlite_master SELECT x FROM "
+                   "users</body></html>")
+    verdict = proof.grade("sqli", "Results for:", [reflected])
+    assert verdict.grade != "proven", verdict.explain()
+    detail = next(c["detail"] for c in verdict.checks
+                  if c["check"] == "data store fingerprinted")
+    assert "the request coming back" in detail, detail
+
+    from argus.proof import DBMS_RE
+    assert DBMS_RE.search("sqlite_master").group(0) == "sqlite_master"
+    assert DBMS_RE.search("sqlite_version").group(0) == "sqlite_version"
+    assert DBMS_RE.search("SQLITE_ERROR").group(0) == "SQLITE_ERROR"
+    assert DBMS_RE.search("3.44.2") is None, \
+        "a bare version number names no engine"

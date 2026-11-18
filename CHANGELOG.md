@@ -5238,12 +5238,75 @@ agreement where there was agreement the gate had deliberately not called
 proof. It is labelled by which claim was matched now: 0/2 proven, 2/2
 withheld.
 
+### The oracle found a false negative in the gate, on a real engine
+
+Pushing the SQLi class to `proven` against the lab's Juice Shop - the
+supervisor's criterion, and a deliberate test of whether the gate can be
+satisfied at all by evidence this repository is willing to collect - stopped
+on one check and stayed there through two attempts.
+
+The injection point is real: `q='))--` on `/rest/products/search` returns the
+whole product table, `q='))` returns `SQLITE_ERROR: near ")": syntax error`,
+and the engine names itself in that error unprompted. A UNION read of ONE
+row from `sqlite_master` - the schema of `Products`, bounded with `LIMIT 1`,
+no credentials and no user table - passed six of seven checks. The seventh,
+"data store fingerprinted", could not pass.
+
+`DBMS_RE` had `sqlite3?\.\w*error`, which catches the Python driver's
+`sqlite3.OperationalError`. Nothing caught `SQLITE_ERROR` - the node/C
+driver form, and what this target returns. Meanwhile the one SQLite token
+that WAS recognised, `sqlite_master`, is one the attacker's own payload
+almost always carries, and the echo guard correctly vetoes it as a
+reflection. So on a real SQLite target an error-channel fingerprint was
+unreachable: the recognised token was always a reflection and the unreflected
+token was unrecognised. A false negative, found by independent ground truth,
+which is what the oracle is for.
+
+With the form added, the same evidence grades `proven`, all seven checks.
+
+AND THE GATE TAUGHT THE PROOF SHAPE ALONG THE WAY, in two steps that were
+each a real requirement rather than an obstacle. First it refused a
+fingerprint from one request paired with rows from another - it wants both
+in the same witness, so a banner cannot be borrowed from a different
+exchange. Then it refused the read without a control: "a request to the same
+endpoint WITHOUT a table in it is what separates a read from the page's own
+furniture". Both are right, and the second caught the first unit-test
+fixture, which had the error and the read but no benign control.
+
+A NEAR MISS WORTH RECORDING. The 10-column UNION returned a 500 of 1991
+bytes against 1078 for the others, which read as a measurable differential -
+and it was the error page echoing a longer payload in its own title, with
+"sqlite" and "UNION" in it because they were in the URL. Reading that as
+evidence of the engine is exactly what the echo guard exists to stop, and it
+was nearly done by hand. The real column count came from the engine instead:
+`SQLITE_ERROR: SELECTs to the left and right of UNION do not have the same
+number of result columns` for 6 through 9, data at 10.
+
+THE FIX'S OWN LOOKAHEAD WAS INERT. It was written as
+`\bsqlite_(?!master\b|version\b)[a-z]+\b` to keep the attacker-carried
+tokens out, and both are matched by their own alternatives earlier in the
+pattern, so the alternation takes those first and the lookahead never
+decides anything. Measured by deleting it: 241 tests, no change. The echo
+guard is what protects, and the ordering is what lets it. Dead complexity
+implying a protection it does not provide is the same defect as a comment
+that claims one, so it is gone - the fourth instance of that shape in this
+session, and the second that was mine.
+
+THE BOARD DID NOT FLIP for `dbSchemaChallenge`, and that is the right
+outcome to leave alone: Juice Shop wants the whole schema, the gate rewards
+"extraction stayed minimal", and one row is what proof needs. Taking more in
+order to satisfy a scoreboard would be optimising for the scoreboard. So the
+two instruments now disagree in both directions, and each disagreement was
+informative: the board flipped where the gate said `candidate` because a
+bypass proves the channel and not the read, and the gate says `proven` where
+the board wants more taken than proof requires.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1032 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1034 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
