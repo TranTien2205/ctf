@@ -2097,8 +2097,47 @@ def test_every_class_either_has_a_proven_test_or_declares_it_cannot():
             f"{name} is listed as unprovable here but its spec allows `proven`"
 
 
-@pytest.mark.parametrize("name", sorted(n for n in CANNOT_BE_PROVEN_HERE
-                                        if n != "dos"))
+_EQUIPMENT_CAPPED = sorted(n for n in CANNOT_BE_PROVEN_HERE if n != "dos")
+
+# An empty parameter set makes pytest skip with its own wording - "got empty
+# parameter set ['name']" - which says nothing about why. The set is empty
+# because every class that was capped for want of EQUIPMENT has since been
+# freed, leaving only the one that is refused by construction, and that is a
+# result rather than an absence. Said in this repository's words, since a
+# refusal here always says why.
+_NO_EQUIPMENT_CAP = [pytest.param(
+    None, marks=pytest.mark.skip(
+        reason="no class is capped for want of equipment any more: xss and "
+               "ssrf came off together once a collector shipped, and `dos` "
+               "is excluded here because a class refused by construction "
+               "has no candidate floor to hold. This test wakes up the day "
+               "a cap is added."))]
+
+
+def test_no_class_is_capped_for_want_of_equipment():
+    """The empty state above, claimed instead of inferred from a skip.
+
+    `CANNOT_BE_PROVEN_HERE` holds one entry and it is not about equipment:
+    `dos` is refused by construction, and the proof of a denial of service
+    is the denial. Every other cap came off - and each one, measured, was a
+    note describing a missing VERIFIER rather than missing evidence, or a
+    missing component that has since shipped.
+
+    This fails if a cap returns, which is the point: a new cap is a claim
+    that this tree's recorder does not hold the artifact, and that claim
+    should be made deliberately and read by someone.
+    """
+    capped = {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
+    assert not capped, (
+        f"{sorted(capped)} are capped again - state the reason in "
+        "CANNOT_BE_PROVEN_HERE and check it is about evidence this tree "
+        "cannot record, not about a verifier nobody has written")
+    assert set(CANNOT_BE_PROVEN_HERE) == {"dos"}, (
+        f"CANNOT_BE_PROVEN_HERE is {sorted(CANNOT_BE_PROVEN_HERE)}; only a "
+        "class refused by construction belongs there now")
+
+
+@pytest.mark.parametrize("name", _EQUIPMENT_CAPPED or _NO_EQUIPMENT_CAP)
 def test_a_capped_class_still_reaches_candidate_on_real_evidence(name):
     """A cap must not collapse to "never useful": the class still has to
     register a real difference as a candidate, which is what the report lists

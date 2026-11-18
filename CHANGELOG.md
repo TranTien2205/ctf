@@ -5752,12 +5752,42 @@ was right - because the TOOL count check already uses the wide set and
 caught it when the number moved earlier in this session. Two checks, two
 denominators, one of them silently smaller.
 
+### The one skipped test, and why it was skipped
+
+Every run reported one skip and nothing said what it was. It turned out to
+be `test_a_capped_class_still_reaches_candidate_on_real_evidence`,
+parametrised over the classes capped for want of EQUIPMENT - and that set is
+empty, because every one of them has been freed. pytest then skips with its
+own wording, "got empty parameter set", which says nothing about why.
+
+The surrounding design is sound and was left alone: `CANNOT_BE_PROVEN_HERE`
+holds one entry, `dos`, with the reason that the proof of a denial of
+service is the denial; the test above it holds that every class either has a
+test asserting `proven` or is in that list with a declared reason AND a spec
+that caps or refuses it; and `dos` is excluded from the parametrised test
+because a class refused by construction has no candidate floor to hold.
+
+Two things changed. The skip says why IN THIS REPOSITORY'S WORDS now, since
+a refusal here always says why - an explicit single parameter carrying the
+reason, rather than an empty set and pytest's generic message. And the empty
+state is CLAIMED rather than inferred from a skip: a new test asserts no
+class carries a ceiling and that the list holds only the
+refused-by-construction entry, so a cap returning is a failure somebody
+reads instead of a skip count going from one to zero.
+
+That second part matters because the skip was load-bearing in the wrong
+direction: a reader seeing "1 skipped" forever learns nothing, while a
+reader seeing it drop to zero learns nothing either. Plant-tested both ways
+- restoring a ceiling on `xss` fails six tests, and adding an entry to the
+list with a reason that is not about evidence fails two AND removes the
+skip, because the parametrised test wakes up.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1055 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1056 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
