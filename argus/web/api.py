@@ -1045,10 +1045,28 @@ class RunRegistry:
                 f"this console has started {started} runs since it was "
                 f"launched, which is its lifetime cap of "
                 f"{MAX_RUNS_PER_SERVER} - restart it, or run from the CLI")
-        guard = ScopeGuard(target)  # fail-closed: private addresses are only
-        # allowed when the target itself is private, and no extra_hosts are
-        # accepted over HTTP - a scope list arriving in a JSON body is a
-        # scope decision made by whoever reached the port.
+        # A guard built from the target, checked against that target, so be
+        # exact about what this does and does not do. MEASURED: `check()` has
+        # five raise branches and ONE of them is reachable here - the scheme
+        # and parse check, which refuses `ftp://`, `file:///` and anything
+        # urlsplit cannot read. The other four cannot fire: the host is the
+        # whole allowlist, `exclude_paths` is empty, and `allow_private` is
+        # forced True for a private target (scope.py:206), so
+        # `http://169.254.169.254/latest/meta-data/`, `http://10.0.0.1/`,
+        # `http://192.168.1.1/admin` and `http://[::1]/` all pass with
+        # `allow_private=True`. What was written here claimed the opposite -
+        # "fail-closed: private addresses are only allowed when the target
+        # itself is private" - which is vacuous, since the target is always
+        # itself. `prompts.py` carries the same measurement for the same
+        # mistake; this is its second site.
+        #
+        # The real protection on this path is the next line down and it is
+        # structural rather than conditional: no `extra_hosts` is accepted
+        # over HTTP at all. A scope list arriving in a JSON body would be a
+        # scope decision made by whoever reached the port, so there is no
+        # parameter for it to arrive in. Scope beyond the target itself comes
+        # from the operator's own invocation or not at all.
+        guard = ScopeGuard(target)
         guard.check(target)
         if not self._slots.acquire(blocking=False):
             # Refuse before anything is created: a directory written for a

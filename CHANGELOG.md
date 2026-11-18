@@ -5026,12 +5026,77 @@ that survives, so the pattern is `\+\s*document\.cookie(?!\.)`. Plant-tested
 by restoring each pre-merge file from git: ssrf-refs fails 1, xss-refs fails
 2, sqli-refs fails 1, all three restored passes 20.
 
+### The second site of a comment that claimed a protection it did not have
+
+`argus/web/api.py` built `ScopeGuard(target)` and checked that same target,
+under the comment "fail-closed: private addresses are only allowed when the
+target itself is private". The target is always itself, so the sentence is
+vacuous; `prompts.py` carries the same measurement for the same mistake, and
+this site was found by reading that note rather than by a test.
+
+MEASURED: `ScopeGuard.check` has five raise branches and exactly ONE is
+reachable when the guard was built from the target it checks - scheme and
+parse, which refuses `ftp://` and `file:///`. The host is the whole
+allowlist, `exclude_paths` is empty, and `allow_private` is forced True for
+a private target, so `http://169.254.169.254/latest/meta-data/`,
+`http://10.0.0.1/`, `http://192.168.1.1/admin` and `http://[::1]/` all pass
+with `allow_private=True`.
+
+No test asserted otherwise, so only the comment was wrong - which is the
+point. A comment that states a protection the code lacks is worse than none,
+because a reader stops looking. It now says which branch is live and which
+four cannot fire.
+
+ONE CLAUSE OF IT WAS TRUE AND IS KEPT: no `extra_hosts` is accepted over
+HTTP. That protection is structural rather than conditional - there is no
+parameter for a scope list to arrive in, so there is no branch for it to
+pass through - and scope beyond the target comes from the operator's own
+invocation or not at all.
+
+A test pins the pair: the measured behaviour, and that the construction line
+carries no trailing claim. Plant-tested in both directions - restoring the
+vacuous comment fails it, and handing the guard an `extra_hosts` from the
+request body fails it.
+
+THE TEST ITSELF TOOK THREE TRIES, each a different way of being wrong about
+its own subject. It built the guard outside the `try`, so the constructor's
+`ScopeError` for `file:///` escaped instead of being counted. It asserted
+`"extra_hosts" not in source` when the word appears in the comment
+explaining its absence. And it asserted the vacuous sentence was gone when
+the replacement QUOTES that sentence to say what was wrong with it - the
+third time in this session that a checker read a mention as an assertion,
+after the doc gate read a helper name quoted in a CHANGELOG example as a
+claim that such a tool is registered, and the skill-policy check read "DO
+NOT follow the credential paths" as an instruction to follow them. The fix
+is the same shape every time: check the claim's FORM, not the presence of
+its words. Here that is a trailing comment on the construction line.
+
+A FOURTH instance arrived while this entry was being written. The paragraph
+above originally quoted that helper's name to illustrate the problem, and
+the documentation gate read the quotation as a claim and failed - inside the
+sentence explaining the three previous times. The gate is right to not
+distinguish them: it cannot, and a reader of a document cannot always
+either. Which is the argument for naming the shape rather than the string.
+
+TWO ITEMS ON THE SAME LIST TURNED OUT NOT TO BE DEFECTS, and saying so is
+part of the work. `ARGUS_WEB_ALLOW_REMOTE` is undocumented outside the
+source, but the refusal that sends an operator looking names it and warns
+against it - "Pass allow_remote=True (or set ARGUS_WEB_ALLOW_REMOTE=1) to
+override, and do not do that on a network you share with the target" - and
+an override for a safety gate is better hard to find than advertised, so
+long as the gate explains itself when it fires. And the 415 reply is sent
+without draining the body, but it is sent with `close=True`, which is the
+correct handling and cheaper than draining: the 413 path drains because a
+legitimate operator must be able to read that refusal, while 415 is the
+cross-site form-POST path that was just refused. The asymmetry is
+deliberate and the comment on the 413 drain already explains it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1023 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1024 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

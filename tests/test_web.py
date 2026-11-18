@@ -1350,3 +1350,72 @@ def test_no_target_shape_echoes_the_password_into_the_json():
                 if password in repr(out):
                     leaked.append((name, "returned", url))
     assert not leaked, leaked[:5]
+
+
+# ------------------- the scope comment on the run path must stay truthful
+
+def test_the_run_path_claims_only_the_protection_it_has():
+    """A comment that states a protection the code lacks is worse than no
+    comment, because a reader stops looking.
+
+    MEASURED: `ScopeGuard.check` has five raise branches and exactly one is
+    reachable when the guard was built from the target it then checks - the
+    scheme/parse branch. The host is the whole allowlist, `exclude_paths` is
+    empty, and `allow_private` is forced True for a private target, so the
+    cloud-metadata address, `http://10.0.0.1/`, `http://192.168.1.1/admin`
+    and `http://[::1]/` all pass. What stood here claimed the opposite -
+    "fail-closed: private addresses are only allowed when the target itself
+    is private" - which is vacuous, since the target is always itself.
+
+    This asserts the pair that matters: the measured behaviour, and that the
+    comment beside it does not claim more than that. Change one and this
+    names the other.
+    """
+    from argus.scope import ScopeGuard, ScopeError
+
+    refused, passed = [], []
+    for target in ("http://169.254.169.254/latest/meta-data/",
+                   "http://10.0.0.1/", "http://192.168.1.1/admin",
+                   "http://[::1]/", "ftp://example.com/", "file:///etc/passwd"):
+        try:
+            # The constructor refuses too - `file:///etc/passwd` raises
+            # there, not in `check()` - and for this question the two are
+            # one gate: either the call pair accepts the target or it does
+            # not. The first version of this test built the guard outside
+            # the try and the ScopeError escaped it.
+            ScopeGuard(target).check(target)
+            passed.append(target)
+        except ScopeError:
+            refused.append(target)
+
+    assert refused == ["ftp://example.com/", "file:///etc/passwd"], (
+        "the self-built guard refuses the scheme/parse class and nothing "
+        f"else; refused={refused}")
+    assert "http://169.254.169.254/latest/meta-data/" in passed, (
+        "if a real address refusal was added, the comment on the run path "
+        "has to be updated to describe it")
+
+    api_src = (Path(__file__).resolve().parents[1]
+               / "argus" / "web" / "api.py").read_text(encoding="utf-8")
+    # Checked in its CLAIM form, not as a string. The replacement comment
+    # quotes the old sentence to say what was wrong with it, and the first
+    # version of this assertion could not tell a quote from a claim - the
+    # third time in this session that a checker read a mention as an
+    # assertion. The claim form is a trailing comment on the construction
+    # line itself, which is how it was written.
+    import re as _re
+    claim = _re.search(r"ScopeGuard\(target\)\s*#\s*(.+)", api_src)
+    assert claim is None, (
+        "the construction line carries a trailing claim again: "
+        f"{claim.group(1)[:60]!r} - say what the guard does in the block "
+        "above it, where there is room to be exact")
+
+    # The protection that IS real there is structural, not conditional:
+    # there is no parameter for a scope list to arrive in over HTTP, so no
+    # branch for it to pass through.
+    # The word appears in the comment that explains the absence, so the
+    # check is for the PASSING form: no caller on this path hands a scope
+    # list to the guard.
+    assert "extra_hosts=" not in api_src, (
+        "a scope list arriving in a JSON body is a scope decision made by "
+        "whoever reached the port")
