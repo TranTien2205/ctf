@@ -5141,12 +5141,64 @@ before, 0 newly solved, nothing attributed. Plant-tested in three
 directions - un-ignoring the runtime directory, restoring the inert flag,
 and putting the oracle on the tool table each fail one test.
 
+### The oracle confirmed a real exploit, and then showed its own hole
+
+The scoreboard reader had never seen a challenge actually flip - every run
+of it so far read 118 published, 1 solved, 0 newly solved. That is a
+plumbing test, not a validation, so the exploit was driven directly: argus's
+own `GuardedClient` against the lab's Juice Shop, no model in the loop,
+because the probes are deterministic and the baselines are still waiting on
+a key.
+
+`POST /rest/user/login` with a wrong password returned 401 and 26 bytes.
+The same endpoint with `{"email": "' OR true--"}` returned 200, 784 bytes
+and a token for `admin@juice-sh.op`. The token was not used for anything:
+the proof is the authentication bypass and the witness is the target's own
+record, which is where this stops - the same shape as `id; echo <nonce>`.
+
+The board then moved on its own: solved 1 -> 2, `newly_solved` naming
+exactly `loginAdminChallenge` [Injection, difficulty 2], and `correlate`
+reporting it CONFIRMED against a `proven` `sqli` claim. That is the first
+independent confirmation in this repository of anything argus produced -
+independent because no part of argus can write that flag.
+
+AND THE SAME EXPERIMENT FOUND THE HOLE. Run against the same two snapshots
+with five claims instead of one - sqli, xss, rce, idor, ssrf - the output
+was identical: `confirmed=['loginAdminChallenge']`, nothing to separate a
+run that claimed the right class from one that claimed everything. Breadth
+was free, in the one instrument that exists to be independent.
+
+The missing piece was the third quadrant. Target solved and argus claimed is
+`confirmed`; target solved and argus silent is `unclaimed`; a claim the board
+does not corroborate had nowhere to go at all. It is reported now, and the
+shotgun claim reads `uncorroborated_classes: [idor, lfi, ssrf, xss]` against
+`[]` for the focused one.
+
+THE CORROBORATION COUNT IS AN UPPER BOUND AND SAYS SO IN ITS NAME. One
+category maps to several classes, so `loginAdminChallenge` corroborates any
+of sqli/nosqli/rce/ssti/xxe that was claimed - measured at 2/2 for a
+`sqli`+`rce` claim off a single SQLi login bypass. Hiding that would make a
+generous number look like a precision score, so the field is
+`claims_corroborated_upper_bound`, a test refuses the unqualified name, and
+`newly_solved_matched` carries the count that IS exact, because a challenge
+is a challenge.
+
+AND AN UNCORROBORATED CLAIM IS NOT CALLED A FALSE POSITIVE. The board covers
+only this application's own challenges, so a real finding outside that set is
+uncorroborated rather than wrong, and a class whose challenges were already
+solved before the run cannot be corroborated at all. A test asserts the
+caveat says so and that the words "wrong" and "invalid" stay out of it.
+
+Three classes in the same Injection group were left alone on purpose, and
+their own names say why: "User Credentials", "NoSQL Exfiltration", "NoSQL
+DoS". CLAUDE.md refuses all three.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1027 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1030 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

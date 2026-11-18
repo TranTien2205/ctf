@@ -181,9 +181,45 @@ def correlate(before: Scoreboard, after: Scoreboard,
         (confirmed if hit else unmapped).append(
             {**ch, "argus_classes": hit})
 
+    # THE THIRD QUADRANT. Target solved + argus claimed is `confirmed`;
+    # target solved + argus silent is `unclaimed`; and a claim the board
+    # does not corroborate had nowhere to go, so a run that claimed EVERY
+    # class scored the same confirmation as one that claimed the right one.
+    # Measured on the live target after a real SQLi login bypass flipped
+    # `loginAdminChallenge`: claiming `sqli` and claiming all of
+    # sqli/xss/rce/idor/ssrf both reported `confirmed=['loginAdminChallenge']`
+    # with nothing to separate them. Breadth was free.
+    #
+    # It is NOT called a false positive. The board covers only this
+    # application's own challenges, so a real finding outside that set is
+    # uncorroborated rather than wrong - and a class whose challenges were
+    # already solved before the run cannot be corroborated at all. The
+    # honest report is the ratio and the names, for a human to read.
+    corroborated = {cls for ch in confirmed for cls in ch["argus_classes"]}
+    uncorroborated = sorted(claimed_classes - corroborated)
+
     return {
         "app": after.app,
         "source": after.source,
+        # How much of what argus claimed the board speaks to at all. A run
+        # that claims one class and gets it confirmed reads 1/1; one that
+        # claims five and gets the same single confirmation reads 2/5.
+        #
+        # 2, not 1, and the reason is worth stating rather than hiding: one
+        # category maps to SEVERAL classes, so `loginAdminChallenge`
+        # (category Injection) corroborates any of sqli/nosqli/rce/ssti/xxe
+        # that was claimed. Measured: claiming all five classes scored 2/5
+        # off a single SQLi login bypass, because `rce` is in the same hint
+        # set. So this numerator is an UPPER BOUND on corroboration, and
+        # `uncorroborated_classes` is the half that cannot be inflated that
+        # way - it listed three classes for the shotgun claim and none for
+        # the focused one, which is the discrimination this was added for.
+        "claims_corroborated_upper_bound": len(corroborated),
+        "claims_made": len(claimed_classes),
+        "uncorroborated_classes": uncorroborated,
+        # Exact, because a challenge is a challenge: how many of the
+        # newly-solved ones matched any claim at all.
+        "newly_solved_matched": len(confirmed),
         "scoreboard_total": after.total,
         "solved_before": len(before.solved),
         "solved_after": len(after.solved),
@@ -201,5 +237,7 @@ def correlate(before: Scoreboard, after: Scoreboard,
         "caveat": ("category-to-class mapping is approximate; the per-challenge "
                    "keys above are the evidence, the counts are a summary of "
                    "them. The scoreboard is the target's own record and no "
-                   "part of argus can write it."),
+                   "part of argus can write it. An uncorroborated class is "
+                   "not a false positive: this board covers only this "
+                   "application's own challenges."),
     }

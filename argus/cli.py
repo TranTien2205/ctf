@@ -774,6 +774,17 @@ def main(argv: list[str] | None = None) -> int:
                   "itself. Save one with --save next time, before the run.")
         print(f"  argus called proven    : {out['proven_findings']} "
               f"({', '.join(out['proven_classes']) or 'none'})")
+        print(f"  challenges matched     : {out['newly_solved_matched']}"
+              f"/{len(out['newly_solved'])} of those newly solved")
+        if out["claims_made"]:
+            print(f"  claims corroborated    : at most "
+                  f"{out['claims_corroborated_upper_bound']}/{out['claims_made']} "
+                  "(upper bound - one category maps to several classes)")
+        if out["uncorroborated_classes"]:
+            print("  claimed, not corroborated: "
+                  + ", ".join(out["uncorroborated_classes"])
+                  + "\n      (not false positives - this board covers only "
+                    "this application's own challenges)")
         for ch in out["confirmed_approx"]:
             print(f"  CONFIRMED (approx)     : {ch['key']} "
                   f"[{ch['category']}] <- argus {', '.join(ch['argus_classes'])}")

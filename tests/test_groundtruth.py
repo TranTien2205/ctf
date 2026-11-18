@@ -221,3 +221,72 @@ def test_the_runtime_output_directory_cannot_be_committed():
                 (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
     assert "engagements/" in patterns or "engagements" in patterns, \
         "engagements/ is runtime output and nothing stops it being committed"
+
+
+# ---------------------------------- breadth must not buy free corroboration
+
+def test_claiming_every_class_does_not_score_like_claiming_the_right_one():
+    """MEASURED on the live target. A real SQLi login bypass flipped
+    `loginAdminChallenge`; claiming `sqli` and claiming all of
+    sqli/xss/rce/idor/ssrf both reported
+    `confirmed=['loginAdminChallenge']` with nothing to separate them.
+    Breadth was free, which is a measurement defect in the one instrument
+    that was supposed to be independent.
+
+    The missing piece was the third quadrant: target solved + argus claimed
+    is `confirmed`, target solved + argus silent is `unclaimed`, and a claim
+    the board does not corroborate had nowhere to go.
+    """
+    before = G.read_scoreboard(_FakeClient(_board()), "http://t.test/")
+    after = G.read_scoreboard(_FakeClient(_board(solved_keys={"ch1"})),
+                              "http://t.test/")   # ch1 is Injection
+
+    focused = G.correlate(before, after, [{"grade": "proven", "vuln_class": "sqli"}])
+    shotgun = G.correlate(before, after, [
+        {"grade": "proven", "vuln_class": c}
+        for c in ("sqli", "xss", "idor", "ssrf", "lfi")])
+
+    # both confirm the challenge - the exploit did happen
+    assert [c["key"] for c in focused["confirmed_approx"]] == ["ch1"]
+    assert [c["key"] for c in shotgun["confirmed_approx"]] == ["ch1"]
+
+    # ...and they are now distinguishable
+    assert focused["uncorroborated_classes"] == []
+    assert shotgun["uncorroborated_classes"] == ["idor", "lfi", "ssrf", "xss"]
+    assert shotgun["claims_made"] > focused["claims_made"]
+
+
+def test_the_corroboration_count_is_labelled_an_upper_bound():
+    """One category maps to several classes, so a single Injection challenge
+    corroborates any of sqli/nosqli/rce/ssti/xxe that was claimed - measured
+    at 2/2 for a `sqli`+`rce` claim off one SQLi login bypass. The field
+    name has to say so, because a numerator that can be inflated by the
+    mapping is not a precision score.
+    """
+    before = G.read_scoreboard(_FakeClient(_board()), "http://t.test/")
+    after = G.read_scoreboard(_FakeClient(_board(solved_keys={"ch1"})),
+                              "http://t.test/")
+    out = G.correlate(before, after, [{"grade": "proven", "vuln_class": c}
+                                      for c in ("sqli", "rce")])
+    assert "claims_corroborated_upper_bound" in out
+    assert "claims_corroborated" not in out, \
+        "an unqualified name invites reading it as exact"
+    assert out["claims_corroborated_upper_bound"] == 2
+    assert out["newly_solved_matched"] == 1, \
+        "the challenge count is exact even where the class count is not"
+
+
+def test_an_uncorroborated_claim_is_not_called_a_false_positive():
+    """The board covers only this application's own challenges, so a real
+    finding outside that set is uncorroborated, not wrong - and a class
+    whose challenges were already solved before the run cannot be
+    corroborated at all."""
+    before = G.read_scoreboard(_FakeClient(_board()), "http://t.test/")
+    after = G.read_scoreboard(_FakeClient(_board(solved_keys={"ch1"})),
+                              "http://t.test/")
+    out = G.correlate(before, after, [{"grade": "proven", "vuln_class": "ssrf"}])
+    assert out["uncorroborated_classes"] == ["ssrf"]
+    low = out["caveat"].lower()
+    assert "not a false positive" in low
+    for word in ("wrong", "invalid", "false finding"):
+        assert word not in low
