@@ -571,6 +571,58 @@ python -m argus run http://127.0.0.1:8777
 `python selftest.py` does the whole thing offline with a scripted model —
 useful in CI or to verify a fresh checkout without an API key.
 
+## Asking the target instead of argus (`argus groundtruth`)
+
+Every number in a report is argus marking its own work. The proof gate makes
+that marking honest; it cannot make it independent, because `proven` means the
+evidence met a requirement this package wrote.
+
+Some deliberately vulnerable applications keep their own score. OWASP Juice
+Shop serves `GET /api/Challenges` - 118 challenges, each with a `solved` flag
+the application sets from its own view of its own state. Nothing in argus can
+write that flag.
+
+```bash
+# BEFORE the run: snapshot the board, because it is cumulative
+argus groundtruth <any-session> --target http://juice.shop:3000 \
+      --save /tmp/board-before.json
+
+# ...run the engagement...
+
+# AFTER: what did the target confirm, beside what argus claimed?
+argus groundtruth engagements/<session> --target http://juice.shop:3000 \
+      --before /tmp/board-before.json
+```
+
+```
+juice-shop scoreboard: http://juice.shop:3000/api/Challenges
+  read recorded in       : engagements/_groundtruth/20261118-141523-juice.shop
+  challenges published   : 118
+  solved before the run  : 1
+  solved after the run   : 1
+  argus called proven    : 2 (rce, sqli)
+```
+
+Without `--before` it says so in words instead of printing a zero, because a
+missing input and a measured zero are different facts.
+
+Three things it deliberately does not do:
+
+- **It is not a tool.** It is absent from the tool table on purpose: an agent
+  that can read the scoreboard can read the answers, and the measurement
+  would then be of a system that was told what to find. A test asserts the
+  module appears nowhere in `argus/tools/registry.py`.
+- **It does not reduce to a score.** Juice Shop's categories ("Injection",
+  "XSS") and this package's proof classes (`sqli`, `rce`, `xss`) are different
+  vocabularies with no exact mapping, so the correlation is labelled
+  approximate and the per-challenge keys are printed beside the counts. A
+  solve argus claimed nothing for is listed separately rather than folded in:
+  either the run tripped it blind or the mapping is too narrow, and both want
+  a human.
+- **It does not touch the session being measured.** The scoreboard read is
+  recorded in `engagements/_groundtruth/`, never appended to the transcript
+  under examination, and the path is printed so you can keep it.
+
 ## Interpreting severity
 
 The agent is instructed to rate honestly: confirmed RCE / auth bypass /

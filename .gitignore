@@ -56,3 +56,11 @@ mcp.json
 # exp/team-$i). Session dirs are runtime output, same as sessions/ above -
 # the numbers go in the write-up, the transcripts stay local.
 exp/
+
+# Runtime output. CLAUDE.md says never commit it, and until now nothing
+# enforced that: `engagements/` showed as untracked, so a single `git add -A`
+# would have staged an engagement's evidence - including a target's response
+# bodies and whatever a transcript recorded. The instruction was being held
+# up by the habit of naming paths explicitly on every commit, which is
+# discipline rather than a guarantee.
+engagements/

@@ -217,6 +217,25 @@ def main(argv: list[str] | None = None) -> int:
     p_ver.add_argument("--json", action="store_true",
                        help="print the raw verification result as JSON")
 
+    p_gt = sub.add_parser(
+        "groundtruth",
+        help="correlate a session's findings against the TARGET's own "
+             "scoreboard (OWASP Juice Shop); operator-side, never a tool")
+    p_gt.add_argument("session_dir")
+    p_gt.add_argument("--target", required=True,
+                      help="base URL of the scoreboard-publishing app")
+    p_gt.add_argument("--app", default="juice-shop",
+                      help="which scoreboard shape to read (default: juice-shop)")
+    p_gt.add_argument("--before", default=None,
+                      help="a scoreboard JSON saved before the run; without "
+                           "it this reads one now and only snapshots, because "
+                           "a cumulative board cannot be differenced against "
+                           "itself")
+    p_gt.add_argument("--save", default=None,
+                      help="write the scoreboard just read to this path, to "
+                           "pass as --before around a later run")
+    p_gt.add_argument("--json", action="store_true")
+
     p_diff = sub.add_parser(
         "diff", help="findings-level retest diff between two sessions: "
                      "FIXED / STILL PRESENT / NEW (match = bug class + "
@@ -659,6 +678,108 @@ def main(argv: list[str] | None = None) -> int:
                   f"findings={r.get('findings','?')} "
                   f"requests={r.get('requests','?')} dur={dur} "
                   f"v{r.get('version','?')}{seal}{flag}")
+        return 0
+
+    if args.cmd == "groundtruth":
+        # Operator-side by construction. The agent must not reach this: a
+        # system that can read the scoreboard can read the answers, and the
+        # measurement would then be of a system that was told what to find.
+        # That is why it is a subcommand and not a tool, and why
+        # `tests/test_groundtruth.py` asserts it appears nowhere in the
+        # registry.
+        import dataclasses
+        from .groundtruth import Scoreboard, correlate, read_scoreboard
+        from .httpclient import GuardedClient
+        from .ratelimit import RateLimiter
+        from .scope import ScopeGuard, ScopeError
+        from .session import Session
+
+        sdir = Path(args.session_dir)
+        fpath = sdir / "findings.json"
+        findings = []
+        if fpath.exists():
+            try:
+                loaded = json.loads(fpath.read_text(encoding="utf-8"))
+                if isinstance(loaded, list):
+                    findings = loaded
+            except ValueError:
+                print(f"{fpath} is not valid JSON - session dir corrupt")
+                return 1
+        else:
+            # Say so rather than reporting zero claims as a result: a
+            # session with no findings.json and a session that claimed
+            # nothing are different facts.
+            print(f"note: no findings.json in {sdir} - the argus side of "
+                  "this comparison is empty, which is not the same as a "
+                  "run that claimed nothing")
+
+        try:
+            # No `--allow-private` flag, because it would do nothing here
+            # and a flag in `--help` that does nothing is a false statement.
+            # `ScopeGuard.__init__` sets `allow_private = allow_private or
+            # target_private` (scope.py:207), and the only request this
+            # command makes goes to the target itself - so a private
+            # scoreboard host grants itself, and a public one has no private
+            # host to reach. The flag was added, measured as inert against
+            # the very targets it was meant for, and removed: the third
+            # instance of this shape in one session, and the first I wrote.
+            scope = ScopeGuard(args.target, allow_private=True)
+        except ScopeError as exc:
+            print(f"refused: {exc}")
+            return 2
+        # WHERE the read is recorded matters twice over. Not in the session
+        # being measured, because appending to that transcript would change
+        # the evidence this command exists to check - verified: the sealed
+        # bwapp session still verifies 24 chained entries afterwards. And not
+        # beside it either, which was the first version: a sealed session
+        # lives under `docs/`, so `sdir.parent` put runtime output inside a
+        # committed directory and `git status` showed it untracked. It goes
+        # to the runtime area, which is gitignored, and the path is printed
+        # so the operator can keep it - a measurement taken off the record is
+        # one nobody can check.
+        record_root = Path("engagements") / "_groundtruth"
+        probe_sess = Session(record_root, args.target,
+                             {"model": "operator", "purpose": "scoreboard read"})
+        client = GuardedClient(scope, probe_sess, RateLimiter(0.0),
+                               max_requests=8)
+        try:
+            after = read_scoreboard(client, args.target, app=args.app)
+        except (ScopeError, ValueError) as exc:
+            print(f"could not read the scoreboard: {exc}")
+            return 2
+
+        if args.save:
+            Path(args.save).write_text(
+                json.dumps(dataclasses.asdict(after), indent=2),
+                encoding="utf-8")
+
+        if args.before:
+            raw = json.loads(Path(args.before).read_text(encoding="utf-8"))
+            before = Scoreboard(**raw)
+        else:
+            before = after
+
+        out = correlate(before, after, findings)
+        if args.json:
+            print(json.dumps(out, indent=2))
+            return 0
+        print(f"{out['app']} scoreboard: {out['source']}")
+        print(f"  read recorded in       : {probe_sess.dir}")
+        print(f"  challenges published   : {out['scoreboard_total']}")
+        print(f"  solved before the run  : {out['solved_before']}")
+        print(f"  solved after the run   : {out['solved_after']}")
+        if not args.before:
+            print("  no --before snapshot, so nothing is attributed to this "
+                  "run: a cumulative board cannot be differenced against "
+                  "itself. Save one with --save next time, before the run.")
+        print(f"  argus called proven    : {out['proven_findings']} "
+              f"({', '.join(out['proven_classes']) or 'none'})")
+        for ch in out["confirmed_approx"]:
+            print(f"  CONFIRMED (approx)     : {ch['key']} "
+                  f"[{ch['category']}] <- argus {', '.join(ch['argus_classes'])}")
+        for ch in out["unclaimed"]:
+            print(f"  target solved, unclaimed: {ch['key']} [{ch['category']}]")
+        print(f"\n  {out['caveat']}")
         return 0
 
     if args.cmd == "verify":

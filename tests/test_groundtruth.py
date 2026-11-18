@@ -168,3 +168,56 @@ def test_the_oracle_is_not_on_the_tool_table():
     import inspect
     src = inspect.getsource(registry)
     assert "groundtruth" not in src
+
+
+# ------------------------------- the oracle reaches an operator, not a tool
+
+def test_the_subcommand_exists_and_is_not_a_tool():
+    """A module nothing calls is the defect this session spent its length
+    fixing in `orchestrator.py`, so the oracle needed a caller. It had to be
+    a SUBCOMMAND and not a tool entry: an agent that can read the scoreboard
+    can read the answers."""
+    import argparse
+    from argus import cli
+    parser = cli.build_parser() if hasattr(cli, "build_parser") else None
+    if parser is None:                                 # pragma: no cover
+        src = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+        assert '"groundtruth"' in src
+        return
+    names = set()
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            names |= set(action.choices)
+    assert "groundtruth" in names, sorted(names)
+
+    from argus.tools import registry
+    assert "groundtruth" not in {t["name"] for t in registry.TOOL_SCHEMAS}
+
+
+def test_the_command_takes_no_flag_that_does_nothing():
+    """MEASURED: a `--allow-private` flag was added, and it was inert for
+    exactly the targets it was meant for. `ScopeGuard.__init__` sets
+    `allow_private = allow_private or target_private`, and the only request
+    this command makes goes to the target itself - so a private scoreboard
+    host grants itself and a public one has no private host to reach.
+    Running it against `http://192.168.223.221:3000` without the flag
+    produced the same full output as with it. A flag in `--help` that does
+    nothing is a false statement about the program."""
+    src = (ROOT / "argus" / "cli.py").read_text(encoding="utf-8")
+    block = src[src.index('p_gt = sub.add_parser('):]
+    block = block[:block.index("p_diff = sub.add_parser(")]
+    assert "--allow-private" not in block, \
+        "the inert flag is back on the groundtruth subcommand"
+
+
+def test_the_runtime_output_directory_cannot_be_committed():
+    """CLAUDE.md: "`engagements/` is runtime output. Never commit it."
+    MEASURED: it was not in `.gitignore` at all - `git status` showed it as
+    untracked, so one `git add -A` would have staged an engagement's
+    evidence, including a target's recorded response bodies. The instruction
+    was being held up by the habit of naming paths on every commit, which is
+    discipline and not a guarantee. This asserts the guarantee."""
+    patterns = {line.strip() for line in
+                (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    assert "engagements/" in patterns or "engagements" in patterns, \
+        "engagements/ is runtime output and nothing stops it being committed"

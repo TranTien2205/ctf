@@ -5091,12 +5091,62 @@ legitimate operator must be able to read that refusal, while 415 is the
 cross-site form-POST path that was just refused. The asymmetry is
 deliberate and the comment on the 413 drain already explains it.
 
+### The oracle gets a caller, and `engagements/` gets a guarantee
+
+`groundtruth.py` had no caller, which is the defect this session spent its
+length fixing in `orchestrator.py` - so finishing it meant giving it one.
+`argus groundtruth <session> --target <url>` reads the target's own
+scoreboard, correlates it against the session's findings, and prints both
+halves. It is a SUBCOMMAND and not a tool entry, for the reason the module
+exists: an agent that can read the scoreboard can read the answers.
+
+Three things it had to get right, and it got two of them wrong first.
+
+WHERE THE READ IS RECORDED. Not in the session being measured - appending to
+that transcript would change the evidence this command exists to check, and
+the sealed bwapp session still verifies its 24 chained entries afterwards.
+The first version put it in `sdir.parent`, which for a sealed session under
+`docs/` meant writing runtime output into a committed directory; `git status`
+showed it untracked straight away. It goes to the runtime area now, and the
+path is printed, because a measurement taken off the record is one nobody
+can check.
+
+A FLAG THAT DID NOTHING. `--allow-private` was added and then measured as
+inert against exactly the targets it was meant for: `ScopeGuard.__init__`
+sets `allow_private = allow_private or target_private`, and the only request
+this command makes goes to the target itself, so a private scoreboard host
+grants itself and a public one has no private host to reach. Running it
+against the lab's Juice Shop without the flag produced the same full output
+as with it. A flag in `--help` that does nothing is a false statement about
+the program, so it is gone - the third instance of this shape in one
+session, and the first that was mine.
+
+WHAT A MISSING `--before` MEANS. The scoreboard is cumulative, so without a
+snapshot taken before the run there is nothing to difference and the command
+says so in words rather than printing a zero: "no --before snapshot, so
+nothing is attributed to this run". A missing input and a measured zero are
+different facts.
+
+AND `engagements/` WAS NEVER IGNORED. CLAUDE.md says "`engagements/` is
+runtime output. Never commit it." Nothing enforced that: `git status` listed
+it as untracked, so a single `git add -A` would have staged an engagement's
+evidence, including a target's recorded response bodies. What had been
+holding the instruction up was the habit of naming paths explicitly on every
+commit - discipline, not a guarantee. It is in `.gitignore` now and a test
+asserts it, which is what found the gap: the new command writes there, and
+writing there made the absence visible.
+
+Measured against the live target: 118 challenges read in full, 1 solved
+before, 0 newly solved, nothing attributed. Plant-tested in three
+directions - un-ignoring the runtime directory, restoring the inert flag,
+and putting the oracle on the tool table each fail one test.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1024 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1027 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
