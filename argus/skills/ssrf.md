@@ -5,13 +5,20 @@
 avatar-by-URL, RSS importers, file-upload-from-link.
 
 `probe_ssrf(url, param)` walks the internal-target ladder (loopback,
-link-local metadata, decimal/IPv6 encodings, redirect chains).
+link-local metadata, decimal/IPv6 encodings, redirect chains). It diffs
+response bodies, which establishes the channel and reaches `candidate`.
+
+`probe_ssrf_oob(url, param)` produces the other artifact: it starts a
+collector on an address THIS target can route back to, injects a URL
+carrying a nonce, waits, and reports any request that arrived with the
+peer it came from. Run it on every parameter `probe_ssrf` found a
+difference on - the difference says the channel may exist, the callback
+says the target made the request.
 
 **This class is no longer capped.** It used to stop at `candidate` because
-proving it needs an out-of-band collector and none shipped here; one does
-now, so `proven` is reachable and the difference between a response that
-changed and a request the target actually made is yours to collect. The
-requirement has two halves and the second is the one that settles it:
+proving it needs an out-of-band collector and none shipped here. One does
+now, and so does the probe that drives it. The requirement has two halves
+and the second is the one that settles it:
 
 - *the excerpt discriminates against a control* - the internal URL answered
   differently from an external one. This is the floor, not the proof: a

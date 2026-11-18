@@ -57,6 +57,7 @@ def _impl(name: str) -> Callable:
         "probe_method": probes.probe_method,
         "probe_idor": probes.probe_idor,
         "probe_ssrf": probes.probe_ssrf,
+        "probe_ssrf_oob": probes.probe_ssrf_oob,
         "probe_xxe": probes.probe_xxe,
         "probe_csrf": probes.probe_csrf,
         "probe_xfh": probes.probe_xfh,
@@ -343,6 +344,29 @@ TOOL_SCHEMAS: list[dict] = [
                                              "(e.g. url, callback, image, dest)"},
             "method": {**_STR, "description": "GET or POST (default GET)"},
             "data": {**_STR, "description": "POST body template; param value is replaced"},
+        },
+        ["url", "param"],
+    ),
+    _schema(
+        "probe_ssrf_oob",
+        "SSRF by OUT-OF-BAND CALLBACK, which is what `proven` needs. Starts a "
+        "collector on an address this target can route back to, injects a URL "
+        "carrying a nonce, waits, and reports any request that arrived. "
+        "`probe_ssrf` diffs response bodies and establishes the channel; this "
+        "one produces the artifact the gate grades - a hit carrying a nonce an "
+        "earlier recorded request sent, arriving LATER than it, FROM the "
+        "target's own address. Cite the injected request and its callback "
+        "together. No callback is reported as the target not fetching the URL, "
+        "with the collector address stated, so it is not confused with the "
+        "collector being unreachable.",
+        {
+            "url": {**_STR, "description": URL_DESC + " Include the query string."},
+            "param": {**_STR, "description": "Parameter that accepts a URL "
+                                             "(e.g. url, callback, image, dest)"},
+            "method": {**_STR, "description": "GET or POST (default GET)"},
+            "data": {**_STR, "description": "POST body template; param value is replaced"},
+            "settle_s": {**_INT, "description": "Seconds to wait for the "
+                                                "target's fetch (default 4)"},
         },
         ["url", "param"],
     ),

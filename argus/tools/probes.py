@@ -2695,3 +2695,89 @@ def probe_websocket(ctx: Context, url: str, message: str = "") -> dict:
     return res
 
 
+
+
+def probe_ssrf_oob(ctx: Context, url: str, param: str,
+                   method: str = "GET", data: str | None = None,
+                   settle_s: float = 4.0) -> dict:
+    """SSRF by out-of-band callback: the target fetches a URL only it was told.
+
+    `probe_ssrf` sends a canary and compares bodies, which establishes the
+    channel and grades `candidate`. `proven` wants the other thing - a
+    request arriving at a collector this package owns, carrying a nonce an
+    earlier recorded request sent, FROM the target's own address. That last
+    clause is what makes it evidence rather than this process talking to
+    itself, and it is checkable here precisely because the target is on
+    another machine.
+
+    Nothing produced that callback before this. The collector was written,
+    the ssrf ceiling was removed, and `routable_host()` - the function that
+    picks the address a callback can come back to - had no caller at all:
+    `collector.py` said so in its own docstring. So the class was freed and
+    unreachable at the same time.
+
+    MEASURED end to end before this was written: bound to the address
+    `routable_host` returns for the lab host, that host fetched the nonce
+    URL and the hit was recorded with `peer=192.168.223.221` and
+    `witness_is_remote` true. The network path is not the hard part; the
+    wiring was.
+    """
+    from argus import collector as _collector
+
+    try:
+        # From `url`, not from any context field: the callback has to be
+        # routable from the host being injected, which is the host in this
+        # URL. `Context` has no `target` attribute - the first version
+        # reached for one and would have raised at the first call.
+        host = _collector.routable_host(url)
+    except ValueError as exc:
+        # Loud, not loopback. The old `routable_host` answered `127.0.0.1`
+        # when it could not find a route, which produces a callback URL
+        # pointing at the TARGET's loopback - so nothing arrives and zero
+        # hits reads as "the target did not call back".
+        return {"attempted": False, "reason": str(exc)}
+
+    col = _collector.Collector(host=host)
+    col.start()
+    try:
+        nonce = _collector.new_nonce()
+        callback = col.url(nonce)
+        at = time.time()
+        sent = _send(ctx, url, param, callback, method, data,
+                     tool="probe_ssrf_oob",
+                     note="out-of-band callback URL carrying a nonce")
+        # The fetch is the target's, not ours, so it can land after the
+        # response that triggered it. A callback that has not arrived yet is
+        # not a callback that will not.
+        time.sleep(max(0.0, float(settle_s)))
+        hits = []
+        for hit in col.hits_for(nonce, after=at):
+            req, resp = col.as_exchange(hit)
+            rid = ctx.session.record_exchange(
+                "collector", req, resp,
+                note="out-of-band callback for the injected URL")
+            hits.append({"request_id": rid, "peer": hit.get("peer", ""),
+                         "remote": _collector.witness_is_remote(hit)})
+    finally:
+        col.stop()
+
+    out = {"attempted": True, "collector_host": host,
+           "request_id": sent.get("request_id"), "status": sent.get("status"),
+           "callbacks": hits, "fetched": bool(hits)}
+    if hits:
+        out["note"] = ("cite the injected request AND its callback together: "
+                       "the gate pairs them by nonce, requires the hit to be "
+                       "later than the request, and for this class requires "
+                       "the peer to be another machine")
+    else:
+        # Separate "it did not happen" from "it could not have been seen",
+        # because they are different facts and only one of them is about the
+        # target.
+        out["note"] = (f"no callback within {settle_s:g}s. The collector was "
+                       f"reachable at {host} and the request was recorded, so "
+                       "this is the target not fetching the URL - not a "
+                       "plumbing failure. A server-side fetch may be "
+                       "disabled (PHP `allow_url_include` off, for example), "
+                       "the parameter may not be used as a URL, or the fetch "
+                       "may be slower than the settle window.")
+    return out

@@ -55,6 +55,11 @@ EXPLOIT = RoleCard(
         "pull_leads", "http_request", "probe_reflection", "probe_sqli",
         "probe_time", "probe_cmdi", "probe_ssti", "probe_lfi", "probe_redirect",
         "probe_cors", "probe_method", "probe_idor", "probe_ssrf",
+        # The callback half belongs with the class it proves. A tool in the
+        # registry that no card grants is unreachable in team mode - the
+        # same shape of missing as a module nothing imports, and the second
+        # time in this session that adding a tool stopped one step short.
+        "probe_ssrf_oob",
         "probe_xxe", "probe_csrf", "probe_xfh", "probe_nosqli",
         "probe_upload", "probe_race", "probe_deserialize", "probe_cache",
         "probe_ppoll", "probe_smuggle", "probe_disclosure", "probe_websocket",

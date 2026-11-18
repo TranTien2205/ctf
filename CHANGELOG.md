@@ -84,7 +84,7 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 47 of the 57 tools served over
+- `user -> LLM -> MCP -> tool`: 48 of the 58 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
@@ -5371,12 +5371,70 @@ The test docstring is corrected rather than left alone: "unverified" and
 PostgreSQL stays unverified and says so - no PostgreSQL target is in this lab
 and the driver is not installed, since this package is standard library only.
 
+### The callback nobody was producing
+
+`ssrf`'s ceiling came off and `argus/collector.py` was written to be the
+out-of-band witness, and the wiring between them was never done.
+`routable_host()` - the function whose whole job is to pick an address a
+callback can come back to - had **no caller anywhere**, which `collector.py`
+stated in its own docstring. So the class was freed and unreachable at the
+same time, and freeing a cap is only real if the class can then be proven.
+Third orphan of this session, after the orchestrator and the oracle.
+
+THE MECHANISM WAS NEVER THE HARD PART. Measured before writing anything:
+bound to the address `routable_host` returns for the lab host, that host
+fetched a nonce URL and the hit was recorded with `peer=192.168.223.221` and
+`witness_is_remote` true. The network path works; nothing drove it.
+
+AND `routable_host` FAILED SILENTLY IN THE SHAPE THAT HIDES. Passing the
+natural thing - a target URL, which is what this package holds everywhere -
+made `sock.connect(("http://192.168.223.221:8080", 9))` raise, and the old
+fallback answered `127.0.0.1`. The callback URL then pointed at the TARGET's
+own loopback, nothing arrived, and zero hits reads as "the target did not
+call back": a refusal that reads as an empty result, in the measurement
+plumbing itself. It takes a URL, a `host:port` or a bare host now, and it
+RAISES when a non-local target has no non-loopback route - a plumbing
+failure must not be reported as a clean negative.
+
+`probe_ssrf_oob(url, param)` is the caller, and tool 58. It starts the
+collector on a routable address, injects a nonce URL, waits, and records
+every hit as a transcript exchange with its peer - so a finding can cite the
+injected request and the callback together, which is what the gate pairs by
+nonce. `probe_ssrf` keeps its job: it diffs bodies, establishes the channel
+and reaches `candidate`; this produces the artifact that settles it.
+
+NO CALLBACK NAMES WHICH HALF FAILED. "The target did not fetch" and "the
+collector was unreachable" are different facts and only one is about the
+target, so the note states the collector address that WAS reached. Measured
+against bWAPP's `rlfi.php`: status 200, no callback in 4s, collector
+reachable at the LAN address - PHP's `allow_url_include` is off, which is a
+fact about the target. Measured the other way against a fixture that does
+fetch: one callback, recorded, peer and remoteness reported.
+
+The host comes from `url`, not from a context field - the first version
+reached for `ctx.target`, which `Context` does not have and which would
+have raised on the first call. Plant-tested four ways: restoring the silent
+loopback fallback, dropping URL parsing, not recording the callback, and
+blurring the two halves of the no-callback note each fail.
+
+`ssrf.md` names the new probe, since a card that says the artifact is
+"yours to collect" was accurate only while no tool collected it.
+
+AND THE SAME THREE-WAY MISS AS LAST TIME, caught by the same three gates.
+Adding the tool to the registry left it ungranted to any role, unattributed
+in the decision ledger, and named by a skill card no role could satisfy -
+exactly what happened when `recon_sweep` went in earlier in this session.
+The ledger one matters most: a probe in neither `PROBE_CLASS` nor
+`UNATTRIBUTED_PROBES` is invisible to it, so the class reads as never tried
+however often the probe runs, and this is the call that produces the
+artifact `proven` needs. Attributed to `ssrf`, granted to exploit.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1036 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1044 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

@@ -40,6 +40,12 @@ from . import proof
 PROBE_CLASS = {
     "probe_sqli": "sqli", "probe_nosqli": "nosqli", "probe_cmdi": "rce",
     "probe_reflection": "xss", "probe_ssti": "ssti", "probe_ssrf": "ssrf",
+    # The out-of-band half of the same class. Attributed to `ssrf` and not
+    # excluded: it records a request against the endpoint like any probe, so
+    # a ledger that could not see it would read the class as never tried
+    # however often the callback probe ran - and this is the call that
+    # produces the artifact `proven` needs, so it is the one that must count.
+    "probe_ssrf_oob": "ssrf",
     "probe_lfi": "lfi", "probe_idor": "idor", "probe_redirect": "redirect",
     "probe_xxe": "xxe", "probe_deserialize": "deserialize",
     "probe_cors": "cors", "probe_csrf": "csrf", "probe_cache": "cache",

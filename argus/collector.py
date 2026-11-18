@@ -34,6 +34,7 @@ import http.server
 import json
 import secrets
 import socket
+import urllib.parse
 import threading
 import time
 from typing import Any, Callable
@@ -212,21 +213,79 @@ class Collector:
         return request, response
 
 
+def _host_of(toward: str) -> str:
+    """The bare host out of a URL, a `host:port`, or a host.
+
+    MEASURED, and this is why it exists: passing the natural thing - the
+    engagement target, which is a URL everywhere in this package - made
+    `sock.connect(("http://192.168.223.221:8080", 9))` raise, and the old
+    fallback answered `127.0.0.1`. The callback URL then pointed at the
+    TARGET's own loopback, nothing arrived, and zero hits reads as "the
+    target did not call back". A refusal that reads as an empty result, in
+    the measurement plumbing itself.
+    """
+    text = str(toward or "").strip()
+    if "://" in text:
+        parsed = urllib.parse.urlsplit(text)
+        return parsed.hostname or ""
+    if text.startswith("["):                       # [::1]:8080
+        return text[1:].split("]", 1)[0]
+    # A bare IPv6 address has several colons and no port; only split a
+    # single trailing `:port`.
+    if text.count(":") == 1:
+        head, tail = text.rsplit(":", 1)
+        if tail.isdigit():
+            return head
+    return text
+
+
+def _is_local(host: str) -> bool:
+    low = (host or "").strip().lower()
+    return (low.startswith("127.") or low in ("localhost", "::1", "[::1]")
+            or low == "0.0.0.0")
+
+
 def routable_host(toward: str) -> str:
     """The local address a host at `toward` would see us on.
 
     No packet is sent - connecting a UDP socket only picks the route - but
     it answers the question `127.0.0.1` cannot: which of this machine's
     addresses is the one a target on another machine can reach.
+
+    `toward` may be a URL, a `host:port` or a bare host.
+
+    RAISES when the target is NOT local and no non-loopback local address
+    routes toward it. The old behaviour was to return `127.0.0.1`, which
+    hands the caller a callback URL the target cannot reach and turns a
+    plumbing failure into a clean-looking negative result. Measured working
+    the other way: bound to the address this returns for the lab, the lab
+    host fetched the nonce URL and the hit was recorded with
+    `peer=192.168.223.221` and `witness_is_remote` true.
     """
+    host = _host_of(toward)
+    if not host:
+        raise ValueError(f"no host in {toward!r}, so no route can be chosen")
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock.connect((toward, 9))
-        return str(sock.getsockname()[0])
-    except OSError:
-        return "127.0.0.1"
+        sock.connect((host, 9))
+        local = str(sock.getsockname()[0])
+    except OSError as exc:
+        if _is_local(host):
+            return "127.0.0.1"
+        raise ValueError(
+            f"no route toward {host!r} ({exc}), so there is no address a "
+            "callback could come back to. An out-of-band proof needs one; "
+            "say the collector is unreachable rather than sending a URL "
+            "the target cannot fetch.") from exc
     finally:
         sock.close()
+    if _is_local(local) and not _is_local(host):
+        raise ValueError(
+            f"the only route toward {host!r} is through {local} - a callback "
+            "to that address would reach the TARGET's loopback, not this "
+            "collector, and the absent hit would read as the target not "
+            "calling back")
+    return local
 
 
 def witness_is_remote(hit: dict, loopback_ok: bool = False) -> bool:
