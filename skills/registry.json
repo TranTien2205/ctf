@@ -1708,8 +1708,8 @@
         "htb-py2-pickle-cookie-reduce-rce-rendered-output"
       ],
       "skill_tokens": 1685,
-      "depth_files": 7,
-      "depth_tokens": 5186,
+      "depth_files": 75,
+      "depth_tokens": 99660,
       "use_when": [
         "a probe or source read produced this class's signal: identify the format from the blob's own magic before touching any gadget",
         "a chain card already proves this class here: htb-dllama-pickle-cookie-auth-bypass-latex-verbatiminput, htb-py2-pickle-cookie-reduce-rce-rendered-output"
