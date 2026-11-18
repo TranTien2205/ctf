@@ -851,6 +851,24 @@ def _doc_consistency() -> None:
     check(f"docs name only real subcommands ({len(real)})", not bogus,
           f"{bogus} not in {sorted(real)}")
 
+    # ...and the OTHER DIRECTION, which nothing checked. The one above
+    # cannot fail by neglect: it fires when someone writes a command that
+    # does not exist. The one that CAN is a command that exists and is
+    # documented nowhere - and the first thing this found was `argus web`,
+    # the subcommand that binds a port, starts scans with no
+    # authentication, and renders bytes a target chose. Its refusal
+    # explains the bind guard when it fires, and nothing told an operator
+    # the command was there at all.
+    #
+    # `real - named`, reusing the extraction above rather than a second
+    # regex: a subcommand whose word merely appears somewhere is not
+    # documented - "web" occurs in four of these files as an ordinary
+    # English word - and two directions that disagreed about what "named"
+    # means would be two concepts wearing one name.
+    undocumented = sorted(real - named)
+    check(f"every subcommand is documented ({len(real)})", not undocumented,
+          f"{undocumented} exist and are named in no gated document")
+
     # 3. counts claimed in prose match the code
     joined = "\n".join(texts.values())
     claims = [

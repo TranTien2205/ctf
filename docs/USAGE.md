@@ -597,6 +597,39 @@ python -m argus run http://127.0.0.1:8777
 `python selftest.py` does the whole thing offline with a scripted model —
 useful in CI or to verify a fresh checkout without an API key.
 
+## The operator console (`argus web`)
+
+```bash
+python -m argus web                              # loopback, port picked
+python -m argus web --port 8920                  # a fixed port
+python -m argus web --session-dir engagements    # scan an existing run dir
+```
+
+A local dashboard over the runs in `--session-dir`: start a run, watch its
+state, read findings and reports. Runs started from the CLI appear too,
+because it scans the directory rather than keeping its own list.
+
+**It binds loopback and should stay there.** The console starts scans and
+renders bytes a target chose, so exposing it to an interface hands both to
+whoever reaches the port - and on an engagement that port is often on the
+same network as the target. `--bind` takes another interface, and a
+non-loopback bind is refused unless `allow_remote` is passed in the API or
+`ARGUS_WEB_ALLOW_REMOTE=1` is set. The refusal names the override itself,
+so an operator who needs it is told; there is no authentication to add.
+
+**Two modes, and the second one locks.** A CTF or test target runs on the
+first. A real engagement requires an authorisation note naming who
+authorised it and over what window, and the form stays disabled until it is
+filled and confirmed. Editing the target after confirming re-locks it and
+clears the confirmation, because an authorisation note is about a specific
+target and silently carrying it to another one is the failure this interlock
+exists to prevent.
+
+A report rendered from evidence contains bytes the target chose, so it is
+served under a `sandbox` CSP with no tokens: scripts disabled, unique opaque
+origin, no form submission, nothing fetchable. The dashboard's own CSP
+allows no external resource at all.
+
 ## Asking the target instead of argus (`argus groundtruth`)
 
 Every number in a report is argus marking its own work. The proof gate makes

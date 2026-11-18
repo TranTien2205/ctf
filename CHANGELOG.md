@@ -4764,7 +4764,7 @@ negative ever settles it, and nothing left open at all. Collapsing those
 into one line would put "we checked and it is fine" and "we checked and
 cannot tell" under the same words.
 
-762 tests, selftest 162/162.
+762 tests, selftest 163/163.
 
 ### xss proved itself on the DOCTYPE, and the first two fixes were both wrong
 
@@ -4849,7 +4849,7 @@ Three scenarios pinned: refused everywhere (every endpoint an untested
 gap, marked), absent everywhere (404 is an answer, settled), and a refusal
 among answers (not blanket-blocked, so the 403 is the control working).
 
-1021 tests, selftest 162/162.
+1021 tests, selftest 163/163.
 
 ### The hybrid fan-out was 1500 lines nothing could reach
 
@@ -4922,7 +4922,7 @@ impose, over the 24 class modules. Planted back, it fails; removed, it
 passes. The scan found exactly one card wrong, which is the number that
 matters: the check was written because one had already drifted, and it had.
 
-1021 tests, selftest 162/162.
+1021 tests, selftest 163/163.
 
 ### An oracle argus cannot write
 
@@ -5630,6 +5630,48 @@ specifically: login.php "carries 4 named input(s) ... and no probe has
 tested any class against it", and products/search "has been probed, but not
 for xss".
 
+### The other direction of the documentation gate, and what it found first
+
+The documentation gate's whole claim is that these documents name only
+things that exist. That direction cannot fail by neglect - it fires when
+somebody writes a command that is not there. The direction that CAN is a
+thing that exists and is documented nowhere, and nothing checked it.
+
+Applied to the two user-facing surfaces: all 59 tools appear in a gated
+document. One of the 18 subcommands did not - **`argus web`**, the console
+that binds a port, starts scans with no authentication, and renders bytes a
+target chose. Its refusal explains the bind guard when it fires, and nothing
+told an operator the command existed at all. The riskiest surface was the
+undocumented one, which is the argument for checking this direction rather
+than trusting that anything worth documenting got documented.
+
+`docs/USAGE.md` covers it now, from the real `--help` rather than from
+memory: the loopback default and why it should stay, `--bind` with the
+override that the refusal itself names, the two modes and the interlock that
+re-locks when the target is edited after confirmation, and the sandbox CSP
+the evidence-rendered report is served under.
+
+The check is `real - named`, reusing the extraction the forward direction
+already does - three patterns including fenced blocks - rather than a second
+regex of its own. Two directions that disagreed about what "named" means
+would be two concepts wearing one name, which is a shape this repository has
+been bitten by. It also matters here specifically: "web" occurs in four
+gated documents as an ordinary English word, so a bare substring search
+would have called it documented.
+
+Plant-tested in both directions, and each catches a different thing:
+deleting the new section fails "every subcommand is documented", while
+adding an invented subcommand to a code block fails "docs name only real
+subcommands".
+
+(This paragraph named that invented subcommand at first, and the forward
+check failed on the sentence describing the plant - eleventh instance this
+session of a checker reading a mention as a claim, and the first where the
+mention was of a deliberately invented name. The conclusion drawn in the
+moment was also wrong: the gate's failure looked like a plant that had not
+been restored, and the plant had been restored. The gate was reading this
+file.)
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
@@ -5643,7 +5685,7 @@ the documentation gate exists to catch - and it caught it.
   fix carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 162 offline checks, including a documentation
+- `python selftest.py`: 163 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
