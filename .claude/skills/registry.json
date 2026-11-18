@@ -2215,8 +2215,8 @@
         "htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"
       ],
       "skill_tokens": 1136,
-      "depth_files": 7,
-      "depth_tokens": 4897,
+      "depth_files": 45,
+      "depth_tokens": 89680,
       "use_when": [
         "a probe or source read produced this class's signal: one arithmetic marker; confirm the engine from the evaluated form or the error string before any chain",
         "a chain card already proves this class here: htb-neonify-erb-ssti-newline-filter-bypass, htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-jerryboree-twig-ssti-symfony-fragment-filesystem-write-htaccess-cgi-escape"

@@ -88,7 +88,7 @@ Lower priority — message bundles are rarely attacker-writable.
 ## 5. OGNL adjacency — Thymeleaf 2.x used OGNL not SpEL
 
 Thymeleaf 2.x's `${}` was OGNL — same `T()`/`new` tricks but the
-OGNL syntax (`ognl.md`-style):
+OGNL syntax (see `java-other.md` for the OGNL section):
 
 ```java
 %{(new java.lang.ProcessBuilder('id')).start()}

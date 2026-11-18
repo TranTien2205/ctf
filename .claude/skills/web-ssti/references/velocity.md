@@ -96,7 +96,7 @@ stacks. OGNL injection uses %{expr} or ${expr} — the Struts CVEs
 ```
 
 If the marker `${7*7}` evaluates in a Struts app — could be OGNL:
-`ognl.md`-style payloads: `%{7*7}`, `%{@java.lang.Runtime@getRuntime().exec('id')}`.
+OGNL-style payloads (see `java-other.md`): `%{7*7}`, `%{@java.lang.Runtime@getRuntime().exec('id')}`.
 
 ---
 
