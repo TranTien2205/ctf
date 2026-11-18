@@ -9,8 +9,8 @@ suggestion, so every row names a code path.
 ## How to re-verify everything
 
 ```bash
-python selftest.py          # 161 offline end-to-end checks, no API key
-python -m pytest tests/ -q  # 762 unit + live-lab + loop tests
+python selftest.py          # 164 offline end-to-end checks, no API key
+python -m pytest tests/ -q  # 1055 unit + live-lab + loop tests
 python -m argus demo        # offline single-agent run against the lab
 python -m argus verify docs/sample-session   # sealed artifact walk-through
 ```

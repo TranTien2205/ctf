@@ -629,13 +629,26 @@ def _doc_selftest_count() -> None:
     accident.
     """
     import re as _re
+    # EVERY gated markdown document, not a hardcoded five. MEASURED: this
+    # read CHANGELOG, README, AGENTS, USAGE and ARCHITECTURE, and
+    # `docs/VERIFICATION.md` - the document that tells a reader how to
+    # verify this system - stated "161 offline end-to-end checks" and "762
+    # tests" against a real 164 and 1055. A check whose denominator is
+    # narrower than the set of documents that state the thing hides whatever
+    # it never covered, and the file it was not covering is the one about
+    # checking.
     joined = ""
-    for name in ("CHANGELOG.md", "README.md", "AGENTS.md", "docs/USAGE.md",
-                 "docs/ARCHITECTURE.md"):
-        fp = ROOT / name
+    for fp in [ROOT / "CHANGELOG.md", ROOT / "README.md", ROOT / "AGENTS.md"] \
+            + sorted((ROOT / "docs").glob("*.md")):
         if fp.is_file():
             joined += fp.read_text(encoding="utf-8")
-    stated = {int(n) for n in _re.findall(r"(\d+) offline checks", joined)}
+    # Two phrasings, because the second one escaped a narrower pattern: a
+    # prose count ("164 offline checks", with anything between the number
+    # and the noun) and a shell-comment count ("selftest.py  # 164 ...").
+    stated = {int(n) for n in
+              _re.findall(r"(\d+) offline[- a-z]*checks", joined)}
+    stated |= {int(n) for n in
+               _re.findall(r"selftest\.py[^\n#]*#\s*(\d+)", joined)}
     total = len(results) + 1
     check(f"doc selftest count matches this run ({total})",
           bool(stated) and stated == {total},
@@ -958,8 +971,14 @@ def _doc_consistency() -> None:
     #     hand six times in one session, which is exactly the kind of number
     #     that rots - so it is checked against a collection run, not trusted.
     import subprocess
+    # Keyed to the COMMAND in both forms, which is what keeps the
+    # CHANGELOG's historical counts out: narrative like "633 tests" has no
+    # command in front of it. The comment form is what
+    # `docs/VERIFICATION.md` used, and it escaped the first pattern.
     stated_tests = {int(n) for n in
                     _re.findall(r"pytest tests/ -q`?: (\d+) tests", joined)}
+    stated_tests |= {int(n) for n in
+                     _re.findall(r"pytest tests/ -q[^\n#]*#\s*(\d+)", joined)}
     if stated_tests:
         try:
             proc = subprocess.run(

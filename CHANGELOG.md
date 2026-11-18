@@ -5709,6 +5709,49 @@ Two audits, one real finding, and the finding was mine from earlier the same
 day. That is the argument for the reverse direction rather than for trusting
 whoever added the thing.
 
+### The count gate was not reading the document about checking
+
+Two documents state counts that no count check covered, and one of them was
+`docs/VERIFICATION.md` - the file that tells a reader how to verify this
+system. Its selftest figure was three short and its pytest figure was
+nearly three hundred short, and both had been wrong for long enough that
+nothing noticed.
+
+(The numbers are described rather than quoted, and that is forced. A
+CHANGELOG's job is to record what was wrong, which means naming wrong
+values; the gate's job is to catch wrong values; and widening the gate's
+denominator in this very entry made it read this entry. Twelfth instance
+this session of a checker reading a mention as a claim, and the only one
+where the two jobs are genuinely in tension rather than one of them being
+careless. A regex cannot tell a quotation from a claim, so the quotation
+goes.)
+
+TWO INDEPENDENT REASONS IT ESCAPED, and they are different in kind.
+
+The selftest-count check built its own text from a hardcoded five files -
+CHANGELOG, README, AGENTS, USAGE, ARCHITECTURE - while every other count
+check uses the whole gated set. A check whose denominator is narrower than
+the set of documents that state the thing hides whatever it never covered,
+and the file it was not covering is the one about checking. It reads every
+gated markdown document now, the same denominator as its neighbours.
+
+And both patterns were keyed to ONE phrasing. The prose form is "164 offline
+checks"; VERIFICATION.md writes a shell comment, `selftest.py  # 164 offline
+end-to-end checks`, where words sit between the number and the noun and the
+number follows the command. Both forms are matched now - and both are still
+keyed to the COMMAND, which is what keeps the CHANGELOG's historical counts
+out: narrative like "633 tests" has no command in front of it.
+
+Plant-tested by restoring each stale number: 161 fails the selftest count
+with "docs state [161, 164]", and 762 fails the pytest count. Measured, not
+assumed - the numbers were corrected first and then the old ones put back to
+watch them be named.
+
+`docs/EXPERIMENTS.md` was outside that narrow list too, and its tool count
+was right - because the TOOL count check already uses the wide set and
+caught it when the number moved earlier in this session. Two checks, two
+denominators, one of them silently smaller.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
