@@ -2379,8 +2379,8 @@
         "htb-xxe-content-type-branch-simplexml-noent-file-read"
       ],
       "skill_tokens": 1138,
-      "depth_files": 3,
-      "depth_tokens": 1252,
+      "depth_files": 77,
+      "depth_tokens": 84998,
       "use_when": [
         "a probe or source read produced this class's signal: one entity pointing at a path the target certainly has, and an out-of-band entity when nothing is echoed",
         "a chain card already proves this class here: htb-xxe-content-type-branch-simplexml-noent-file-read"
