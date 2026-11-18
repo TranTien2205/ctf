@@ -908,8 +908,17 @@ def _doc_consistency() -> None:
             if not found:
                 continue
             if any(t in line for t in _ALLOWED_TOOLS) \
-                    or "docker" in line or "pip " in line:
+                    or "docker" in line or "pip " in line or "npm " in line:
                 continue          # this line is about another tool
+            # `npm` joins `docker` and `pip ` here and NOT `_ALLOWED_TOOLS`,
+            # and the difference matters. `_ALLOWED_TOOLS` is what
+            # `run_external` may invoke; adding `agent-browser` or `npm`
+            # there would hand the model a new subprocess, which is a
+            # capability change dressed as a documentation fix. This list is
+            # only "other programs whose flags legitimately appear in these
+            # documents" - the install line for `agent-browser` needs npm's
+            # own flags, and a flag belonging to another program is
+            # indistinguishable from an invented one without it.
             doc_flags |= found
     invented = sorted(doc_flags - real_flags)
     check(f"docs name only real flags ({len(real_flags)})", not invented,

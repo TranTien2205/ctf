@@ -5549,6 +5549,37 @@ the gate graded `xss` **proven** on all four checks. Plant-tested three
 ways - restoring the `_default_headers`-only read, removing the tolerance,
 and deleting the fallback each fail.
 
+### The one class that needs an external tool now says so where operators read
+
+`xss` is the only proof class whose requirement names an external tool, and
+`docs/USAGE.md` did not mention `agent-browser` anywhere. The runtime verdict
+says it - with both of its two reasons - but an operator planning an
+engagement finds out by failing to prove a class. The *External tools*
+section covers it now: why execution cannot be read off the bytes, the two
+install shapes including the one that does not touch the global prefix, and
+the measured result on bWAPP.
+
+AND THE DOC GATE REFUSED THE INSTALL LINE, twice, which is the eighth and
+ninth instance of one shape this session: it checks that every flag the docs
+name is one an argus parser accepts, and npm's flags are indistinguishable
+from invented ones without knowing whose they are.
+
+The gate already had the right mechanism and was missing a member. It
+decides PER LINE and skips a line that mentions another program - the set is
+`_ALLOWED_TOOLS` plus `docker` and `pip `. `npm` joins that line-level list.
+
+It does NOT join `_ALLOWED_TOOLS`, and the difference is the point:
+`_ALLOWED_TOOLS` is what `run_external` may invoke, so putting `npm` or
+`agent-browser` there would hand the model a new subprocess - a capability
+change dressed as a documentation fix. `agent-browser` is driven by
+`argus/tools/browser.py` with a fixed argument shape, not by `run_external`,
+and that stays true.
+
+Plant-tested that the exemption is scoped and not blind: an invented argus
+flag on an ordinary line still fails the check, and an unknown flag on the
+npm line is excused - which is the line-level rule working rather than a
+hole.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

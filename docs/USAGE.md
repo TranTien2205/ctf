@@ -349,6 +349,32 @@ proxies), target lists inside files (`nmap -iL`, `sqlmap -r`, nuclei `-l`
 working directory. If a run is refused, pick the in-scope equivalent —
 e.g. `-b name=value` instead of a cookie-jar path.
 
+### `agent-browser`, and the one class that cannot be proven without it
+
+`xss` is the only class whose requirement names an external tool. Reflection
+is visible in the bytes; execution is not, and the gate will not take a
+probe's word that a script ran — so `proven` needs a headless browser that
+fetches a collector URL carrying a nonce, which is a request argus records
+off its own socket.
+
+```bash
+npm i -g agent-browser
+# or, without touching the global prefix:
+npm install --prefix /some/dir agent-browser
+export AGENT_BROWSER_BIN=/some/dir/node_modules/.bin/agent-browser
+```
+
+Without it the class stops at `candidate`, and the verdict says which of two
+things happened — "`agent-browser` is not on PATH" versus "it is on this
+machine; drive it at the reflecting URL, and if it still does not call back
+the payload did not execute". Those are the same grade for opposite reasons
+and the gate distinguishes them, so a `candidate` xss is worth reading
+rather than skipping.
+
+Measured against the lab's bWAPP: reflection confirmed with every
+metacharacter unescaped, two of three payload shapes executed, callbacks
+recorded, and the class graded `proven` on all four checks.
+
 ## A second model on the evidence (`argus judge`)
 
 ```bash
