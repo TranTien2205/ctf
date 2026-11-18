@@ -1678,8 +1678,8 @@
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
       "skill_tokens": 1115,
-      "depth_files": 3,
-      "depth_tokens": 1557,
+      "depth_files": 62,
+      "depth_tokens": 88010,
       "use_when": [
         "a probe or source read produced this class's signal: a cross-origin form whose content type the endpoint still accepts, submitted by the viewer you control",
         "a chain card already proves this class here: htb-tornadoservice-bot-csrf-class-pollution, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
