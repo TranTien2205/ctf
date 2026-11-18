@@ -549,3 +549,107 @@ def test_the_two_resolvers_agree_on_every_module_on_disk():
 
     assert both, "no module resolves as its own class - the mapping is gone"
     assert refs_only, "no -refs module resolves; the depth tier is unreachable"
+
+
+# ----------------------------- 6. the cards obey the repository's refusals
+
+# CLAUDE.md: "Denial of service, persistence, lateral movement, credential
+# dumping, data exfiltration, or any demonstration whose proof is the damage"
+# - and for execution, "proven with `id; echo <nonce>` and stops there".
+#
+# These cards are returned by `load_skill` into the model's prompt, and an
+# entry skill routes to its `-refs` module the moment a class is confirmed,
+# so a line here is an INSTRUCTION, not a document. Measured before the fix:
+# `load_skill('ssrf-refs')` handed the model `…/iam/security-credentials/
+# <role>` and `…/service-accounts/default/token` under the heading "high-value
+# first targets", a pivot table of internal services to enumerate, and
+# "cite the recorded response body verbatim" for a credentials response.
+_FORBIDDEN_SHAPES = {
+    r"iam/security-credentials": "fetches the instance's IAM credentials",
+    r"service-accounts/default/token": "fetches the instance's OAuth token",
+    r"_cat/indices": "lists an internal service's contents",
+    r"INTO OUTFILE '/path/shell": "drops a webshell (persistence)",
+    r"sp_configure 'xp_cmdshell',1": "enables a disabled exec facility on the target",
+    # `document.cookie` is fine; `document.cookie` as the VALUE SENT is not.
+    # The trailing `(?!\.)` is what separates them: `.length` and `.split`
+    # are measurements of the cookie, and the card's own surviving shapes
+    # use exactly those.
+    r"\+\s*document\.cookie(?!\.)": "sends the victim's session cookie off-box",
+    r"JSON\.stringify\(localStorage\)": "sends the victim's whole storage off-box",
+    r"\?t='\+h\.match": "sends a CSRF token's value off-box",
+}
+
+# A forbidden shape may be NAMED, but only inside a paragraph that refuses
+# it. English cannot be parsed, so this is a fixed vocabulary and nothing
+# else counts - which is the point: a card that wants to name one of these
+# has to write the refusal beside it.
+#
+# The unit is the PARAGRAPH, not the line. Measured: the first version of
+# this check read line by line and reported `ssrf-refs.md:39` as an
+# instruction, when line 38 is "DO NOT follow the credential paths -" and 39
+# is its continuation. A refusal does not fit on one line, so a line is the
+# wrong window to judge one in.
+_REFUSAL_WORDS = ("do not", "don't", "never", "not to do", "refuses",
+                  "instead of", "adds nothing", "stops there",
+                  "changes the target", "do not depend")
+
+
+def _paragraphs(text: str):
+    """(first line number, text) per blank-line-separated block."""
+    out, buf, start = [], [], 1
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.strip():
+            if not buf:
+                start = i
+            buf.append(line)
+        elif buf:
+            out.append((start, "\n".join(buf)))
+            buf = []
+    if buf:
+        out.append((start, "\n".join(buf)))
+    return out
+
+
+def test_no_card_instructs_an_action_the_repository_refuses():
+    """Plant-tested: restoring the pre-merge `ssrf-refs.md` metadata table
+    names two shapes, and the pre-merge `xss-refs.md` payload block two
+    more."""
+    offences = []
+    for path in sorted(SKILLS.glob("*.md")):
+        for lineno, para in _paragraphs(read(path)):
+            low = para.lower()
+            refused = any(w in low for w in _REFUSAL_WORDS)
+            for pattern, why in _FORBIDDEN_SHAPES.items():
+                m = re.search(pattern, para)
+                if m and not refused:
+                    offences.append(
+                        f"{path.name}:{lineno} {why}: "
+                        f"{para[max(0, m.start() - 20):m.end() + 20].strip()[:70]}")
+    assert not offences, (
+        "skill cards instruct actions CLAUDE.md refuses - these load into the "
+        "model's prompt, so each one is an instruction:\n  " +
+        "\n  ".join(offences))
+
+
+def test_the_proof_shaped_capability_is_still_there():
+    """The counterpart. Blanket-refusing the whole area would remove real
+    capability, and these are the artifacts that prove a class WITHOUT
+    taking anything: `/etc/passwd` is world-readable and holds no secret,
+    the same reason `id` is the execution proof, and a metadata root that
+    answers 200 settles that the IMDS is exposed without holding its keys.
+    """
+    sqli = read(SKILLS / "sqli-refs.md")
+    assert "LOAD_FILE('/etc/passwd')" in sqli
+    assert "pg_read_file('/etc/passwd')" in sqli
+
+    ssrf = read(SKILLS / "ssrf-refs.md")
+    assert "169.254.169.254/latest/meta-data/" in ssrf, \
+        "the reachability probe is the finding and must stay"
+    assert "IMDSv2-hardened honestly" in ssrf, \
+        "reporting a hardened target is a real result, not a failure"
+
+    xss = read(SKILLS / "xss-refs.md")
+    assert "+d.length" in xss, \
+        "the measurement-not-value shape the card already had must stay"
+    assert "document.cookie.length" in xss, \
+        "cookie reachability is provable from its size"

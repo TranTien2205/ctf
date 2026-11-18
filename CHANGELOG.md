@@ -4968,12 +4968,70 @@ was truncated, because a count taken from a cut list is not a count.
 Measured against the live target: 118 challenges read in full, 1 solved
 before the run, 0 newly solved, nothing credited.
 
+### Three skill cards instructed what the repository refuses
+
+The eight `*-refs.md` depth modules that arrived with the two-tier skill work
+are returned by `load_skill` into the model's prompt, and an entry skill
+routes to its refs module the moment a class is confirmed. Verified at the
+runtime level before changing anything: `load_skill('ssrf-refs')` resolves to
+class `ssrf` and `ssrf.md` names `ssrf-refs`, so the chain is live. These are
+instructions, not documents - the same reading that made the stale `ssrf.md`
+cap a defect rather than a typo.
+
+CLAUDE.md names what this repository will not help with: "persistence,
+lateral movement, credential dumping, data exfiltration, or any demonstration
+whose proof is the damage", and settles the principle for execution -
+`id; echo <nonce>` and it stops there. Three cards crossed it:
+
+- `ssrf-refs.md` handed the model `…/iam/security-credentials/<role>` and
+  `…/service-accounts/default/token` under "high-value first targets", a
+  table of internal services to enumerate once inside, and "cite the
+  recorded response body verbatim" for a credentials response.
+- `sqli-refs.md` taught `INTO OUTFILE '/path/shell.php'` and
+  `sp_configure 'xp_cmdshell',1` - a webshell drop, and changing the
+  target's configuration so your own exploit works.
+- `xss-refs.md` sent `document.cookie`, a CSRF token's value and
+  `JSON.stringify(localStorage)` to the collector.
+
+THE TEST APPLIED WAS "WHAT DOES THIS ADD TO THE PROOF", not "does this sound
+dangerous". A 200 from the metadata root already establishes that the target
+fetched a URL it should not have and that its IMDS is exposed; the severity of
+an exposed IMDS does not depend on anyone holding the keys, so following the
+credential path adds nothing to the finding and everything to the damage. An
+internal port that answers differently from a closed one establishes the
+request left the target's stack; `/_cat/indices` adds nothing. A privilege
+that can be named from a recorded query - `secure_file_priv` empty, the role
+holding superuser, `xp_cmdshell` already on - is a reportable fact; dropping
+a file is persistence. A callback carrying `len=42` proves the script ran in
+the victim's origin with that access; the value proves nothing further.
+
+SO THE READ-SIDE CAPABILITY STAYED. `LOAD_FILE('/etc/passwd')` and
+`pg_read_file('/etc/passwd')` are kept, for the same reason `id` is the
+execution proof: world-readable, no secret in it, and its arrival through the
+injection settles the question. Blanket-refusing the area would have removed
+real capability, and a test now asserts those artifacts are still present.
+
+AND THE CARD HAD ALREADY GOT ONE RIGHT. `xss-refs.md`'s HttpOnly line sent
+`d.length` - the measurement, not the data - while the three beside it sent
+values. The fix was not a standard imposed from outside; it was the three
+lines made to match the one the author wrote correctly.
+
+The check that holds this is mechanical and had to be rebuilt once. Its first
+version read line by line and reported a refusal's own second line as an
+instruction, because "DO NOT follow the credential paths -" and the paths it
+names do not fit on one line. A line is the wrong window to judge a
+prohibition in; the unit is the paragraph. The cookie pattern needed the same
+care - `document.cookie` is fine and `document.cookie.length` is the shape
+that survives, so the pattern is `\+\s*document\.cookie(?!\.)`. Plant-tested
+by restoring each pre-merge file from git: ssrf-refs fails 1, xss-refs fails
+2, sqli-refs fails 1, all three restored passes 20.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1021 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1023 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

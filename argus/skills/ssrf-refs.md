@@ -25,27 +25,48 @@ peer IP at connect time precisely because this class exists.
 
 ## Cloud metadata (high-value first targets)
 
-| Provider | URL | Notes |
+REACHING the metadata service is the whole finding. Stop there.
+
+| Provider | Reachability probe | Notes |
 |---|---|---|
-| AWS IMDSv1 | `http://169.254.169.254/latest/meta-data/` then `…/iam/security-credentials/<role>` | plain GET |
-| AWS IMDSv2 | same paths, but needs `PUT /latest/api/token` with `X-aws-ec2-metadata-token-ttl-seconds` first — SSRF usually can't PUT; report IMDSv2-hardened honestly |
-| GCP | `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token` | needs header `Metadata-Flavor: Google` — only works if the SSRF lets you set headers |
+| AWS IMDSv1 | `http://169.254.169.254/latest/meta-data/` | plain GET; a 200 listing instance keys is the proof |
+| AWS IMDSv2 | same path, but needs `PUT /latest/api/token` with `X-aws-ec2-metadata-token-ttl-seconds` first — SSRF usually can't PUT; report IMDSv2-hardened honestly, which is a real and useful result |
+| GCP | `http://metadata.google.internal/computeMetadata/v1/instance/` | needs header `Metadata-Flavor: Google` — only works if the SSRF lets you set headers |
 | Azure | `http://169.254.169.254/metadata/instance?api-version=2021-02-01` | needs `Metadata: true` header |
-| DigitalOcean | `http://169.254.169.254/metadata/v1/user-data` | plain GET |
+| DigitalOcean | `http://169.254.169.254/metadata/v1/` | plain GET |
 
-A metadata response with credentials is a critical finding — cite the
-recorded response body verbatim; never echo secret values beyond what the
-transcript already holds.
+DO NOT follow the credential paths - `…/iam/security-credentials/<role>`,
+`…/service-accounts/default/token`, or any sibling that returns a key, token
+or password. That is credential dumping, which this package refuses, and it
+adds NOTHING to the proof: a 200 from the metadata root already establishes
+that the target fetched a URL it should not have and that the instance
+metadata service is exposed through it. The severity of an exposed IMDS does
+not depend on you holding the keys.
 
-## Internal pivot — what to probe once inside
+Record what proves reach - the status, the response's shape, the key NAMES a
+metadata listing returns - and never a secret value. The same rule as
+`id; echo <nonce>`: the proof is that the channel works, not what you could
+take through it.
 
-| Port | Service | Cheap probe |
-|---|---|---|
-| 80/443/8080/8443/3000/5000 | HTTP services | fetch root, banner-diff vs baseline |
-| 6379 | Redis | `gopher://` or raw URL only if scheme unchecked |
-| 9200 | Elasticsearch | `http://127.0.0.1:9200/_cat/indices` |
-| 27017 | MongoDB | banner/timeout difference |
-| 3306/5432 | MySQL/Postgres | banner grab, no auth needed for version |
+## Internal reach — how far, and then stop
+
+Showing the SSRF reaches the target's own network is part of its impact.
+ENUMERATING that network is lateral movement, which this package refuses, so
+the two have to be kept apart deliberately.
+
+What to establish: that an internal address answers DIFFERENTLY from one that
+does not. Pick a port you expect closed and a port you expect open on
+`127.0.0.1` or a private address, send the same request to both, and record
+the difference - status, body length, or time to respond. A measured
+difference between an open and a closed internal port is the finding: the
+request left the target's own stack and the target's loopback is reachable
+through it.
+
+What NOT to do: list a service's contents (`/_cat/indices`, a Redis
+`KEYS`-shaped URL, a database listing), authenticate to anything, or walk the
+internal range for more hosts. That is the target's data and the target's
+network, and none of it makes the SSRF more proven than the port difference
+already did.
 | 2375 | Docker API | `/containers/json` — unauthenticated RCE if open |
 | 11211 | memcached | `stats` via gopher |
 

