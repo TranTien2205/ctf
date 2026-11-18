@@ -45,3 +45,23 @@ thing from the command line.
 | XFH reflected; 403 path under X-Original-URL | `host-header` |
 | First pass over an unknown target | `triage` |
 | Findings recorded; the report is next | `report-writing` |
+
+## Depth references (`*-refs`)
+
+The modules above confirm the bug and rate it. When a confirmed class needs
+payload-level detail — per-DBMS syntax, context payload sets, engine or
+format identification, OOB/second-order escalation — the entry skill names a
+`*-refs` module to load next. Load at most one per confirmed finding, same
+as entry skills: a refs file is depth for a live hypothesis, not background
+reading.
+
+| Confirmed class | Refs module |
+|---|---|
+| SQL injection — per-DBMS extraction, error/blind/time channels, file ops, OOB, WAF evasion | `sqli-refs` |
+| XSS — context payload sets (html/attr/JS/DOM), filter bypass, exfil shapes | `xss-refs` |
+| SSRF — URL-parser bypass, cloud metadata, internal pivot, OOB proof | `ssrf-refs` |
+| Request smuggling — CL.TE/TE.CL shapes, hidden-path, 101 upgrade channel | `request-smuggling-refs` |
+| Deserialization — magic-byte format ID, safe probes, per-language notes | `deserialization-refs` |
+| SSTI — engine detection flowchart, per-engine escapes, filter bypass | `ssti-refs` |
+| NoSQLi — operator table, aggregation pipelines, blast-radius rules | `nosqli-refs` |
+| XXE — content-type confusion, OOB parameter-entity exfil, XInclude | `xxe-refs` |

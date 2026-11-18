@@ -59,6 +59,14 @@ def main() -> int:
     check("finding dedups same class+endpoint",
           _raises(ValueError, lambda: s.add_finding(
               "t2", "low", "x", "u", [rid], "root:x", "d", "r")))
+    # header-class findings cite their real proof - recorded response
+    # headers are part of the citable evidence text (CRLF, security hdrs)
+    hid = s.record_exchange("t", {},
+                            {"status": 200, "body": "",
+                             "headers": {"xcanary": "yes"}})
+    check("finding cites recorded response header",
+          _ok(lambda: s.add_finding(
+              "t", "low", "crlf", "u2", [hid], "xcanary: yes", "d", "r")))
 
     from argus.session import verify_transcript
     res = verify_transcript(s.dir)
@@ -1269,7 +1277,7 @@ def _doc_consistency() -> None:
     for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
         if fp.name == "INDEX.md":
             continue
-        spec = proof.spec_for(fp.stem)
+        spec = proof.module_spec(fp.stem)
         if spec is None:          # methodology only, by design
             continue
         module_count += 1
@@ -1342,7 +1350,7 @@ def _doc_consistency() -> None:
         if fp.name == "INDEX.md":
             continue
         body = fp.read_text(encoding="utf-8")
-        own = proof.spec_for(fp.stem)
+        own = proof.module_spec(fp.stem)
         own_class = own.vuln_class if own else ""
         if own_class:
             taught.add(own_class)

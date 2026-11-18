@@ -78,3 +78,8 @@ cross-request bleed after repeats.
 Request hijack/capture demonstrated: high-critical. Web-cache poisoning via
 smuggling: high. Desync affecting only own requests: medium-high (primitive
 proven, reachability unclear).
+
+## Route to depth
+
+Confirmed disagreement needs variant shapes, hidden-path smuggling, or the
+101 upgrade channel: load `request-smuggling-refs`.

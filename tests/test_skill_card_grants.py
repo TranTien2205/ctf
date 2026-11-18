@@ -254,9 +254,21 @@ _METHODOLOGY_ONLY = re.compile(
 
 
 def methodology_only_modules() -> set[str]:
-    """Modules with no proof requirement, derived from the matrix."""
+    """Modules with no proof requirement, derived from the matrix.
+
+    `module_spec`, not `spec_for`, because that is what `load_skill` uses at
+    runtime and the two do not answer the same question: `spec_for` resolves
+    a CLASS name, `module_spec` resolves a MODULE name and knows that a
+    `<class>-refs` depth reference belongs to `<class>`.
+
+    MEASURED: with `spec_for` this counted 12 methodology-only modules
+    against INDEX.md's four, and INDEX.md was right - all eight `*-refs`
+    modules carry their class's requirement, which `load_skill('sqli-refs')`
+    returns. A test that resolves names differently from the runtime
+    disagrees with reality and reports the runtime as the defect.
+    """
     return {p.stem for p in SKILLS.glob("*.md")
-            if p.name != "INDEX.md" and proof.spec_for(p.stem) is None}
+            if p.name != "INDEX.md" and proof.module_spec(p.stem) is None}
 
 
 def test_index_counts_and_names_the_methodology_only_modules():
@@ -493,3 +505,47 @@ def test_the_module_reference_check_reads_both_spellings():
 
 if __name__ == "__main__":                              # pragma: no cover
     raise SystemExit(pytest.main([__file__, "-q"]))
+
+
+def test_the_two_resolvers_agree_on_every_module_on_disk():
+    """`spec_for` and `module_spec` answer different questions, and a caller
+    that reaches for the wrong one gets a confident wrong answer.
+
+    `spec_for` resolves a CLASS name. `module_spec` resolves a MODULE name
+    and knows a `<class>-refs` file is the depth tier of `<class>`. The test
+    above used the first where the runtime uses the second and reported
+    eight modules as carrying no requirement when every one of them does.
+
+    So: wherever both resolve, they must agree. Where only `module_spec`
+    does, the module must be a `-refs` file whose base IS a class - that is
+    the one shape the extra resolution exists for, and anything else
+    resolving only there means a second mapping has grown beside this one.
+    """
+    both, refs_only, neither = [], [], []
+    for path in sorted(SKILLS.glob("*.md")):
+        if path.name == "INDEX.md":
+            continue
+        stem = path.stem
+        by_class = proof.spec_for(stem)
+        by_module = proof.module_spec(stem)
+        if by_class is not None and by_module is not None:
+            assert by_class.vuln_class == by_module.vuln_class, (
+                f"{stem}: spec_for says {by_class.vuln_class}, "
+                f"module_spec says {by_module.vuln_class}")
+            both.append(stem)
+        elif by_module is not None:
+            refs_only.append(stem)
+        elif by_class is None:
+            neither.append(stem)
+
+    for stem in refs_only:
+        assert stem.endswith("-refs"), (
+            f"{stem} resolves only through module_spec and is not a -refs "
+            "module, so a second name mapping has grown beside the matrix")
+        base = stem[: -len("-refs")]
+        assert proof.spec_for(base) is not None, (
+            f"{stem} points at {base!r}, which is not a proof class")
+        assert proof.module_spec(stem).vuln_class == proof.spec_for(base).vuln_class
+
+    assert both, "no module resolves as its own class - the mapping is gone"
+    assert refs_only, "no -refs module resolves; the depth tier is unreachable"

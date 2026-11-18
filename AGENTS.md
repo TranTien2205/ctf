@@ -33,7 +33,8 @@ probe, update the lab and its test together.
 - `argus/team/` — multi-agent plane: `leads.py` (typed work queue),
   `board.py` (blackboard), `cards.py` + `roles/` (worker definitions),
   `coordinator.py` (threads + watchdog). Entry: `argus team`.
-- `argus/skills/*.md` — methodology modules loaded via `load_skill`
+- `argus/skills/*.md` — methodology modules loaded via `load_skill`;
+  `<class>-refs.md` are depth references a confirmed class routes to
 - `argus/resources/wordlists/` — bundled `wordlist_fuzz` lists;
   `<cwd>/resources/wordlists/*.txt` extends/overrides at runtime
 - `argus/resources/exploits/<id>/` — bundled `run_exploit` manifests;
@@ -51,6 +52,9 @@ probe, update the lab and its test together.
 - Every tool must be registered in `tools/registry.py` (`_impl` + schema).
 - New bug class → add `argus/skills/<name>.md` + INDEX row; keep the
   format: when / first probes / confirm / bypasses / falsifier / severity.
+  Payload-level depth (per-DBMS syntax, context payload sets, format
+  tables) belongs in `<name>-refs.md`, routed from the entry skill's
+  "Route to depth" section — keep entry skills short.
 - New role → a card in `argus/team/cards.py` + a `roles/<name>.md` prompt.
   Tool restrictions belong in the card's `tools` set (enforced in
   `dispatch`), never only in the prompt.

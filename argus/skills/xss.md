@@ -46,3 +46,8 @@ every context. For stored: the rendering page shows the literal payload text.
 Reflected XSS needing no interaction: medium. Stored XSS: medium-high.
 Session-cookie theft demonstrated or admin-viewed stored XSS: high.
 Self-XSS (only affects the submitter): low at best - say so honestly.
+
+## Route to depth
+
+Confirmed reflection needs context payload sets (html/attr/JS/DOM), filter
+bypass, or an exfil shape: load `xss-refs`.

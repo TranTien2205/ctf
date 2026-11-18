@@ -9,8 +9,8 @@ suggestion, so every row names a code path.
 ## How to re-verify everything
 
 ```bash
-python selftest.py          # 121 offline end-to-end checks, no API key
-python -m pytest tests/ -q  # 165 unit + live-lab + loop tests
+python selftest.py          # 161 offline end-to-end checks, no API key
+python -m pytest tests/ -q  # 762 unit + live-lab + loop tests
 python -m argus demo        # offline single-agent run against the lab
 python -m argus verify docs/sample-session   # sealed artifact walk-through
 ```
@@ -92,6 +92,7 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Context compaction bounded; stubs keep every evidence-id shape | `_compact_history` (`request_id`/`run_id`/`call_id`/`rid`) | `test_compact_history_bounds_context`, `test_compact_history_keeps_all_id_shapes`, `test_loop_warns_before_budget_exhaustion` |
 | `--max-workers` caps workers, not the lead; 0 is refused | `_spawn_guarded` role filter + CLI floor | `test_max_workers_counts_workers_not_lead` |
 | Ctrl-C stops cleanly and still seals | `stop_event` + `finally` seal path | `test_loop_survives_keyboard_interrupt`, `test_loop_interrupt_during_dispatch_stops` |
+| Skill routing never names a dead module | `load_skill` sanitize + two-tier INDEX (`*-refs` depth files) | `test_skill_two_tier_wiring` |
 
 ## Runtime and packaging
 

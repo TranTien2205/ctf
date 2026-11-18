@@ -4372,6 +4372,14 @@ def spec_for(category: str) -> ProofSpec | None:
     return MATRIX.get(key) or MATRIX.get(key.replace("-", ""))
 
 
+def module_spec(stem: str) -> ProofSpec | None:
+    """Resolve a skills/ module name to the class it serves. A `<class>-refs`
+    module is that class's depth reference - same requirement, one hop.
+    Callers resolving module stems go through here so load_skill and the
+    selftest wiring checks cannot disagree on what a stem teaches."""
+    return spec_for(stem) or spec_for(stem.removesuffix("-refs"))
+
+
 def classes() -> list[str]:
     return sorted({spec.vuln_class for spec in MATRIX.values()})
 

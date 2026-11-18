@@ -40,3 +40,8 @@ Auth bypass via `$ne`: high. Data read beyond your own objects: high.
 `$where` code execution confirmed: critical. Operator accepted but confined
 to your own document: medium (broken object-level authorization is the real
 finding - see `idor`).
+
+## Route to depth
+
+Operator injection confirmed — aggregation-pipeline surface, blind regex
+oracle, or blast-radius rules needed: load `nosqli-refs`.

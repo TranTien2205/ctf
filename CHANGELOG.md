@@ -693,6 +693,18 @@ somebody reading only the list.
   a rejected initial spawn surfaces on stderr instead of vanishing, and
   `--max-workers 0` is refused outright (zero workers means no probe
   tools and no `record_finding` anywhere).
+- Methodology modules gain a second tier: the 27 entry skills stay small
+  (confirm/falsify/rate), and 8 `*-refs.md` depth references — ported
+  from the original ctf-v4 skill corpus — carry payload-level detail for
+  confirmed classes: per-DBMS SQLi extraction channels + file/OOB
+  escalation + WAF evasion, XSS context payload sets + exfil shapes, SSRF
+  parser-bypass table + cloud metadata + internal pivot, CL.TE/TE.CL
+  desync shapes + upgrade smuggling, deserialization magic-byte format
+  identification, SSTI engine flowchart + escapes, NoSQL operator and
+  aggregation-pipeline surface, and XXE content-type confusion +
+  parameter-entity exfil. Entry skills route to their refs file via a
+  "Route to depth" section; `test_skill_two_tier_wiring` locks the
+  INDEX/pointer wiring.
 - Artifact provenance: `meta.json` and `summary.json` record the
   producing `argus_version` (resume keeps the original and marks
   `resumed_by`); `argus sessions` lists it, `argus verify` reports it
@@ -4752,7 +4764,7 @@ negative ever settles it, and nothing left open at all. Collapsing those
 into one line would put "we checked and it is fine" and "we checked and
 cannot tell" under the same words.
 
-761 tests, selftest 160/160.
+762 tests, selftest 162/162.
 
 ### xss proved itself on the DOCTYPE, and the first two fixes were both wrong
 
@@ -4837,7 +4849,7 @@ Three scenarios pinned: refused everywhere (every endpoint an untested
 gap, marked), absent everywhere (404 is an answer, settled), and a refusal
 among answers (not blanket-blocked, so the 403 is the control working).
 
-1019 tests, selftest 161/161.
+1021 tests, selftest 162/162.
 
 ### The hybrid fan-out was 1500 lines nothing could reach
 
@@ -4910,7 +4922,7 @@ impose, over the 24 class modules. Planted back, it fails; removed, it
 passes. The scan found exactly one card wrong, which is the number that
 matters: the check was written because one had already drifted, and it had.
 
-1019 tests, selftest 161/161.
+1021 tests, selftest 162/162.
 
 ### An oracle argus cannot write
 
@@ -4961,7 +4973,7 @@ Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1019 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1021 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
@@ -4969,7 +4981,7 @@ the documentation gate exists to catch - and it caught it.
   fix carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 161 offline checks, including a documentation
+- `python selftest.py`: 162 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

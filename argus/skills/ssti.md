@@ -48,3 +48,8 @@ rejected - nothing evaluates to 49.
 
 Arithmetic eval confirmed: medium baseline. Data/config disclosure: high.
 RCE proven with benign command: critical.
+
+## Route to depth
+
+Eval confirmed — engine identification flowchart or engine-specific escape
+needed: load `ssti-refs`.

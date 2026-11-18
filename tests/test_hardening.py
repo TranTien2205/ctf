@@ -184,6 +184,35 @@ def test_dispatch_total_on_malformed_args(ctx):
             assert "result" in out or "error" in out, (name, out)
 
 
+def test_skill_two_tier_wiring():
+    """Every 'load `X`' pointer inside a skill must resolve to a real file,
+    and INDEX must route to every shipped module - a named-but-missing
+    module is a dead end the model hits mid-run."""
+    import re
+    skills = Path(__file__).parent.parent / "argus" / "skills"
+    files = {p.stem: p for p in skills.glob("*.md")}
+    index = (skills / "INDEX.md").read_text(encoding="utf-8")
+
+    # every module except the index itself is routable from INDEX
+    for stem in files:
+        if stem != "INDEX":
+            assert f"`{stem}`" in index, f"{stem} missing from INDEX.md"
+
+    # every `load <name>` / "load `name`" pointer resolves to a file
+    for stem, path in files.items():
+        for m in re.findall(r"load(?:_skill)?\s*\(?`([a-z0-9_-]+)`",
+                            path.read_text(encoding="utf-8")):
+            assert m in files, f"{path.name} routes to missing {m}"
+
+    # every -refs module is named by exactly its entry skill
+    for stem in files:
+        if stem.endswith("-refs"):
+            entry = stem[: -len("-refs")]
+            assert entry in files, f"{stem} has no entry skill"
+            assert f"`{stem}`" in files[entry].read_text(encoding="utf-8"), \
+                f"{entry}.md never routes to {stem}"
+
+
 def test_readers_survive_mutated_session_dir(tmp_path):
     """argus verify/report/findings on a tampered session dir must degrade
     to warnings/errors - these readers exist to audit artifacts an

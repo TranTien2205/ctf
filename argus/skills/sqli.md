@@ -68,3 +68,8 @@ injected effect after it has run.
 - Blind confirmed with timing: high
 - Error-based only, no extraction path demonstrated: medium-high
 - sqlmap confirms but you could not reproduce manually: verify first, then rate
+
+## Route to depth
+
+Confirmed channel needs per-DBMS syntax, extraction loops, file/OOB
+escalation, or WAF evasion: load `sqli-refs`.

@@ -60,3 +60,8 @@ resolution behavior across the payload set.
 
 Disable external entities/DTD processing in the parser (language-specific:
 `FEATURE_SECURE_PROCESSING`, `libxml_disable_entity_loader`, defusedxml).
+
+## Route to depth
+
+Parser reachable — content-type confusion, OOB parameter-entity exfil, or
+XInclude fallback needed: load `xxe-refs`.

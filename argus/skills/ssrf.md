@@ -75,3 +75,8 @@ outbound fetch is observable through any consumer.
 
 Internal resource read-back: high. Cloud credentials/metadata: critical.
 Port-scan oracle only: medium. Unverifiable single case: info/lead.
+
+## Route to depth
+
+Confirmed fetch needs URL-parser bypass, cloud-metadata paths, internal
+pivoting, or OOB proof: load `ssrf-refs`.
