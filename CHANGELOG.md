@@ -5331,12 +5331,52 @@ driver is installed because this package is standard library only. Those
 alternatives in `DBMS_RE` are unverified by this audit rather than confirmed
 by it.
 
+### The MySQL side was measurable after all, and the harness was the obstacle
+
+The fingerprint audit recorded the MySQL forms as unverified because bWAPP
+and DVWA both answered 302 to every request. That was true of the harness,
+not of the targets.
+
+The differential settled it in one request: `login=bee&password=bug` on
+bWAPP returns 302 to portal.php, while a wrong password returns 200 and the
+login page again. Authentication plainly worked - so the 302s afterwards were
+not an authorisation failure, they were the session being lost between
+requests.
+
+`GuardedClient` keeps a cookie jar, and a `Cookie` header passed in `headers`
+REPLACES it. Reading Set-Cookie from the successful login and sending it back
+by hand - the obvious thing, and what was done five times - loses the
+session. The same sequence with no Cookie header at all reached portal.php
+(200) and the SQLi endpoint behind it.
+
+The schema had always said "Session cookies are kept by the client". What it
+did not say is the consequence, which is the operationally important half: a
+target that looks unreachable right after a login that returned its success
+redirect is this, not the target. A model would reach exactly that false
+negative. The tool description and the `headers` parameter now say not to set
+Cookie and why, and a test drives a local server to pin all three facts -
+nothing sent on the first request, the jar's cookie on the second, and an
+explicit header replacing it on the third.
+
+SO THE MEASUREMENT CLOSED. bWAPP and DVWA both return "You have an error in
+your SQL syntax; check the manual that corresponds to your MySQL server
+version" on a quote, `DBMS_RE` matches it, and the class reaches `proven` on
+bWAPP from one row of `information_schema.tables` - metadata, not
+credentials, and `LIMIT 1`. The sqli class is now proven on two engines
+against two independently written applications, with evidence this
+repository is willing to collect.
+
+The test docstring is corrected rather than left alone: "unverified" and
+"verified" are different claims and the file must not keep the stale one.
+PostgreSQL stays unverified and says so - no PostgreSQL target is in this lab
+and the driver is not installed, since this package is standard library only.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1035 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1036 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

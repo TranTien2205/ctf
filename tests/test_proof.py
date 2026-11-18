@@ -5425,11 +5425,21 @@ def test_the_fingerprint_matches_the_forms_that_name_an_engine_and_no_others():
     an in-memory database in this process, so the test cannot drift from
     what the driver actually emits.
 
-    NOT MEASURED HERE: the MySQL and PostgreSQL forms. The lab's MySQL
-    targets (bWAPP, DVWA) answer 302 to an unauthenticated request, and
-    neither driver is installed - this package is standard library only. The
-    MySQL alternatives in `DBMS_RE` are therefore unverified by this test
-    rather than confirmed by it, and saying so is the point.
+    MEASURED SINCE, on two independent MySQL targets. bWAPP and DVWA both
+    return "You have an error in your SQL syntax; check the manual that
+    corresponds..." on a quote, `DBMS_RE` matches it, and the class reaches
+    `proven` on bWAPP from one row of `information_schema.tables`. The
+    earlier version of this docstring said the MySQL forms were unverified
+    because both targets answered 302 - which was true of the harness, not
+    of the targets: `GuardedClient` carries cookies itself, and setting an
+    explicit `Cookie` header FOUGHT its jar. Both facts are recorded here
+    because "unverified" and "verified" are different claims and this file
+    must not keep the stale one.
+
+    STILL NOT MEASURED: the PostgreSQL forms. No PostgreSQL target is in
+    this lab and the driver is not installed - this package is standard
+    library only - so those alternatives are unverified rather than
+    confirmed.
     """
     import sqlite3
     db = sqlite3.connect(":memory:")
@@ -5463,3 +5473,8 @@ def test_the_fingerprint_matches_the_forms_that_name_an_engine_and_no_others():
     # and the node/C form, which is what the live target returns
     assert DBMS_RE.search("SQLITE_ERROR: near \")\": syntax error")
     assert DBMS_RE.search("SQLITE_CONSTRAINT: UNIQUE constraint failed")
+
+    # and the MySQL form, verbatim from bWAPP and DVWA
+    mysql = ("You have an error in your SQL syntax; check the manual that "
+             "corresponds to your MySQL server version")
+    assert DBMS_RE.search(mysql), "the measured MySQL error form must match"

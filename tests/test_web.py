@@ -1419,3 +1419,68 @@ def test_the_run_path_claims_only_the_protection_it_has():
     assert "extra_hosts=" not in api_src, (
         "a scope list arriving in a JSON body is a scope decision made by "
         "whoever reached the port")
+
+
+def test_the_client_holds_the_session_and_an_explicit_cookie_replaces_it():
+    """The behaviour that cost five attempts against a live target.
+
+    `GuardedClient` keeps a cookie jar, which the `http_request` schema has
+    always said. What it did not say is the CONSEQUENCE: a `Cookie` header
+    passed in `headers` REPLACES the jar's, so reading Set-Cookie from a
+    successful login and sending it back by hand loses the session.
+
+    MEASURED against bWAPP. `login=bee&password=bug` returned 302 to
+    portal.php while wrong credentials returned 200 and the login page
+    again, so authentication plainly worked - and every following request
+    with a hand-set Cookie got 302 to login.php, while the same sequence
+    with NO Cookie header reached the authenticated page and the SQLi
+    endpoint behind it. A target that looks unreachable right after a login
+    that returned its success redirect is this, not the target.
+
+    This drives a local server rather than the lab, so it runs anywhere.
+    """
+    import http.server
+    import threading
+
+    seen = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen.append(self.headers.get("Cookie"))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Set-Cookie", "SID=fromserver; path=/")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        from argus.httpclient import GuardedClient
+        from argus.ratelimit import RateLimiter
+        from argus.scope import ScopeGuard
+        from argus.session import Session
+        import tempfile
+
+        sess = Session(Path(tempfile.mkdtemp()), base, {"model": "t"})
+        cl = GuardedClient(ScopeGuard(base, allow_private=True), sess,
+                           RateLimiter(0.0), max_requests=8)
+
+        cl.send("GET", base + "/one")                     # server sets SID
+        cl.send("GET", base + "/two")                     # jar should carry it
+        cl.send("GET", base + "/three",
+                headers={"Cookie": "SID=mine"})           # and this replaces it
+
+        assert seen[0] is None, "nothing to send on the first request"
+        assert seen[1] is not None and "fromserver" in seen[1], \
+            "the client must carry the session it was given"
+        assert "mine" in seen[2] and "fromserver" not in seen[2], \
+            ("an explicit Cookie header REPLACES the jar's - which is why "
+             "the schema tells the caller not to set one")
+    finally:
+        srv.shutdown()
+        srv.server_close()

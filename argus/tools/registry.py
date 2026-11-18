@@ -136,11 +136,20 @@ TOOL_SCHEMAS: list[dict] = [
         "Send one HTTP request inside scope. The full request and response are "
         "recorded in the transcript; cite the returned request_id as evidence. "
         "Redirects are NOT followed unless follow_redirects is true - a 3xx "
-        "Location is itself evidence. Session cookies are kept by the client.",
+        "Location is itself evidence. Session cookies are kept by the client - "
+        "so log in once and keep probing, and do NOT put a Cookie header in "
+        "`headers`: yours replaces the jar's and the session is lost. "
+        "MEASURED: reading Set-Cookie from a successful bWAPP login and "
+        "sending it back by hand got 302 to login.php on every following "
+        "request, while the same login with no Cookie header at all reached "
+        "the authenticated page. A target that looks unreachable right after "
+        "a login that returned its success redirect is this, not the target.",
         {
             "method": {**_STR, "description": "HTTP method, e.g. GET, POST, PUT, DELETE, OPTIONS"},
             "url": {**_STR, "description": URL_DESC},
-            "headers": {**_HEADERS, "description": "Extra headers for this request only"},
+            "headers": {**_HEADERS, "description":
+                "Extra headers for this request only. Not Cookie - the client "
+                "holds the session and yours would replace it"},
             "body": {**_STR, "description": "Raw request body (for POST/PUT/PATCH)"},
             "follow_redirects": {**_BOOL, "description": "Follow 3xx chains (default false)"},
             "note": {**_STR, "description": "One-line note stored with the transcript entry"},
