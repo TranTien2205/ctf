@@ -25,7 +25,7 @@ source resolved, then retries with the full tool schema. Exit codes:
 auth rejected; 2 = auth works but the tool surface was rejected
 (degraded - constrain it). Note: OAuth (subscription) auth bills calls
 to your account's "extra usage" budget, not plan limits - on a
-constrained account the full ~58-tool schema may be rejected
+constrained account the full ~59-tool schema may be rejected
 (`--tools` shrinks it; team mode splits tools across role cards and
 fits under the cap).
 
@@ -519,7 +519,7 @@ python -m argus mcp-serve http://127.0.0.1:8777 --allow-private \
     --require-proof --session-dir sessions
 ```
 
-Speaks newline-delimited stdio JSON-RPC and serves 48 of the 58 tools.
+Speaks newline-delimited stdio JSON-RPC and serves 49 of the 59 tools.
 Takes the same flags as `run`. Register it with any MCP host:
 
 ```json

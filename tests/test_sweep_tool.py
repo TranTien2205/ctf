@@ -5,6 +5,7 @@ lines no engagement could reach. These pin the seam, and in particular the
 one defect driving it found - a refusal that read as an empty result.
 """
 from __future__ import annotations
+import inspect
 
 import pathlib
 import sys
@@ -126,3 +127,82 @@ def test_the_tool_is_on_the_table_and_dispatchable():
     props = schema["input_schema"]["properties"]
     assert {"url", "tools", "wordlist", "timeout_s"} <= set(props)
     assert schema["input_schema"]["required"] == ["url"]
+
+
+# ------------------------------- the fan-out half, and the fourth orphan
+
+def test_the_fanout_is_on_the_tool_table():
+    """`exploit_fanout` was written, tested and reached by nothing - found by
+    auditing the package for public functions with no caller anywhere, which
+    returned it and `schemas_for` out of several hundred. Fourth orphan of
+    this session."""
+    from argus.tools import registry
+    assert "fanout_sweep" in {t["name"] for t in registry.TOOL_SCHEMAS}
+
+
+def test_the_fanout_is_granted_and_taught():
+    """The three steps past the registry entry, missed twice in this session
+    before being done in the same edit as the third."""
+    from argus.team.cards import EXPLOIT
+    assert "fanout_sweep" in EXPLOIT.tools
+    card = (ROOT / "argus" / "team" / "roles" / "exploit.md").read_text(
+        encoding="utf-8")
+    assert "fanout_sweep" in card, "a role that holds a tool must be told why"
+
+
+def test_a_non_url_is_refused_with_its_reason_not_dropped(ctx):
+    out = sweep_mod.fanout_sweep(ctx, endpoints="notaurl\nalso bad")
+    assert "error" in out
+    reasons = [r["reason"] for r in out["refused"]]
+    assert all("http(s)" in r for r in reasons), out
+
+
+def test_the_endpoint_list_is_capped_and_says_so(ctx, monkeypatch):
+    """A model picks this list, so the cap is lower than the orchestrator's
+    500 - an engagement that wants 200 endpoints swept at once is an
+    operator's decision, not a tool call's. And the cap is REPORTED: a
+    caller who sent 80 and got 24 would keep sending 80 otherwise.
+
+    The orchestrator is stubbed because the point is the list, not the
+    scanners - and running 24 real sweeps to check an arithmetic bound
+    would make this test cost minutes.
+    """
+    passed = {}
+
+    def fake_fanout(target, endpoints, **kw):
+        passed["endpoints"] = list(endpoints)
+        return []
+
+    monkeypatch.setattr(sweep_mod.orchestrator, "exploit_fanout", fake_fanout)
+    many = "\n".join(f"http://t.local/{i}" for i in range(80))
+    out = sweep_mod.fanout_sweep(ctx, endpoints=many)
+
+    assert len(passed["endpoints"]) == sweep_mod.MAX_FANOUT_ENDPOINTS
+    assert out["requested"] == sweep_mod.MAX_FANOUT_ENDPOINTS
+    assert any("capped" in r["reason"] for r in out["not_submitted"]), out
+
+
+def test_duplicate_endpoints_are_collapsed(ctx, monkeypatch):
+    passed = {}
+    monkeypatch.setattr(
+        sweep_mod.orchestrator, "exploit_fanout",
+        lambda target, endpoints, **kw: passed.setdefault("e", list(endpoints)) and [])
+    sweep_mod.fanout_sweep(ctx, endpoints="http://t.local/a\nhttp://t.local/a\n"
+                                           "http://t.local/b")
+    assert passed["e"] == ["http://t.local/a", "http://t.local/b"]
+
+
+def test_nothing_scanned_is_the_verdict_not_a_count_of_zero():
+    """The defect `recon_sweep` was fixed for, in the fan-out's own words.
+    MEASURED against the lab: two out-of-scope endpoints returned
+    `refused: True` and "NOTHING WAS SCANNED across 2 endpoint(s)" naming
+    the guard's own message, with "do not widen the endpoint list" - because
+    a model told its list was empty widens the list and retries forever.
+    """
+    import argus.tools.sweep as m
+    src = inspect.getsource(m.fanout_sweep)
+    assert "NOTHING WAS SCANNED" in src
+    assert "not a result about the" in src
+    # and the dedup: one entry per endpoint, not per tool
+    assert 'x["endpoint"] == result.target' in src, \
+        "a three-tool sweep of one refused endpoint must not read as three"

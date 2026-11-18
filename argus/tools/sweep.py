@@ -197,3 +197,119 @@ def recon_sweep(ctx: Context, url: str, tools: str = "", wordlist: str = "",
                           "those are different, and only the second one you "
                           "can fix.")
     return out
+
+
+#: What `exploit_fanout` drives. Separate from `SWEEP_TOOLS` because these
+#: are the ones that send payloads rather than enumerate: naming them here
+#: keeps the error message honest about what this tool can and cannot run.
+FANOUT_TOOLS = ("curl", "nuclei", "sqlmap")
+
+#: The orchestrator caps the list at 500 and the parallelism at 16. This cap
+#: is smaller because a model picks the list: an engagement that wants 200
+#: endpoints swept at once is a decision for an operator, not a tool call.
+MAX_FANOUT_ENDPOINTS = 24
+
+
+def fanout_sweep(ctx: Context, endpoints: str = "", timeout_s: int = 180,
+                  max_parallel: int = 4) -> dict:
+    """Work several confirmed endpoints concurrently, one result each.
+
+    The other half of `argus/orchestrator.py`, and the fourth orphan this
+    session found: `exploit_fanout` was written, tested and reached by
+    nothing - a repo-wide audit for public functions with no caller anywhere
+    in the package returned it and one other.
+
+    `recon_sweep` enumerates ONE url. This takes a list and fans out, each
+    endpoint in its own directory, because sqlmap keys its session files by
+    target host and two endpoints on one host would otherwise share a
+    session directory and corrupt each other's state.
+
+    Every endpoint is scope-checked inside its own sweep before any process
+    exists, so an out-of-scope entry in the list refuses itself rather than
+    taking the call down.
+    """
+    raw = [e.strip() for e in str(endpoints or "").replace(",", "\n").split("\n")]
+    eps, seen, refused = [], set(), []
+    for ep in raw:
+        if not ep or ep in seen:
+            continue
+        if not ep.lower().startswith(("http://", "https://")):
+            refused.append({"endpoint": ep[:120],
+                            "reason": "not an http(s) URL"})
+            continue
+        seen.add(ep)
+        eps.append(ep)
+        if len(eps) >= MAX_FANOUT_ENDPOINTS:
+            refused.append({"endpoint": "...",
+                            "reason": f"list capped at {MAX_FANOUT_ENDPOINTS} "
+                                      "endpoints per call"})
+            break
+    if not eps:
+        return {"error": "no usable endpoint; pass full http(s) URLs, one per "
+                         "line or comma-separated",
+                "refused": refused}
+
+    try:
+        results = orchestrator.exploit_fanout(
+            # `target` is context for the agent prompt and is never dialled -
+            # the orchestrator's own docstring says so, and `agent_fn` is
+            # None here, so nothing reads it. `ScopeGuard` exposes no
+            # `.target`, and a `hasattr` dance implying one would be a
+            # sentence that gets believed. The first endpoint, plainly.
+            eps[0],
+            eps,
+            scope=ctx.scope,
+            workdir=str(ctx.session.dir),
+            agent_fn=None,          # see the module docstring
+            timeout_s=_ival(timeout_s, 180, 20, 600),
+            max_parallel=_ival(max_parallel, 4, 1, 8),
+        )
+    except Exception as exc:        # noqa: BLE001
+        return {"error": f"the fan-out could not run: {exc}"}
+
+    per, scanned, all_refused = [], 0, []
+    for result in results:
+        runs = []
+        for run in result.tool_runs:
+            rid = _record(ctx, result.target, run)
+            runs.append({"request_id": rid, "tool": run.tool, "rc": run.rc,
+                         "seconds": run.seconds,
+                         "skipped": run.skipped_reason,
+                         "output_chars": len(run.stdout or "")})
+            if run.skipped_reason and "scope" in run.skipped_reason.lower():
+                # One entry per ENDPOINT, not per tool. The guard refuses
+                # before each tool starts, so a three-tool sweep of one
+                # out-of-scope endpoint produced the same line three times
+                # and read as three problems.
+                if not any(x["endpoint"] == result.target for x in all_refused):
+                    all_refused.append({"endpoint": result.target,
+                                        "reason": run.skipped_reason})
+            elif not run.skipped_reason:
+                scanned += 1
+        per.append({"endpoint": result.target, "runs": runs,
+                    "endpoints": result.endpoints[:50],
+                    "seconds": result.seconds})
+
+    out = {"requested": len(eps), "results": per, "agent_ran": False,
+           "tools": list(FANOUT_TOOLS)}
+    if refused:
+        out["not_submitted"] = refused
+    if all_refused:
+        out["scope_refused"] = all_refused
+    # Same defect shape `recon_sweep` was fixed for: a refusal must not read
+    # as an empty result. If nothing was scanned at all, that is the verdict,
+    # not a count of zero findings.
+    if scanned == 0:
+        reason = (all_refused[0]["reason"] if all_refused
+                  else "every tool was skipped - check which are installed")
+        out["refused"] = bool(all_refused)
+        out["verdict"] = ("NOTHING WAS SCANNED across "
+                          f"{len(eps)} endpoint(s): {reason}. Do not widen "
+                          "the endpoint list; this is not a result about the "
+                          "target.")
+    else:
+        out["verdict"] = (f"{scanned} tool run(s) completed across "
+                          f"{len(eps)} endpoint(s). Cite a run's request_id "
+                          "for anything you claim from its output; the raw "
+                          "output is in the transcript via read_response.")
+    return out

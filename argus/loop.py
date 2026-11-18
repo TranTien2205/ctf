@@ -18,6 +18,7 @@ from .scope import ScopeGuard
 from .session import Session
 from .system import build_seed, build_system
 from .tools import TOOL_SCHEMAS, Context, dispatch
+from .tools.registry import schemas_for
 
 _MAX_RESULT_CHARS = 16_000
 # Older tool_results are compacted to stubs once this many newer result
@@ -170,8 +171,12 @@ class AgentLoop:
             self.seed += (f"\n\nThis run RESUMES session {self.session.id}. "
                           f"Prior findings already recorded - do not re-verify "
                           f"them, build on them:\n{prior}")
-        self.tools = TOOL_SCHEMAS if allowed is None else \
-            [s for s in TOOL_SCHEMAS if s["name"] in allowed]
+        # `schemas_for`, not a comprehension: the same filter was written
+        # out here while a named function for it sat in `registry.py` with
+        # no caller at all - two expressions of one concept, and a change to
+        # how a role gets its surface would have had to find both. Found by
+        # auditing the package for public functions nothing reaches.
+        self.tools = TOOL_SCHEMAS if allowed is None else schemas_for(allowed)
         if board is None:
             from .tools.registry import BOARD_TOOLS
             self.tools = [s for s in self.tools

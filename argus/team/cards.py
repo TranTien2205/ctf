@@ -60,6 +60,12 @@ EXPLOIT = RoleCard(
         # same shape of missing as a module nothing imports, and the second
         # time in this session that adding a tool stopped one step short.
         "probe_ssrf_oob",
+        # The fan-out belongs to exploit by definition: recon finds the
+        # endpoints, this works them. Third tool in this session, and the
+        # first where the grant, the ledger attribution and the card were
+        # done in the same edit as the registry entry instead of two gates
+        # later.
+        "fanout_sweep",
         "probe_xxe", "probe_csrf", "probe_xfh", "probe_nosqli",
         "probe_upload", "probe_race", "probe_deserialize", "probe_cache",
         "probe_ppoll", "probe_smuggle", "probe_disclosure", "probe_websocket",

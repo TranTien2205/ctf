@@ -84,6 +84,7 @@ def _impl(name: str) -> Callable:
         "record_finding": analysis.record_finding,
         "run_external": analysis.run_external,
         "recon_sweep": sweep_tool.recon_sweep,
+        "fanout_sweep": sweep_tool.fanout_sweep,
         "mcp_list": mcp_tools.mcp_list,
         "mcp_call": mcp_tools.mcp_call,
         "finish": analysis.finish,
@@ -346,6 +347,27 @@ TOOL_SCHEMAS: list[dict] = [
             "data": {**_STR, "description": "POST body template; param value is replaced"},
         },
         ["url", "param"],
+    ),
+    _schema(
+        "fanout_sweep",
+        "Work SEVERAL confirmed endpoints concurrently - the fan-out half of "
+        "the orchestrator, where `recon_sweep` enumerates one URL. Takes a "
+        "list (one per line or comma-separated), gives each endpoint its own "
+        "directory because sqlmap keys session files by host, and returns one "
+        "result per endpoint. Every endpoint is scope-checked inside its own "
+        "sweep before any process exists, so an out-of-scope entry refuses "
+        "itself instead of taking the call down. If nothing was scanned at "
+        "all the verdict says so rather than reporting zero findings - that "
+        "is not a result about the target. THE AGENT HALF IS YOURS: this runs "
+        "scanners only.",
+        {
+            "endpoints": {**_STR, "description": "Full http(s) URLs, one per "
+                                                 "line or comma-separated"},
+            "timeout_s": {**_INT, "description": "Per-tool timeout (default 180)"},
+            "max_parallel": {**_INT, "description": "Endpoints at once, 1-8 "
+                                                    "(default 4)"},
+        },
+        ["endpoints"],
     ),
     _schema(
         "probe_ssrf_oob",

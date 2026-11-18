@@ -167,7 +167,7 @@ waste budget inside scope.
 
 A third plane, and the one that spells out the chain the project is built
 against — `user -> LLM -> MCP -> tool`. `argus/mcpserver.py` exposes 45 of
-the 58 tools over newline-delimited stdio JSON-RPC, symmetric with the client
+the 59 tools over newline-delimited stdio JSON-RPC, symmetric with the client
 in `argus/mcp.py`, so the two halves of the protocol are testable against
 each other rather than against a mock.
 

@@ -84,7 +84,7 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 48 of the 58 tools served over
+- `user -> LLM -> MCP -> tool`: 49 of the 59 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
@@ -5429,12 +5429,71 @@ The ledger one matters most: a probe in neither `PROBE_CLASS` nor
 however often the probe runs, and this is the call that produces the
 artifact `proven` needs. Attributed to `ssrf`, granted to exploit.
 
+### An audit for orphans, and the other half of the orchestrator
+
+Three components in this session turned out to be complete, tested and
+reached by nothing, so the question was asked properly: which public
+function in this package does nobody call?
+
+The first pass over-reported badly - thirty-odd names, almost all of them
+`verify_*` functions that the proof matrix calls through a table in their
+own file, which the audit was excluding as "the owning module". That is the
+same mistake a coverage audit here made before: the UNREACHABLE verdicts are
+an audit's unreliable half. Counting same-module use, including dispatch
+tables, the real answer was TWO out of several hundred.
+
+**The orchestrator's fan-out entry point** - its other half. One result
+per endpoint, all endpoints worked concurrently, each in its own directory
+because sqlmap keys session files by host and two endpoints on one host
+would corrupt each other's state. Written, tested, called by nothing.
+`fanout_sweep` is tool 59 and the caller - named outside the
+`exploit_` prefix on purpose, because registering an `exploit_*` tool made
+the doc gate read three legitimate identifiers as tools: a transcript event
+kind, a parameter of `run_exploit`, and the orchestrator function itself.
+Third time in this session that the fix for a checker confusing things was
+to name the thing so it cannot be confused with the language around it. Measured on the lab with a
+deliberately mixed list: four submitted, one refused as not a URL with the
+reason, one out-of-scope endpoint refused by the guard before any process
+existed, nine tool runs completed across the three in scope.
+
+Two things it got wrong first. `scope_refused` listed the same endpoint
+three times - once per tool, because the guard refuses before each one -
+which reads as three problems; it is one entry per endpoint now. And the
+`target` argument was reached for as `ctx.scope.target`, which `ScopeGuard`
+does not have: a `hasattr` dance implying it might would be a sentence that
+gets believed, and the orchestrator's own docstring says that argument is
+context for the agent prompt and is never dialled, so the first endpoint is
+passed plainly.
+
+The cap is 24 endpoints per call, not the orchestrator's 500, because a
+MODEL picks this list - and the cap is reported, since a caller who sent 80
+and got 24 would keep sending 80.
+
+**`schemas_for`** - "tool schemas restricted to a name set (a role card)",
+in `registry.py`, called by nothing at all while `loop.py` wrote the same
+filter out inline. Two expressions of one concept, where a change to how a
+role gets its surface would have had to find both. `loop.py` calls it now.
+
+AND THE THREE STEPS PAST THE REGISTRY ENTRY WERE DONE IN THE SAME EDIT this
+time - grant, ledger, card - after being missed twice earlier in this
+session. The ledger needed no change and the reason is in `decide.py`
+already: the attribution partition only reaches tools named `probe_*`,
+because mapping `fingerprint` to a class would make reading a banner count
+as probing, and a fan-out is the same case. `exploit.md` teaches it as step
+3, for several leads on one host, with "for one, probe it" - a tool that
+earns its cost on a list and not on a single URL.
+
+A test that could never run was replaced rather than left. The cap test
+began as `pytest.skip("list parsing is inline")`, which is a test that
+passes forever on nothing; it stubs the orchestrator and asserts on what the
+list became.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1044 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1050 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
