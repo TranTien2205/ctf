@@ -1623,8 +1623,8 @@
         "htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
       ],
       "skill_tokens": 1210,
-      "depth_files": 2,
-      "depth_tokens": 5813,
+      "depth_files": 68,
+      "depth_tokens": 95687,
       "use_when": [
         "a probe or source read produced this class's signal: one benign separator with a command whose output is unmistakable, and a timing variant as a fallback channel",
         "a chain card already proves this class here: htb-pcalc-php-eval-letter-filter-highbyte-constant-tilde-complement-rce"
