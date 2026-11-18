@@ -1277,7 +1277,7 @@ def _doc_consistency() -> None:
     for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
         if fp.name == "INDEX.md":
             continue
-        spec = proof.spec_for(fp.stem)
+        spec = proof.module_spec(fp.stem)
         if spec is None:          # methodology only, by design
             continue
         module_count += 1
@@ -1317,7 +1317,7 @@ def _doc_consistency() -> None:
         if fp.name == "INDEX.md":
             continue
         body = fp.read_text(encoding="utf-8")
-        own = proof.spec_for(fp.stem)
+        own = proof.module_spec(fp.stem)
         own_class = own.vuln_class if own else ""
         if own_class:
             taught.add(own_class)

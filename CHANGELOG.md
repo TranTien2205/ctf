@@ -4764,21 +4764,21 @@ negative ever settles it, and nothing left open at all. Collapsing those
 into one line would put "we checked and it is fine" and "we checked and
 cannot tell" under the same words.
 
-761 tests, selftest 160/160.
+762 tests, selftest 161/161.
 
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 761 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 762 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix
   carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 160 offline checks, including a documentation
+- `python selftest.py`: 161 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count

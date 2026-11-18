@@ -1,8 +1,8 @@
 # NoSQL injection — depth reference
 
-Load when `nosqli` confirmed the request value stays an object and reaches a
-query. Keep first probes read-only and scoped to a record you created or can
-identify.
+Load when `probe_nosqli` confirmed the request value stays an object and
+reaches a query. Keep first probes read-only and scoped to a record you
+created or can identify.
 
 ## Operator table
 
@@ -12,7 +12,7 @@ identify.
 | `$regex` | prefix/boolean oracle | against a known field on your record |
 | `$where` | server-side JS predicate where enabled | confirm support read-only |
 | `$exists` | field-shape probing | read-only |
-| `$rename`, `$set`-adjacent | write-shaped | never without `--write-ack` equivalent — see blast radius |
+| `$rename`, `$set`-adjacent | write-shaped | never fire on a shared collection — see blast radius |
 
 ## Authentication filters
 

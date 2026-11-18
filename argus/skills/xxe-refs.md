@@ -1,7 +1,7 @@
 # XXE — depth reference
 
-Load when `xxe` confirmed an XML parser reachable from a request body. The
-highest-yield door on modern stacks is content-type confusion — cover it
+Load when `probe_xxe` confirmed an XML parser reachable from a request body.
+The highest-yield door on modern stacks is content-type confusion — cover it
 before hand-crafting DOCTYPEs on an XML endpoint.
 
 ## Content-type confusion (the reliable door)

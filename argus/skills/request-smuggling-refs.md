@@ -1,9 +1,9 @@
 # Request smuggling — depth reference
 
-Load when `request-smuggling` confirmed a front/back parse disagreement and
-you need the variant that fits the chain. All probes go through `send_raw` —
-one TCP write per ambiguous request, then count status lines: a real desync
-answers a request the front end never saw.
+Load once `probe_smuggle` confirmed a front/back parse disagreement and you
+need the variant that fits the chain. Its raw sends write each ambiguous
+request in one TCP write — then count status lines: a real desync answers a
+request the front end never saw.
 
 ## The variant alphabet
 

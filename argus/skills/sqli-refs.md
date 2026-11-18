@@ -79,9 +79,10 @@ before setting a threshold; keep requests sequential.
 | MSSQL | `OPENROWSET(BULK 'C:\path', SINGLE_CLOB)` | `xp_cmdshell` after `sp_configure 'xp_cmdshell',1` |
 | Oracle | `UTL_FILE` needs a directory object | `DBMS_SCHEDULER` / Java stored proc |
 
-File-write payloads (webshell shapes) belong on `send_raw` with the path
-confirmed writable — do not claim file-read from a load_file-shaped payload
-that returned nothing.
+File-write payloads (webshell shapes) are write-shaped actions — run them
+through a `run_exploit` manifest once the path is confirmed writable, not in
+a blind `http_request` body. Do not claim file-read from a `LOAD_FILE`-shaped
+payload that returned nothing.
 
 ## Out-of-band extraction (response shows nothing)
 

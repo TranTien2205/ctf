@@ -206,8 +206,10 @@ def load_skill(ctx: Context, name: str) -> dict:
     out = {"skill": safe, "content": path.read_text(encoding="utf-8")}
     # The requirement belongs here, not only in the record_finding result: the
     # skill is read BEFORE probing the class, which is when knowing what has to
-    # be collected still changes what gets sent.
-    spec = proof.spec_for(safe)
+    # be collected still changes what gets sent. A `<class>-refs` module is the
+    # same class's depth reference - it carries that class's requirement, or
+    # _also_taught would re-offer the class as something OTHER than itself.
+    spec = proof.module_spec(safe)
     if spec is not None:
         out["vuln_class"] = spec.vuln_class
         out["proof_requirement"] = spec.requirement

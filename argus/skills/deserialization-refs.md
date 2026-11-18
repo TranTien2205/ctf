@@ -1,6 +1,6 @@
 # Deserialization — depth reference
 
-Load when `deserialization` found a serialized blob in a cookie, param,
+Load when `probe_deserialize` found a serialized blob in a cookie, param,
 hidden field, or body. Identification comes before exploitation — the format
 decides the gadget tooling and whether a safe probe exists at all.
 

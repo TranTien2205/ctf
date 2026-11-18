@@ -1,9 +1,9 @@
 # SSRF — depth reference
 
-Load when `ssrf` confirmed the server fetches a controlled URL and you need
-filter bypass, cloud-metadata targets, or internal pivoting. Every fetched
-URL still goes through `http_request`/`fetch_url` — the scope guard applies
-to the *first* request; what the server resolves after that is the bug.
+Load once `probe_ssrf` confirmed the server fetches a controlled URL and you
+need filter bypass, cloud-metadata targets, or internal pivoting. Every
+fetched URL still goes through `http_request` — the scope guard applies to
+the *first* request; what the server resolves after that is the bug.
 
 ## URL-parser bypass table (filters that check host)
 
