@@ -33,12 +33,22 @@ Một lần đo nhất quán, sau khi đã sửa hết các lỗi ở mục 4:
 | argus-lab | rce | 3 | **proven** | proven | `uid=1000(lab)` |
 | DVWA | sqli | 15 | **proven** | proven | `5f4dcc3b5aa765d61d8327deb882cf99` |
 | DVWA | rce | 3 | **proven** | proven | `uid=33(www-data)` |
-| DVWA | xss | 1 | candidate | candidate | (đúng ceiling — không có browser) |
+| DVWA | xss | 6 | **proven** | proven | `<script>fetch('http://…/argusfb04…')</script>` |
+| bWAPP | xss | 6 | **proven** | proven | `<script>fetch('http://…/argusc9d2…')</script>` |
+| argus-lab | xss | 6 | **proven** | proven | `<script>fetch('http://…/argus8589…')</script>` |
 | bWAPP | sqli | 20 | **proven** | proven | `6885858486f31043e5839c735d99457f045affd0` |
 | bWAPP | rce | 3 | **proven** | proven | `uid=33(www-data)` |
 | Juice Shop | sqli | 14 | candidate | proven | chỉ error-based, chưa trích được bảng |
 
-**7/8 ca đạt ceiling của lớp; 74 request toàn bộ.**
+**9/10 ca đạt ceiling của lớp.**
+
+Đo lại ngày 2026-11-16 sau khi gỡ trần lớp `xss`. Ba dòng `xss` là **mới**: lần
+đo trước lớp này bị chặn cứng ở `candidate` với lý do "gói không có browser",
+nên nó không bao giờ có thể là một kết quả. Giờ nó được đo như mọi lớp khác, và
+đạt `proven` trên cả ba mục tiêu — **hai trong số đó là ứng dụng của bên thứ ba**.
+
+Bằng chứng được trích là chính payload đã phản chiếu, mang nonce mà browser gọi
+về collector. Việc trích đúng thứ này không tự nhiên mà có: xem mục 4.7.
 
 Về các bằng chứng trên: `5f4dcc3b5aa765d61d8327deb882cf99` là MD5 của
 `password` — mật khẩu băm của `admin` trong bảng `users` của DVWA.
@@ -199,6 +209,98 @@ chứng thất bại của request này. Đây đúng là họ lỗi của mục
 Sau ba bản sửa này: dò ra 7 cột, extract trả về hash SHA1 mật khẩu của `bee`,
 và lớp `sqli` của bWAPP đạt `proven`. Đo được: 6/8 → **7/8** ca đạt ceiling.
 
+### 4.6 Hai lớp bị chặn trần vì **một** thứ thiếu, không phải hai
+
+`xss` và `ssrf` là hai lớp duy nhất ma trận giữ ở `candidate` bất kể bằng chứng.
+Lý do khai ra đọc như hai vấn đề khác nhau — *"gói này không có browser"* và
+*"không có collector ngoài băng"* — và chúng là **một vấn đề**.
+
+Mỗi lớp nhìn thấy một nửa bằng chứng trong byte: một payload phản chiếu nguyên
+vẹn, một response khác với đối chứng. Không lớp nào nhìn thấy nửa còn lại, mà
+trong **cả hai** trường hợp nửa đó là *một request mà payload tạo ra khi nó thật
+sự chạy*.
+
+**Và thiết kế hiển nhiên là sai.** Chỉ dẫn sẵn trong code nói: lái một browser
+rồi trích nonce mà nó báo về. Nhưng câu trả lời đó đến tay cổng chứng minh
+**thông qua probe** — nên probe trở thành người phán quyết chính mình, đúng thứ
+`record_finding` từ chối cho 28 lớp còn lại.
+
+Nguyên tắc rút ra, và nó tổng quát hơn đề tài này:
+
+> **Bằng chứng phải đến trên một kênh mà người chấm sở hữu, chứ không phải do
+> bên bị chấm chuyển lời.**
+
+Nên payload được viết để **làm** một việc: gọi về một listener của chính argus
+(`argus/collector.py`). Hit đến trên socket đó, và cổng chấm hit — không chấm
+lời kể của công cụ về chính nó. Đúng cấu trúc `id; echo <nonce>` đã dùng cho RCE.
+
+Bốn điều kiện, mỗi cái chặn một cách chứng minh rỗng:
+
+| Điều kiện | Nếu bỏ thì sao |
+|---|---|
+| hướng `inbound` | request **ta tự gửi** đến collector của mình đọc y hệt hit nhận được |
+| nonce khớp một request đã gửi | hit không ai gây ra thì chứng minh gì |
+| đến **sau** (`>` chứ không `>=`) | cùng mốc thời gian là chưa chứng minh được cái nào trước |
+| `ssrf`: từ **máy khác** | điều kiện duy nhất **không** dựa vào việc tin probe của chính mình |
+
+Kết quả: danh sách lớp không chứng minh được từ **3 xuống 1**, và cái còn lại
+(`dos`) bị từ chối theo chính sách chứ không phải thiếu thiết bị.
+
+### 4.7 Vá xong lớp mới thì tạo lại đúng lỗ hổng cũ — lần thứ ba
+
+Ngay sau khi `xss` lên được `proven`, phép đo trên DVWA cho kết quả này:
+
+```
+DVWA  xss  6  proven  <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML
+```
+
+Lớp đạt **proven** với bằng chứng là **khung trang**. Đây là lần thứ ba cùng một
+hình dạng lỗi: mục 4.1 (`sqli` trên `<!DOCTYPE html>`), mục 4.3 (`rce` trên
+`DOCTYPE`), và giờ `xss`.
+
+Nguyên nhân: check *"payload reflected unencoded"* chỉ hỏi **excerpt có chứa
+`<>"'` không**, không hỏi **excerpt có phải payload không**. DOCTYPE có `<` và
+`"`, nên nó qua.
+
+**Bản vá đầu tiên của tôi sai, và cách nó sai đáng ghi lại.** Tôi dùng câu mà
+lớp này tự khai trong `requirement` — *"executing the payload and reporting the
+probe nonce"* — và bắt excerpt phải mang nonce của collector. Nó chặn DOCTYPE
+đúng như mong muốn. Nhưng nó **cũng chặn** canary mà một lần chạy không có
+browser phản chiếu hoàn toàn hợp lệ, vì canary không mang nonce nào.
+
+Hậu quả: **phiên mẫu được ship ngừng verify.** Finding `xss` của nó tụt từ
+`candidate` xuống `unproven`, nên `argus verify` báo `TAMPERED` trên chính hồ sơ
+mà gói này dùng làm ví dụ. Đó là cách bản vá sai bị bắt — không phải bằng suy
+luận, mà bằng một artifact có thật ngừng hợp lệ.
+
+Lỗi nằm ở chỗ tôi lẫn hai thứ: *"excerpt phải là payload"* với *"excerpt phải
+mang nonce của collector"*. Cái thứ hai chặt hơn điều cần chứng minh.
+
+**Bản vá đúng là cấu trúc, không phụ thuộc định dạng marker.** Phản chiếu nghĩa
+là byte **đi ra rồi quay về**, nên excerpt phải có trong **cả request lẫn
+response** của cùng một exchange. DOCTYPE có trong response, không có trong
+request — bị từ chối. Canary có trong cả hai — được nhận. Payload collector có
+trong cả hai — được nhận. (Request mã hoá payload theo percent-encoding nên phép
+so sánh làm trên bản đã giải mã.)
+
+Đo lại trên mục tiêu thật sau bản vá đúng:
+
+| Trích gì | Kết quả |
+|---|---|
+| `<script>fetch('http://…/argusfaf…')</script>` | **proven** |
+| `<!DOCTYPE html>\n<html>\n…` | candidate |
+
+Cả ba mục tiêu vẫn `proven` với payload thật. **Bản vá bỏ chứng minh giả mà
+không bỏ chứng minh thật** — đó là tiêu chuẩn duy nhất để nói một bản vá cổng là
+đúng, và bản vá đầu của tôi trượt đúng vế thứ hai.
+
+**Điều đáng đưa vào chương bàn luận.** Ba lần, cùng một lỗi, ở ba lớp khác nhau,
+do ba lần viết phép tương quan **riêng cho từng lớp** thay vì viết một lần. Một
+cổng chứng minh không chỉ cần đúng luật cho từng lớp — nó cần **một phép tương
+quan dùng chung**, nếu không mỗi lớp mới là một cơ hội tái tạo lại cùng một lỗ
+hổng. Và cả ba lần, thứ phát hiện ra là **phép đo trên mục tiêu thật**, không
+phải bộ test tự viết.
+
 ### 4.5 Hạn chế còn lại, không sửa trong phiên này
 
 - **XSS dừng ở `candidate`** — không có browser trong gói. Đã ghi là cap có
@@ -210,6 +312,97 @@ và lớp `sqli` của bWAPP đạt `proven`. Đo được: 6/8 → **7/8** ca �
 - **`dos` bị từ chối theo chính sách** của repo.
 
 ---
+
+## 4b. So sánh với công trình cùng loại
+
+Phần này đọc **mã nguồn** của các công cụ cùng loại, không đọc tài liệu quảng
+cáo. Mọi khẳng định dưới đây đều chỉ tới một dòng mã cụ thể.
+
+### 4b.1 Strix (Apache-2.0, Python) — `create_vulnerability_report`
+
+| | |
+|---|---|
+| docstring | **404 dòng** |
+| thân hàm thực thi | **47 dòng** |
+| kiểm tra duy nhất | ID exchange có tồn tại trong proxy Caido không |
+
+Docstring dặn model rất kỹ: *"file only when you're 100% sure"*, *"Counterevidence
+pass (required before filing)"*. Nhưng đó là **chỉ dẫn cho LLM đọc**. Trong code,
+`evidence`, `counterevidence`, `confidence` đều là chuỗi tự do **không kiểm tra
+gì**, và trường `http-exchange-ids` của Strix là **tuỳ chọn**. Chính docstring của hàm kiểm tra
+viết: *"a proxy outage never blocks a finding"* — tức kiểm tra cố ý không chặn.
+
+### 4b.2 PentestCode (MIT, TypeScript) — `state-update.ts`, `xss-detect.ts`
+
+```ts
+evidence: d.evidence || ""                 // ghi được với bằng chứng RỖNG
+status: classification === "reflected" ? "confirmed" : "suspected"
+```
+
+Dòng thứ hai là điểm so sánh trực tiếp nhất với đề tài này: **payload phản chiếu
+không escape → trạng thái `confirmed`**. Trong repo không có browser nào, nên về
+mặt cấu trúc nó không thể phân biệt *phản chiếu* với *thực thi*.
+
+Cùng một bằng chứng, argus chấm **`candidate`**: check *"payload reflected
+unencoded into HTML"* PASS, nhưng *"a real browser executed it"* FAIL cho tới khi
+có callback mang nonce. Mục 4.6 giải thích vì sao khác biệt này không phải chi
+tiết kỹ thuật mà là khác biệt về nguyên tắc.
+
+### 4b.3 Khác biệt cốt lõi: ai ra phán quyết
+
+| | Strix / PentestCode | argus |
+|---|---|---|
+| Ai quyết định đã chứng minh được | **LLM tự đánh giá**, hệ thống ghi lại | **Hệ thống** chấm lại byte theo yêu cầu của lớp |
+| Bằng chứng | chuỗi tự do | phải là substring của response đã ghi |
+| Kiểm lại được không | fingerprint để dedup | `verify` chấm lại, báo `TAMPERED` |
+| Khi kiểm tra hỏng | finding **vẫn** được ghi | từ chối |
+
+### 4b.4 Điều hai công trình đó làm tốt hơn, và ta đã lấy về
+
+Không phải chiều nào ta cũng hơn.
+
+- **Strix** có `analysis/counterevidence.md` nêu ba trạng thái đóng một nghi vấn:
+  `confirmed` / `ruled_out` (phải **nêu tên được control cụ thể**) /
+  `open_proof_gap`. argus không có khái niệm "nghi vấn đã mở mà chưa đóng" — một
+  probe chạy rồi không ra gì thì biến mất lặng lẽ. Đã lấy về và **biến từ lời dặn
+  LLM thành phép tính từ bằng chứng đã ghi** (mục 4.8).
+- **PentestCode** có vòng đời vector `attempted | confirmed | resolved | blocked`.
+  Trạng thái `blocked` chỉ ra một lỗ hổng thật trong cơ chế của ta (mục 4.9).
+- **PentestCode** có `bench/verify-claims.ts`: một bộ benchmark **tự kiểm tuyên bố
+  của chính dự án về nó** (số công cụ, challenge nào pass). argus có doc gate làm
+  việc tương tự.
+
+### 4b.5 Một khác biệt là đánh đổi, không phải hơn kém
+
+Scope gate của PentestCode: hỏi người vận hành khi gặp mục tiêu ngoài phạm vi,
+**tự động mở rộng** cho mục tiêu nằm trong mạng đã chiếm được, và **chỉ cảnh báo
+rồi chạy tiếp khi không có TTY**. argus thì `ScopeGuard` từ chối thẳng, không hỏi,
+và model không bao giờ mở rộng được phạm vi.
+
+Hai lựa chọn phục vụ hai mô hình mối đe doạ: họ hỗ trợ dịch chuyển ngang trong
+một kỳ kiểm thử thật, ta từ chối theo chính sách. **Nên trình bày như một đánh
+đổi**, không phải như một ưu thế.
+
+### 4b.6 ARTEX — không lấy gì, nhưng trích dẫn một chi tiết
+
+| | |
+|---|---|
+| 26/07/2026 | phát hành GitHub, AGPL-3.0 |
+| **08/10/2026** | tác giả **đóng mã nguồn**, dừng cập nhật, nêu lý do bị lạm dụng |
+| 05/11/2026 | Check Point công bố phân tích việc tội phạm sử dụng |
+| 13/11/2026 | FBI cảnh báo có vụ đạt quyền đặc quyền dưới 3 giờ |
+
+Không lấy gì từ ARTEX: mã nguồn đã đóng, và trích dẫn nó như nguồn cảm hứng thiết
+kế là rủi ro về uy tín.
+
+Nhưng một chi tiết trong báo cáo Check Point là **bằng chứng ngoài cho đúng vấn đề
+đề tài này giải**: các agent **tự báo cáo rút tiền thành công**, trong khi đó là
+**ảo giác** dựa trên response API có vẻ báo thành công — không khoản tiền nào thực
+sự về ví kẻ tấn công.
+
+Một agent AI báo cáo thành công không hề xảy ra, vì nó đọc response làm xác nhận.
+Đó chính xác là thứ cổng chứng minh tồn tại để chặn, và bằng chứng này đến từ phía
+kẻ tấn công nên không phải tiếp thị của hãng nào.
 
 ## 5. Phương hướng tiếp theo và biện pháp cải thiện
 
@@ -258,8 +451,9 @@ tiếp theo cùng loại:
   (wildcard vừa thêm là ca đầu).
 - `probe_cmdi` hiện chỉ gửi `id` và `whoami`; năm từ khoá khác
   (`uname/hostname/pwd/ver/cat`) có trong pattern nhưng không probe nào gửi.
-- Lớp `xss` cần một browser để lên `proven`. Playwright MCP đã có trong cấu
-  hình nhưng phiên này không kết nối được — nối được là mở cap của lớp này.
+- ~~Lớp `xss` cần một browser để lên `proven`.~~ **Đã làm**, bằng
+  `agent-browser` (npm, Apache-2.0) chứ không phải Playwright MCP. Nhưng cách
+  làm quan trọng hơn việc làm được: xem mục 4.7.
 
 ### 5.4 Viết báo cáo NCKH
 

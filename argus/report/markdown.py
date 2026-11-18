@@ -188,17 +188,33 @@ def _open_proof_gaps(entries, findings) -> list[dict]:
                 shapes.add(_shape(cited))
         settled |= {(sh, klass) for sh in shapes if sh}
 
-    from argus.proof import negative_settles, spec_for
+    from argus.proof import (negative_settles, anything_got_through, spec_for,
+                             status_of, _REFUSED_STATUSES)
+
+    # Whether anything in this run got past a refusal at all. A WAF
+    # answering 401/403 to everything makes every probe result say nothing
+    # about the target, and the first version of this reported such a run
+    # as having no gaps - "nothing was left open" about an engagement
+    # where nothing was tested.
+    got_through = anything_got_through(entries)
 
     gaps = []
     for (shape, klass), runs in sorted(probed.items()):
         if (shape, klass) in settled:
             continue            # a finding settled it, either way
         spec = spec_for(klass)
-        if spec is not None and negative_settles(spec, runs):
+        if spec is not None and negative_settles(spec, runs, got_through):
             continue            # the matrix says this negative IS an answer
-        gaps.append({"endpoint": shape, "vuln_class": klass,
-                     "requests": len(runs)})
+        refused = [r for r in runs if status_of(r) in _REFUSED_STATUSES]
+        gap = {"endpoint": shape, "vuln_class": klass, "requests": len(runs)}
+        if refused and len(refused) == len(runs):
+            # Not "we tested and cannot tell" - we never got to test. The
+            # two read identically in a list of endpoints and mean
+            # opposite things to whoever reads the report next.
+            gap["blocked"] = True
+            gap["detail"] = (f"every request was refused "
+                             f"({sorted({status_of(r) for r in refused})})")
+        gaps.append(gap)
     return gaps
 
 
@@ -618,9 +634,21 @@ def render_report(session: Session, cfg: Config, summary: str = "",
                   "| Endpoint | Class | Requests | Why it is not an answer |",
                   "|---|---|---|---|"]
         from argus.proof import spec_for
+        blocked = [g for g in gaps if g.get("blocked")]
+        if blocked:
+            lines[-4:-4] = []
+            lines += ["", f"**{len(blocked)} of these were never tested.** "
+                      "Every request to them was refused, so the result says "
+                      "nothing about the target - only about our access. A "
+                      "run refused everywhere produces no findings and, "
+                      "before this was separated out, no gaps either: a "
+                      "report reading *nothing was left open* about an "
+                      "engagement where nothing was opened.", ""]
         for g in gaps[:60]:
             spec = spec_for(str(g.get("vuln_class") or ""))
-            why = ("the matrix records no negative that settles this class"
+            why = (g.get("detail", "never tested - every request refused")
+                   if g.get("blocked")
+                   else "the matrix records no negative that settles this class"
                    if spec is None or not spec.ruled_out_by
                    else f"settled only by: {spec.ruled_out_by}")
             lines.append(f"| {_code(str(g.get('endpoint')))} "

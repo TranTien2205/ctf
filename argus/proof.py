@@ -1044,21 +1044,62 @@ def _object_refs(entry: dict) -> set[str]:
 # question; a 200 that merely looks unremarkable does not, which is why
 # this is a status rule and not a body rule.
 RULED_OUT_NOT_SERVED = "the endpoint does not serve it (401/403/404)"
-_NOT_SERVED_STATUSES = (401, 403, 404, 410)
+
+# Two kinds of negative, and the first version treated them as one.
+#
+# 404 and 410 are statements about the TARGET: the thing is not there.
+# 401 and 403 are statements about US: we were refused. On one path that
+# distinction is academic - a 403 to "is /.env served" is the control
+# working. Across a whole run it is not, because a WAF answering 403 to
+# everything produces a run with no findings AND no open gaps, and a
+# report reading "nothing was left open" about an engagement where
+# nothing was tested at all. Measured: five probe requests, all 403, zero
+# gaps reported.
+#
+# So a refusal settles a class only when the run shows we were NOT being
+# refused wholesale. It is the same differential this gate keeps needing:
+# "was this path refused" and "are we being refused everything" are
+# different questions, and only the second can be answered by comparison.
+_ABSENT_STATUSES = (404, 410)
+_REFUSED_STATUSES = (401, 403)
 
 
-def negative_settles(spec: "ProofSpec", entries: list) -> bool:
+def negative_settles(spec: "ProofSpec", entries: list,
+                     anything_got_through: bool = True) -> bool:
     """Whether these recorded responses rule the class out.
 
     `entries` are the probe exchanges for one endpoint and one class. The
     rule has to hold for ALL of them: one 404 among five 200s says the
     target refused one path, not that the class is answered.
+
+    `anything_got_through` is whether this engagement saw any response that was
+    neither 401 nor 403. When it did not, a refusal here carries no
+    information about the target, and nothing is settled.
     """
     if spec.ruled_out_by != RULED_OUT_NOT_SERVED:
         return False
     answered = [e for e in entries if isinstance(e, dict)]
-    return bool(answered) and all(
-        status_of(e) in _NOT_SERVED_STATUSES for e in answered)
+    if not answered:
+        return False
+    allowed = (_ABSENT_STATUSES + _REFUSED_STATUSES if anything_got_through
+               else _ABSENT_STATUSES)
+    return all(status_of(e) in allowed for e in answered)
+
+
+def anything_got_through(entries: list) -> bool:
+    """Did anything in this run get a response that was not a refusal?
+
+    Named away from the `run_` prefix on purpose: `run_external` makes
+    `run_*` a tool family, and the doc gate reads a bare `run_something`
+    in prose as a claim about a registered tool. It was right to - a
+    helper sharing a tool family's prefix is confusable by a reader too.
+
+    False means every recorded response was 401 or 403 - a blanket block,
+    where no probe result says anything about the target.
+    """
+    answered = [e for e in entries
+                if isinstance(e, dict) and isinstance(e.get("response"), dict)]
+    return any(status_of(e) not in _REFUSED_STATUSES for e in answered)
 
 
 def _ceiling_reason(spec: "ProofSpec") -> str:
@@ -2391,6 +2432,52 @@ def _callback_check(name: str, claim: Claim, absent: str,
     return _check(name, False, absent)
 
 
+# A run has to be long enough that finding it in the request means
+# something, and short enough not to refuse a short payload. `x<>'"` is
+# five characters, three of them metacharacters, and is a payload by any
+# reading - an eight-character floor refused it, which is the second time
+# this correlation was written too strict. Four characters carrying a
+# metacharacter does not occur by accident in a request that did not send
+# it: `<!DOCTYPE html PUBLIC "...` has such runs, and none of them appear
+# in a URL that never carried a `<`.
+_REFLECTION_RUN = 4
+
+
+def _came_from_this_request(excerpt: str, entry: dict) -> bool:
+    """Did some real part of these quoted bytes go out in this request?
+
+    Not the whole excerpt: a tester quoting a reflection naturally takes
+    the surrounding markup with it - `Results for <payload></h1>` - and
+    demanding the entire quote be in the request refused exactly those
+    natural quotes, which is how the probe-agreement run caught this
+    being too strict after the first version was too loose.
+
+    So: some run of at least `_REFLECTION_RUN` characters, carrying a raw
+    metacharacter, has to appear in what was sent. `<!DOCTYPE html>` has
+    no such run in any request that did not send it; a canary or a
+    script payload does, with or without context around it.
+    """
+    if not excerpt:
+        return False
+    sent = urllib.parse.unquote_plus(req_text(entry)) + " " + req_text(entry)
+    # Bounded: the excerpt is a quote, not a body, and an unbounded scan
+    # over a pathological one would be quadratic in its length.
+    window = excerpt[:400]
+    for start in range(len(window)):
+        if len(window) - start < _REFLECTION_RUN:
+            break
+        for end in range(len(window), start + _REFLECTION_RUN - 1, -1):
+            run = window[start:end]
+            if not any(ch in run for ch in "<>\"'"):
+                continue
+            if run in sent:
+                return True
+            # Shorter runs from this start are prefixes of the one just
+            # rejected only when the rejection was about length, so keep
+            # shrinking rather than moving the start.
+    return False
+
+
 def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """Reflection is checkable from the bytes; execution is not.
 
@@ -2400,10 +2487,31 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
     """
     reflected, encoded = None, None
     raw = [ch for ch in "<>\"'" if ch in (claim.excerpt or "")]
+    # The excerpt has to BE the payload, not merely contain the characters
+    # a payload would. Measured on DVWA: the class graded `proven` quoting
+    # `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML`, which carries a raw `<`
+    # and a raw `"` and is on every page the server has ever served. The
+    # check asked whether the quoted bytes could break out of their
+    # context and never asked whether this probe put them there - the same
+    # hole that let `sqli` prove itself on page furniture and `rce` on the
+    # word DOCTYPE, reappearing in a third class because the correlation
+    # was written per-class each time instead of once.
+    #
+    # The tie is structural, not a marker format. Reflection means the
+    # bytes went OUT and came BACK, so the excerpt has to be in the
+    # request as well as the response of the same exchange. A first
+    # attempt demanded a collector nonce instead, which also refused the
+    # canary a browserless run legitimately reflects - stricter than the
+    # claim, and it broke the shipped sample session. Requests carry the
+    # payload percent-encoded, so the comparison is against the decoded
+    # text; a payload that survives encoding unchanged compares equal
+    # either way.
     for entry in claim.exchanges:
         body = resp_body(entry)
         if not claim.excerpt or claim.excerpt not in body:
             continue
+        if not _came_from_this_request(claim.excerpt, entry):
+            continue  # in the page, but this request did not put it there
         if not re.search(r"(?i)text/html|application/xhtml",
                          str((_resp(entry).get("headers")) or "")):
             continue
@@ -2412,7 +2520,8 @@ def verify_browser_execution(claim: Claim, spec: "ProofSpec") -> list[dict]:
         elif re.search(r"&lt;|&gt;|&quot;|&#x?\d", body):
             encoded = entry
     return [
-        _check("payload reflected unencoded into HTML", reflected is not None,
+        _check("payload reflected unencoded into HTML",
+               reflected is not None,
                f"{reflected[1]!r} survived into {reflected[0].get('id')}"
                if reflected
                else ("the response entity-encodes the payload - that is the fix "

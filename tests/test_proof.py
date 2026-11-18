@@ -5172,3 +5172,172 @@ def test_only_classes_with_a_conclusive_negative_declare_one():
     for n in ("sqli", "rce", "ssti", "xxe", "deserialize"):
         assert not proof.spec_for(n).ruled_out_by, \
             f"{n} claims a negative settles it - a blind instance of it does not"
+
+
+# --- the browser needs the session the probe already has --------------------
+
+def test_a_cookie_value_never_reaches_the_probe_result():
+    """The browser is given the operator's session; the result must not
+    carry it.
+
+    `_prove_execution` returns a dict the model reads and the transcript
+    stores. It reports how many cookies were set and nothing about what
+    they were, because a session value in a shipped artifact is the same
+    leak whether it arrives through a header or through a helpfully
+    detailed tool result.
+    """
+    from argus.tools import browser
+    secret = "PHPSESSID=abc123secret; security=low"
+    # No browser installed in CI: the call returns without running anything,
+    # and the point is what it returns, not what it ran.
+    out = browser.set_cookies(secret, "http://t/")
+    blob = repr(out)
+    assert "abc123secret" not in blob, blob
+    assert "PHPSESSID=abc123secret" not in blob, blob
+
+
+def test_set_cookies_reports_a_name_but_never_a_value_on_failure():
+    """A failure line names the cookie that failed, not its contents."""
+    import argus.tools.browser as browser
+
+    class _Proc:
+        returncode = 1
+    calls = []
+
+    def _fake_run(cmd, **kw):
+        calls.append(cmd)
+        return _Proc()
+
+    real_available, real_run = browser.available, browser.subprocess.run
+    browser.available = lambda: "/nonexistent/agent-browser"
+    browser.subprocess.run = _fake_run
+    try:
+        out = browser.set_cookies("SESSION=topsecret", "http://t/")
+    finally:
+        browser.available, browser.subprocess.run = real_available, real_run
+    assert out["set"] == 0 and out["failed"], out
+    assert "SESSION" in out["failed"][0], out
+    assert "topsecret" not in repr(out), out
+    # ...and the value did reach the command, which is the whole point
+    assert any("topsecret" in str(c) for c in calls), calls
+
+
+def test_xss_refuses_the_doctype_as_its_payload():
+    """Measured on DVWA, and the third time this shape has appeared.
+
+    The run graded `proven` quoting `<!DOCTYPE html PUBLIC "-//W3C//DTD
+    XHTML`, which carries a raw `<` and a raw `"` and is on every page the
+    server has ever served. The check asked whether the quoted bytes COULD
+    break out of their context and never asked whether this probe put them
+    there - the same hole that let `sqli` prove itself on page boilerplate
+    and `rce` on the word DOCTYPE.
+
+    The correlation is structural, not a marker format: reflection means
+    the bytes went OUT and came BACK, so the excerpt has to be in the
+    request as well as the response. A first attempt demanded a collector
+    nonce, which also refused the canary a browserless run legitimately
+    reflects - stricter than the claim, and it broke the shipped sample
+    session, which is how it was caught.
+    """
+    nonce = "argus9e65f74ab50966d3"
+    payload = f"<script>fetch('http://127.0.0.1:35657/{nonce}')</script>"
+    doctype = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML'
+    sent = {"id": "r1", "ts": 1000.0, "tool": "probe_reflection",
+            "request": {"method": "GET", "url": f"http://t/s?q={payload}",
+                        "headers": {}},
+            "response": {"status": 200,
+                         "headers": {"content-type": "text/html"},
+                         "body": f"{doctype}><h1>Results for {payload}</h1>"}}
+    hit = {"id": "r2", "ts": 1002.0, "tool": "collector",
+           "request": {"direction": "inbound", "method": "GET",
+                       "url": f"http://127.0.0.1:35657/{nonce}",
+                       "headers": {}, "body": "", "peer": "127.0.0.1"},
+           "response": {"status": 204, "headers": {}, "body": ""}}
+
+    good = proof.grade("xss", payload, [sent, hit])
+    assert good.grade == "proven", good.explain()
+
+    # Same evidence, same callback, same page - only the quote changes.
+    furniture = proof.grade("xss", doctype, [sent, hit])
+    assert furniture.grade == "candidate", furniture.explain()
+    check = [c for c in furniture.checks
+             if c["check"] == "payload reflected unencoded into HTML"][0]
+    assert not check["ok"], check
+
+    # ...and the canary a browserless run reflects is still evidence, which
+    # is the case the nonce rule wrongly refused.
+    canary = "xtt7bdjc7<>'\"&=/"
+    plain = {"id": "r3", "ts": 1000.0, "tool": "probe_reflection",
+             "request": {"method": "GET",
+                         "url": "http://t/s?q=" + canary, "headers": {}},
+             "response": {"status": 200,
+                          "headers": {"content-type": "text/html"},
+                          "body": f"{doctype}><h1>Results for {canary}</h1>"}}
+    reflected = proof.grade("xss", canary, [plain])
+    assert reflected.grade == "candidate", reflected.explain()
+    ok = [c for c in reflected.checks
+          if c["check"] == "payload reflected unencoded into HTML"][0]
+    assert ok["ok"], ok
+
+
+def test_a_run_refused_everywhere_is_not_a_clean_run():
+    """A WAF answering 403 to everything used to read as nothing to report.
+
+    Found by reading PentestCode's attack-vector vocabulary, which carries
+    a `blocked` state this gate did not have. Measured here first: five
+    probe requests, all 403, produced zero findings AND zero gaps, so the
+    report said "nothing was left open" about an engagement where nothing
+    was tested.
+
+    The cause was treating 404 and 403 as one negative. 404 is a statement
+    about the TARGET - the thing is not there. 403 is a statement about
+    US - we were refused. On one path the difference is academic; across a
+    run it is the difference between a measurement and a blocked probe.
+    """
+    def req(rid, path, status):
+        return {"id": rid, "ts": 1.0, "tool": "probe_disclosure",
+                "request": {"method": "GET", "url": f"http://t/{path}",
+                            "headers": {}},
+                "response": {"status": status,
+                             "headers": {"content-type": "text/html"},
+                             "body": "<html>no</html>"}}
+
+    from argus.report.markdown import _open_proof_gaps
+
+    # 1. refused everywhere: every endpoint is an untested gap, marked
+    all_refused = [req(f"r{i}", f"p{i}", 403) for i in range(1, 6)]
+    gaps = _open_proof_gaps(all_refused, [])
+    assert len(gaps) == 5, gaps
+    assert all(g.get("blocked") for g in gaps), gaps
+    assert "refused" in gaps[0]["detail"], gaps[0]
+
+    # 2. absent everywhere: 404 IS an answer about the target, so settled
+    all_absent = [req(f"r{i}", f"p{i}", 404) for i in range(1, 6)]
+    assert _open_proof_gaps(all_absent, []) == [], _open_proof_gaps(all_absent, [])
+
+    # 3. a refusal among answers: we were not blanket-blocked, so a 403
+    #    here is the control working and settles its own endpoint
+    mixed = [req("r1", "a", 403), req("r2", "b", 200)]
+    left = _open_proof_gaps(mixed, [])
+    assert len(left) == 1 and "/b" in left[0]["endpoint"], left
+    assert not left[0].get("blocked"), left
+
+
+def test_blocked_and_unsettled_are_different_sentences():
+    """"We tested and cannot tell" and "we never got to test" read the same
+    in a list of endpoints and mean opposite things."""
+    from argus.proof import negative_settles, anything_got_through, spec_for
+    refused = [{"id": "r1", "ts": 1.0, "tool": "probe_disclosure",
+                "request": {"method": "GET", "url": "http://t/x", "headers": {}},
+                "response": {"status": 403, "headers": {}, "body": ""}}]
+    spec = spec_for("disclosure")
+    # alone in a run, a refusal settles nothing
+    assert not anything_got_through(refused)
+    assert not negative_settles(spec, refused, anything_got_through(refused))
+    # beside a real answer, the same refusal is the control working
+    answered = refused + [{"id": "r2", "ts": 1.0, "tool": "probe_disclosure",
+                           "request": {"method": "GET", "url": "http://t/y",
+                                       "headers": {}},
+                           "response": {"status": 200, "headers": {}, "body": "ok"}}]
+    assert anything_got_through(answered)
+    assert negative_settles(spec, refused, anything_got_through(answered))

@@ -4754,12 +4754,97 @@ cannot tell" under the same words.
 
 761 tests, selftest 160/160.
 
+### xss proved itself on the DOCTYPE, and the first two fixes were both wrong
+
+Measured on DVWA the moment the class could reach `proven`:
+
+    DVWA  xss  6  proven  '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML'
+
+Third time for this shape. `sqli` graded `proven` on `<!DOCTYPE html>`,
+`rce` on the word `DOCTYPE`, and now `xss` on a doctype with a public
+identifier. The check asked whether the quoted bytes carry a raw `<` or
+`"` - whether they COULD break out of their context - and never asked
+whether this probe put them there. Three classes, three separately
+written correlations, the same hole each time: a gate needs one shared
+correlation or every new class is a fresh chance to rebuild it.
+
+FIRST FIX, too strict. The class requirement says "executing the payload
+and reporting the probe nonce", so the excerpt was made to carry a
+collector nonce. It refused the doctype correctly and also refused the
+canary that a browserless run legitimately reflects, which carries no
+nonce at all. The shipped sample session stopped verifying: its `xss`
+finding fell from `candidate` to `unproven` and `argus verify` reported
+TAMPERED on this package's own example. That is how it was caught - not
+by reasoning, but by a real artifact ceasing to be valid. The mistake was
+conflating "the excerpt is the payload" with "the excerpt carries a
+collector nonce"; the second is stricter than the claim.
+
+SECOND FIX, still too strict. Reflection means the bytes went out and
+came back, so the excerpt had to appear in the request as well as the
+response. Correct in principle and wrong at the edges: a tester quoting a
+reflection takes the surrounding markup with it, and demanding the whole
+quote be in the request refused exactly those natural quotes. The
+probe-agreement run caught it.
+
+THIRD FIX. Some run of at least four characters, carrying a
+metacharacter, has to appear in what was sent - decoded, since requests
+percent-encode. A first attempt put that floor at eight and refused
+`x<>'"`, five characters and three of them metacharacters, a payload by
+any reading. Four does not match by accident in a request that never
+carried a `<`.
+
+Measured after, on the real targets: the payload proves, the payload with
+twenty or sixty characters of surrounding page proves, the doctype does
+not. A gate fix is right only when it removes the false proof WITHOUT
+removing the true one, and the first two attempts each failed that second
+half in a different way.
+
+`xss` now grades `proven` on three targets, two of them third-party
+applications, quoting the reflected payload whose nonce came back to the
+collector. The results table goes from 7/8 to 9/10 at the class ceiling.
+
+764 tests, selftest 160/160.
+
+### A run refused everywhere read as a run with nothing to report
+
+Found by reading another project's vocabulary rather than this one's code.
+PentestCode (MIT, TypeScript) tracks attack vectors through
+`attempted | confirmed | resolved | blocked`, and `blocked` is a state this
+gate did not have. Measured here immediately: five probe requests, every
+one answered 403, produced zero findings AND zero open proof gaps - so the
+report said "nothing was left open" about an engagement where nothing was
+tested at all.
+
+The cause was treating two different negatives as one. 404 and 410 are
+statements about the TARGET: the thing is not there. 401 and 403 are
+statements about US: we were refused. On a single path the distinction is
+academic, and a 403 to "is /.env served" really is the control working.
+Across a whole run it is the difference between a measurement and a wall.
+
+So a refusal settles a class only when the run shows we were not being
+refused wholesale - `anything_got_through`, which asks whether anything in the
+engagement came back as something other than 401/403. The same differential
+this gate keeps needing: "was this path refused" and "are we being refused
+everything" are different questions, and only the second is answerable by
+comparison.
+
+Gaps that were never tested now carry `blocked` and say so in their own
+sentence, because "we tested and cannot tell" and "we never got to test"
+read identically in a list of endpoints and mean opposite things to
+whoever reads the report next.
+
+Three scenarios pinned: refused everywhere (every endpoint an untested
+gap, marked), absent everywhere (404 is an answer, settled), and a refusal
+among answers (not blanket-blocked, so the 403 is the control working).
+
+766 tests, selftest 160/160.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 761 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 766 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions). Every hardened fix

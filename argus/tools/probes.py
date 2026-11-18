@@ -160,6 +160,18 @@ def _prove_execution(ctx: Context, url: str, param: str, method: str,
 
     col = _collector.Collector().start()
     try:
+        # The probe reaches the target with a session; the browser starts
+        # with none. Driving it at an authenticated page without one lands
+        # on a login screen, nothing executes, and the result reads as
+        # "the payload did not run" when the browser never saw the page.
+        # Take the session from the client that is already using it.
+        cookie = ""
+        for key, value in (getattr(ctx.client, "_default_headers", {}) or {}).items():
+            if str(key).lower() == "cookie":
+                cookie = str(value)
+                break
+        cookie_result = (_browser.set_cookies(cookie, url) if cookie
+                         else {"set": 0, "reason": "the probe holds no session"})
         shapes = {}
         for label, template in (
             ("script", "<script>fetch({u},{{mode:'no-cors'}})</script>"),
@@ -203,6 +215,11 @@ def _prove_execution(ctx: Context, url: str, param: str, method: str,
         _browser.close()
         return {"attempted": True, "sent": records, "callbacks": hits_out,
                 "executed": bool(hits_out),
+                # Names only, never values: a cookie value is the operator's
+                # session and does not belong in a probe result the model
+                # reads or a transcript that ships.
+                "browser_session": {"cookies_set": cookie_result.get("set", 0),
+                                    "note": cookie_result.get("reason", "")},
                 "note": ("cite the payload request AND its callback together: "
                          "the gate pairs them by nonce and refuses a hit that "
                          "does not follow the request that sent it")

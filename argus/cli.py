@@ -128,6 +128,21 @@ def main(argv: list[str] | None = None) -> int:
              "drives the assessment lives outside, the guards stay here")
     _add_run_args(p_serve)
 
+    p_web = sub.add_parser(
+        "web",
+        help="serve the operator dashboard - target in, mode-specific prompt "
+             "out, findings and reports back")
+    p_web.add_argument("--port", type=int, default=8787)
+    p_web.add_argument(
+        "--bind", default="127.0.0.1",
+        help="interface to listen on. The default is loopback and should "
+             "stay that way: this console starts scans and renders bytes a "
+             "target chose, so exposing it to the network hands both to "
+             "whoever reaches the port")
+    p_web.add_argument("--session-dir", default="sessions",
+                       help="directory the runs live in; the dashboard scans "
+                            "it, so runs started from the CLI appear too")
+
     p_rep = sub.add_parser("report", help="re-render report.md for a session dir")
     p_rep.add_argument("session_dir")
     p_rep.add_argument("--seal-key", default=None,
@@ -286,6 +301,13 @@ def main(argv: list[str] | None = None) -> int:
         result = team.run()
         print(json.dumps(result, indent=2))
         return 1 if result.get("lead_error") else 0
+
+    if args.cmd == "web":
+        # imported here, not at module scope: `argus --help` has to work on a
+        # tree where the web package is absent or half-installed, and the
+        # other serving command (mcp-serve) already sets that precedent.
+        from .web.server import serve
+        return serve(args.bind, args.port, Path(args.session_dir))
 
     if args.cmd == "report":
         from .report.markdown import render_report

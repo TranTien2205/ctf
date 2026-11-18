@@ -58,6 +58,47 @@ def why_unavailable() -> str:
             f"payload can be shown to reflect but not to execute.")
 
 
+def set_cookies(cookie_header: str, url: str, timeout: int = 30) -> dict:
+    """Give the browser the session the probe is already authenticated with.
+
+    Without this, driving a browser at an authenticated target navigates to
+    a login page, nothing executes, and the probe reports "reflected but
+    did not execute" - a negative produced by the browser never reaching
+    the page under test. That is the same confident-negative shape as
+    navigating to a URL with no payload on it, and it is worse here because
+    the run looks like a measurement of the target.
+
+    Each cookie is set with `--url`, so it is scoped to the origin the
+    probe is testing and does not leak to any other host the browser
+    visits. HttpOnly is NOT set: the flag only hides a cookie from page
+    scripts, and this one is being planted on purpose for a session the
+    operator already holds.
+    """
+    binary = available()
+    if not binary or not cookie_header.strip():
+        return {"ok": False, "set": 0,
+                "reason": "" if cookie_header.strip() else "no cookies given"}
+    done, failed = 0, []
+    for pair in cookie_header.split(";"):
+        name, _, value = pair.strip().partition("=")
+        if not name or not value:
+            continue
+        try:
+            proc = subprocess.run(
+                [binary, "cookies", "set", name, value, "--url", url],
+                capture_output=True, text=True, timeout=timeout, check=False)
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            failed.append(f"{name}: {exc}")
+            continue
+        if proc.returncode == 0:
+            done += 1
+        else:
+            # The NAME is safe to report; the value is a session secret and
+            # does not belong in a transcript or a terminal.
+            failed.append(f"{name}: exit {proc.returncode}")
+    return {"ok": done > 0 and not failed, "set": done, "failed": failed}
+
+
 def visit(url: str, timeout: int = _NAV_TIMEOUT) -> dict:
     """Navigate to `url` and return what the CLI said.
 
