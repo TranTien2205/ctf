@@ -86,6 +86,22 @@ probe, update the lab and its test together.
   `tests/test_probe_matrix_agreement.py` in both directions: against a lab
   endpoint that really has the bug, some honest quote must reach `proven`
   (or the ceiling); against a clean endpoint, nothing may.
+- **Take a freed class END TO END on a real target, because the defect may
+  be anywhere on the path and it will look like "nothing found".** The rule
+  above says the defect is in the probe. Three more classes were driven to
+  `proven` against third-party targets and none of the three defects was in
+  a probe's logic: for `sqli` the VERIFIER's engine-fingerprint pattern did
+  not know the node driver's error form, so a real SQLite target could never
+  satisfy a check six of whose seven siblings passed; for `ssrf` the helper
+  that picks a callback address fell back to loopback when handed a URL, so
+  the callback pointed at the target's own loopback; for `xss` the session
+  handed to the headless browser was read from a header dict that is empty,
+  so the browser landed on a login page. All three produced the SAME
+  symptom - a clean-looking negative - and none produced an error. Removing
+  a ceiling is not the work; the work is one real target, one real
+  `proven`, and reading the failing check's own detail text, which in each
+  case named the problem precisely.
+
 - **Count the agreement table against what the lab plants, not against the
   verifiers that exist.** The proving table covered fourteen classes and
   looked complete; the lab plants nine more and nothing drove them. A table
