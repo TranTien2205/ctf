@@ -813,3 +813,69 @@ def test_rule_five_does_not_print_a_probe_call_count_it_cannot_measure():
     assert str(action.detail["requests_sent"]) in action.why, action.why
     assert str(decide.BUDGET_PER_CLASS) in action.why, action.why
     assert action.detail["budget_requests"] == decide.BUDGET_PER_CLASS
+
+
+def test_every_proof_class_has_some_way_to_be_tried():
+    """The reverse direction of `PROBE_CLASS`, and the one nothing checked.
+
+    The existing partition asks "is every registered `probe_*` tool
+    attributed to a class". This asks the other question: is every CLASS
+    reachable by something? A class in the matrix that no tool can be
+    recommended for is capped in practice without saying so anywhere - the
+    shape this session hit three times, where a ceiling was removed and the
+    mechanism that would replace it had no caller.
+
+    Three legitimate answers, and a class must have one:
+      * a probe attributed to it in `PROBE_CLASS`
+      * an entry in `CLASS_TOOL_CHAIN`, for a proof that needs a chain this
+        controller cannot name as one probe (`jwt`: decode, forge, then the
+        request that carries the forgery - and the two offline steps are
+        deliberately NOT in `PROBE_CLASS`, because putting them there would
+        mark the class tried on a call that sent nothing)
+      * no required checks at all, which is how a refused-by-construction
+        class looks (`dos`)
+
+    Audited when this was written: 29 classes, 27 with probes, `dos` with no
+    checks, `jwt` with a chain. Clean - and the point is that the next class
+    added without any of the three fails here instead of being quietly
+    unreachable.
+    """
+    from argus import proof
+    from argus.decide import CLASS_TOOL_CHAIN, PROBE_CLASS
+    from argus.tools import registry
+
+    registered = {t["name"] for t in registry.TOOL_SCHEMAS}
+    probed = {cls for tool, cls in PROBE_CLASS.items() if tool in registered}
+
+    unreachable = []
+    for name in sorted(proof.classes()):
+        spec = proof.spec_for(name)
+        if name in probed:
+            continue
+        chain = [t for t in CLASS_TOOL_CHAIN.get(name, ()) if t in registered]
+        if chain:
+            continue
+        if not spec.required:
+            continue            # refused by construction
+        unreachable.append(name)
+
+    assert not unreachable, (
+        f"{unreachable} are proof classes with required checks, no probe "
+        "attributed to them, and no tool chain - so nothing recommends a way "
+        "to try them and the class is capped in practice without saying so. "
+        "Attribute a probe, add a CLASS_TOOL_CHAIN entry, or say in the "
+        "matrix that the class requires nothing.")
+
+
+def test_a_class_tool_chain_names_only_registered_tools():
+    """A chain that names a removed tool recommends a call that cannot be
+    made - the same defect as a document naming a command that does not
+    exist, which this repository already gates against."""
+    from argus.decide import CLASS_TOOL_CHAIN
+    from argus.tools import registry
+
+    registered = {t["name"] for t in registry.TOOL_SCHEMAS}
+    bogus = {cls: [t for t in tools if t not in registered]
+             for cls, tools in CLASS_TOOL_CHAIN.items()}
+    bogus = {k: v for k, v in bogus.items() if v}
+    assert not bogus, f"chains name tools that are not registered: {bogus}"

@@ -5580,12 +5580,62 @@ flag on an ordinary line still fails the check, and an unknown flag on the
 npm line is excused - which is the line-level rule working rather than a
 hole.
 
+### The audit that found nothing, turned into the check that would
+
+Three times this session a class was freed or a component completed while
+nothing could reach it, so the question was asked of the whole matrix: is
+every PROOF CLASS reachable by something?
+
+The existing partition asks the opposite - "is every registered `probe_*`
+tool attributed to a class" - and its own comment says why that direction is
+the safe one: it "cannot fail by neglect". The direction that can is a class
+with no way to try it, and nothing checked that.
+
+AUDITED: 29 classes, 27 with a probe attributed, and the two without are
+both correct. `dos` has no required checks at all, which is how a
+refused-by-construction class looks. `jwt` is deliberately absent from
+`PROBE_CLASS` - `jwt_decode` and `jwt_forge` SEND NOTHING, so attributing
+them would mark the class tried on an offline call, the same reason
+`fingerprint` is excluded - and `CLASS_TOOL_CHAIN` covers it instead, naming
+decode, forge, then the request that carries the forgery. The comment there
+records that the ledger used to answer `http_request` alone, which is the
+last step of the chain with no hint that the first two exist.
+
+So the audit came back CLEAN, and saying that plainly is part of the result:
+there was no defect to fix anywhere else in the matrix, and manufacturing
+one to have something to report would be worse than nothing. (That sentence
+first gave the count of the remaining classes, and the count gate read it as
+a claim about the total - tenth instance this session of a checker reading a
+mention as an assertion, and the gate is right to be literal: a number
+beside the word is a claim about the number, whichever subset the writer
+meant.)
+
+What it produced instead is the invariant. A class must have one of three
+things - a probe in `PROBE_CLASS`, an entry in `CLASS_TOOL_CHAIN`, or no
+required checks - so the next class added without any of them fails loudly
+rather than sitting unreachable. A second check holds that a chain names
+only registered tools, because a chain naming a removed tool recommends a
+call that cannot be made, which is the same defect as a document naming a
+command that does not exist.
+
+Plant-tested three ways: emptying the chain table, pointing a chain at a
+tool that does not exist, and removing a probe's attribution each fail.
+
+The ledger itself was measured on real transcripts from this session's
+probing rather than a fixture, after the fixture turned out to be the wrong
+instrument - `next_action` reads the session DIRECTORY, so in-memory
+exchanges produced "the transcript holds no request/response pair yet" for
+both the empty and the full case. On the real directories it answers
+specifically: login.php "carries 4 named input(s) ... and no probe has
+tested any class against it", and products/search "has been probed, but not
+for xss".
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1052 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1054 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
