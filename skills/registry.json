@@ -956,8 +956,8 @@
         "htb-red-island-ssrf-gopher-redis-lua-rce"
       ],
       "skill_tokens": 1650,
-      "depth_files": 4,
-      "depth_tokens": 4696,
+      "depth_files": 45,
+      "depth_tokens": 95354,
       "use_when": [
         "a probe or source read produced this class's signal: an absolute path to a file the target certainly has, before trying any traversal",
         "a chain card already proves this class here: htb-nginxatsu-alias-traversal-appkey-session-forge-blind-sqli, htb-red-island-ssrf-gopher-redis-lua-rce"
