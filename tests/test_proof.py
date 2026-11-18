@@ -5404,3 +5404,62 @@ def test_the_new_sqlite_form_does_not_weaken_the_echo_guard():
     assert DBMS_RE.search("SQLITE_ERROR").group(0) == "SQLITE_ERROR"
     assert DBMS_RE.search("3.44.2") is None, \
         "a bare version number names no engine"
+
+
+def test_the_fingerprint_matches_the_forms_that_name_an_engine_and_no_others():
+    """Generated from the real stdlib `sqlite3` driver, not from memory.
+
+    A web application leaks a store error in one of three shapes, and the
+    fix for SQLITE_ERROR was exactly one of them:
+
+      Python driver  `sqlite3.OperationalError: no such table: x`  names it
+      node/C driver  `SQLITE_ERROR: no such table: x`              names it
+      bare message   `no such table: x`                           names nothing
+
+    The bare form MUST NOT match. "no such table", "incomplete input" and
+    "unrecognized token" are things several engines say, so matching them
+    would let one store's message be reported as a fingerprint for another -
+    and "data store fingerprinted" exists to say WHICH store answered.
+
+    The six messages below are produced by running real statements against
+    an in-memory database in this process, so the test cannot drift from
+    what the driver actually emits.
+
+    NOT MEASURED HERE: the MySQL and PostgreSQL forms. The lab's MySQL
+    targets (bWAPP, DVWA) answer 302 to an unauthenticated request, and
+    neither driver is installed - this package is standard library only. The
+    MySQL alternatives in `DBMS_RE` are therefore unverified by this test
+    rather than confirmed by it, and saying so is the point.
+    """
+    import sqlite3
+    db = sqlite3.connect(":memory:")
+    cur = db.cursor()
+    cur.execute("CREATE TABLE t (a INTEGER PRIMARY KEY, b TEXT UNIQUE)")
+    cur.execute("INSERT INTO t VALUES (1, 'x')")
+
+    bare, qualified = [], []
+    for sql in ("SELECT ((",
+                "SELECT * FROM nope",
+                "SELECT zzz FROM t",
+                "SELECT a FROM t UNION SELECT a, b FROM t",
+                "INSERT INTO t VALUES (2, 'x')",
+                "SELECT * FROM t WHERE a = #"):
+        try:
+            cur.execute(sql)
+        except Exception as exc:                       # noqa: BLE001
+            bare.append(str(exc))
+            qualified.append(f"{type(exc).__module__}."
+                             f"{type(exc).__name__}: {exc}")
+    assert len(bare) == 6, "every statement above must raise"
+
+    from argus.proof import DBMS_RE
+    for text in qualified:
+        assert DBMS_RE.search(text), f"driver-qualified form missed: {text}"
+    for text in bare:
+        assert DBMS_RE.search(text) is None, (
+            f"a message that names no engine must not be a fingerprint: "
+            f"{text!r}")
+
+    # and the node/C form, which is what the live target returns
+    assert DBMS_RE.search("SQLITE_ERROR: near \")\": syntax error")
+    assert DBMS_RE.search("SQLITE_CONSTRAINT: UNIQUE constraint failed")
