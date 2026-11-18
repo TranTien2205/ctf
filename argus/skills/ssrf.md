@@ -4,7 +4,26 @@
 `callback=`, `webhook`, "import from URL", PDF/image renderers, admin bots,
 avatar-by-URL, RSS importers, file-upload-from-link.
 
-`probe_ssrf(url, param)` walks the internal-target ladder (loopback, link-local metadata, decimal/IPv6 encodings, redirect chains). The class is capped at `candidate` here on purpose - proving it needs an out-of-band collector the target can reach, and none ships with this package.
+`probe_ssrf(url, param)` walks the internal-target ladder (loopback,
+link-local metadata, decimal/IPv6 encodings, redirect chains).
+
+**This class is no longer capped.** It used to stop at `candidate` because
+proving it needs an out-of-band collector and none shipped here; one does
+now, so `proven` is reachable and the difference between a response that
+changed and a request the target actually made is yours to collect. The
+requirement has two halves and the second is the one that settles it:
+
+- *the excerpt discriminates against a control* - the internal URL answered
+  differently from an external one. This is the floor, not the proof: a
+  difference is equally consistent with the target timing out differently.
+- *the target reached a collector we control* - a request carrying this
+  probe's nonce arrived at a listener this package owns, **from the target's
+  own address**. A hit from loopback is this process reaching its own
+  collector, and the gate refuses it: that is the one condition here that
+  does not rest on trusting our own probe.
+
+So point the parameter at the collector, not only at an internal host. A
+difference alone is a candidate however many encodings you tried.
 
 ## Detect
 

@@ -38,6 +38,12 @@ RECON = RoleCard(
     tools=_COMMON | frozenset({
         "http_request", "fingerprint", "crawl", "js_recon", "wordlist_fuzz",
         "graphql_introspect", "probe_disclosure",
+        # The hybrid fan-out belongs to recon by definition: it runs the
+        # scanners and hands back the shapes this role then writes a
+        # wordlist from. A tool in the registry that no card grants is
+        # unreachable in team mode, which is the same shape of missing as
+        # one nothing imports.
+        "recon_sweep",
         "run_external", "emit_lead", "finish",
     }),
     prompt_file="recon.md",

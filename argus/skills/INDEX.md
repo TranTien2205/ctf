@@ -7,11 +7,11 @@ actually confirms the bug, and bypasses for common filters.
 When the name maps to a proof-matrix class - directly or as one of its
 aliases, so `command-injection` resolves to `rce` and `file-read` to `lfi` -
 the result carries `vuln_class` plus that class's `proof_requirement` and the
-checks it has to pass. Three modules are methodology only and carry no
-requirement: `auth-enum`, `auth-session`, `triage`. Read it here,
-before probing - after you have written the finding is too late to choose a
-different request. `argus proof <class>` prints the same thing from the
-command line.
+checks it has to pass. Four modules are methodology only and carry no
+requirement: `auth-enum`, `auth-session`, `report-writing`, `triage`.
+Read it here, before probing - after you have written the finding is too
+late to choose a different request. `argus proof <class>` prints the same
+thing from the command line.
 
 ## Signal -> skill
 
@@ -44,3 +44,4 @@ command line.
 | Value lands in a response header unencoded | `crlf` |
 | XFH reflected; 403 path under X-Original-URL | `host-header` |
 | First pass over an unknown target | `triage` |
+| Findings recorded; the report is next | `report-writing` |

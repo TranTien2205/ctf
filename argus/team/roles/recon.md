@@ -11,8 +11,14 @@ Produce leads, not prose:
   goldmine (types, mutations, object ids).
 - `probe_disclosure` for the sensitive-artifact sweep (.env, .git,
   backups) - its hits are leads too.
-- `run_external` for installed scanners (nmap, ffuf, nuclei) - their output
-  is a lead source, still scope-checked.
+- `recon_sweep` runs nmap, ffuf and nuclei AT ONCE on one URL and merges
+  what they agree on. Then do the half a scanner cannot: a scanner only
+  finds what its wordlist already names, so read the shapes that came back
+  - the naming convention, the extensions, the parameter style - write the
+  candidates they suggest, and call it again with `wordlist=`. That second
+  pass is the one that beats either tool or model alone, and it is yours.
+- `run_external` for a scanner invocation you need to hand-write; it takes
+  an argument string and applies its own per-tool guards.
 - For EVERY endpoint+parameter set that could carry a bug, call
   `emit_lead` immediately - do not batch them for "later". The exploit
   workers are blocked waiting; a lead emitted now is tested now.

@@ -39,6 +39,7 @@ def _ival(v, default: int, lo: int, hi: int) -> int:
 # Tool functions are imported lazily inside _impl() to keep module import cheap.
 def _impl(name: str) -> Callable:
     from . import analysis, mcp_tools, probes, team, web  # noqa: F401
+    from . import sweep as sweep_tool  # noqa: F401
     table = {
         "http_request": web.http_request,
         "crawl": web.crawl,
@@ -81,6 +82,7 @@ def _impl(name: str) -> Callable:
         "read_notes": analysis.read_notes,
         "record_finding": analysis.record_finding,
         "run_external": analysis.run_external,
+        "recon_sweep": sweep_tool.recon_sweep,
         "mcp_list": mcp_tools.mcp_list,
         "mcp_call": mcp_tools.mcp_call,
         "finish": analysis.finish,
@@ -657,6 +659,26 @@ TOOL_SCHEMAS: list[dict] = [
         },
         ["title", "severity", "category", "url",
          "evidence_excerpt", "description", "remediation"],
+    ),
+    _schema(
+        "recon_sweep",
+        "Run the installed scanners (nmap, ffuf, nuclei) against one in-scope "
+        "URL, all at once, and return the endpoints they agree on. Every "
+        "invocation is recorded; read_response(request_id) reaches the raw "
+        "output. THE SECOND HALF IS YOURS: a scanner only finds what its "
+        "wordlist names, so read the shapes that came back, write the "
+        "candidates they suggest, and call sweep again with wordlist= - that "
+        "is where this beats a scanner alone.",
+        {
+            "url": {**_STR, "description": URL_DESC},
+            "tools": {**_STR, "description": "Space-separated subset of "
+                                             "nmap/ffuf/nuclei (default: all installed)"},
+            "wordlist": {**_STR, "description": "Newline-separated candidate "
+                                                "paths you wrote from what the "
+                                                "last sweep returned"},
+            "timeout_s": {**_INT, "description": "Per-tool seconds (default 180, cap 600)"},
+        },
+        ["url"],
     ),
     _schema(
         "run_external",

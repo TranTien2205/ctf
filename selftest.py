@@ -1286,6 +1286,39 @@ def _doc_consistency() -> None:
           "that drives it, so the agent reading it does not learn the tool "
           "exists")
 
+    # 8a2. a module must not teach a CAP the matrix does not impose.
+    #
+    #      These cards are loaded into the model's prompt at runtime, so a
+    #      stale sentence here is not a stale document - it is an instruction.
+    #      MEASURED: `ssrf.md` kept teaching "the class is capped at
+    #      `candidate` here on purpose" for two days after the ceiling came
+    #      off and `argus/collector.py` gave the class the artifact it needs.
+    #      An agent loading that card before probing was told the class tops
+    #      out at candidate by design, so it had no reason to collect the one
+    #      thing the matrix now requires for `proven`. Nothing was watching
+    #      the two halves against each other.
+    capped_prose = []
+    cap_re = _re.compile(r"(?i)\b(?:is |are |stays? |stops? at |capped at|"
+                         r"held at|ceiling)\b[^.\n]{0,60}`?candidate`?")
+    for fp in sorted((ROOT / "argus" / "skills").glob("*.md")):
+        if fp.name == "INDEX.md":
+            continue
+        spec = proof.spec_for(fp.stem)
+        if spec is None or spec.ceiling:
+            continue              # methodology-only, or genuinely capped
+        body = fp.read_text(encoding="utf-8")
+        for line in body.splitlines():
+            if _re.search(r"(?i)capped at|cap(?:ped)? on purpose|ceiling", line) \
+                    and cap_re.search(line):
+                capped_prose.append(f"{fp.name}: {line.strip()[:70]}")
+                break
+    check("no module teaches a cap the matrix does not impose "
+          f"({len([f for f in (ROOT / 'argus' / 'skills').glob('*.md') if proof.spec_for(f.stem) is not None])} class modules)",
+          not capped_prose,
+          f"{capped_prose} - the card is read into the agent's prompt, so a "
+          "cap it states and the matrix does not is an instruction to stop "
+          "collecting what the class now needs")
+
     # 8b. ...and the mirror: every gradeable class is TAUGHT by some module.
     #
     #     Check 8 reads module -> class, which is the direction you only

@@ -1,0 +1,1547 @@
+<!doctype html>
+<html lang="en" data-mode="lab">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>argus console</title>
+<!--
+  THE OPERATOR CONSOLE.
+
+  Three rules this file does not break, whatever it is made to look like:
+
+  1. NO EXTERNAL RESOURCES. No CDN, no web font, no network image. A console
+     that needs the internet to render is a console that fails on a jump box
+     with no route out.
+
+  2. NO innerHTML. Not "escaped innerHTML" - none. Finding titles, evidence
+     excerpts and target URLs are BYTES THE TARGET CHOSE. Every value from
+     the API reaches the page as a text node, so there is no place for the
+     next person to forget to escape.
+
+  3. THE TWO MODES ARE NOT A LABEL. `data-mode` on <html> re-themes the whole
+     chassis. Lab is steel; engagement is hazard-striped and red-bezelled,
+     and will not arm until four authorisation fields and a confirmation are
+     in.
+
+  TYPOGRAPHY CARRIES THE ARGUMENT. Monospace is reserved for bytes that came
+  off the wire - targets, excerpts, ids, clock readings. Sans is what argus
+  itself says. The boundary between "the target produced this" and "we claim
+  this" is the whole product, so the page draws it in type.
+
+  COLOUR CARRIES THE SAME DISCIPLINE. Chroma belongs to the grade and only to
+  the grade. `unproven` is deliberately NOT red: it means nothing in the
+  cited evidence met the requirement, which is an absence, not a danger -
+  painting it red would teach a judgement the system never made. Severity
+  gets its own ordinal ramp, because "how bad if true" and "do we know it is
+  true" are different questions and the previous console blurred them.
+-->
+<style>
+:root{
+  --v0:#0b0f14; --v1:#10151c; --v2:#161d26; --v3:#1d2631; --v4:#243041;
+  --line:#26303d; --line-soft:#1b232d;
+  --ink:#e2e9f1; --dim:#8d9aab; --faint:#5d6b7c;
+  --steel:#5fd0e8; --steel-dim:#1d4855;
+
+  --proven:#3ddc97; --candidate:#f0b429; --unproven:#7f8c9e; --refused:#9b86c7;
+  --proven-b:#0f3a2b; --candidate-b:#3a2e0d; --unproven-b:#222a34; --refused-b:#241e33;
+
+  --sev5:#ff6b5e; --sev4:#ff9f45; --sev3:#e8c33c; --sev2:#6d9bb5; --sev1:#5b6775;
+
+  --hazard:#ff5a52; --hazard-deep:#43110e;
+
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --nav:236px;
+  --ease:cubic-bezier(.22,.61,.36,1);
+  color-scheme:dark;
+}
+html[data-mode="engagement"]{ --steel:var(--hazard); --steel-dim:var(--hazard-deep); }
+
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--v0); color:var(--ink);
+  font:400 13px/1.55 var(--sans);
+  -webkit-font-smoothing:antialiased;
+  display:grid; grid-template-columns:var(--nav) 1fr;
+}
+.mono{font-family:var(--mono)}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+.hide{display:none !important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+
+/* ======================================================= LEFT RAIL ===== */
+.rail{
+  background:var(--v1); border-right:1px solid var(--line);
+  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+}
+.brand{padding:18px 18px 16px;border-bottom:1px solid var(--line-soft)}
+.brand h1{
+  font-size:17px;font-weight:650;letter-spacing:.16em;
+  display:flex;align-items:center;gap:9px;
+}
+.eye{width:15px;height:15px;flex:none;color:var(--steel);transition:color .3s var(--ease)}
+.brand p{color:var(--faint);font-size:11px;margin-top:5px;line-height:1.4}
+
+nav{padding:12px 10px;display:flex;flex-direction:column;gap:2px}
+.nav{
+  display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:10px;
+  padding:9px 10px;border-radius:4px;color:var(--dim);
+  text-align:left;font-size:13px;position:relative;
+  transition:background .15s,color .15s;
+}
+.nav:hover{background:var(--v2);color:var(--ink)}
+.nav[aria-selected="true"]{background:var(--v3);color:var(--ink);font-weight:550}
+.nav[aria-selected="true"]::before{
+  content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:2px;
+  background:var(--steel);border-radius:0 2px 2px 0;
+}
+.nav svg{width:16px;height:16px;opacity:.85}
+.nav .ct{
+  font:500 11px/1 var(--mono);color:var(--faint);
+  background:var(--v1);border:1px solid var(--line);border-radius:999px;
+  padding:3px 7px;min-width:22px;text-align:center;
+}
+.nav[aria-selected="true"] .ct{color:var(--ink);border-color:var(--v4)}
+.nav kbd{
+  font:500 10px/1 var(--mono);color:var(--faint);
+  border:1px solid var(--line);border-radius:3px;padding:2px 4px;
+}
+
+.railgap{flex:1}
+.status{padding:14px 16px;border-top:1px solid var(--line-soft)}
+.status h2{font-size:11px;color:var(--faint);font-weight:500;margin-bottom:9px}
+.lamp{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11.5px;color:var(--dim)}
+.lamp i{
+  width:7px;height:7px;border-radius:50%;flex:none;
+  background:var(--v4);box-shadow:inset 0 0 0 1px #000;
+}
+.lamp.on i{background:var(--proven);box-shadow:0 0 7px -1px var(--proven)}
+.lamp.off i{background:#3a2326;box-shadow:inset 0 0 0 1px #000}
+.lamp.off{color:var(--faint)}
+.lamp .mono{font-size:11px}
+.ver{padding:10px 16px 14px;color:var(--faint);font:400 10.5px/1 var(--mono)}
+
+/* ========================================================== CHASSIS ==== */
+main{min-width:0;display:flex;flex-direction:column}
+
+.moderail{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 24px;border-bottom:1px solid var(--line);
+  background:var(--v1);
+  font-size:12px;color:var(--dim);
+}
+html[data-mode="engagement"] .moderail{
+  background:repeating-linear-gradient(135deg,var(--hazard-deep) 0 11px,#2a0b09 11px 22px);
+  border-bottom-color:#5e1a16; color:#ffd7d4;
+}
+.moderail b{
+  font:600 11px/1 var(--mono);letter-spacing:.1em;
+  padding:5px 9px;border-radius:3px;
+  background:var(--v3);color:var(--ink);border:1px solid var(--line);
+}
+html[data-mode="engagement"] .moderail b{
+  background:var(--hazard);color:#2a0705;border-color:#ff8f89;
+}
+
+.wrap{padding:22px 24px 40px;max-width:1480px;width:100%}
+
+/* ============================================================ HERO ===== */
+.hero{
+  background:linear-gradient(180deg,var(--v2),var(--v1));
+  border:1px solid var(--line);border-radius:6px;
+  box-shadow:inset 0 1px 0 #ffffff07;
+  display:grid;grid-template-columns:auto 1fr auto;gap:26px;
+  padding:20px 22px;align-items:center;
+}
+@media (max-width:1180px){ .hero{grid-template-columns:auto 1fr;gap:20px} .hero .mix{grid-column:1/-1} }
+@media (max-width:820px){ .hero{grid-template-columns:1fr} }
+
+.gauge{position:relative;width:168px;height:168px;flex:none}
+.gauge svg{width:100%;height:100%;display:block;overflow:visible}
+.gauge .trk{fill:none;stroke:var(--v4);stroke-width:11}
+.gauge .seg{fill:none;stroke-width:11;transition:d .9s var(--ease)}
+.gauge .tick{stroke:var(--line);stroke-width:1}
+.gcent{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;pointer-events:none;
+}
+.gnum{
+  font:600 50px/1 var(--mono);letter-spacing:-.03em;color:var(--proven);
+  font-variant-numeric:tabular-nums;
+}
+.gof{font-size:11.5px;color:var(--dim);margin-top:5px;max-width:124px;line-height:1.35}
+
+.hmid{min-width:0}
+.hmid h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.hmid .sub{color:var(--dim);font-size:12px;margin-top:3px}
+
+.strip{display:flex;gap:2px;margin:14px 0 10px;height:34px;align-items:stretch}
+.cell{
+  flex:1 1 0;min-width:5px;border-radius:2px;
+  background:var(--unproven-b);transform-origin:bottom;
+  transition:transform .12s var(--ease),filter .12s;
+}
+.anim .cell{animation:rise .5s var(--ease) backwards}
+@keyframes rise{from{transform:scaleY(.08);opacity:0}to{transform:scaleY(1);opacity:1}}
+.cell.proven{background:var(--proven);color:var(--proven)}
+.cell.candidate{background:var(--candidate);color:var(--candidate)}
+.cell.unproven{background:var(--unproven);color:var(--unproven)}
+.cell.refused{color:var(--refused);background:repeating-linear-gradient(135deg,
+  var(--refused) 0 3px, var(--refused-b) 3px 6px)}
+.cell:hover{transform:scaleY(1.14);filter:brightness(1.25)}
+.cell.on{box-shadow:0 0 0 2px var(--v1),0 0 0 3px currentColor}
+
+.striplegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11.5px;color:var(--dim)}
+.lg{
+  display:flex;align-items:baseline;gap:7px;border-radius:3px;
+  padding:3px 5px;margin:-3px -5px;transition:background .14s;
+}
+.lg:hover{background:var(--v3)}
+.lg b{font:600 12.5px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.lg i{width:9px;height:9px;border-radius:2px;flex:none;align-self:center}
+.lg em{font-style:normal;color:var(--faint)}
+.lg[aria-pressed="true"]{background:var(--v3);color:var(--ink)}
+.lg.p i{background:var(--proven)} .lg.c i{background:var(--candidate)}
+.lg.u i{background:var(--unproven)}
+.lg.r i{background:repeating-linear-gradient(135deg,var(--refused) 0 3px,var(--refused-b) 3px 6px)}
+
+.mix{min-width:190px}
+.mix h3{font-size:11px;color:var(--faint);font-weight:500;margin-bottom:9px}
+.meter{display:grid;grid-template-columns:60px 1fr 22px;align-items:center;gap:9px;padding:2.5px 0}
+.meter span{font-size:11.5px;color:var(--dim)}
+.meter .bar{height:7px;background:var(--v4);border-radius:2px;overflow:hidden}
+.meter .fil{height:100%;width:0;border-radius:2px;transition:width .9s var(--ease)}
+.meter b{font:500 11.5px/1 var(--mono);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+
+/* ========================================================== PANELS ===== */
+.grid{display:grid;grid-template-columns:356px 1fr;gap:16px;margin-top:16px;align-items:start}
+@media (max-width:1100px){ .grid{grid-template-columns:1fr} }
+
+.panel{background:var(--v2);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.phead{
+  display:flex;align-items:center;gap:10px;justify-content:space-between;
+  padding:12px 15px;border-bottom:1px solid var(--line-soft);
+}
+.phead h2{font-size:13px;font-weight:600}
+.phead .note{color:var(--faint);font-size:11.5px}
+.pbody{padding:15px}
+
+.k{
+  border:1px solid var(--line);background:var(--v3);color:var(--ink);
+  border-radius:4px;padding:7px 12px;font-size:12.5px;
+  transition:background .14s,border-color .14s,transform .08s;
+}
+.k:hover:not(:disabled){background:var(--v4);border-color:var(--v4)}
+.k:active:not(:disabled){transform:translateY(1px)}
+.k:disabled{opacity:.4;cursor:not-allowed}
+.k.sm{padding:4px 9px;font-size:11.5px}
+.k.go{background:var(--steel-dim);border-color:var(--steel);font-weight:600}
+.k.go:hover:not(:disabled){background:var(--steel);color:#06181d}
+html[data-mode="engagement"] .k.go{background:var(--hazard-deep);border-color:var(--hazard);color:#ffd9d6}
+html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard);color:#2a0705}
+
+.modes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pos{
+  border:1px solid var(--line);background:var(--v1);border-radius:5px;
+  padding:11px 12px;cursor:pointer;display:block;
+  transition:border-color .18s,background .18s;
+}
+.pos:hover{border-color:var(--v4)}
+.pos.on{border-color:var(--steel);background:var(--v3)}
+.pos.arm.on{border-color:var(--hazard);background:#1f0f0e}
+.pos .top{display:flex;align-items:center;gap:8px}
+.pos .top i{width:8px;height:8px;border-radius:50%;background:var(--v4);flex:none}
+.pos.on .top i{background:var(--steel);box-shadow:0 0 8px -1px var(--steel)}
+.pos.arm.on .top i{background:var(--hazard);box-shadow:0 0 8px -1px var(--hazard);animation:beat 1.9s infinite}
+@keyframes beat{0%,100%{opacity:1}50%{opacity:.4}}
+.pos .top b{font-size:12.5px;font-weight:600}
+.pos p{color:var(--dim);font-size:11.5px;margin-top:5px;line-height:1.4}
+
+.fld{margin-top:14px}
+.fld label{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px}
+.fld label em{color:var(--hazard);font-style:normal;font-size:10.5px;margin-left:5px}
+.fld input,.fld textarea{
+  width:100%;background:var(--v1);border:1px solid var(--line);border-radius:4px;
+  padding:8px 10px;font-family:var(--mono);font-size:12.5px;transition:border-color .15s;
+}
+.fld input:focus,.fld textarea:focus{border-color:var(--steel);outline:none}
+.fld textarea{resize:vertical;min-height:62px;font-family:var(--sans)}
+.fld input::placeholder,.fld textarea::placeholder{color:var(--faint)}
+
+#auth{border:1px solid var(--hazard);border-radius:5px;padding:13px;margin-top:14px;background:#190b0a}
+#auth > p{color:#ffc9c5;font-size:11.5px;line-height:1.45}
+#auth > p b{color:#fff}
+.confirm{display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:11.5px;color:#ffc9c5}
+.confirm input{margin-top:2px;accent-color:var(--hazard);flex:none}
+
+.errs{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.errs li{
+  display:flex;gap:9px;background:#1d1210;border-left:2px solid var(--hazard);
+  border-radius:0 4px 4px 0;padding:8px 10px;font-size:11.5px;color:#ffcfcb;line-height:1.45;
+}
+.errs li .tagw{font:600 10px/1 var(--mono);color:var(--hazard);letter-spacing:.07em;flex:none;padding-top:2px}
+.ok{margin-top:12px;background:#0d2419;border-left:2px solid var(--proven);
+  border-radius:0 4px 4px 0;padding:8px 10px;font-size:11.5px;color:#bff0d8;line-height:1.45}
+.warn{margin-top:12px;background:#231a06;border-left:2px solid var(--candidate);
+  border-radius:0 4px 4px 0;padding:9px 11px;font-size:11.5px;color:#f3dca2;line-height:1.5}
+.acts{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
+
+pre.prompt{
+  margin-top:6px;background:var(--v0);border:1px solid var(--line);border-radius:4px;
+  padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;
+  white-space:pre-wrap;word-break:break-word;max-height:330px;overflow:auto;color:#c9d6e4;
+}
+
+.tw{overflow-x:auto}
+/* MEASURED BUG: with table-layout:auto the <thead> and the per-run <tbody>
+   groups disagreed on column widths - the first header cell computed to
+   597px against an 82px body cell - because each run's note row spans all
+   columns and the auto algorithm handed the slack to column one. Fixed
+   layout with a colgroup makes the columns deterministic, and it is the
+   right default for a data table anyway: content can no longer blow a
+   column out, which is what forced the page to scroll sideways. */
+table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+thead th{
+  text-align:left;font-size:11px;font-weight:500;color:var(--faint);
+  padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;
+}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tbody.row:hover td{background:#ffffff05}
+td.r{text-align:right}
+/* With table-layout:fixed a cell does not widen for its content, it
+   OVERFLOWS into the next column - a timestamp ran into Elapsed and
+   read "04:54:010s", two values welded into one. Clip instead. */
+td.mt{font-family:var(--mono);font-size:11.5px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+td.b{font-weight:600}
+/* `break-all` chopped `http://127.0.0.1:65501` into "http://1 / 27.0.0. /
+   1:65501", which is unreadable and makes a target look like three. Break
+   only where there is nowhere else to break. */
+.url{font-family:var(--mono);font-size:11.5px;color:#bcd3e6;overflow-wrap:anywhere;word-break:normal}
+.sub2{color:var(--faint);font-size:11px;margin-top:2px;font-family:var(--mono)}
+
+.st{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;white-space:nowrap}
+.st i{width:7px;height:7px;border-radius:50%;flex:none;background:var(--v4)}
+.st.live i{background:var(--steel);box-shadow:0 0 7px -1px var(--steel);animation:beat 1.6s infinite}
+.st.done i{background:var(--proven)}
+.st.bad i{background:var(--hazard)}
+.st.blocked i{background:var(--candidate)}
+
+.gr{display:inline-block;font:600 10.5px/1 var(--mono);letter-spacing:.06em;
+  padding:4px 7px;border-radius:3px;border:1px solid transparent}
+.gr.proven{background:var(--proven-b);color:var(--proven);border-color:#1d6b4f}
+.gr.candidate{background:var(--candidate-b);color:var(--candidate);border-color:#6b561a}
+.gr.unproven{background:var(--unproven-b);color:var(--unproven);border-color:var(--v4)}
+.gr.refused{background:var(--refused-b);color:var(--refused);border-color:#473a63}
+
+.sv{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;white-space:nowrap}
+.sv i{width:3px;height:12px;border-radius:1px;flex:none}
+.sv.critical i{background:var(--sev5)} .sv.high i{background:var(--sev4)}
+.sv.medium i{background:var(--sev3)} .sv.low i{background:var(--sev2)}
+.sv.info i{background:var(--sev1)}
+
+.ev{
+  font-family:var(--mono);font-size:11.5px;color:#cfe0ef;
+  background:var(--v0);border-left:2px solid var(--v4);
+  padding:6px 9px;border-radius:0 3px 3px 0;
+  word-break:break-all;max-width:420px;line-height:1.5;
+}
+tbody.row.proven .ev{border-left-color:var(--proven)}
+tbody.row.candidate .ev{border-left-color:var(--candidate)}
+
+.why{background:#1a1407;border-left:2px solid var(--candidate);
+  padding:8px 11px;font-size:11.5px;color:#f0dcae;line-height:1.5;border-radius:0 3px 3px 0}
+
+.empty{padding:28px 15px;text-align:center;color:var(--faint);font-size:12.5px}
+.empty b{display:block;color:var(--dim);font-size:13px;margin-bottom:5px;font-weight:550}
+
+.filt{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.filt select,.filt input{
+  background:var(--v1);border:1px solid var(--line);border-radius:4px;padding:6px 9px;font-size:12px;
+}
+.filt input{font-family:var(--mono);min-width:170px}
+.filt input:focus,.filt select:focus{border-color:var(--steel);outline:none}
+
+.cls{display:flex;flex-direction:column;gap:7px}
+.crow{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center}
+.crow span{font:500 11.5px/1 var(--mono);color:var(--dim)}
+.cbar{height:16px;display:flex;gap:1.5px}
+.cbar i{display:block;width:9px;border-radius:1px}
+.crow b{font:500 11.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+
+.drawer{
+  border:1px solid var(--line);border-radius:6px;background:var(--v2);
+  margin-top:16px;overflow:hidden;animation:slide .26s var(--ease);
+}
+@keyframes slide{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+.tape{
+  background:var(--v0);font-family:var(--mono);font-size:11.5px;line-height:1.7;
+  padding:12px 15px;max-height:280px;overflow:auto;color:#b9cadb;
+}
+.tape div{display:flex;gap:11px}
+.tape em{color:var(--faint);font-style:normal;flex:none}
+.reader{
+  background:var(--v0);font-family:var(--mono);font-size:11.5px;line-height:1.65;
+  padding:16px 18px;max-height:62vh;overflow:auto;white-space:pre-wrap;
+  word-break:break-word;color:#c6d5e4;
+}
+
+.foot{
+  margin-top:26px;padding-top:15px;border-top:1px solid var(--line-soft);
+  color:var(--faint);font-size:11.5px;line-height:1.6;max-width:84ch;
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
+    transition-duration:.001ms !important}
+}
+@media (max-width:760px){
+  body{grid-template-columns:1fr}
+  .rail{position:static;height:auto}
+  nav{flex-direction:row;overflow-x:auto}
+  .railgap,.status,.ver{display:none}
+  .wrap{padding:16px}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="rail">
+  <div class="brand">
+    <h1>
+      <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+        <path d="M1.8 12S5.5 5 12 5s10.2 7 10.2 7-3.7 7-10.2 7S1.8 12 1.8 12Z"/>
+        <circle cx="12" cy="12" r="2.8"/>
+      </svg>
+      ARGUS
+    </h1>
+    <p>Nothing is recorded that the transcript does not already prove.</p>
+  </div>
+
+  <nav role="tablist" aria-label="Screens">
+    <button class="nav" id="tab-dash" role="tab" aria-selected="true" aria-controls="panel-dash">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <path d="M4 14a8 8 0 0 1 16 0"/><path d="m12 14 4-4"/><path d="M4 14h2M18 14h2M12 6V4"/>
+      </svg>
+      <span>Deck</span><kbd>1</kbd>
+    </button>
+    <button class="nav" id="tab-find" role="tab" aria-selected="false" aria-controls="panel-find">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 5.8 5.8"/>
+      </svg>
+      <span>Findings</span><span class="ct" id="ct-find">0</span>
+    </button>
+    <button class="nav" id="tab-rep" role="tab" aria-selected="false" aria-controls="panel-rep">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+        <path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>
+      </svg>
+      <span>Reports</span><span class="ct" id="ct-rep">0</span>
+    </button>
+  </nav>
+
+  <div class="railgap"></div>
+
+  <div class="status">
+    <h2>This host</h2>
+    <div id="lamps"></div>
+  </div>
+  <div class="ver mono" id="ver">argus</div>
+</div>
+
+<main>
+  <div class="moderail">
+    <b id="armtag">lab / ctf</b>
+    <span id="armsay">practice target you own - no authorisation note required</span>
+  </div>
+
+  <div class="wrap">
+
+    <section class="hero" aria-label="Proof record">
+      <div class="gauge">
+        <svg id="gsvg" viewBox="0 0 120 120" aria-hidden="true"></svg>
+        <div class="gcent">
+          <div class="gnum" id="gnum">0</div>
+          <div class="gof" id="gof">no findings on record</div>
+        </div>
+      </div>
+
+      <div class="hmid">
+        <h2>Every finding, graded against the bytes on record</h2>
+        <p class="sub">One cell per finding. Click a grade to filter the record.</p>
+        <div class="strip" id="strip"></div>
+        <div class="striplegend">
+          <button class="lg p" id="lg-proven" type="button" aria-pressed="false">
+            <i></i><b id="n-proven">0</b> proven <em>artifact and control on record</em>
+          </button>
+          <button class="lg c" id="lg-candidate" type="button" aria-pressed="false">
+            <i></i><b id="n-candidate">0</b> candidate <em>a named check still missing</em>
+          </button>
+          <button class="lg u" id="lg-unproven" type="button" aria-pressed="false">
+            <i></i><b id="n-unproven">0</b> unproven <em>nothing cited meets it</em>
+          </button>
+          <button class="lg r" id="lg-refused" type="button" aria-pressed="false">
+            <i></i><b id="n-refused">0</b> refused <em>argus will not prove this class</em>
+          </button>
+        </div>
+      </div>
+
+      <div class="mix">
+        <h3>If true, how bad</h3>
+        <div id="sevmix"></div>
+      </div>
+    </section>
+
+    <div id="modelwarn" class="warn hide"></div>
+
+    <!-- ===================================================== DECK ===== -->
+    <div id="panel-dash" role="tabpanel" aria-labelledby="tab-dash">
+      <div class="grid">
+
+        <section class="panel">
+          <div class="phead"><h2>Start a run</h2><span class="note" id="launchmode">lab</span></div>
+          <div class="pbody">
+            <div class="modes">
+              <label class="pos on" id="pos-lab">
+                <input type="radio" name="mode" id="mode-lab" value="lab" class="sr" checked>
+                <span class="top"><i></i><b>Lab / CTF</b></span>
+                <p>A practice target you own. No authorisation note.</p>
+              </label>
+              <label class="pos arm" id="pos-eng">
+                <input type="radio" name="mode" id="mode-eng" value="engagement" class="sr">
+                <span class="top"><i></i><b>Engagement</b></span>
+                <p>A real system. Four authorisation fields required.</p>
+              </label>
+            </div>
+
+            <div class="fld">
+              <label for="target">Target <em>required</em></label>
+              <input id="target" placeholder="https://host.example  or  10.0.0.5" autocomplete="off" spellcheck="false">
+            </div>
+
+            <div id="auth" class="hide">
+              <p><b>Authorisation.</b> All four are required. The server refuses an
+                engagement run that does not carry them, and this form will not send one.</p>
+              <div id="authfields"></div>
+              <label class="confirm">
+                <input type="checkbox" id="confirm">
+                <span>I hold written authorisation covering <b>this target</b> and
+                  <b>this window</b>, and I am the person named above or act on their instruction.</span>
+              </label>
+            </div>
+
+            <div id="stale" class="warn hide"><span id="stalesay"></span></div>
+
+            <div class="fld">
+              <label for="extra">Notes for the agent <span style="color:var(--faint)">optional</span></label>
+              <textarea id="extra" placeholder="e.g. the login is /auth/login - test the password reset flow first"></textarea>
+            </div>
+
+            <div class="acts">
+              <button class="k go" id="btn-go" type="button">launch lab run</button>
+              <button class="k" id="btn-prev" type="button">Preview prompt</button>
+            </div>
+
+            <ul class="errs" id="errs"></ul>
+            <div class="ok hide" id="ack"><span id="acksay"></span></div>
+
+            <div id="promptwrap" class="hide">
+              <div class="fld">
+                <label>What the agent will be told, before anything runs</label>
+                <pre class="prompt" id="promptpre"></pre>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div>
+          <section class="panel">
+            <div class="phead">
+              <h2>Runs</h2>
+              <span style="display:flex;gap:9px;align-items:center">
+                <span class="note" id="runstat"></span>
+                <button class="k sm" id="btn-runs" type="button">Refresh</button>
+              </span>
+            </div>
+            <div class="tw">
+              <table id="t-runs">
+                <colgroup>
+                  <col style="width:92px"><col><col style="width:96px">
+                  <col style="width:158px"><col style="width:76px">
+                  <col style="width:70px"><col style="width:64px">
+                </colgroup>
+                <thead><tr>
+                  <th>State</th><th>Target</th><th>Mode</th><th>Started</th>
+                  <th>Elapsed</th><th class="r">Findings</th><th></th>
+                </tr></thead>
+              </table>
+            </div>
+            <div class="empty hide" id="runs-empty">
+              <b>No runs yet</b>Start one on the left, or run <span class="mono">argus run</span> and it will appear here.
+            </div>
+          </section>
+
+          <section class="panel" style="margin-top:16px">
+            <div class="phead"><h2>What has been found, by class</h2>
+              <span class="note">one mark per finding</span></div>
+            <div class="pbody"><div class="cls" id="clsdiag"></div></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="drawer hide" id="recorder">
+        <div class="phead">
+          <h2>Event tape <span class="mono" id="recid" style="color:var(--faint);font-weight:400"></span></h2>
+          <button class="k sm" id="btn-recclose" type="button">Close</button>
+        </div>
+        <div class="tape" id="rectape"></div>
+      </div>
+    </div>
+
+    <!-- ================================================= FINDINGS ===== -->
+    <div id="panel-find" role="tabpanel" aria-labelledby="tab-find" hidden>
+      <section class="panel">
+        <div class="phead">
+          <h2>Findings</h2>
+          <span class="filt">
+            <select id="f-grade" aria-label="Filter by grade">
+              <option value="all">All grades</option>
+              <option value="proven">proven</option>
+              <option value="candidate">candidate</option>
+              <option value="unproven">unproven</option>
+              <option value="refused">refused</option>
+            </select>
+            <select id="f-sev" aria-label="Filter by severity">
+              <option value="all">All severities</option>
+              <option value="critical">critical</option><option value="high">high</option>
+              <option value="medium">medium</option><option value="low">low</option>
+              <option value="info">info</option>
+            </select>
+            <input id="q" placeholder="class, title, url, evidence" aria-label="Filter text" autocomplete="off">
+            <button class="k sm" id="btn-clear" type="button">Clear</button>
+            <button class="k sm" id="btn-find" type="button">Refresh</button>
+          </span>
+        </div>
+        <div class="tw">
+          <table id="t-finds">
+            <colgroup>
+              <col style="width:104px"><col style="width:104px"><col style="width:108px">
+              <col><col style="width:228px"><col style="width:300px">
+            </colgroup>
+            <thead><tr>
+              <th>Grade</th><th>Severity</th><th>Class</th><th>Finding</th>
+              <th>Target</th><th>Quoted from the target</th>
+            </tr></thead>
+          </table>
+        </div>
+        <div class="empty hide" id="finds-empty">
+          <b>Nothing matches</b>Clear the filters, or run something.
+        </div>
+      </section>
+    </div>
+
+    <!-- ================================================== REPORTS ===== -->
+    <div id="panel-rep" role="tabpanel" aria-labelledby="tab-rep" hidden>
+      <section class="panel">
+        <div class="phead">
+          <h2>Reports</h2>
+          <span style="display:flex;gap:9px;align-items:center">
+            <span class="note" id="repstat"></span>
+            <button class="k sm" id="btn-rep" type="button">Refresh</button>
+          </span>
+        </div>
+        <div class="tw">
+          <table id="t-reps">
+            <colgroup>
+              <col style="width:168px"><col style="width:220px"><col>
+              <col style="width:84px"><col style="width:178px"><col style="width:76px">
+            </colgroup>
+            <thead><tr>
+              <th>Sealed</th><th>Run</th><th>Target</th>
+              <th class="r">Findings</th><th>Formats</th><th></th>
+            </tr></thead>
+          </table>
+        </div>
+        <div class="empty hide" id="reps-empty">
+          <b>No reports yet</b>A report is rendered when a run finishes.
+        </div>
+      </section>
+
+      <div class="drawer hide" id="reader">
+        <div class="phead">
+          <h2>Report <span class="mono" id="readid" style="color:var(--faint);font-weight:400"></span></h2>
+          <button class="k sm" id="btn-readclose" type="button">Close</button>
+        </div>
+        <div class="reader" id="readbody"></div>
+      </div>
+    </div>
+
+    <p class="foot">
+      argus proves; it does not damage. No denial of service, no persistence, no
+      lateral movement, no credential dumping, no exfiltration. Code execution is
+      proven with <span class="mono">id; echo &lt;nonce&gt;</span> and stops there.
+      The engagement tier refuses to open without an authorisation note naming who
+      authorised it and over what window.
+    </p>
+  </div>
+</main>
+
+<script>
+'use strict';
+/*
+  THE HTTP CONTRACT this page speaks (argus/web/server.py is the other half):
+
+    GET  /api/health              -> {ok,version,model_configured,tools{nmap,ffuf,nuclei,sqlmap}}
+    POST /api/prompt              -> {ok,prompt,errors[]}
+    POST /api/runs                -> {ok,run_id,errors[]}
+    GET  /api/runs                -> {runs:[{id,target,mode,state,started,finished,findings,note}]}
+    GET  /api/runs/<id>           -> {run:{...},events:[{ts,text}]}
+    GET  /api/findings            -> {findings:[{run_id,id,title,severity,grade,vuln_class,url,excerpt}]}
+    GET  /api/reports             -> {reports:[{run_id,target,when,findings,formats[]}]}
+    GET  /api/reports/<id>?fmt=md -> raw report bytes
+
+  No innerHTML below. Every value from the API becomes a text node.
+*/
+(function () {
+/* `document` is absent under node. The decision logic below - what the
+   engagement interlock refuses, how a finished run's elapsed time reads,
+   which grade an unknown word maps to - is the part worth testing without a
+   browser, so the module exports it and stops before touching the DOM.
+   A test that only greps this file for source strings proves nothing about
+   what it does; this seam is what lets the suite drive it instead. */
+var HEADLESS = (typeof document === 'undefined');
+var D = HEADLESS ? null : document, SVGNS = 'http://www.w3.org/2000/svg';
+function $(id) { return D.getElementById(id); }
+
+/* ---------------------------------------------------------- vocabulary
+   argus's own words. This page must never invent a grade or a state: a word
+   shown here before the system makes that distinction teaches the operator
+   something untrue. */
+/* These are argus's four grades, in `argus.proof.GRADES` order. A page
+   that knows only three maps the fourth onto one of them - and
+   `refused` folded into `unproven` tells the operator the evidence
+   fell short, when what happened is that the class is refused by
+   policy and no evidence could have changed it. */
+var GRADES = ['proven', 'candidate', 'unproven', 'refused'];
+var GRADE_MEANING = {
+  proven:    'the class-specific artifact and its control are on record',
+  candidate: 'a real signal, but a named check is still missing',
+  unproven:  'nothing in the cited evidence meets the requirement',
+  refused:   'argus refuses to prove this class: the proof would be the damage'
+};
+var SEVS = ['critical', 'high', 'medium', 'low', 'info'];
+var SEV_LEVEL = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
+var LIVE = { queued: 1, running: 1 };
+/* A state word is jargon until it is glossed. "blocked" in particular reads
+   like a failure and is not one: the run was accepted and then refused
+   before any traffic, which is a different thing to tell an operator. Every
+   state the API can send has a sentence here; one with none shows its bare
+   word, which is what this map exists to stop. */
+var STATE_WORDS = {
+  queued:  'accepted, waiting for a worker - nothing has been sent yet',
+  running: 'an agent is working on this target now',
+  done:    'the run finished and its evidence is sealed',
+  failed:  'the run stopped before it finished - the note says what stopped it',
+  blocked: 'accepted, then refused before any traffic was sent'
+};
+var AUTH = [
+  ['authorised_by', 'Authorised by', 'name and role of the person who authorised this'],
+  ['scope',         'Scope',         'hosts / applications the authorisation covers'],
+  ['window',        'Window',        'dates and hours testing is permitted'],
+  ['reference',     'Reference',     'contract / ticket / email reference']
+];
+var TOOLS = ['nmap', 'ffuf', 'nuclei', 'sqlmap'];
+var POLL_RUNS = 3000, POLL_HEALTH = 30000, REPORT_MAX = 1200000;
+
+var S = {
+  tab: 'dash', mode: 'lab', stale: false, lastTarget: '',
+  runs: [], findings: [], reports: [],
+  filt: { grade: 'all', sev: 'all', q: '' },
+  lamps: null, arc: null, auth: null
+};
+
+/* ------------------------------------------------------------- helpers */
+function t(v) { return typeof v === 'string' ? v.trim() : (v == null ? '' : String(v).trim()); }
+function low(v) { return t(v).toLowerCase(); }
+function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
+function pick(o, k, d) { return has(o, k) ? o[k] : d; }
+function el(tag, cls, text) {
+  var n = D.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = String(text);
+  return n;
+}
+function svgn(tag, attrs) {
+  var n = D.createElementNS(SVGNS, tag);
+  for (var k in attrs) if (has(attrs, k)) n.setAttribute(k, String(attrs[k]));
+  return n;
+}
+function put(host, node) { host.appendChild(node); return node; }
+function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); return n; }
+function setText(n, s) { s = String(s); if (n.textContent !== s) n.textContent = s; }
+function setCls(n, s) { if (n.className !== s) n.className = s; }
+function show(n, on) { if (n) n.classList.toggle('hide', !on); }
+function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+function clock(ts) {
+  var ms = Number(ts); if (!isFinite(ms) || ms <= 0) return '--';
+  var d = new Date(ms * 1000);
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+         ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+function finishedAt(run) {
+  var f = Number(pick(run, 'finished', 0));
+  return isFinite(f) && f > 0 ? f : 0;
+}
+function isLive(run) { return !!pick(LIVE, low(run && run.state), 0); }
+function elapsed(run, nowMs) {
+  /* MEASURED BUG this guards: elapsed was computed from Date.now() whatever
+     the state, so a session sealed two days ago read "50h08m". A finished run
+     is measured to its `finished` stamp; only a live run is measured to now,
+     and a finished run with no stamp reports nothing rather than guessing. */
+  var a = Number(pick(run, 'started', 0));
+  if (!isFinite(a) || a <= 0) return '--';
+  var b = finishedAt(run);
+  if (!b) { if (!isLive(run)) return '--'; b = nowMs / 1000; }
+  var s = Math.max(0, Math.round(b - a));
+  if (s < 60) return s + 's';
+  if (s < 3600) return Math.floor(s / 60) + 'm' + pad(s % 60) + 's';
+  return Math.floor(s / 3600) + 'h' + pad(Math.floor((s % 3600) / 60)) + 'm';
+}
+
+/* --------------------------------------------------------------- fetch */
+function jreq(method, path, body) {
+  var opts = { method: method, cache: 'no-store', credentials: 'same-origin' };
+  if (body != null) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify(body);
+  }
+  return fetch(path, opts).then(function (res) {
+    return res.text().then(function (txt) {
+      var data = null;
+      try { data = JSON.parse(txt); } catch (e) { data = null; }
+      if (data && typeof data === 'object') {
+        /* The server's `errors` array is the operator's only account of WHY a
+           run was refused. An earlier build dropped it on any non-2xx, which
+           is the one case it exists for. */
+        data._ok = res.ok;
+        if (!res.ok && !data.error) data.error = 'HTTP ' + res.status;
+        return data;
+      }
+      return { _ok: false, error: res.ok ? 'the reply was not JSON' : 'HTTP ' + res.status };
+    });
+  }).catch(function (e) {
+    return { _ok: false, error: 'the console could not reach the server (' + (e && e.message) + ')' };
+  });
+}
+function jget(p) { return jreq('GET', p, null); }
+function rawget(path) {
+  return fetch(path, { cache: 'no-store', credentials: 'same-origin' })
+    .then(function (res) {
+      return res.text().then(function (txt) {
+        return { _ok: res.ok, text: txt, error: res.ok ? '' : 'HTTP ' + res.status };
+      });
+    })
+    .catch(function (e) { return { _ok: false, text: '', error: String(e && e.message) }; });
+}
+
+/* ---------------------------------------------------------- rail lamps */
+function buildLamps() {
+  var host = clear($('lamps')), rec = {};
+  rec.model = put(host, el('div', 'lamp'));
+  put(rec.model, el('i'));
+  rec.modelTxt = put(rec.model, el('span', '', 'model'));
+  TOOLS.forEach(function (name) {
+    var row = put(host, el('div', 'lamp'));
+    put(row, el('i'));
+    put(row, el('span', 'mono', name));
+    rec[name] = row;
+  });
+  S.lamps = rec;
+}
+function warn(msg) { var n = $('modelwarn'); show(n, !!msg); setText(n, msg || ''); }
+function loadHealth() {
+  return jget('/api/health').then(function (r) {
+    var L = S.lamps; if (!L) return;
+    if (!r._ok) {
+      setCls(L.model, 'lamp off'); setText(L.modelTxt, 'server unreachable');
+      TOOLS.forEach(function (n) { setCls(L[n], 'lamp off'); });
+      setText($('ver'), 'argus - no reply');
+      warn('The console cannot reach the server, so nothing on this page is current.');
+      return;
+    }
+    var ok = !!r.model_configured;
+    setCls(L.model, 'lamp ' + (ok ? 'on' : 'off'));
+    setText(L.modelTxt, ok ? 'model configured' : 'no model');
+    var tools = (r.tools && typeof r.tools === 'object') ? r.tools : {};
+    TOOLS.forEach(function (n) { setCls(L[n], 'lamp ' + (tools[n] ? 'on' : 'off')); });
+    setText($('ver'), 'argus ' + (t(r.version) || '?'));
+    warn(ok ? '' :
+      'No model is configured, so a run launched here cannot be driven by an agent: it ' +
+      'will be accepted, immediately marked blocked, and send no traffic at all. The ' +
+      'tool half (nmap, ffuf, nuclei, sqlmap) can still be driven from the CLI against ' +
+      'the same target. Set ANTHROPIC_API_KEY in the server environment and restart it.');
+  });
+}
+
+/* ====================================================== THE PROOF GAUGE */
+/* A 270-degree arc drawn as three stacked segments in grade order. The
+   centre carries the proven COUNT, not a percentage: the operator's question
+   is "how many of these do I actually hold", and a percentage of eight
+   findings rounds away the one that matters. */
+var ARC = { r: 50, cx: 60, cy: 60, start: 135, sweep: 270 };
+function polar(cx, cy, r, deg) {
+  var a = (deg - 90) * Math.PI / 180;
+  return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+}
+function arcPath(from, to) {
+  var a = polar(ARC.cx, ARC.cy, ARC.r, from), b = polar(ARC.cx, ARC.cy, ARC.r, to);
+  var big = (to - from) > 180 ? 1 : 0;
+  return 'M' + a.x.toFixed(2) + ' ' + a.y.toFixed(2) +
+         'A' + ARC.r + ' ' + ARC.r + ' 0 ' + big + ' 1 ' + b.x.toFixed(2) + ' ' + b.y.toFixed(2);
+}
+function buildGauge() {
+  var g = clear($('gsvg'));
+  put(g, svgn('path', { 'class': 'trk', d: arcPath(ARC.start, ARC.start + ARC.sweep) }));
+  S.arc = {};
+  GRADES.forEach(function (k) {
+    var p = svgn('path', { 'class': 'seg', stroke: 'var(--' + k + ')', d: '' });
+    put(g, p); S.arc[k] = p;
+  });
+  for (var i = 0; i <= 6; i++) {
+    var deg = ARC.start + (ARC.sweep * i / 6);
+    var o = polar(ARC.cx, ARC.cy, ARC.r + 9, deg), q = polar(ARC.cx, ARC.cy, ARC.r + 13, deg);
+    put(g, svgn('line', { 'class': 'tick', x1: o.x, y1: o.y, x2: q.x, y2: q.y }));
+  }
+}
+function gradeOf(f) { return low(f && f.grade); }
+function gradeKey(g) {
+  /* An unrecognised grade is shown as itself, never mapped onto a
+     known one: mapping invents a verdict argus did not reach. */
+  return GRADES.indexOf(g) >= 0 ? g : 'unproven';
+}
+function counts(list) {
+  /* Derived from GRADES, not hand-written: a hand-written triple is how the
+     fourth grade went missing from this page in the first place. */
+  var c = Object.create(null);
+  GRADES.forEach(function (k) { c[k] = 0; });
+  (list || []).forEach(function (f) { c[gradeKey(gradeOf(f))]++; });
+  return c;
+}
+function paintGauge() {
+  var list = S.findings || [], c = counts(list), total = list.length, at = ARC.start;
+  GRADES.forEach(function (k) {
+    var span = (total ? c[k] / total : 0) * ARC.sweep;
+    S.arc[k].setAttribute('d', span <= 0.01 ? '' : arcPath(at, at + span));
+    at += span;
+  });
+  setText($('gnum'), String(c.proven));
+  setText($('gof'), total
+    ? 'of ' + total + (total === 1 ? ' finding carries its proof' : ' findings carry their proof')
+    : 'no findings on record');
+  GRADES.forEach(function (k) { setText($('n-' + k), String(c[k])); });
+
+  /* One cell per finding. Not a percentage bar: with eight findings you can
+     count them, and a bar that rounds 1/8 to "13%" hides the single finding
+     the operator most needs to look at. */
+  var host = $('strip');
+  if (host.childNodes.length !== total) {
+    clear(host);
+    list.forEach(function (f, i) {
+      var g = gradeKey(gradeOf(f));
+      var b = put(host, el('button', 'cell ' + g));
+      b.type = 'button';
+      b.style.animationDelay = (i * 34) + 'ms';
+      b.title = g + ' - ' + pick(GRADE_MEANING, g, '') + '\n' +
+               (t(f.title) || '(untitled)');
+      b.addEventListener('click', function () {
+        S.filt.grade = g; S.filt.sev = 'all';
+        syncFilterControls(); showTab('find'); drawFindings(); paintStripState();
+      });
+    });
+    host.classList.add('anim');
+  } else {
+    var i = 0;
+    Array.prototype.forEach.call(host.childNodes, function (b) {
+      var f = list[i++], g = gradeKey(gradeOf(f));
+      setCls(b, 'cell ' + g);
+      b.title = g + ' - ' + pick(GRADE_MEANING, g, '') + '\n' +
+                (t(f.title) || '(untitled)');
+    });
+  }
+  paintStripState();
+  paintSeverity(list);
+  paintClasses(list);
+  setText($('ct-find'), String(total));
+}
+function paintStripState() {
+  GRADES.forEach(function (k) {
+    $('lg-' + k).setAttribute('aria-pressed', S.filt.grade === k ? 'true' : 'false');
+  });
+  var on = S.filt.grade;
+  Array.prototype.forEach.call($('strip').childNodes, function (b) {
+    b.classList.toggle('on', on !== 'all' && b.classList.contains(on));
+  });
+}
+function paintSeverity(list) {
+  var by = {}, max = 0;
+  SEVS.forEach(function (s) { by[s] = 0; });
+  (list || []).forEach(function (f) {
+    var s = low(f && f.severity);
+    if (SEVS.indexOf(s) < 0) s = 'info';
+    by[s]++; if (by[s] > max) max = by[s];
+  });
+  var host = $('sevmix');
+  if (!host.childNodes.length) {
+    SEVS.forEach(function (s) {
+      var row = put(host, el('div', 'meter'));
+      row.dataset.sev = s;
+      put(row, el('span', '', s));
+      var fil = put(put(row, el('div', 'bar')), el('div', 'fil'));
+      fil.style.background = 'var(--sev' + SEV_LEVEL[s] + ')';
+      put(row, el('b', '', '0'));
+    });
+  }
+  Array.prototype.forEach.call(host.childNodes, function (row) {
+    var n = by[row.dataset.sev];
+    row.querySelector('.fil').style.width = (max ? (n / max) * 100 : 0) + '%';
+    setText(row.querySelector('b'), String(n));
+    row.style.opacity = n ? '1' : '.45';
+  });
+}
+/* A finding has a class; the record has a shape. One mark per finding, so
+   this diagram and the strip above it can be counted against each other. */
+function paintClasses(list) {
+  var by = {}, order = [];
+  (list || []).forEach(function (f) {
+    var k = low(f && f.vuln_class) || 'unclassed';
+    if (!has(by, k)) { by[k] = []; order.push(k); }
+    by[k].push(gradeKey(gradeOf(f)));
+  });
+  order.sort(function (a, b) { return by[b].length - by[a].length || (a < b ? -1 : 1); });
+  var host = clear($('clsdiag'));
+  if (!order.length) { put(host, el('div', 'empty', 'Nothing recorded yet.')); return; }
+  order.forEach(function (k) {
+    var row = put(host, el('div', 'crow'));
+    put(row, el('span', '', k));
+    var bar = put(row, el('div', 'cbar'));
+    by[k].sort(function (a, b) { return GRADES.indexOf(a) - GRADES.indexOf(b); })
+      .forEach(function (g) {
+        var cell = put(bar, el('i'));
+        cell.style.background = 'var(--' + g + ')';
+        cell.title = g;
+      });
+    put(row, el('b', '', String(by[k].length)));
+  });
+}
+
+/* ------------------------------------------------- in-place row syncing
+   MEASURED BUG this exists for: the tables were rebuilt wholesale on every
+   3s poll, so a row detached from the DOM between mousedown and mouseup and
+   its button could not be clicked. Rows are matched by key and updated in
+   place; only genuinely new keys create nodes. */
+function syncRows(host, items, keyOf, make, fill) {
+  var have = {}, order = [];
+  Array.prototype.forEach.call(host.childNodes, function (n) {
+    if (n.nodeType === 1 && n.dataset && n.dataset.key) have[n.dataset.key] = n;
+  });
+  (items || []).forEach(function (it) {
+    var key = String(keyOf(it)); order.push(key);
+    var node = have[key];
+    if (!node) {
+      var rec = make();
+      node = rec.root; node.dataset.key = key; node._rec = rec;
+      have[key] = node;
+    }
+    fill(node._rec, it);
+  });
+  var seen = {};
+  order.forEach(function (k) { seen[k] = 1; });
+  Object.keys(have).forEach(function (k) {
+    if (!seen[k] && have[k].parentNode === host) host.removeChild(have[k]);
+  });
+  order.forEach(function (k) { host.appendChild(have[k]); });
+}
+
+/* ============================================================== RUNS == */
+function stateCls(state) {
+  var s = low(state);
+  if (LIVE[s]) return 'st live';
+  if (s === 'done') return 'st done';
+  if (s === 'failed') return 'st bad';
+  if (s === 'blocked') return 'st blocked';
+  return 'st';
+}
+function drawRuns() {
+  var runs = S.runs || [], now = Date.now();
+  show($('runs-empty'), !runs.length);
+  setText($('runstat'), runs.length ? runs.length + (runs.length === 1 ? ' run' : ' runs') : '');
+  syncRows($('t-runs'), runs, function (r) { return t(r.id); },
+    function () {
+      var tb = el('tbody', 'row'), tr = put(tb, el('tr'));
+      var rec = {
+        root: tb,
+        state: put(tr, el('td')), target: put(tr, el('td')), mode: put(tr, el('td')),
+        started: put(tr, el('td', 'mt')), elapsed: put(tr, el('td', 'mt')),
+        count: put(tr, el('td', 'r mt b')), act: put(tr, el('td', 'r'))
+      };
+      rec.open = put(rec.act, el('button', 'k sm', 'Tape'));
+      rec.open.type = 'button';
+      rec.noteRow = put(tb, el('tr'));
+      rec.noteCell = put(rec.noteRow, el('td'));
+      rec.noteCell.colSpan = 7;
+      rec.note = put(rec.noteCell, el('div', 'why'));
+      return rec;
+    },
+    function (rec, r) {
+      var word = low(r.state) || 'unknown';
+      var pill = put(clear(rec.state), el('span', stateCls(r.state)));
+      put(pill, el('i'));
+      put(pill, el('span', '', word));
+      pill.title = pick(STATE_WORDS, word, 'this state is not one argus defines');
+
+      clear(rec.target);
+      put(rec.target, el('div', 'url', t(r.target) || '--'));
+      put(rec.target, el('div', 'sub2', t(r.id)));
+
+      /* A run recorded outside the web UI carries no mode. The old console
+         printed the word "unknown", which reads as a state argus has; it does
+         not. An em dash says "not recorded" without inventing one. */
+      var m = low(r.mode);
+      clear(rec.mode);
+      put(rec.mode, el('span', m ? 'gr ' + (m === 'engagement' ? 'candidate' : 'unproven') : '',
+        m ? (m === 'engagement' ? 'engagement' : 'lab') : '—'));
+
+      setText(rec.started, clock(r.started));
+      setText(rec.elapsed, elapsed(r, now));
+      var n = Number(r.findings);
+      setText(rec.count, isFinite(n) ? String(n) : '--');
+      rec.open.onclick = function () { openRun(t(r.id)); };
+
+      /* The server's own note wins: it says why THIS run is where it is.
+         With no note the state is still glossed, so a bare "blocked" never
+         stands alone with nothing telling the operator what it means. */
+      var note = t(r.note) || pick(STATE_WORDS, word, '');
+      show(rec.noteRow, !!note && word !== 'done');
+      setText(rec.note, note);
+    });
+}
+function loadRuns() {
+  return jget('/api/runs').then(function (r) {
+    if (!r._ok) return;
+    S.runs = Array.isArray(r.runs) ? r.runs : [];
+    drawRuns();
+  });
+}
+function openRun(id) {
+  show($('recorder'), true);
+  setText($('recid'), id);
+  put(clear($('rectape')), el('div', '', 'reading...'));
+  return jget('/api/runs/' + encodeURIComponent(id)).then(function (r) {
+    var host = clear($('rectape'));
+    if (!r._ok) { put(host, el('div', '', 'could not read this run: ' + t(r.error))); return; }
+    var evs = Array.isArray(r.events) ? r.events : [];
+    if (!evs.length) { put(host, el('div', '', 'nothing recorded for this run yet')); return; }
+    evs.forEach(function (e) {
+      var row = put(host, el('div'));
+      put(row, el('em', '', clock(e && e.ts)));
+      put(row, el('span', '', t(e && e.text)));
+    });
+    host.scrollTop = host.scrollHeight;
+  });
+}
+
+/* ========================================================== FINDINGS == */
+function matches(f, filt) {
+  var F = filt || S.filt;
+  if (F.grade !== 'all' && gradeKey(gradeOf(f)) !== F.grade) return false;
+  if (F.sev !== 'all' && low(f.severity) !== F.sev) return false;
+  var q = low(F.q);
+  if (!q) return true;
+  return [f.vuln_class, f.title, f.url, f.excerpt, f.run_id, f.severity, f.grade]
+    .some(function (v) { return low(v).indexOf(q) >= 0; });
+}
+function drawFindings() {
+  var list = (S.findings || []).filter(matches).sort(function (a, b) {
+    var g = GRADES.indexOf(gradeKey(gradeOf(a))) - GRADES.indexOf(gradeKey(gradeOf(b)));
+    if (g) return g;
+    return (SEV_LEVEL[low(b.severity)] || 0) - (SEV_LEVEL[low(a.severity)] || 0);
+  });
+  show($('finds-empty'), !list.length);
+  syncRows($('t-finds'), list,
+    function (f) { return t(f.run_id) + '/' + t(f.id); },
+    function () {
+      var tb = el('tbody', 'row'), tr = put(tb, el('tr'));
+      return {
+        root: tb,
+        grade: put(tr, el('td')), sev: put(tr, el('td')), cls: put(tr, el('td', 'mt')),
+        title: put(tr, el('td')), target: put(tr, el('td')), ev: put(tr, el('td'))
+      };
+    },
+    function (rec, f) {
+      var g = gradeKey(gradeOf(f));
+      setCls(rec.root, 'row ' + g);
+      var badge = put(clear(rec.grade), el('span', 'gr ' + g, g));
+      badge.title = pick(GRADE_MEANING, g, '');
+
+      var s = low(f.severity); if (SEVS.indexOf(s) < 0) s = 'info';
+      var sv = put(clear(rec.sev), el('span', 'sv ' + s));
+      put(sv, el('i')); put(sv, el('span', '', s));
+
+      setText(rec.cls, low(f.vuln_class) || '--');
+
+      clear(rec.title);
+      put(rec.title, el('div', '', t(f.title) || '(untitled)'));
+      put(rec.title, el('div', 'sub2', t(f.run_id) + ' / ' + t(f.id)));
+
+      put(clear(rec.target), el('div', 'url', t(f.url) || '--'));
+      put(clear(rec.ev), el('div', 'ev', t(f.excerpt) || '(no excerpt recorded)'));
+    });
+}
+function loadFindings() {
+  return jget('/api/findings').then(function (r) {
+    if (!r._ok) return;
+    S.findings = Array.isArray(r.findings) ? r.findings : [];
+    paintGauge();
+    drawFindings();
+  });
+}
+function syncFilterControls() {
+  $('f-grade').value = S.filt.grade;
+  $('f-sev').value = S.filt.sev;
+  $('q').value = S.filt.q;
+}
+
+/* =========================================================== REPORTS == */
+function drawReports() {
+  var reps = S.reports || [];
+  show($('reps-empty'), !reps.length);
+  setText($('repstat'), reps.length
+    ? reps.length + (reps.length === 1 ? ' report sealed' : ' reports sealed') : '');
+  setText($('ct-rep'), String(reps.length));
+  syncRows($('t-reps'), reps, function (r) { return t(r.run_id); },
+    function () {
+      var tb = el('tbody', 'row'), tr = put(tb, el('tr'));
+      var rec = {
+        root: tb,
+        when: put(tr, el('td', 'mt')), run: put(tr, el('td', 'mt')),
+        target: put(tr, el('td')), count: put(tr, el('td', 'r mt b')),
+        fmts: put(tr, el('td')), act: put(tr, el('td', 'r'))
+      };
+      rec.read = put(rec.act, el('button', 'k sm', 'Read'));
+      rec.read.type = 'button';
+      return rec;
+    },
+    function (rec, r) {
+      setText(rec.when, clock(r.when));
+      setText(rec.run, t(r.run_id));
+      put(clear(rec.target), el('div', 'url', t(r.target) || '--'));
+      var n = Number(r.findings);
+      setText(rec.count, isFinite(n) ? String(n) : '--');
+
+      /* MEASURED BUG: this column was clipped by a 430px panel and the row
+         opened nothing, while the server returned the report correctly. */
+      var fm = clear(rec.fmts);
+      var fmts = Array.isArray(r.formats) ? r.formats : [];
+      if (!fmts.length) put(fm, el('span', 'sub2', 'none on disk'));
+      fmts.forEach(function (f) {
+        var word = t(f); if (!word) return;
+        var a = put(fm, el('a', 'k sm', word));
+        a.href = '/api/reports/' + encodeURIComponent(t(r.run_id)) + '?fmt=' + encodeURIComponent(word);
+        a.target = '_blank'; a.rel = 'noopener noreferrer';
+        a.style.marginRight = '5px';
+        a.style.display = 'inline-block';
+        a.style.textDecoration = 'none';
+      });
+      rec.read.onclick = function () { openReport(t(r.run_id)); };
+    });
+}
+function loadReports() {
+  return jget('/api/reports').then(function (r) {
+    if (!r._ok) return;
+    S.reports = Array.isArray(r.reports) ? r.reports : [];
+    drawReports();
+  });
+}
+function openReport(id) {
+  show($('reader'), true);
+  setText($('readid'), id);
+  setText($('readbody'), 'reading...');
+  return rawget('/api/reports/' + encodeURIComponent(id) + '?fmt=md').then(function (r) {
+    if (!r._ok) { setText($('readbody'), 'could not read this report: ' + t(r.error)); return; }
+    var txt = String(r.text == null ? '' : r.text);
+    /* Rendered as TEXT, never as markup: the report quotes bytes the target
+       chose, and a console that renders them is a console the target writes to. */
+    if (txt.length > REPORT_MAX) {
+      txt = txt.slice(0, REPORT_MAX) +
+        '\n\n[truncated in the console at ' + REPORT_MAX + ' characters - open the md link for all of it]';
+    }
+    setText($('readbody'), txt);
+    $('readbody').scrollTop = 0;
+  });
+}
+
+/* ============================================================== FORM == */
+function buildAuthFields() {
+  var host = clear($('authfields'));
+  S.auth = {};
+  AUTH.forEach(function (p) {
+    var f = put(host, el('div', 'fld'));
+    var lab = put(f, el('label', '', p[1]));
+    put(lab, el('em', '', 'required'));
+    var inp = put(f, el('input'));
+    inp.id = 'auth-' + p[0];
+    inp.placeholder = p[2];
+    inp.autocomplete = 'off';
+    lab.setAttribute('for', inp.id);
+    inp.addEventListener('input', gate);
+    S.auth[p[0]] = inp;
+  });
+}
+function readForm() {
+  var f = { mode: S.mode, target: $('target').value, extra: $('extra').value,
+            confirmed: $('confirm').checked, stale: S.stale };
+  AUTH.forEach(function (p) { f[p[0]] = S.auth[p[0]].value; });
+  return f;
+}
+function authTrimmed(form) {
+  var a = {};
+  AUTH.forEach(function (p) { a[p[0]] = t(form[p[0]]); });
+  return a;
+}
+function validate(form) {
+  var errs = [];
+  if (!t(form.target)) errs.push('A target is required - a URL, a hostname or an IP.');
+  if (form.mode === 'engagement') {
+    AUTH.forEach(function (p) {
+      if (!t(form[p[0]])) {
+        errs.push('Engagement mode: "' + p[1] + '" is required. The run is refused without it.');
+      }
+    });
+    if (!form.confirmed) {
+      errs.push('Engagement mode: confirm you hold written authorisation for this target and this window.');
+    }
+    if (form.stale) {
+      errs.push('The target changed after the authorisation was entered. Re-read the four fields against this target, then confirm again.');
+    }
+  }
+  return errs;
+}
+function body(form) {
+  /* The MODE decides whether authorisation travels. The four fields keep
+     their text when the operator flips back to Lab, so sending them
+     regardless would attach an engagement's authorisation note to a run that
+     is not an engagement - and the server could not tell. */
+  var mode = form.mode === 'engagement' ? 'engagement' : 'lab';
+  var out = { mode: mode, target: t(form.target), auth: null, extra: t(form.extra) };
+  if (mode === 'engagement') out.auth = authTrimmed(form);
+  return out;
+}
+function setMode(mode) {
+  S.mode = mode === 'engagement' ? 'engagement' : 'lab';
+  var eng = S.mode === 'engagement';
+  /* The whole chassis re-themes off this one attribute: hazard rail, red
+     bezel, armed lamp, armed button. The two modes are not a label. */
+  D.documentElement.setAttribute('data-mode', S.mode);
+  setCls($('pos-lab'), 'pos' + (eng ? '' : ' on'));
+  setCls($('pos-eng'), 'pos arm' + (eng ? ' on' : ''));
+  $('mode-lab').checked = !eng;
+  $('mode-eng').checked = eng;
+  show($('auth'), eng);
+  setText($('armtag'), eng ? 'engagement' : 'lab / ctf');
+  setText($('armsay'), eng
+    ? 'a real system - you must hold written authorisation naming this target and this window'
+    : 'practice target you own - no authorisation note required');
+  setText($('launchmode'), eng ? 'armed' : 'lab');
+  setText($('btn-go'), eng ? 'launch engagement run' : 'launch lab run');
+  gate();
+}
+function gate() {
+  var errs = validate(readForm());
+  /* The button is disabled AND the server refuses the same request. Two
+     independent refusals; this one only saves a round trip. */
+  $('btn-go').disabled = errs.length > 0;
+  $('btn-go').title = errs.length ? errs.join('\n') : '';
+  var stale = S.mode === 'engagement' && S.stale;
+  show($('stale'), stale);
+  setText($('stalesay'), stale
+    ? 'The target changed after these four fields were entered. Authorisation is per target: re-read all four against the target above, then confirm again.'
+    : '');
+}
+function onTarget() {
+  var next = $('target').value;
+  /* Authorisation is per target. A note typed for host A, then a target
+     edited to host B, leaves four filled fields that authorise nothing. */
+  if (t(S.lastTarget) !== t(next)) {
+    var a = authTrimmed(readForm());
+    if (AUTH.some(function (p) { return !!a[p[0]]; })) {
+      S.stale = true; $('confirm').checked = false;
+    }
+  }
+  S.lastTarget = next;
+  gate();
+}
+function showErrors(list) {
+  var host = clear($('errs'));
+  (list || []).forEach(function (msg) {
+    var li = put(host, el('li'));
+    put(li, el('span', 'tagw', 'refused'));
+    put(li, el('span', '', String(msg)));
+  });
+}
+function ack(msg) { show($('ack'), !!msg); setText($('acksay'), msg || ''); }
+
+function preview() {
+  var form = readForm(), errs = validate(form);
+  showErrors(errs); ack('');
+  if (!t(form.target)) { show($('promptwrap'), false); return Promise.resolve(); }
+  $('btn-prev').disabled = true;
+  return jreq('POST', '/api/prompt', body(form)).then(function (r) {
+    $('btn-prev').disabled = false;
+    var server = (Array.isArray(r.errors) ? r.errors : []).map(String);
+    if (!r._ok && !server.length) {
+      showErrors(errs.concat([t(r.error)])); show($('promptwrap'), false); return;
+    }
+    showErrors(errs.concat(server));
+    if (r.ok === false && !t(r.prompt)) {
+      /* Never leave a stale prompt beside a refusal: that is how an operator
+         comes to believe a run will be told something it will not. */
+      show($('promptwrap'), false); return;
+    }
+    show($('promptwrap'), true);
+    setText($('promptpre'), String(r.prompt == null ? '' : r.prompt));
+  });
+}
+function launch() {
+  var form = readForm(), errs = validate(form);
+  showErrors(errs); ack('');
+  if (errs.length) return Promise.resolve();
+  $('btn-go').disabled = true;
+  return jreq('POST', '/api/runs', body(form)).then(function (r) {
+    gate();
+    var server = (Array.isArray(r.errors) ? r.errors : []).map(String);
+    if (!r._ok && !server.length) { showErrors([t(r.error)]); return; }
+    if (r.ok === false || !t(r.run_id)) {
+      showErrors(server.length ? server : ['The server refused the run and gave no reason.']);
+      return;
+    }
+    showErrors(server);
+    ack('Run ' + t(r.run_id) + ' accepted. It is in the run list, and its event tape is open below.');
+    openRun(t(r.run_id));
+    loadRuns();
+  });
+}
+
+/* =============================================================== TABS == */
+function showTab(name) {
+  S.tab = name;
+  ['dash', 'find', 'rep'].forEach(function (n) {
+    var b = $('tab-' + n), p = $('panel-' + n);
+    if (b) b.setAttribute('aria-selected', n === name ? 'true' : 'false');
+    if (p) p.hidden = (n !== name);
+  });
+  if (name === 'find') loadFindings();
+  if (name === 'rep') loadReports();
+}
+
+/* =============================================================== BOOT == */
+function boot() {
+  buildLamps();
+  buildGauge();
+  buildAuthFields();
+
+  ['dash', 'find', 'rep'].forEach(function (n) {
+    $('tab-' + n).addEventListener('click', function () { showTab(n); });
+  });
+  GRADES.forEach(function (k) {
+    $('lg-' + k).addEventListener('click', function () {
+      S.filt.grade = (S.filt.grade === k) ? 'all' : k;
+      syncFilterControls(); drawFindings(); paintStripState();
+      if (S.filt.grade !== 'all') showTab('find');
+    });
+  });
+
+  $('mode-lab').addEventListener('change', function () { setMode('lab'); });
+  $('mode-eng').addEventListener('change', function () { setMode('engagement'); });
+  $('target').addEventListener('input', onTarget);
+  $('extra').addEventListener('input', gate);
+  $('confirm').addEventListener('change', function () {
+    if ($('confirm').checked) S.stale = false;   /* re-confirmed against this target */
+    gate();
+  });
+  $('btn-prev').addEventListener('click', function () { preview(); });
+  $('btn-go').addEventListener('click', function () { launch(); });
+  $('btn-runs').addEventListener('click', function () { loadRuns(); });
+  $('btn-find').addEventListener('click', function () { loadFindings(); });
+  $('btn-rep').addEventListener('click', function () { loadReports(); });
+  $('btn-recclose').addEventListener('click', function () { show($('recorder'), false); });
+  $('btn-readclose').addEventListener('click', function () { show($('reader'), false); });
+  $('f-grade').addEventListener('change', function () {
+    S.filt.grade = $('f-grade').value; drawFindings(); paintStripState();
+  });
+  $('f-sev').addEventListener('change', function () {
+    S.filt.sev = $('f-sev').value; drawFindings();
+  });
+  $('q').addEventListener('input', function () { S.filt.q = $('q').value; drawFindings(); });
+  $('btn-clear').addEventListener('click', function () {
+    S.filt = { grade: 'all', sev: 'all', q: '' };
+    syncFilterControls(); drawFindings(); paintStripState();
+  });
+
+  D.addEventListener('keydown', function (e) {
+    var tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+      if (e.key === 'Escape') e.target.blur();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === '1') showTab('dash');
+    else if (e.key === '2') showTab('find');
+    else if (e.key === '3') showTab('rep');
+    else if (e.key === '/') { e.preventDefault(); showTab('find'); $('q').focus(); }
+    else if (e.key === 'Escape') { show($('recorder'), false); show($('reader'), false); }
+  });
+
+  setMode('lab');
+  paintGauge();
+
+  loadHealth();
+  loadRuns();
+  /* The gauge is the first thing on the page, so the record it reads from is
+     loaded at boot - not when the Findings screen is first opened. */
+  loadFindings();
+  loadReports();
+
+  setInterval(loadRuns, POLL_RUNS);
+  setInterval(loadHealth, POLL_HEALTH);
+  /* Elapsed on a live run is a clock, so it has to tick between polls. */
+  setInterval(function () {
+    if ((S.runs || []).some(isLive)) drawRuns();
+  }, 1000);
+}
+
+if (HEADLESS) {
+  /* The pure surface, for tests. Nothing here touches the DOM or the network. */
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+      GRADES: GRADES, GRADE_MEANING: GRADE_MEANING, STATE_WORDS: STATE_WORDS,
+      SEVS: SEVS, AUTH: AUTH, TOOLS: TOOLS, LIVE: LIVE,
+      validate: validate, body: body, elapsed: elapsed, clock: clock,
+      gradeKey: gradeKey, counts: counts, matches: matches,
+      stateCls: stateCls, isLive: isLive, finishedAt: finishedAt
+    };
+  }
+} else if (D.readyState === 'loading') {
+  D.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+
+})();
+</script>
+</body>
+</html>

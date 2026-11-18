@@ -1,0 +1,495 @@
+"""Static gates over the documents that are injected into a worker's context.
+
+`argus/system.py` already derives what to tell an agent whose grant is
+narrower than the shared playbook (`_grant_block`, and the `NO_LEDGER_BLOCK`
+swap at `build_system`) - its own docstring records that an unconditional
+`next_action()` instruction survived in a prompt no role could obey, which is
+the bug that block exists to prevent.
+
+Skill cards and role prompts are static text injected PAST that filter:
+`load_skill` returns a card verbatim and `RoleCard.prompt()` appends a role
+prompt verbatim, so nothing compares either against the role's tool grant.
+Measured consequence, which is why this file exists: `report-writing.md` told
+the report worker to call `next_action` and to read a `record_finding` result,
+and `CARDS['report'].tools` grants neither - `dispatch` answers
+"tool next_action is not available to role 'report'" and `AgentLoop` filters
+the schema out of the model's tool list entirely, so the worker cannot even
+see it. The same context also carried the system prompt's derived line saying
+those tools belong to another worker, so the two contradicted each other.
+
+These checks are deliberately static. They read the shipped text and the
+shipped code and compare them; they start no agent and send no request.
+"""
+from __future__ import annotations
+
+import inspect
+import re
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from argus import proof
+from argus.team.cards import CARDS
+from argus.tools.registry import TOOL_SCHEMAS
+
+SKILLS = ROOT / "argus" / "skills"
+ROLES = ROOT / "argus" / "team" / "roles"
+
+TOOL_NAMES = {t["name"] for t in TOOL_SCHEMAS}
+
+
+# --------------------------------------------------------------- extraction
+
+def tools_named_in(text: str) -> set[str]:
+    """Registry tools this document tells its reader to call.
+
+    Two spellings, because cards use both: `name(args)` and a bare backticked
+    `name`. `system._tools_named_in` reads only the first - which is why the
+    backticked `next_action` and `record_finding` instructions in
+    report-writing.md were invisible to every existing check. Only names that
+    are real registered tools count; a prose word in backticks is not a
+    promise, a tool name is.
+    """
+    found = set()
+    for m in re.finditer(r"`([a-z_][a-z0-9_]*)`", text):
+        if m.group(1) in TOOL_NAMES:
+            found.add(m.group(1))
+    for m in re.finditer(r"\b([a-z_][a-z0-9_]*)\s*\(", text):
+        if m.group(1) in TOOL_NAMES:
+            found.add(m.group(1))
+    return found
+
+
+def every_role_tool() -> set[str]:
+    out: set[str] = set()
+    for card in CARDS.values():
+        out |= set(card.tools)
+    return out
+
+
+def read(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+# ------------------------------------------- 1. cards name reachable tools
+
+def test_the_extractor_sees_a_backticked_tool_name_too():
+    """Instrument first: a check whose detector misses the shape it is for
+    passes forever on nothing. This repo has four recorded instances of the
+    instrument being the defect, so prove the detector before trusting it.
+    """
+    planted = "call `next_action` and read the `record_finding` result"
+    assert tools_named_in(planted) == {"next_action", "record_finding"}
+    # ...and a prose word in backticks is still not a tool
+    assert tools_named_in("the `missing` checks and the `grade`") == set()
+
+
+def test_every_tool_a_skill_card_names_is_callable_by_some_role():
+    """A card naming a tool no card grants is a step no worker can take.
+
+    Union over the role cards, not over the registry: a registered tool that
+    no role holds is still unreachable from a card read inside a team run.
+    """
+    union = every_role_tool()
+    offgrant = {}
+    for card in sorted(SKILLS.glob("*.md")):
+        extra = sorted(tools_named_in(read(card)) - union)
+        if extra:
+            offgrant[card.name] = extra
+    assert not offgrant, f"named in a card, granted to no role: {offgrant}"
+
+
+def test_report_writing_names_only_tools_the_report_role_holds():
+    """The failing direction of this file.
+
+    `report-writing.md` is the card whose signal row is "Findings recorded;
+    the report is next", so the role that loads it is `report`. Measured
+    before the fix: the card named `next_action`, `record_finding` and
+    `finish_engagement`, none of which `CARDS['report'].tools` contains.
+    """
+    named = tools_named_in(read(SKILLS / "report-writing.md"))
+    denied = sorted(named - set(CARDS["report"].tools))
+    assert not denied, (
+        f"report-writing.md instructs {denied}; dispatch refuses them for "
+        f"role 'report' and loop.py filters their schemas out of the "
+        f"model's tool list")
+    # the card has to be about tools at all - an empty set would pass the
+    # assertion above while teaching nothing
+    assert "read_findings" in named
+
+
+def test_the_subset_check_catches_a_planted_off_grant_tool():
+    """Same instrument, the other direction: a card body that names an
+    exploit-only tool must be flagged against the report grant."""
+    planted = "then call `probe_sqli` and record it with `record_finding`"
+    denied = tools_named_in(planted) - set(CARDS["report"].tools)
+    assert denied == {"probe_sqli", "record_finding"}
+
+
+def test_role_prompt_names_only_tools_that_role_holds():
+    """The same rule for the other static document in a worker's context.
+
+    `system._grant_block` derives this for the shared playbook; a role prompt
+    is appended after it and is checked by nothing.
+    """
+    bad = {}
+    for name, card in sorted(CARDS.items()):
+        path = ROLES / card.prompt_file
+        if not path.exists():
+            continue
+        denied = sorted(tools_named_in(read(path)) - set(card.tools))
+        if denied:
+            bad[card.prompt_file] = denied
+    assert not bad, f"role prompts instruct tools their own card denies: {bad}"
+
+
+# ------------------------------------------------- 2. grade vocabulary
+
+_GRADE_ADJECTIVE = re.compile(
+    r"(?i)\b(?:a|an|the)\s+`?([a-z][a-z-]{2,20})`?\s+grade\b")
+
+# Narrow on purpose: these are the shapes that assert a ceiling held a grade
+# down, which is a claim about the matrix and not a turn of phrase.
+_CAP_CLAIM = re.compile(
+    r"(?i)capped\s+grade|capped\s+at\s+`?[a-z]+`?|ceiling\s+held"
+    r"|\bis\s+capped\b|\bare\s+capped\b")
+
+# Empty, and it emptied the way an exemption should. `ssrf.md` was listed
+# here because it still said the class "is capped at `candidate` here on
+# purpose" while the matrix had no ceiling left - a sentence loaded into the
+# agent's prompt telling it not to collect the one artifact `proven` now
+# needs. The entry carried the note that this list fails the day the claim
+# goes, the claim went, and the list failed. An exemption that cannot
+# outlive its reason is the only kind worth having.
+_CAP_CLAIM_EXEMPT: set[str] = set()
+
+
+def capped_classes() -> set[str]:
+    return {s.vuln_class for s in proof.MATRIX.values() if s.ceiling}
+
+
+def test_a_grade_word_in_a_skill_card_is_a_real_grade():
+    """`proof.GRADES` is the whole vocabulary; prose may not add to it.
+
+    Measured before the fix: report-writing.md:53 taught "A capped grade
+    means the ceiling held it down rather than the evidence falling short".
+    `capped` is not a grade - it is a separate annotation field on `Verdict`,
+    rendered as `capped_by_this_system` - so the one card about not inventing
+    facts invented a grade.
+    """
+    allowed = set(proof.GRADES) | {"proof", "ungraded"}
+    bad = {}
+    for card in sorted(SKILLS.glob("*.md")):
+        invented = sorted(set(_GRADE_ADJECTIVE.findall(read(card))) - allowed)
+        if invented:
+            bad[card.name] = invented
+    assert not bad, (
+        f"cards name grades outside proof.GRADES {proof.GRADES}: {bad}")
+
+
+def test_the_grade_word_check_catches_a_planted_invented_grade():
+    assert _GRADE_ADJECTIVE.findall(
+        "Never round up. A capped grade means the ceiling held it down") \
+        == ["capped"]
+    assert "capped" not in proof.GRADES
+
+
+def test_no_skill_card_claims_a_cap_the_matrix_does_not_apply():
+    """A cap is a fact about `ProofSpec.ceiling`, not a way to excuse a
+    shortfall. With no class capped, a card that blames a ceiling sends the
+    reader to write "capped by this system" over a `candidate` whose real
+    unmet check is printed in the report beside it.
+    """
+    capped = capped_classes()
+    claims = {}
+    for card in sorted(SKILLS.glob("*.md")):
+        if card.name in _CAP_CLAIM_EXEMPT:
+            continue
+        hits = _CAP_CLAIM.findall(read(card))
+        if hits:
+            claims[card.name] = hits
+    if not capped:
+        assert not claims, (
+            f"no class in the matrix has a ceiling, but {claims} claim one")
+    else:
+        # a real cap must name the classes it applies to
+        for name in claims:
+            text = read(SKILLS / name)
+            assert any(f"`{k}`" in text for k in capped), name
+
+
+def test_every_cap_exemption_is_still_needed():
+    """The exemption list says what it is for, or it says nothing.
+
+    Pattern borrowed from selftest's "every tool-name exemption is still
+    needed": an exemption nothing needs is an invitation to add rather than
+    to check.
+    """
+    stale = sorted(n for n in _CAP_CLAIM_EXEMPT
+                   if not (SKILLS / n).exists()
+                   or not _CAP_CLAIM.search(read(SKILLS / n)))
+    assert not stale, (
+        f"{stale} are exempted from the cap check and no longer claim a cap "
+        f"- delete the exemption")
+
+
+# ------------------------------------- 3. INDEX counts what is on disk
+
+_NUMBER_WORD = {"no": 0, "none": 0, "one": 1, "two": 2, "three": 3,
+                "four": 4, "five": 5, "six": 6, "seven": 7, "eight": 8,
+                "nine": 9, "ten": 10}
+
+# `\s+` between every word, not a literal space: the sentence is wrapped in
+# the shipped file, and a regex that only matched the unwrapped form failed on
+# `assert m` instead of on the count - a failing direction for the wrong
+# reason, which is the same defect as a check that cannot fail.
+_METHODOLOGY_ONLY = re.compile(
+    r"(?i)\b([A-Za-z]+)\s+modules?\s+(?:are|is)\s+methodology\s+only\s+and"
+    r"\s+carr(?:y|ies)\s+no\s+requirement:"
+    r"((?:\s*`[a-z0-9_-]+`\s*,?\s*(?:and\s*)?)+)")
+
+
+def methodology_only_modules() -> set[str]:
+    """Modules with no proof requirement, derived from the matrix."""
+    return {p.stem for p in SKILLS.glob("*.md")
+            if p.name != "INDEX.md" and proof.spec_for(p.stem) is None}
+
+
+def test_index_counts_and_names_the_methodology_only_modules():
+    """`load_skill('index')` returns this text verbatim beside the module
+    listing, so a sentence the listing contradicts is read as fact.
+
+    Measured before the fix: INDEX.md said "Three modules are methodology
+    only ... `auth-enum`, `auth-session`, `triage`" while
+    `proof.spec_for('report-writing')` is None, making four. The numeric
+    count gate in selftest cannot see it - its regex wants a digit and this
+    count is spelled as a word.
+    """
+    text = read(SKILLS / "INDEX.md")
+    m = _METHODOLOGY_ONLY.search(text)
+    assert m, ("INDEX.md no longer states which modules carry no proof "
+               "requirement - a deleted sentence must not read as agreement")
+    word, names = m.group(1).lower(), set(re.findall(r"`([a-z0-9_-]+)`",
+                                                     m.group(2)))
+    expected = methodology_only_modules()
+    assert word in _NUMBER_WORD, f"{word!r} is not a number word"
+    assert _NUMBER_WORD[word] == len(expected), (
+        f"INDEX.md says {word} ({_NUMBER_WORD[word]}), the matrix leaves "
+        f"{len(expected)} modules without a requirement: {sorted(expected)}")
+    assert names == expected, (
+        f"INDEX.md names {sorted(names)}, the matrix leaves "
+        f"{sorted(expected)} without a requirement")
+
+
+def test_every_module_in_the_signal_table_exists_on_disk():
+    """A signal row pointing at no file is an invented module."""
+    text = read(SKILLS / "INDEX.md")
+    rows = re.findall(r"^\|.*\|\s*`([a-z0-9_-]+)`\s*\|\s*$", text, re.M)
+    assert rows, "the signal table no longer parses"
+    missing = sorted(r for r in rows
+                     if not (SKILLS / f"{r}.md").exists()
+                     and proof.spec_for(r) is None)
+    assert not missing, f"INDEX.md points at {missing}, which do not exist"
+
+
+# ------------------------------------- 4. read_findings is described once
+
+# field word in a prompt -> the finding key it promises the reader
+_FIELD_WORDS = {
+    "id": "id", "ids": "id", "title": "title", "titles": "title",
+    "severity": "severity", "category": "category", "categories": "category",
+    "url": "url", "urls": "url",
+    "excerpt": "evidence_excerpt", "excerpts": "evidence_excerpt",
+    "evidence": "evidence_ids",
+    "grade": "grade", "grades": "grade",
+    "description": "description", "remediation": "remediation",
+    "cvss": "cvss",
+}
+
+
+def slim_finding_keys() -> set[str]:
+    """What `read_findings` actually returns per row - measured by calling it
+    with a finding that carries every field, not by reading its docstring.
+
+    `read_findings` reads `ctx.session.findings` and nothing else, so a stub
+    session is the whole dependency and this stays an offline check.
+    """
+    from types import SimpleNamespace
+
+    from argus.tools.team import read_findings
+
+    full = {
+        "id": "F01", "title": "t", "severity": "high",
+        "category": "sqli", "url": "http://127.0.0.1/x",
+        "evidence_excerpt": "bytes", "evidence_ids": ["R1"],
+        "grade": "candidate", "description": "d", "remediation": "r",
+        "cvss": "7.5",
+    }
+    ctx = SimpleNamespace(session=SimpleNamespace(findings=[full]))
+    rows = read_findings(ctx)["findings"]
+    assert rows, "read_findings returned nothing for a session with a finding"
+    # the premise of the test below: the slim view really does drop fields
+    assert set(rows[0]) < set(full), "read_findings is no longer a slim view"
+    return set(rows[0])
+
+
+def bullet_for(text: str, tool: str) -> str:
+    """The prompt bullet that describes one tool, continuation lines included."""
+    out, grabbing = [], False
+    for line in text.splitlines():
+        if re.match(rf"^\s*[-*]\s*`{re.escape(tool)}`", line):
+            grabbing, out = True, [line]
+            continue
+        if grabbing:
+            if not line.strip() or re.match(r"^\s*[-*]\s", line):
+                break
+            out.append(line)
+    return "\n".join(out)
+
+
+def test_the_report_role_prompt_promises_only_fields_read_findings_returns():
+    """Two documents land in one report worker's context and described the
+    same tool in opposite ways.
+
+    Measured before the fix: roles/report.md:6 promised "every recorded
+    finding with severity, category, URL, evidence ids and excerpts", while
+    `argus/tools/team.py:read_findings` returns only id, title, severity,
+    category and url. A worker that believed the prompt either wrote
+    excerpt-backed prose from fields it never received, or spent turns
+    hunting a tool that returns them - and no tool its role holds does.
+
+    Only the role prompt's bullet is parsed, not the card's prose: the card
+    names `excerpts` in order to say they are NOT in the slim view, which a
+    word-level check would read backwards.
+    """
+    returned = slim_finding_keys()
+    bullet = bullet_for(read(ROLES / "report.md"), "read_findings")
+    assert bullet, "roles/report.md no longer describes read_findings"
+    promised = {_FIELD_WORDS[w] for w in re.findall(r"[a-z]+", bullet.lower())
+                if w in _FIELD_WORDS}
+    overpromised = sorted(promised - returned)
+    assert not overpromised, (
+        f"roles/report.md promises {overpromised} from read_findings; it "
+        f"returns {sorted(returned)}")
+
+
+def test_the_field_promise_check_catches_the_shape_it_is_for():
+    returned = slim_finding_keys()
+    planted = ("- `read_findings` - every recorded finding with severity,\n"
+               "  category, URL, evidence ids and excerpts.\n")
+    bullet = bullet_for(planted, "read_findings")
+    promised = {_FIELD_WORDS[w] for w in re.findall(r"[a-z]+", bullet.lower())
+                if w in _FIELD_WORDS}
+    assert sorted(promised - returned) == ["evidence_excerpt", "evidence_ids"]
+
+
+# ------------------------------------- 5. the worker is routed to the card
+
+def test_the_report_role_prompt_routes_the_worker_to_its_card():
+    """A card nothing points at is a document the worker never reads.
+
+    The only reference to `report-writing` in the tree was INDEX.md's signal
+    row, which costs a `load_skill('index')` turn to see; the role's turn cap
+    is 15, so the document most likely to be read was the role prompt alone.
+    """
+    text = read(ROLES / "report.md")
+    assert "report-writing" in text, (
+        "roles/report.md never names its own methodology card")
+    assert "load_skill" in text, (
+        "naming the card without naming the call that loads it is not a route")
+    assert (SKILLS / "report-writing.md").exists()
+    assert "load_skill" in CARDS["report"].tools
+
+
+# --------------------------- 6. where a worker's finish summary really goes
+
+def test_the_card_states_the_summary_route_the_code_implements():
+    """The card claimed `finish` "is where the summary is written".
+
+    True in solo mode (`AgentLoop.run` renders with `ctx.finish_summary`),
+    false for a report worker: the coordinator builds every worker with
+    `report=False` and renders the Executive summary from the LEAD's result
+    only, so a worker's `finish` text reaches the artifact just inside the
+    collapsed working-notes appendix.
+
+    The premise is asserted from the source, so if the coordinator is ever
+    changed to read the report worker's summary this test says to update the
+    card rather than silently going green on stale prose.
+    """
+    from argus.team.coordinator import TeamRun
+    worker_src = inspect.getsource(TeamRun._start_worker)
+    run_src = inspect.getsource(TeamRun.run)
+    assert "report=False" in worker_src, (
+        "premise changed: workers now render their own report")
+    assert 'self._results.get("lead"' in run_src, (
+        "premise changed: the Executive summary no longer comes from the "
+        "lead's result alone")
+
+    card = read(SKILLS / "report-writing.md")
+    assert "`finish`, which is where the summary is written" not in card, (
+        "the card still tells a report worker that finish publishes its "
+        "summary; in team mode only the lead's does")
+    # and it has to name the route that does reach the lead
+    assert tools_named_in(card) & {"note", "post_board_note"}, (
+        "the card must name a route a report worker actually holds for "
+        "getting its narrative to the lead")
+
+
+# ----------------------- 7. a named module is a module that exists
+
+_SKILL_REF = re.compile(
+    r"""load_skill\(\s*["']([a-z0-9_<>-]+)["']\s*\)"""
+    r"""|load_skill`?\s+(?:for\s+)?(?:the\s+)?`([a-z0-9_-]+)`""")
+
+
+def skill_names_in(text: str) -> set[str]:
+    """Modules a document tells its reader to load, either spelling."""
+    out = set()
+    for a, b in _SKILL_REF.findall(text):
+        name = a or b
+        if name and "<" not in name:
+            out.add(name)
+    return out
+
+
+def test_every_module_a_context_document_names_exists_on_disk():
+    """selftest's proof-class gate reads every `load_skill("x")` literal as a
+    claim that x is a proof-matrix class, so it fails on a TRUE statement
+    about one of the four methodology-only modules (`triage`, `auth-enum`,
+    `auth-session`, `report-writing` - all on disk, all with
+    `proof.spec_for(...) is None`). That over-reach is in a file this module
+    does not own; this is the check it should be, over the documents that are
+    injected into a worker's context: a named module must exist, whether or
+    not it carries a requirement.
+    """
+    checked = 0
+    missing = {}
+    for doc in sorted(SKILLS.glob("*.md")) + sorted(ROLES.glob("*.md")):
+        for name in skill_names_in(read(doc)):
+            checked += 1
+            if not (SKILLS / f"{name}.md").exists() \
+                    and proof.spec_for(name) is None:
+                missing.setdefault(doc.name, set()).add(name)
+    assert checked, "no document names a module to load - the check is empty"
+    assert not missing, f"documents point at modules that do not exist: {missing}"
+
+
+def test_the_module_reference_check_reads_both_spellings():
+    assert skill_names_in('call load_skill("sqli") first') == {"sqli"}
+    assert skill_names_in("call load_skill('index') first") == {"index"}
+    assert skill_names_in(
+        "Your first call is `load_skill` for the `report-writing` module") \
+        == {"report-writing"}
+    # a placeholder is not a module name
+    assert skill_names_in('`load_skill("<name>")`') == set()
+    # and the failing direction
+    assert skill_names_in('load_skill("no-such-module")') \
+        == {"no-such-module"}
+    assert not (SKILLS / "no-such-module.md").exists()
+
+if __name__ == "__main__":                              # pragma: no cover
+    raise SystemExit(pytest.main([__file__, "-q"]))

@@ -24,6 +24,11 @@ include = ["argus*"]
 
 [tool.setuptools.package-data]
 argus = ["models.json",
+         # The console is a data file, not a module: an install without it
+         # serves a blank page from a working server, which is the worst
+         # shape of missing - the operator sees a reachable port and a dead
+         # UI with nothing saying why.
+         "web/*.html",
          "skills/*.md", "team/roles/*.md",
          "resources/wordlists/*.txt",
          "resources/exploits/*/manifest.json",

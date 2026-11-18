@@ -84,7 +84,7 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 46 of the 56 tools served over
+- `user -> LLM -> MCP -> tool`: 47 of the 57 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
@@ -1707,7 +1707,7 @@ somebody reading only the list.
 - Three checks, each proved to fail on its own. Dropping the grant block:
   *"recon is instructed to call record_finding and cannot, with no
   statement in the prompt that it cannot"*. Rendering the disclaimer in
-  single-agent mode, where all 56 tools are granted and nothing is
+  single-agent mode, where every tool is granted and nothing is
   withheld: `'YOUR TOOLS.' not in ...` fails. Taking the ledger back off
   the lead: the grant assertion names the frozenset it is missing from.
 
@@ -3440,7 +3440,7 @@ honestly listed `jwt_forge: 5`.
   argument. Both bundled PoCs now refuse to follow a redirect and name the
   host they would not follow; a PoC that needs a second hop has to be
   given that host, so the guard sees it.
-- **An empty tool grant permitted all 56 tools.** `AgentLoop.__init__`
+- **An empty tool grant permitted every tool.** `AgentLoop.__init__`
   built it as `frozenset(allowed) if allowed else None` and `dispatch`
   reads `None` as "no restriction", so a card granting nothing advertised
   zero schemas and refused nothing. `mcpserver.py` already spells the same
@@ -4837,21 +4837,139 @@ Three scenarios pinned: refused everywhere (every endpoint an untested
 gap, marked), absent everywhere (404 is an answer, settled), and a refusal
 among answers (not blanket-blocked, so the 403 is the control working).
 
-766 tests, selftest 160/160.
+1019 tests, selftest 161/161.
+
+### The hybrid fan-out was 1500 lines nothing could reach
+
+`argus/orchestrator.py` runs several scanners at once and merges what they
+found. It was written, tested to 67 cases, reviewed, and imported by nothing:
+a repo-wide grep found it named only in its own test file. No tool entry, no
+CLI path, no registry row. Everything it claimed was exercised only by tests.
+
+`argus/tools/sweep.py` puts it on the table as
+`recon_sweep(url, tools, wordlist)`, and the design question it had to answer
+was where the AGENT half goes. The
+orchestrator takes an injected `agent_fn` so its second pass can ask a model
+for more paths; in an engagement the model IS the caller, so wiring that back
+in would re-enter the agent loop from inside a tool call. So the hybrid is
+realised one level up and it is the same hybrid: `recon_sweep(url)` returns
+what the scanners found, the model reads the shapes and writes candidates,
+and `recon_sweep(url, wordlist=...)` runs them. The generating half happens in the
+model's own turn, where its reasoning is in the transcript rather than buried
+in a subprocess. The reply says so rather than reporting an agent half that
+did not run.
+
+Every invocation is recorded as its own exchange, so a finding can cite the
+sweep that found its endpoint and `read_response` reaches the raw output.
+
+A MODEL-WRITTEN WORDLIST IS TARGET-INFLUENCED INPUT. It is derived from bytes
+the target chose, so it is filtered like any other: 400 words, 120 characters
+each, no control characters, and nothing beginning with `-`, because ffuf
+reads a value starting with a dash as the next option and a word like `-oOUT`
+turns a scan into a file write. What is dropped is reported, because a caller
+that sent 300 words and got 40 will keep sending them otherwise.
+
+AND THE DEFECT DRIVING IT FOUND. An out-of-scope target returned
+`endpoint_count: 0` under the sentence "no endpoint came back - either
+nothing is there, or the wordlist did not name it". The orchestrator had
+refused correctly and spawned nothing; the refusal was sitting in each run's
+`skipped` field, under a summary that contradicted it. A model reading that
+widens its wordlist and retries forever instead of learning its target is out
+of scope. A refusal is a decision and has to be the headline. Measured both
+ways: restoring the single-branch version fails two tests.
+
+IT WAS CALLED `sweep` FOR AN HOUR. The grant check caught it: `recon.md`
+says "`probe_disclosure` for the sensitive-artifact sweep", and a tool named
+after a common English word makes every prose use of that word read as a
+tool reference. Third time this package has hit the shape: a doc-gate regex
+reading a two-letter fragment of Vietnamese prose as a subcommand, and a
+helper whose name began with the prefix of an existing tool family being
+read as a tool - and the fix is the same each time: name the thing so it cannot be
+confused with the language around it. `recon_sweep` also says what it
+sweeps, and matches the orchestrator function it wraps.
+
+A TOOL NO CARD GRANTS IS AS UNREACHABLE AS ONE NOTHING IMPORTS. The registry
+entry alone left it uncallable in team mode; `test_every_registered_tool_is_
+granted_to_some_role` said so immediately. Granted to recon, which is whose
+job it is, and `recon.md` now teaches the two-pass shape rather than just
+listing the name - a role that holds a tool and is not told what it is for
+holds it the way the registry held the orchestrator.
+
+### A skill card taught a cap the matrix had dropped
+
+`argus/skills/ssrf.md` still read "the class is capped at `candidate` here on
+purpose - proving it needs an out-of-band collector, and none ships with this
+package" two days after the ceiling came off and `argus/collector.py` became
+that collector. These cards are loaded into the model's prompt at runtime, so
+this is not a stale document - it is an instruction. An agent loading it
+before probing was told the class tops out at candidate by design and had no
+reason to collect the one artifact `proven` now requires.
+
+A selftest check now asserts that no module teaches a cap the matrix does not
+impose, over the 24 class modules. Planted back, it fails; removed, it
+passes. The scan found exactly one card wrong, which is the number that
+matters: the check was written because one had already drifted, and it had.
+
+1019 tests, selftest 161/161.
+
+### An oracle argus cannot write
+
+Every number this package produces about itself is this package marking its
+own work. The proof gate makes that marking honest; it cannot make it
+independent, because `proven` means the evidence met a requirement argus
+wrote.
+
+Some deliberately vulnerable applications keep their own score. OWASP Juice
+Shop serves `GET /api/Challenges` - 118 challenges, each with a `solved`
+flag the application sets from its own view of its own state. Nothing in
+argus can write that flag. `argus/groundtruth.py` reads it before and after
+a run and reports what the target confirmed beside what argus claimed.
+
+IT IS DELIBERATELY NOT A TOOL. An agent that can read the scoreboard can
+read the answers, and the measurement would then be of a system that was
+told what to find - a different and much weaker claim. A test asserts the
+module appears nowhere in `tools/registry.py`.
+
+IT DOES NOT REDUCE TO A SCORE. Juice Shop's categories ("Injection", "XSS")
+and this package's proof classes (`sqli`, `rce`, `xss`) are different
+vocabularies with no exact mapping, so the correlation is labelled
+approximate and the per-challenge keys are kept beside the counts. A solve
+argus claimed nothing for is reported separately rather than folded in:
+either the run tripped it blind or the mapping is too narrow, and both want
+a human instead of a number that splits the difference.
+
+THE READ IS DIFFERENTIAL, like everything else here that works. The
+scoreboard is cumulative, so a target someone exercised yesterday would
+otherwise credit this run with work it did not do.
+
+AND IT WALKED INTO A DEFECT THIS REPO ALREADY HAD WRITTEN DOWN. The first
+read raised "Unterminated string at char 11978": `GuardedClient.send` hands
+back `body[:12000]` to bound what reaches a model while recording
+`body[:200000]`, and the scoreboard is 69KB. `probes.recorded_body` exists
+with a docstring about exactly this, and a new module reached for the
+returned value anyway. The failure was loud this time; the case that is not
+is a cut landing on a record boundary, which parses cleanly and yields a
+SHORT list - a measurement module reporting a wrong total with no error
+anywhere. It reads the recorded body now, and refuses outright if even that
+was truncated, because a count taken from a cut list is not a count.
+
+Measured against the live target: 118 challenges read in full, 1 solved
+before the run, 0 newly solved, nothing credited.
 
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 766 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1019 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
-  external-tool subprocess path + hardening regressions). Every hardened fix
-  carries a regression test: UA-redaction, malformed JWT/manifest/MCP
+  external-tool subprocess path + hardening regressions + the web console +
+  the orchestrator + prompt assembly + skill-card grants). Every hardened
+  fix carries a regression test: UA-redaction, malformed JWT/manifest/MCP
   entries, atomic-write litter, non-JSON tool results, worker-crash
   isolation.
-- `python selftest.py`: 160 offline checks, including a documentation
+- `python selftest.py`: 161 offline checks, including a documentation
   consistency pass — every tool, subcommand, proof class and **stated count**
   in the docs is verified against the code, and a count the docs stop stating
   fails rather than passing on nothing. It caught a stale tool-schema count
