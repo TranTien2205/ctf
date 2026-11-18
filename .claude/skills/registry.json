@@ -1763,8 +1763,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 1049,
-      "depth_files": 2,
-      "depth_tokens": 3954,
+      "depth_files": 41,
+      "depth_tokens": 117133,
       "use_when": [
         "a probe or source read produced this class's signal: one introspection query; if it is disabled, one field-suggestion error to recover names"
       ],

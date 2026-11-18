@@ -1,0 +1,530 @@
+# Wordlists — the seed names for field discovery
+
+The name pools for `graphql_probe map --seed`, the suggestion-oracle probes,
+and admin-field guessing. Ordered by CTF hit-rate.
+
+---
+
+## 1. Flag/secret names — the prize fields
+
+```text
+flag flags getFlag flagValue flagContent flagData flag_field
+secret secrets getSecret secretValue secretKey secretKeyData
+super_secret_flag superSecretFlag super_secret_flag_dispenser
+superSecretFlagDispenser superSecretFlagDispenserAuthorized
+superSecretFlagDispenserAuth superSecretFlagDispenserToken
+hidden_flag hiddenFlag private_flag privateFlag internal_flag
+internalFlag admin_flag adminFlag backdoor_flag backdoorFlag
+debug_flag debugFlag config_flag configFlag env_flag envFlag
+theFlag the_flag realFlag real_flag trueFlag true_flag
+actualFlag actual_flag flagValue flagContent flagText flagString
+flagResult flagResponse flagOutput flagReturn flagData flagData
+flag_field flagField flag_field_value flagFieldValue flagVal
+flagVal flag_value flag_data flagData flag_text flagText
+flag_str flagStr flag_string flagString flag_flag flagFlag
+flag_flag_value flagFlagValue flag_flag_value flagFlagValue
+ctf_flag ctfFlag ctf_flag_value ctfFlagValue ctf{...}
+```
+
+## 2. Admin/internal names — the gated surface
+
+```text
+admin admins administrator administrators superuser superusers
+root rootUser rootUsers system systemInfo systemStatus systemHealth
+internal internals internalApi internalApiKey internalConfig
+internalService internalEndpoint internalRoute internalRouteList
+debug debugInfo debugEnv debugVars debugConfig debugSecrets
+debugFlag debugMode debugLevel debugTrace debugStack debugDump
+debugLog debugLogs debugEntry debugEvent debugEvents debugAudit
+private privates privateData privateDataList privateSecret
+privateSecrets privateConfig privateFlag privateNote privateNotes
+hidden hiddens hiddenData hiddenSecret hiddenFlag hiddenField
+hiddenType hiddenField hiddenValue hiddenConfig hiddenSetting
+backdoor backdoors backdoorFlag backdoorSecret backdoorConfig
+backdoorAccess backdoorAccessToken backdoorToken backdoorKey
+config configs configuration configurations configValue
+configValues configData configDataList configSecret configSecrets
+env envs envVar envVars envValue envValues envList envListData
+envSecret envSecrets envConfig envConfigs envVar envVarList
+var vars variable variables varValue varValues varList varListData
+varSecret varSecrets varConfig varConfigs varVar varVarList
+setting settings settingValue settingValues settingList
+settingSecret settingSecrets settingConfig settingConfigs
+settingVar settingVars settingParam settingParams settingProp
+settingProps settingKey settingKeys settingData settingDataList
+property properties propertyValue propertyValues propertyList
+propertySecret propertySecrets propertyConfig propertyConfigs
+param params parameter parameters paramValue paramValues
+paramList paramSecret paramSecrets paramConfig paramConfigs
+key keys apiKey apiKeys apikey apikeys keyValue keyValues
+keyList keySecret keySecrets keyConfig keyConfigs keyKey
+keyKeys keyData keyDataList keyParam keyParams keyProp
+keyProps keySetting keySettings keyProperty keyProperties
+credential credentials cred creds credentialValue credentialValues
+credentialList credentialSecret credentialSecrets credentialConfig
+credentialConfigs credentialKey credentialKeys credentialData
+credentialDataList credentialParam credentialParams
+token tokens accessToken accessTokens tokenValue tokenValues
+tokenList tokenSecret tokenSecrets tokenConfig tokenConfigs
+tokenKey tokenKeys tokenData tokenDataList tokenParam tokenParams
+jwt jwts jwtToken jwtTokens jwtValue jwtValues jwtSecret
+jwtSecrets jwtConfig jwtConfigs jwtKey jwtKeys jwtData
+session sessions sessionId sessionIds sessionToken sessionTokens
+sessionValue sessionValues sessionList sessionSecret
+sessionSecrets sessionConfig sessionConfigs sessionKey
+sessionKeys sessionData sessionDataList sessionParam sessionParams
+apiKey apiKeys apikey apikeys apiKeyValue apiKeyValues
+apiKeyList apiKeySecret apiKeySecrets apiKeyConfig apiKeyConfigs
+apiKeyKey apiKeyKeys apiKeyData apiKeyDataList apiKeyParam
+apiKeyParams apiKeyProp apiKeyProps apiKeySetting apiKeySettings
+apiKeyProperty apiKeyProperties
+```
+
+## 3. Object/read names — the IDOR surface
+
+```text
+user users me account accounts profile profiles userProfile
+userProfiles myProfile myProfiles currentUser currentUsers
+authenticatedUser authenticatedUsers viewer viewers identity
+identities principal principals credential credentials auth
+auths authentication authentications session sessions
+login logins logout logouts signin signins signup signups
+register registers registration registrations member members
+customer customers client clients tenant tenants org orgs
+organization organizations team teams group groups role
+roles permission permissions perm perms privilege privileges
+scope scopes acl acls access accesses allow allows deny
+denies grant grants revoke revokes verify verifies confirm
+confirms approve approves activate activates deactivate
+deactivates enable enables disable disables lock locks
+unlock unlocks ban bans unban unbans suspend suspends
+unsuspend unsuspends promote promotes demote demotes
+elevate elevates depress depresses upgrade upgrades
+downgrade downgrades invite invites share shares
+collaborate collaborates collaborator collaborators
+owner owners ownerId ownerIds creator creators createdBy
+createdBys modifier modifiers modifiedBy modifiedBys
+assignee assignees assigned assignedTo assignedTos
+post posts article articles blog blogs page pages content
+contents comment comments note notes memo memos doc docs
+document documents file files attachment attachments media
+medias asset assets resource resources object objects item
+items entry entries record records row rows result results
+data datas datum datums entity entities node nodes
+element elements member members user users account accounts
+order orders purchase purchases cart carts checkout checkouts
+payment payments invoice invoices bill bills transaction
+transactions transfer transfers deposit deposits withdrawal
+withdrawals balance balances wallet wallets fund funds
+credit credits debit debits loan loans mortgage mortgages
+investment investments portfolio portfolios stock stocks
+share shares bond bonds equity equities fund funds etf
+etfs index indices crypto cryptos coin coins token tokens
+nft nfts collectible collectibles card cards bank banks
+account accounts routing routings swift swifts iban ibans
+branch branches branchId branchIds branchId branchIds
+message messages chat chats conversation conversations
+channel channels room rooms thread threads dm dms
+notification notifications alert alerts event events
+log logs audit audits auditLog auditLogs auditEntry
+auditEntries history histories historyEntry historyEntries
+activity activities activityLog activityLogs activityEntry
+activityEntries feed feeds feedItem feedItems feedEntry
+feedEntries news newses newsItem newsItems newsEntry
+newsEntries update updates updateLog updateLogs updateEntry
+updateEntries change changes changeLog changeLogs
+changeEntry changeEntries auditTrail auditTrails trail
+trails footprint footprints breadcrumb breadcrumbs
+tracking trackings tracker trackers metric metrics
+stat stats statistic statistics analytics analytic
+report reports reporting reportings summary summaries
+summaryReport summaryReports digest digests digestReport
+digestReports insight insights insightReport insightReports
+dashboard dashboards dashboardItem dashboardItems
+dashboardEntry dashboardEntries widget widgets widgetItem
+widgetItems widgetEntry widgetEntries
+```
+
+## 4. Mutation names — the write surface
+
+```text
+create creates add adds insert inserts new news make makes
+build builds construct constructs generate generates produce
+produces emit emits emitEvent emitEvents emitSignal
+emitSignals publish publishes publishEvent publishEvents
+publishSignal publishSignals dispatch dispatches dispatchEvent
+dispatchEvents dispatchSignal dispatchSignals send sends
+sendMessage sendMessages sendNotification sendNotifications
+sendAlert sendAlerts sendEmail sendEmails sendSms sendSmses
+sendPush sendPushes sendWebhook sendWebhooks sendEvent
+sendEvents update updates modify modifies edit edits
+change changes alter alters set sets patch patches put
+puts delete deletes remove removes destroy destroys drop
+drops truncate truncates purge purges clean cleans wipe
+wipes erase erases obliterate obliterates annihilate
+annihilates nullify nullifies reset resets restart
+restarts reboot reboots reload reloads refresh refreshes
+reinit reinits reinitialize reinitializes reinitialise
+reinitialises renew renews regenerate regenerates
+rebuild rebuilds reconstruct reconstructs remanufacture
+remanufactures reprocess reprocesses reperform reperforms
+redo redoes redoOperation redoOperations undo undoes
+undoOperation undoOperations revert reverts revertOperation
+revertOperations rollback rollbacks rollbackOperation
+rollbackOperations restore restores restoreOperation
+restoreOperations recover recovers recoverOperation
+recoverOperations retrieve retrieves retrieveOperation
+retrieveOperations fetch fetches fetchOperation
+fetchOperations get gets getOperation getOperations
+read reads readOperation readOperations query queries
+queryOperation queryOperations search searches
+searchOperation searchOperations find finds findOperation
+findOperations lookup lookups lookupOperation
+lookupOperations scan scans scanOperation scanOperations
+filter filters filterOperation filterOperations sort
+sorts sortOperation sortOperations order orders
+orderOperation orderOperations arrange arranges
+arrangeOperation arrangeOperations organize organizes
+organizeOperation organizeOperations group groups
+groupOperation groupOperations aggregate aggregates
+aggregateOperation aggregateOperations compute computes
+computeOperation computeOperations calculate calculates
+calculateOperation calculateOperations process processes
+processOperation processOperations execute executes
+executeOperation executeOperations run runs runOperation
+runOperations invoke invokes invokeOperation
+invokeOperations call calls callOperation callOperations
+perform performs performOperation performOperations
+do does doOperation doOperations action actions
+actionOperation actionOperations operate operates
+operateOperation operateOperations handle handles
+handleOperation handleOperations manage manages
+manageOperation manageOperations control controls
+controlOperation controlOperations administer administers
+administerOperation administerOperations admin admins
+adminOperation adminOperations adminTask adminTasks
+adminJob adminJobs adminWork adminWorks adminAction
+adminActions adminOperation adminOperations adminCommand
+adminCommands adminDirective adminDirectives
+system systems systemTask systemTasks systemJob systemJobs
+systemWork systemWorks systemAction systemActions
+systemOperation systemOperations systemCommand
+systemCommands systemDirective systemDirectives
+internal internals internalTask internalTasks
+internalJob internalJobs internalWork internalWorks
+internalAction internalActions internalOperation
+internalOperations internalCommand internalCommands
+internalDirective internalDirectives debug debugs
+debugTask debugTasks debugJob debugJobs debugWork
+debugWorks debugAction debugActions debugOperation
+debugOperations debugCommand debugCommands debugDirective
+debugDirectives test tests testTask testTasks testJob
+testJobs testWork testWorks testAction testActions
+testOperation testOperations testCommand testCommands
+testDirective testDirectives verify verifies
+verifyOperation verifyOperations confirm confirms
+confirmOperation confirmOperations approve approves
+approveOperation approveOperations activate activates
+activateOperation activateOperations deactivate
+deactivates deactivateOperation deactivateOperations
+enable enables enableOperation enableOperations disable
+disables disableOperation disableOperations lock locks
+lockOperation lockOperations unlock unlocks
+unlockOperation unlockOperations ban bans banOperation
+banOperations unban unbans unbanOperation
+unbanOperations suspend suspends suspendOperation
+suspendOperations unsuspend unsuspends unsuspendOperation
+unsuspendOperations promote promotes promoteOperation
+promoteOperations demote demotes demoteOperation
+demoteOperations elevate elevates elevateOperation
+elevateOperations grant grants grantOperation
+grantOperations revoke revokes revokeOperation
+revokeOperations allow allows allowOperation
+allowOperations deny denies denyOperation denyOperations
+permit permits permitOperation permitOperations forbid
+forbids forbidOperation forbidOperations authorize
+authorizes authorizeOperation authorizeOperations
+authenticate authenticates authenticateOperation
+authenticateOperations login logins loginOperation
+loginOperations logout logouts logoutOperation
+logoutOperations signin signins signinOperation
+signinOperations signup signups signupOperation
+signupOperations register registers registerOperation
+registerOperations enroll enrolls enrollOperation
+enrollOperations subscribe subscribes subscribeOperation
+subscribeOperations unsubscribe unsubscribes
+unsubscribeOperation unsubscribeOperations follow
+follows followOperation followOperations unfollow
+unfollows unfollowOperation unfollowOperations like
+likes likeOperation likeOperations unlike unlikes
+unlikeOperation unlikeOperations favorite favorites
+favoriteOperation favoriteOperations unfavorite
+unfavorites unfavoriteOperation unfavoriteOperations
+bookmark bookmarks bookmarkOperation bookmarkOperations
+unbookmark unbookmarks unbookmarkOperation
+unbookmarkOperations star stars starOperation
+starOperations unstar unstars unstarOperation
+unstarOperations flag flags flagOperation
+flagOperations unflag unflags unflagOperation
+unflagOperations mark marks markOperation
+markOperations unmark unmarks unmarkOperation
+unmarkOperations tag tags tagOperation tagOperations
+untag untags untagOperation untagOperations label
+labels labelOperation labelOperations unlabel unlabels
+unlabelOperation unlabelOperations categorize categorizes
+categorizeOperation categorizeOperations uncategorize
+uncategorizes uncategorizeOperation uncategorizeOperations
+classify classifies classifyOperation classifyOperations
+unclassify unclassifies unclassifyOperation
+unclassifyOperations archive archives archiveOperation
+archiveOperations unarchive unarchives unarchiveOperation
+unarchiveOperations restore restores restoreOperation
+restoreOperations recover recovers recoverOperation
+recoverOperations import imports importOperation
+importOperations export exports exportOperation
+exportOperations backup backups backupOperation
+backupOperations restore restores restoreOperation
+restoreOperations sync syncs syncOperation
+syncOperations synchronize synchronizes
+synchronizeOperation synchronizeOperations migrate
+migrates migrateOperation migrateOperations transfer
+transfers transferOperation transferOperations move
+moves moveOperation moveOperations copy copies
+copyOperation copyOperations clone clones
+cloneOperation cloneOperations duplicate duplicates
+duplicateOperation duplicateOperations replicate
+replicates replicateOperation replicateOperations
+mirror mirrors mirrorOperation mirrorOperations
+backup backups backupOperation backupOperations
+snapshot snapshots snapshotOperation snapshotOperations
+checkpoint checkpoints checkpointOperation
+checkpointOperations commit commits commitOperation
+commitOperations rollback rollbacks rollbackOperation
+rollbackOperations merge merges mergeOperation
+mergeOperations split splits splitOperation
+splitOperations partition partitions partitionOperation
+partitionOperations shard shards shardOperation
+shardOperations replicate replicates replicateOperation
+replicateOperations distribute distributes
+distributeOperation distributeOperations disseminate
+disseminates disseminateOperation disseminateOperations
+broadcast broadcasts broadcastOperation
+broadcastOperations multicast multicasts
+multicastOperation multicastOperations unicast
+unicasts unicastOperation unicastOperations publish
+publishes publishOperation publishOperations subscribe
+subscribes subscribeOperation subscribeOperations
+notify notifies notifyOperation notifyOperations
+alert alerts alertOperation alertOperations warn
+warns warnOperation warnOperations inform informs
+informOperation informOperations announce announces
+announceOperation announceOperations declare declares
+declareOperation declareOperations proclaim proclaims
+proclaimOperation proclaimOperations pronounce pronounces
+pronounceOperation pronounceOperations state states
+stateOperation stateOperations express expresses
+expressOperation expressOperations voice voices
+voiceOperation voiceOperations utter utters
+utterOperation utterOperations articulate articulates
+articulateOperation articulateOperations communicate
+communicates communicateOperation communicateOperations
+convey conveys conveyOperation conveyOperations
+transmit transmits transmitOperation transmitOperations
+send sends sendOperation sendOperations emit emits
+emitOperation emitOperations dispatch dispatches
+dispatchOperation dispatchOperations forward forwards
+forwardOperation forwardOperations relay relays
+relayOperation relayOperations route routes
+routeOperation routeOperations redirect redirects
+redirectOperation redirectOperations funnel funnels
+funnelOperation funnelOperations channel channels
+channelOperation channelOperations pipe pipes
+pipeOperation pipeOperations stream streams
+streamOperation streamOperations flow flows
+flowOperation flowOperations feed feeds
+feedOperation feedOperations supply supplies
+supplyOperation supplyOperations provide provides
+provideOperation provideOperations deliver delivers
+deliverOperation deliverOperations furnish furnishes
+furnishOperation furnishOperations render renders
+renderOperation renderOperations output outputs
+outputOperation outputOperations produce produces
+produceOperation produceOperations generate generates
+generateOperation generateOperations create creates
+createOperation createOperations make makes
+makeOperation makeOperations build builds
+buildOperation buildOperations construct constructs
+constructOperation constructOperations fabricate
+fabricates fabricateOperation fabricateOperations
+manufacture manufactures manufactureOperation
+manufactureOperations assemble assembles
+assembleOperation assembleOperations compose composes
+composeOperation composeOperations form forms
+formOperation formOperations shape shapes
+shapeOperation shapeOperations mold molds
+moldOperation moldOperations forge forges
+forgeOperation forgeOperations fashion fashions
+fashionOperation fashionOperations craft crafts
+craftOperation craftOperations engineer engineers
+engineerOperation engineerOperations design designs
+designOperation designOperations develop develops
+developOperation developOperations devise devises
+deviseOperation deviseOperations invent invents
+inventOperation inventOperations innovate innovates
+innovateOperation innovateOperations originate originates
+originateOperation originateOperations pioneer pioneers
+pioneerOperation pioneerOperations establish establishes
+establishOperation establishOperations found founds
+foundOperation foundOperations institute institutes
+instituteOperation instituteOperations launch launches
+launchOperation launchOperations initiate initiates
+initiateOperation initiateOperations start starts
+startOperation startOperations begin begins
+beginOperation beginOperations commence commences
+commenceOperation commenceOperations open opens
+openOperation openOperations kickOff kickOffs
+kickOffOperation kickOffOperations inaugurate inaugurates
+inaugurateOperation inaugurateOperations setUp setUps
+setUpOperation setUpOperations setup setups
+setupOperation setupOperations configure configures
+configureOperation configureOperations config configs
+configOperation configOperations install installs
+installOperation installOperations deploy deploys
+deployOperation deployOperations provision provisions
+provisionOperation provisionOperations provision
+provisions provisionOperation provisionOperations
+prepare prepares prepareOperation prepareOperations
+ready readys readyOperation readyOperations prime
+primes primeOperation primeOperations load loads
+loadOperation loadOperations preload preloads
+preloadOperation preloadOperations initialize initializes
+initializeOperation initializeOperations initialise
+initialises initialiseOperation initialiseOperations
+boot boots bootOperation bootOperations bootstrap
+bootstraps bootstrapOperation bootstrapOperations
+warmUp warmUps warmUpOperation warmUpOperations
+prewarm prewarms prewarmOperation prewarmOperations
+ignite ignites igniteOperation igniteOperations
+activate activates activateOperation activateOperations
+turnOn turnOns turnOnOperation turnOnOperations
+switchOn switchOns switchOnOperation switchOnOperations
+powerOn powerOns powerOnOperation powerOnOperations
+energize energizes energizeOperation energizeOperations
+animate animates animateOperation animateOperations
+spark sparks sparkOperation sparkOperations trigger
+triggers triggerOperation triggerOperations fire fires
+fireOperation fireOperations ignite ignites
+igniteOperation igniteOperations kindle kindles
+kindleOperation kindleOperations light lights
+lightOperation lightOperations illuminate illuminates
+illuminateOperation illuminateOperations brighten
+brightens brightenOperation brightenOperations shine
+shines shineOperation shineOperations glow glows
+glowOperation glowOperations flare flares
+flareOperation flareOperations blaze blazes
+blazeOperation blazeOperations burn burns
+burnOperation burnOperations combust combusts
+combustOperation combustOperations explode explodes
+explodeOperation explodeOperations detonate detonates
+detonateOperation detonateOperations burst bursts
+burstOperation burstOperations rupture ruptures
+ruptureOperation ruptureOperations shatter shatters
+shatterOperation shatterOperations smash smashes
+smashOperation smashOperations crash crashes
+crashOperation crashOperations collapse collapses
+collapseOperation collapseOperations fail fails
+failOperation failOperations error errors
+errorOperation errorOperations exception exceptions
+exceptionOperation exceptionOperations abort aborts
+abortOperation abortOperations halt halts
+haltOperation haltOperations stop stops
+stopOperation stopOperations cease ceases
+ceaseOperation ceaseOperations terminate terminates
+terminateOperation terminateOperations end ends
+endOperation endOperations finish finishes
+finishOperation finishOperations complete completes
+completeOperation completeOperations conclude concludes
+concludeOperation concludeOperations close closes
+closeOperation closeOperations shut shuts
+shutOperation shutOperations shutdown shutdowns
+shutdownOperation shutdownOperations powerOff powerOffs
+powerOffOperation powerOffOperations turnOff turnOffs
+turnOffOperation turnOffOperations switchOff switchOffs
+switchOffOperation switchOffOperations deactivate
+deactivates deactivateOperation deactivateOperations
+idle idles idleOperation idleOperations sleep sleeps
+sleepOperation sleepOperations suspend suspends
+suspendOperation suspendOperations hibernate hibernates
+hibernateOperation hibernateOperations dormant dormants
+dormantOperation dormantOperations standby standbys
+standbyOperation standbyOperations wait waits
+waitOperation waitOperations pause pauses
+pauseOperation pauseOperations hold holds
+holdOperation holdOperations delay delays
+delayOperation delayOperations stall stalls
+stallOperation stallOperations queue queues
+queueOperation queueOperations buffer buffers
+bufferOperation bufferOperations cache caches
+cacheOperation cacheOperations memoize memoizes
+memoizeOperation memoizeOperations remember remembers
+rememberOperation rememberOperations recall recalls
+recallOperation recallOperations retain retains
+retainOperation retainOperations persist persists
+persistOperation persistOperations save saves
+saveOperation saveOperations store stores
+storeOperation storeOperations stash stashes
+stashOperation stashOperations hoard hoards
+hoardOperation hoardOperations accumulate accumulates
+accumulateOperation accumulateOperations gather gathers
+gatherOperation gatherOperations collect collects
+collectOperation collectOperations harvest harvests
+harvestOperation harvestOperations reap reaps
+reapOperation reapOperations glean gleans
+gleanOperation gleanOperations extract extracts
+extractOperation extractOperations retrieve retrieves
+retrieveOperation retrieveOperations fetch fetches
+fetchOperation fetchOperations obtain obtains
+obtainOperation obtainOperations acquire acquires
+acquireOperation acquireOperations procure procures
+procureOperation procureOperations secure secures
+secureOperation secureOperations gain gains
+gainOperation gainOperations earn earns
+earnOperation earnOperations win wins
+winOperation winOperations claim claims
+claimOperation claimOperations take takes
+takeOperation takeOperations get gets
+getOperation getOperations receive receives
+receiveOperation receiveOperations accept accepts
+acceptOperation acceptOperations admit admits
+admitOperation admitOperations allow allows
+allowOperation allowOperations let lets
+letOperation letOperations permit permits
+permitOperation permitOperations authorize authorizes
+authorizeOperation authorizeOperations grant grants
+grantOperation grantOperations approve approves
+approveOperation approveOperations endorse endorses
+endorseOperation endorseOperations sanction sanctions
+sanctionOperation sanctionOperations validate validates
+validateOperation validateOperations verify verifies
+verifyOperation verifyOperations confirm confirms
+confirmOperation confirmOperations certify certifies
+certifyOperation certifyOperations attest attests
+attestOperation attestOperations authenticate
+authenticates authenticateOperation
+authenticateOperations authorize authorizes
+authorizeOperation authorizeOperations
+flag flags flagOperation flagOperations
+```
+
+## 5. The feed-the-oracle batch
+
+For `graphql_probe map --seed` — the highest-value starter set:
+
+```bash
+python3 tools/web/graphql_probe.py map --url "$BASE/graphql" \
+  --seed flag,secret,admin,internal,debug,config,env,var,key,token,jwt,session,apikey,credential,user,users,me,account,profile,post,comment,file,document,message,order,log,audit,event,node,entity,system,health,status,info,version,metrics,stats,backup,export,dump,data,record,item,entry,result,search,filter,query,find,lookup,read,write,update,delete,create,add,insert,new,make,build,generate,produce,emit,publish,dispatch,send,modify,edit,change,alter,set,patch,put,remove,destroy,drop,truncate,purge,clean,wipe,erase,reset,restart,reboot,reload,refresh,reinit,reinitialize,renew,regenerate,rebuild,reconstruct,reprocess,redo,undo,revert,rollback,restore,recover,retrieve,fetch,get,read,query,search,find,lookup,scan,filter,sort,order,arrange,organize,group,aggregate,compute,calculate,process,execute,run,invoke,call,perform,do,action,operate,handle,manage,control,administer,admin,system,internal,debug,test,verify,confirm,approve,activate,deactivate,enable,disable,lock,unlock,ban,unban,suspend,unsuspend,promote,demote,elevate,grant,revoke,allow,deny,permit,forbid,authorize,authenticate,login,logout,signin,signup,register,enroll,subscribe,unsubscribe,follow,unfollow,like,unlike,favorite,unfavorite,bookmark,unbookmark,star,unstar,flag,unflag,mark,unmark,tag,untag,label,unlabel,categorize,uncategorize,classify,unclassify,archive,unarchive,import,export,backup,restore,sync,synchronize,migrate,transfer,move,copy,clone,duplicate,replicate,mirror,snapshot,checkpoint,commit,rollback,merge,split,partition,shard,replicate,distribute,disseminate,broadcast,multicast,unicast,publish,subscribe,notify,alert,warn,inform,announce,declare,proclaim,pronounce,state,express,voice,utter,articulate,communicate,convey,transmit,send,emit,dispatch,forward,relay,route,redirect,funnel,channel,pipe,stream,flow,feed,supply,provide,deliver,furnish,render,output,produce,generate,create,make,build,construct,fabricate,manufacture,assemble,compose,form,shape,mold,forge,fashion,craft,engineer,design,develop,devise,invent,innovate,originate,pioneer,establish,found,institute,launch,initiate,start,begin,commence,open,kickOff,inaugurate,setUp,setup,configure,config,install,deploy,provision,prepare,ready,prime,load,preload,initialize,initialise,boot,bootstrap,warmUp,prewarm,ignite,activate,turnOn,switchOn,powerOn,energize,animate,spark,trigger,fire,ignite,kindle,light,illuminate,brighten,shine,glow,flare,blaze,burn,combust,explode,detonate,burst,rupture,shatter,smash,crash,collapse,fail,error,exception,abort,halt,stop,cease,terminate,end,finish,complete,conclude,close,shut,shutdown,powerOff,turnOff,switchOff,deactivate,idle,sleep,suspend,hibernate,dormant,standby,wait,pause,hold,delay,stall,queue,buffer,cache,memoize,remember,recall,retain,persist,save,store,stash,hoard,accumulate,gather,collect,harvest,reap,glean,extract,retrieve,fetch,obtain,acquire,procure,secure,gain,earn,win,claim,take,get,receive,accept,admit,allow,let,permit,authorize,grant,approve,endorse,sanction,validate,verify,confirm,certify,attest,authenticate,authorize \
+  --max 500
+```
+
+That seed covers the CTF-common namespace — the suggestion oracle fills in
+the challenge-specific names from there.

@@ -19,8 +19,8 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 1,936,000 tokens across 1101 files. Opening
-`skills/ctf-pwn/` alone is about 117,000. A router is 100–1,300 tokens and a
+The depth corpus is roughly 2,049,000 tokens across 1140 files. Opening
+`skills/web-graphql/` alone is about 118,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
 whatever that file happened to describe.
