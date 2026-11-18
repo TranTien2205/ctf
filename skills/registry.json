@@ -2101,8 +2101,8 @@
         "htb-weather-app-ssrf-crlf-request-smuggling-upsert"
       ],
       "skill_tokens": 1244,
-      "depth_files": 5,
-      "depth_tokens": 4489,
+      "depth_files": 98,
+      "depth_tokens": 66100,
       "use_when": [
         "a probe or source read produced this class's signal: one folded control character inside the interpolated value; compare the upstream error with an ordinary hostname",
         "a chain card already proves this class here: htb-weather-app-ssrf-crlf-request-smuggling-upsert"
