@@ -81,8 +81,15 @@ Shares signals with: `../web-logic-flaw/`, `../web-idor/`. Check those before co
 
 Depth, one named file at a time:
 
-- `skills/web-mass-assignment/references/README.md`
-- `skills/web-mass-assignment/references/binding-shapes.md`
+- `skills/web-mass-assignment/references/README.md` — the full index
+- `skills/web-mass-assignment/references/field-manual.md` — the runbook
+- `skills/web-mass-assignment/references/quick-reference.md` — 30 seconds
+- `skills/web-mass-assignment/references/detection.md` — the endpoint+field map
+- `skills/web-mass-assignment/references/readback-protocol.md` — the method
+- `skills/web-mass-assignment/references/falsifiers.md` — the kill-map
+- `skills/web-mass-assignment/references/exploitation.md` — the shapes
+- `skills/web-mass-assignment/references/class-boundary.md` — vs IDOR/pollution
+- `skills/web-mass-assignment/references/binding-shapes.md` — the original anchor
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

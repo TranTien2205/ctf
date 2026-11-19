@@ -1897,9 +1897,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1049,
-      "depth_files": 3,
-      "depth_tokens": 717,
+      "skill_tokens": 1196,
+      "depth_files": 64,
+      "depth_tokens": 49168,
       "use_when": [
         "a probe or source read produced this class's signal: repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back"
       ],
