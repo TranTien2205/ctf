@@ -975,8 +975,16 @@ class Session:
         duration_s: both are legitimately rewritten by `argus report`
         re-renders."""
         files: dict[str, str] = {}
+        # Every rendered artifact, including report-h1.html. A new renderer
+        # that is not in this list produces a file `argus verify` reports as
+        # an unsealed addition - which is exactly how this list stayed
+        # honest: adding the bug-bounty renderer without adding it here
+        # failed `test_a_file_added_after_sealing_is_named` on a freshly
+        # sealed session. An artifact outside the seal is an artifact nobody
+        # can check, which is the opposite of what sealing is for.
         for name in ("meta.json", "findings.json", "notes.md",
-                     "report.md", "report.html", "report.sarif"):
+                     "report.md", "report.html", "report-h1.html",
+                     "report.sarif"):
             p = self.dir / name
             if p.exists():
                 files[name] = hashlib.sha256(p.read_bytes()).hexdigest()

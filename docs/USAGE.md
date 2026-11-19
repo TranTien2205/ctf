@@ -212,6 +212,7 @@ no commands and keep cwd shadowing unconditionally.
 sessions/20261106-101500-app.example/
   report.md        ← start here
   report.html      ← same report for browsers/slides
+  report-h1.html   ← bug-bounty shape: one section per finding, with the PoC
   report.sarif     ← SARIF 2.1.0: upload to GitHub code scanning / CI
   findings.json    ← same data, machine-readable
   transcript.jsonl ← every request/response, cited by request_id
@@ -596,6 +597,38 @@ python -m argus run http://127.0.0.1:8777
 
 `python selftest.py` does the whole thing offline with a scripted model —
 useful in CI or to verify a fresh checkout without an API key.
+
+### `report-h1.html` — the bug-bounty shape
+
+`report.md` answers "what did this engagement find". A triager asks something
+narrower and in a fixed order: what is it, how bad, how do I reproduce it,
+show me the bytes. `report-h1.html` renders that — one section per finding,
+strongest proof first — and it is written by every `render_report`, so there
+is nothing extra to run. Over HTTP it is the `h1` format.
+
+Three things it will not print, and the reason each one is a refusal rather
+than a missing feature:
+
+- **No `curl` or any replay command.** A command composed from a recorded
+  exchange would carry the redaction marker where twelve request header names
+  and `Set-Cookie` are masked, so it would be wrong to read AND wrong to
+  send — while a reader would reasonably assume a command in a PoC was the
+  command that ran. The literal recorded request is printed instead; where
+  the client captured raw wire bytes, those are the PoC. A request rebuilt
+  from the recorded parts says so, because a reconstruction must not be taken
+  for a capture.
+- **No URL in any attribute.** Every byte in a finding is target-influenced,
+  so they stay in text nodes — the same reasoning the console uses for having
+  no `innerHTML` at all rather than escaped `innerHTML`.
+- **No invented remediation.** Fix advice nobody observed to work is the same
+  failure as an invented finding, so the section says that instead.
+
+Steps to reproduce are derived from the cited exchanges and nothing else.
+There is no reproduction-prose field anywhere in the tree, and composing one
+is the single thing this report will not do. A section that cannot be built names the missing piece
+rather than rendering an empty box — a finding may cite an *event* id that
+carries no request at all, and that gets a sentence, with the event's own
+output still shown as evidence.
 
 ## The operator console (`argus web`)
 

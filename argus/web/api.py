@@ -534,6 +534,10 @@ def findings_rows(root: Path) -> list[dict]:
 REPORT_FORMATS = {
     "md": ("report.md", "text/markdown; charset=utf-8"),
     "html": ("report.html", "text/html; charset=utf-8"),
+    # One section per finding with the PoC, for a bug-bounty submission.
+    # Served under the same sandbox CSP as `html`, which is why it carries
+    # no script and no external resource of its own.
+    "h1": ("report-h1.html", "text/html; charset=utf-8"),
     "sarif": ("report.sarif", "application/json; charset=utf-8"),
 }
 

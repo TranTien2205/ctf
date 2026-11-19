@@ -5883,12 +5883,95 @@ measurement, not the tree. The honest path was a local server and the real
 redaction at all - that happens in the client, so a test that calls
 `record_exchange` directly measures nothing about it.
 
+### A bug-bounty shaped report, and three things it will not print
+
+The existing renderers answer "what did this engagement find". A triager
+asks something narrower and in a fixed order: what is it, how bad, how do I
+reproduce it, show me the bytes. `report-h1.html` renders that shape - one
+section per finding, strongest proof first - and `render_report` writes it
+beside the others under the same convenience contract as the HTML one, so a
+failure there cannot cost the canonical markdown report. It is served as the
+`h1` format under the same sandbox CSP, which is why it carries no script
+and no external resource of its own.
+
+Three refusals, each from reading what the recorder actually holds rather
+than from taste, and each with a test because a refusal nobody checks is a
+comment.
+
+NO REPLAY COMMAND IS COMPOSED. A `curl` built from a recorded exchange would
+carry the redaction marker where twelve request header names and
+`Set-Cookie` are masked, so it would be wrong to READ and wrong to SEND -
+and a reader would reasonably assume a command in a PoC was the command that
+ran. The literal recorded request is printed instead, and where the client
+captured raw wire bytes those are the PoC, because they are what went out. A
+rebuild from the recorded parts is LABELLED as a rebuild, since a
+reconstruction must not be taken for a capture.
+
+NO URL EVER REACHES AN ATTRIBUTE. Every byte in a finding is
+target-influenced, so text nodes only - the same reasoning the operator
+console uses for having no `innerHTML` at all rather than escaped
+`innerHTML`. Checking this the obvious way was wrong and is recorded:
+grepping for `href=` found 101 hits and reported a defect, because the
+TARGET's own recorded HTML body is quoted, escaped, inside a `<pre>`.
+Parsing settles it - the only attribute names in the whole document are
+charset, class, content, lang, name and style. Fifteenth instance this
+session of a checker reading a mention as a claim, and the checker was mine.
+
+ABSENCE IS PRINTED. The existing HTML renderer shows a missing field as an
+empty cell - an empty `<pre></pre>` under "Proof (verbatim excerpt)" - which
+reads as "no proof" when it means "no field". Here every section that cannot
+be built says which piece was missing. A finding may cite an EVENT id with
+no request at all, and the shipped sample's jwt finding does exactly that:
+it gets a sentence saying the event carries no request and is therefore not
+a step, with its recorded output still shown as evidence.
+
+AND THE RESPONSE WINDOW IS CENTRED ON THE QUOTED BYTES, taken from the
+markdown renderer rather than the HTML one. `html.py` prints
+`response.body[:4000]` from the start, so on a longer body whose proving
+bytes are later the HTML report omits the proof while the markdown report
+shows it. The offset is stated rather than implied.
+
+Steps to reproduce are DERIVED from the cited exchanges and nothing else -
+argus stores no reproduction prose, a search of the tree finds no such
+field, and composing it would be the thing this whole system refuses.
+Remediation is left out with the reason, because fix advice nobody observed
+to work is the same failure as an invented finding.
+
+Plant-tested four ways: emitting a curl, un-centring the window, dropping
+the no-request sentence, and offering generic remediation each fail.
+
+### The bug-bounty report joins the seal, and the documentation
+
+Two things the suite and the gate caught after the renderer worked.
+
+THE NEW ARTIFACT WAS OUTSIDE THE SEAL. `render_report` writes
+`report-h1.html`, and `Session.seal` enumerates the artifacts it hashes by
+name - so a freshly sealed session reported `report-h1.html` as an unsealed
+ADDITION, which `test_a_file_added_after_sealing_is_named` failed on
+immediately. An artifact outside the seal is an artifact nobody can check,
+which is the opposite of what sealing is for. It is in the list now, and the
+list carries the note that a new renderer missing from it produces exactly
+that failure.
+
+AND IT WAS DOCUMENTED NOWHERE, which the reverse-direction check added
+earlier today exists to catch. `docs/USAGE.md` names it in the artifact
+listing and explains the three refusals as refusals rather than as missing
+features, because a reader who does not know why there is no `curl` will
+reasonably assume it was an oversight and add one.
+
+ONE MORE INSTANCE OF A SHAPE THIS SESSION KEPT HITTING, and a new guise:
+the sentence "argus stores no reproduction prose" happened to begin a LINE,
+and the subcommand check reads a line starting with `argus <word>` as a
+command claim - so it reported a subcommand named `stores`. Not the content,
+the line wrapping. Sixteenth instance, and the fix was to rewrite the
+sentence so no line opens with that word.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1071 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1079 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

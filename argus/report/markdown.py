@@ -728,6 +728,14 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     except Exception:
         pass  # html is a convenience; the markdown report is canonical
     try:
+        # The bug-bounty shape: one section per finding, with the PoC. Same
+        # convenience contract as the html one above - a failure here must
+        # not cost the canonical markdown report.
+        from .hackerone import render_hackerone
+        render_hackerone(session, cfg, summary, extra)
+    except Exception:
+        pass
+    try:
         from .sarif import render_sarif
         render_sarif(session, extra)
     except Exception:
