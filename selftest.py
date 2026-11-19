@@ -862,10 +862,39 @@ def _doc_consistency() -> None:
         named |= set(_re.findall(r"`argus ([a-z][a-z-]+)", text))
         # inside a fenced shell block the command often has no backticks and
         # no `python -m` prefix, which is where most examples live
-        for block in _re.findall(r"```(?:bash|sh|console)?\n(.*?)```", text,
+        # ANY LANGUAGE TAG. `(?:bash|sh|console)?` did not match `json`,
+        # and an unmatched OPENING fence makes the next closing ``` read as
+        # an opening - so every region after the first `json` block is
+        # INVERTED: real code becomes invisible and the prose between blocks
+        # becomes "block content". README.md has 20 fences of which 2 are
+        # `json`, docs/USAGE.md 42 of which 2 are `json`.
+        #
+        # Measured consequence: this branch found ZERO subcommands across
+        # every gated document, while its own comment says "which is where
+        # most examples live". It had never caught anything. With the tag
+        # accepted it finds `groundtruth` in docs/USAGE.md.
+        #
+        # Found by planting an invented subcommand name in a fenced block
+        # and watching the gate pass - the form a reader copies and runs,
+        # while the same fabrication in prose backticks was caught.
+        #
+        # DESCRIBED, NOT QUOTED. The first version of this comment wrote
+        # the invented name inside backticks, and the prose branch of the
+        # check below read it as a claim - so the note explaining the fix
+        # broke the gate the fix had just repaired.
+        for block in _re.findall(r"```[a-zA-Z0-9_-]*\n(.*?)```", text,
                                  _re.S):
-            named |= set(_re.findall(r"(?m)^\s*(?:\$\s*)?argus\s+([a-z][a-z-]+)",
-                                     block))
+            # COLUMN 0, or after a `$ ` prompt. `^\s*` also matched OUTPUT
+            # inside a fence: docs/USAGE.md prints a report line reading
+            # "  argus called proven    : 2 (rce, sqli)" - "argus called
+            # [these] proven" - which is not a claim that `called` is a
+            # subcommand. The dead branch above had been hiding it.
+            #
+            # Measured over the gated docs: indentation-allowed finds
+            # ['called', 'groundtruth'], column-0 finds ['groundtruth'],
+            # and a planted fabrication at column 0 is still caught.
+            named |= set(_re.findall(
+                r"(?m)^(?:argus|\$\s*argus)\s+([a-z][a-z-]+)", block))
     bogus = sorted(n for n in named if n not in real)
     check(f"docs name only real subcommands ({len(real)})", not bogus,
           f"{bogus} not in {sorted(real)}")

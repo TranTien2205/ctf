@@ -7422,12 +7422,127 @@ the mistake. The rule is not "do not break a gate", it is "a gate run is a
 statement about one tree state", and an edit mid-run makes it a statement
 about none.
 
+### Four more audit claims, refuted by reconstruction
+
+A GRADE CORRECTION LEAVING THE PROOF BLOCK CONTRADICTORY. Planted: the
+sample session's F03, graded `candidate` by the matrix, edited in
+findings.json to claim `proven`. The re-render warns, corrects, and the
+block is wholly consistent with the corrected grade:
+
+    - **Category:** xss - **proof: candidate**
+    - [x] payload reflected unencoded into HTML - '<>"' survived into r19
+    - [ ] a real browser executed it - no callback carrying a probe nonce
+
+It names the requirement, shows the unmet item unchecked, and gives the
+reason. Both the metadata line and the proof grade carry the correction.
+
+A WEBSOCKET PROBE WITH AN 8-SECOND DEADLINE. `probe_websocket` is 64 lines
+and contains no `settimeout`, no `recv`, no `deadline` and no sleep; it
+calls one helper, `_marker`. There is no raw socket anywhere in
+`probes.py`, and the only remaining numeric sleeps in the file are 0.05
+poll intervals.
+
+A TE.CL PROBE RESTING ON A 3-SECOND READ. `probe_smuggle` has no timing
+line at all, and it is BETTER than the claim assumed: it proves a desync by
+CONTENT, not by a clock - `s2["status"] >= 400 and _SMUGGLE_G.search(body)`,
+the target echoing back the stray `G` that poisoned the following request.
+A witness, not a timeout. And three distinct `inconclusive` verdicts
+separate "the connection did not survive", "the second request failed after
+the ambiguous one - could be a desync or just a reset", and "no queued
+response", so it refuses to call a desync on ambiguous evidence. Timing-
+based smuggling detection is exactly what produces false positives on a
+slow network, and this probe does not do it.
+
+A HEADER-QUOTED EXCERPT REPORTED AS NOT FOUND IN THE RESPONSE.
+`hackerone.py` says "shown from the start of the body: the quoted excerpt
+was not found in it verbatim", where "it" is the body - which is accurate.
+The claim misquoted the note as speaking about the response.
+
+RUNNING TALLY ON THE AUDIT: nine real defects fixed, six claims refuted by
+reconstruction, one taxonomy decision reported rather than taken. Every
+structural statement its dimensions made was correct; what it could not
+establish was whether any of it reaches a finding, which needs the recorder
+and 22 real findings rather than the code.
+
+### A branch of the gate that had never caught anything
+
+The check that every `argus <subcommand>` named in the docs is real has two
+branches: prose backticks, and fenced code blocks. Its own comment on the
+second says "inside a fenced shell block the command often has no backticks
+and no `python -m` prefix, which is where most examples live".
+
+Measured: that branch found ZERO subcommands across every gated document.
+
+Its fence pattern was ```(?:bash|sh|console)? which does not match `json`,
+and an unmatched OPENING fence makes the next closing ``` read as an
+opening - inverting every region after it, so real code becomes invisible
+and the prose between blocks becomes "block content". README.md has 20
+fences of which 2 are `json`; docs/USAGE.md 42 of which 2 are `json`.
+
+So a fabricated subcommand inside a code block - THE FORM A READER COPIES
+AND RUNS - passed the gate, while the same fabrication in prose backticks
+was caught. The whole session has been fixing the opposite direction, a
+checker reading a MENTION as a CLAIM; this is a checker missing a real
+claim in the form that most looks like one.
+
+Found by planting an invented subcommand name in a fenced block and
+watching the gate pass. Not by reading the pattern - the pattern looks correct, and the
+inversion only happens in the presence of a tag it does not list.
+
+AND THE FIX EXPOSED A FALSE POSITIVE THE DEAD BRANCH HAD BEEN HIDING.
+docs/USAGE.md prints "  argus called proven    : 2 (rce, sqli)" - a report
+line meaning "argus called [these] proven". With `^\s*` that reads as a
+claim that `called` is a subcommand. The discriminator, measured over the
+real corpus rather than chosen: commands sit at column 0 or after a `$ `
+prompt, output is indented. Indentation-allowed finds ['called',
+'groundtruth']; column-0 finds ['groundtruth'], which is the real one, and
+a planted fabrication at column 0 is still caught.
+
+ASSERTED AS THE YIELD, not as the pattern. A branch whose scan returns
+nothing is indistinguishable from one that works, and only the count says
+which: `test_the_fenced_block_scan_actually_finds_something` fails when it
+covers nothing. Both plants are caught by selftest itself as well - and
+reverting the fence pattern makes the REVERSE check fail, because
+`groundtruth` then appears in no gated document.
+
+AND THE SEVENTH WRONG INSTRUMENT IN THIS SESSION produced a finding that
+does not exist. The first plant matrix decided its verdict with
+`grep -qE "^16[0-9]/16[0-9] passed"`, which matches `163/164` as well as
+`164/164` - so a FAILING run was recorded as "missed". That table reported
+two holes. Re-measured on the exit code, there is one: the flag check works
+in both prose and fenced form, and those rows were the instrument, not the
+subject. Same shape as `grep -c` versus `grep -cx` earlier - a pattern
+matching more than intended - and this time it invented a defect rather
+than hiding one.
+
+### And the note explaining the fix broke the gate the fix had repaired
+
+Gate 104 came back red on one line: the subcommand check naming an invented
+command in a gated document. The document was this CHANGELOG, and the
+invented command was in the paragraph above describing how the hole was
+found - written inside backticks, where the prose branch of that same check
+reads it as a claim.
+
+FOURTH TIME IN THIS SESSION, and the durable fix was already written down
+here: describe rather than quote. Three earlier CHANGELOG paragraphs did
+this, each describing a planted shape by reproducing it, and the entry
+recording that lesson is a few hundred lines above the one that repeated
+it.
+
+What makes this one different from the first three is the ordering. The
+quote was written into the note explaining a fix to the OTHER branch of the
+same check - so the prose branch, working correctly, failed the document
+that had just restored the fenced branch. The gate was right both times and
+the two halves disagreed about one string, which is as clear a statement as
+this check can make: an example and an assertion are the same bytes, and
+only the form around them says which one it is.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1159 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1162 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

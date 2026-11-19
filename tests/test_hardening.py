@@ -897,3 +897,106 @@ def test_a_multi_value_header_stays_a_list_through_redaction():
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+# ---- the gate's own fenced-block scan must not go dead again
+
+_GATED_DOCS = ("README.md", "AGENTS.md", "docs/USAGE.md",
+               "docs/ARCHITECTURE.md")
+
+
+def _fence_scan(text: str, fence: str, cmd: str) -> set:
+    import re
+    found = set()
+    for block in re.findall(fence, text, re.S):
+        found |= set(re.findall(cmd, block))
+    return found
+
+
+def test_the_fenced_block_scan_actually_finds_something():
+    """A CHECK THAT COVERS NOTHING PASSES EVERYTHING, measured.
+
+    `selftest.py` verifies that every `argus <subcommand>` in the docs is
+    real, and does it in two branches: prose backticks, and fenced code
+    blocks. Its own comment on the second says "inside a fenced shell block
+    the command often has no backticks and no `python -m` prefix, which is
+    where most examples live".
+
+    That branch found ZERO subcommands across every gated document. Its
+    fence pattern was ```(?:bash|sh|console)? - which does not match
+    `json`, and an unmatched OPENING fence makes the next closing ``` read
+    as an opening, inverting every region after it. README.md has 20 fences
+    of which 2 are `json`; docs/USAGE.md 42 of which 2 are `json`.
+
+    So a fabricated subcommand inside a code block - the form a reader
+    copies and runs - passed the gate, while the same fabrication in prose
+    backticks was caught. Found by planting it and watching the gate pass,
+    not by reading the pattern.
+
+    This asserts the YIELD, not the pattern: a branch whose scan returns
+    nothing is indistinguishable from a branch that works, and only the
+    count says which it is.
+    """
+    import pathlib
+
+    root = pathlib.Path(__file__).resolve().parent.parent
+    fence = r"```[a-zA-Z0-9_-]*\n(.*?)```"
+    cmd = r"(?m)^(?:argus|\$\s*argus)\s+([a-z][a-z-]+)"
+
+    total = set()
+    for rel in _GATED_DOCS:
+        path = root / rel
+        if path.is_file():
+            total |= _fence_scan(path.read_text(encoding="utf-8"),
+                                 fence, cmd)
+    assert total, (
+        "the fenced-block branch of the subcommand check finds no command "
+        "in any gated document - it covers nothing and therefore passes "
+        "everything")
+
+
+def test_an_unrecognised_language_tag_does_not_blind_the_scan():
+    """The mechanism, asserted directly rather than through its symptom.
+
+    Two fences with a tag the pattern does not accept are enough to invert
+    the pairing for everything after them, so this plants that shape and
+    requires the command after it to still be seen.
+    """
+    doc = (
+        "```json\n"
+        '{"grade": "proven"}\n'
+        "```\n\n"
+        "```\n"
+        "argus verify docs/sample-session\n"
+        "```\n"
+    )
+    fence_old = r"```(?:bash|sh|console)?\n(.*?)```"
+    fence_new = r"```[a-zA-Z0-9_-]*\n(.*?)```"
+    cmd = r"(?m)^(?:argus|\$\s*argus)\s+([a-z][a-z-]+)"
+
+    assert _fence_scan(doc, fence_new, cmd) == {"verify"}
+    assert _fence_scan(doc, fence_old, cmd) == set(), \
+        "premise: the old pattern was blinded by the json tag"
+
+
+def test_output_inside_a_fence_is_not_read_as_a_command():
+    """The direction the fix had to preserve, and the false positive the
+    dead branch was hiding.
+
+    `docs/USAGE.md` prints "  argus called proven    : 2 (rce, sqli)" - a
+    report line meaning "argus called [these] proven". With `^\\s*` it read
+    as a claim that `called` is a subcommand; the discriminator measured
+    over the real corpus is that commands sit at column 0 or after a `$ `
+    prompt and output is indented.
+    """
+    fence = r"```[a-zA-Z0-9_-]*\n(.*?)```"
+    cmd = r"(?m)^(?:argus|\$\s*argus)\s+([a-z][a-z-]+)"
+    loose = r"(?m)^\s*(?:\$\s*)?argus\s+([a-z][a-z-]+)"
+
+    doc = ("```\n"
+           "argus check docs/sample-session\n"
+           "  argus called proven    : 2 (rce, sqli)\n"
+           "```\n")
+    assert _fence_scan(doc, fence, cmd) == {"check"}
+    assert _fence_scan(doc, fence, loose) == {"check", "called"}, \
+        "premise: indentation-allowed reads the output line as a command"
