@@ -7641,6 +7641,48 @@ evidence about the instrument first. Written into AGENTS.md as a rule for
 the next sweep - measure the package by path, anchored under the package
 directory, never by filename.
 
+### The three layers, run end to end against a live target
+
+`argus replay` had never been run against a running target - only against
+unit fixtures and a loopback server inside the suite. Started the bundled
+lab on loopback, ran the scripted engagement against it, and replayed the
+findings it produced:
+
+    F01..F05  reproduced     the target returned the quoted bytes again (HTTP 200)
+    F06       inconclusive   the recorded request carried authorization and
+                             the transcript stores the hash, not the value
+
+    1 inconclusive, 5 reproduced
+
+The inconclusive one is the designed behaviour, measured rather than
+argued: F06 is the jwt finding whose request carried a credential header,
+the transcript keeps only its digest, so the replay SAYS IT COULD NOT ASK
+instead of reporting that the finding did not hold. That is the whole
+reason `not_reproduced` and `inconclusive` are separate outcomes, and this
+is the first time the distinction has been exercised outside a test.
+
+AND THE DELIVERABLE STATES ITS OWN COVERAGE:
+
+    | graded by the matrix           | 6/6 | did the target produce the quoted bytes |
+    | read by a second model         | 0/6 | do those bytes demonstrate the class claimed |
+    | re-verified against the target | 5/6 | does the target still do it |
+
+with an explicit line that no finding here has been read by a model from
+another family, naming the command that would do it. Three questions, three
+answers, and the zero is printed rather than omitted.
+
+`argus verify` is still clean afterwards - 73 chained entries anchored to
+summary.json, 6 findings re-validated, artifacts sealed - which confirms on
+a live session that replaying re-renders and re-seals rather than leaving
+the artifact digests behind, the defect that made the first version of this
+command break the seal of every session it touched.
+
+AND A TENTH WRONG INSTRUMENT, immediately. A first pass searched the report
+for the absence wording and found one line, which read as "the five
+reproduced findings print nothing". They print the success wording, which is
+a different string. A pattern narrower than the thing it looks for, for the
+second time today.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
