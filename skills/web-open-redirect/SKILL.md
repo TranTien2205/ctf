@@ -62,6 +62,34 @@ Depth, one named file at a time:
 | Signal or task | Open |
 |---|---|
 | Any redirect-parameter question | `references/filter-bypasses.md` |
+| the mechanism model | `references/mechanism.md` `references/mechanism-deep.md` `references/theory.md` |
+| the detection signals | `references/detection.md` `references/detection-deep.md` `references/detection-matrix.md` `references/detection-signals.md` `references/detection-catalogue.md` |
+| the param vocabulary | `references/param-inventory.md` `references/per-param.md` `references/per-endpoint.md` `references/per-surface.md` `references/detection-surface.md` |
+| the bypass arms | `references/filter-bypass-deep.md` `references/per-check.md` `references/per-vector.md` `references/per-boundary.md` `references/per-target.md` `references/payload-dictionary.md` `references/payload-variants.md` `references/payload-map.md` `references/boundary-map.md` `references/encoding-attacks.md` `references/evasion.md` `references/extended-corpus.md` |
+| the parser gaps | `references/parser-differentials.md` `references/framework-matrix.md` |
+| the carriers | `references/client-side.md` `references/stored-and-referer.md` `references/per-channel.md` `references/per-mechanism.md` `references/edge-cases.md` |
+| the chain routes | `references/chain-routes.md` `references/per-route.md` `references/multi-step-chains.md` `references/attack-shapes.md` `references/exploitation.md` `references/second-order.md` |
+| the evidence rules | `references/evidence-rules.md` `references/evidence-rules-deep.md` `references/detection-verdicts.md` |
+| the falsifiers | `references/falsifiers.md` `references/falsifiers-deep.md` `references/per-falsifier.md` `references/detection-verdicts.md` |
+| the negatives | `references/negative-results.md` `references/negative-results-deep.md` `references/negative-map.md` |
+| the workflow | `references/workflow.md` `references/workflow-deep.md` `references/field-manual.md` `references/first-hour.md` `references/recon-order.md` `references/detection-workflow.md` `references/detection-playbook.md` |
+| the checklists | `references/checklist.md` `references/checklist-deep.md` `references/detection-checklist.md` |
+| the quick-ref | `references/quick-reference.md` `references/quick-reference-deep.md` `references/decision-table.md` `references/decision-catalogue.md` |
+| the onboarding | `references/onboarding.md` `references/onboarding-deep.md` `references/operator-notes.md` `references/lead-grammar.md` |
+| the edge/trap | `references/edge-cases.md` `references/common-mistakes.md` `references/common-mistakes-deep.md` `references/anti-patterns.md` `references/troubleshoot.md` `references/troubleshoot-deep.md` `references/common-questions.md` `references/common-questions-deep.md` |
+| the cases | `references/case-studies.md` `references/real-world-cases.md` |
+| the preconditions | `references/preconditions.md` `references/preconditions-deep.md` `references/class-boundary.md` |
+| the probes | `references/probe-catalogue.md` `references/probe-map.md` `references/detection-playbook.md` |
+| the indexes | `references/README.md` `references/detection-index.md` `references/detection-index-deep.md` `references/detection-map.md` `references/mechanism-index.md` `references/mechanism-map.md` `references/per-surface-map.md` `references/negative-map.md` |
+| the honest state | `references/verified-chains.md` `references/field-notes-deep.md` `references/summary.md` `references/glossary.md` |
+
+## stop_conditions
+
+- `stop when` every canary + bypass arm on a surface returns a verbatim
+  `Location:` to a safe/allowlisted/forced-relative destination — the
+  class falsifier
+- `budget`: five probes per mechanism (the canary + the arm family on one
+  surface), twenty-five per challenge — `../LOOP_DISCIPLINE.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
