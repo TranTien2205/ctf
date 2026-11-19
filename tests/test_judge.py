@@ -922,3 +922,92 @@ def test_judge_itself_consults_the_shared_definition(tmp_path, capsys,
         "the warning must NAME the flag - a session edited after sealing is "
         "a different problem from a broken chain, and the operator cannot "
         "act on 'something is wrong'")
+
+
+def test_the_case_file_withholds_the_first_models_reasoning(tmp_path):
+    """THE PROMPT'S OWN CLAIM, held by a test instead of by a docstring.
+
+    `PROMPT` tells the second model "You are NOT shown the first model's
+    reasoning, and you should not try to reconstruct it". That was a
+    sentence in a string until now. Measured on a live case file - 8892
+    bytes over six findings - the description, the remediation and the
+    agent's run summary are all absent, and this asserts it so a later edit
+    to the case file cannot quietly add one.
+
+    What IS shown is load-bearing, and each disclosure is named as
+    disputable in the prompt rather than offered as a hint:
+
+        class, url, severity claimed   the claim under test
+        grade from the proof matrix    the one-way door: a judge cannot
+                                       promote, and is told to say so in
+                                       prose if the evidence is stronger
+        proof requirement              what would establish the class
+        raw request/response records   the evidence itself
+    """
+    from argus.judge import render_case
+
+    finding = {
+        "id": "F01", "title": "SQL injection in /item id parameter",
+        "vuln_class": "sqli", "category": "sqli", "severity": "critical",
+        "grade": "proven", "url": "http://t.test/item?id=1",
+        "evidence_ids": ["r1"], "evidence_excerpt": "sqlite 3.45",
+        "description": "ID IS INTERPOLATED INTO THE QUERY STRING",
+        "remediation": "USE PARAMETERIZED QUERIES",
+        # a SOFTENED requirement, planted: the case file must ignore it
+        "proof": {"requirement": "any 200 response will do", "missing": []},
+    }
+    entries = [{
+        "id": "r1", "tool": "probe_sqli",
+        "request": {"method": "GET", "url": "http://t.test/item?id=1",
+                    "headers": {}, "body": ""},
+        "response": {"status": 200, "headers": {}, "body": "sqlite 3.45",
+                     "truncated": False},
+    }]
+
+    text = render_case(finding, entries)
+
+    for leak in ("ID IS INTERPOLATED", "USE PARAMETERIZED"):
+        assert leak not in text, (
+            f"the case file carries the first model's reasoning: {leak!r}")
+
+    # and the disclosures the prompt treats as disputable are present,
+    # because a judge that does not know the claim cannot dispute it
+    for needed in ("sqli", "critical", "proven", "http://t.test/item?id=1",
+                   "sqlite 3.45"):
+        assert needed in text, f"the case file omits {needed!r}"
+
+    # THE REQUIREMENT COMES FROM THE MATRIX, NOT FROM THE FINDING, which is
+    # stronger than it looks: a tampered findings.json cannot soften the bar
+    # it is judged against. The planted "any 200 response will do" must not
+    # appear, and the real sqli requirement must.
+    from argus.proof import spec_for
+
+    assert "any 200 response will do" not in text, \
+        "a finding supplied its own requirement and the case file used it"
+    real = str(spec_for("sqli").requirement)
+    assert real[:40] in text, \
+        "the case file does not carry the matrix's requirement"
+
+
+def test_an_agent_summary_cannot_reach_the_case_file(tmp_path):
+    """The run summary is the first model's narrative about its own work -
+    the single largest piece of reasoning in a session - and it must not
+    arrive as context for the review of a finding."""
+    from argus.judge import render_case
+
+    story = "I ESCALATED FROM SQLI TO RCE AND CONFIRMED ADMIN ACCESS"
+    finding = {
+        "id": "F01", "title": "t", "vuln_class": "sqli", "category": "sqli",
+        "severity": "high", "grade": "proven", "url": "http://t.test/",
+        "evidence_ids": ["r1"], "evidence_excerpt": "x",
+        "agent_summary": story, "notes": story, "summary": story,
+        "proof": {"requirement": "r", "missing": []},
+    }
+    entries = [{
+        "id": "r1",
+        "request": {"method": "GET", "url": "http://t.test/", "headers": {},
+                    "body": ""},
+        "response": {"status": 200, "headers": {}, "body": "x",
+                     "truncated": False}}]
+
+    assert story not in render_case(finding, entries)

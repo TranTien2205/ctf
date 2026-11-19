@@ -7718,12 +7718,67 @@ exercised against a target that checks the credential.
 entries anchored to summary.json, 6 findings re-validated - so the
 re-render-and-re-seal holds across repeated runs, not just the first.
 
+### What the judge is and is not shown, measured on a live case file
+
+The judge layer cannot be run end to end from here: the provider refuses to
+send a credential to a non-TLS endpoint, so there is no way to point it at a
+local stub without weakening a guard that exists for exactly the reason it
+says. That refusal is correct and stays.
+
+What CAN be exercised is everything up to the network call, and that is
+where the design lives. Ran the dry run against the live session - 8892
+bytes, 219 lines - and measured what reaches the second model:
+
+    first model's title            SHOWN
+    class, url, severity claimed   SHOWN
+    grade from the proof matrix    SHOWN
+    proof requirement for class    SHOWN
+    raw request/response records   SHOWN
+    first model's description       absent
+    first model's remediation       absent
+    the agent's run summary         absent
+
+A HYPOTHESIS OF MINE, REFUTED BY READING THE PROMPT. Showing the grade
+looked like anchoring: a second reader primed with "the matrix says proven"
+is a weaker check than one asked blind. The prompt settles it, and each
+disclosure is load-bearing:
+
+- "You are NOT shown the first model's reasoning, and you should not try to
+  reconstruct it" - which the measurement above confirms rather than
+  assumes.
+- "Answer this and nothing else: does the evidence, ON ITS OWN, establish
+  the claim the finding makes?"
+- The severity is shown because the judge is told to dispute it when "the
+  severity is not defensible from the evidence". It is the claim under test,
+  not a hint.
+- The grade is shown because the judge "cannot promote a finding" and is
+  told that if the evidence is STRONGER than the grade says, to say so in
+  prose - so the grade defines the one-way door rather than the answer.
+
+The residual is real but is a research question, not a defect: showing a
+verdict creates some agreement prior, and the only way to size it is to run
+both forms against real models and compare dispute rates. That needs an
+endpoint, and it would measure models rather than this code.
+
+Recorded because the measurement is the useful part, and now held by a
+test rather than by a docstring: planting the description and the
+remediation into the case file fails, and so does planting the agent's run
+summary.
+
+AND THE REQUIREMENT COMES FROM THE MATRIX, NOT FROM THE FINDING, which is
+stronger than it looks and was found by the test failing. The first version
+of this test passed its own requirement text in the finding and asserted it
+appeared; it did not, because the case file looks the requirement up by
+class. So a tampered findings.json cannot soften the bar it is judged
+against - asserted now by planting "any 200 response will do" as a
+finding's own requirement and requiring the real one to appear instead.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1169 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1171 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
