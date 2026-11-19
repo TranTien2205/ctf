@@ -711,6 +711,12 @@ _DOC_FILES = ("README.md", "AGENTS.md", "SECURITY.md", "CHANGELOG.md",
               "docs/nckh-evidence/README.md",
               "docs/nckh-evidence/RESULTS.md",
               "docs/nckh-evidence/presentation.html",
+              # The progress report for the supervisor. Gated like every
+              # other shipped document, which is what caught it: the
+              # reverse-direction check added earlier in this session names
+              # a document on disk that no check reads, and this file was
+              # the first thing it found.
+              "docs/nckh-evidence/bao-cao-nckh.html",
               "lab/README.md", "argus/skills/INDEX.md",
               "argus/resources/exploits/README.md",
               "argus/resources/wordlists/README.md",

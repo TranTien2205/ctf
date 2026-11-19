@@ -1,0 +1,619 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Báo cáo NCKH Argus</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: một cột đọc dọc, chữ bó ở 68ch, sơ đồ tràn ra dải rộng.
+   Bốn màu grade là từ vựng của chính hệ thống, không phải màu trang trí. */
+:root{
+  --bg:#f7f8f7; --panel:#ffffff; --ink:#15201c; --ink-2:#4a5a53; --ink-3:#7b8a83;
+  --line:#dde3e0; --line-2:#c6d0cb;
+  --accent:#0f6b4f;            /* xanh của cổng chứng minh */
+  --proven:#0f6b4f; --candidate:#9a6a08; --unproven:#6b7680; --refused:#8c2f39;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1412; --panel:#151d1a; --ink:#e7eeea; --ink-2:#a9b8b1; --ink-3:#7d8c85;
+  --line:#243029; --line-2:#33423a;
+  --accent:#4cc79a;
+  --proven:#4cc79a; --candidate:#d6a22a; --unproven:#8995a0; --refused:#e2707c;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0e1412; --panel:#151d1a; --ink:#e7eeea; --ink-2:#a9b8b1; --ink-3:#7d8c85;
+  --line:#243029; --line-2:#33423a;
+  --accent:#4cc79a;
+  --proven:#4cc79a; --candidate:#d6a22a; --unproven:#8995a0; --refused:#e2707c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.6;
+     font-size:15.5px;margin:0}
+.wrap{max-width:980px;margin:0 auto;
+      padding-left:max(16px,env(safe-area-inset-left,0px));
+      padding-right:max(16px,env(safe-area-inset-right,0px));
+      padding-block:0}
+h1,h2,h3{font-family:var(--sans);text-wrap:balance;line-height:1.22;margin:0}
+h1{font-size:clamp(26px,4.6vw,40px);font-weight:680;letter-spacing:-.02em}
+h2{font-size:clamp(19px,2.6vw,25px);font-weight:660;letter-spacing:-.01em}
+h3{font-size:16px;font-weight:650}
+p{margin:0;max-width:68ch}
+code,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+code{font-size:.9em;background:var(--panel);border:1px solid var(--line);
+     border-radius:4px;padding:.08em .34em}
+a{color:var(--accent)}
+.lede{font-size:clamp(16px,1.8vw,18.5px);color:var(--ink-2);max-width:62ch}
+.eyebrow{font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;
+         color:var(--ink-3);font-weight:620}
+
+header{border-bottom:1px solid var(--line);padding-block:clamp(34px,6vw,64px) 30px}
+section{border-bottom:1px solid var(--line);padding-block:clamp(30px,4.5vw,52px)}
+section:last-of-type{border-bottom:0}
+.stack{display:flex;flex-direction:column;gap:18px}
+.stack-sm{display:flex;flex-direction:column;gap:10px}
+
+/* bảng số liệu */
+.figs{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+      border-radius:8px;overflow:hidden;
+      grid-template-columns:repeat(auto-fit,minmax(132px,1fr))}
+.fig{background:var(--panel);padding:14px 15px;min-width:0}
+.fig b{display:block;font-family:var(--mono);font-variant-numeric:tabular-nums;
+       font-size:clamp(20px,2.7vw,27px);font-weight:600;letter-spacing:-.02em}
+.fig span{display:block;font-size:12.5px;color:var(--ink-3);margin-top:3px}
+
+/* thẻ */
+.cards{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(252px,1fr))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:9px;
+      padding:15px 16px;min-width:0;display:flex;flex-direction:column;gap:7px}
+.card h3{margin:0}
+.card p{font-size:14px;color:var(--ink-2);max-width:none}
+
+/* bốn grade: hình dạng mang nghĩa, không chỉ màu */
+.grades{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);
+        border-radius:8px;overflow:hidden;
+        grid-template-columns:repeat(auto-fit,minmax(176px,1fr))}
+.grade{background:var(--panel);padding:13px 15px;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:7px;font-family:var(--mono);
+      font-size:12.5px;font-weight:600}
+.dot{width:13px;height:13px;border-radius:3px;flex:0 0 auto}
+.dot-proven{background:var(--proven)}
+.dot-candidate{background:transparent;border:2px solid var(--candidate)}
+.dot-unproven{background:var(--unproven);opacity:.38}
+.dot-refused{background:repeating-linear-gradient(45deg,var(--refused) 0 2px,transparent 2px 4px);
+             border:1px solid var(--refused)}
+.grade p{font-size:13px;color:var(--ink-2);margin-top:6px;max-width:none}
+
+figure{margin:0;display:flex;flex-direction:column;gap:9px}
+/* Sơ đồ CUỘN ở cỡ đọc được thay vì co nhỏ. ĐO ĐƯỢC ở khổ 400px: với
+   width:100% một viewBox rộng 980 co về 338px, tỉ lệ 0,34 — chữ 12,5px
+   trong sơ đồ hiển thị còn khoảng 4px, không đọc nổi. Contract cho phép
+   sơ đồ rộng hơn trang miễn là nó cuộn trong container riêng. */
+figure svg{display:block;height:auto;width:100%;min-width:660px}
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:9px;
+        background:var(--panel);padding:14px}
+figcaption{font-size:13px;color:var(--ink-3);max-width:68ch}
+
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:470px}
+th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);
+      vertical-align:top}
+th{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);
+   font-weight:620;white-space:nowrap}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:0}
+
+ul{margin:0;padding-left:1.15em;max-width:68ch}
+li{margin-block:5px}
+.refuse li{color:var(--ink-2)}
+.quote{border-left:3px solid var(--accent);padding:2px 0 2px 14px;
+       color:var(--ink-2);font-size:14.5px;max-width:64ch}
+footer{padding-block:28px 40px;color:var(--ink-3);font-size:13px}
+@media (prefers-reduced-motion:no-preference){
+  .grow{transform-origin:left center;animation:grow .9s cubic-bezier(.2,.7,.3,1) both}
+  @keyframes grow{from{transform:scaleX(.04)}to{transform:scaleX(1)}}
+}
+</style>
+
+<div class="wrap">
+<header class="stack">
+  <div class="eyebrow">Nghiên cứu khoa học · báo cáo tiến độ</div>
+  <h1>Agent không được phép ghi một lỗ hổng mà không có bằng chứng</h1>
+  <p class="lede">Argus là một hệ thống agent kiểm thử xâm nhập có <strong>cổng chứng minh</strong>:
+    mỗi phát hiện phải trích dẫn byte mà chính mục tiêu đã trả về, và một cổng độc lập
+    chấm điểm bằng chứng đó trước khi nó được gọi là lỗ hổng. Trang này báo cáo những gì
+    đã xây và những gì đã <em>đo được</em> — mọi con số dưới đây đến từ một lần chạy thật.</p>
+</header>
+
+<section class="stack">
+  <div class="eyebrow">Vấn đề</div>
+  <h2>Một agent biết nói “có lỗ hổng” rẻ hơn nhiều so với một agent biết chứng minh</h2>
+  <p>Khi để một mô hình ngôn ngữ tự dò lỗ hổng, cái nó giỏi nhất là <strong>viết ra một
+    bản báo cáo trông hợp lý</strong>. Nó có thể nêu một endpoint không tồn tại, một
+    tham số nó chưa gửi, một CVE nó chưa quan sát. Người đọc không có cách nào phân biệt,
+    vì bản báo cáo nào cũng trôi chảy như nhau.</p>
+  <p>Đề tài này không cố làm mô hình trung thực hơn. Nó <strong>dựng một cái cổng</strong>:
+    phát hiện nào không kèm bằng chứng ghi được từ dây thì không qua. Mô hình được tự do
+    phỏng đoán; cái nó không được tự do làm là <em>gọi phỏng đoán đó là kết quả</em>.</p>
+  <div class="quote">Mô hình đề xuất. Bằng chứng quyết định. Hai việc đó được tách ra
+    bằng mã, không bằng lời nhắc.</div>
+</section>
+<section class="stack">
+  <div class="eyebrow">Kiến trúc</div>
+  <h2>Mọi thứ đi qua một đường ra duy nhất, và đường đó ghi lại</h2>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 980 240" role="img" aria-label="Sơ đồ đường đi: người dùng đặt phạm vi, mô hình chọn nước đi, công cụ thực thi qua một client duy nhất, mọi trao đổi được ghi và băm chuỗi, cổng chứng minh chấm điểm, hồ sơ được niêm phong">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+        </marker>
+      </defs>
+      <g font-family="system-ui,sans-serif" font-size="12.5" fill="currentColor" color="currentColor">
+        <!-- hàng trên: chuỗi chính -->
+        <g>
+          <rect x="6" y="26" width="140" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="76" y="48" text-anchor="middle" font-weight="620">Người dùng</text>
+          <text x="76" y="65" text-anchor="middle" font-size="11" opacity=".72">mục tiêu + phạm vi</text>
+        </g>
+        <line x1="150" y1="52" x2="186" y2="52" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="190" y="26" width="140" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="260" y="48" text-anchor="middle" font-weight="620">LLM</text>
+          <text x="260" y="65" text-anchor="middle" font-size="11" opacity=".72">chọn nước đi</text>
+        </g>
+        <line x1="334" y1="52" x2="370" y2="52" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="374" y="26" width="152" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="450" y="48" text-anchor="middle" font-weight="620">59 công cụ</text>
+          <text x="450" y="65" text-anchor="middle" font-size="11" opacity=".72">probe · scanner · agent</text>
+        </g>
+        <line x1="530" y1="52" x2="566" y2="52" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <!-- cổ chai: một client duy nhất -->
+        <g>
+          <rect x="570" y="20" width="166" height="64" rx="7" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <text x="653" y="42" text-anchor="middle" font-weight="650" fill="var(--accent)">Một đường ra</text>
+          <text x="653" y="58" text-anchor="middle" font-size="11" opacity=".78">GuardedClient</text>
+          <text x="653" y="73" text-anchor="middle" font-size="11" opacity=".78">scope · rate · ghi lại</text>
+        </g>
+        <line x1="740" y1="52" x2="776" y2="52" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="780" y="26" width="146" height="52" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="853" y="48" text-anchor="middle" font-weight="620">Mục tiêu</text>
+          <text x="853" y="65" text-anchor="middle" font-size="11" opacity=".72">được cho phép</text>
+        </g>
+        <!-- nhánh xuống: bằng chứng -->
+        <path d="M653 88 L653 118" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="520" y="122" width="266" height="48" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="653" y="142" text-anchor="middle" font-weight="620">Transcript băm chuỗi</text>
+          <text x="653" y="158" text-anchor="middle" font-size="11" opacity=".72">mỗi mục khoá vào mục trước</text>
+        </g>
+        <path d="M520 146 L404 146" stroke="currentColor" stroke-width="1.3" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="222" y="118" width="178" height="56" rx="7" fill="none" stroke="var(--accent)" stroke-width="2"/>
+          <text x="311" y="140" text-anchor="middle" font-weight="650" fill="var(--accent)">CỔNG CHỨNG MINH</text>
+          <text x="311" y="156" text-anchor="middle" font-size="11" opacity=".78">29 lớp · 4 mức</text>
+        </g>
+        <path d="M222 146 L150 146 L150 196" stroke="currentColor" stroke-width="1.3" fill="none" marker-end="url(#ar)" opacity=".6"/>
+        <g>
+          <rect x="60" y="200" width="180" height="32" rx="7" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="150" y="221" text-anchor="middle" font-size="12">Hồ sơ niêm phong</text>
+        </g>
+        <text x="760" y="190" font-size="11" opacity=".68">Mô hình không bao giờ</text>
+        <text x="760" y="205" font-size="11" opacity=".68">tự chấm điểm việc của mình.</text>
+        <text x="760" y="220" font-size="11" opacity=".68">Cổng đọc bản ghi, không đọc</text>
+        <text x="760" y="235" font-size="11" opacity=".68">lời khai của probe.</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Điểm chịu lực của thiết kế là cái <strong>cổ chai</strong> màu xanh:
+      không công cụ nào được mở socket riêng. Nhờ vậy mọi byte gửi đi và nhận về đều
+      nằm trong transcript, và cổng chứng minh có thể chấm trên bản ghi chứ không chấm
+      trên lời tự thuật của công cụ.</figcaption>
+  </figure>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Cổng chứng minh</div>
+  <h2>Bốn mức, và mức thấp cũng là một kết quả</h2>
+  <div class="grades">
+    <div class="grade">
+      <span class="chip"><span class="dot dot-proven"></span>proven</span>
+      <p>Bằng chứng đáp ứng đủ yêu cầu của lớp đó. Ví dụ với SQLi: dấu vết engine
+        <em>cộng</em> ít nhất một dòng từ một bảng có tên.</p>
+    </div>
+    <div class="grade">
+      <span class="chip"><span class="dot dot-candidate"></span>candidate</span>
+      <p>Có tín hiệu thật nhưng chưa đủ. Một lần vòng qua xác thực chứng minh
+        <em>kênh tiêm</em> tồn tại, không chứng minh <em>đã đọc được dữ liệu</em>.</p>
+    </div>
+    <div class="grade">
+      <span class="chip"><span class="dot dot-unproven"></span>unproven</span>
+      <p>Đã thử và không thấy gì. Đây là thông tin, không phải thất bại — nó nói
+        lớp đó đã được kiểm.</p>
+    </div>
+    <div class="grade">
+      <span class="chip"><span class="dot dot-refused"></span>refused</span>
+      <p>Hệ thống từ chối theo thiết kế. Bằng chứng của một cuộc từ chối dịch vụ
+        <em>chính là</em> cuộc từ chối đó, nên lớp này không bao giờ được chứng minh ở đây.</p>
+    </div>
+  </div>
+  <p>Điều quan trọng với một hội đồng khoa học: <strong>mỗi mức trượt đều kèm tên của
+    check đã trượt và lý do</strong>. Khi cổng nói <code>candidate</code>, nó nói luôn
+    còn thiếu gì — ví dụ <em>“a boolean differential proves the channel, not the read”</em>.
+    Nhờ vậy một bất đồng giữa người và máy giải quyết được trong một bước.</p>
+</section>
+<section class="stack">
+  <div class="eyebrow">Đóng góp chính · đo được</div>
+  <h2>Kết hợp công cụ và agent tìm được nhiều hơn mỗi bên làm riêng</h2>
+  <p>Công cụ quét (<code>ffuf</code>, <code>nmap</code>, <code>nuclei</code>) chỉ tìm được
+    những gì <strong>wordlist đã có sẵn tên</strong>. Mô hình thì ngược lại: nó không
+    quét nhanh, nhưng nó <strong>đọc được hình dạng</strong> những gì vừa trả về —
+    quy ước đặt tên, phần mở rộng, kiểu tham số — và sinh ra ứng viên mới từ đó.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 980 300" role="img" aria-label="Sơ đồ hai làn chạy song song: làn công cụ dùng wordlist có sẵn, làn agent đọc kết quả từng phần và sinh wordlist mới, kết quả hợp lại thành mười endpoint">
+      <g font-family="system-ui,sans-serif" font-size="12.5" fill="currentColor" color="currentColor">
+        <text x="6" y="16" font-size="11.5" font-weight="620" opacity=".66">MỘT URL VÀO</text>
+        <!-- làn công cụ -->
+        <rect x="6" y="34" width="430" height="104" rx="9" fill="none" stroke="currentColor" stroke-width="1.2" opacity=".42"/>
+        <text x="20" y="54" font-weight="650">Làn công cụ</text>
+        <text x="20" y="71" font-size="11.5" opacity=".74">shell riêng cho mỗi công cụ, chạy đồng thời</text>
+        <g font-family="ui-monospace,monospace" font-size="11.5">
+          <rect x="20" y="82" width="86" height="24" rx="5" fill="none" stroke="currentColor" opacity=".55"/>
+          <text x="63" y="98" text-anchor="middle">nmap</text>
+          <rect x="114" y="82" width="86" height="24" rx="5" fill="none" stroke="currentColor" opacity=".55"/>
+          <text x="157" y="98" text-anchor="middle">ffuf</text>
+          <rect x="208" y="82" width="86" height="24" rx="5" fill="none" stroke="currentColor" opacity=".55"/>
+          <text x="251" y="98" text-anchor="middle">nuclei</text>
+        </g>
+        <text x="20" y="126" font-size="11.5" opacity=".74">bị bó bởi wordlist trong <tspan font-family="ui-monospace,monospace">resources/</tspan></text>
+        <!-- làn agent -->
+        <rect x="6" y="152" width="430" height="104" rx="9" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+        <text x="20" y="172" font-weight="650" fill="var(--accent)">Làn agent</text>
+        <text x="20" y="189" font-size="11.5" opacity=".78">chạy ĐỒNG THỜI, không chờ công cụ xong</text>
+        <text x="20" y="211" font-size="11.5" opacity=".78">đọc kết quả từng phần → thấy quy ước</text>
+        <text x="20" y="228" font-size="11.5" opacity=".78">→ sinh ứng viên → lần quét ffuf thứ hai</text>
+        <text x="20" y="247" font-size="11" opacity=".62">một lần gọi, timeout riêng, có ghi vào transcript</text>
+        <!-- mũi tên seed -->
+        <path d="M230 138 L230 152" stroke="var(--accent)" stroke-width="1.4" fill="none" opacity=".8"/>
+        <text x="240" y="149" font-size="10.5" fill="var(--accent)">kết quả từng phần</text>
+        <!-- hợp lại -->
+        <path d="M440 90 L494 136" stroke="currentColor" stroke-width="1.3" opacity=".55" fill="none"/>
+        <path d="M440 204 L494 158" stroke="var(--accent)" stroke-width="1.5" fill="none"/>
+        <rect x="498" y="118" width="150" height="58" rx="8" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".6"/>
+        <text x="573" y="142" text-anchor="middle" font-weight="620">Hợp lại</text>
+        <text x="573" y="160" text-anchor="middle" font-size="11" opacity=".74">khử trùng lặp</text>
+        <!-- kết quả đo -->
+        <g font-family="ui-monospace,monospace">
+          <text x="676" y="60" font-family="system-ui,sans-serif" font-size="11.5" font-weight="620" opacity=".66">ĐO TRÊN JUICE SHOP</text>
+          <text x="676" y="92" font-size="12" opacity=".8" font-family="system-ui,sans-serif">chỉ công cụ</text>
+          <rect x="676" y="100" width="108" height="20" rx="4" fill="currentColor" opacity=".3" class="grow"/>
+          <text x="792" y="115" font-size="15" font-weight="650">6</text>
+          <text x="676" y="146" font-size="12" opacity=".8" font-family="system-ui,sans-serif">công cụ + agent</text>
+          <rect x="676" y="154" width="180" height="20" rx="4" fill="var(--accent)" class="grow"/>
+          <text x="864" y="169" font-size="15" font-weight="650" fill="var(--accent)">10</text>
+          <text x="676" y="200" font-size="11" font-family="system-ui,sans-serif" opacity=".72">agent thêm:</text>
+          <text x="676" y="217" font-size="11.5">/ftp  /rest</text>
+          <text x="676" y="234" font-size="11.5">/api-docs</text>
+          <text x="676" y="258" font-size="11" font-family="system-ui,sans-serif" opacity=".72">agent làm mất: 0</text>
+        </g>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Một lần chạy <code>ffuf</code> trên OWASP Juice Shop. Nửa agent
+      <strong>chỉ cộng thêm</strong> theo cấu trúc — nó góp một wordlist, và một wordlist
+      chỉ có thể tìm ra thêm đường, không thể làm mất đường đã tìm được. Ba endpoint nó
+      thêm (<code>/ftp</code>, <code>/rest</code>, <code>/api-docs</code>) là ba endpoint
+      đáng giá mà wordlist chung không mang theo.</figcaption>
+  </figure>
+  <div class="cards">
+    <div class="card">
+      <h3>Nửa agent bị bó như một tiến trình ngoài</h3>
+      <p>Một lần gọi, timeout 20 giây, counter token riêng. Lý do rất cụ thể: luồng chạy
+        nó <em>không thể bị huỷ</em> trong Python, nên nếu để 5 lần thử thì riêng thời gian
+        ngủ giữa các lần đã là 62 giây — và luồng bị bỏ rơi vẫn tiếp tục tiêu tiền.</p>
+    </div>
+    <div class="card">
+      <h3>Lỗi của nhà cung cấp không mang byte của họ</h3>
+      <p>Thông điệp lỗi từ API có thể chứa lại chính khoá đã gửi. Chỉ <em>loại</em> ngoại lệ
+        được ghi, không bao giờ nội dung. Đã kiểm bằng một lỗi 401 có nhúng khoá:
+        khoá không xuất hiện ở đâu trong bản ghi.</p>
+    </div>
+    <div class="card">
+      <h3>Thiếu khoá được báo là thiếu khoá</h3>
+      <p>Không cấu hình model thì nửa công cụ vẫn chạy, và báo cáo nói rõ
+        <em>“không với tới được model X”</em> — chứ không phải “model đã chạy và không nói gì”.
+        Hai điều đó là hai sự thật khác nhau.</p>
+    </div>
+  </div>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Mở rộng theo chiều ngang</div>
+  <h2>Khi tìm được nhiều endpoint, cả shell và agent chạy cho từng cái cùng lúc</h2>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 980 212" role="img" aria-label="Sơ đồ fan-out: một lần recon ra ba endpoint, mỗi endpoint được cấp một bộ shell công cụ và một agent, cả ba chạy đồng thời">
+      <g font-family="system-ui,sans-serif" font-size="12.5" fill="currentColor" color="currentColor">
+        <rect x="6" y="80" width="126" height="48" rx="8" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".58"/>
+        <text x="69" y="100" text-anchor="middle" font-weight="620">recon</text>
+        <text x="69" y="117" text-anchor="middle" font-size="11" opacity=".74">3 endpoint</text>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" opacity=".5">
+          <path d="M136 104 L176 48"/><path d="M136 104 L176 104"/><path d="M136 104 L176 160"/>
+        </g>
+        <g font-family="ui-monospace,monospace" font-size="11">
+          <g>
+            <rect x="180" y="24" width="330" height="48" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="194" y="44" font-family="system-ui,sans-serif" font-size="11.5">/rest/products/search</text>
+            <text x="194" y="62">curl · nuclei · sqlmap  +  agent</text>
+          </g>
+          <g>
+            <rect x="180" y="80" width="330" height="48" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="194" y="100" font-family="system-ui,sans-serif" font-size="11.5">/rest/user/login</text>
+            <text x="194" y="118">curl · nuclei · sqlmap  +  agent</text>
+          </g>
+          <g>
+            <rect x="180" y="136" width="330" height="48" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="194" y="156" font-family="system-ui,sans-serif" font-size="11.5">/api/Challenges</text>
+            <text x="194" y="174">curl · nuclei · sqlmap  +  agent</text>
+          </g>
+        </g>
+        <text x="540" y="44" font-size="11.5" font-weight="620" opacity=".66">ĐO ĐƯỢC</text>
+        <text x="540" y="70" font-size="12.5">3 luồng agent <tspan font-weight="650">khác nhau</tspan></text>
+        <text x="540" y="92" font-size="12.5">bắt đầu cách nhau <tspan font-family="ui-monospace,monospace" font-weight="650">0,53 s</tspan></text>
+        <text x="540" y="114" font-size="12.5">tổng <tspan font-family="ui-monospace,monospace" font-weight="650">37,9 s</tspan> — không phải 3×38</text>
+        <text x="540" y="146" font-size="11.5" opacity=".72">mỗi endpoint có thư mục riêng, vì sqlmap</text>
+        <text x="540" y="163" font-size="11.5" opacity=".72">khoá file phiên theo host: hai endpoint</text>
+        <text x="540" y="180" font-size="11.5" opacity=".72">cùng host sẽ phá state của nhau</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Một endpoint ngoài phạm vi được <strong>từ chối trước khi có tiến trình nào</strong>,
+      và nó tự chối riêng nó chứ không làm sụp cả lượt gọi. Khi không có gì được quét,
+      kết quả nói <em>“NOTHING WAS SCANNED”</em> thay vì báo 0 phát hiện — vì một mô hình
+      đọc “0 phát hiện” sẽ mở rộng wordlist và thử lại mãi.</figcaption>
+  </figure>
+</section>
+<section class="stack">
+  <div class="eyebrow">Đối chứng độc lập</div>
+  <h2>Số do chính mục tiêu ghi, không phải số hệ thống tự khai</h2>
+  <p>Mọi con số một hệ thống tự nói về mình đều là nó tự chấm việc của nó. Cổng chứng minh
+    làm việc tự chấm đó <em>trung thực</em>, nhưng không làm nó <em>độc lập</em>: “proven”
+    nghĩa là bằng chứng đạt một yêu cầu do chính hệ thống viết ra.</p>
+  <p>OWASP Juice Shop có một thứ giải được chuyện đó: nó phục vụ
+    <code>GET /api/Challenges</code> — <strong>118 bài</strong>, mỗi bài có một cờ
+    <code>solved</code> mà <strong>chính ứng dụng</strong> đặt từ góc nhìn của nó.
+    Không phần nào của hệ thống này ghi được cờ đó.</p>
+  <figure>
+    <div class="scroll">
+    <svg viewBox="0 0 980 170" role="img" aria-label="Sơ đồ đối chứng: đọc bảng điểm trước khi chạy, chạy khai thác, đọc lại, và chỉ phần chênh lệch mới được tính">
+      <g font-family="system-ui,sans-serif" font-size="12.5" fill="currentColor" color="currentColor">
+        <g>
+          <rect x="6" y="40" width="168" height="54" rx="8" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="90" y="62" text-anchor="middle" font-weight="620">Đọc bảng điểm</text>
+          <text x="90" y="80" text-anchor="middle" font-size="11" opacity=".74">TRƯỚC khi chạy</text>
+          <text x="90" y="112" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13">1 / 118</text>
+        </g>
+        <path d="M178 67 L214 67" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+        <g>
+          <rect x="218" y="34" width="210" height="66" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="323" y="56" text-anchor="middle" font-weight="650" fill="var(--accent)">Khai thác thật</text>
+          <text x="323" y="74" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11">' OR true--</text>
+          <text x="323" y="91" text-anchor="middle" font-size="11" opacity=".76">đối chứng 401 → payload 200</text>
+        </g>
+        <path d="M432 67 L468 67" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+        <g>
+          <rect x="472" y="40" width="168" height="54" rx="8" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+          <text x="556" y="62" text-anchor="middle" font-weight="620">Đọc lại</text>
+          <text x="556" y="80" text-anchor="middle" font-size="11" opacity=".74">SAU khi chạy</text>
+          <text x="556" y="112" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="var(--accent)">2 / 118</text>
+        </g>
+        <path d="M644 67 L680 67" stroke="currentColor" stroke-width="1.3" opacity=".55"/>
+        <g>
+          <rect x="684" y="34" width="290" height="66" rx="8" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="829" y="54" text-anchor="middle" font-weight="650" fill="var(--accent)">Chỉ phần CHÊNH được tính</text>
+          <text x="829" y="72" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11">loginAdminChallenge</text>
+          <text x="829" y="90" text-anchor="middle" font-size="11" opacity=".76">target tự xác nhận, không phải ta</text>
+        </g>
+        <text x="6" y="146" font-size="11.5" opacity=".72">Bảng điểm là tích luỹ. Không trừ đi phần đã giải trước đó thì một mục tiêu người khác</text>
+        <text x="6" y="163" font-size="11.5" opacity=".72">đã chọc hôm qua sẽ được tính công cho lần chạy này — đúng lỗi “lấy tuyệt đối thay cho vi phân”.</text>
+      </g>
+    </svg>
+    </div>
+    <figcaption>Và module này <strong>cố ý không nằm trên bảng công cụ của agent</strong>:
+      một hệ thống đọc được bảng điểm là đọc được đáp án, và phép đo khi đó là đo một hệ thống
+      <em>đã được mách</em>. Người vận hành đọc nó, trước và sau, quanh một lượt chạy mà agent
+      làm trong mù.</figcaption>
+  </figure>
+  <div class="cards">
+    <div class="card">
+      <h3>Rộng không được thưởng miễn phí</h3>
+      <p>Thí nghiệm đầu cho thấy một lượt tuyên bố <em>cả 5 lớp</em> ghi điểm y như lượt
+        tuyên bố đúng một lớp. Thiếu một ngăn: tuyên bố mà bảng điểm không đối chứng.
+        Giờ nó được báo riêng, nên vơ vét hiện ra chứ không được che.</p>
+    </div>
+    <div class="card">
+      <h3>Điểm bị giữ lại khác với im lặng</h3>
+      <p>Một lần vòng qua xác thực làm lật một bài, mà cổng chấm <code>candidate</code> —
+        và cổng <strong>đúng</strong>: bypass chứng minh kênh, không chứng minh việc đọc.
+        Nếu gộp với “không tuyên bố gì” thì báo cáo sẽ nói oracle tìm ra lỗi hệ thống bỏ sót.</p>
+    </div>
+  </div>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Chứng minh trên mục tiêu thật</div>
+  <h2>Ba lớp đi hết đường, trên ứng dụng do người khác viết</h2>
+  <p>Gỡ một cái trần <strong>không phải là việc</strong>. Việc là chứng minh lớp đó
+    đạt được mức cao nhất trên một mục tiêu thật — và mỗi lớp khi đi hết đường đều
+    lộ ra một lỗi mà trước đó không ai thấy.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Lớp</th><th>Chứng minh trên</th><th>Lỗi lộ ra khi đi hết đường</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="n">sqli</td>
+        <td>SQLite (Juice Shop) <em>và</em> MySQL (bWAPP)</td>
+        <td>Mẫu nhận dạng engine của <strong>bộ chấm</strong> không biết dạng lỗi của driver
+            node, nên một mục tiêu SQLite thật không thể qua được một check mà sáu check
+            còn lại đã qua.</td>
+      </tr>
+      <tr>
+        <td class="n">xss</td>
+        <td>bWAPP, browser thật thực thi payload</td>
+        <td>Phiên đưa sang browser bị đọc từ một dict <strong>vốn rỗng</strong>, nên browser
+            vào trang cần xác thực mà không có phiên, rơi vào trang login, và ba payload
+            “không thực thi”.</td>
+      </tr>
+      <tr>
+        <td class="n">ssrf</td>
+        <td>Callback thật từ máy lab, <code>peer=192.168.223.221</code></td>
+        <td>Hàm chọn địa chỉ callback <strong>rơi im lặng về loopback</strong> khi nhận một URL,
+            nên callback trỏ vào loopback của chính mục tiêu.</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Ba lỗi đó có một điểm chung đáng thành kết luận của đề tài:
+    <strong>cả ba đều cho ra một kết quả âm trông sạch sẽ, và không cái nào sinh ra lỗi</strong>.
+    Không có traceback, không có cảnh báo — chỉ là “không tìm thấy gì”. Trong một hệ thống
+    mà sản phẩm là một phán quyết, dạng lỗi nguy hiểm nhất không phải lỗi làm nó sập,
+    mà lỗi làm nó <em>im lặng trả lời sai</em>.</p>
+</section>
+<section class="stack">
+  <div class="eyebrow">Quy mô hiện tại</div>
+  <h2>Những con số kiểm được</h2>
+  <div class="figs">
+    <div class="fig"><b>59</b><span>công cụ trên bảng</span></div>
+    <div class="fig"><b>29</b><span>lớp chứng minh</span></div>
+    <div class="fig"><b>36</b><span>module phương pháp</span></div>
+    <div class="fig"><b>1071</b><span>test</span></div>
+    <div class="fig"><b>164</b><span>kiểm tra ngoại tuyến</span></div>
+    <div class="fig"><b>0</b><span>lớp bị chặn trần</span></div>
+  </div>
+  <div class="figs">
+    <div class="fig"><b>28 480</b><span>dòng mã nguồn</span></div>
+    <div class="fig"><b>23 606</b><span>dòng test</span></div>
+    <div class="fig"><b>4</b><span>hồ sơ niêm phong</span></div>
+    <div class="fig"><b>118</b><span>bài đối chứng độc lập</span></div>
+  </div>
+  <p>Hai con số cuối của hàng đầu đáng nói riêng. <strong>164 kiểm tra ngoại tuyến</strong>
+    chạy không cần khoá API, và một phần trong đó kiểm chính <em>tài liệu</em>: nó bắt lỗi
+    khi tài liệu nêu một lệnh, một cờ hay một công cụ không tồn tại. Với một đề tài có
+    luận đề là “hệ thống này không bịa ra thứ gì”, một README nêu một lệnh đã bị xoá
+    <strong>là một lỗi đúng nghĩa</strong>, không phải chuyện nhỏ về trình bày.</p>
+  <p><strong>0 lớp bị chặn trần</strong> nghĩa là không lớp nào bị khoá ở mức dưới
+    <code>proven</code> vì thiếu thiết bị. Lớp duy nhất không bao giờ đạt <code>proven</code>
+    ở đây là từ chối dịch vụ — và đó là một quyết định, không phải một giới hạn.</p>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>Hồ sơ niêm phong</th><th>Trao đổi đã ghi</th><th>Phát hiện</th><th>Đạt proven</th><th>Xác thực chuỗi băm</th></tr></thead>
+    <tbody>
+      <tr><td class="n">argus-lab</td><td class="n">66</td><td class="n">6</td><td class="n">5</td><td>OK</td></tr>
+      <tr><td class="n">argus-lab-team</td><td class="n">76</td><td class="n">6</td><td class="n">5</td><td>OK</td></tr>
+      <tr><td class="n">bwapp</td><td class="n">24</td><td class="n">2</td><td class="n">2</td><td>OK</td></tr>
+      <tr><td class="n">dvwa</td><td class="n">19</td><td class="n">2</td><td class="n">2</td><td>OK</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Mỗi hồ sơ là một thư mục có thể kiểm lại độc lập bằng
+    <code>argus verify &lt;thư mục&gt;</code>. Nó xác minh rằng từng mục trong transcript
+    khoá đúng vào mục trước nó, nên <strong>không thể sửa một byte bằng chứng mà
+    chuỗi vẫn khớp</strong>. Đó là điều cho phép một người thứ ba kiểm lại kết luận
+    mà không cần tin người chạy.</p>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Giới hạn có chủ ý</div>
+  <h2>Những gì hệ thống từ chối làm, và vì sao đó là một đóng góp</h2>
+  <ul class="refuse">
+    <li><strong>Từ chối dịch vụ</strong> — bằng chứng của nó chính là thiệt hại, nên lớp này
+      không bao giờ đạt <code>proven</code> ở đây.</li>
+    <li><strong>Trụ lại trong hệ thống, di chuyển ngang, lấy credential, rút dữ liệu</strong> —
+      không phần nào của hệ thống hỗ trợ.</li>
+    <li><strong>Thi hành mã</strong> được chứng minh bằng <code>id; echo &lt;nonce&gt;</code>
+      rồi <em>dừng</em>. Không webshell, không đổi cấu hình mục tiêu.</li>
+    <li><strong>Tầng xâm nhập</strong> không mở nếu không có văn bản cho phép nêu rõ
+      ai cho phép và trong khoảng thời gian nào.</li>
+  </ul>
+  <p>Trong phiên làm việc này, ba thẻ phương pháp (nạp vào ngữ cảnh mô hình lúc chạy)
+    hoá ra đang dạy agent lấy IAM credential, liệt kê mạng nội bộ, và gửi cookie phiên
+    ra ngoài. Câu hỏi dùng để sửa <em>không phải</em> “cái này nghe có nguy hiểm không”,
+    mà <strong>“cái này thêm gì cho việc chứng minh?”</strong></p>
+  <div class="quote">Một dịch vụ metadata bị lộ nghiêm trọng như nhau dù người kiểm thử
+    có giữ khoá trong tay hay không. Nên việc lấy khoá <em>không</em> làm phát hiện mạnh hơn —
+    nó chỉ biến phát hiện thành một hành vi mà đề tài này từ chối.</div>
+  <p>Và phần đọc dữ liệu vẫn được giữ nguyên: <code>LOAD_FILE('/etc/passwd')</code> là
+    bằng chứng đúng, cùng lý do <code>id</code> là bằng chứng đúng cho thi hành mã —
+    file đó ai cũng đọc được, không chứa secret, và việc nó về được qua điểm tiêm
+    là đủ để kết luận. Chặn bừa cả vùng sẽ gỡ mất năng lực thật.</p>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Tiến độ</div>
+  <h2>Khối lượng công việc và mức hoàn thành</h2>
+  <div class="scroll">
+  <table>
+    <thead><tr><th>STT</th><th>Nội dung công việc</th><th>Tỉ lệ hoàn thành</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Nghiên cứu tổng quan và phân tích yêu cầu đề tài</td><td class="n">100%</td></tr>
+      <tr><td class="n">2</td><td>Khảo sát công nghệ và lựa chọn mô hình AI phù hợp</td><td class="n">90%</td></tr>
+      <tr><td class="n">3</td><td>Thiết kế kiến trúc hệ thống AI tác tử</td><td class="n">50%</td></tr>
+      <tr><td class="n">4</td><td>Xây dựng môi trường lab và mục tiêu thử nghiệm</td><td class="n">40%</td></tr>
+      <tr><td class="n">5</td><td>Xây dựng các mô đun dò tìm lỗ hổng và thu thập bằng chứng</td><td class="n">30%</td></tr>
+      <tr><td class="n">6</td><td>Xây dựng AI tác tử xác thực lỗ hổng và tổng hợp kết quả kiểm thử</td><td class="n">10%</td></tr>
+      <tr><td class="n">7</td><td>Tích hợp, thử nghiệm và đánh giá hệ thống</td><td class="n">0%</td></tr>
+      <tr><td class="n">8</td><td>Tổng hợp kết quả và viết báo cáo</td><td class="n">0%</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>Tiến độ chung của đề tài: <strong>khoảng 40%</strong>.</p>
+  <h3>Kế hoạch thực hiện tiếp theo</h3>
+  <ul>
+    <li>Hoàn thiện môi trường lab và bổ sung mục tiêu thử nghiệm</li>
+    <li>Hoàn thiện các mô đun dò tìm lỗ hổng và thu thập bằng chứng</li>
+    <li>Xây dựng AI tác tử xác thực lỗ hổng</li>
+    <li>Tích hợp và thử nghiệm hệ thống trên nhiều mục tiêu</li>
+    <li>Đánh giá kết quả và hoàn thiện báo cáo</li>
+  </ul>
+  <p>Các nội dung trên để ở mức tổng quát, vì hướng triển khai chi tiết của những
+    hạng mục sau còn có thể điều chỉnh. Phần đã làm được và cách kiểm lại từng con số
+    nằm ở các mục phía trên của báo cáo này.</p>
+</section>
+
+<section class="stack">
+  <div class="eyebrow">Còn lại</div>
+  <h2>Chưa làm được, và vì sao</h2>
+  <div class="cards">
+    <div class="card">
+      <h3>So sánh nhiều mô hình</h3>
+      <p>Cần khoá API cho từng mô hình. Phần <em>bằng chứng có thật hay không</em> đã trả lời
+        được mà không cần mô hình nào — toàn bộ phần xác minh ba lớp ở trên chạy với probe
+        tất định. Phần còn thiếu là <em>mô hình nào tìm ra nó</em>.</p>
+    </div>
+    <div class="card">
+      <h3>Dạng lỗi của PostgreSQL</h3>
+      <p>Chưa xác minh: lab không có mục tiêu PostgreSQL và driver không được cài, vì
+        package chỉ dùng standard library. Test nói rõ là <em>chưa xác minh</em> chứ không
+        im lặng để người đọc tưởng đã kiểm.</p>
+    </div>
+    <div class="card">
+      <h3>Báo cáo dạng HackerOne</h3>
+      <p>Bộ dựng báo cáo hiện theo dạng pentest cổ điển. Phần khảo sát để chuyển sang dạng
+        một mục cho mỗi phát hiện — kèm Steps To Reproduce và PoC dựng từ byte thật trong
+        transcript — đã xong, chưa triển khai.</p>
+    </div>
+  </div>
+</section>
+
+<footer class="stack-sm">
+  <p>Mọi con số trên trang này đến từ một lần chạy thật trên mã nguồn hiện tại và được
+    ghi trong <code>CHANGELOG.md</code> của kho mã, kèm lệnh để kiểm lại.
+    Luận đề và kiến trúc được trình bày chi tiết hơn ở
+    <code>docs/nckh-evidence/presentation.html</code>.</p>
+  <p>Trang này tự chứa hoàn toàn: không tải font, script hay ảnh từ bên ngoài, nên mở được
+    từ ổ đĩa và không gửi request nào đi đâu khi xem.</p>
+</footer>
+</div>
