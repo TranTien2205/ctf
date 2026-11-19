@@ -78,6 +78,19 @@ Depth, one named file at a time:
 
 | Any bytecode/custom-VM question | `references/instruction-decoding.md` |
 
+## The corpus — the workflow's anchors
+
+`references/` carries ~1,870 modules in base/deep/checklist/map form.
+Start from these:
+
+- The end-to-end route — `references/the-workflow.md`, `references/op-decode-depth.md`, `references/vm-worked-full.md`, `references/the-map-index.md`
+- .pyc — `references/the-magic.md`, `references/the-header.md`, `references/the-marshal.md`, `references/the-pyc-dis.md`, `references/pyc-version-depth.md`, `references/co-fields.md`, `references/dis-reading.md`, `references/the-nested-code.md`, `references/pyc-check-locate.md`, `references/the-decompile-gap.md`, `references/the-pyinstaller.md`
+- Custom VM — `references/the-custom-vm.md`, `references/dispatch-table-recovery.md`, `references/the-input-op.md`, `references/the-program-array.md`, `references/jump-target-decode.md`, `references/the-register-decode.md`, `references/the-const-pool.md`, `references/the-runtime-table.md`, `references/the-vm-trace.md`, `references/the-check-sum.md`, `references/vm-failfast-oracle.md`
+- WASM — `references/the-wasm-module.md`, `references/wasm-check-depth.md`, `references/wasm-data-seg.md`, `references/the-wat.md`
+- Other bytecode — `references/the-class-files.md`, `references/the-smali.md`, `references/the-luac.md`, `references/the-beam.md`, `references/evm-dis.md`
+- Check shapes — `references/the-compare-first.md`, `references/the-transform-order.md`, `references/the-length-check.md`, `references/the-oracle-vm.md`, `references/the-check-sum.md`
+- Discipline — `references/evidence-depth.md`, `references/the-verify-rule.md`, `references/the-falsifiers.md`, `references/checklist-deep.md`, `references/traps-depth.md`, `references/class-boundary.md`, `references/the-worked-1.md`, `references/the-worked-2.md`, `references/the-worked-3.md`, `references/the-map-index.md`
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

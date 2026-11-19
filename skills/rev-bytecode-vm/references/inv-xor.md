@@ -1,0 +1,3 @@
+# Inverting ^
+
+xor — self-inverse.

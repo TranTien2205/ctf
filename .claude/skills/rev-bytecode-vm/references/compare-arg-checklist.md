@@ -1,0 +1,12 @@
+# The compare's operand — checklist
+
+Companion to `compare-arg.md`.
+
+## Checklist
+
+- [ ] Format identified (magic/header)
+- [ ] Check located
+- [ ] Table/dis read
+- [ ] Expected extracted
+- [ ] Input produced
+- [ ] Verified

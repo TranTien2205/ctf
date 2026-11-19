@@ -1,0 +1,12 @@
+# Recovering the opcode table — checklist
+
+Companion to `vm-table-recover.md`.
+
+## Checklist
+
+- [ ] Format identified (magic/header)
+- [ ] Check located
+- [ ] Table/dis read
+- [ ] Expected extracted
+- [ ] Input produced
+- [ ] Verified

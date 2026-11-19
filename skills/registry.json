@@ -1455,9 +1455,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1040,
-      "depth_files": 3,
-      "depth_tokens": 888,
+      "skill_tokens": 1499,
+      "depth_files": 1875,
+      "depth_tokens": 68513,
       "use_when": [
         "a probe or source read produced this class's signal: for a .pyc read the header magic and name the python version before running any decompiler, falling back to the stdlib dis module on the unmarshalled code object when uncompyle6 refuses; for a custom VM recover the OPCODE TABLE before reading one instruction of its program"
       ],
