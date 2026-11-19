@@ -8007,12 +8007,52 @@ it.
 Both were reported rather than taken, because each one changes what the
 system claims rather than whether it keeps its claims.
 
+### The same bug on two subjects was two findings
+
+The dedup key had already decided that a different subject VALUE on one
+endpoint is one finding: it keeps query parameter NAMES and drops their
+values, so two ids in a query string merge. The path was used verbatim, so
+the same bug written as a REST path parameter got the opposite treatment.
+Measured:
+
+    /item?id=1   vs /item?id=9      merged
+    /api/user/2  vs /api/user/3     SPLIT
+
+AND IT IS REACHABLE, which is how it was found. Running the ledger against
+a live session that already held an idor finding for one subject, it
+recommended recording the next subject as a NEW finding - correctly, by its
+own rules: the evidence is in the transcript and no finding cites it. So an
+engagement against a REST API with N enumerable subjects produced N
+findings for one bug, and the report counted N.
+
+That is inflation at the source rather than at the presentation layer: not
+a renderer double-counting, but the store genuinely holding N rows.
+
+Numeric path segments now normalise, matching the decision already made for
+query values. NARROW ON PURPOSE, because the note on that key is right that
+over-merging hides a real finding and that is worse than the duplicate it
+prevents. Only all-digit segments: a version segment keeps two APIs apart,
+two collections with the same subject id stay apart, a longer path stays
+its own endpoint, and a segment that merely begins with a digit - an
+authentication factor count, for instance - is not an id. A uuid segment is
+also an identifier, and merging those is a larger claim that can have its
+own evidence and its own test.
+
+Both directions planted: the verbatim path fails, and a looser rule that
+merges anything beginning with a digit fails.
+
+FOUND BY RUNNING THE LEDGER, which had never been run on a session that
+needed a decision. The rule that blocks an engagement's exit while a proven
+finding has no second-family reading was added earlier today and its output
+had only been reasoned about, never read. The first thing it actually said
+was about something else entirely.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1176 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1178 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

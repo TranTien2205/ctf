@@ -559,7 +559,30 @@ def _finding_key(category: str, url: str) -> tuple:
         host = f"{host}:{port}"
     elif not host and p.netloc:
         host = p.netloc.lower()
-    return (cat, host, p.path or "/", params)
+    # A PURELY NUMERIC PATH SEGMENT IS A SUBJECT, NOT AN ENDPOINT, and this
+    # line already made that decision for query strings: `params` keeps the
+    # NAMES and drops the values, so `/item?id=1` and `/item?id=9` are one
+    # finding. The path was used verbatim, so the same bug expressed as a
+    # REST path parameter got the opposite treatment. Measured:
+    #
+    #   /item?id=1   vs /item?id=9      merged
+    #   /api/user/2  vs /api/user/3     SPLIT
+    #
+    # And it is reachable rather than theoretical: on a live session with an
+    # idor finding recorded for one subject, `argus next` recommends
+    # recording the next subject as a new finding, because the evidence
+    # exists and no finding cites it. An engagement against a REST API with
+    # N enumerable subjects yields N findings for one bug.
+    #
+    # Narrow on purpose, because the note above is right that over-merging
+    # hides a real finding and that is worse than the duplicate it prevents.
+    # ONLY all-digit segments: `v2` keeps its endpoint apart from `v3`, and
+    # `/api/user/2` stays apart from `/api/order/2`. A uuid segment is also
+    # an identifier, and merging those is a larger claim with its own
+    # evidence, so it is left for one.
+    segments = tuple("{id}" if seg.isdigit() else seg
+                     for seg in (p.path or "/").split("/"))
+    return (cat, host, "/".join(segments) or "/", params)
 
 
 # Audit-grade reports carry standard identifiers; the category the model

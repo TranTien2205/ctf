@@ -919,3 +919,57 @@ def test_recording_and_re_validation_agree_on_every_form(tmp_path):
         finally:
             srv.shutdown()
             srv.server_close()
+
+
+def test_the_same_bug_on_two_subjects_is_one_finding():
+    """MEASURED, AND REACHABLE - the ledger actively recommends the second.
+
+    The dedup key already decided that a different subject VALUE on one
+    endpoint is one finding: `params` keeps query parameter NAMES and drops
+    their values, so two ids in a query string merge. The path was used
+    verbatim, so the same bug written as a REST path parameter got the
+    opposite treatment:
+
+        /item?id=1   vs /item?id=9      merged
+        /api/user/2  vs /api/user/3     SPLIT
+
+    On a live session with an idor finding recorded for one subject, `argus
+    next` recommends recording the next subject as a new finding, because
+    the evidence exists in the transcript and no finding cites it. An
+    engagement against a REST API with N enumerable subjects therefore
+    produced N findings for one bug - inflation at the ledger level, which
+    a report then counts as N.
+    """
+    from argus.session import _finding_key
+
+    def merges(a, b):
+        return _finding_key("idor", a) == _finding_key("idor", b)
+
+    assert merges("http://t/api/user/2", "http://t/api/user/3")
+    assert merges("http://t/page/1", "http://t/page/2")
+    assert merges("http://t/item?id=1", "http://t/item?id=9"), \
+        "the query-string behaviour this matches must not change"
+
+
+def test_normalising_a_subject_does_not_merge_two_endpoints():
+    """THE DIRECTION THAT MATTERS MORE, and the reason this is narrow.
+
+    The comment on this key says over-merging hides a second real finding
+    and that is worse than the duplicate it prevents. So only ALL-DIGIT
+    segments normalise: a version segment is not one, and two different
+    collections with the same subject id stay apart.
+    """
+    from argus.session import _finding_key
+
+    def merges(a, b):
+        return _finding_key("idor", a) == _finding_key("idor", b)
+
+    assert not merges("http://t/api/user/2", "http://t/api/order/2"), \
+        "two collections with one subject id are two endpoints"
+    assert not merges("http://t/api/v2/user", "http://t/api/v3/user"), \
+        "a version segment is part of the endpoint, not a subject"
+    assert not merges("http://t/a", "http://t/b")
+    assert not merges("http://t/u/2", "http://t/u/2/edit"), \
+        "a longer path is a different endpoint"
+    assert not merges("http://t/api/2fa/enrol", "http://t/api/3fa/enrol"), \
+        "a segment that merely starts with a digit is not an id"
