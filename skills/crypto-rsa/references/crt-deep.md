@@ -1,50 +1,49 @@
-# crt deep — residues, CRT-RSA, and the Bellcore fault
+# crt deep — residues / Bellcore fault / dp-dq-qInv, the full treatment
 
-## Three preconditions
+## The three recoveries
 
-1. **Residues**: `m ≡ ri (mod pi)` for several small coprime `pi` — combine to
-   `m mod ∏pi`; if `∏pi > m`, `m` is recovered.
-2. **CRT-RSA leak**: `dp`,`dq`,`qInv` (the fast-decryption params) leak →
-   reconstruct the private key.
-3. **Bellcore fault**: a correct `s` and a faulty `s'` of the same `m` →
-   `gcd(s'^e - m, n) = q` (or `p`).
+### 1. Residue reconstruction
+`m` given mod `p_i` for several `p_i`, `∏pi > m` → CRT → `m`. The classic
+"split the secret across primes" — the `crt` id's `--residues/--moduli` form.
 
-## The maths
+### 2. Bellcore fault
+A CRT-signing device returns a correct `sig = m^d` and a faulty `sig'` of the
+same `m`. `sig'^e - m ≡ 0 mod p` (correct half) but `≢0 mod q` →
+`gcd(sig'^e - m, n) = p` (or `q`). **Manual** — `gcd`, not a `crypto_attack.py`
+flag.
 
-### Residue recovery
-CRT: `x ≡ ri mod pi` for `i=1..k`, `∏pi` coprime → unique `x mod ∏pi`. If
-`∏pi > m`, `x = m`.
+### 3. dp/dq/qInv leak
+`dp = d mod (p-1)` etc. in a partial private key → recover `p`,`q`:
+`e·dp - 1 = k·(p-1)` for some `k` → try `p` candidates from `e·dp-1`.
+**Manual** — a `gcd`/loop, not a `crypto_attack.py` flag.
 
-### CRT-RSA
-`mp = c^dp mod p`, `mq = c^dq mod q`, `m = mp + q·((qInv·(mp-mq)) mod p)` or the
-symmetric form. A leaked `dp` alone: `e·dp - 1` is a multiple of `p-1` →
-`gcd(a^(e·dp-1)-1, n) = p`.
+## Detection
 
-### Bellcore
-A fault in `mp` makes `s'` valid mod `q` but not `p`: `s'^e ≡ m mod q`,
-`s'^e ≢ m mod p` → `gcd(s'^e - m, n) = q`. Needs a correct `s` *and* a faulty
-`s'` of the same `m`.
+- **residues**: `m mod pi` for several `pi`, `∏pi>m`.
+- **a fault**: `sig_correct` and `sig_faulty` of the same `m`.
+- **`dp`,`dq`,`qInv`** in a partial private key.
 
-## The tool
+## The bounds
+
+- residues: `∏pi > m` for a unique `m`.
+- fault: a correct+faulty pair on the same `m`.
+- `dp`: `e·dp - 1` divisible by some `k` giving `p`.
+
+## The attacks
 
 ```bash
-python3 tools/crypto_attack.py crt --residues "r1,r2,...;p1,p2,..."
+python3 tools/crypto_attack.py crt --residues "r1,r2,..." --moduli "p1,p2,..."
 ```
 
-## The bound / falsifier
-
-- Residues: `∏pi > m` required.
-- Bellcore: a fault + a correct sig of the same `m`.
-- `dp`,`dq`,`qInv` must be consistent with `n`.
+```python
+# Bellcore — manual
+q = gcd(pow(sig_faulty, e, n) - m, n)
+# dp — manual
+for k in range(1, e):
+    p = (e*dp - 1)//k + 1
+    if n % p == 0: break
+```
 
 ## The verify
 
-`pow(m,e,n)==c`, or `p*q==n` for a recovered factor.
-
-## The traps
-
-- Bellcore needs the **faulty** signature — a correct `s` alone is not enough;
-  the challenge must inject the fault.
-- A single `dp` (not `dq` too) still factors `n` via the `e·dp-1` gcd.
-- The CRT-RSA private-key PEM carries `dp`,`dq`,`qInv` as fields — a "partially
-  redacted private key" leaks them.
+`pow(m,e,n)==c` / `gcd==q` / `p*q==n`.

@@ -1,51 +1,62 @@
-# hastad deep — the broadcast attack, in full
+# hastad deep — the broadcast attack, the full treatment
 
-## The precondition
+## The mechanism
 
-The **same** plaintext `m` encrypted to `e` different recipients under `e`
-different moduli `n1…ne`, all with the same small `e`. You hold `c1…ce`.
+The same `m` encrypted for `e` recipients under `e` distinct coprime moduli —
+`c_i = m^e mod n_i`. CRT recombines `c_i` into `x = m^e mod ∏ni`; `∏ni > m^e`
+→ `x = m^e` exactly → `m = x^{1/e}`.
 
-## The maths
+## Detection
 
-`ci = m^e mod ni`. By CRT, the system `x ≡ ci (mod ni)` has a unique solution
-`x mod N` for `N = ∏ni`. Since `x ≡ m^e mod ni` for every `i`, `x ≡ m^e mod N`.
-When `N > m^e`, `x = m^e` as a plain integer — take the `e`-th root.
+- **`e` small** (usually 3, up to the recipient count).
+- **≥ `e` ciphertexts** of the *same* `m` under `e` coprime `n`.
+- **a "broadcast" keygen** — `for n in ns: send(pow(m,e,n))`.
 
-With `e=3` and 3 moduli of ~1024 bits, `N ~ 3072` bits > `m³ ~ 2400` bits for a
-100-byte flag — the root recovers `m`.
+## The bound / falsifier
 
-## The procedure
+`≥e` coprime `n`, `∏ni > m^e`, no randomized pad. `<e` n's → `∏ni<m^e` → the
+root isn't `m` → dead; route `coppersmith`/`franklin-reiter`. A pad → `m`
+differs per `n` → dead.
+
+## The attack
 
 ```python
 from sympy.ntheory.modular import crt
 from sympy import integer_nthroot
-x = crt([n1,n2,n3],[c1,c2,c3])[0]      # x = m^e mod N
-m, exact = integer_nthroot(x, e)
-assert exact and pow(m, e) == x
+x = crt([n1,n2,n3], [c1,c2,c3])[0]
+m, ok = integer_nthroot(x, e); assert pow(m,e)==x
 ```
 
-## The tool
+Or: `crypto_attack.py hastad --pairs "n1,c1;n2,c2;n3,c3" --e 3` /
+`--n/--c` lists.
 
-```bash
-python3 tools/crypto_attack.py hastad --pairs "n1,c1;n2,c2;n3,c3" --e <e>
-python3 tools/crypto_attack.py crt --residues "c1,c2,c3;n1,n2,n3"
-```
+## The chain
 
-## The bound / falsifier
-
-- `≥ e` ciphertexts of the **same** `m` under distinct coprime `n`.
-- `< e` → `N < m^e` → root isn't `m` → route to `coppersmith`/pad/`franklin`.
-- Pad randomizes `m` → no common root → dead.
-- Shared prime → `batch-gcd` anyway.
+`x` → `m` → `pow(m,e)==x` → the flag (strip a pad if `m` is a padded block).
 
 ## The verify
 
-`pow(m,e)==x` exactly; `pow(m,e,ni)==ci` per modulus.
+`pow(m,e)==x` — the CRT value equals `m^e` exactly.
 
-## The traps
+## Worked shape
 
-- **Same `m` is the gate** — a random pad means each `mi` differs; the count is
-  right but the attack is dead.
-- `N = ∏ni` must exceed `m^e` — a borderline case may root to `m` plus a wrap;
-  verify with `pow`.
-- The `e` in the bound is the *exponent* — 3 recipients for `e=3`, 17 for `e=17`.
+```
+c1 = m³ mod n1, c2 = m³ mod n2, c3 = m³ mod n3   (same m, 3 coprime n)
+x = CRT(c1,c2,c3) = m³ mod n1n2n3
+m³ < n1n2n3 → x = m³ → m = x^{1/3}
+```
+
+## Variants
+
+- **padded broadcast** — `coppersmith` partial-message if the pad is structured.
+- **linear relations** — `franklin-reiter` generalises `m_i = a_i·m+b_i`.
+- **`e` larger** — needs `e` moduli, not 3 — `c` count must match.
+
+## Failure modes
+
+- `<e` recipients — the product is too small.
+- A randomized pad (OAEP) — `m` differs per `n` — the whole attack dead.
+
+## The honest status
+
+Håstad 1988 — catalogue.

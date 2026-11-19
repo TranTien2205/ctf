@@ -1,41 +1,33 @@
-# Detection surface — every place the signal can hide
+# Detection surface — the artifacts, the reads, the signals
 
-## The file surface
+## The file types → the read
 
-- **`keygen.py` / `chal.py` / `output.txt`** — the generator and the numbers.
-  The comment names the misuse; the numbers feed the sheet.
-- **`pubkey.pem` / `cert.crt`** — a public `n`,`e`. `openssl x509 -text` or
-  `RSA.importKey`. `n`,`e` only — the rest is on the sheet.
-- **`priv.pem`** — a *full* private key ends it; a **partial** (redacted) one is
-  the `coppersmith`/`crt`/`factor-from-d` leak.
-- **`keys.json` / `moduli.txt`** — the batch for `batch-gcd` / `hastad`.
-- **`flag.txt.enc` / `output.bin`** — the `c`.
+| Type | The read | The signal |
+|---|---|---|
+| `.pem`/`.der`/`.crt`/`.key` | `RSA.importKey` | `n` bits, `e`, `d`/`p`/`q`/`dp`/`dq`/`qInv` |
+| `.json` | `json.load` | `n`,`e`,`c`/`d`/`phi`/`dp` fields |
+| `.txt` | `re.findall(r'\d{20,}')` | the `n`,`e`,`c` integers |
+| `.py` | `grep`/`read` | `next_prime`,`seed`,`getPrime(d)`,`p-1`,`e=3`,no pad,`a·m1+b`,`dp`,`dq`,`qInv`,`redact` |
+| `.bin` | `xxd`/`strings`/`binwalk` | an embedded key/`n` |
+| `.pcap` | `tshark`/`scapy` | a handshake `n`,`e`, a `c` |
+| live `nc`/`host` | `nc`/`requests` | a `c`/`sig`/oracle output |
 
-## The runtime surface
+## The observable signals
 
-- **a socket printing `n`,`e`,`c`** — transport, not an oracle. Treat as the
-  numbers. If it *re-encrypts* your `m` → `crypto-symmetric-oracle`.
-- **a signature service** — returns `(n, e, sig)` or `(n, e, sig, sig_faulty)`.
-  The pair → `crt` Bellcore.
-- **an interactive `oracle.py`** — a menu that encrypts/decrypts/signs →
-  `crypto-symmetric-oracle`, not this class.
+| Signal | The attack |
+|---|---|
+| `e`=3/5/17 | `small-e`/`hastad`/`franklin-reiter` |
+| `e`≈`n` | `wiener`/`boneh-durfee` |
+| `n`s share `p` | `batch-gcd` |
+| `p-1` smooth | `pollard-pm1` |
+| `p`/`m` bits | `coppersmith` |
+| `d`/`phi`/`dp`/`qInv`/`p`,`q` | `factor-from-d`/`crt`/`rsa-decrypt` |
+| `m2=a·m1+b` | `franklin-reiter` |
+| `sig`+fault | `crt` Bellcore |
+| `m` residues | `crt` |
+| `gcd(e,phi)>1` | `eth-root` |
+| `n`=p²/prime | degenerate |
 
-## The numeric surface
+## The verify
 
-- **`e` small** (3/5/17) → wrap / broadcast / relation.
-- **`e` large** (~`n`) → small `d` → wiener / boneh-durfee.
-- **`n` even / prime / square / smooth** → degenerate.
-- **`c` < `n`** → `m^e` wrapped — not a root.
-
-## The leak surface
-
-- `d` / `phi` / `dp` / `dq` / `qInv` → arithmetic.
-- `p`'s high/low bits → `coppersmith`.
-- `m`'s partial → `coppersmith` partial-message.
-- a fault → `crt` Bellcore.
-- `p`,`q` → `rsa-decrypt` / `eth-root`.
-
-## The read-order
-
-`recon-order.md` — source → count → exponent → leak → relation. The first yes
-picks the attack.
+`pow(m,e,n)==c` / `p*q==n`.

@@ -1,52 +1,61 @@
-# pollard-pm1 deep — the smooth predecessor
+# pollard-pm1 deep — the smooth-predecessor split, the full treatment
 
-## The precondition
+## The mechanism
 
-`n` has a factor `p` where `p-1` is **B-smooth** — all its prime factors ≤ `B`.
-Hint: "weak prime", a `p-1`-construction in the keygen, or `n` resisting every
-cheap attack.
+If `p-1` is `B`-smooth (every prime factor ≤ B), then `p-1 | B!` → `a^{B!} ≡ 1
+mod p` by Fermat's little theorem → `p | a^{B!}-1` and `p | n` →
+`gcd(a^{B!}-1, n) = p`.
 
-## The maths
+## Detection
 
-By Fermat's little theorem, `a^(p-1) ≡ 1 mod p`. If `p-1` divides `M` (e.g.
-`M = B!` or `M = lcm(1..B)`), then `a^M ≡ 1 mod p` → `p | a^M - 1` →
-`gcd(a^M - 1, n) = p`.
+- **keygen**: `p = getPrime(512)` where `p-1` is smooth, a product of small
+  primes, or a "weak prime" / "smooth predecessor" hint.
+- **the tell**: `p` generated so `p-1` has small factors — or `p` reused.
 
-The incremental form: `a ← a^k mod n` for `k=2,3,…,B` computes `a^(B!)` without
-the huge `M` — `a_k = a_(k-1)^k`.
+## The bound / falsifier
+
+`B` ≥ the largest `p-1` factor. `gcd(a^{B!}-1,n)=1` for `B` → `p-1` not smooth
+enough → raise `B` or closed.
+
+## The attack
 
 ```python
 from math import gcd
 a = 2
-for k in range(2, B+1):
-    a = pow(a, k, n)          # a = 2^(k!) mod n
-g = gcd(a-1, n)
-if 1 < g < n: p = g
+for j in range(2, B+1):
+    a = pow(a, j, n)          # a = a^(j) accumulates 2^(j!)
+g = gcd(a-1, n)               # >1 → p
 ```
 
-## The tool
+Or: `crypto_attack.py pollard-pm1 --n <n> --b <B>`.
 
-```bash
-python3 tools/crypto_attack.py pollard-pm1 --n <n> --e <e> --c <c>
-```
+## The chain
 
-## The bound / falsifier
-
-`B` must be ≥ the largest prime factor of `p-1`. `gcd=1` for a reasonable `B`
-(~10⁵–10⁶) → `p-1` not smooth enough → negative.
+`p` → `q=n/p` → `phi` → `d` → `m` → `pow` verify.
 
 ## The verify
 
-`gcd=p` with `1<p<n`; `p*q==n`; `rsa-decrypt` → `pow(m,e,n)==c`.
+`1 < gcd < n` proves a non-trivial factor; `p*q==n` proves the split.
 
-## The traps
+## Worked shape
 
-- `gcd=n` if `q-1` is *also* `B`-smooth → retry with a smaller `B` or another `a`.
-- `p+1` smooth → Williams `p+1`, a different method — `pollard-pm1` is `p-1` only.
-- A moderate `B` is cheap; a huge `B` is brute-force — pick `B` from the hint.
+```
+n = p·q, p-1 = product of primes ≤ B
+a = 2^(B!) mod n   →   a ≡ 1 mod p   →   gcd(a-1, n) = p
+```
 
-## Why "weak prime" is the tell
+## Variants
 
-The challenge telegraphs it: `p` built as `prod(small_primes)+1`, or a comment
-about a "smooth" or "weak" prime. The `p-1` construction is the attack's whole
-precondition.
+- A **stage-2** for one large factor — `pollard-pm1` with a second stage
+  (`a^{B!}·a^{j}` for primes `j>B`).
+- `p+1` smooth → **Williams p+1** (a different method, not this tool).
+- `p-1` *and* `p+1` both smooth → either method splits it.
+
+## Failure modes
+
+- `p-1` not `B`-smooth — `gcd=1`; raise `B` or closed.
+- `B` too small — the largest factor missed → raise `B`.
+
+## The honest status
+
+Pollard 1974 — catalogue.

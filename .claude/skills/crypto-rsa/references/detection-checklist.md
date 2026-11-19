@@ -1,11 +1,14 @@
-# Detection checklist — run every line before attacking
+# Detection checklist — the pre-attack audit
 
 ## The artifact
 
-- [ ] Files listed — `.pem`/`.der`/`.crt`/`.json`/`.txt`/`.py`/`.bin`.
-- [ ] `keygen.py`/`chal.py` read — the misuse line found.
-- [ ] `RSA.importKey` on every key/cert — `n`,`e`,private fields recorded.
-- [ ] The integers parsed — `re.findall(r'\d{20,}')`.
+- [ ] Every file listed — `.pem`/`.der`/`.crt`/`.key`/`.json`/`.txt`/`.py`/`.bin`/`.pcap`.
+- [ ] `keygen.py`/`chal.py`/`gen.py` read — the misuse line (`next_prime`,
+      `seed`, `getPrime(d)`, `p-1`, `e=3`, no pad, `m2=a·m1+b`, `dp`,`dq`,
+      `qInv`, `d`/`phi` printed, `redact`/`XXXX`) found.
+- [ ] `RSA.importKey` on every key — `n`,`e`,`d`/`p`/`q`/`dp`/`dq`/`qInv` recorded.
+- [ ] The integers parsed — `re.findall(r'(?:0x)?[0-9a-fA-F]{20,}|\b\d{20,}\b')`.
+- [ ] A `.pcap` → `tshark`/`scapy` for `n`,`e`,`c`.
 
 ## The counts
 
@@ -16,30 +19,27 @@
 ## The exponent
 
 - [ ] `e` small (3/5/17/257) → `small-e`/`hastad`/`franklin-reiter`.
-- [ ] `e`=65537 → the bug is elsewhere.
+- [ ] `e`=65537 → the bug is elsewhere (a leak, the primes, a relation).
 - [ ] `e`~`n` → `wiener`/`boneh-durfee`.
 - [ ] `gcd(e,phi)>1` (if `phi`/`p`,`q` known) → `eth-root`.
+- [ ] `e`=1 → `m=c` trivially.
 
-## The keygen
+## The leak
 
-- [ ] `next_prime`/`p+k`/`q=p+2` → `fermat`.
-- [ ] `getPrime(d)` small → `wiener`/`boneh-durfee`.
-- [ ] `random.seed` → `batch-gcd`.
-- [ ] `p-1` smooth → `pollard-pm1`.
-- [ ] `e=3`,no pad → `small-e`/`hastad`.
-- [ ] `m2=a·m1+b` → `franklin-reiter`.
-- [ ] `dp`,`dq`,`qInv` → `crt`.
-- [ ] `d`/`phi` printed → `factor-from-d`.
-- [ ] `redact`/`XXXX` → `coppersmith`/`crt`/`factor-from-d`.
+- [ ] `d`/`phi`/`dp`/`dq`/`qInv`/`p`/`q` present → `factor-from-d`/`crt`/`rsa-decrypt`.
+- [ ] `p`-high/low bits → `coppersmith-high-bits`/`-core`.
+- [ ] `m` partial → `coppersmith` partial-message.
+- [ ] a correct+faulty `sig` pair → `crt` Bellcore.
 
 ## The degenerate
 
-- [ ] `isqrt(n)**2==n` → `n=p²`.
-- [ ] `isPrime(n)` → `n` prime.
-- [ ] `factorint(n)` → smooth `n`.
+- [ ] `isqrt(n)**2==n` → `n=p²` → `phi=p(p-1)`.
+- [ ] `isPrime(n)` → `phi=n-1`.
+- [ ] `factorint(n)` → a smooth `n` → direct.
+- [ ] `n` multi-prime → `phi=∏(pi-1)`.
 
 ## The route
 
-- [ ] `crypto_attack.py list` — the inventory + bounds.
+- [ ] `crypto_attack.py list` — the inventory + `lll_backend`.
 - [ ] `attack-table.md` — the first-yes row.
 - [ ] `per-bound.md` — the falsifier.

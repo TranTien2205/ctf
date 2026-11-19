@@ -1,51 +1,62 @@
-# common-modulus deep — Bezout on coprime exponents
+# common-modulus deep — the shared-modulus Bezout attack, the full treatment
 
-## The precondition
+## The mechanism
 
-One modulus `n` shared by two public exponents `e1`, `e2`; the **same** message
-`m` encrypted to both: `c1 = m^e1 mod n`, `c2 = m^e2 mod n`. The classic "same
-secret to two recipients who share a modulus."
+`c1 = m^e1 mod n`, `c2 = m^e2 mod n`, `gcd(e1,e2)=1`. Bezout's identity gives
+`a·e1 + b·e2 = 1` → `m^{a·e1+b·e2} = m^1 = m` → `m = c1^a · c2^b mod n`.
 
-## The maths
+## Detection
 
-`gcd(e1,e2)=1` ⇒ extended Euclidean gives `a`,`b` with `a·e1+b·e2=1`. Then
-
-```
-c1^a · c2^b = m^(a·e1) · m^(b·e2) = m^(a·e1 + b·e2) = m^1 = m   (mod n)
-```
-
-One of `a`,`b` is negative — `c^(-k) mod n` = `pow(c, -1, n)^k` = `pow(c, -k, n)`.
-
-## The procedure
-
-```python
-from math import gcd
-def egcd(a,b):
-    if b==0: return (a,1,0)
-    g,x,y=egcd(b,a%b); return (g, y, x-(a//b)*y)
-g,a,b = egcd(e1,e2)
-assert g==1
-m = (pow(c1,a,n)*pow(c2,b,n))%n
-```
-
-## The tool
-
-```bash
-python3 tools/crypto_attack.py common-modulus --n <n> --e1 <e1> --e2 <e2> --c1 <c1> --c2 <c2>
-```
+- **one `n`, two `e`** (`e1`,`e2`) and two ciphertexts of the same `m`.
+- **keygen**: `encrypt(m, e1, n)` and `encrypt(m, e2, n)` — a shared-modulus
+  broadcast; a comment like "we reuse n for speed".
 
 ## The bound / falsifier
 
-`gcd(e1,e2)=1` is required. `gcd(e1,e2)=g>1` → the identity gives `m^g`; rescue
-only if `m^g < n` (`nth-root`), else dead.
+`gcd(e1,e2)=1`. `gcd>1` → recovers `m^gcd`, not `m` — then `nth-root` if
+`m^gcd<n`.
+
+## The attack
+
+```python
+from sympy import gcdex
+g, a, b = gcdex(e1, e2)            # a·e1 + b·e2 = 1
+assert g == 1
+m = pow(c1, a, n) * pow(c2, b, n) % n
+assert pow(m, e1, n) == c1
+```
+
+Or: `crypto_attack.py common-modulus --n <n> --e1 <e1> --c1 <c1> --e2 <e2> --c2 <c2>`.
+
+## The chain
+
+`m` → `pow(m,e1,n)==c1` → the flag.
 
 ## The verify
 
-`pow(m,e1,n)==c1` **and** `pow(m,e2,n)==c2` — both must hold.
+`pow(m,e1,n)==c1` — the recovered `m` re-encrypts under `e1`.
 
-## The traps
+## Worked shape
 
-- The **same `m`** is required — a pad or a different `m` yields `m1^a·m2^b`.
-- `gcd>1` → `m^g`; the check `pow(m^g, 1, n)` won't reproduce `c`.
-- The negative Bezout coefficient needs `pow(c,-k,n)` — the modular inverse,
-  not a literal `c**-k`.
+```
+e1=3, e2=17, same n, same m
+a·3 + b·17 = 1  →  a=-5, b=1?  -15+16=1  →  wait: 5·3-1·17=-2
+solve: 6·17 - 34·3 = 0 ... gcdex(3,17) → a, b s.t. a·3+b·17=1
+m = c1^a · c2^b mod n
+```
+
+## Variants
+
+- `gcd>1` → `m^gcd`; then `small-e`/`nth-root` if `m^gcd<n`.
+- >2 exponents — Bezout generalises pairwise (chain two at a time).
+- the same `n` with a *private* `d` for one `e` → `rsa-decrypt` directly.
+
+## Failure modes
+
+- `gcd>1` — `m^gcd`, not `m`.
+- different `m` per ciphertext — the relation isn't shared-`m`.
+- `pow(c1,a,n)` with negative `a` — Python computes the modular inverse.
+
+## The honest status
+
+Standard published attack — catalogue.

@@ -1,52 +1,63 @@
-# boneh-durfee deep — the lattice ceiling for small d
+# boneh-durfee deep — the small-d lattice attack, the full treatment
 
-## The precondition
+## The mechanism
 
-`d` small but beyond Wiener's `n^0.25` — `d` in the `0.25–0.292` window, or the
-challenge states `d < n^0.27`. `e` is large (`e≈n`).
+`ed ≡ 1 mod φ` → `ed + k(n+1-p-q) = 1 + kn` → `e·d + k·s ≡ 1 + k(n+1) mod e`
+with `s = p+q`. Rearranged: `f(x,y) = x(A-y) + 1 ≡ 0 mod e`, `A = n+1`, has the
+root `(k, s)` where `k ≈ d < n^0.292` and `s < n^0.5`. Coppersmith's bivariate
+small-root LLL recovers `(k,s)` → `d` and `p`,`q`.
 
-## The derivation
+## Detection
 
-`ed ≡ 1 mod φ` ⇒ `ed + k·φ = ed + k·(n - p - q + 1)` for `ed = 1 + kφ`.
-Rearrange mod `e`:
-
-```
-ed + k·(n+1) - k·(p+q) ≡ 1 + k·n   (mod e)
-⇒  k·(A - y) + 1 ≡ 0  (mod e)      where A = n+1, y = p+q
-```
-
-The bivariate polynomial `f(x,y) = x·(A - y) + 1` has the small root `(x,y) =
-(k, p+q)` mod `e`. `k < d` (small), `y = p+q < 3√n`. Coppersmith's bivariate
-method finds the root for `d < n^0.292`.
-
-## The lattice
-
-Build the lattice of `f`-shifts and `e`-multiples; LLL reduces it; the short
-vector encodes a bivariate polynomial whose small root is `(k, p+q)`. The `m`
-(lattice dimension) and `t` parameters tune the approach toward `n^0.292`.
-
-## The tool
-
-```bash
-python3 tools/crypto_attack.py boneh-durfee --n <n> --e <e> --c <c>
-python3 tools/crypto_attack.py boneh-durfee-escalate --n <n> --e <e> --c <c>  # auto m
-```
-
-`escalate` retries increasing `m` — hands-off but slower.
+- **`e`≈`n`** — small `d` (same tell as wiener).
+- **`d` in `n^0.25..n^0.292`** — beyond Wiener, within the lattice bound.
+- **keygen**: `d` explicitly small but larger than `n^0.25`.
 
 ## The bound / falsifier
 
-`d < n^0.292` is the hard ceiling — exceeding it is the falsifier, and no `m`
-parameter recovers. Pure-python LLL is slow — minutes on a large `m`.
+`d < n^0.292`. `d ≥ n^0.292` → small-d closed — the bound is a theorem. The
+`m`,`t` lattice parameters *approach* the bound; they cannot exceed it.
+
+## The attack
+
+```bash
+python3 tools/crypto_attack.py boneh-durfee --n <n> --e <e>
+python3 tools/crypto_attack.py boneh-durfee-escalate --n <n> --e <e> --m 4 --t 3
+```
+
+`fpylll` is absent → `tools/crypto/` runs a pure-python LLL — slower, same
+bound. `crypto_attack.py list` reports `lll_backend`. The lattice dimension is
+`ω ~ O(m²)` — raise `m`,`t` to approach `n^0.292`.
+
+## The chain
+
+`(k,s)` → `s = p+q` → `p`,`q` from `x² - sx + n = 0` → `phi` → `d` → `m` →
+`pow` verify.
 
 ## The verify
 
-`pow(c,d,n)` → plaintext; `p*q==n`.
+`pow(c,d,n)==m` → `pow(m,e,n)==c`; or `p*q==n` on the quadratic roots.
 
-## The traps
+## Worked shape
 
-- Check `d`'s bound against `wiener` first — `d<n^0.25` is cheaper via CF.
-- `fpylll` absent → pure-python LLL — much slower; the `lll_backend` line in
-  `list` reports it.
-- The applicability line the tool prints is the contract — read it before the
-  lattice.
+```
+f(x,y) = x(A-y) + 1  mod e, A = n+1
+x = k  (k ≈ d),  y = s (s = p+q)
+LLL → the small roots (k, s)
+→ d = k,  p,q = (s ± sqrt(s²-4n))/2
+```
+
+## Variants
+
+- **`boneh-durfee-escalate`** — raise `m`,`t` to approach `n^0.292`.
+- **a partial `d`** — combine with `coppersmith` if `d`'s bits leak.
+
+## Failure modes
+
+- `d ≥ n^0.292` — unreachable.
+- LLL too slow — the dimension `ω~O(m²)`; give it the budget, not a retry.
+- `fpylll` absent → pure-python LLL may be weaker at the bound's edge.
+
+## The honest status
+
+Boneh-Durfee 1999 — catalogue.

@@ -1,71 +1,34 @@
-# Edge cases deep — the degenerate and boundary shapes
+# Edge cases deep — the degenerate forms, annotated
 
-## `n` is a perfect square
+## `n` degenerate
 
-`n = p²` → `isqrt(n)` is exact → `phi = p(p-1)`, `d = inverse(e, phi)`. Check
-`n` for a square root before assuming two primes.
+- **`n` prime** — `phi=n-1`, `d=inverse(e,n-1)` — no factorisation.
+- **`n`=`p²`** — `phi=p(p-1)` — `isqrt(n)**2==n`.
+- **`n` smooth** — `factorint(n)` splits → `phi` directly.
+- **`n` multi-prime** — `phi=∏(pi-1)` — a multi-prime challenge.
+- **`n` small** (≤512-bit) — `factorint` or a factor DB (factordb) may split it.
+- **`n` shared across keys** — `batch-gcd`.
 
-## `n` is prime
+## `e` degenerate
 
-`phi = n-1` → `d = inverse(e, n-1)`. A "prime modulus" is textbook RSA on a
-single prime — still recoverable if the model holds. Check `isPrime(n)`.
+- **`e`=1** — `c=m`, no attack.
+- **`e` even/`gcd(e,phi)>1`** — no inverse → `eth-root`, the `g` candidates.
+- **`e`≈`n`** — small `d` → `wiener`/`boneh-durfee`.
+- **`e` coprime but `phi` shared** — two `e` → `common-modulus`.
 
-## `n` is a product of >2 primes
+## `d`/`phi` degenerate
 
-`n = p·q·r` → `phi = ∏(pi-1)`. `factor-from-d`/`rsa-decrypt` still work with
-the right `phi`; `fermat`/`batch-gcd`/`pollard` still find a factor; `boneh-durfee`
-bound degrades (smaller `β`).
+- **`d` held** → `factor-from-d`, `rsa-decrypt`.
+- **`phi` held** → `factor-from-d`/`rsa-decrypt`/`d=inverse(e,phi)`.
+- **`dp`,`dq`,`qInv`** → `crt` manual.
+- **`d` multi** — `d` may differ by `λ`/`φ` — both decrypt.
 
-## `n` is smooth / has a small factor
+## `m` degenerate
 
-`n` = many small factors → trial division / `sympy.factorint` splits it. A
-smooth `n` is degenerate — `phi` is computable directly.
+- **`m`=0/1/small** — `c=pow(m,e,n)` trivially — check first.
+- **`m` padded** — strip `\x00\x02<pad>\x00`/OAEP.
+- **`m` not the flag** — `m` is a key/seed; the flag is `m`-derived.
 
-## `e` = 1
+## The verify
 
-`c = m` — no encryption. `m = c` directly.
-
-## `e` shares a factor with φ
-
-`gcd(e, φ) > 1` → `inverse` fails → `eth-root`: `gcd(e,phi)` candidate roots;
-`pow`+format picks the true one.
-
-## `m` = 0 or `m` = 1
-
-`c` = 0 or 1 trivially. `m = c`.
-
-## `m` ≥ n
-
-The plaintext wraps — `m mod n` is encrypted. A "decrypt" gives `m mod n`; the
-full `m` is unrecoverable unless the relation leaks it.
-
-## `c` = 0 or `c` = 1
-
-`m` = 0 or 1 (or an `e`th root of 1 for `c=1`).
-
-## `p` = `q` (a square)
-
-Covered by `n=p²`. `phi = p(p-1)`.
-
-## `d` = 1 or `e` = 1
-
-`m` = `c`. Trivial.
-
-## `phi` directly given
-
-`factor-from-d` / `rsa-decrypt` — `d = inverse(e, phi)`.
-
-## `dp`, `dq`, `qInv` given without `d`
-
-`crt` reconstruction — `p`,`q` from `dp` (`p` divides `e·dp-1` candidates) or
-the consistent `qInv`.
-
-## `n`, `e` only — no `c`
-
-A *key-recovery* challenge — the answer is `d`,`phi`,`p`,`q`, not `m`. The same
-attacks; the verify is `pow(c,d,n)==m` skipped for `p*q==n`/`e·d≡1 mod phi`.
-
-## `n` enormous (4096+ bits)
-
-Size is not the bug — the precondition is. The lattice attacks still run; the
-cheap ones are unchanged.
+`pow(m,e,n)==c` / `p*q==n`.

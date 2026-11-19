@@ -1,28 +1,44 @@
-# Mechanism catalogue — every attack, its primitive, its bound
+# Mechanism catalogue — the six primitives, the bound, the verify
 
-## The primitives and their attacks
+## Wrap — `m^e<n`
 
-| Primitive | Attacks | Bound | Verify |
-|---|---|---|---|
-| wrap | `small-e-root`,`nth-root`,`hastad` | `m^e<n` / `∏n>m^e` | `pow(m,e)==c/x` |
-| gap | `fermat` | `\|p-q\|` small | `p*q==n` |
-| divisor | `batch-gcd` | a collision | `p*q==n` |
-| divisor | `pollard-pm1` | `B`≥`p-1` factor | `gcd=p` |
-| exponent | `common-modulus` | `gcd(e1,e2)=1` | `pow==c` |
-| exponent | `wiener` | `d<n^0.25` | `pow(c,d,n)==m` |
-| exponent | `boneh-durfee` | `d<n^0.292` | `pow(c,d,n)==m` |
-| exponent | `factor-from-d` | `d`/`phi` held | `p*q==n` |
-| partial | `coppersmith-high-bits`,`-core` | window≥`n^0.25` | `p\|n` |
-| relation | `franklin_reiter` | `m2=a·m1+b` | `pow==c` |
-| relation | `crt` | `∏pi>m`/fault/`dp` | `pow==c`/`gcd=q` |
-| leak | `rsa-decrypt`,`eth-root` | factors held | `pow==c` |
+- The identity: `c=m^e mod n`; `m^e<n` → `c=m^e` — a plain integer power.
+- The bound: `m^e<n` (single) / `m^e<∏ni` (broadcast).
+- The attacks: `small-e-root`/`nth-root` (`c^{1/e}`), `hastad` (CRT+root).
+- The verify: `pow(m,e)==c` — plain, no `mod n`.
 
-## The primitive → the signal
+## Gap — `|p-q|` small
 
-- **wrap** — `e` small, `m` short, or same `m` to `e` n's.
-- **gap** — `next_prime`,`p+k`,shared seed in keygen.
-- **divisor** — ≥2 moduli, or a "weak prime" hint.
-- **exponent** — `e` ~`n`, two `e` on one `n`, a `d`/`phi` leak.
-- **partial** — a redacted key, a partial `m`, a centred guess.
-- **relation** — related `m`'s, residues, a faulty sig.
-- **leak** — the private value itself.
+- `n=p·q`, `|p-q|` small → `n=a²-b²`, `a=(p+q)/2` near `√n`.
+- The bound: the `a` walk `O(|p-q|)` — small gap.
+- The attack: `fermat`.
+- The verify: `p*q==n`.
+
+## Divisor — a shared/smooth factor
+
+- `gcd(ni,nj)=p` (shared) → `batch-gcd`; `gcd(a^{B!}-1,n)=p` (`p-1` `B`-smooth)
+  → `pollard-pm1`.
+- The bound: a `gcd>1` / `p-1` `B`-smooth.
+- The verify: `1<p<n`, `p|n`, `p*q==n`.
+
+## Exponent — `ed≡1 mod φ` leaks `d`
+
+- `d<n^0.25` → CF → `wiener`; `d<n^0.292` → LLL → `boneh-durfee`;
+  `gcd(e1,e2)=1` → Bezout → `common-modulus`; `d`/`phi`/`dp`/`qInv`/`p`,`q`
+  held → `factor-from-d`/`crt`/`rsa-decrypt`.
+- The bound: the `n^α`/`gcd`/held-value forms.
+- The verify: `pow(c,d,n)==m`/`pow(m,e,n)==c`.
+
+## Partial — bits → Coppersmith
+
+- `p`/`m` = known + small unknown → `f(x)≡0 mod p`/`mod n` small root →
+  `coppersmith-*`.
+- The bound: window `n^0.25` (factor) / `n^(1/e)` (message).
+- The verify: `p|n` / `pow(m,e,n)==c`.
+
+## Relation/leak — structure
+
+- `m2=a·m1+b` → `franklin-reiter`; `sig` fault / `m` residues / `dp` → `crt`;
+  `gcd(e,phi)>1` → `eth-root`; `p`,`q`/`d`/`phi` → `rsa-decrypt`/`factor-from-d`.
+- The bound: the relation/leak present.
+- The verify: `pow`/`gcd`/`p*q`.

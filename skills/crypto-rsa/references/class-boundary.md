@@ -1,35 +1,33 @@
-# Class boundary — where crypto-rsa ends and the neighbours begin
+# Class boundary — what crypto-rsa is, and is not
 
-## The defining line
+## The class
 
-`crypto-rsa` is **integer factorisation / RSA private-value recovery** — `n`,`e`,
-`c` and a private value to recover. The boundary is whether the problem is a
-factoring problem.
+RSA key or plaintext recovery — `n`,`e`,`c` + a leak → `p`,`q`,`d`,`φ`,`m`.
+The violation is a weak `n`/`d`/`φ`/`m` relation — wrap, gap, divisor,
+exponent, partial, relation/leak.
 
-## The neighbours
+## What it is not
 
-| Neighbour | The tell that routes away |
+- **Not ECC/DH** — a curve, a `y = x^3+ax+b`, a `dLog`, a nonce, a
+  `secp256k1`/`Curve25519` → `crypto-ecc-dlog`, not RSA.
+- **Not a block/stream oracle** — AES/DES/a padding/bit-flip oracle →
+  `crypto-symmetric-oracle`.
+- **Not a PRNG** — a `state`/LCG/LFSR/`MT`/`xorshift` → `crypto-prng`.
+- **Not classical** — a substitution/Vigenère/frequency → `crypto-classical`.
+- **Not an encoding** — a base64/hex/carrier → `misc-encoding-carrier`.
+- **Not a web layer** — a `pow`/`encrypt` inside a web service → the bug is in
+  the web layer; `web-*` first.
+
+## The boundary signals
+
+| If you see | Route to |
 |---|---|
-| `crypto-ecc-dlog` | `g`,`h=g^x`,a curve,`order`,`dlog` — a discrete-log, not factoring. `bsgs`,`pohlig-hellman`,`smart_attack`,`singular_ec`. |
-| `crypto-prng` | a keystream / generator output — `lcg`,`mt19937`,`lfsr`,`xorshift`. No modulus. |
-| `crypto-symmetric-oracle` | a *service* that encrypts/decrypts/signs — padding oracle,ECB,GCM,length-extension. Numbers → `crypto-rsa`; a *function* → oracle. |
-| `crypto-classical` | xor,vigenere,base64,a classical cipher — no `n`,`e`. |
-| `misc-constraint-puzzle` | a constraint puzzle that *uses* RSA values but asks a property, not a recovery. |
-| `web-*` | a web bug — RSA may appear but the class is the web class. |
+| a `y`, `x`, `G`, `order`, `point`, `dlog` | `crypto-ecc-dlog` |
+| AES/DES/block/ECB/CBC/CTR | `crypto-symmetric-oracle` |
+| `random`, `state`, `LCG`, `LFSR`, `MT` | `crypto-prng` |
+| a substitution/rot13/Vigenère/base | `crypto-classical`/`misc-encoding-carrier` |
+| a `n`,`e`,`c` + a leak | **crypto-rsa** — this class |
 
-## The ambiguous edges
+## The verify
 
-- A socket that *prints* `n`,`e`,`c` → this class (transport, not oracle).
-- A socket that *computes* on your `m` → `crypto-symmetric-oracle`.
-- A signature service → if it returns a *faulty* sig → `crt` Bellcore (this
-  class); if it signs arbitrary `m` → the signature-forgery class, not this.
-- A "decrypt this" with `d`/`φ`/`p`/`q` held → `factor-from-d`/`rsa-decrypt`
-  (this class terminal).
-- An `n` with a `g`,`h` and a `pow` construction → `crypto-ecc-dlog`, not RSA.
-
-## The switch rule
-
-When the handout names `n`,`e`,`c` and a private value to recover → stay. When
-it names `g`,`h`,a curve,or a group element → `crypto-ecc-dlog`. When it is a
-service that computes → `crypto-symmetric-oracle`. When it is a keystream →
-`crypto-prng`.
+`pow(m,e,n)==c` / `p*q==n` — the RSA-shaped gate. A non-RSA problem fails it.

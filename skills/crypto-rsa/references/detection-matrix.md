@@ -1,32 +1,42 @@
-# Detection matrix — the signal grid
+# Detection matrix — observable × attack
 
-## `e` signature × leak
+## The counts
 
-| | `e` small | `e`=65537 | `e`~`n` | `gcd(e,phi)>1` |
-|---|---|---|---|---|
-| no leak | small-e/hastad | look elsewhere | wiener/boneh | eth-root (if p,q) |
-| `p`-bits | coppersmith | coppersmith | coppersmith | eth-root |
-| `d`/`phi`/`dp` | factor-from-d/crt | factor-from-d/crt | factor-from-d/crt | factor-from-d/crt |
-| `p`,`q` | rsa-decrypt/eth-root | rsa-decrypt | rsa-decrypt | eth-root |
-| `m2=a·m1+b` | franklin-reiter | franklin-reiter | franklin-reiter | eth-root |
-
-## `n` count × same-`m`
-
-| | `n`≥2, shared prime | `n`≥2, same `m` | `n`=1 |
+| n | e | c | The attack |
 |---|---|---|---|
-| — | batch-gcd | hastad | single-modulus |
+| ≥2 | 1 small, same `m` | ≥`e` | `hastad` |
+| ≥2 | 1 small, `m2=a·m1+b` | 2 | `franklin-reiter` |
+| ≥2 | any | any | `batch-gcd` |
+| 1 | 2, same `m` | 2 | `common-modulus` |
+| 1 | 1 | 1 | single-modulus |
 
-## keygen tell × attack
+## `e` signal
 
-| Tell | Attack |
+| `e` | The attack |
 |---|---|
-| `next_prime`/`p+k` | fermat |
-| `getPrime(d)` small | wiener/boneh-durfee |
-| `random.seed` | batch-gcd |
-| `p-1` smooth | pollard-pm1 |
-| `e=3`,no pad | small-e/hastad |
-| `m2=a·m1+b` | franklin-reiter |
-| `dp`,`dq`,`qInv` | crt |
-| `d`/`phi` | factor-from-d |
-| `redact`/`XXXX` | coppersmith/crt/factor-from-d |
-| `n` square/prime/multi | degenerate phi |
+| 3/5/17 | `small-e`/`hastad`/`franklin-reiter` |
+| 65537 | a leak/the primes/a relation |
+| `e`≈`n` | `wiener`/`boneh-durfee` |
+| `gcd(e,phi)>1` | `eth-root` |
+| 1 | `c=m` |
+
+## `n` shape
+
+| `n` | The attack |
+|---|---|
+| `|p-q|` small | `fermat` |
+| `p-1` smooth | `pollard-pm1` |
+| `p` bits | `coppersmith` |
+| `p²`/prime/multi | degenerate |
+
+## The leak
+
+| `p`/`m` bits | `coppersmith` |
+| `d`/`phi`/`p`,`q` | `factor-from-d`/`rsa-decrypt` |
+| `dp`,`dq`,`qInv` | `crt` |
+| `sig`+fault | `crt` Bellcore |
+| `m` residues | `crt` |
+
+## The verify
+
+`pow(m,e,n)==c` / `p*q==n`.

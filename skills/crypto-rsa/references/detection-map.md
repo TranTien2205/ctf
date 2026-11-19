@@ -1,39 +1,29 @@
-# Detection map — the signal → the class → the file
+# Detection map — the read order → the signal → the file
 
-## The count signals
+## The artifact reads
 
-- `moduli ≥ 2` → `batch-gcd`/`hastad` → `batch-gcd.md`, `hastad.md`
-- `moduli = 1` → single-modulus → `detection.md`, `fermat.md`, `wiener.md`, …
-- `e count = 2` on one `n` → `common-modulus` → `common-modulus.md`
-- `c count ≥ e`, same `m` → `hastad` → `hastad.md`
+| Read | The file |
+|---|---|
+| `ls`/`file`/`xxd` | `detection*.md`,`detection-surface*` |
+| `RSA.importKey` | `parameter-sheet.md`,`detection*.md` |
+| `re.findall` | `detection*.md`,`probe-catalogue.md` |
+| `keygen`/`chal` grep | `detection*.md`,`detection-catalogue*` |
+| `crypto_attack.py list` | `detection*.md`,`attack-table*` |
 
-## The exponent signals
+## The arithmetic reads
 
-- `e` = 3/5/17 → `small-e-root`/`hastad`/`franklin-reiter` → `small-e-root.md`
-- `e` = 65537 → the default → `detection.md`
-- `e` ~ `n` → `wiener`/`boneh-durfee` → `wiener.md`, `boneh-durfee.md`
-- `gcd(e,phi)>1` → `eth-root` → `factor-from-d.md`
+| `n`,`e`,`c` counts | `detection*.md`,`detection-matrix*` |
+| `e` size | `detection*.md`,`per-signal.md` |
+| `gcd(e,phi)` | `detection*.md`,`eth-root*.md` |
+| `n` square/prime | `detection*.md`,`edge-cases*` |
+| `m^e` vs `n` | `detection*.md`,`small-e-root*.md` |
 
-## The keygen signals
+## The route reads
 
-- `next_prime`/`p+k`/`q=p+2` → `fermat` → `fermat.md`
-- `getPrime(small)` for `d` → `wiener`/`boneh-durfee`
-- `random.seed`/`reused p` → `batch-gcd`
-- `p-1` smooth → `pollard-pm1`
-- `e=3`, no pad → `small-e-root`/`hastad`
-- `m2=a·m1+b` → `franklin-reiter`
+| `attack-table.md` row | `attack-table*.md`,`decision-table.md` |
+| `per-bound.md` bound | `per-bound.md`,`lattice-bounds.md` |
+| `crypto_attack.py <id>` | `workflow*.md`,`payload-*` |
 
-## The leak signals
+## The verify
 
-- `d`/`phi`/`dp` → `factor-from-d`/`crt` → `factor-from-d.md`, `crt.md`
-- `p`-high/low → `coppersmith-*` → `coppersmith.md`
-- partial `m` → `coppersmith` partial-message → `coppersmith.md`
-- correct+faulty sig → `crt` Bellcore → `crt.md`
-
-## The format signals
-
-- `.pem`/`.der` → `n`,`e` only → `detection.md`
-- `.json` list → batch → `batch-gcd.md`
-- `priv.pem` fields → `crt`/`factor-from-d`
-- `.txt` numbers → the sheet → `parameter-sheet.md`
-- `.py` source → the comment → `recon-order.md`
+`pow(m,e,n)==c` / `p*q==n`.

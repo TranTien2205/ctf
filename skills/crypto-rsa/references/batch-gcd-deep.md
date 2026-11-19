@@ -1,60 +1,76 @@
-# batch-gcd deep — the shared-prime break, in full
+# batch-gcd deep — the shared-prime attack, the full treatment
 
-## The precondition
+## The mechanism
 
-Two or more RSA moduli produced by a generator that reuses a prime. The reuse is
-the bug — a bad RNG, a seeded counter, a keygen that does `q = next_prime(p)`
-for one and `p = next_prime(seed2)` for another landing on the same value.
+`n_i = p·q_i`, `n_j = p·q_j` for a shared prime `p` → `gcd(n_i, n_j) = p`. A weak
+or seeded RNG that generates `p` once and `q` fresh — or that draws both primes
+from a small pool — produces collisions. This is the "Mining your Ps and Qs"
+class of bug.
 
-## Why gcd works
+## Detection
 
-`n1 = p·q1`, `n2 = p·q2` → `gcd(n1,n2) = p` exactly, because `p` divides both and
-nothing else does (assuming `q1 ≠ q2`). One `gcd` call splits two moduli.
-
-## The batch algorithm
-
-For `k` moduli, the naive O(k²) pairwise `gcd` is fine for a CTF batch:
-
-```python
-from math import gcd
-shared = {}
-for i in range(len(ns)):
-    for j in range(i+1, len(ns)):
-        g = gcd(ns[i], ns[j])
-        if 1 < g < ns[i]:
-            shared[i]=g; shared[j]=g
-```
-
-For very large batches, a **product tree + remainder tree** computes `gcd(ni,
-∏n / ni)` efficiently — but a CTF is small; the pairwise loop is the right tool.
-
-## The tool
-
-```bash
-python3 tools/crypto_attack.py batch-gcd --moduli n1 n2 n3 ... --e <e> --c <c>
-```
+- **count** — `len(set(n_list)) >= 2` from the same generator.
+- **keygen** — `random.seed(...)`, `getPrime` called once, a reused `p`, a
+  comment like "efficient primes" or "shared".
+- **shape** — a `.json`, `.pem` set, or `.txt` list of moduli.
 
 ## The bound / falsifier
 
-- Needs **≥2** moduli. One `n` → never.
-- Needs **a collision** — all `gcd=1` → proper RNG → negative.
+A collision must exist — `gcd(n_i, n_j) > 1` for some pair. All `gcd=1` → no
+shared prime → a **negative**; route per-`n` to `fermat`/`wiener`/etc. The
+*count* of moduli is not the bug — the *collision* is.
+
+## The attack
+
+```python
+from math import gcd
+ns = [n1, n2, n3, ...]
+for i in range(len(ns)):
+    for j in range(i+1, len(ns)):
+        g = gcd(ns[i], ns[j])
+        if 1 < g:
+            p = g
+            qi, qj = ns[i]//p, ns[j]//p
+            print(f'n[{i}] = {p} * {qi}')
+            print(f'n[{j}] = {p} * {qj}')
+```
+
+Or: `python3 tools/crypto_attack.py batch-gcd --moduli n1 n2 ...` /
+`--file <path>`.
+
+## The chain
+
+`p` → `q = n//p` → `phi = (p-1)*(q-1)` → `d = pow(e,-1,phi)` → `m = pow(c,d,n)`
+→ `pow(m,e,n)==c` → the flag.
 
 ## The verify
 
-`p*q==ni` → `d_i = inverse(e, (p-1)(q_i-1))` → `pow(c_i, d_i, n_i) == m` →
-`pow(m, e, n_i)==c_i`.
+`p*q == n` for each split modulus — the split is real. Then `pow(m,e,n)==c` for
+the plaintext.
 
-## The real-world shape
+## Worked shape
 
-"Mining your Ps and Qs" (2012) factored ~0.5% of the public TLS/SSH key space
-this way — embedded devices with poor entropy produced shared primes at scale.
-The Debian OpenSSL RNG bug (2008) is the extreme: ~32k possible keys. The CTF
-version is the same shape, miniaturised.
+```python
+# n = p * q where p was reused across two keys
+n1 = p * q1; n2 = p * q2
+gcd(n1, n2) == p          # the collision
+# → p, q1, q2 — both keys split
+phi1=(p-1)*(q1-1); d1=pow(e,-1,phi1); m1=pow(c1,d1,n1)
+```
 
-## The traps
+## Variants
 
-- A `.json`/`keylist` carries every `n` — extract them all; the colliding pair
-  may be non-adjacent.
-- A shared `q` is identical — `gcd` doesn't care which prime repeats.
-- A shared `e` is normal — only a shared **prime** splits.
-- Proper RNG → all `gcd=1` → the count is not a bug.
+- **A `.pem` batch** — `RSA.importKey` each, collect `n`, `gcd` pairwise.
+- **A seeded RNG** — `random.seed` then `getPrime` — either regenerate the
+  prime stream or `gcd` the emitted `n`'s.
+- **`n` sharing `q` not `p`** — `gcd` doesn't care which factor is shared.
+- **A "weak prime pool"** — `p`,`q` from a small set → many collisions.
+
+## Failure modes
+
+- All `gcd=1` — the RNG was fine; the *count* isn't the bug.
+- `n` already a prime power — a false "collision" if `n` was `p^k`.
+
+## The honest status
+
+Standard published attack — catalogue, no local solve.

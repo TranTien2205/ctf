@@ -1,63 +1,39 @@
-# Common mistakes deep — the wrong moves, and why they fail
+# Common mistakes deep — the traps, annotated
 
-## "e=3 means small-e-root"
+## Attacking the wrong parameter
 
-`e=3` is only weak when `m³<n`. A real flag is usually longer — `m³` wraps, the
-exact root fails. Route: `hastad` (≥3 moduli of the same `m`), `coppersmith`
-(partial `m`), or `franklin-reiter` (a relation). Check `m^e<n` before the root.
+`e` small + `m` short → `small-e`; `e` small + broadcast → `hastad`; `e`≈`n` →
+small `d`; `d`/`phi` held → `factor-from-d`. The *tells* route — the parameter
+matters, not the attack's name.
 
-## "a large n is safe"
+## Confusing the bounds
 
-The modulus size is not the bug — a 4096-bit `n` with `q=next_prime(p)` falls to
-`fermat` in seconds. The bug is a *precondition violation*, not the size. Read
-the keygen.
+- `d<n^0.25` (Wiener) ≠ `d<n^0.292` (Boneh-Durfee) — the wider reach is slower.
+- The Coppersmith window `n^0.25` (factor) ≠ `n^(1/e)` (message) — the degree
+  `d` differs.
+- `m^e<n` (exact root) ≠ `m^e≥n` (wrapped — `hastad`/`coppersmith`).
 
-## "a large e is strong"
+## `n=p²` → `phi=(p-1)²`
 
-`e`≈`n` is the *small-`d`* tell — `e=inverse(d,phi)` for small `d` ≈ `n`. The
-larger `e`, the smaller `d` → `wiener`/`boneh-durfee`.
+`n=p²` → `phi=p(p-1)` — Euler for a prime power, not `(p-1)²`. A wrong `phi` →
+a wrong `d` → `pow` fails.
 
-## "20 moduli means batch-gcd"
+## `pow(m,e,n)==c` skipped
 
-The count is not the bug — a *collision* is. `gcd(ni,nj)=1` everywhere → no
-shared prime; `batch-gcd` is a negative. The bug might be `hastad` (same `m`) or
-a per-`n` attack.
+`m` is a candidate until `pow`. A `m` that decrypts but isn't re-encryptable is
+wrong; a `p*q==n` that doesn't decrypt `c` is incomplete.
 
-## "the PEM is the private key"
+## Reading `d` as a plaintext leak
 
-A `.pem`/`crt` *public* key is `n`,`e` only — extract and move on. A *partial*
-private key's redacted field is the attack surface — `coppersmith`/`crt`/
-`factor-from-d` on what is *not* redacted.
+`d` held → `factor-from-d`/`rsa-decrypt` — `d` is the *exponent*, not `m`.
+`phi`/`dp`/`qInv` similarly.
 
-## "the lattice failed = try again"
+## A flag-shaped `m` that isn't
 
-A bound exceeded is a theorem, not a tuning problem. `d≥n^0.292` → Boneh-Durfee
-cannot work; window `<n^0.25` → Coppersmith cannot work. Record the negative;
-route the fallback.
+`m` may be a padded block — strip `\x00\x02<pad>\x00`/OAEP. A flag-shaped `m`
+that fails `pow` is a decoy.
 
-## "the root is the flag"
+## The relation misread
 
-`pow(m,e,n)==c` is the gate. A flag-shaped string that fails `pow` is a decoy;
-a padded `m` is the padded block — strip `\x00\x02<pad>\x00`; an `eth-root`
-candidate must `pow`-verify and match the format.
-
-## "phi is (p-1)(q-1) always"
-
-`n=p²` → `phi=p(p-1)`; `n` prime → `phi=n-1`; `n=p·q·r` → `phi=∏(pi-1)`. The
-degenerate `n` needs the degenerate `phi`.
-
-## "inverse(e,phi) failing is a bug"
-
-`gcd(e,phi)>1` is `eth-root` — a *signature*, not an error. `p`,`q` held → the
-gcd candidates; `pow`+format picks the true root.
-
-## "a socket printing n,e,c is an oracle"
-
-A socket that *prints* the values is transport — treat as the numbers. A socket
-that *computes* on your `m` is `crypto-symmetric-oracle`. The difference is a
-menu/loop.
-
-## "recovered d = decrypt done"
-
-`pow(c,d,n)==m` recovers `m`; `pow(m,e,n)==c` *verifies* it. Run both — a wrong
-`d` gives garbage that may look flag-shaped.
+`m2=a·m1+b` is `franklin-reiter`; `m_i=a_i·m+b_i` broadcast is `hastad`/pad;
+a random pad is dead — read the keygen.

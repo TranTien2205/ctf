@@ -1,64 +1,35 @@
-# Field manual deep — the RSA engagement, the full procedure
+# Field manual deep — the procedures, annotated
 
-## The intake
+## The discriminate procedure
 
-```python
-# extract every integer and key
-from Crypto.PublicKey import RSA
-import re, json, glob
-for f in glob.glob('*'):
-    if f.endswith(('.pem','.der','.key','.crt')):
-        try:
-            k=RSA.importKey(open(f,'rb').read())
-            print(f,'n=',k.n.bit_length(),'bits','e=',k.e,'has d:',k.has_private())
-        except Exception as ex: print(f,'parse-fail',ex)
-    elif f.endswith('.json'):
-        d=json.load(open(f)); print(f,'keys:',len(d) if isinstance(d,list) else '?')
-    else:
-        nums=re.findall(r'\b\d{20,}\b',open(f,errors='replace').read())
-        if nums: print(f,'ints:',[int(v).bit_length() for v in nums])
-```
+1. `crypto_attack.py list` — the inventory + `lll_backend`.
+2. `parameter-sheet.md` — `n`,`e`,`c`,counts,`e_sig`,leak,keygen,degenerate.
+3. `attack-table.md` — the first-yes row.
+4. `per-bound.md` — the falsifier read.
 
-Build the sheet: moduli, exponents, ciphertexts, leaks, the keygen.
+## The cheap-attack procedure
 
-## The discriminant
+`fermat` → `batch-gcd` → `small-e-root` → `common-modulus` → `pollard-pm1` →
+`wiener` → `crt`/`hastad`/`factor-from-d`/`rsa-decrypt`/`eth-root` — the
+non-lattice ids, in cost order.
 
-```
-n count≥2?          → batch-gcd / hastad
-2 e on 1 n?          → common-modulus
-e ~ n?               → wiener → boneh-durfee
-e=3, m short?        → small-e-root
-p,q close?           → fermat
-p-1 smooth?          → pollard-pm1
-p-bits leaked?       → coppersmith
-d/phi/dp/p,q held?   → factor-from-d/crt
-m2=a·m1+b?           → franklin-reiter
-residues/fault?      → crt
-```
+## The lattice procedure
 
-First yes picks the id.
+`boneh-durfee` (`d<n^0.292`) → `boneh-durfee-escalate` (`m`,`t` up) →
+`coppersmith-high-bits`/`coppersmith-core` (bits) — give the budget, approach
+the bound.
 
-## The attack order
+## The manual procedure
 
-Cheap first: `fermat`, `batch-gcd`, `common-modulus`, `small-e-root`,
-`pollard-pm1`, `wiener` — seconds. Then the lattice: `boneh-durfee`,
-`coppersmith`. The applicability bound is the gate — read it before the run.
+`franklin-reiter` (`tools/crypto/franklin_reiter.py`) · `crt` Bellcore `gcd` ·
+`crt` `dp`/`dq`/`qInv` loop — no `crypto_attack.py` id.
 
-## The verify
+## The verify procedure
 
-`pow(m,e,n)==c` for `m`; `p*q==n` for `p`,`q`. The only proof.
+`m` → `pow(m,e,n)==c` → `long_to_bytes(m)` → strip a pad → the flag bytes.
+`p`,`q` → `p*q==n` → `phi` → `d` → `m` → `pow`.
 
-## The traps (the short list)
+## The chain procedure
 
-- `e=3` ≠ weak — check `m^e<n`.
-- balanced primes ≠ close — fermat needs `|p-q|` small in *value*.
-- 20 moduli ≠ a bug — a *collision* is.
-- a leak in `m` ≠ a leak in `p` — different coppersmith.
-- a bound exceeded = negative, not retry.
-- a public PEM = `n`,`e` only.
-
-## The record
-
-`solved/<name>/` + `classify_solve.py` + the evidence tuple
-`{sheet, attack, bound, recovered, pow}`; or `knowledge/attempts/` for a dead
-end with each bound.
+`factor`/`d`/`phi` → `factor-from-d`/`rsa-decrypt --p --q` → `m` → `pow` →
+the flag.

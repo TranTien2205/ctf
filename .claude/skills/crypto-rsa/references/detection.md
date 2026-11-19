@@ -1,15 +1,39 @@
-# Detection — fingerprinting the RSA weakness
+# Detection — the signals that name the attack
 
-Read `recon-order.md`: source → count → exponent → leak → relation → degenerate.
+## The counts
 
-- **source**: `keygen.py` — `next_prime`/`seed`/`getPrime(d)`/`p-1`/`e=3`/no pad.
-- **counts**: `n`≥2 → batch/hastad; `e` count 2 → common-modulus; `c`≥`e` → hastad.
-- **exponent**: `e` small / 65537 / ~`n` / `gcd(e,phi)>1`.
-- **leak**: `d`,`phi`,`dp`,`p`-bits,`m`-partial,`p`,`q`.
-- **relation**: `m2=a·m1+b`, residues, a fault.
-- **degenerate**: `n` square / prime / multi-prime.
+- `n` count ≥2 → `batch-gcd`/`hastad`; 1 → single-modulus.
+- `e` count on 1 `n` — 2 → `common-modulus`.
+- `c` count ≥`e` same `m` → `hastad`.
 
-The fingerprint → `attack-table.md` row → the attack. See `detection-deep.md`,
-`detection-checklist.md`, `detection-matrix.md`, `detection-catalogue.md`,
-`detection-variants.md`, `detection-surface.md`, `detection-index.md`,
-`detection-map.md`, `detection-playbook.md`.
+## The exponent
+
+- `e`=3/5/17/257 → `small-e`/`hastad`/`franklin-reiter`.
+- `e`=65537 → the bug is elsewhere (a leak, the primes, a relation).
+- `e`≈`n` → `wiener`/`boneh-durfee`.
+- `gcd(e,phi)>1` → `eth-root`.
+- `e`=1 → `c=m`.
+
+## The leak
+
+- `d`/`phi`/`dp`/`dq`/`qInv`/`p`/`q` → `factor-from-d`/`crt`/`rsa-decrypt`.
+- `p`/`m` bits → `coppersmith-*`.
+- `sig`+`sig_faulty` → `crt` Bellcore.
+- `m` residues `mod pi` → `crt`.
+
+## The degenerate
+
+`isqrt(n)**2==n` → `n=p²` → `phi=p(p-1)` · `isPrime(n)` → `phi=n-1` ·
+`factorint(n)` → smooth `n` · multi-prime → `phi=∏(pi-1)`.
+
+## The keygen tell
+
+`next_prime`/`p+k`/`q=p+2` → `fermat` · `seed`/reused `p` → `batch-gcd` ·
+`getPrime(d)` small → `wiener`/`boneh-durfee` · `p-1` smooth → `pollard-pm1` ·
+`e=3`,no pad → `small-e`/`hastad` · `a·m1+b` → `franklin-reiter` ·
+`dp`,`dq`,`qInv` → `crt` · `d`/`phi`/`p`,`q` → `factor-from-d`/`rsa-decrypt` ·
+`redact`/`XXXX` → `coppersmith`/`crt`/`factor-from-d`.
+
+## The route
+
+`attack-table.md` → `per-bound.md` → `crypto_attack.py <id>` → `verify.md`.

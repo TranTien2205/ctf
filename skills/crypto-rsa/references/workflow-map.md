@@ -1,57 +1,17 @@
 # Workflow map — the phase → the file → the command
 
-## Phase 0 — extract
+| Phase | The file | The command |
+|---|---|---|
+| extract | `parameter-sheet*.md`,`recon-order*.md`,`detection*` | `RSA.importKey`,`re.findall`,`crypto_attack.py list` |
+| discriminate | `attack-table*.md`,`decision-*`,`detection-matrix*`,`detection-catalogue*` | the first-yes row |
+| bound-check | `per-bound.md`,`lattice-bounds.md`,`falsifiers*`,`boundary-cases*` | the falsifier |
+| attack | `workflow*.md`,`payload-*`,`per-attack-*`,`probe-*` | `crypto_attack.py <id>` |
+| chain | `multi-step-chains*.md` | `factor-from-d`/`rsa-decrypt`/etc |
+| verify | `verify*`,`evidence-*`,`checklist*` | `pow(m,e,n)==c`/`p*q==n` |
+| record | `evidence-*`,`solved/` | `post-probe`,`classify_solve.py` |
+| escalate | `tools/decide.py` | `chain_match`,`reclassify`,`writeup_search`,`novel_plan`,`fanout_sweep`,`solver_handoff` |
 
-| File | The command |
-|---|---|
-| `parameter-sheet.md` | fill the sheet |
-| `detection.md`/`detection-deep.md` | fingerprint the weakness |
-| `recon-order.md` | source → count → exponent → leak → relation |
+## The indexes
 
-`python3 tools/crypto_attack.py list` — the inventory + bounds.
-
-## Phase 1 — discriminate
-
-| File | The command |
-|---|---|
-| `attack-table.md`/`attack-table-deep.md` | the first-yes row |
-| `per-signal.md`/`per-parameter.md`/`per-bound.md`/`per-mechanism.md` | the maps |
-| `detection-matrix.md`/`detection-catalogue.md` | the feature grid |
-
-## Phase 2 — bound-check
-
-| File | The command |
-|---|---|
-| `per-bound.md`/`lattice-bounds.md`/`falsifiers.md`/`boundary-cases.md` | the bounds |
-| `per-check.md`/`per-falsifier.md`/`falsifier-map.md` | the checks |
-
-Read the applicability line the tool prints — the falsifier.
-
-## Phase 3 — attack
-
-| File | The command |
-|---|---|
-| `payload-dictionary.md`/`payload-map.md`/`payload-families.md`/`payload-variants.md` | the call |
-| `exploitation.md`/`exploitation-deep.md`/`exploitation-catalogue.md` | the run |
-| `probe-catalogue.md`/`probe-map.md` | the measurable reads |
-
-`python3 tools/crypto_attack.py <id> <flags>` — `<id> --help` for the args.
-
-## Phase 4 — verify
-
-| File | The command |
-|---|---|
-| `verify.md`/`verification-protocol.md`/`evidence-rules.md`/`evidence-deep.md`/`evidence-catalogue.md` | the proof |
-
-`pow(m,e,n)==c` or `p*q==n`.
-
-## Phase 5 — record / escalate
-
-| File | The command |
-|---|---|
-| `negative-results.md`/`falsifiers.md` | the dead attacks |
-| `troubleshoot.md`/`troubleshoot-deep.md`/`common-mistakes.md`/`anti-patterns.md`/`edge-cases.md`/`evasion.md` | the stalls |
-| `verified-chains.md` | the honest status |
-
-`tools/classify_solve.py --chain <id>` after a solve; `knowledge/attempts/` for
-a dead end.
+`README*.md`,`index.md`,`map-index.md`,`mechanism-index.md`,`detection-index*`,
+`summary-map.md`,`summary-index.md`,`closing-index.md`,`field-notes-deep.md`.

@@ -1,41 +1,29 @@
-# Map index — every per-* map, one line
+# Map index — every map/table/index file
 
 ## The maps
 
-| Map | Maps |
+| File | Maps |
 |---|---|
-| `per-attack.md` | attack id → the file + the one-liner |
-| `per-parameter.md` | the value → what it leaks |
-| `per-bound.md` | the bound → the attacks → the falsifier |
-| `per-signal.md` | the observation → the hypothesis |
-| `per-mechanism.md` | the primitive → the falsifier |
-| `per-endpoint.md` | the channel → what it carries |
-| `per-class.md` | crypto-rsa vs the neighbours |
-| `per-target.md` | the artifact → the attack |
-| `per-form.md` | the shape → the parse → the attack |
-| `per-channel.md` | how the value arrives → the parse |
-| `per-check.md` | the discriminating test → the attack |
-| `per-condition.md` | the precondition → the attack |
-| `per-falsifier.md` | the closing observation → what it kills |
-| `per-route.md` | the recovery route → the chain |
-| `per-vector.md` | the injection point → the value |
-| `per-boundary.md` | the edge → inside/outside crypto-rsa |
+| `mechanism-map*.md` | primitive → bug files |
+| `detection-map*.md` | read → signal → file |
+| `probe-map.md` | read → signal → attack → file |
+| `per-attack-map.md` | id → primitive → file |
+| `falsifier-map.md` | falsifier → file |
+| `negative-map.md` | negative → file |
+| `workflow-map.md` | phase → file → command |
+| `quick-map.md` | signal → command → bound |
+| `summary-map.md` | the one-page summary |
+| `case-studies-map.md` | shape → file → solve |
+| `common-questions-map.md` | question → file |
+| `boundary-cases.md`/`per-boundary.md` | the boundaries |
 
-## The other maps
+## The tables
 
-| Map | Maps |
-|---|---|
-| `detection-map.md` | the signal → the class → the file |
-| `mechanism-map.md` | the primitive → the bug files |
-| `theory-map.md` | the bound → the classes it bounds |
-| `evidence-map.md` | the evidence type → the file/rule |
-| `negative-map.md` | the observed-negative → the class closed |
-| `workflow-map.md` | the phase → the file → the command |
-| `payload-map.md` | the attack id → the flags |
-| `probe-map.md` | the question → the probe → the attack |
-| `summary-map.md` | the one-line index |
+`attack-table*.md` — the discriminator; `decision-table.md`/`decision-catalogue*`
+— the if/else; `detection-matrix*.md` — the cross-table; `attack-catalogue.md` —
+the flags+bounds; `per-bound.md` — the falsifiers.
 
-## The decision tables
+## The indexes
 
-`decision-table.md` — the one-look router; `decision-catalogue.md` — every
-branch with its command.
+`README*.md`,`index.md`,`map-index.md`,`mechanism-index.md`,`detection-index*`,
+`summary-map.md`,`summary-index.md`,`closing-index.md`,`field-notes-deep.md`.

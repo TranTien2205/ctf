@@ -1,39 +1,25 @@
-# Negative map — the observed-negative → the class it rules out
+# Negative map — the closing observation → the file
 
-## The negatives, by observation
-
-| You observed | It rules out |
+| The negative | The file |
 |---|---|
-| every `gcd(ni,nj)=1` | `batch-gcd` — no shared prime |
-| `gcd(e1,e2)>1` | `common-modulus` — `m^gcd`, not `m` |
-| `a` past budget, no `a²-n` square | `fermat` — `|p-q|` too large |
-| `d ≥ n^0.25` | `wiener` — escalate to `boneh-durfee` |
-| `d ≥ n^0.292` | `wiener`+`boneh-durfee` — small-d dead |
-| known window `< n^0.25` | `coppersmith-*` — need a bigger leak |
-| `m^e ≥ n` | `small-e-root`/`nth-root` — wrapped |
-| `<e` ciphertexts / a pad | `hastad` — product too small / `m` differs |
-| `gcd(a^M-1,n)=1` for `B` | `pollard-pm1` — `p-1` not smooth enough |
-| relation not linear | `franklin_reiter` — needs `m2=a·m1+b` |
-| `∏pi≤m` / no fault | `crt` — wraps / Bellcore impossible |
-| `d`/`phi` fails `pow` | `factor-from-d`/`rsa-decrypt` — wrong input |
+| `gcd(ni,nj)=1` all | `batch-gcd*.md`,`negative-results*.md` |
+| `gcd(e1,e2)>1` | `common-modulus*.md` |
+| `gcd(a^{B!}-1,n)=1` | `pollard-pm1*.md` |
+| `gcd(s'^e-m,n)=1` | `crt*.md` |
+| `d ≥ n^0.25` | `wiener*.md`,`lattice-bounds.md` |
+| `d ≥ n^0.292` | `boneh-durfee*.md` |
+| window `< n^0.25`/`n^(1/e)` | `coppersmith*.md` |
+| `m^e ≥ n` | `small-e-root*.md`,`nth-root*.md` |
+| `<e` n's / `∏n<m^e` / pad | `hastad*.md` |
+| `|p-q|` too large | `fermat*.md` |
+| `p-1` not `B`-smooth | `pollard-pm1*.md` |
+| relation not `a·m1+b` | `franklin-reiter*.md` |
+| `∏pi≤m`/no fault/inconsistent `dp` | `crt*.md` |
+| `gcd(e,phi)=1` | `eth-root*.md` |
+| `d`/`phi` fails `pow`/`p*q` | `factor-from-d*.md`,`rsa-decrypt*.md` |
+| every bound met | `class-boundary.md` — not RSA |
 
-## The negatives → the fallback
+## The record
 
-| Closed | Try next |
-|---|---|
-| batch-gcd | per-`n` single attacks |
-| wiener | boneh-durfee |
-| boneh-durfee | a leak / another class |
-| small-e-root | hastad (e n's) or coppersmith |
-| hastad | coppersmith / franklin-reiter |
-| fermat | pollard-pm1 / a leak |
-| common-modulus | nth-root if `m^g<n` |
-| coppersmith | a bigger leak / another attack |
-| pollard-pm1 | a different precondition |
-| franklin-reiter | a different relation |
-| all bounds met | reclassify — protocol/oracle class |
-
-## The kill-map
-
-`knowledge/attempts/<challenge>.json` — each dead attack's id, the measured
-bound, and the precondition that would reopen it.
+`knowledge/attempts/<challenge>.json` + `negative-results*.md` +
+`../field-notes.md`.

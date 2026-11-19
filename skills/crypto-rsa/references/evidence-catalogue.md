@@ -1,43 +1,33 @@
-# Evidence catalogue — the per-attack check
+# Evidence catalogue — the confirms, the gates, the record
 
-## The check, by what the attack returns
+## The confirms
 
-| Attack | Returns | The check |
+| Claim | The gate | The bytes |
 |---|---|---|
-| `batch-gcd` | `p` | `p*q==n`, `p|n`, `1<p<n` |
-| `common-modulus` | `m` | `pow(m,e1,n)==c1` |
-| `fermat` | `p`,`q` | `p*q==n` |
-| `wiener` | `d` | `pow(c,d,n)==m`, `pow(m,e,n)==c` |
-| `boneh-durfee` | `d` | `pow(c,d,n)==m`, `pow(m,e,n)==c` |
-| `coppersmith-*` | `p`/`x` | `p|n`, `p*q==n` |
-| `small-e-root`/`nth-root` | `m` | `pow(m,e)==c` |
-| `hastad` | `m` | `pow(m,e)==x` (CRT value) |
-| `pollard-pm1` | `p` | `1<gcd<n`, `p*q==n` |
-| `franklin-reiter` | `m` | `pow(m,e,n)==c` |
-| `crt` residues | `m` | `pow(m,e,n)==c` |
-| `crt` Bellcore | `q` | `gcd==q`, `p*q==n` |
-| `crt` dp | `p` | `p*q==n` |
-| `factor-from-d` | `p`,`q` | `p*q==n` |
-| `rsa-decrypt` | `m` | `pow(m,e,n)==c` |
-| `eth-root` | `m` candidates | `pow(m,e,n)==c` + format |
+| `m` recovered | `pow(m,e,n)==c` | the `pow` output + `long_to_bytes(m)` |
+| `p`,`q` recovered | `p*q==n` | `p*q==n` + the `d`/`m` chain |
+| `d` recovered | `pow(c,d,n)==m` | `pow` output |
+| `phi` recovered | `n-phi+1==p+q` | the consistency + `d`/`m` chain |
+| `m_i` (`eth-root`) | `pow(m_i,e,n)==c`+format | the candidate list + `pow` |
+| `p` recovered | `1<p<n`,`p|n` | the `gcd`/`divmod` output |
 
-## The evidence tuple (for `solved/`)
+## The record
 
-```python
-{
-  'challenge': <name>,
-  'discriminator': <the row that fired>,
-  'attack': <the crypto_attack.py id>,
-  'bound': <the measured bound>,
-  'input': <the leaked values>,
-  'recovered': <p,q | d | m>,
-  'verify': 'pow(m,e,n)==c' | 'p*q==n',
-  'response': '<the pow/gcd output>',
-}
+```bash
+RESP="$(python3 - <<'PY'\nprint(pow(m,e,n)==c)\nPY)"
+python3 tools/hooks.py post-probe --hypothesis-id <hN> --class crypto-rsa \
+  --verdict confirms --evidence-kind impact --evidence "pow(m,e,n)==c" --response "$RESP"
 ```
 
-## The quote rule
+`--evidence` must be a substring of `--response` — the check is verified.
 
-`hooks.py post-probe` asserts `--evidence` is a substring of `--response`. The
-"response" is the `pow`/`gcd` output — put the `pow` result in `--response` and
-the claim in `--evidence`.
+## The decoy
+
+A flag-shaped `m` that fails `pow` — a wrong root/decoy. `p*q` that fails `==n`
+— a false split. `d` that doesn't decrypt — wrong.
+
+## The honest status
+
+`pow`/`p*q` is the deterministic gate — the "artifact" for this class. The
+files: `evidence-rules.md`,`evidence-rules-deep.md`,`evidence-playbook.md`,
+`evidence-catalogue.md`,`verify.md`,`verification-protocol.md`.

@@ -1,58 +1,104 @@
-# Worked examples deep — annotated solves with the verify inline
+# Worked examples deep — the annotated solves
 
-## fermat, fully annotated
+## `fermat` — `q=next_prime(p)`
 
-`q = next_prime(p)` → `p,q` within ~a few thousand. `a=(p+q)/2` sits just above
-`sqrt(n)`; `a²-n = b² = ((p-q)/2)²`, a small square.
 ```python
+# n = p*q where q = next_prime(p) — p and q differ by ~hundreds
 a = isqrt(n) + 1
-# a²-n is ((p+q)/2)² - pq = ((p-q)/2)² — a perfect square when it lands
-b, ok = integer_nthroot(a*a - n, 2)
+while True:
+    b2 = a*a - n
+    if is_square(b2): p, q = a+isqrt(b2), a-isqrt(b2); break
+    a += 1
+# p*q == n → phi → d → m → pow(m,e,n)==c
 ```
-The `a` climb is `O(|p-q|/2)` — for `next_prime` that's tens of iterations.
-`p=a-b`, `q=a+b`. Then `phi`, `d`, `m`. **`p*q==n` proves the split**.
 
-## wiener, fully annotated
+The `a` climb lands in `O(|p-q|)` steps — a few hundred for adjacent primes.
 
-`ed ≡ 1 mod phi` → `ed - k·phi = 1` for some `k` → `|e/n - k/d| < 1/(3d²)` —
-`k/d` is a convergent of `e/n` when `d < n^0.25`. The CF expansion of `e/n`
-enumerates the convergents; for each `k_i/d_i` candidate, `phi'=(e·d_i-1)/k_i`
-→ check the quadratic `x²-(n-phi'+1)x+n=0` for integer roots. **`pow(c,d,n)==m`
-proves the `d`**.
+## `wiener` — `d` small, `e`≈`n`
 
-## boneh-durfee, fully annotated
+```python
+# e/n has convergents k/d; d < n^0.25 → d is a convergent
+for (k,d) in convergents(e/n):
+    if (e*d-1) % k == 0:
+        phi = (e*d-1)//k
+        s = n - phi + 1                    # p+q
+        if discriminant s²-4n is square:   # p,q = (s±√disc)/2
+            return d, p, q
+# → d → m = pow(c,d,n) → pow(m,e,n)==c
+```
 
-`ed ≡ 1 mod phi` → `ed - k(n+1-p-q) = 1` → `e·d + k·(p+q) ≡ 1+k(n+1) mod e` →
-`f(x,y)=x(A-y)+1 ≡ 0 mod e` has root `(k, p+q)`, `A=n+1`. Coppersmith's
-bivariate LLL recovers `(k, s)` for `d<n^0.292`; `d=(e·d mod e)`... the lattice
-returns `d`/`(k,s)` → `p`,`q` from `s=p+q`. **`pow(c,d,n)==m` proves it**.
+## `boneh-durfee` — `d` in `n^0.25..n^0.292`
 
-## hastad, fully annotated
+```python
+# f(x,y) = x(A-y)+1 mod e, A=n+1 — root (k,s), s=p+q
+# LLL → the small roots → d=k, p,q from s
+```
 
-`c_i = m³ mod n_i` for `i=1,2,3`. CRT: `x ≡ c_i mod n_i` → `x = m³ mod n1n2n3`.
-Since `m³ < n1n2n3`, `x = m³` exactly → `m = x^{1/3}`. **`pow(m,3)==x` proves
-it** — the CRT product *must* exceed `m^e` for the root to be `m`.
+## `batch-gcd` — a shared `p`
 
-## common-modulus, fully annotated
+```python
+for i,j in pairs(ns):
+    g = gcd(ns[i], ns[j])
+    if g > 1: p = g; qi, qj = ns[i]//p, ns[j]//p
+```
 
-`c1=m^3`, `c2=m^17` mod `n`. `gcd(3,17)=1`, `a·3+b·17=1` → `a=-5,b=1`? `-15+16=1` no; `5·3 -1·17 = -2`... solve `a·e1+b·e2=1` → `m = c1^a · c2^b mod n`
-(a negative `a` means `pow(c1,a,n)` — Python handles modular inverse).
-**`pow(m,e1,n)==c1` proves it**.
+## `small-e-root` — `m³<n`
 
-## pollard-pm1, fully annotated
+```python
+m, exact = integer_nthroot(c, 3)
+assert exact and pow(m,3) == c     # no mod n — c was m³ plain
+```
 
-If `p-1 | B!` → `a^{B!} ≡ 1 mod p` → `p | a^{B!}-1` and `p | n` →
-`gcd(a^{B!}-1, n) = p`. The loop `a=pow(a,j,n)` for `j=2..B` computes
-`a^{B!}`. **`gcd>1` proves the factor** — `1<gcd<n` is a non-trivial factor.
+## `hastad` — `e` n's, same `m`
 
-## coppersmith, fully annotated
+```python
+x = crt(ns, cs)[0]                 # x = m^e mod ∏ni = m^e exactly
+m, ok = integer_nthroot(x, e); assert pow(m,e)==x
+```
 
-`p = a + x`, `a` the known high bits, `|x|<n^0.25`. `f(x)=a+x ≡ 0 mod p`. LLL on
-the `f` lattice finds a polynomial with a small integer root `x0` → `p=a+x0`.
-**`p|n` proves it**.
+## `common-modulus` — `gcd(e1,e2)=1`
 
-## eth-root, fully annotated
+```python
+g,a,b = gcdex(e1,e2); m = pow(c1,a,n)*pow(c2,b,n) % n
+assert pow(m,e1,n)==c1
+```
 
-`gcd(e,phi)=g>1` → `e` not invertible mod `phi`. `p`,`q` held → compute the `g`
-`e`th-root candidates mod `p` and mod `q` → CRT → `g` candidates mod `n` →
-`pow(m_i,e,n)==c` + flag format picks the true one.
+## `pollard-pm1` — `p-1` smooth
+
+```python
+a = 2
+for j in range(2,B+1): a = pow(a,j,n)
+g = gcd(a-1,n)                     # = p
+```
+
+## `coppersmith` — `p` bits
+
+```python
+# f(x) = a+x ≡ 0 mod p — LLL small root → x → p = a+x
+```
+
+## `franklin-reiter` — `m2=a·m1+b`
+
+```python
+# gcd(x^e-c1, (a*x+b)^e-c2) over Z_n[x] = x-m
+```
+
+## `crt` — residues / Bellcore / dp
+
+```python
+# residues: x = crt(pi, ri)[0] → m (if ∏pi>m)
+# Bellcore: gcd(pow(sig_faulty,e,n)-m, n) → q
+# dp: for k in 1..e: p=(e*dp-1)/k+1; if n%p==0 → p
+```
+
+## `factor-from-d`/`rsa-decrypt`/`eth-root` — the leaks
+
+```python
+# factor-from-d: ed-1 → 2^t·r → g^r sequence → a non-trivial x²≡1 → gcd(x-1,n)
+# rsa-decrypt: --p --q → phi → d → m
+# eth-root: the g roots mod p,q → CRT → pow+format
+```
+
+## The verify
+
+`pow(m,e,n)==c` / `p*q==n` — every solve.

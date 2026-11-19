@@ -1,59 +1,49 @@
-# Evidence playbook — the proof, run as commands
+# Evidence playbook — the confirm commands
 
-## The plaintext proof
+## `m` recovered
 
 ```python
-# recovered m
-assert pow(m, e, n) == c, "candidate, not a recovery"
+from Crypto.Util.number import long_to_bytes
+assert pow(m, e, n) == c
+print(long_to_bytes(m))
 ```
 
-## The factor proof
+## `p`,`q` recovered
 
 ```python
-# recovered p,q
-assert p * q == n
-assert 1 < p < n
-phi = (p-1)*(q-1); d = pow(e,-1,phi)
-assert pow(c, d, n) == m
-```
-
-## The d proof
-
-```python
-# recovered d
-m = pow(c, d, n)
+assert p*q == n and 1 < p < n
+phi = (p-1)*(q-1); d = pow(e,-1,phi); m = pow(c,d,n)
 assert pow(m, e, n) == c
 ```
 
-## The eth-root proof
+## `d` recovered
 
 ```python
-for m in eth_root_candidates(c, e, n, p, q):
-    if pow(m, e, n) == c and isprintable(m): print('FLAG', m)
+m = pow(c, d, n); assert pow(m, e, n) == c
 ```
 
-`pow` picks the true root; the format confirms.
-
-## The padded-plaintext proof
+## `phi` recovered
 
 ```python
-b = long_to_bytes(m)
-# PKCS#1 v1.5:  \x00\x02<padding>\x00<message>
-# strip to the flag; pow(m,e,n)==c held on the padded block
+assert (n - phi + 1) == p + q    # if p,q known
+d = pow(e, -1, phi); m = pow(c, d, n); assert pow(m,e,n)==c
+```
+
+## `eth-root` `m_i`
+
+```python
+for mi in candidates:
+    if pow(mi, e, n) == c and is_flag_format(mi): print(mi)
 ```
 
 ## The hooks call
 
 ```bash
-RESP="$(python3 -c 'print(pow(m,e,n)==c)')"
+RESP="$(python3 - <<'PY'\nprint(pow(m,e,n)==c)\nPY)"
 python3 tools/hooks.py post-probe --hypothesis-id <hN> --class crypto-rsa \
-  --verdict confirms --evidence-kind impact \
-  --evidence "pow(m,e,n)==c" --response "$RESP"
+  --verdict confirms --evidence-kind impact --evidence "pow(m,e,n)==c" --response "$RESP"
 ```
 
-## What fails
+## The rule
 
-- `pow!=c` → a candidate.
-- `p*q!=n` → not a factor.
-- a flag-shaped string without `pow` → a decoy.
-- exit status → not evidence.
+`pow`/`p*q` is the gate — a value that fails is a candidate.

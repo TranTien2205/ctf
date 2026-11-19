@@ -1,38 +1,48 @@
-# Theory catalogue — every theorem, its bound, its file
+# Theory catalogue — the identity → the family → the attack
 
-## The factoring theorems
+## The identity
 
-- **Fermat** — `n=a²-b²`, `|p-q|` small → `fermat.md`.
-- **Pollard p-1** — `p-1` `B`-smooth → `pollard-pm1.md`.
-- **batch-gcd** — shared prime → `batch-gcd.md`.
-- **trial/ECM/QS/NFS** — the general factoring methods; not this class's tools.
+`n=p·q`, `φ=(p-1)(q-1)`, `ed≡1 mod φ`, `c=m^e mod n`, `m=c^d mod n`.
+`pow(m,e,n)==c` is the verify.
 
-## The small-d theorems
+## Wrap — `m^e<n` → `c` a plain power
 
-- **Wiener** — `d<n^0.25`, CF → `wiener.md`.
-- **Boneh-Durfee** — `d<n^0.292`, bivariate LLL → `boneh-durfee.md`.
+- `m=c^{1/e}` → `small-e-root`/`nth-root`.
+- `m^e<∏ni` → CRT → `c^{1/e}` → `hastad`.
+- The bound: `m^e<n` — the wrap never engaged.
 
-## The small-root theorems
+## Gap — `|p-q|` small → `n=a²-b²`
 
-- **Coppersmith univariate** — `f(x)≡0 mod p`, `|x|<n^(β²/d)` → `coppersmith.md`.
-- **Coppersmith bivariate** — small `d` → `boneh-durfee.md`.
-- **partial-message** — `f(x)≡0 mod n`, `|x|<n^(1/e)` → `coppersmith.md`.
+- `a=(p+q)/2` near `√n`; `a²-n=((p-q)/2)²` square → `fermat`.
+- The bound: the `a` walk is `O(|p-q|)`.
 
-## The broadcast / relation theorems
+## Divisor — a shared/smooth factor
 
-- **Håstad** — same `m`, `e` moduli → `hastad.md`.
-- **Franklin-Reiter** — `m2=a·m1+b` → `franklin-reiter.md`.
-- **common-modulus** — `gcd(e1,e2)=1` → `common-modulus.md`.
-- **CRT** — residues → `crt.md`.
-- **Bellcore** — a fault → `crt.md`.
+- `gcd(ni,nj)=p` → `batch-gcd` — a shared `p`.
+- `gcd(a^{B!}-1,n)=p` (`p-1` `B`-smooth) → `pollard-pm1`.
 
-## The algebraic theorems
+## Exponent — `ed≡1 mod φ` leaks `d`
 
-- **factor-from-d** — `ed-1` splits `n` → `factor-from-d.md`.
-- **eth-root** — `gcd(e,phi)>1` → `crt.md`/`factor-from-d.md`.
-- **Bezout** — `a·e1+b·e2=1` → `common-modulus.md`.
-- **CF / Legendre** — `k/d` a convergent → `wiener.md`.
+- `d<n^0.25` → CF `k/d` → `wiener`.
+- `d<n^0.292` → LLL `f(x,y)=x(A-y)+1` → `boneh-durfee`.
+- `gcd(e1,e2)=1` → Bezout `m=c1^a·c2^b` → `common-modulus`.
+- `d`/`phi`/`dp`/`qInv`/`p`,`q` held → `factor-from-d`/`crt`/`rsa-decrypt`.
 
-## The verify theorem
+## Partial — bits → Coppersmith
 
-`pow(m,e,n)==c` ⇔ `m` is the plaintext — the RSA identity itself.
+- `p=a+x`, `|x|<n^0.25` → `coppersmith-high-bits`/`-core`.
+- `m` pad, `|x|<n^(1/e)` → partial-message.
+
+## Relation/leak — the structure
+
+- `m2=a·m1+b` → poly `gcd` → `franklin-reiter`.
+- `sig`+`sig_faulty` → `gcd(s'^e-m,n)` → `crt` Bellcore.
+- `gcd(e,phi)>1` → `g` roots → `eth-root`.
+
+## The bounds, ordered
+
+```
+d<n^0.25 wiener · d<n^0.292 boneh-durfee · window n^0.25/n^(1/e) coppersmith
+m^e<n small-e · ≥e n's hastad · gcd=1 common-modulus · |p-q| fermat
+B≥factor pollard-pm1 · ∏pi>m crt · linear franklin-reiter · gcd(e,phi)>1 eth-root
+```

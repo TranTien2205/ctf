@@ -1,68 +1,72 @@
-# Case studies deep — the full shapes, annotated
+# Case studies deep — the annotated challenge shapes
 
-## Case A — the `next_prime` keygen
-
-`keygen.py`:
-```python
-p = getPrime(512); q = next_prime(p)
-n = p*q; e = 65537
-```
-**Sheet**: `n`,`e`,`c`; keygen `next_prime`.
-**Discriminator**: `p,q` close → `fermat`.
-**Attack**: `crypto_attack.py fermat --n <n>` — converges, `|p-q|` small.
-**Verify**: `p*q==n` → `rsa-decrypt` → `pow(m,e,n)==c` → the flag.
-**Lesson**: one keygen line names the whole attack.
-
-## Case B — the small-e broadcast
+## `fermat` — `q=next_prime(p)`
 
 ```python
-e=3
-for n in (n1,n2,n3): send(pow(m,3,n))
+p = getPrime(512); q = next_prime(p); n = p*q
 ```
-**Sheet**: `e`=3, three `n`,`c`, same `m`.
-**Discriminator**: `c` count ≥ `e` → `hastad`.
-**Attack**: CRT `x=m³ mod n1n2n3` → `integer_nthroot(x,3)=m`.
-**Verify**: `pow(m,3)==x` → the flag.
-**Lesson**: `e` small + same `m` → broadcast, not a single root.
+`|p-q|` ~ hundreds → `fermat` climbs `a` in `O(|p-q|)` → `p`,`q`.
 
-## Case C — the Wiener handout
+## `wiener` — `d` small
 
 ```python
-d = getPrime(64); e = inverse(d, (p-1)*(q-1))
+d = getPrime(64); e = inverse(d, phi)   # e ≈ n
 ```
-**Sheet**: `e` ~ `n` in bits.
-**Discriminator**: `e` large → small `d` → `wiener`/`boneh-durfee`.
-**Attack**: `wiener` CF → `k/d` convergent → `d`.
-**Verify**: `pow(c,d,n)==m`, `pow(m,e,n)==c`.
-**Lesson**: a large `e` *is* the small-`d` signature — `e=inverse(d,phi)` ≈ `n`.
+`d=64-bit<n^0.25` → `wiener` CF → `d`.
 
-## Case D — the `gcd` batch
+## `batch-gcd` — a seeded RNG / shared `p`
 
-`keys.json`: 20 moduli, `e`=65537, `c` per `n`.
-**Discriminator**: `n` count ≥ 2 → `batch-gcd`.
-**Attack**: pairwise `gcd`; `gcd(n3,n7)=p` → `p`,`q`.
-**Verify**: `p*q==n3` → `rsa-decrypt` → `pow==c`.
-**Lesson**: the *count* is not the bug; the *collision* is — `gcd=1` elsewhere.
+```python
+random.seed(0); n1 = p*q1; n2 = p*q2   # p reused
+```
+`gcd(n1,n2)=p` → both split.
 
-## Case E — the partial private key
+## `small-e-root` — `e=3`, `m` short
 
-`priv.pem` with `p`'s high bytes present, low redacted.
-**Discriminator**: `p`-bits leak → `coppersmith-high-bits`.
-**Attack**: `a`=known-high, `unknown-bits`=256 → `x` → `p=a+x`.
-**Verify**: `p|n`, `p*q==n` → `rsa-decrypt`.
-**Lesson**: a redacted field is the attack surface.
+```python
+e=3; c=pow(m,3,n)   # m³<n
+```
+`m=c^{1/3}` — the wrap never engaged.
 
-## Case F — the shared modulus
+## `hastad` — broadcast
 
-`n`, `e1`=3, `e2`=17, `c1`, `c2` of the same `m`.
-**Discriminator**: 2 `e`, 1 `n`, `gcd=1` → `common-modulus`.
-**Attack**: Bezout `m=c1^a·c2^b mod n`.
-**Verify**: `pow(m,e1,n)==c1`.
-**Lesson**: two exponents on one modulus is the whole bug.
+```python
+for n in [n1,n2,n3]: send(pow(m,3,n))   # same m, e=3
+```
+CRT + root → `m`.
 
-## Case G — `gcd(e,φ)>1`
+## `common-modulus` — shared `n`
 
-`e`,`phi` share a factor → `inverse` fails.
-**Discriminator**: `gcd(e,phi)>1` → `eth-root`.
-**Attack**: `p`,`q` held → the `gcd` candidates → `pow`+format picks.
-**Lesson**: `inverse` failing is the *signature* of `eth-root`, not an error.
+```python
+encrypt(m,e1,n); encrypt(m,e2,n)   # gcd(e1,e2)=1
+```
+Bezout → `m`.
+
+## `pollard-pm1` — `p-1` smooth
+
+```python
+p = smooth_prime(512)   # p-1 a product of small primes
+```
+`gcd(a^{B!}-1,n)=p`.
+
+## `coppersmith` — `p` bits
+
+```python
+print(hex(p)[:200] + 'XXXX...')   # high half of p
+```
+`p=a+x`, `|x|<n^0.25` → `coppersmith-high-bits`.
+
+## `franklin-reiter` — `m2=a·m1+b`
+
+```python
+m2 = 2*m1 + 7; c1 = pow(m1,e,n); c2 = pow(m2,e,n)
+```
+Poly `gcd` → `m`.
+
+## `crt` — Bellcore / dp / residues
+
+`sig`+`sig_faulty` → `gcd` → `q` · `dp`/`qInv` → `p` · `m mod pi` → `m`.
+
+## `factor-from-d`/`rsa-decrypt`/`eth-root` — leaks
+
+`d`/`phi`/`p`,`q`/`gcd(e,phi)>1` — arithmetic, not a search.

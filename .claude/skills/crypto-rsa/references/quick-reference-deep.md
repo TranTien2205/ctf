@@ -1,59 +1,38 @@
-# Quick reference deep — the one-page RSA card
+# Quick reference deep — the commands, the bounds, the chain
 
-## The commands
+## The one-liner
 
-```bash
-python3 tools/crypto_attack.py list                  # the inventory + bounds
-python3 tools/crypto_attack.py <id> --help           # the flags for <id>
-python3 tools/crypto_attack.py <id> <flags>          # run the attack
-```
+`crypto_attack.py list` → the signal → the bound → `crypto_attack.py <id>` →
+`pow(m,e,n)==c`/`p*q==n`.
 
-## The discriminators (first yes wins)
+## The signal → attack
 
-```
-d/phi/dp/p,q  → factor-from-d/rsa-decrypt/eth-root
-≥2 moduli      → batch-gcd
-same m, e n's  → hastad
-2 e on 1 n     → common-modulus
-p,q close      → fermat
-e~n            → wiener → boneh-durfee
-p-bits         → coppersmith-high-bits/-core
-e=3,m short    → small-e-root/nth-root
-p-1 smooth     → pollard-pm1
-m2=a·m1+b      → franklin-reiter
-residues/fault → crt
-gcd(e,phi)>1   → eth-root
-```
+| Signal | Command |
+|---|---|
+| `|p-q|` small | `fermat --n <n>` |
+| `e`=3,`m³<n` | `small-e-root --n --e --c` |
+| `e`≈`n`,`d` small | `wiener --n --e` / `boneh-durfee --n --e` |
+| `n`s share `p` | `batch-gcd --moduli n1 n2 ...` |
+| `p-1` smooth | `pollard-pm1 --n --b` |
+| `p` bits | `coppersmith-high-bits --n --known --bits` |
+| `e` n's same `m` | `hastad --pairs "n1,c1;..." --e` |
+| 2 `e` on `n` | `common-modulus --n --e1 --c1 --e2 --c2` |
+| `d`/`phi` | `factor-from-d --n --e --d` |
+| `p`,`q` | `rsa-decrypt --n --e --c --p --q` |
+| `gcd(e,phi)>1` | `eth-root --c --e --factors` |
+| `m2=a·m1+b` | `tools/crypto/franklin_reiter.py` (manual) |
+| `sig` fault / `dp` | `crt` manual `gcd`/`e·dp-1` |
 
-## The bounds
+## The bound
 
-```
-d<n^0.25    wiener
-d<n^0.292   boneh-durfee
-window<n^0.25  coppersmith
-m^e<n       small-e/nth-root
-≥e n's      hastad
-gcd=1       common-modulus
-|p-q| small fermat
-B≥factor    pollard
-∏pi>m       crt
-linear      franklin-reiter
-gcd(e,phi)>1 eth-root
-```
+`d<n^0.25` · `d<n^0.292` · window`n^0.25`/`n^(1/e)` · `m^e<n` · `≥e` n's ·
+`gcd=1` · `|p-q|` small · `B`≥factor · `∏pi>m` · linear · `gcd(e,phi)>1` ·
+the value held.
 
 ## The verify
 
-```
-pow(m,e,n)==c     plaintext
-p*q==n            factor
-pow(c,d,n)==m     d
-```
+`pow(m,e,n)==c` / `p*q==n` / `pow(c,d,n)==m` / `1<p<n`,`p|n`.
 
-## The toolchain
+## The chain
 
-`tools/crypto/` stdlib-only · `fpylll` absent → pure-python LLL · `lll_backend`
-reports · `sympy`/`Crypto` present.
-
-## The honest status
-
-Catalogue — no local solve. `../field-notes.md` grows with real solves.
+`factor`/`d`/`phi` → `rsa-decrypt --p --q` → `m` → `pow` → the flag.

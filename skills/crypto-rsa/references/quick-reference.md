@@ -1,23 +1,28 @@
-# Quick reference — the RSA card
+# Quick reference — the commands, the bounds
 
-`crypto_attack.py list` → `attack-table.md` → bound → attack → `pow`/`p*q` verify.
+## The one-liner
 
-```
-d/phi/dp/p,q → factor-from-d/rsa-decrypt/eth-root
-≥2 moduli     → batch-gcd
-same m,e n's  → hastad
-2 e on 1 n    → common-modulus
-p,q close     → fermat
-e~n           → wiener→boneh-durfee
-p-bits        → coppersmith
-e=3,m short   → small-e-root
-p-1 smooth    → pollard-pm1
-m2=a·m1+b     → franklin-reiter
-residues/fault→ crt
-gcd(e,phi)>1  → eth-root
-```
+`crypto_attack.py list` → signal → bound → `crypto_attack.py <id>` →
+`pow`/`p*q` verify.
 
-Bounds: `d<n^0.25`/`0.292`, window`n^0.25`, `m^e<n`, `≥e` n's, `gcd=1`,
-`|p-q|`,`B`,`∏pi>m`,linear,`gcd(e,phi)>1`.
+## The signal → attack
 
-Catalogue class. See `quick-reference-deep.md`.
+| Signal | Command | Bound |
+|---|---|---|
+| `|p-q|` small | `fermat --n` | `|p-q|` |
+| `e`=3,`m³<n` | `small-e-root --n --e --c` | `m^e<n` |
+| `e`≈`n`,`d` small | `wiener`/`boneh-durfee --n --e` | `n^.25`/`n^.292` |
+| `n`s share `p` | `batch-gcd --moduli` | `gcd>1` |
+| `p-1` smooth | `pollard-pm1 --n --b` | `B`≥factor |
+| `p` bits | `coppersmith-high-bits --n --known --bits` | `n^0.25` |
+| `e` n's same `m` | `hastad --pairs --e` | `≥e` n's |
+| 2 `e` on `n` | `common-modulus --n --e1 --c1 --e2 --c2` | `gcd=1` |
+| `d`/`phi` | `factor-from-d --n --e --d` | held |
+| `p`,`q` | `rsa-decrypt --n --e --c --p --q` | held |
+| `gcd(e,phi)>1` | `eth-root --c --e --factors` | `gcd>1` |
+| `m2=a·m1+b` | `tools/crypto/franklin_reiter.py` | linear |
+| `sig` fault/`dp` | `crt` manual | the relation |
+
+## The verify
+
+`pow(m,e,n)==c` / `p*q==n` / `pow(c,d,n)==m`.

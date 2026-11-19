@@ -1,67 +1,21 @@
-# Probe map — the question → the probe → the attack
+# Probe map — the read → the signal → the attack → the file
 
-## "How many moduli?"
+| The read | The signal | The attack | The file |
+|---|---|---|---|
+| `n` count ≥2 | multi | `batch-gcd`/`hastad` | `batch-gcd*.md`,`hastad*.md` |
+| `e` count 2 on 1 `n` | two `e` | `common-modulus` | `common-modulus*.md` |
+| `e` small | `e`=3/5/17 | `small-e`/`hastad`/`franklin-reiter` | `small-e-root*.md`,`hastad*.md` |
+| `e`≈`n` | small `d` | `wiener`/`boneh-durfee` | `wiener*.md`,`boneh-durfee*.md` |
+| `gcd(e,phi)>1` | no inverse | `eth-root` | `eth-root*.md` |
+| `n` square/prime | degenerate | `phi` | `edge-cases*.md` |
+| `m^e<n` | wrap | `small-e`/`nth-root` | `small-e-root*.md` |
+| `keygen` `next_prime` | close `p,q` | `fermat` | `fermat*.md` |
+| `keygen` `seed` | weak RNG | `batch-gcd` | `batch-gcd*.md` |
+| `keygen` `p-1` smooth | smooth `p-1` | `pollard-pm1` | `pollard-pm1*.md` |
+| `keygen` `a·m1+b` | linear `m` | `franklin-reiter` | `franklin-reiter*.md` |
+| `keygen` `dp`,`qInv` | CRT leak | `crt` | `crt*.md` |
+| `keygen` `d`/`phi`/`redact` | a leak | `factor-from-d`/`coppersmith`/`crt` | `factor-from-d*.md` |
 
-`len(set of n)` → `≥2` → `batch-gcd` or `hastad`; `=1` → single-modulus.
+## The verify
 
-## "How many exponents on one n?"
-
-`len(e on the same n)` → `2` → `common-modulus`; `1` → single-exponent.
-
-## "How many ciphertexts of the same m?"
-
-`len(c of same m)` → `≥e` → `hastad`.
-
-## "What is e?"
-
-`e` → `3/5/17` → `small-e`/`hastad`/`franklin-reiter`; `65537` → default;
-`~n` → `wiener`/`boneh-durfee`; `gcd(e,phi)>1` → `eth-root`.
-
-## "Are p,q close?"
-
-keygen `next_prime`/`p+k`/`q=p+2`, or `a=isqrt(n)+1` quickly finds `a²-n` square
-→ `fermat`.
-
-## "Is d small?"
-
-`e≈n` → `d<n`^0.292 likely → `wiener` then `boneh-durfee`.
-
-## "Is p-1 smooth?"
-
-keygen hints / `pollard-pm1` `gcd` fires → `pollard-pm1`.
-
-## "Is there a leak?"
-
-`d`/`phi`/`dp`/`dq`/`qInv`/`p`-bits/`m`-partial/`p`,`q` present →
-`factor-from-d`/`crt`/`coppersmith`/`rsa-decrypt`/`eth-root`.
-
-## "Is there a relation?"
-
-`m2=a·m1+b` linear → `franklin-reiter`.
-
-## "Is there a fault?"
-
-correct + faulty `sig` of same `m` → `crt` Bellcore.
-
-## "Is there a partial?"
-
-`p` high/low → `coppersmith-*`; `m` partial → `coppersmith` partial-message.
-
-## "Is m wrapped?"
-
-`m^e<n` → `small-e-root`/`nth-root`; `m^e≥n` → `hastad`/`coppersmith`.
-
-## The falsifier probes
-
-| Probe | If it fails → rules out |
-|---|---|
-| all `gcd(ni,nj)=1` | `batch-gcd` |
-| `gcd(e1,e2)>1` | `common-modulus` |
-| `a` past budget | `fermat` |
-| `d≥n^0.292` | `wiener`+`boneh-durfee` |
-| window `<n^0.25` | `coppersmith-*` |
-| `m^e≥n` | `small-e-root` |
-| `<e` n's / pad | `hastad` |
-| `gcd(a^{B!}-1,n)=1` | `pollard-pm1` |
-| not linear | `franklin-reiter` |
-| `∏pi≤m` / no fault | `crt` |
+`pow(m,e,n)==c` / `p*q==n`.

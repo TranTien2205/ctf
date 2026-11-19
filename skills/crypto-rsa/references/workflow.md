@@ -1,15 +1,30 @@
-# Workflow — the RSA solve
+# Workflow — the phase procedure
 
-`parameter-sheet.md` → `attack-table.md` discriminator → `per-bound.md`
-bound-check → `crypto_attack.py <id>` → `verify.md` → record.
+## Phase 0 — extract
 
-1. **extract** — parse `n`,`e`,`c`,the leak,the keygen → the sheet.
-2. **discriminate** — `attack-table.md` first yes picks the id.
-3. **bound-check** — `per-bound.md`/`lattice-bounds.md` — the falsifier.
-4. **attack** — `crypto_attack.py <id> <flags>` — cheap first, lattice last.
-5. **verify** — `pow(m,e,n)==c` / `p*q==n`.
-6. **record** — `solved/` + `classify_solve.py` or `knowledge/attempts/`.
+`parameter-sheet.md` + `detection.md` + `recon-order.md` — `n`,`e`,`c`,counts,
+`e_sig`,leak,keygen,degenerate. `crypto_attack.py list` — the inventory +
+`lll_backend`. `RSA.importKey` on the keys.
 
-The loop: 5 probes / 15 min per family → change the row; a bound exceeded →
-record, escalate; every bound met → `class-boundary.md`. See `workflow-deep.md`,
-`workflow-map.md`, `workflow-index.md`, `workflow-playbook.md`.
+## Phase 1 — discriminate
+
+`attack-table.md` + `decision-table.md` + `detection-matrix.md` — the
+first-yes row.
+
+## Phase 2 — bound-check
+
+`per-bound.md` + `lattice-bounds.md` + `falsifiers.md` — the falsifier read.
+
+## Phase 3 — attack
+
+`workflow-playbook*.md` + `payload-*` + `per-attack-*` + `probe-*` — the
+`crypto_attack.py <id>` invocation.
+
+## Phase 4 — verify
+
+`verify.md` + `evidence-*` + `checklist*` — `pow(m,e,n)==c`/`p*q==n`.
+
+## Phase 5 — record / escalate
+
+`solved/` + `classify_solve.py --chain <id>` · `knowledge/attempts/` ·
+`../field-notes.md` · `tools/decide.py` for the budget/escalation.

@@ -1,77 +1,38 @@
-# Troubleshoot deep — every stall, its cause, its fix
+# Troubleshoot deep — the failure → the read → the file
 
-## "The script ran but printed nothing / an error"
+## The arithmetic is slow
 
-- Read the traceback — a `ValueError`/`ZeroDivisionError` is often the bound:
-  `inverse` failing → `gcd(e,phi)>1` → `eth-root`, not a crash.
-- `crypto_attack.py <id> --help` for the exact flag names — they differ per id.
-- The args are *integers* — pass `0x…` or decimal; a string flag fails.
+- **The LLL** (`boneh-durfee`,`coppersmith`) — `fpylll` absent → pure-python LLL
+  on a `ω~O(m²)` lattice. Give it the budget; raise `m`,`t` to approach the
+  bound. `crypto_attack.py list` reports `lll_backend`.
+- **`fermat`** — the `a` walk is `O(|p-q|)`; `--max-iters` bounds it.
+- **`pollard-pm1`** — `a^{B!}` is `O(B)` `pow`s; `B` bounds it.
 
-## "Wiener returned nothing"
+## The attack returns nothing
 
-`d ≥ n^0.25` — out of Wiener's bound. Escalate: `boneh-durfee`, then
-`boneh-durfee-escalate` (`m`,`t` up). If `d ≥ n^0.292` → small-d closed, record
-the negative.
+- **`wiener`/`boneh-durfee`** — `d≥n^0.25`/`n^0.292` → the bound, not a failure.
+- **`coppersmith`** — the window `< n^0.25`/`n^(1/e)` → the leak is too small.
+- **`fermat`** — `|p-q|` too large → the `a` budget passed.
+- **`hastad`** — `<e` n's / `∏n<m^e` / a pad → the CRT didn't reach `m`.
+- **`common-modulus`** — `gcd(e1,e2)>1` → `m^gcd`, not `m`.
+- **`pollard-pm1`** — `p-1` not `B`-smooth → `gcd=1`.
+- **`franklin-reiter`** — the relation isn't `a·m1+b`.
 
-## "Boneh-Durfee is slow / hangs"
+## The value fails the verify
 
-`fpylll` is absent → pure-python LLL. `tools/crypto/` is stdlib-only by design.
-`crypto_attack.py list` reports `lll_backend`. It is *slow*, not broken — give
-it the budget. If the bound was exceeded it is failing, not slow — check
-`d<n^0.292` before assuming.
+- **`pow(m,e,n)≠c`** — the wrong `m` (`eth-root` root, a decoy, a wrong pad
+  strip). Try the other `g` candidates; check `pow` on the padded block.
+- **`p*q≠n`** — the wrong `p` (a gcd-1 false split, a partial `p`).
+- **`pow(c,d,n)`≠`m`/`pow(m,e,n)`≠`c`** — the wrong `d`/`phi`.
 
-## "Coppersmith found no root"
+## The wrong class
 
-- The unknown window `< n^0.25` — out of bound. Measure the leak again; a bigger
-  known window is the only fix.
-- `fpylll` absent → the pure-python LLL may be weaker at the edge of the bound.
-- The polynomial / `a` was wrong — recheck the leak layout.
+- Every bound met → **no RSA violation** → `crypto-symmetric-oracle`,
+  `crypto-ecc-dlog`, `crypto-prng`, or `web-*`. `class-boundary.md`.
 
-## "batch-gcd all gcd=1"
+## The tool contract
 
-No prime collision — the RNG was fine. Record the negative; route per-`n` to the
-single-modulus attacks (`fermat`, `wiener`, …). The *count* is not the bug.
-
-## "Hastad root isn't the flag"
-
-- `<e` ciphertexts → `∏ni<m^e` → the root isn't `m`. Route `coppersmith` or
-  `franklin-reiter`.
-- A pad was applied → `m` differs per `n` → `hastad` dead; route `coppersmith`
-  partial-message.
-- The root is a padded block → strip `\x00\x02<pad>\x00`.
-
-## "pow(m,e,n)!=c"
-
-- A decoy — a flag-shaped string that fails `pow` is a candidate.
-- The wrong `eth-root` candidate → try the others.
-- A pad → `pow` held on the padded block; strip for the flag.
-- The recovered `d`/`phi` was wrong → recheck the algebra.
-
-## "fermat climbs forever"
-
-`|p-q|` too large — `a` walks `O(|p-q|)`. Bound it (`--max-iters`) and route to
-`pollard-pm1`, `coppersmith`, or a leak.
-
-## "pollard-pm1 gcd=1 for B"
-
-`p-1` has a factor `>B` — raise `B`. If `B` already large → `p-1` not smooth →
-record the negative.
-
-## "inverse(e,phi) fails"
-
-`gcd(e,phi)>1` → `eth-root` — the gcd candidates; `pow`+format picks the true
-root.
-
-## "The PEM won't import"
-
-- A `.der` (binary) vs `.pem` (base64) mismatch — `RSA.importKey` handles both
-  if the bytes are right; check `openssl asn1parse`.
-- A *certificate* (`.crt`) — `openssl x509 -pubkey -noout -in c.crt` for the key.
-- An *encrypted* private key — needs the passphrase; the redacted fields are the
-  attack surface instead.
-
-## "Nothing in attack-table.md fires"
-
-Proper RSA → the class falsifier. The bug is in the protocol — a padding oracle,
-a signature forgery, a side channel, or a `crypto-*` neighbour class. Route via
-`class-boundary.md`.
+- `crypto_attack.py <id> --help` — the real flags. The contract test scans the
+  corpus — an invented flag fails the gate.
+- `franklin-reiter`, the Bellcore `sig`, and `dp`/`dq`/`qInv` are **manual** —
+  no `crypto_attack.py` flag.

@@ -1,34 +1,27 @@
-# Falsifier map — the falsifier → the file that defines it
+# Falsifier map — the closing observation → the file
 
-## The bound falsifiers
+| The falsifier | Kills | The file |
+|---|---|---|
+| `gcd(ni,nj)=1` all | `batch-gcd` | `batch-gcd*.md` |
+| `gcd(e1,e2)>1` | `common-modulus` | `common-modulus*.md` |
+| `gcd(a^{B!}-1,n)=1` | `pollard-pm1` | `pollard-pm1*.md` |
+| `gcd(s'^e-m,n)=1` | `crt` Bellcore | `crt*.md` |
+| `d ≥ n^0.25` | `wiener` | `wiener*.md` |
+| `d ≥ n^0.292` | `boneh-durfee` | `boneh-durfee*.md` |
+| window `< n^0.25`/`n^(1/e)` | `coppersmith` | `coppersmith*.md` |
+| `m^e ≥ n` | `small-e`/`nth-root` | `small-e-root*.md` |
+| `<e` n's/`∏n<m^e`/pad | `hastad` | `hastad*.md` |
+| `|p-q|` too large | `fermat` | `fermat*.md` |
+| `p-1` not `B`-smooth | `pollard-pm1` | `pollard-pm1*.md` |
+| relation not `a·m1+b` | `franklin-reiter` | `franklin-reiter*.md` |
+| `∏pi≤m`/no fault/inconsistent | `crt` | `crt*.md` |
+| `gcd(e,phi)=1` | `eth-root` | `eth-root*.md` |
+| `d`/`phi` fails `pow`/`p*q` | `factor-from-d`/`rsa-decrypt` | `factor-from-d*.md` |
 
-| Falsifier | The file |
-|---|---|
-| `d ≥ n^0.25` | `wiener.md`, `lattice-bounds.md`, `per-bound.md` |
-| `d ≥ n^0.292` | `boneh-durfee.md`, `lattice-bounds.md`, `boundary-cases-deep.md` |
-| window `< n^0.25` | `coppersmith.md`, `lattice-bounds.md` |
-| `m^e ≥ n` | `small-e-root.md`, `per-bound.md` |
-| `<e` n's / `∏n<m^e` / pad | `hastad.md`, `per-bound.md` |
-| `gcd(e1,e2)>1` | `common-modulus.md` |
-| `|p-q|` large | `fermat.md` |
-| `p-1` not `B`-smooth | `pollard-pm1.md` |
-| `∏pi≤m` / no fault | `crt.md` |
-| relation not linear | `franklin-reiter.md` |
-| `gcd(e,phi)=1` | `crt.md`, `factor-from-d.md` |
-| `d`/`phi` fails `pow` | `factor-from-d.md`, `evidence-rules.md` |
+## The class falsifier
 
-## The observation → the negative
+Every bound met → no RSA violation → `class-boundary.md`.
 
-| Observation | → |
-|---|---|
-| all `gcd=1` | `batch-gcd` dead |
-| `a` budget out | `fermat` dead |
-| lattice empty at bound | the lattice dead |
-| `pow!=c` | a candidate, not a recovery |
-| every bound met | the class falsifier — reclassify |
+## The record
 
-## The files
-
-`falsifiers.md` — the list; `per-falsifier.md` — the kill map; `negative-map.md`
-— observation → closed class; `negative-results.md` — the record shape;
-`boundary-cases.md`/`-deep` — the bound at its edge.
+`knowledge/attempts/` + `negative-results*.md` + `../field-notes.md`.
