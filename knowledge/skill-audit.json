@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T15:15:45",
+  "generated_at": "2026-11-19T20:47:48",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,7 +8,7 @@
   "summary": {
     "skills": 95,
     "review": 0,
-    "warn": 1,
+    "warn": 2,
     "local_evidence_present": 22,
     "local_evidence_stub": 37,
     "local_evidence_missing": 0,
@@ -17,7 +17,8 @@
   },
   "review": [],
   "warn": [
-    "crypto-triage"
+    "crypto-triage",
+    "web-websocket"
   ],
   "skills": [
     {
@@ -1164,11 +1165,14 @@
       "id": "web-websocket",
       "layer": "depth",
       "path": "skills/web-websocket/SKILL.md",
-      "flags": [],
+      "flags": [
+        "corpus of 101172 tokens with no stop condition",
+        "corpus of 101172 tokens with no budget"
+      ],
       "score": null,
-      "verdict": "reference",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 90
+      "lines": 129
     },
     {
       "id": "web-xs-leaks",

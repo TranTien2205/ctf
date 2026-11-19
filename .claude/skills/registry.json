@@ -2289,9 +2289,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 986,
-      "depth_files": 3,
-      "depth_tokens": 861,
+      "skill_tokens": 2112,
+      "depth_files": 114,
+      "depth_tokens": 101172,
       "use_when": [
         "the target opens a ws:// or wss:// channel, or uses Socket.IO or SockJS",
         "a live feature carries the flag path and the cookie is HttpOnly"

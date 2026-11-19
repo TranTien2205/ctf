@@ -81,7 +81,46 @@ message. After the channel is open, test:
 Shares signals with: `../web-csrf/`, `../web-auth-session/`, `../web-xss/`.
 Depth, one named file at a time: `../ctf-web/client-side.md`.
 
-| Any channel-abuse question | `references/channel-abuse.md` |
+| Any channel-abuse question | `references/channel-abuse.md` / `references/channel-abuse-deep.md` |
+|---|---|
+| the model | `references/mechanism.md` / `references/mechanism-deep.md` / `references/theory.md` / `references/theory-deep.md` / `references/summary.md` / `references/summary-deep.md` / `references/glossary.md` / `references/glossary-deep.md` |
+| the handshake checks | `references/handshake-side.md` / `references/handshake-side-deep.md` |
+| CSWSH | `references/cswsh.md` / `references/cswsh-deep.md` |
+| the message checks | `references/message-side.md` / `references/message-side-deep.md` |
+| a per-frame object gap | `references/message-idor.md` / `references/message-idor-deep.md` |
+| a privileged action | `references/action-dispatch.md` / `references/action-dispatch-deep.md` |
+| an injection carrier | `references/injection-in-frames.md` / `references/injection-in-frames-deep.md` |
+| the envelope | `references/framing-protocols.md` / `references/framing-protocols-deep.md` |
+| the timed pass | `references/workflow.md` / `references/workflow-deep.md` / `references/first-hour.md` / `references/recon-order.md` |
+| detection | `references/detection.md` / `references/detection-deep.md` / `references/detection-matrix.md` / `references/detection-index.md` / `references/detection-checklist.md` / `references/detection-surface.md` / `references/detection-playbook.md` / `references/detection-catalogue.md` / `references/detection-signals.md` / `references/detection-map.md` / `references/detection-verdicts.md` / `references/detection-workflow.md` |
+| the evidence discipline | `references/evidence-rules.md` / `references/evidence-rules-deep.md` / `references/evidence-map.md` |
+| the kill-map | `references/falsifiers.md` / `references/falsifiers-deep.md` / `references/per-falsifier.md` |
+| the dead ends | `references/negative-results.md` / `references/negative-results-deep.md` / `references/negative-map.md` |
+| the pass, box by box | `references/checklist.md` / `references/checklist-deep.md` |
+| the required state | `references/preconditions.md` / `references/preconditions-deep.md` |
+| the nonstandard cases | `references/edge-cases.md` / `references/edge-cases-deep.md` |
+| the failure modes | `references/common-mistakes.md` / `references/common-mistakes-deep.md` / `references/anti-patterns.md` |
+| the fix map | `references/troubleshoot.md` / `references/troubleshoot-deep.md` |
+| the check bypasses | `references/evasion.md` / `references/evasion-deep.md` |
+| the payload corpus | `references/payload-variants.md` / `references/payload-dictionary.md` / `references/payload-map.md` / `references/extended-corpus.md` / `references/probe-catalogue.md` / `references/probe-map.md` |
+| the exploit templates | `references/attack-shapes.md` / `references/multi-step-chains.md` / `references/exploitation.md` / `references/second-order.md` |
+| the worked material | `references/worked-examples.md` / `references/scenarios.md` / `references/case-studies.md` / `references/case-studies-deep.md` / `references/real-world-cases.md` / `references/verified-chains.md` |
+| the mechanism inventory | `references/mechanism-index.md` / `references/mechanism-map.md` / `references/mechanism-catalogue.md` |
+| the reply verdicts | `references/decision-table.md` / `references/decision-catalogue.md` / `references/detection-verdicts.md` |
+| the cheat sheets | `references/quick-map.md` / `references/quick-reference.md` / `references/quick-reference-deep.md` |
+| the grammar | `references/lead-grammar.md` |
+| the boundaries | `references/boundary-map.md` / `references/per-boundary.md` |
+| the routes | `references/per-route.md` / `references/reporting.md` |
+| per endpoint | `references/per-endpoint.md` / `references/per-endpoint-deep.md` |
+| per field | `references/per-message-field.md` / `references/per-message-field-deep.md` |
+| per transport | `references/per-transport.md` / `references/per-transport-deep.md` |
+| per channel | `references/per-channel.md` |
+| per mechanism | `references/per-mechanism.md` |
+| per check | `references/per-check.md` |
+| per surface | `references/per-surface.md` / `references/per-surface-map.md` |
+| per vector | `references/per-vector.md` |
+| per target | `references/per-target.md` |
+| the operator files | `references/field-manual.md` / `references/operator-notes.md` / `references/closing-notes.md` / `references/onboarding.md` / `references/onboarding-deep.md` / `references/field-notes-deep.md` / `references/common-questions.md` / `references/class-boundary.md` |
 
 ## Field notes
 
