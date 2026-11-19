@@ -594,7 +594,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
    The strip counts grades; the meters count severities. A finding lives at
    the crossing of the two questions, so this grid counts the crossings and
    each cell is a two-way filter. */
-.mx{display:grid;grid-template-columns:74px repeat(4,minmax(0,1fr));gap:6px}
+.mx{display:grid;grid-template-columns:74px repeat(5,minmax(0,1fr));gap:6px}
 .mxh{font:500 10px/30px var(--sans);color:var(--faint);text-align:center;letter-spacing:.06em}
 .mxl{font:500 11px/34px var(--sans);color:var(--dim)}
 .mxc{
@@ -1069,6 +1069,33 @@ thead th{border-bottom:1px solid var(--line-soft)}
 }
 .armring[data-unknown] b{color:var(--faint)}
 .armrow #toolsay{margin:0}
+
+/* ---------------------------------------------------- THE FIFTH BUCKET
+   `ungraded` is the absence of a verdict, not a fifth verdict, so it is the
+   only bucket on this page with NO HUE. The four verdicts are tinted - green,
+   yellow, lavender-grey, violet - and reading a hue here would place a row
+   with no verdict somewhere on the same scale as the ones that have one.
+   Neutral slate puts it off that scale. The border is dashed for the same
+   reason: solid belongs to the three reached verdicts, diagonal stripes to
+   refused, so dashed is the one grammar left that says "not settled". */
+:root{
+  --ungraded:#9BA1AE; --ungraded-b:#191B21;
+}
+.cell.ungraded{background:var(--ungraded);color:var(--ungraded);opacity:.72}
+.lg.g i{background:var(--ungraded);border:1px dashed var(--ungraded)}
+.gr.ungraded{
+  background:var(--ungraded-b); color:var(--ungraded);
+  border-style:dashed;
+  border-color:color-mix(in srgb,var(--ungraded) 58%,transparent);
+}
+tbody.row.ungraded .ev{border-left-color:var(--ungraded);border-left-style:dashed}
+.mxc.ungraded.lit{
+  background:var(--ungraded-b);
+  border-style:dashed;
+  border-color:color-mix(in srgb,var(--ungraded) 58%,transparent);
+  color:var(--ungraded);
+}
+.gauge .seg.ungraded{opacity:.8}
 </style>
 </head>
 <body>
@@ -1149,6 +1176,9 @@ thead th{border-bottom:1px solid var(--line-soft)}
           </button>
           <button class="lg r" id="lg-refused" type="button" aria-pressed="false">
             <i></i><b id="n-refused">0</b> refused <em>argus will not prove this class</em>
+          </button>
+          <button class="lg g" id="lg-ungraded" type="button" aria-pressed="false">
+            <i></i><b id="n-ungraded">0</b> ungraded <em>recorded before grading existed</em>
           </button>
         </div>
       </div>
@@ -1300,6 +1330,7 @@ thead th{border-bottom:1px solid var(--line-soft)}
               <option value="candidate">candidate</option>
               <option value="unproven">unproven</option>
               <option value="refused">refused</option>
+              <option value="ungraded">ungraded</option>
             </select>
             <select id="f-sev" aria-label="Filter by severity">
               <option value="all">All severities</option>
@@ -1416,11 +1447,27 @@ function $(id) { return D.getElementById(id); }
    fell short, when what happened is that the class is refused by
    policy and no evidence could have changed it. */
 var GRADES = ['proven', 'candidate', 'unproven', 'refused'];
+/* GRADES is what argus can REACH - it mirrors proof.GRADES. BUCKETS is what a
+   row on this page can LAND IN, and the fifth is not a verdict: it is the
+   absence of one. The report already keeps these two lists apart - markdown.py
+   has a four-key _GRADE_ORDER for ranking and a five-key _GRADE_MEANING for
+   display - and this page used ONE list for both questions, which is how an
+   ungraded row came to be shown as 'unproven'. */
+var UNGRADED = 'ungraded';
+var BUCKETS = GRADES.concat([UNGRADED]);
+/* Rank for sorting. GRADES.indexOf returns -1 for a bucket outside the four,
+   and -1 sorts an ungraded row ABOVE proven - a row with no verdict leading a
+   table ranked by strength of verdict. Least-established sorts last. */
+function gradeRank(g) {
+  var i = GRADES.indexOf(g);
+  return i >= 0 ? i : GRADES.length;
+}
 var GRADE_MEANING = {
   proven:    'the class-specific artifact and its control are on record',
   candidate: 'a real signal, but a named check is still missing',
   unproven:  'nothing in the cited evidence meets the requirement',
-  refused:   'argus refuses to prove this class: the proof would be the damage'
+  refused:   'argus refuses to prove this class: the proof would be the damage',
+  ungraded:  'recorded before grading existed'
 };
 var SEVS = ['critical', 'high', 'medium', 'low', 'info'];
 var SEV_LEVEL = { critical: 5, high: 4, medium: 3, low: 2, info: 1 };
@@ -1658,7 +1705,7 @@ function buildGauge() {
   put(g, svgn('circle', { 'class': 'halo', cx: ARC.cx, cy: ARC.cy, r: ARC.r + 17 }));
   put(g, svgn('path', { 'class': 'trk', d: arcPath(ARC.start, ARC.start + ARC.sweep) }));
   S.arc = {};
-  GRADES.forEach(function (k, i) {
+  BUCKETS.forEach(function (k, i) {
     var p = svgn('path', { 'class': 'seg ' + k, stroke: 'var(--' + k + ')', d: '',
                           pathLength: '1', 'stroke-dasharray': '1' });
     p.style.animationDelay = (i * 130) + 'ms';
@@ -1672,9 +1719,18 @@ function buildGauge() {
 }
 function gradeOf(f) { return low(f && f.grade); }
 function gradeKey(g) {
-  /* An unrecognised grade is shown as itself, never mapped onto a
-     known one: mapping invents a verdict argus did not reach. */
-  return GRADES.indexOf(g) >= 0 ? g : 'unproven';
+  /* MEASURED: this returned 'unproven' for any grade outside the four, so a
+     row argus never graded was shown and counted as "nothing in the cited
+     evidence meets the requirement" - a verdict on evidence, asserted about a
+     row where no evidence was ever weighed. Planted a findings.json with one
+     'withdrawn' row and one row carrying no `grade` key at all: both rendered
+     an `unproven` badge with that tooltip, and the gauge counted them in.
+     The data had no unproven findings whatsoever, so every unproven on the
+     page was manufactured here.
+     An unrecognised grade is never displayed as one of the four verdicts.
+     'ungraded' is not a fifth verdict - it is the absence of one, which is
+     what the report has always called it. */
+  return GRADES.indexOf(g) >= 0 ? g : UNGRADED;
 }
 function sevOf(f) {
   var s = low(f && f.severity);
@@ -1684,13 +1740,18 @@ function counts(list) {
   /* Derived from GRADES, not hand-written: a hand-written triple is how the
      fourth grade went missing from this page in the first place. */
   var c = Object.create(null);
-  GRADES.forEach(function (k) { c[k] = 0; });
+  /* BUCKETS, not GRADES: an unseeded key makes `c[k]++` evaluate undefined + 1
+     and store NaN, and the bucket is then missing from every total built here. */
+  BUCKETS.forEach(function (k) { c[k] = 0; });
   (list || []).forEach(function (f) { c[gradeKey(gradeOf(f))]++; });
   return c;
 }
 function paintGauge() {
   var list = S.findings || [], c = counts(list), total = list.length, at = ARC.start;
-  GRADES.forEach(function (k) {
+  /* The arcs have to partition the ring the denominator counts. An ungraded row
+     sat in `total` and in no arc, so the ring silently stopped summing - the
+     same "counted nowhere" defect report/html.py carries a comment about. */
+  BUCKETS.forEach(function (k) {
     var span = (total ? c[k] / total : 0) * ARC.sweep;
     S.arc[k].setAttribute('d', span <= 0.01 ? '' : arcPath(at, at + span));
     at += span;
@@ -1699,7 +1760,7 @@ function paintGauge() {
   setText($('gof'), total
     ? 'of ' + total + (total === 1 ? ' finding carries its proof' : ' findings carry their proof')
     : 'no findings on record');
-  GRADES.forEach(function (k) { countUp($('n-' + k), c[k]); });
+  BUCKETS.forEach(function (k) { countUp($('n-' + k), c[k]); });
 
   /* One cell per finding. Not a percentage bar: with eight findings you can
      count them, and a bar that rounds 1/8 to "13%" hides the single finding
@@ -1735,7 +1796,7 @@ function paintGauge() {
   countUp($('ct-find'), total);
 }
 function paintStripState() {
-  GRADES.forEach(function (k) {
+  BUCKETS.forEach(function (k) {
     $('lg-' + k).setAttribute('aria-pressed', S.filt.grade === k ? 'true' : 'false');
   });
   var on = S.filt.grade;
@@ -1795,7 +1856,7 @@ function paintClasses(list) {
        nhiều nhất", và chia cho tổng thì mọi thanh đều ngắn khi có nhiều lớp. */
     bar.style.width = Math.max(8, Math.round(100 * by[k].length / top)) + '%';
     var i = 0;
-    by[k].sort(function (a, b) { return GRADES.indexOf(a) - GRADES.indexOf(b); })
+    by[k].sort(function (a, b) { return gradeRank(a) - gradeRank(b); })
       .forEach(function (g) {
         var cell = put(bar, el('i'));
         cell.style.background = 'var(--' + g + ')';
@@ -1998,7 +2059,7 @@ function drawFindings() {
      có tham số thứ hai tuỳ chọn không được truyền thẳng vào `filter`. */
   var list = (S.findings || []).filter(function (f) { return matches(f); })
     .sort(function (a, b) {
-    var g = GRADES.indexOf(gradeKey(gradeOf(a))) - GRADES.indexOf(gradeKey(gradeOf(b)));
+    var g = gradeRank(gradeKey(gradeOf(a))) - gradeRank(gradeKey(gradeOf(b)));
     if (g) return g;
     return (SEV_LEVEL[sevOf(b)] || 0) - (SEV_LEVEL[sevOf(a)] || 0);
   });
@@ -2056,10 +2117,10 @@ function buildMatrix() {
   var host = clear($('matrix'));
   MX = {};
   put(host, el('span', 'mxl', ''));
-  GRADES.forEach(function (g) { put(host, el('span', 'mxh', g)); });
+  BUCKETS.forEach(function (g) { put(host, el('span', 'mxh', g)); });
   SEVS.forEach(function (sv) {
     put(host, el('span', 'mxl', sv));
-    GRADES.forEach(function (g) {
+    BUCKETS.forEach(function (g) {
       var c = put(host, el('button', 'mxc ' + g, '·'));
       c.type = 'button';
       c.setAttribute('aria-pressed', 'false');
@@ -2078,12 +2139,12 @@ function buildMatrix() {
 function paintMatrix() {
   if (!MX) return;
   var cell = {};
-  SEVS.forEach(function (sv) { cell[sv] = {}; GRADES.forEach(function (g) { cell[sv][g] = 0; }); });
+  SEVS.forEach(function (sv) { cell[sv] = {}; BUCKETS.forEach(function (g) { cell[sv][g] = 0; }); });
   (S.findings || []).forEach(function (f) {
     cell[sevOf(f)][gradeKey(gradeOf(f))]++;
   });
   SEVS.forEach(function (sv) {
-    GRADES.forEach(function (g) {
+    BUCKETS.forEach(function (g) {
       var n = cell[sv][g], c = MX[sv][g];
       setText(c, n ? String(n) : '·');
       c.classList.toggle('lit', n > 0);
@@ -2433,7 +2494,7 @@ function boot() {
   ['dash', 'find', 'rep'].forEach(function (n) {
     $('tab-' + n).addEventListener('click', function () { showTab(n); });
   });
-  GRADES.forEach(function (k) {
+  BUCKETS.forEach(function (k) {
     $('lg-' + k).addEventListener('click', function () {
       S.filt.grade = (S.filt.grade === k) ? 'all' : k;
       syncFilterControls(); drawFindings(); paintStripState(); paintMatrix();
@@ -2510,7 +2571,9 @@ if (HEADLESS) {
   /* The pure surface, for tests. Nothing here touches the DOM or the network. */
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-      GRADES: GRADES, GRADE_MEANING: GRADE_MEANING, STATE_WORDS: STATE_WORDS,
+      GRADES: GRADES, BUCKETS: BUCKETS, UNGRADED: UNGRADED,
+      gradeRank: gradeRank,
+      GRADE_MEANING: GRADE_MEANING, STATE_WORDS: STATE_WORDS,
       SEVS: SEVS, AUTH: AUTH, TOOLS: TOOLS, LIVE: LIVE,
       validate: validate, body: body, elapsed: elapsed, clock: clock,
       gradeKey: gradeKey, counts: counts, matches: matches,

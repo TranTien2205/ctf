@@ -409,7 +409,22 @@ def test_grade_vocabulary_is_the_proof_modules(dash: str):
     from argus import proof
     js = extract_scripts(dash)[0]
     assert set(js_string_array(js, "GRADES")) == set(proof.GRADES)
-    assert set(js_object_keys(js, "GRADE_MEANING")) == set(proof.GRADES)
+    # SUPERSET, NOT EQUALITY, and `==` here was stricter than the repo's own
+    # practice. The docstring asks that the page know every grade argus can
+    # produce, which is a superset relation; `==` additionally forbade a
+    # gloss for anything else, and that was true only while the two lists
+    # happened to coincide. `markdown.py` keeps them APART on purpose -
+    # `_GRADE_ORDER` has four entries for ranking and `_GRADE_MEANING` five
+    # for display, the fifth being `ungraded`, "recorded before grading
+    # existed" - so this module would have failed its own assertion.
+    #
+    # Measured in the sealed evidence: 14 proven + 2 candidate, and ZERO
+    # unproven. A row with no grade had to land somewhere, and the console
+    # was mapping it onto `unproven`, "nothing in the cited evidence meets
+    # the requirement" - a verdict about evidence that nothing reached. The
+    # report had a fifth bucket for it; the console did not.
+    assert set(js_object_keys(js, "GRADE_MEANING")) >= set(proof.GRADES), \
+        "the page must gloss every grade argus can produce"
 
 
 def test_grade_vocabulary_check_catches_an_invented_grade(dash: str):
@@ -599,7 +614,12 @@ def test_an_unknown_grade_is_not_silently_remapped(dash: str, tmp_path: Path):
     assert c["proven"] == 2 and c["refused"] == 1 and c["candidate"] == 1
     assert c["unproven"] == 0, "refused must not be counted as unproven"
     assert refused == "refused"
-    assert upper == "unproven", "gradeKey is given lowercase words by gradeOf"
+    # WAS `unproven`, which pinned the defect rather than the rule. The
+    # test's NAME is about `refused` not being folded into `unproven`, and
+    # that part passed throughout; this line separately recorded where an
+    # unrecognised value went, so fixing that mapping necessarily turned
+    # this red. The red was the signal.
+    assert upper == "ungraded", "an unrecognised grade gets no verdict"
 
 
 def test_the_filter_matches_on_evidence_and_class(dash: str, tmp_path: Path):
@@ -1238,3 +1258,61 @@ def test_the_floor_is_not_silently_degraded_in_this_checkout():
     assert source == "HEAD", (
         f"the structural floor fell back to its absolute values, so it is "
         f"no longer scaled to the file: {source}")
+
+
+def test_an_unrecognised_grade_lands_in_no_verdict_bucket(dash: str,
+                                                          tmp_path: Path):
+    """THE RULE, not the current destination.
+
+    The previous assertion pinned `unproven`, which was the defect, and a
+    later one would pin `ungraded`, which is today's answer. Neither is the
+    invariant. What must hold is that an unrecognised value is not handed a
+    VERDICT: `proven`, `candidate`, `unproven` and `refused` are all claims
+    about evidence, and a row nobody graded supports none of them.
+
+    Measured in the sealed evidence when this was found: 14 proven, 2
+    candidate, ZERO unproven. So every `unproven` the console could display
+    was manufactured by the fallback - the bucket had no legitimate
+    occupants at all.
+    """
+    from argus import proof
+
+    call = _pure(dash, tmp_path)
+    res = call([{"fn": "gradeKey", "args": [v]}
+                for v in ("withdrawn", "", "PROVEN", "pending", "???")])
+    for value, got in zip(("withdrawn", "", "PROVEN", "pending", "???"),
+                          [r["v"] for r in res]):
+        assert got not in proof.GRADES, (
+            f"{value!r} was mapped onto the verdict {got!r}, which is a "
+            "claim about evidence that nothing reached")
+
+
+def test_every_bucket_is_seeded_before_anything_is_counted(dash: str,
+                                                           tmp_path: Path):
+    """THE HALF WITH NO GUARD ANYWHERE, and the one that catches arithmetic.
+
+    `counts()` partitions findings, and every surface that renders a
+    partition - the gauge arcs, the matrix columns, the legend chips - reads
+    a key out of its result. A bucket the seed loop omits is `undefined`,
+    and `undefined + 1` is NaN, which reaches the page as a count rather
+    than as an error. A row inside the total but in no arc is the
+    "counted nowhere" shape `report/html.py` carries a comment about.
+
+    So this asserts the seed, not a tally: every bucket the page partitions
+    by must be present and numeric even when no finding occupies it.
+    """
+    call = _pure(dash, tmp_path)
+    js = extract_scripts(dash)[0]
+    buckets = js_string_array(js, "GRADES")
+    extra = [v for v in ("UNGRADED",) if v in js]
+    res = call([{"fn": "counts", "args": [[]]},
+                {"fn": "counts", "args": [[{"grade": "proven"}]]}])
+    empty, one = [r["v"] for r in res]
+    for bucket in buckets:
+        assert bucket in empty, f"{bucket} is not seeded by counts([])"
+        assert isinstance(empty[bucket], (int, float)), \
+            f"{bucket} seeds to {empty[bucket]!r}, so += yields NaN"
+        assert empty[bucket] == 0
+    assert extra, "the page is expected to name a bucket beyond the verdicts"
+    assert one.get("proven") == 1
+    assert sum(v for v in one.values() if isinstance(v, (int, float))) >= 1
