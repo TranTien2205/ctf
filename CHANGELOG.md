@@ -7863,6 +7863,36 @@ Worth recording as a negative result for the same reason as the orphan
 sweep: a dimension that comes back clean is information, and leaving it
 unwritten makes the next sweep pay for it again.
 
+### The three layers were absent from the document that exists to list them
+
+`docs/VERIFICATION.md` tells a reader how to re-verify everything this
+system claims. Measured: it mentioned the proof matrix, the cross-read and
+the re-verification layer zero times each. The whole subject of this
+session was missing from the one document a reviewer reads.
+
+Added in the file's own shape - a property, where it is enforced, and the
+test that proves it - for twelve properties across the three layers, plus
+the end-to-end run against the bundled lab and the explicit note that the
+cross-read column reads zero without a model endpoint and says so rather
+than being omitted.
+
+AND I INVENTED FOUR TEST NAMES, which is a different mistake from the seven
+before it. The earlier seven reproduced a string a gate scans for; this one
+asserted that four tests exist when they do not - in a document whose claim
+is that it names only things that exist. Writing from memory of what the
+tests "must" be called produced four plausible names, and the gate named
+all four.
+
+That is the error this system is built to prevent, made by its author in
+its own documentation. The mechanism is identical to the one the proof
+matrix exists for: a claim that sounds right, written by something that
+believed it, with nothing behind it. The difference is only that a test
+name has a gate behind it and a finding has a matrix - and both were
+needed, by the same person, on the same day.
+
+Eighth write-up failure, and the first that was a fabrication rather than a
+quotation.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

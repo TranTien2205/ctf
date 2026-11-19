@@ -45,6 +45,44 @@ python -m argus verify docs/sample-session   # sealed artifact walk-through
 | Severity/CVSS validated | enum + `_CVSS_RE` | `test_severity_enum`, `test_finding_cvss_vector_validated`, `test_report_flags_bogus_severity` |
 | Reports exclude findings whose evidence no longer verifies | `findings_bad` revalidation at render | `test_report_excludes_tampered_findings`, `test_verify_revalidates_findings` |
 
+## Three verification layers
+
+Each answers a different question about a finding, and none of them asks a
+tool whether it succeeded. The report prints all three counts, including the
+zeroes: a layer that has not run says so rather than being omitted.
+
+| Layer | Question | Who answers | What it blocks |
+|---|---|---|---|
+| proof matrix | did the target produce the quoted bytes | deterministic, no model | an agent writing its own command output and calling it a success |
+| cross-read | do those bytes demonstrate the class claimed | a model from another family, reading evidence only | the wrong class, and a severity the evidence does not carry |
+| re-verification | does the target still do it | deterministic, no model | a finding that has since been fixed, published as if current |
+
+| Property | Enforced in | Proven by |
+|---|---|---|
+| A grade is never a parameter: the matrix decides it from recorded bytes | `add_finding` has no grade argument | `test_finding_carries_its_grade` |
+| A class with no required checks can never grade proven | the non-empty guard in `_grade` | `test_a_class_with_no_required_checks_can_never_grade_proven` |
+| Classes that cannot be proven are exactly the refused ones | one set compared against the other | `test_the_only_class_without_required_checks_is_the_refused_one` |
+| The cross-reader is from a different model family than the author | `pick_judge` excludes the author's family | `test_a_judge_is_never_from_the_authors_own_family` |
+| The cross-reader never sees the first model's reasoning | the case file omits description, remediation and run summary | `test_the_case_file_withholds_the_first_models_reasoning` |
+| The requirement comes from the matrix, so a tampered findings file cannot soften the bar | the case file resolves it by class | same test, planted direction |
+| A cross-read can lower a grade or dispute it, never raise one | the one-way doors in `apply_verdict` | `test_a_judge_cannot_raise_a_grade` |
+| A dispute is attributed to the model that raised it, on every renderer | the verdict history, dispute-first | `test_a_dispute_names_the_model_that_raised_it_on_every_renderer` |
+| A request that never reached the target is inconclusive, not a refutation | the transport branch in `replay_finding` | `test_an_unreachable_target_is_inconclusive_not_a_refutation` |
+| A re-verification failure is never cleared by a later success | the one-way door in `apply_replay` | `test_a_failure_outranks_a_later_success_on_every_artifact` |
+| Replaying re-renders and re-seals, so the artifact digests still verify | the seal step in the replay command | `test_the_command_leaves_the_chain_verifying` |
+| A capability that is missing is reported as missing, not as a negative result | the unmet-check reason names the absent tool | the live run described below |
+
+Measured end to end against the bundled lab on loopback: six findings, all
+six graded, five re-verified without a credential and the sixth
+inconclusive because its recorded request carried one and the transcript
+keeps only the digest. Supplying that credential at replay time turned it
+into a reproduction, and both attempts stay in the history so a reader can
+see that the first answer was "could not ask" rather than "did not hold".
+
+The cross-read layer needs a model endpoint, so it reads zero on evidence
+produced without one - and the report states that zero and names the
+command that would change it, rather than leaving the column out.
+
 ## Integrity and tamper-evidence
 
 | Property | Enforced in | Proven by |
