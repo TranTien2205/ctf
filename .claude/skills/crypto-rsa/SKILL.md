@@ -86,7 +86,25 @@ Depth, one named file at a time:
 - `skills/ctf-crypto/triage-rsa.md`
 - `skills/ctf-crypto/rsa-attacks.md`
 
-| Any RSA recovery question | `references/attack-table.md` |
+| Question | File |
+|---|---|
+| start / the sheet | `references/onboarding.md` · `references/parameter-sheet.md` |
+| which attack | `references/attack-table.md` · `references/decision-table.md` |
+| the fingerprint | `references/detection.md` · `references/detection-deep.md` |
+| the bound | `references/per-bound.md` · `references/lattice-bounds.md` |
+| the maths | `references/theory.md` · `references/theory-deep.md` |
+| the procedure | `references/workflow.md` · `references/exploitation.md` |
+| the payload/flags | `references/payload-map.md` · `references/payload-variants.md` |
+| the verify | `references/verify.md` · `references/evidence-rules.md` |
+| the falsifier | `references/falsifiers.md` · `references/boundary-cases.md` |
+| a stall | `references/troubleshoot.md` · `references/anti-patterns.md` |
+| the cases | `references/case-studies.md` · `references/worked-examples.md` |
+| the index | `references/README.md` · `references/map-index.md` |
+
+Per-attack depth: `references/per-attack-*.md` and `references/*-deep.md` —
+`batch-gcd`, `wiener`, `fermat`, `boneh-durfee`, `coppersmith`, `small-e-root`,
+`hastad`, `common-modulus`, `pollard-pm1`, `franklin-reiter`, `crt`,
+`factor-from-d`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

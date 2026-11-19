@@ -542,9 +542,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1090,
-      "depth_files": 3,
-      "depth_tokens": 912,
+      "skill_tokens": 1384,
+      "depth_files": 156,
+      "depth_tokens": 59436,
       "use_when": [
         "a probe or source read produced this class's signal: answer the six discriminators in order with python3 tools/crypto_attack.py list, then run the ONE attack they select: how many moduli, is e small, is d small, are the primes close, is part of a factor known, is phi shared"
       ],

@@ -1,54 +1,29 @@
-# RSA: pick the attack from what you're given
+# Attack table — every RSA attack id, its trigger, its bound
 
-The handout decides the attack — never brute-force. Read the given numbers
-first, then take exactly one row.
+The applicability text below is what `tools/crypto_attack.py list` prints —
+reproduce the bound before running, because exceeding it is the class falsifier.
 
-## Given → attack
+| Attack id | Hold | Bound / falsifier | Output |
+|---|---|---|---|
+| `batch-gcd` | ≥2 moduli, same bad RNG | needs a shared prime; single `n` never applies | shared `p`, then `q`, `d`, `m` |
+| `common-modulus` | one `n`, `c1`,`c2`, `e1`,`e2` | `gcd(e1,e2)==1`; shares a factor → dead | `m` via Bezout `a*e1+b*e2=1` |
+| `coppersmith-high-bits` | `n`, `e`, `c`, top half of `p` | known window ≥ `n^0.25` | `p` → `d` → `m` |
+| `coppersmith-core` | centred guess `a` of a factor | `|p-a| < n^0.25`-ish window | `p` → `d` → `m` |
+| `eth-root` / `small-e-root` | one `n`, small `e`, short `m` | only if `m^e < n` (no wrap) | `m` by exact root |
+| `factor-from-d` | `n`, `e`, `d` (or `phi`) | none — direct | `(p,q)` → `m` |
+| `fermat` | `n` with `p≈q` | gap must be small; distant `p,q` → dead | `p`,`q` → `d` → `m` |
+| `franklin_reiter` | `c1`,`c2` of `m`,`a*m+b` mod `n` | linear relation required | `m` |
+| `hastad` | `e` ciphertexts of one `m`, `e` moduli | need ≥ `e` recipients; fewer → pad/coppersmith | `m` via CRT + root |
+| `nth-root` | `m^e` with no wrap | exact root must land | `m` |
+| `pollard-pm1` | `n` with `p-1` smooth | only helps when `p-1` is smooth | `p` → `d` → `m` |
+| `rsa-decrypt` | factor/`d`/`phi` held | terminal step | `m` |
+| `wiener` | `n`, `e` with `d < n^0.25` | `d` above `0.25` bound → use boneh-durfee | `d` → `m` |
+| `boneh-durfee` | `n`, `e`, `d < n^0.29` | lattice bound ~`0.292`; above → dead | `d` → `m` |
+| `boneh-durfee-escalate` | same, no manual `m` param | auto-escalates the lattice `m` | `d` → `m` |
+| `crt` | residues of `m` mod small primes | product of moduli > `m` needed | `m` |
 
-| Given | Attack | One-liner |
-|---|---|---|
-| `e=3` (or tiny e), `c` only, small `m` | direct root | `m = c^(1/e)` exact root — `gmpy2.iroot` |
-| `e=3`, same `m` to ≥3 recipients | Håstad broadcast | CRT combine the c's, then `iroot` |
-| `p` and `q` in the source | immediate | `d = inverse(e, (p-1)(q-1))` |
-| `phi` or `d` given | immediate | skip the math |
-| `N` and `d` both public | recover p,q | `ed-1 = k*phi` — factor N from d |
-| `N` factorable | factor it | `factordb`, `yafu`, `RsaCtfTool` |
-| `p`,`q` close together | Fermat | `p,q` near `sqrt(N)` — `sympy.isqrt` + walk |
-| `dp` or `dq` leaked | small-dp attack | `e*dp - 1 = k(p-1)`, k < e |
-| `d` small (d < N^0.25-ish) | Wiener | continued fractions on `e/N` |
-| `d` medium | Boneh-Durfee | `d < N^0.292` — `RsaCtfTool` |
-| same `N` different `e`, same `m` | common modulus | `gcd(e1,e2)` bezout combine |
-| `N` reused across `m` (`m1`,`m2` gcd) | gcd attack | `gcd(N1,N2)` shares p |
-| padding oracle (server answers valid/invalid) | Bleichenbacher | oracle + `2B` bounds walk |
-| `e=65537`, standard `m`, big `c` | not this class | the bug is elsewhere — look at padding/signature/key reuse |
+## The chain
 
-## Working it
-
-```python
-from Crypto.Util.number import long_to_bytes, inverse
-import gmpy2
-p, q = ...                       # from whichever row matched
-phi = (p-1)*(q-1)
-d = inverse(e, phi)
-m = pow(c, d, p*q)
-print(long_to_bytes(m))
-```
-
-`RsaCtfTool` covers most rows: `python3 RsaCtfTool.py --publickey key.pem
---uncipherfile c.bin [--attack fermat|wiener|boneh_durfee|...]`.
-
-## Falsifier
-
-The numbers are all correct-size, `N` doesn't factor on `factordb`, no small-
-`e`/`d`/`p`/`q`/`dp`/`phi`/`oracle` is given — the break is not in the RSA
-parameters; look at *how it's used* (padding, signature verification, key
-reuse, RNG seeding the primes).
-
-## Traps
-
-- `factordb.com` before any math — a trivially-factored `N` is the most common
-  CTF RSA problem and the tool does it in one call.
-- `m = c^(1/e)` only works when `m^e < N` — check `c < N` and `e` is 3 first.
-- CRT `m^e mod N_i` broadcast needs *different* N's on the same m.
-- PEM/DER key files are easier than numbers — extract `n`, `e` with
-  `openssl rsa -pubin -text` before doing anything else.
+Every attack ends the same way: recover `(p,q)` or `d` or `phi`, then
+`rsa-decrypt` to `m`, then **verify** `pow(m,e,n)==c`. A plaintext that fails
+`pow` is a candidate, not a recovery.
