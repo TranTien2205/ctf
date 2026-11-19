@@ -76,14 +76,28 @@ for pwntools `p.send`).
 
 ## Routing
 
-Shares signals with: `../pwn-stack-overflow/`. Check those before committing to this one.
+Shares signals with: `../pwn-stack-overflow/` and `../pwn-code-reuse/`.
+Check those before committing to this one.
 
 Depth, one named file at a time:
 
 - `skills/ctf-pwn/format-string.md`
 - `skills/pwn-binary-triage/SKILL.md`
 
+The `references/` corpus (one file per question, `*-deep` / `*-checklist` /
+`-map` companions for most):
+
+| Question | File |
+|---|---|
 | Any format-string question | `references/read-and-write.md` |
+| The runbook start to finish | `references/workflow.md` |
+| Detect / offset | `references/detection.md`, `references/arg-offset-finder.md`, `references/arg-index-math.md`, `references/first-offset-check.md` |
+| Reads and leaks | `references/leak-via-p.md`, `references/arb-read-via-s.md`, `references/stack-pointer-leak.md`, `references/fmtstr-binary-leak.md`, `references/fmtstr-libc-leak.md` |
+| Writes | `references/arb-write-via-n.md`, `references/partial-write.md`, `references/fmtstr-count-math.md`, `references/fmtstr-the-count-ledger.md`, `references/write-granularity-table.md` |
+| Targets | `references/got-overwrite-fmt.md`, `references/ret-addr-overwrite.md`, `references/hooks-overwrite.md`, `references/fmtstr-ret-addr-full.md`, `references/the-write-target-table.md` |
+| Boundaries | `references/format-literal-boundary.md`, `references/fmtstr-partial-relro-check.md`, `references/fmtstr-under-pie.md`, `references/canary-pie-composition.md`, `references/blind-fmtstr.md`, `references/fmtstr-one-shot-write.md`, `references/fmtstr-loop-service.md`, `references/fmtstr-vs-n-format.md` |
+| Compose / chains | `references/fmtstr-and-rop-composition.md`, `references/fmtstr-after-smash.md`, `references/fmtstr-plus-infoleak.md`, `references/multi-step-chains.md`, `references/second-stage.md` |
+| Discipline | `references/evidence.md`, `references/falsifiers.md`, `references/troubleshoot.md`, `references/anti-patterns.md`, `references/fmtstr-checklist.md`, `references/fmtstr-glossary.md`, `references/fmtstr-map-index.md`, `references/worked-examples.md`, `references/negative-results.md`, `references/when-all-closed.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

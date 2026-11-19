@@ -1,0 +1,32 @@
+# Partial write — %hn / %hhn for byte-level control
+
+A full %n writes a qword; %hn writes 2 bytes; %hhn writes 1. Byte-wise writes let you set a large value (like an address) without printing billions of bytes for the count.
+
+## Signals
+
+| Observation | Meaning | Route |
+|---|---|---|
+| the value is large (an address) | byte-wise write | %hhn |
+| only low bytes need changing | partial overwrite | %hn/%hhn |
+| a 2-byte redirect | %hn | low bytes |
+
+## Steps
+
+1. For a large address, write it byte-by-byte with %hhn at increasing offsets.
+2. Each %hhn writes the low byte of the count — control the count per byte.
+3. Write the LOW bytes first if the high bytes are already correct.
+4. A 2-byte redirect via %hn reaches the same page/64KB region.
+
+## Falsifier
+
+Falsifier — the byte-precision write can't compose the needed value at the reachable positions: the write is incomplete.
+
+## Traps
+
+- %hhn writes count&0xff — set the count so its low byte is your target byte.
+- Multiple %hhn in one fmtstr write several bytes — order them.
+- The count is cumulative — reset via a new call or compute the deltas.
+
+## Cross-references
+
+`got-overwrite-fmt.md` · `arb-write-via-n.md`

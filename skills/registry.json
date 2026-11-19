@@ -1355,9 +1355,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1040,
-      "depth_files": 3,
-      "depth_tokens": 922,
+      "skill_tokens": 1494,
+      "depth_files": 802,
+      "depth_tokens": 91180,
       "use_when": [
         "a probe or source read produced this class's signal: send a handful of %p in one request and read the leaked words back, which is the cheapest confirmation in pwn, then locate your own buffer with %N$p before deciding read against write"
       ],

@@ -1,0 +1,29 @@
+# The write-target table — GOT vs ret-addr vs hook — deep
+
+Three redirectable targets for a %n write: a GOT entry (call-time redirect), a saved return address (return-time), a malloc/free hook (alloc-time). Choose by what's reachable and what fires.
+
+## Mechanism internals
+
+The format string is an interpreter: each specifier consumes an argument by position, %p/%x read, %s dereferences, %n writes the cumulative byte-count. The whole primitive is argument-position arithmetic plus count control — the exploit is locating your planted value's index N and steering the count to the value you want written.
+
+## Boundary conditions
+
+- x64: args 1-6 in registers; stack args N≥6.
+- A literal format closes the class.
+- Full RELRO closes GOT.
+- glibc ≥2.35 removes the hooks.
+- %s/%n reads/writes until a \x00 — null bytes truncate.
+- The count is cumulative — byte-wise writes compose it.
+
+## Falsifier
+
+Falsifier — none of the three is writable/reachable/firable: no %n redirect exists.
+
+## Highest-cost traps
+
+- GOT is the usual target (partial RELRO); hook for old glibc; ret-addr when stack addr is known.
+- The redirect's arg comes from the CALL site — check it calls system-style args.
+
+## Cross-references
+
+`got-overwrite-fmt.md` · `ret-addr-overwrite.md` · `hooks-overwrite.md`

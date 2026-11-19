@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T04:10:19",
+  "generated_at": "2026-11-20T04:39:02",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -686,10 +686,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 96,
+      "lines": 110,
       "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.19,
+      "overlap": 0.148,
       "trust": "catalogue-or-unreviewed"
     },
     {
