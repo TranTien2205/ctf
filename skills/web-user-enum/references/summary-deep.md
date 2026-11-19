@@ -44,5 +44,5 @@ collision). A no-throttle/bypass → `web-auth-session`'s credential loop.
 
 ## The honest status
 
-**Catalogue** — no local solve. `../../field-notes.md` accumulates real
+**Catalogue** — no local solve. `../field-notes.md` accumulates real
 measurements; a confirmed chain-solve promotes the class.

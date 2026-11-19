@@ -85,4 +85,12 @@ verified here yet).
 `real-world-deep`, `scenarios`, `worked-examples`, `username-sources`/
 `username-sources-deep`, `framework-matrix`, `sso-and-federated`,
 `differentials`/`differentials-deep`, `detection-*` (13 files),
-`mechanism-*`, `per-*`.
+`mechanism-*`, `per-*`, plus the late-corpus modules `timing-statistics`
+(the N>=8 median+jitter protocol), `account-lockout` (the lock-as-oracle),
+`spray-and-lists` (the bounded candidate/spray strategy),
+`response-diffing` (the masked raw-byte protocol),
+`graphql-resolvers-deep`, `rest-resources-deep`, `mfa-and-state`,
+`transport-and-concurrency`, `anti-enum-defenses`, `observability-side`,
+`distributed-and-cache`, `username-formats`, `verification-workflow`,
+`detection-signals`, `operator-checklist`, `reporting`, `second-order`,
+`throttle-taxonomy`, `per-signal-map`.

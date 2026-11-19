@@ -88,34 +88,46 @@ Depth, one named file at a time — the corpus index is
 `references/quick-map.md`, `references/checklist.md`.
 
 **The mechanism** — `references/mechanism.md` +
-`references/mechanism-deep.md`/`mechanism-index.md`/`mechanism-map.md`/
-`mechanism-catalogue.md`, `references/theory.md`/`theory-deep.md`,
-`references/channels.md`/`channels-deep.md` (the four oracle channels),
-`references/form-surface.md`/`form-surface-deep.md` (the endpoint
+`references/mechanism-deep.md`/`references/mechanism-index.md`/`references/mechanism-map.md`/
+`references/mechanism-catalogue.md`, `references/theory.md`/`references/theory-deep.md`,
+`references/channels.md`/`references/channels-deep.md` (the four oracle channels),
+`references/form-surface.md`/`references/form-surface-deep.md` (the endpoint
 inventory).
 
 **Detection** — `references/detection.md` + `-deep`/`-index`/`-matrix`/
 `-checklist`/`-surface`/`-playbook`/`-catalogue`/`-map`, and the
-per-channel protocols `references/channel-body.md`, `channel-status.md`,
-`channel-side.md`, `timing-oracle.md`. Per form:
-`references/login-enum.md`/`-deep`, `register-reset-enum.md`/`-deep`,
-`api-enum.md`/`-deep` (JSON/REST/GraphQL), `sso-and-federated.md`,
-`framework-matrix.md` (Django/Flask/Express/Rails/Laravel/Spring/ASP.NET/WP).
+per-channel protocols `references/channel-body.md`, `references/channel-status.md`,
+`references/channel-side.md`, `references/timing-oracle.md`. Per form:
+`references/login-enum.md`/`-deep`, `references/register-reset-enum.md`/`-deep`,
+`references/api-enum.md`/`-deep` (JSON/REST/GraphQL), `references/graphql-resolvers-deep.md`,
+`references/rest-resources-deep.md`, `references/mfa-and-state.md`,
+`references/sso-and-federated.md`,
+`references/framework-matrix.md` (Django/Flask/Express/Rails/Laravel/Spring/ASP.NET/WP).
 
 **Exploit** — `references/exploitation.md`/`-deep` (confirmed-name →
-flag chains), `attack-shapes.md`/`-deep`, `multi-step-chains.md`/`-deep`,
-`case-studies.md`/`-deep`, `real-world-cases.md`/`-deep`, `scenarios.md`,
-`worked-examples.md`, `username-sources.md`/`-deep`, `payload-variants.md`,
-`payload-dictionary.md`, `extended-corpus.md`, `probe-catalogue.md`,
-`probe-map.md`.
+flag chains), `references/attack-shapes.md`/`-deep`, `references/multi-step-chains.md`/`-deep`,
+`references/case-studies.md`/`-deep`, `references/real-world-cases.md`/`-deep`, `references/scenarios.md`,
+`references/worked-examples.md`, `references/username-sources.md`/`-deep`, `references/payload-variants.md`,
+`references/payload-dictionary.md`, `references/extended-corpus.md`, `references/probe-catalogue.md`,
+`references/probe-map.md`.
 
 **The throttle** — `references/throttling.md`/`-deep` (the loop-bound
-taxonomy), `rate-limit-bypass.md`/`-deep` (every counter-reset).
+taxonomy), `references/throttle-taxonomy.md`,
+`references/rate-limit-bypass.md`/`-deep` (every counter-reset),
+`references/account-lockout.md` (the lock-as-oracle),
+`references/spray-and-lists.md` (the bounded candidate/spray split),
+`references/anti-enum-defenses.md` (which channel survives each defense).
+
+**The measurement details** — `references/timing-statistics.md` (the
+N>=8 median+jitter protocol), `references/response-diffing.md` (the
+masked raw-byte diff), `references/observability-side.md`,
+`references/distributed-and-cache.md`, `references/username-formats.md`,
+`references/transport-and-concurrency.md`, `references/second-order.md`.
 
 **The pass** — `references/workflow.md` + `-deep`/`-map`/`-checklist`/
-`-playbook`/`-catalogue`, `recon-order.md`, `field-manual.md`/`-deep`,
-`operator-notes.md`, `closing-notes.md`, `decision-table.md`,
-`decision-catalogue.md`.
+`-playbook`/`-catalogue`, `references/recon-order.md`, `references/field-manual.md`/`-deep`,
+`references/operator-notes.md`, `references/closing-notes.md`, `references/decision-table.md`,
+`references/decision-catalogue.md`.
 
 **Per-axis maps** — `references/per-form.md`, `references/per-surface.md`,
 `references/per-check.md`, `references/per-endpoint.md`,
@@ -130,6 +142,9 @@ plus its `-deep` variant.
 `references/falsifier-map.md`, `references/verification-protocol.md`,
 `references/negative-results.md` + `-deep` +
 `references/negative-map.md`, `references/lead-grammar.md`,
+`references/verification-workflow.md`, `references/detection-signals.md`,
+`references/reporting.md`, `references/operator-checklist.md`,
+`references/per-signal-map.md`, `references/quick-start.md`,
 `references/verified-chains.md` (catalogue-honest: none yet).
 
 **Traps & boundaries** — `references/edge-cases.md` + `-deep` +

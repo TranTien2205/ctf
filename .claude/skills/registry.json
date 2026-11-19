@@ -2241,9 +2241,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1888,
-      "depth_files": 141,
-      "depth_tokens": 83618,
+      "skill_tokens": 2158,
+      "depth_files": 161,
+      "depth_tokens": 99341,
       "use_when": [
         "a probe or source read produced this class's signal: one known-good username and one obviously-bad username against the same form, then the same bad username twice — compare message, status, and timing across the three"
       ],

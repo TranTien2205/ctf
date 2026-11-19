@@ -46,7 +46,7 @@ over the measured throttle.
   `web-oauth-sso`
 - every (form × channel) cell: LEAK / uniform / unmeasured
 - a fully-closed form → `knowledge/attempts/` kill-map
-- `../../field-notes.md` updated
+- `../field-notes.md` updated
 
 ## The hour's exits
 

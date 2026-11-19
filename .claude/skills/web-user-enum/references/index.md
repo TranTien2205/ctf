@@ -85,4 +85,4 @@
 
 - `glossary.md` / `glossary-deep.md` — the vocabulary
 - `summary.md` / `summary-deep.md` — the class in brief
-- `../../field-notes.md` / `field-notes-deep.md` — the recorded patterns
+- `../field-notes.md` / `field-notes-deep.md` — the recorded patterns

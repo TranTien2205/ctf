@@ -30,7 +30,7 @@ A real solve where:
 
 ## The field-notes discipline
 
-`../../field-notes.md` records every real observation of this class — a
+`../field-notes.md` records every real observation of this class — a
 confirmed oracle, a measured throttle, a bypassed limit — marked
 `proposed` until reviewed, `confirmed` when checked. A confirmed
 chain-solve promotes the class from `catalogue` to `verified` in
@@ -39,4 +39,4 @@ chain-solve promotes the class from `catalogue` to `verified` in
 ## The honesty rule
 
 Never present a catalogue shape as "worked here". The corpus is standard
-knowledge; `../../field-notes.md` is where local experience accumulates.
+knowledge; `../field-notes.md` is where local experience accumulates.

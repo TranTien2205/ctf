@@ -78,4 +78,4 @@ done
 ## The close
 
 Every finding verbatim-recorded; every name routed; every closed cell a
-negative; `../../field-notes.md` updated.
+negative; `../field-notes.md` updated.

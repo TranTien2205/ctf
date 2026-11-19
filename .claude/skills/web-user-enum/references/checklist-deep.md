@@ -43,7 +43,7 @@
 - [ ] a no-throttle / bypassed-limit recorded as a finding
 - [ ] every (form × channel) cell marked LEAK / uniform / unmeasured
 - [ ] a fully-closed form → kill-map written
-- [ ] `../../field-notes.md` updated with the real measurement
+- [ ] `../field-notes.md` updated with the real measurement
 
 ## Do-not (the guardrails)
 
