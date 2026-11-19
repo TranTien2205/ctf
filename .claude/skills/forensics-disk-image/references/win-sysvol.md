@@ -1,0 +1,3 @@
+# SYSVOL
+
+A domain share.

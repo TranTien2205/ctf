@@ -1,0 +1,3 @@
+# ffind
+
+Name→inode.

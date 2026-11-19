@@ -1,0 +1,3 @@
+# blkls
+
+sleuthkit block→bytes.

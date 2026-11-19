@@ -1,0 +1,3 @@
+# mmls
+
+sleuthkit partition list.

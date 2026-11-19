@@ -1,0 +1,3 @@
+# ifind
+
+inode→name.

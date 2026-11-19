@@ -1,0 +1,3 @@
+# /tmp
+
+Temp — volatile content.

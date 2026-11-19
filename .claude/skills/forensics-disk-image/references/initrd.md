@@ -1,0 +1,3 @@
+# initrd
+
+The initial ramdisk.

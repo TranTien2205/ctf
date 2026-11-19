@@ -1,0 +1,3 @@
+# FileVault
+
+macOS FDE — encrypted.

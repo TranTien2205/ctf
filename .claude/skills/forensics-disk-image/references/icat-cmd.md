@@ -1,0 +1,3 @@
+# icat
+
+sleuthkit inode→bytes.

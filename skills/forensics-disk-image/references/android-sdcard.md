@@ -1,0 +1,3 @@
+# /sdcard
+
+The external storage.

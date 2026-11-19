@@ -1,0 +1,3 @@
+# binwalk
+
+Signature scan + extract.

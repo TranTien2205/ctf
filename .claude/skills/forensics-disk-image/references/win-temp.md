@@ -1,0 +1,3 @@
+# Temp dirs
+
+%TEMP% — volatile.

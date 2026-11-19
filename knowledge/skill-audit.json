@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T06:31:06",
+  "generated_at": "2026-11-20T06:43:40",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -468,10 +468,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 237,
+      "lines": 250,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.071,
+      "nearest_neighbour": "rev-managed-code",
+      "overlap": 0.068,
       "trust": "catalogue-or-unreviewed"
     },
     {

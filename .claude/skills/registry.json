@@ -982,9 +982,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 3344,
-      "depth_files": 3,
-      "depth_tokens": 617,
+      "skill_tokens": 3765,
+      "depth_files": 2346,
+      "depth_tokens": 60272,
       "use_when": [
         "a probe or source read produced this class's signal: mount or list the filesystem first (fls/icat or mmls) — the flag is usually a deleted file or an unallocated-space carve, not live content"
       ],

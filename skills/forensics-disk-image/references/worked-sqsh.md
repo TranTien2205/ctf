@@ -1,0 +1,7 @@
+# Worked: squashfs
+
+squashfs_read list → get the flag file.
+
+## The route
+
+Read-only; the flag is recovered bytes. See the-workflow.md for the extraction order.

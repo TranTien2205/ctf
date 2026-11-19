@@ -1,0 +1,3 @@
+# istat
+
+sleuthkit inode→metadata.

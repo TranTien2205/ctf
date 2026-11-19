@@ -1,0 +1,3 @@
+# /usr
+
+Installed programs.

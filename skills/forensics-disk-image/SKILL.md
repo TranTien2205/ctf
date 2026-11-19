@@ -226,6 +226,19 @@ Depth, one named file at a time:
 - `skills/forensics-disk-image/references/README.md`
 - `skills/forensics-disk-image/references/deleted-and-unallocated.md`
 
+## The corpus — the workflow's anchors
+
+`references/` carries ~2,340 modules. Start from these:
+
+- The route — `references/the-workflow.md`, `references/the-order.md`, `references/the-extraction-recap.md`, `references/the-map-index.md`, `references/the-detection.md`
+- Structure — `references/the-partition.md`, `references/the-mbr.md`, `references/the-gpt.md`, `references/the-unallocated.md`
+- Filesystems — `references/the-fat.md`, `references/the-deleted-fat.md`, `references/the-exfat.md`, `references/the-ext.md`, `references/the-ntfs.md`, `references/the-ads.md`, `references/the-usnjrnl.md`, `references/the-mft.md`, `references/the-slack.md`
+- Carving — `references/the-carve.md`, `references/the-carve-2.md`, `references/tool-carve_scan.md`
+- Second layers — `references/the-archives.md`, `references/the-sqlite.md`, `references/the-containers.md`, `references/the-firmware.md`, `references/the-encrypted.md`, `references/the-browser.md`, `references/the-mac.md`
+- The hides — `references/the-zip-local.md`, `references/the-tar-tail.md`, `references/the-git-dangle.md`, `references/the-office.md`, `references/the-iso.md`, `references/the-thumbs.md`, `references/the-recycle.md`, `references/the-e01.md`, `references/the-luks.md`
+- Per-tool — the `tool-` modules under `references/` index every `tools/forensics/` reader
+- Discipline — `references/the-readonly.md`, `references/the-verify.md`, `references/the-falsifier.md`, `references/the-evidence.md`, `references/the-boundary.md`, `references/the-traps.md`, `references/the-checklist.md`, `references/the-worked-fat.md`, `references/the-worked-ext.md`, `references/the-worked-sqlite.md`
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 
