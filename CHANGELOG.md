@@ -7893,6 +7893,49 @@ needed, by the same person, on the same day.
 Eighth write-up failure, and the first that was a fabrication rather than a
 quotation.
 
+### Two refutations redone by reconstruction, and the worst near-miss of the session
+
+Two timing claims were refuted earlier by READING the code - counting lines
+and searching for socket calls - in a session whose whole lesson is that
+reading is weaker than running. Redone against the live lab:
+
+    the smuggling probe      0.02s total
+    the websocket probe      0.00s and 0.03s
+
+No deadline, no settle window, no timing dependence in either. The
+smuggling probe returned `inconclusive` with the honest reason - the second
+request failed after the ambiguous one, which could be a desync or just a
+dropped connection - so it refuses to name a desync on ambiguous evidence,
+which is the property that matters and which reading only suggested.
+
+AND THE WEBSOCKET PROBE IS RIGOROUS IN THE WAY THIS SYSTEM IS SUPPOSED TO
+BE. Its verdict rests on a round trip, not a status: it sends a foreign
+Origin, gets the upgrade, sends a canary it minted, and requires the target
+to ECHO THAT CANARY BACK. The recorded result carries the origin it sent,
+the canary, and the reply containing it. It does not ask the socket whether
+it opened.
+
+THE NEAR-MISS, and it is the most dangerous mistake I made today. Running
+that probe against the lab's socket endpoint, I read its verdict as a FALSE
+POSITIVE on a path that does not exist - because a manual check of that
+path had printed nothing. It printed nothing because the check lacked a
+time limit and the surrounding timeout killed it while the upgraded
+connection stayed open. The empty output was the instrument, not the
+target. The endpoint exists, the lab's own route list documents it as
+returning an upgrade, and a check with a time limit shows the upgrade
+immediately.
+
+So the sequence was: assert a false positive, in the system built to
+prevent false positives, on the strength of an empty result from a tool
+used wrongly. Fourteenth wrong instrument in this session and the first
+that would have produced a retraction of a true finding - symmetrical to
+the fabricated test names an hour earlier, and the same mechanism: a
+confident claim with nothing under it.
+
+What caught it was re-measuring with a bounded request and reading the
+target's own documentation of its routes. Not scepticism in the abstract -
+a second instrument.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
