@@ -5782,12 +5782,113 @@ reader seeing it drop to zero learns nothing either. Plant-tested both ways
 list with a reason that is not about evidence fails two AND removes the
 skip, because the parametrised test wakes up.
 
+### The hybrid's agent half gets its caller
+
+`argus/orchestrator.py` runs the scanners and ALSO takes an injected
+`agent_fn(prompt) -> text`, starts it CONCURRENTLY with the tools still
+running, and turns its words into a second ffuf pass. That half was complete,
+tested to twelve cases - overlap, a hung agent, a raising agent, scope
+checking every word, capping, a daemon thread - and it had no caller. Both
+adapters passed `agent_fn=None`, so the tool half always ran alone. Fourth
+orphan this session, and the one that was costing the most: the tool half is
+bounded by the wordlist it was given.
+
+MEASURED on the lab, one ffuf run against OWASP Juice Shop. Tools alone: 6
+endpoints. Tools plus an agent half supplying five words: 10 - `/api-docs`,
+`/api-docs/`, `/ftp` and `/rest` added, nothing lost. It is additive by
+construction, because the agent contributes a wordlist and a wordlist can
+only find more paths. The fan-out measured the same way: three endpoints,
+three calls, three distinct thread ids starting within 0.53s of each other,
+the whole thing finishing in 37.9s rather than three times that.
+
+A new module beside the two adapters is the caller, and every line of care
+in it answers a hazard that was read out of the code it has to live beside
+(its name is not spelled here: the doc gate reads an identifier in that
+shape as a claim that a tool by that name is registered, and this is a
+module, not a tool - thirteenth instance this session of a checker reading a
+mention as a claim):
+
+- **Its own client, built on the CALLER's thread.** `resolve_auth` writes a
+  temp file named only by PID and `os.replace()`s the operator's real
+  credentials file, so two concurrent refreshes collide on one path. The
+  credential is resolved once, before any worker thread exists.
+- **Its own token counters.** The clients count with `self.input_tokens +=`,
+  a non-atomic read-modify-write; sharing the agent loop's client across
+  threads corrupts the run's cost line, and a private client instead makes
+  the spend invisible because nothing aggregates a second client's counters.
+  So it keeps its own under a lock and hands them back for the tool result,
+  named with the model that was actually billed - folding them into the
+  loop's totals would price them at `cfg.model`'s rate, and the report's
+  claim is that every figure traces to a line someone can check.
+- **One attempt.** The orchestrator abandons the agent thread after as
+  little as five seconds because a Python thread cannot be killed, and five
+  attempts carry 2+4+8+16+32 = 62 seconds of `time.sleep` regardless of the
+  timeout - so the abandoned call would keep retrying and keep SPENDING
+  after its result has nowhere to go. `max_attempts` is now a constructor
+  argument on both providers, defaulting to the old five so no existing
+  caller changes.
+- **Its errors carry no provider bytes.** The adapters embed up to 500 bytes
+  of a provider's response body in `LLMError`, that message reaches the
+  sweep's note and the session artifacts, and the redaction only replaces
+  operator-declared secrets. Only the exception TYPE leaves the module -
+  plant-tested with `401 {...'key':'sk-ant-LEAKED123'}`, which does not
+  appear in the stats.
+- **The model comes from the table by role.** `breadth` is the table's own
+  name for cheap wide work, which is what generating path candidates is.
+  `for_role` returns a Model, not a name: the first version did
+  `str(picked or "")`, which is the dataclass repr - a name the table would
+  not find, routed to Anthropic as nonsense. Caught by checking the return
+  type rather than by a failed call, and a test now asserts that
+  `str(model) != model.key` so the trap cannot become invisible.
+
+AND A MISSING KEY IS REPORTED AS ITSELF. With no credential the client still
+constructs - the CALL is what fails - so the orchestrator sees an empty
+string and notes "agent_fn returned no text", which reads as "the model ran
+and had nothing to say". The adapter replaces that note with which model
+could not be reached and why, and says the tool half's results stand on
+their own. A refusal reading as an empty result, one layer up from where
+this repository usually finds it.
+
+THE MOST USEFUL PLANT WAS THE ONE THAT FAILED TO APPLY. Three defects
+planted into the agent half were caught; a fourth - reverting an adapter to
+`agent_fn=None` - missed its anchor, never planted, and the suite passed.
+That pass was the finding: nothing asserted the WIRING, only the parts
+either side of it, which is exactly how the orphan survived in the first
+place. Two tests now hold it, and the plant lands.
+
+### A multi-value header was a Python literal in the artifact
+
+`_header_dict` preserves multi-value Set-Cookie with
+`resp.headers.get_list(...)`, because collapsing it loses cookies. The
+redaction then coerced any non-`str` value with `str()` - right for a
+model-supplied header dict, where a JSON array is legal input, and wrong for
+this one. Two cookies became a single string holding a Python list literal,
+which is what a report prints as the evidence for a cookie-flag finding.
+Each element is redacted on its own now and the list stays a list.
+
+AND THE PART THE READER OF THAT CODE GOT WRONG IS RECORDED TOO, because the
+next person should not re-fix it. The claim was that the mangling leaked the
+values. It does not: the cookie redaction splits on "; " and finds "=" in
+`'sid=secretvalue1`, so the value was masked even inside the literal.
+Measured both ways through the real client against a local server sending
+two Set-Cookie headers - no credential either way. The defect is the SHAPE
+of the artifact, not a disclosure, and the test says so.
+
+The first measurement of this was also wrong and in a way worth naming: it
+called `str()` and `split("; ")` BY HAND on a recorded value, reproducing
+what the claim said the code does rather than running the code. The recorded
+value was already an intact list, so the mangled output came from the
+measurement, not the tree. The honest path was a local server and the real
+`GuardedClient`, which is also what showed `record_exchange` does no
+redaction at all - that happens in the client, so a test that calls
+`record_exchange` directly measures nothing about it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1056 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1071 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

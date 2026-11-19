@@ -167,7 +167,8 @@ class OpenAICompatClient:
 
     def __init__(self, api_key: str, api_base: str, model: str,
                  max_tokens: int = 4096, timeout: float = 120.0,
-                 allow_insecure_base: bool = False, temperature: float = 0.2):
+                 allow_insecure_base: bool = False, temperature: float = 0.2,
+                 max_attempts: int = 5):
         if not api_base:
             raise LLMError(f"model {model!r} has no api_base in models.json")
         if not api_base.lower().startswith("https://") \
@@ -184,6 +185,11 @@ class OpenAICompatClient:
         self.max_tokens = max_tokens
         self.timeout = timeout
         self.temperature = temperature
+        #: See ClaudeClient.max_attempts - same reason, same default. A
+        #: bounded side-call on an uncancellable thread needs to stop
+        #: retrying when its deadline has passed, and five attempts carry
+        #: 62 seconds of backoff sleeps regardless of the timeout.
+        self.max_attempts = max(1, int(max_attempts))
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
@@ -208,7 +214,7 @@ class OpenAICompatClient:
         headers = {"authorization": f"Bearer {self.api_key}",
                    "content-type": "application/json"}
         delay, last = 2.0, ""
-        for _ in range(5):
+        for _ in range(self.max_attempts):
             try:
                 with httpx.Client(timeout=self.timeout) as client:
                     resp = client.post(self.api_base, json=payload,

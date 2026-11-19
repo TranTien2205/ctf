@@ -401,7 +401,29 @@ class TeamRun:
 
         from ..report.markdown import render_report
         lead_res = self._results.get("lead", {})
-        summary = lead_res.get("summary") or ""
+        # The REPORT role's summary, not the lead's, when there is one.
+        #
+        # MEASURED DEFECT this replaces: `_DEFAULT_TASKS["report"]` tells that
+        # role, in these words, to "Read all findings and board notes, then
+        # write the executive summary of the engagement". The role runs, its
+        # result is collected into `self._results["report"]`, and this line
+        # read `self._results["lead"]` - so the specialist that holds
+        # `report-writing.md` wrote prose that reached only `notes.md`,
+        # which the renderer files as a collapsed "agent working notes"
+        # appendix, while the generalist's summary filled the one
+        # first-class section it was written for. The mechanism was
+        # complete; one line dropped the connection.
+        #
+        # The lead stays as the fallback, because a run with no report
+        # worker (`--report 0`) must still have an executive summary, and
+        # `_authored_by` records which role wrote it rather than leaving a
+        # reader to assume.
+        report_res = self._results.get("report", {})
+        summary = str(report_res.get("summary") or "").strip()
+        summary_author = "report"
+        if not summary:
+            summary = str(lead_res.get("summary") or "").strip()
+            summary_author = "lead" if summary else ""
         def _sum_tokens(key: str) -> int:
             return sum((r.get("llm_tokens") if isinstance(
                 r.get("llm_tokens"), dict) else {}).get(key, 0)
@@ -418,6 +440,7 @@ class TeamRun:
             report_path = str(render_report(
                 self.session, cfg, summary, extra={
                     "mode": "team", "agents": self.board.agents(),
+                    "summary_author": summary_author,
                     "llm_calls": calls, "llm_tokens": tokens,
                     "llm_cost": cost,
                 }))

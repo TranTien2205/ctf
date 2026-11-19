@@ -129,6 +129,23 @@ def _redact_headers(headers: dict, secret_values: set[str]) -> dict:
         # are legal tool input) - coerce so redaction cannot crash the
         # record path and mask the real httpx error
         ks = k if isinstance(k, str) else str(k)
+        if isinstance(v, (list, tuple)):
+            # A LIST is not a stringly value to coerce - it is the shape
+            # this client deliberately built. `_header_dict` preserves
+            # multi-value Set-Cookie with `resp.headers.get_list(...)`
+            # precisely because collapsing it loses cookies, and `str()` on
+            # that list then fed `"['sid=a; Path=/; HttpOnly', 'csrf=b; ...]"`
+            # into the cookie redaction, which splits on "; ".
+            #
+            # MEASURED: two cookies became
+            # `["['sid=a", 'Path=/', "HttpOnly', 'csrf=b", ...]` - an
+            # unterminated Python list literal with the values masked, which
+            # is what a report would print as the evidence for a
+            # cookie-flag finding. Each element is redacted on its own and
+            # the list stays a list.
+            out[ks] = [_redact_header_value(
+                ks, x if isinstance(x, str) else str(x)) for x in v]
+            continue
         vs = v if isinstance(v, str) else str(v)
         # `.strip()` before the membership test, because these names are
         # model-supplied and whitespace defeated it: `"Authorization "`

@@ -823,3 +823,77 @@ def test_a_trickling_body_is_bounded_and_says_it_was(monkeypatch):
     # ...and the caller is told, because a body cut short is not a
     # complete response and used to be indistinguishable from one
     assert "still arriving" in str(out.get("error")), out
+
+
+def test_a_multi_value_header_stays_a_list_through_redaction():
+    """A LIST header value is the shape this client deliberately built.
+
+    `_header_dict` preserves multi-value Set-Cookie with
+    `resp.headers.get_list(...)` precisely because collapsing it loses
+    cookies. `_redact_headers` then coerced any non-str with `str()` - a
+    coercion that is right for a model-supplied header dict, where a JSON
+    array is legal input, and wrong for this one.
+
+    MEASURED BOTH WAYS through the real client against a local server
+    sending two Set-Cookie headers:
+
+      before: a `str` holding "['sid=***; Path=***; HttpOnly', 'csrf=***;
+              Secure; SameSite=***']" - a Python list literal, which is
+              what a report prints as the evidence for a cookie-flag
+              finding
+      after:  a `list` of two readable, separately-redacted cookies
+
+    And the part a reader of this code got WRONG, recorded so the next
+    person does not re-fix it: no credential leaked either way. The cookie
+    redaction splits on "; " and finds "=" in `'sid=secretvalue1`, so the
+    value was masked even inside the mangled literal. The defect is the
+    SHAPE of the artifact, not a disclosure.
+    """
+    import http.server
+    import pathlib
+    import tempfile
+    import threading
+
+    class _Cookies(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Set-Cookie", "sid=secretvalue1; Path=/; HttpOnly")
+            self.send_header("Set-Cookie",
+                             "csrf=secretvalue2; Secure; SameSite=Lax")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), _Cookies)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        base = f"http://127.0.0.1:{srv.server_address[1]}"
+        from argus.httpclient import GuardedClient
+        from argus.ratelimit import RateLimiter
+        from argus.scope import ScopeGuard
+        from argus.session import Session
+
+        sess = Session(pathlib.Path(tempfile.mkdtemp()), base, {"model": "t"})
+        client = GuardedClient(ScopeGuard(base, allow_private=True), sess,
+                               RateLimiter(0.0), max_requests=4)
+        sent = client.send("GET", base + "/login")
+        headers = sess._transcript[sent["request_id"]]["response"]["headers"]
+        cookies = headers.get("set-cookie")
+
+        assert isinstance(cookies, list), (
+            "a multi-value header must not be stringified into a Python "
+            f"list literal; got {type(cookies).__name__}: {cookies!r}")
+        assert len(cookies) == 2, cookies
+        for one in cookies:
+            assert isinstance(one, str) and not one.startswith("["), one
+        # each cookie still redacted, and the attributes that carry no
+        # value survive so a flag finding can show them
+        joined = " ".join(cookies)
+        assert "secretvalue1" not in joined and "secretvalue2" not in joined
+        assert "sid=" in joined and "csrf=" in joined
+        assert "HttpOnly" in joined and "Secure" in joined
+    finally:
+        srv.shutdown()
+        srv.server_close()

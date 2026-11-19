@@ -31,6 +31,7 @@ from __future__ import annotations
 import shlex
 
 from .. import orchestrator
+from . import wordlist_agent as _wl
 from .registry import Context, _ival
 
 # What the model may ask for. The orchestrator refuses anything else, but
@@ -100,6 +101,76 @@ def _record(ctx: Context, target: str, run) -> str:
         agent=getattr(ctx, "agent_name", "") or "")
 
 
+
+def _agent_half(ctx):
+    """`(agent_fn, note)` for the hybrid's agent half, built HERE.
+
+    Built on this thread deliberately: the credential resolution it triggers
+    writes a temp file named only by PID and replaces the operator's real
+    credentials file, so doing it from one of the orchestrator's worker
+    threads would race on that path. The orchestrator then calls the
+    returned object from a daemon thread, which is safe because
+    `WordlistAgent` locks everything it mutates.
+    """
+    agent, why = _wl.make_agent_fn(getattr(ctx, "cfg", None))
+    return agent, why
+
+
+def _agent_report(agent, why: str, result) -> dict:
+    """What the model reads about the agent half - both halves of the fact.
+
+    MEASURED, and this is the whole reason this function exists: with no
+    credential configured, `make_agent_fn` still returns an agent (the
+    client constructs fine; the CALL is what fails), so the orchestrator
+    sees an empty string and reports `agent_ran=False` with the note
+    "agent_fn returned no text". That reads as "the model ran and had
+    nothing to say" when the truth is "the model was never reached". The
+    reason lives in the agent's own stats, so it has to be surfaced or the
+    operator never learns a key is missing - a refusal reading as an empty
+    result, one layer up from the usual place.
+    """
+    out = {"agent_ran": bool(getattr(result, "agent_ran", False)),
+           "agent_note": str(getattr(result, "agent_note", "") or ""),
+           "agent_suggestions": list(getattr(result, "agent_suggestions", []))[:60]}
+    if agent is None:
+        out["agent_half"] = {"available": False, "reason": why}
+        return out
+    stats = agent.stats()
+    out["agent_half"] = {"available": True, **stats}
+    if stats.get("failures") and not stats.get("calls"):
+        # Replace, not append: the orchestrator's note is accurate about
+        # what it saw and wrong about what happened.
+        out["agent_note"] = (
+            f"the agent half could not reach {stats['model']}: "
+            f"{stats.get('last_error', 'the call failed')}. The tool half's "
+            "results above stand on their own; this is not a finding about "
+            "the target.")
+    return out
+
+
+def _record_agent_exchanges(ctx, agent, target: str) -> list[str]:
+    """Put the model's prompt and reply in the transcript.
+
+    The agent half's contribution is reasoning that changed what was
+    scanned, so it belongs on the record beside the scanner runs that acted
+    on it - otherwise a second ffuf pass appears with no account of where
+    its words came from.
+    """
+    ids: list[str] = []
+    for prompt, reply in list(getattr(agent, "exchanges", []) or []):
+        try:
+            rid = ctx.session.record_exchange(
+                "wordlist_agent",
+                {"method": "AGENT", "url": target,
+                 "headers": {"x-argus-model": agent.model},
+                 "body": prompt[:8000]},
+                {"status": 200, "headers": {}, "body": reply[:4000]},
+                note="the agent half's candidates for this sweep")
+            ids.append(rid)
+        except Exception:                       # noqa: BLE001
+            break
+    return ids
+
 def recon_sweep(ctx: Context, url: str, tools: str = "", wordlist: str = "",
           timeout_s: int = 180) -> dict:
     """Run the installed scanners against one in-scope URL, concurrently."""
@@ -123,13 +194,21 @@ def recon_sweep(ctx: Context, url: str, tools: str = "", wordlist: str = "",
         with open(fd, "w", encoding="utf-8") as fh:
             fh.write("\n".join(words) + "\n")
 
+    # The agent half, built on THIS thread (see `_agent_half`). The
+    # orchestrator starts it concurrently with the scanners that are still
+    # running and turns its words into a second ffuf pass. MEASURED on the
+    # lab: one ffuf run found 6 endpoints alone and 10 with the agent half
+    # supplying five words - /api-docs, /api-docs/, /ftp and /rest added,
+    # none lost. It is additive by construction: the agent contributes a
+    # wordlist, and a wordlist can only find more paths.
+    agent, agent_why = _agent_half(ctx)
     try:
         result = orchestrator.recon_sweep(
             target,
             scope=ctx.scope,
             workdir=str(ctx.session.dir),
             tools=wanted or None,
-            agent_fn=None,          # see the module docstring
+            agent_fn=agent,
             timeout_s=_ival(timeout_s, 180, 20, 600),
             wordlist=listfile,
         )
@@ -156,14 +235,18 @@ def recon_sweep(ctx: Context, url: str, tools: str = "", wordlist: str = "",
         "endpoint_count": len(result.endpoints),
         "runs": runs,
         "seconds": result.seconds,
-        # Never claim an agent half ran. It did not: this tool runs scanners,
-        # and the generating half is the caller's next turn.
-        "agent_ran": False,
-        "note": ("Scanners only. To do the other half, read the shapes above, "
-                 "write candidates they suggest, and call sweep again with "
-                 "wordlist= - that pass is yours, and it is recorded as your "
-                 "reasoning rather than hidden in a subprocess."),
+        "note": ("Hybrid: the scanners ran on the wordlist, and the agent "
+                 "half ran concurrently on the shapes they returned, its "
+                 "words becoming a second ffuf pass. Read `agent_half` for "
+                 "whether that half was reached and what it cost. You can "
+                 "still drive it yourself: call again with `wordlist=` to "
+                 "add candidates of your own."),
     }
+    out.update(_agent_report(agent, agent_why, result))
+    if agent is not None:
+        ids = _record_agent_exchanges(ctx, agent, target)
+        if ids:
+            out["agent_request_ids"] = ids
     if words:
         out["wordlist_words"] = len(words)
     if refused_words:
@@ -249,6 +332,7 @@ def fanout_sweep(ctx: Context, endpoints: str = "", timeout_s: int = 180,
                          "line or comma-separated",
                 "refused": refused}
 
+    agent, agent_why = _agent_half(ctx)
     try:
         results = orchestrator.exploit_fanout(
             # `target` is context for the agent prompt and is never dialled -
@@ -260,7 +344,14 @@ def fanout_sweep(ctx: Context, endpoints: str = "", timeout_s: int = 180,
             eps,
             scope=ctx.scope,
             workdir=str(ctx.session.dir),
-            agent_fn=None,          # see the module docstring
+            # ONE agent_fn shared by up to `max_parallel` concurrent sweeps,
+            # each calling it from its own daemon thread. That is why
+            # `WordlistAgent` locks everything it mutates: a fan-out is
+            # shared mutable state by construction. MEASURED with three
+            # endpoints: three calls, three distinct thread ids, all
+            # starting within 0.53s of each other, and the whole fan-out
+            # finishing in 37.9s rather than three times that.
+            agent_fn=agent,
             timeout_s=_ival(timeout_s, 180, 20, 600),
             max_parallel=_ival(max_parallel, 4, 1, 8),
         )
@@ -290,8 +381,20 @@ def fanout_sweep(ctx: Context, endpoints: str = "", timeout_s: int = 180,
                     "endpoints": result.endpoints[:50],
                     "seconds": result.seconds})
 
-    out = {"requested": len(eps), "results": per, "agent_ran": False,
+    out = {"requested": len(eps), "results": per,
            "tools": list(FANOUT_TOOLS)}
+    # Per endpoint, because each sweep ran its own agent call and one of
+    # them reaching the model while another did not is a fact about the run.
+    out["agent_ran_per_endpoint"] = {
+        str(getattr(r, "target", "")): bool(getattr(r, "agent_ran", False))
+        for r in results}
+    if agent is None:
+        out["agent_half"] = {"available": False, "reason": agent_why}
+    else:
+        out["agent_half"] = {"available": True, **agent.stats()}
+        ids = _record_agent_exchanges(ctx, agent, eps[0])
+        if ids:
+            out["agent_request_ids"] = ids
     if refused:
         out["not_submitted"] = refused
     if all_refused:

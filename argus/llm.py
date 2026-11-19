@@ -28,13 +28,24 @@ NO_CREDENTIAL_MSG = (
 class ClaudeClient:
     def __init__(self, api_key: str, api_base: str, model: str,
                  max_tokens: int = 4096, timeout: float = 120.0,
-                 auth_token: str = "", prompt_cache: bool = True):
+                 auth_token: str = "", prompt_cache: bool = True,
+                 max_attempts: int = 5):
         self.api_key = api_key
         self.auth_token = auth_token
         self.api_base = api_base
         self.model = model
         self.max_tokens = max_tokens
         self.timeout = timeout
+        #: Attempts for ONE kind of caller: a bounded side-call on a thread
+        #: the caller cannot cancel. MEASURED hazard it answers - the
+        #: orchestrator's agent half runs `agent_fn` on a daemon thread and
+        #: abandons it after `max(5.0, timeout_s - elapsed)`, as little as
+        #: five seconds, because a Python thread cannot be killed. With the
+        #: attempts fixed at five the backoff ALONE is 2+4+8+16+32 = 62
+        #: seconds of `time.sleep` inside that thread, so an abandoned call
+        #: keeps retrying and keeps SPENDING long after its result has
+        #: nowhere to go. The default leaves every existing caller unchanged.
+        self.max_attempts = max(1, int(max_attempts))
         self.calls = 0
         self.input_tokens = 0
         self.output_tokens = 0
@@ -101,7 +112,7 @@ class ClaudeClient:
             }
         delay = 2.0
         last_error = ""
-        for attempt in range(5):
+        for attempt in range(self.max_attempts):
             try:
                 with httpx.Client(timeout=self.timeout) as client:
                     resp = client.post(

@@ -206,3 +206,62 @@ def test_nothing_scanned_is_the_verdict_not_a_count_of_zero():
     # and the dedup: one entry per endpoint, not per tool
     assert 'x["endpoint"] == result.target' in src, \
         "a three-tool sweep of one refused endpoint must not read as three"
+
+
+# ------------------------------------- the wiring itself, not just the parts
+
+def test_both_adapters_pass_a_real_agent_half():
+    """Found by a plant that FAILED to apply. Three defects planted into the
+    agent half were caught and a fourth - reverting an adapter to
+    `agent_fn=None` - did not match its anchor, so it never planted, and the
+    suite passed. That pass was the finding: nothing here asserted the
+    wiring, only the parts either side of it.
+
+    This is the whole point of the change. The orchestrator's agent half was
+    complete and tested to twelve cases and had NO CALLER for as long as
+    both adapters passed None.
+    """
+    import inspect
+
+    import argus.tools.sweep as m
+
+    for fn in (m.recon_sweep, m.fanout_sweep):
+        src = inspect.getsource(fn)
+        assert "agent_fn=agent" in src, (
+            f"{fn.__name__} does not hand the orchestrator an agent half; "
+            "the tool half would run alone and nothing else here would say so")
+        assert "agent_fn=None" not in src, \
+            f"{fn.__name__} still passes None somewhere"
+        assert "_agent_half(ctx)" in src, (
+            f"{fn.__name__} must build the agent on ITS OWN thread - the "
+            "credential resolution is not safe to do concurrently")
+
+
+def test_a_missing_model_is_reported_as_itself_not_as_an_empty_answer(ctx, monkeypatch):
+    """MEASURED. With no credential, `make_agent_fn` still returns an agent -
+    the client constructs fine and the CALL is what fails - so the
+    orchestrator sees "" and reports `agent_ran=False` with the note
+    "agent_fn returned no text". That reads as "the model ran and had
+    nothing to say" when the model was never reached.
+    """
+    import argus.tools.sweep as m
+    from argus.tools.wordlist_agent import WordlistAgent
+
+    class _Dead:
+        def chat(self, messages, tools, system):
+            raise RuntimeError("401 no credential")
+
+    monkeypatch.setattr(m, "_agent_half",
+                        lambda c: (WordlistAgent(_Dead(), "haiku-x"), ""))
+    monkeypatch.setattr(m.orchestrator.subprocess, "Popen",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            FileNotFoundError("no scanner here")))
+    out = m.recon_sweep(ctx, "http://127.0.0.1:1/", tools="ffuf", timeout_s=20)
+
+    assert out["agent_half"]["available"] is True
+    assert out["agent_half"]["failures"] == 1
+    assert "could not reach haiku-x" in out["agent_note"], out["agent_note"]
+    assert "not a finding about the target" in out["agent_note"]
+    assert "returned no text" not in out["agent_note"], \
+        "the orchestrator's note is accurate about what it saw and wrong " \
+        "about what happened; it has to be replaced, not appended to"

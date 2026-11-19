@@ -634,3 +634,55 @@ def test_an_empty_tool_grant_refuses_everything_not_nothing(tmp_path):
         {"http_request", "probe_sqli", "record_finding"})
     assert "YOUR TOOLS" in subset.system, (
         "the single-agent --tools prompt did not say which tools it has")
+
+
+def test_the_executive_summary_comes_from_the_report_role():
+    """MEASURED DEFECT. `_DEFAULT_TASKS["report"]` tells that role, in these
+    words, to "Read all findings and board notes, then write the executive
+    summary of the engagement". The role runs, its result is collected into
+    `_results["report"]` - and the renderer was handed
+    `_results["lead"]["summary"]`.
+
+    So the specialist that holds `report-writing.md` wrote prose that reached
+    only `notes.md`, which the renderer files as a collapsed "agent working
+    notes" appendix, while the generalist's summary filled the one
+    first-class `## Executive summary` section it was written for. The
+    mechanism was complete; one line dropped the connection.
+
+    The lead stays as the fallback, because a run with no report worker must
+    still have a summary - and which role wrote it is recorded rather than
+    left for a reader to assume.
+    """
+    import inspect
+
+    from argus.team import coordinator as coord
+
+    # the task really does say it, so the preference is not invented here
+    assert "executive summary" in coord._DEFAULT_TASKS["report"].lower()
+
+    src = inspect.getsource(coord)
+    # the preference, the fallback, and the provenance
+    assert '_results.get("report", {})' in src, \
+        "the report role's own result must be the first choice"
+    assert 'summary_author' in src, \
+        "which role wrote the summary has to be recorded, not assumed"
+    # and the old unconditional read must be gone
+    assert 'summary = lead_res.get("summary") or ""' not in src, \
+        "the lead's summary is the fallback now, not the only source"
+
+
+def test_the_summary_falls_back_to_the_lead_when_no_report_worker_ran():
+    """`--report 0` is a legitimate run shape. A missing report role must
+    leave the executive summary filled by the lead rather than empty, and
+    the author field must then say `lead` - the two facts travel together."""
+    import inspect
+
+    from argus.team import coordinator as coord
+
+    src = inspect.getsource(coord)
+    i = src.index('_results.get("report", {})')
+    window = src[i:i + 900]
+    assert 'lead_res.get("summary")' in window, \
+        "the fallback must be right there, not somewhere else"
+    assert '"lead" if summary else ""' in window, \
+        "an empty fallback must not claim the lead wrote one"
