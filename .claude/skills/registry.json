@@ -1593,9 +1593,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1023,
-      "depth_files": 1,
-      "depth_tokens": 651,
+      "skill_tokens": 1696,
+      "depth_files": 120,
+      "depth_tokens": 95497,
       "use_when": [
         "a challenge has an admin bot and a client-side payload needs debugging",
         "the challenge itself exposes a WebDriver or Selenium endpoint"
@@ -1898,8 +1898,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 1196,
-      "depth_files": 64,
-      "depth_tokens": 49133,
+      "depth_files": 115,
+      "depth_tokens": 96160,
       "use_when": [
         "a probe or source read produced this class's signal: repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back"
       ],
@@ -2125,9 +2125,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 690,
-      "depth_files": 3,
-      "depth_tokens": 936,
+      "skill_tokens": 1127,
+      "depth_files": 48,
+      "depth_tokens": 25769,
       "use_when": [
         "the front-end is a bundled SPA and the only available source",
         "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"

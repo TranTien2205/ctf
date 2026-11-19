@@ -58,10 +58,27 @@ a 404 map is a falsifier for this route.
 
 ## Routing
 
-Shares signals with: `../web-triage/`, `../file-read-primitives/`. Depth, one
+Shares signals with: `../web-triage/`, `../file-read-primitives/`,
+`../web-info-disclosure/`. Depth, one named file at a time:
+`../ctf-web/client-side.md`.
 
-| Bundle/map extraction or endpoint mining | `references/bundle-mining.md` |
-named file at a time: `../ctf-web/client-side.md`.
+| Need | File |
+|---|---|
+| the bundle + map mechanism | `references/mechanism.md`, `references/mechanism-deep.md` |
+| detect a bundle/map | `references/detection.md`, `references/detection-matrix.md`, `references/detection-index.md`, `references/detection-checklist.md`, `references/detection-surface.md` |
+| extract endpoints/secrets | `references/extraction.md`, `references/extraction-deep.md`, `references/bundle-mining.md` |
+| the `.map` recovery | `references/source-maps.md` |
+| secret candidates | `references/secrets.md` |
+| per-framework shapes | `references/frameworks.md` |
+| the ordered pass | `references/workflow.md`, `references/first-hour.md`, `references/field-manual.md` |
+| a lead to its class | `references/per-target.md`, `references/per-check.md`, `references/per-route.md`, `references/per-surface.md`, `references/per-vector.md` |
+| exploit shapes / chains | `references/attack-shapes.md`, `references/multi-step-chains.md` |
+| evidence / falsifiers | `references/evidence-rules.md`, `references/falsifiers.md`, `references/per-falsifier.md` |
+| dead ends / cases | `references/negative-results.md`, `references/case-studies.md`, `references/real-world-cases.md`, `references/verified-chains.md` |
+| edge cases / mistakes | `references/edge-cases.md`, `references/common-mistakes.md`, `references/anti-patterns.md`, `references/troubleshoot.md`, `references/evasion.md` |
+| reference | `references/theory.md`, `references/glossary.md`, `references/summary.md`, `references/onboarding.md`, `references/checklist.md`, `references/quick-reference.md`, `references/preconditions.md`, `references/class-boundary.md`, `references/common-questions.md`, `references/mechanism-index.md`, `references/extended-corpus.md` |
+
+The full index is `references/README.md`.
 
 ## Field notes
 
