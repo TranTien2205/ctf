@@ -6523,6 +6523,58 @@ premise written into it, and keeping the half that still holds and always
 mattered: an unjudged finding must not read as AGREED or DISPUTED. Saying a
 check was not performed and implying its outcome are different claims.
 
+### The second CI-only flake, and a precondition is not a claim
+
+CI on e239843: 10 jobs of 11 green, one red on ubuntu 3.14 - the version
+this machine runs, with the local gate green.
+`test_many_sequential_runs_do_not_accumulate` failed `assert 429 == 200`.
+
+429 is the console's own concurrency cap, and it is RIGHT. The four slots
+are released by each run's WORKER THREAD, so a POST issued before the
+previous thread has released its slot is refused correctly. Whether that
+happens is thread scheduling against the speed of a test loop.
+
+THE FIX IS TO SEPARATE THE PRECONDITION FROM THE CLAIM. That test claims
+four things - n runs on disk, live records bounded, dead threads reaped, an
+evicted run still readable through its sidecar. `status == 200` is how it
+REACHES n runs; it is not what it asserts. So the precondition retries and
+every claim stays strict.
+
+And the retries are COUNTED, with `retries <= n`, because a blind retry
+loop turns "the server refuses every request" into a slow pass. Plant-
+tested both ways: a server that 429s everything fails the test, and the
+concurrency cap lowered to 1 - the worst scheduling case - passes.
+
+### Then the amplifier found a third, and the third was the instrument
+
+Two race flakes in one file, both green locally and red on CI, is a reason
+not to wait for CI to find the next one. Ten local runs of the whole web
+suite: 80 passed, ten times, no flake. That is WEAK EVIDENCE and worth
+saying so - the local gate is the instrument that missed both of the known
+ones.
+
+So the race was amplified deterministically instead: concurrency cap 4 ->
+1, which is the worst case for slot contention, five runs of the suite. It
+found `test_the_lifetime_run_cap_stops_an_unbounded_post_loop` failing one
+run in five.
+
+THAT FAILURE WAS MY OWN INSTRUMENT. The test patches the LIFETIME cap and
+spawns with the module default for the concurrency cap, so lowering that
+default put it in a configuration it never runs in. At the real cap it
+passes ten times out of ten.
+
+But the sensitivity it exposed is real and worth fixing: a test about the
+lifetime cap depended, unstated, on the concurrency cap being at least two.
+Its claim was already exact - `"lifetime cap" in errors[0]` distinguishes
+the two 429s, so a slot refusal could never satisfy it - and only the
+precondition needed to be robust. Now 8 of 8 with the cap at 1, where it
+was 4 of 5 before, and unchanged at the real cap.
+
+A deterministic amplifier is worth more than load for this: load produced
+three timing failures in one gate run on this machine and told me nothing
+about which were real, while one changed constant named the coupling
+exactly.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

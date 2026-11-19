@@ -449,12 +449,37 @@ def test_many_sequential_runs_do_not_accumulate(tmp_path):
     n = api.MAX_TRACKED_RUNS + 16
     w = _spawn(root)              # runner=None: every run blocks at once
     try:
+        # A 429 HERE IS THE CONCURRENCY CAP WORKING, NOT THE BEHAVIOUR UNDER
+        # TEST. `MAX_CONCURRENT_RUNS` slots are released by each run's worker
+        # thread, so a POST issued before the previous thread has released
+        # its slot is refused - correctly. Whether that happens depends on
+        # thread scheduling against the speed of this loop, and it is a race:
+        # CI failed one job of eleven on `assert 429 == 200` while ten passed
+        # and the local gate was green.
+        #
+        # What this test claims is everything below: n runs on disk, live
+        # records bounded, dead threads reaped, an evicted run still
+        # readable. Reaching n runs is its PRECONDITION, so the precondition
+        # retries and the claim stays strict.
+        #
+        # The retries are counted, so a regression that refuses everything
+        # still fails: a blind retry loop would turn "the server 429s every
+        # request" into a slow pass.
+        retries = 0
         for _ in range(n):
-            status, data, _ = _json_req(
-                f"{w.base}/api/runs", "POST",
-                {"mode": "lab", "target": LAB_TARGET, "auth": None,
-                 "extra": ""})
+            for attempt in range(40):
+                status, data, _ = _json_req(
+                    f"{w.base}/api/runs", "POST",
+                    {"mode": "lab", "target": LAB_TARGET, "auth": None,
+                     "extra": ""})
+                if status != 429:
+                    break
+                retries += 1
+                time.sleep(0.02)
             assert status == 200 and data["ok"] is True
+        assert retries <= n, (
+            f"{retries} slot refusals for {n} runs - the cap is refusing "
+            "more than it admits, which is not a scheduling race")
         w.registry.wait(10)
         assert len(list(root.iterdir())) == n      # every run is on disk
         assert len(w.registry.live()) <= api.MAX_TRACKED_RUNS
@@ -540,10 +565,26 @@ def test_the_lifetime_run_cap_stops_an_unbounded_post_loop(web, monkeypatch):
     test asserts the refusal rather than the clock.
     """
     monkeypatch.setattr("argus.web.api.MAX_RUNS_PER_SERVER", 2)
+    # The precondition tolerates the CONCURRENCY cap; the claim below does
+    # not. This test patches the lifetime cap and left the slot cap as an
+    # unstated dependency - `MAX_CONCURRENT_RUNS` is a constructor parameter
+    # with a module default, and lowering that default made this test fail
+    # one run in five on a refusal from the OTHER cap. Found by amplifying
+    # the race deterministically (cap 4 -> 1) rather than waiting for load
+    # to reproduce it.
+    #
+    # The claim stays exact because it reads the message: `"lifetime cap" in
+    # errors[0]` already distinguishes the two 429s, so a slot refusal can
+    # never satisfy it. Only reaching two started runs needed to be robust.
     for _ in range(2):
-        status, data, _ = _json_req(
-            f"{web.base}/api/runs", "POST",
-            {"mode": "lab", "target": LAB_TARGET, "auth": None, "extra": ""})
+        for attempt in range(40):
+            status, data, _ = _json_req(
+                f"{web.base}/api/runs", "POST",
+                {"mode": "lab", "target": LAB_TARGET, "auth": None,
+                 "extra": ""})
+            if status != 429 or "lifetime cap" in str(data.get("errors")):
+                break
+            time.sleep(0.02)
         assert status == 200 and data["ok"] is True
     before = sorted(p.name for p in web.root.iterdir())
     status, data, _ = _json_req(
