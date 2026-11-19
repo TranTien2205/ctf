@@ -1381,9 +1381,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 898,
-      "depth_files": 3,
-      "depth_tokens": 1089,
+      "skill_tokens": 1380,
+      "depth_files": 974,
+      "depth_tokens": 85248,
       "use_when": [
         "a probe or source read produced this class's signal: answer the glibc version question first, because tcache behaviour, double-free detection and fd mangling differ sharply across versions, then map the allocation lifecycle and name the primitive the bug gives before choosing any technique"
       ],

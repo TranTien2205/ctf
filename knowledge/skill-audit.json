@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T04:39:02",
+  "generated_at": "2026-11-20T04:59:42",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -234,8 +234,8 @@
       "local_evidence": "stub",
       "lines": 117,
       "actionability": "operational",
-      "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.146,
+      "nearest_neighbour": "rev-native-check",
+      "overlap": 0.144,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -672,8 +672,8 @@
       "local_evidence": "stub",
       "lines": 85,
       "actionability": "operational",
-      "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.2,
+      "nearest_neighbour": "rev-native-check",
+      "overlap": 0.185,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -689,7 +689,7 @@
       "lines": 110,
       "actionability": "operational",
       "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.148,
+      "overlap": 0.145,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -702,10 +702,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 85,
+      "lines": 101,
       "actionability": "operational",
-      "nearest_neighbour": "rev-native-check",
-      "overlap": 0.201,
+      "nearest_neighbour": "pwn-code-reuse",
+      "overlap": 0.159,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -730,8 +730,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.159,
+      "nearest_neighbour": "pwn-code-reuse",
+      "overlap": 0.15,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -778,8 +778,8 @@
       "local_evidence": "stub",
       "lines": 84,
       "actionability": "operational",
-      "nearest_neighbour": "pwn-heap-corruption",
-      "overlap": 0.201,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.191,
       "trust": "catalogue-or-unreviewed"
     },
     {

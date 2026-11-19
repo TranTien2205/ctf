@@ -65,14 +65,30 @@ r2 -d ./chal          # dmh, dmhf for the heap walk
 
 ## Routing
 
-Shares signals with: `../pwn-stack-overflow/`. Check those before committing to this one.
+Shares signals with: `../pwn-stack-overflow/` and `../pwn-format-string/`.
+Check those before committing to this one.
 
 Depth, one named file at a time:
 
 - `skills/ctf-pwn/heap-techniques.md`
 - `skills/ctf-pwn/heap-fsop.md`
 
+The `references/` corpus (one file per question, `*-deep` / `*-checklist` /
+`-map` companions for most):
+
+| Question | File |
+|---|---|
 | Any heap-corruption question | `references/chunk-abuse.md` |
+| The runbook start to finish | `references/workflow.md` |
+| Foundations | `references/glibc-version-first.md`, `references/chunk-anatomy.md`, `references/the-bins.md`, `references/first-fit.md`, `references/bin-map.md` |
+| Bugs to primitives | `references/the-bug-shapes.md`, `references/primitive-matrix.md`, `references/uaf-primitive.md`, `references/double-free.md`, `references/off-by-one.md`, `references/index-array-bug.md` |
+| Techniques | `references/tcache-poisoning.md`, `references/fastbin-dup.md`, `references/the-unsorted-write.md`, `references/house-of-force.md`, `references/house-of-spirit.md`, `references/large-bin-attack.md`, `references/overlapping-chunks.md`, `references/fake-chunk.md` |
+| Version gates | `references/version-feature-map.md`, `references/safe-linking.md`, `references/tcache-key.md`, `references/the-consistency-checks.md`, `references/free-hook.md`, `references/vtable-check.md` |
+| Leaks | `references/unsorted-bin-leak.md`, `references/heap-leak.md`, `references/environ-leak.md`, `references/libc-version-offsets.md` |
+| Grooming | `references/heap-feng-shui.md`, `references/guard-chunks.md`, `references/the-free-order.md`, `references/coalesce-order.md` |
+| Endings | `references/write-targets-heap.md`, `references/fsop-basics.md`, `references/system-binsh.md`, `references/one-gadget.md`, `references/the-endgame-table.md` |
+| Diagnosis | `references/heap-crash-map.md`, `references/r2-heap-view.md`, `references/troubleshoot.md`, `references/anti-patterns.md` |
+| Discipline | `references/evidence.md`, `references/falsifiers.md`, `references/the-checklist.md`, `references/the-glossary.md`, `references/the-map-index.md`, `references/heap-negative-results.md`, `references/heap-boundary.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
