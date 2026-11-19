@@ -42,40 +42,45 @@
 -->
 <style>
 :root{
-  /* INDIGO DECK.
+  /* SENTINEL DECK — dựng từ bản mẫu thiết kế "Tổng quan SOC".
 
-     Năm màu neo do người vận hành chọn: nền #0b0a14, thẻ #15131f, nhấn
-     indigo #7c6cf5, proven #34d8a0, candidate #f5a524. Phần còn lại suy ra
-     từ chúng bằng số đo, không ướm mắt: bề mặt giữ nguyên hue 246° của nền
-     và chỉ đổi độ sáng, nên năm tầng là MỘT vật liệu dưới năm mức ánh sáng
-     chứ không phải năm màu khác nhau.
+     Các giá trị dưới đây được TRÍCH từ bản mẫu, không ướm mắt: nền #04050D,
+     mặt thẻ #0A0C26 -> #141A44, viền #2A3170, và dải cyan/violet/magenta
+     #00E5FF / #8B6CFF / #FF2E97 làm viền gradient. README của bản mẫu nói
+     rõ phải TÁI HIỆN giá trị trong hệ thống của mình chứ không chép nguyên
+     khối, nên không có một dòng mã nào của nó ở đây - chỉ các con số.
 
-     MỘT CĂNG THẲNG, VÀ CÁCH GIẢI. File này viết "chroma thuộc về mức bằng
-     chứng và chỉ thuộc về nó", nhưng indigo bão hoà 0.87 còn `proven` 0.68,
-     nên nếu để cạnh nhau thì chrome sẽ lấn. Giải bằng VỊ TRÍ: indigo chỉ
-     sống ở khung - logo, điều hướng, tiêu điểm, nút chính - và không bước
-     vào lớp dữ liệu. Mức bằng chứng vẫn là thứ duy nhất mang màu ở nơi
-     người đọc đi tìm phán quyết.
+     MỘT SAI LỆCH BẮT BUỘC, VÀ LÝ DO. Bản mẫu nạp 'Be Vietnam Pro' và
+     'Chakra Petch' từ Google Fonts. Console này chạy dưới CSP
+     `font-src data:` và luật "không tài nguyên ngoài" mà 41 test canh, nên
+     webfont là điều không thể ở đây. Thay bằng ngăn xếp hệ thống; mọi giá
+     trị khác giữ đúng bản mẫu.
 
-     `unproven` trung tính và không phát quang: một sự vắng mặt, không phải
-     một nguy hiểm. Tô đỏ nó là dạy người đọc một phán quyết chưa hề có. */
-  --v0:#0b0a14; --v1:#15131f; --v2:#1f1e27; --v3:#282732; --v4:#343240;
-  --line:#3a3949; --line-soft:#2a2936;
-  --ink:#f2f2f5; --dim:#afadc0; --faint:#807d99;
-  --steel:#7c6cf5; --steel-dim:#272442;
+     CHROMA VẪN THUỘC VỀ MỨC BẰNG CHỨNG. Bản mẫu rắc gradient lên mọi thẻ;
+     ở đây gradient chỉ sống trên KHUNG (logo, hero, viền panel), không bước
+     vào lớp dữ liệu. Nếu không, một viền magenta sẽ đọc nhầm thành `refused`
+     và một viền vàng thành `candidate`. `unproven` vẫn trung tính và vẫn
+     không phát quang: nó là một sự vắng mặt, không phải một nguy hiểm. */
+  --v0:#04050D; --v1:#0A0C26; --v2:#141A44; --v3:#1C2456; --v4:#263070;
+  --line:#2A3170; --line-soft:#1A1F4A;
+  --ink:#F1F3FF; --dim:#A9B0DD; --faint:#7E86BC;
+  --steel:#7DF3FF; --steel-dim:#07293B;
 
-  --proven:#34d8a0; --candidate:#f5a524; --unproven:#918fa3; --refused:#cc8fd6;
-  --proven-b:#132720; --candidate-b:#272013; --unproven-b:#201f26; --refused-b:#2b172e;
+  --proven:#3DF5B4; --candidate:#FFD23F; --unproven:#959BCB; --refused:#C5B6FF;
+  --proven-b:#07241C; --candidate-b:#2B210A; --unproven-b:#171C3C; --refused-b:#211A45;
 
-  --sev5:#e06979; --sev4:#e28a58; --sev3:#e4b956; --sev2:#9189ca; --sev1:#8a889d;
+  --sev5:#FF7A98; --sev4:#FFA866; --sev3:#FFD23F; --sev2:#7DB8FF; --sev1:#7E86BC;
 
-  --hazard:#e36176; --hazard-deep:#281316;
-  --amb:rgba(124,108,245,.055); --amb2:rgba(245,165,36,.04);
+  --hazard:#FF3D6E; --hazard-deep:#2A0A18;
+  --amb:rgba(0,229,255,.055); --amb2:rgba(139,108,255,.05);
 
   /* mặt tối mà bản ghi mang: tối hơn deck, vì nó giữ byte của mục tiêu */
-  --scr:#0c0b11; --scr-line:#2b2a3a; --scr-ink:#d9d8e1; --scr-dim:#9997ad;
+  --scr:#02030A; --scr-line:#1A1F4A; --scr-ink:#D7DBF5; --scr-dim:#A9B0DD;
 
-  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  /* ba màu đường của bản mẫu, dùng cho viền gradient và quầng sáng */
+  --g1:#00E5FF; --g2:#8B6CFF; --g3:#FF2E97;
+
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
   --ease:cubic-bezier(.22,.61,.36,1);
   color-scheme:dark;
@@ -831,6 +836,98 @@ footer p, .foot p{max-width:74ch}
    rộng 358px. Bản sửa đầu của tôi liệt kê `.wrap > *` và `.deck > *` nên
    bỏ sót đúng phần tử đang gây ra chuyện. */
 .tw{max-width:100%}
+/* ═══ LỚP SENTINEL — hình thức lấy từ bản mẫu "Tổng quan SOC" ═════════
+   Nối vào cuối, không cắt vào quy tắc cũ. Hôm trước một lát cắt sai đã xoá
+   521 dòng của chính file này mà mọi test vẫn xanh; cách viết này không thể
+   gây ra điều đó. */
+
+/* NỀN NĂM LỚP + LƯỚI 44px. Trích nguyên số đo từ bản mẫu: ba vầng sáng ở
+   trên (cyan trái, violet phải, magenta giữa) và hai ở dưới, rồi một lưới
+   violet rất mờ 0.045 alpha. Lần trước tôi đã BỎ một lớp lưới vì nó đọc ra
+   "ảnh nền"; lưới này khác - 44px và 4.5% alpha, nó ở dưới ngưỡng nhận biết
+   như một hoa văn và chỉ còn tác dụng cho mặt phẳng một kết cấu. */
+body{
+  background-color:var(--v0);
+  background-image:
+    radial-gradient(1100px 640px at 6% -8%, rgba(0,229,255,.18), rgba(0,229,255,0) 65%),
+    radial-gradient(1000px 720px at 98% 2%, rgba(139,108,255,.28), rgba(139,108,255,0) 68%),
+    radial-gradient(1200px 800px at 50% 56%, rgba(255,46,151,.08), rgba(255,46,151,0) 70%),
+    radial-gradient(1000px 700px at 0% 100%, rgba(0,229,255,.12), rgba(0,229,255,0) 70%),
+    radial-gradient(900px 640px at 100% 100%, rgba(139,108,255,.18), rgba(139,108,255,0) 70%),
+    linear-gradient(rgba(139,108,255,.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,108,255,.045) 1px, transparent 1px);
+  background-size:auto,auto,auto,auto,auto,44px 44px,44px 44px;
+  background-repeat:no-repeat,no-repeat,no-repeat,no-repeat,no-repeat,repeat,repeat;
+  background-attachment:fixed;
+  font-size:14px;line-height:20px;
+}
+body::before{background:none}
+
+/* VIỀN GRADIENT — kỹ thuật chữ ký của bản mẫu, và nó chạy được ở đây vì nó
+   không cần tài nguyên nào: hai lớp background, một vào padding-box làm mặt
+   thẻ, một vào border-box làm viền, với `border:1px solid transparent` để
+   lớp dưới lộ ra đúng một pixel. */
+.panel{
+  border:1px solid transparent;border-radius:12px;
+  background:
+    linear-gradient(145deg,var(--v2),var(--v1)) padding-box,
+    linear-gradient(135deg,var(--g1),var(--g2),var(--g3)) border-box;
+  box-shadow:0 0 24px rgba(0,229,255,.16), 0 0 40px rgba(255,46,151,.10);
+}
+/* Panel chỉ để đọc thì dịu hơn: cùng mặt thẻ, viền phẳng. Gradient dành cho
+   nơi người vận hành thao tác, nên nó mang thông tin chứ không phải trang trí. */
+.panel:not(:has(button)):not(:has(input)){
+  background:linear-gradient(145deg,var(--v2),var(--v1)) padding-box,
+             linear-gradient(135deg,var(--line),var(--line-soft)) border-box;
+  box-shadow:0 0 28px rgba(4,5,13,.6);
+}
+
+/* CHỮ GRADIENT cho số trưng bày. Bản mẫu: trắng -> cyan 55% -> violet. */
+.gnum{
+  background:linear-gradient(90deg,#fff,var(--steel) 55%,#B6A3FF);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;color:transparent;
+  letter-spacing:-.01em;
+}
+/* Tên sản phẩm là <h1>, không phải .brand b - kiểm markup rồi mới viết */
+header h1{
+  background:linear-gradient(90deg,var(--steel),#B6A3FF 55%,#FF7AC0);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+  letter-spacing:.12em;font-weight:700;
+}
+
+/* ĐÃ BỎ MỘT QUY TẮC TÔI VỪA VIẾT, và cả hai lý do đáng ghi.
+   Tôi thêm `::before` lên `.phead` để dựng dấu chấm kiểu bản mẫu, nhưng
+   (1) dấu chấm ĐÃ CÓ SẴN ở `.phead h2::before`, nên nó thành hai cái, và
+   (2) `.phead` là flex `space-between` với đúng hai con - thêm một con nữa
+   làm nó phân bố ba phần và đẩy tiêu đề vào giữa. Một `::before` trên
+   phần tử flex là một PHẦN TỬ, không phải một trang trí.
+   Nên tô lại cái đã có thay vì thêm cái mới. */
+h2::before{
+  background:linear-gradient(135deg,var(--g1),var(--g2)) !important;
+  box-shadow:0 0 10px rgba(0,229,255,.5);border-radius:2px;
+}
+.lamp i,.eye svg,header svg{filter:drop-shadow(0 0 6px rgba(0,229,255,.45))}
+
+/* VIÊN THUỐC — bản mẫu dùng bo 999px ở 77 chỗ, nhiều hơn mọi bán kính khác. */
+.seg,.segslide,.tag-pill,.chip,.k,.lg,.mode{border-radius:999px}
+
+/* Dải ô bằng chứng: phát quang theo đúng màu của mức, như các thanh của
+   bản mẫu. `unproven` KHÔNG phát quang - chủ ý, nó là một sự vắng mặt. */
+.mxc.proven.lit,.cell.proven{box-shadow:0 0 16px -2px color-mix(in srgb,var(--proven) 52%,transparent)}
+.mxc.candidate.lit,.cell.candidate{box-shadow:0 0 16px -2px color-mix(in srgb,var(--candidate) 44%,transparent)}
+.mxc.refused.lit,.cell.refused{box-shadow:0 0 16px -2px color-mix(in srgb,var(--refused) 40%,transparent)}
+
+/* Liên kết: cyan -> violet khi rê, đúng bản mẫu. */
+a,.url{color:var(--steel)}
+a:hover,.url:hover{color:var(--refused)}
+
+/* Bảng: dòng sáng lên khi rê, viền dưới mảnh như bản mẫu. */
+tbody tr:hover{background:rgba(139,108,255,.06)}
+thead th{border-bottom:1px solid var(--line-soft)}
+
+@media (prefers-reduced-motion:reduce){*{animation:none !important}}
 </style>
 </head>
 <body>

@@ -2785,7 +2785,25 @@ def probe_ssrf_oob(ctx: Context, url: str, param: str,
         # The fetch is the target's, not ours, so it can land after the
         # response that triggered it. A callback that has not arrived yet is
         # not a callback that will not.
-        time.sleep(max(0.0, float(settle_s)))
+        #
+        # POLLED, not slept. A flat `sleep(settle_s)` was wrong at both
+        # ends: a target that calls back in 50ms still cost the full
+        # window, and one that called back at `settle_s` plus a
+        # millisecond was reported as "no callback within Ns" - a cliff
+        # rather than a bound. Windows CI found it, failing
+        # `attempted and fetched` on a 3-second window while ten other
+        # jobs passed.
+        #
+        # The window is still a ceiling, so a target that never calls back
+        # costs exactly what it did before. Nothing waits longer than it
+        # used to; a hit is just acted on when it arrives.
+        deadline = time.time() + max(0.0, float(settle_s))
+        while True:
+            if col.hits_for(nonce, after=at):
+                break
+            if time.time() >= deadline:
+                break
+            time.sleep(0.05)
         hits = []
         for hit in col.hits_for(nonce, after=at):
             req, resp = col.as_exchange(hit)

@@ -6701,6 +6701,37 @@ and, on an authenticated target, a credential the transcript deliberately
 does not keep. A rule that blocked the exit on that would strand every
 engagement whose target went down.
 
+### A flat sleep is a cliff, not a bound
+
+Windows CI failed `probe_ssrf_oob`'s callback test on `attempted and
+fetched` while ten other jobs passed. The probe sent the payload, the
+target's fetch had not arrived, and the probe had already decided.
+
+`time.sleep(settle_s)` then check ONCE was wrong at both ends. A target
+calling back in 50ms still cost the whole window; a target calling back at
+`settle_s` plus a millisecond was reported as "no callback within Ns" -
+which reads as a fact about the target and is a fact about the clock.
+
+Polled instead, with the same ceiling, so a target that never calls back
+costs exactly what it did before and nothing waits longer than it used to.
+Measured: the two callback tests went from 3s of flat sleep each to 0.59s
+and 0.51s.
+
+AND THE TEST HAD MADE ITSELF TIGHTER THAN PRODUCTION. It passed
+`settle_s: 3` against a product default of 4.0, so it was failing on a
+window narrower than any real run uses. Widened to 8 as a ceiling, which
+polling makes free. The two no-callback tests keep `settle_s: 1`: waiting
+longer for something expected not to arrive proves nothing and costs
+seconds.
+
+I ALSO MISREAD MY OWN MEASUREMENT on the way. Run times moved 7.7s to
+12.7s after the change and I attributed it to the wider window - then
+`--durations` showed the two tests I touched at 0.59s and 0.51s, and the
+5.03s belonging to `test_an_unroutable_target_is_refused_before_any_request`,
+which has no settle window and is slow because a connect to an unroutable
+address times out. The variation was never mine. A number that moved after
+a change is not a number the change moved.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

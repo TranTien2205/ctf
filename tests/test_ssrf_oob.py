@@ -113,7 +113,7 @@ def test_a_target_that_fetches_produces_a_recorded_callback():
         ctx = _ctx(base)
         out = dispatch(ctx, "probe_ssrf_oob",
                        {"url": base + "/?u=x", "param": "u",
-                        "settle_s": 3})["result"]
+                        "settle_s": 8})["result"]
         assert out["attempted"] and out["fetched"], out
         assert len(out["callbacks"]) == 1, out
         hit = out["callbacks"][0]
@@ -134,7 +134,7 @@ def test_a_loopback_callback_is_reported_as_not_remote():
     try:
         out = dispatch(_ctx(base), "probe_ssrf_oob",
                        {"url": base + "/?u=x", "param": "u",
-                        "settle_s": 3})["result"]
+                        "settle_s": 8})["result"]
         assert out["callbacks"][0]["peer"].startswith("127."), out
         assert out["callbacks"][0]["remote"] is False, out
     finally:
