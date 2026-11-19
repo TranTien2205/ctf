@@ -30,7 +30,7 @@ python3 tools/hooks.py post-probe <ch> \
   --response "$(cat readback.json)"
 ```
 
-And in `field-notes.md`:
+And in `../field-notes.md`:
 
 ```
 ## POST /register — endpoint falsifier

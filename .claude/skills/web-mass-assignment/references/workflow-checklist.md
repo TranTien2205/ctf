@@ -47,5 +47,5 @@
 
 - [ ] flag through `pre-flag` against live response
 - [ ] `classify_solve.py --chain <id>` — promotes catalogue→verified
-- [ ] `field-notes.md` updated with the mechanism, falsifiers, carriers
+- [ ] `../field-notes.md` updated with the mechanism, falsifiers, carriers
 - [ ] background processes cleaned

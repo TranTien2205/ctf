@@ -1899,7 +1899,7 @@
       "verified_by": [],
       "skill_tokens": 1196,
       "depth_files": 64,
-      "depth_tokens": 49168,
+      "depth_tokens": 49133,
       "use_when": [
         "a probe or source read produced this class's signal: repeat the legitimate request with one extra field the client never sends (role, is_admin, balance, discount) — then read the affected object back"
       ],

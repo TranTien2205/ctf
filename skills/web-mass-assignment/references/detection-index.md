@@ -28,11 +28,11 @@
 
 | Artifact | Where it lands |
 |---|---|
-| endpoint list | `notes.md` — the binder surface |
-| field list | `notes.md` — the writable surface |
-| binder fingerprint | `notes.md` — the grammar |
-| falsifier map | `field-notes.md` — the dead cells |
-| live-cell matrix | `field-notes.md` — the remaining probes |
+| endpoint list | `../field-notes.md` — the binder surface |
+| field list | `../field-notes.md` — the writable surface |
+| binder fingerprint | `../field-notes.md` — the grammar |
+| falsifier map | `../field-notes.md` — the dead cells |
+| live-cell matrix | `../field-notes.md` — the remaining probes |
 
 ## The cheap-first order
 
