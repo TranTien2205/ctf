@@ -1649,8 +1649,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 1017,
-      "depth_files": 51,
-      "depth_tokens": 52718,
+      "depth_files": 74,
+      "depth_tokens": 84788,
       "use_when": [
         "a probe or source read produced this class's signal: repeat an authenticated request with a foreign Origin and read whether the origin is reflected alongside credentials"
       ],
