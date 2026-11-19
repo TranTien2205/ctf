@@ -424,15 +424,45 @@ def test_a_runner_that_records_nothing_is_not_reported_done(tmp_path):
         assert not (root / run_id / "transcript.jsonl").exists()
         # and the row no longer contradicts the directory it describes
         assert api._derive_state(root / run_id)[0] == "failed"
-        # the same after a restart, when only the sidecar is left: a
+        # The same after a restart, when only the sidecar is left: a
         # terminal state skips the stale check, so a `done` written there
-        # was permanent
-        assert json.loads(
-            (root / run_id / api.WEB_STATE_FILE).read_text(encoding="utf-8")
-        )["state"] == "failed"
+        # was permanent.
+        #
+        # POLLED, because the API row and this FILE are written by different
+        # parties. The row above is derived from the directory and is
+        # terminal as soon as the runner returns; the sidecar is flushed by
+        # the WORKER THREAD, and asserting it in the same breath read
+        # `'running' == 'failed'` on one Windows CI job while ten others
+        # passed. The claim is that the sidecar ends up terminal, not that
+        # it is written before the response is read.
+        side = root / run_id / api.WEB_STATE_FILE
+        state = _until(lambda: json.loads(
+            side.read_text(encoding="utf-8")).get("state") == "failed")
+        assert state, json.loads(side.read_text(encoding="utf-8"))
     finally:
         w.srv.shutdown()
         w.srv.server_close()
+
+
+def _until(cond, timeout: float = 10.0, step: float = 0.02):
+    """Wait for a background thread to finish making a post-condition true.
+
+    Several assertions in this file read state that a WORKER THREAD sets
+    after the request that started it returned. `registry.wait()` joins the
+    threads, but some of what these tests assert is set elsewhere - a run's
+    state transition, a lazily reaped thread list - so asserting immediately
+    after `wait()` is a race, and CI found three of them one at a time while
+    the local gate stayed green.
+
+    Returns the condition's last value either way, so the caller asserts on
+    it and gets the real value in the failure message rather than `False`.
+    """
+    deadline = time.time() + timeout
+    value = cond()
+    while not value and time.time() < deadline:
+        time.sleep(step)
+        value = cond()
+    return value
 
 
 def test_many_sequential_runs_do_not_accumulate(tmp_path):
@@ -483,8 +513,23 @@ def test_many_sequential_runs_do_not_accumulate(tmp_path):
         w.registry.wait(10)
         assert len(list(root.iterdir())) == n      # every run is on disk
         assert len(w.registry.live()) <= api.MAX_TRACKED_RUNS
-        alive = [t for t in w.registry._threads if t.is_alive()]
-        assert len(w.registry._threads) <= len(alive) + 1
+        # THE DETERMINISTIC INVARIANT, not a snapshot comparison. This read
+        # `len(_threads) <= len(alive) + 1` with `alive` computed AFTER
+        # `wait()` joined every thread - so `alive` is always 0 and the
+        # assertion meant `<= 1`. That holds only when runs finish faster
+        # than the loop creates them, which is the very condition that fails
+        # under load: CI failed it with `assert 3 <= (0 + 1)`.
+        #
+        # Reaping happens inside `create()`, which filters the list to the
+        # live threads and appends one. Concurrency bounds the live set, so
+        # the list is bounded by `max_concurrent + 1` ALWAYS - and if reaping
+        # were broken this would be n, which is 80 here.
+        assert len(w.registry._threads) <= w.registry.max_concurrent + 1, (
+            f"{len(w.registry._threads)} thread objects for "
+            f"{w.registry.max_concurrent} slots - dead threads are "
+            "accumulating")
+        assert not [t for t in w.registry._threads if t.is_alive()], \
+            "wait() returned with threads still running"
         # nothing a reader can see was lost: the sidecar carries the state
         # and the event log of an evicted run
         oldest = sorted(p.name for p in root.iterdir())[0]

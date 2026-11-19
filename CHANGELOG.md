@@ -6575,6 +6575,60 @@ three timing failures in one gate run on this machine and told me nothing
 about which were real, while one changed constant named the coupling
 exactly.
 
+### Fixing one assertion per CI round is a losing pattern
+
+Three CI-only races in one file, found one at a time over three runs, and
+the third was the same test as the second failing on a DIFFERENT line. That
+is the point to stop patching and characterise the shape.
+
+ALL THREE ARE ASSERTIONS ON STATE A WORKER THREAD WRITES, read in the same
+breath as the request that started it.
+
+- `assert 3 <= (0 + 1)`: the thread-list check compared
+  `len(_threads) <= len(alive) + 1` with `alive` computed AFTER `wait()`
+  joined everything, so `alive` is always 0 and the assertion meant `<= 1`.
+  That holds only while runs finish faster than the loop creates them.
+  Replaced with the DETERMINISTIC invariant: reaping happens inside
+  `create()`, which filters to live threads and appends one, and
+  concurrency bounds the live set - so the list is bounded by
+  `max_concurrent + 1` always, and would be 80 if reaping were broken.
+- `assert 'running' == 'failed'` at the SIDECAR, not at the API row. The
+  row is derived from the directory and is terminal as soon as the runner
+  returns; the sidecar file is flushed by the worker thread. The test
+  already polled for the row and then read the file immediately.
+- the 429 precondition, fixed in the previous commit.
+
+A `_until(cond, timeout)` helper now carries the pattern, returning the
+condition's last value so a failure message shows the real state rather
+than `False`.
+
+THEN THE SWEEP, AND ITS FIRST ANSWER WAS WRONG. Grepping for assertions
+that read background-written state found 15 with no preceding wait - and
+most read PLANTED sessions, which have no worker thread at all. The
+syntactic shape is not the hazard, which is the same error as reading a
+mention as a claim, this time in my own analysis.
+
+Narrowed to assertions inside tests that actually POST /api/runs: ZERO
+remain. So the three fixed are the complete set of that shape, which is a
+stronger statement than ten green local runs - those found nothing while
+the local gate was the instrument that missed all three.
+
+It is one shape, not every race. The chunked-body failure was a
+client-versus-server write race and this sweep would not have found it.
+
+AND THE VERIFICATION ARRIVED BY ACCIDENT, in the best form available. The
+gate run that confirmed these fixes took 16,832 seconds - 4 hours 40
+minutes against a normal 380, forty-four times slower - because the machine
+was swapping: 160,083 pages out, 452 MB free of 7,938.
+
+That is the worst timing environment this machine produced all session, and
+every interleaving a race needs is stretched wide open in it. All three
+formerly-flaky tests passed, and the suite was green: 1098 passed, 1
+skipped, selftest 164/164.
+
+A 44x-slower run is better evidence for a race fix than ten fast ones, and
+the instinct is to discard it as noise.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
