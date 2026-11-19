@@ -568,9 +568,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 944,
-      "depth_files": 3,
-      "depth_tokens": 965,
+      "skill_tokens": 1682,
+      "depth_files": 421,
+      "depth_tokens": 125145,
       "use_when": [
         "a probe or source read produced this class's signal: detect ECB in ONE request wherever you control plaintext -- identical plaintext blocks give identical ciphertext blocks -- then separate an invalid-pad answer from an invalid-MAC answer before writing any oracle loop"
       ],

@@ -67,13 +67,33 @@ python3 tools/crypto_attack.py length-extension --help
 
 Shares signals with: `../crypto-prng/`, `../misc-encoding-carrier/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time — every question has one owning module:
 
-- `skills/crypto-triage/references/block-cipher.md`
-- `skills/crypto-triage/references/hash-attacks.md`
-- `skills/ctf-crypto/modern-ciphers.md`
+| Question | File |
+|---|---|
+| Which of the four oracles do I hold? | `references/detection.md` → `references/oracle-shapes.md` |
+| ECB fingerprint / byte-at-a-time / splice | `references/ecb-detection.md` `references/ecb-byte-at-a-time.md` `references/ecb-cut-and-paste.md` |
+| Prefix/boundary math | `references/block-alignment.md` |
+| CBC pad-oracle / bit-flip / IV bugs | `references/cbc-padding-oracle.md` `references/cbc-bitflip.md` `references/cbc-iv-equals-key.md` |
+| CTR/stream reuse and malleability | `references/ctr-nonce-reuse.md` `references/crib-drag.md` `references/stream-integrity.md` |
+| GCM nonce reuse (forbidden attack) | `references/gcm-nonce-reuse.md` `references/tools-gcm-nonce.md` |
+| MAC: extend, forge, truncate, time | `references/length-extension.md` `references/mac-forgery.md` `references/verify-oracle.md` `references/cbc-mac.md` |
+| Raw-hash vs HMAC boundary | `references/hmac-vs-raw-mac.md` |
+| Byte-level XOR | `references/single-byte-xor.md` |
+| Tag/nonce/key recon | `references/iv-reuse-detection.md` `references/key-path.md` `references/key-confirmation.md` |
+| Signed tokens (JWT/Django) | `references/jwt-signing-boundary.md` |
+| Mode variant notes | `references/poodle-and-legacy.md` `references/rc4-and-salsa.md` `references/cbc-iv-prediction.md` `references/cmac-and-variants.md` |
+| Response-channel anatomy | `references/response-distinguishers.md` `references/error-taxonomy.md` `references/timing-oracles.md` `references/format-vs-padding-oracles.md` |
+| Transport choice | `references/webservice-vs-local.md` `references/chosen-ciphertext.md` |
+| Tool drivers | `references/tools-ecb-oracle.md` `references/tools-pad-oracle.md` `references/tools-gcm-nonce.md` `references/tools-length-extension.md` `references/tools-crib-drag.md` `references/tools-parity-oracle.md` |
+| Forging the end token | `references/token-forgery-workflows.md` `references/ecb-reordering.md` `references/chained-oracles.md` `references/ecb-prefix-suffix.md` |
+| Discipline | `references/evidence.md` `references/falsifiers.md` `references/preconditions.md` `references/negative-results.md` |
+| Cases and maps | `references/attack-catalogue.md` `references/workflow.md` `references/recon-order.md` `references/case-studies.md` `references/worked-examples.md` `references/cryptopals-map.md` `references/multi-step-chains.md` `references/closing-index.md` |
+| Edge/boundary/stuck | `references/boundary-cases.md` `references/edge-cases.md` `references/class-boundary.md` `references/authenticated-boundary.md` `references/anti-patterns.md` `references/common-mistakes.md` `references/troubleshoot.md` `references/evasion.md` `references/operator-notes.md` `references/theory.md` `references/glossary.md` `references/field-manual.md` `references/verified-chains.md` `references/per-boundary.md` `references/per-condition.md` `references/per-probe.md` `references/per-signal.md` |
 
-| Any block/stream/MAC-oracle question | `references/oracle-shapes.md` |
+Every module above also ships `-deep`, `-checklist`, `-index`, `-map`, and
+(for the core attacks) `-variant`, `-catalogue`, `-playbook`, `-summary`
+companions — pick the depth the situation needs.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

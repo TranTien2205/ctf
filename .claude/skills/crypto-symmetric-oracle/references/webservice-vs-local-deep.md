@@ -1,0 +1,28 @@
+# Web-service oracles vs local oracles — deep
+
+The same attacks exist in two transports; the differences are operational.
+
+## Boundary conditions
+
+- The module's table is the discriminator: when a row's observation is absent, the row's attack is dead — do not tune it.
+- Rows assume honest crypto; a tag verified before decryption overrides every row (see `authenticated-boundary.md`).
+- A row that applies only under a precondition fails silently when the precondition is untested — `preconditions.md` first.
+- Timing-dependent rows need 50+ samples on both sides before the row's conclusion is trusted.
+- When two rows both appear to apply, run the cheaper probe first; the discriminator was designed so the cheapest probe decides.
+
+## The table, verbatim
+
+| Oracle is | Use |
+|---|---|
+| HTTP endpoint | pad_oracle/ecb_oracle tools |
+| local binary | inline subprocess loop |
+| function in handout source | import it — pure-Python loop |
+| a mix | the cheapest channel per stage |
+
+## Falsifier
+
+The module's own abort conditions fire: the observed surface does not match any row, or a row's precondition probe returns the negative result it names.
+
+## Cross-references
+
+`preconditions.md` · `falsifiers.md` · `../field-notes.md`
