@@ -2319,8 +2319,8 @@
         "htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
       ],
       "skill_tokens": 1888,
-      "depth_files": 2,
-      "depth_tokens": 2837,
+      "depth_files": 71,
+      "depth_tokens": 86844,
       "use_when": [
         "a probe or source read produced this class's signal: decide first where attacker code may run: if CSP or a URL allowlist keeps you from executing script on any origin the bot can reach, enumerate every piece of server state a plain GET from the bot can change, and use that as the read-back channel",
         "a chain card already proves this class here: htb-stylish-css-unicode-range-token-leak-bot-selforigin-approve-sqlite-limit-blind"
