@@ -90,6 +90,31 @@ together.
   `lab/vulnapp.py` keeps `python lab/vulnapp.py` + `import vulnapp`
   working); `tests/`, `selftest.py`
 
+## Scanning this tree
+
+Measure the package by PATH, never by filename, and anchor the path under
+the package directory. Three things in this checkout answer to the basename
+of a package module and are not it:
+
+- `build/lib/argus/` — local build output, gitignored and never committed,
+  and measured 126 lines behind the real evidence store at the time this
+  was written
+- `challenges/*/venv/` — virtualenvs with their own vendored libraries,
+  several of which have modules named like ours
+- `lab/vulnapp.py` — a deliberate shim for the bundled lab
+
+An orphan sweep over the finding axis hit all three: it filtered candidate
+files by basename, parsed a vendored HTTP-session module as if it were
+ours, and reported a function that exists nowhere in this project. A
+recursive text search for that same function then reported zero
+occurrences of a string that does exist. Two instruments disagreeing in
+opposite directions on one question, and the answer came only from reading
+the single file.
+
+So a tree-wide claim about this package needs the path in it, and a
+surprising result is a reason to check the instrument before writing up the
+subject.
+
 ## Rules for changes
 
 - Every network request goes through `GuardedClient.send` (or `send_raw`

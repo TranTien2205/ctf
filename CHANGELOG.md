@@ -7608,6 +7608,39 @@ too: weakening a citation claim to "some" fails.
 The console's line remains the user's call, with the same recommendation -
 state the number.
 
+### The orphan sweep found no orphan, and two broken instruments
+
+Swept the finding axis - the evidence store, the matrix, the judge, the
+replay, the decision rules - for top-level functions nothing calls. Three
+candidates, and all three are explained:
+
+    decide.py  _reverified            defined once, called once
+    replay.py  _entry_response_body   defined once, called once
+    session.py looks_like_ci          NOT OURS
+
+A clean negative on a dimension that produced three real orphans earlier in
+this session, so the result is worth stating rather than quietly dropping.
+
+THE THIRD CANDIDATE DOES NOT EXIST IN THIS PROJECT. The sweep filtered
+candidate files by BASENAME, and three things in this checkout answer to
+the basename of a package module without being it: a gitignored local build
+tree measured 126 lines behind the real evidence store, the virtualenvs
+under `challenges/` with their own vendored libraries, and a deliberate
+shim for the bundled lab. The sweep parsed a vendored HTTP-session module
+as if it were ours.
+
+AND THE CHECK OF THAT REPORTED ZERO FOR A STRING THAT EXISTS. A recursive
+text search for the same function name found nothing anywhere, which is
+what nearly settled it as a hallucinated scan result. Reading the one file
+directly found two occurrences. Two instruments disagreeing in opposite
+directions on one question, and the subject was fine both times.
+
+Ninth wrong instrument in this session. The pattern across all nine is the
+same and it is the only durable lesson here: a surprising measurement is
+evidence about the instrument first. Written into AGENTS.md as a rule for
+the next sweep - measure the package by path, anchored under the package
+directory, never by filename.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
