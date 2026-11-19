@@ -2268,9 +2268,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 937,
-      "depth_files": 2,
-      "depth_tokens": 4265,
+      "skill_tokens": 1469,
+      "depth_files": 164,
+      "depth_tokens": 107183,
       "use_when": [
         "a probe or source read produced this class's signal: read the setup contract and the solved condition first; that names the exact state you must reach"
       ],

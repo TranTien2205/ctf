@@ -59,9 +59,17 @@ and any function that is reachable before initialisation.
 
 ## Routing
 
-Depth, one named file at a time:
+Depth, one named file at a time. Read `references/README.md` for the index.
 
-- `skills/web-web3/references/extended.md`
+- Start: `references/onboarding.md` + `references/mechanism.md` — the mental model
+- The predicate → the class: `references/attack-shapes.md`, `references/per-condition.md`, `references/detection-map.md`, `references/detection-index-deep.md`
+- The order: `references/workflow.md`, `references/first-hour.md`, `references/recon-order.md`, `references/field-manual.md`, `references/checklist.md`
+- The bug classes: `references/access-control.md`, `references/reentrancy.md`, `references/delegatecall.md`, `references/storage-collision.md`, `references/tx-origin.md`, `references/integer-overflow.md`, `references/weak-randomness.md`, `references/selfdestruct.md`, `references/uninitialized-proxy.md`, `references/front-running.md`, `references/signature-replay.md`, `references/accounting-vault.md`, `references/visibility.md`, `references/gas-griefing-dos.md`, `references/token-standards.md`, `references/flashloan-oracle.md`
+- The bug → call map: `references/per-bug.md`, `references/per-verb.md`, `references/per-endpoint.md`, `references/per-class.md`, `references/decision-table.md`
+- The payloads: `references/payload-dictionary.md`, `references/payload-families.md`, `references/exploitation.md`, `references/exploitation-catalogue.md`, `references/probe-catalogue.md`, `references/multi-step-chains.md`
+- The proof: `references/evidence-rules.md`, `references/verification-protocol.md`, `references/evidence-catalogue.md`, `references/negative-results.md`, `references/falsifiers.md`, `references/per-falsifier.md`
+- The traps: `references/edge-cases.md`, `references/common-mistakes.md`, `references/anti-patterns.md`, `references/troubleshoot.md`, `references/evasion.md`, `references/boundary-cases.md`, `references/preconditions.md`
+- The cases + reference: `references/case-studies.md`, `references/real-world-cases.md`, `references/worked-examples.md`, `references/scenarios.md`, `references/common-questions.md`, `references/theory.md`, `references/glossary.md`, `references/summary.md`, `references/index.md`, `references/quick-reference.md`, `references/verified-chains.md`, `references/extended.md`
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
