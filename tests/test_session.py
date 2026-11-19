@@ -759,3 +759,163 @@ def test_an_excerpt_the_transcript_does_not_hold_cannot_be_recorded(tmp_path):
     finally:
         srv.shutdown()
         srv.server_close()
+
+
+_HDR_CLASSES = "CRLF injection, security headers, server disclosure"
+
+
+def _header_session(tmp_path, nth=0):
+    """A fresh session with one recorded response carrying banner headers.
+
+    FRESH PER QUOTE, because `add_finding` dedupes on url+class: a second
+    call for the same pair takes the upgrade branch instead of the
+    recording one, and reading its result as a verdict on the EXCERPT is
+    how an earlier version of this measurement produced four wrong rows.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from argus.httpclient import GuardedClient, RateLimiter
+    from argus.scope import ScopeGuard
+
+    class _Banner(BaseHTTPRequestHandler):
+        server_version = "Apache/2.4.49"
+        sys_version = ""
+
+        def do_GET(self):
+            body = b"<html>ordinary page</html>"
+            self.send_response(200)
+            self.send_header("X-Powered-By", "PHP/5.6.40")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _Banner)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}/"
+    s = Session(tmp_path / f"s{nth}", base, {"target": base})
+    client = GuardedClient(ScopeGuard(base), s, RateLimiter(80.0))
+    rid = client.send("GET", base)["request_id"]
+    return srv, s, base, rid
+
+
+def test_a_header_quoted_as_http_writes_it_can_be_cited(tmp_path):
+    """MEASURED, and it is the direction of error that matters here.
+
+    The recorded header keys are lowercased, so a finding in one of the
+    three classes whose proof IS a header name could only cite it if the
+    quote happened to be lowercased too:
+
+        x-powered-by: PHP/5.6.40        accepted
+        X-Powered-By: PHP/5.6.40        REFUSED
+        Server: Apache/2.4.49           REFUSED
+
+    The refused forms are how the header appears on the wire, in `curl -i`,
+    and in every browser's network panel. And the refusal says the excerpt
+    "is not a verbatim substring of any cited response" - telling an agent
+    that its REAL evidence is fabricated.
+
+    The comment on this code said the two shapes were both included "so
+    either quotation form matches", which was true of JSON-vs-wire and not
+    of the casing.
+    """
+    for nth, quote in enumerate((
+            "X-Powered-By: PHP/5.6.40",
+            "Server: Apache/2.4.49",
+            '"X-Powered-By": "PHP/5.6.40"',
+            "x-powered-by: PHP/5.6.40",       # must keep working
+            "PHP/5.6.40",
+            "ordinary page")):
+        srv, s, base, rid = _header_session(tmp_path, nth)
+        try:
+            out = s.add_finding("banner", "low", "disclosure", base, [rid],
+                                quote, "d", "r")
+            assert out["evidence_excerpt"] == quote
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+
+def test_a_fabricated_header_line_is_still_refused(tmp_path):
+    """THE DIRECTION THAT MATTERS MORE, and the reason the fix adds parts
+    rather than relaxing the comparison.
+
+    Each added form is a separate part, still matched exactly, so a quote
+    that matches no part still matches no part. A case-insensitive
+    comparison would have been the smaller edit and would have let
+    `UID=0(ROOT)` stand in for recorded `uid=0(root)`.
+    """
+    # THE FIRST VERSION OF THIS LISTED ONLY STRINGS THAT DIFFER IN
+    # CONTENT, so planting a case-insensitive comparison left all 30 tests
+    # green - the docstring above named `UID=0(ROOT)` as the hazard and the
+    # test did not contain a single case-variant of a recorded byte. Same
+    # defect as the checks this session keeps fixing, in a test written to
+    # guard against it: the comment stated the invariant and the code did
+    # not hold it.
+    #
+    # The last three differ from recorded bytes ONLY by case. They must be
+    # refused, because the proof claim is that the target produced THESE
+    # bytes, and bytes that differ in case are different bytes.
+    for nth, quote in enumerate((
+            "X-Fake: yes",
+            "x-fake: yes",
+            "Server: nginx/1.0.0",
+            "uid=0(root) gid=0",
+            "extraordinary page",
+            "ORDINARY PAGE",                  # body is `ordinary page`
+            "Server: APACHE/2.4.49",          # value is `Apache/2.4.49`
+            "X-Powered-By: php/5.6.40"), start=100):
+        srv, s, base, rid = _header_session(tmp_path, nth)
+        try:
+            with pytest.raises(ValueError, match="verbatim substring"):
+                s.add_finding("made up", "low", "disclosure", base, [rid],
+                              quote, "d", "r")
+        finally:
+            srv.shutdown()
+            srv.server_close()
+
+
+def test_recording_and_re_validation_agree_on_every_form(tmp_path):
+    """TWO CHECKS, ONE CONCEPT - asserted between the real functions.
+
+    `add_finding` decides what may be recorded and `findings_bad` decides
+    what still verifies on re-read, and a disagreement either way is a
+    defect: accept-then-refuse makes `argus verify` print a tampered
+    finding on a session nobody edited, refuse-then-accept makes the gate
+    narrower than the verifier.
+
+    Measured 7 forms before this fix and 7 after, identical both times -
+    recorded here so a future change to one of the two is caught by the
+    relation rather than by whichever test happens to cover one side.
+    """
+    from argus.session import findings_bad
+
+    forms = ("X-Powered-By: PHP/5.6.40", "x-powered-by: PHP/5.6.40",
+             "Server: Apache/2.4.49", "PHP/5.6.40", "ordinary page",
+             "uid=0(root) gid=0", "X-Fake: yes")
+    for nth, quote in enumerate(forms, start=200):
+        srv, s, base, rid = _header_session(tmp_path, nth)
+        try:
+            try:
+                s.add_finding("t", "low", "disclosure", base, [rid], quote,
+                              "d", "r")
+                recorded = True
+            except ValueError:
+                recorded = False
+            # `severity` is REQUIRED by findings_bad, and omitting it marked
+            # every row bad regardless of its excerpt - including a quote
+            # verbatim in the body, which is what exposed the broken
+            # harness rather than any asymmetry.
+            revalidates = not findings_bad(
+                {rid: s.get_exchange(rid)},
+                [{"id": "F1", "severity": "low", "evidence_ids": [rid],
+                  "evidence_excerpt": quote}])
+            assert recorded == revalidates, (
+                f"{quote!r}: add_finding={recorded} findings_bad="
+                f"{revalidates} - the gate and the verifier disagree")
+        finally:
+            srv.shutdown()
+            srv.server_close()

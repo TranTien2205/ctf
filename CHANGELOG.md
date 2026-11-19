@@ -7303,12 +7303,131 @@ is excluded - `chain` is a digest and inviting a reader to treat it as part
 of the proof is its own hazard - and an entry that really carries nothing
 says so.
 
+### A header quoted the way HTTP writes it could not be cited
+
+The recorded header keys are lowercased, so a finding in one of the three
+classes whose proof IS a header name - CRLF injection, security headers,
+server disclosure - could only cite it if the quote happened to be
+lowercased too. Measured, each in a fresh session:
+
+    x-powered-by: PHP/5.6.40        accepted
+    X-Powered-By: PHP/5.6.40        REFUSED
+    Server: Apache/2.4.49           REFUSED
+    PHP/5.6.40                      accepted
+    uid=0(root) gid=0 (fabricated)  refused
+
+The refused forms are how the header appears on the wire, in `curl -i`, and
+in every browser's network panel. The refusal says the excerpt "is not a
+verbatim substring of any cited response", which tells an agent that its
+REAL evidence is fabricated - the direction of error this repository treats
+as the one that matters. The comment on that code said both shapes were
+included "so either quotation form matches", which was true of
+JSON-versus-wire and not of the casing.
+
+Fixed by ADDING parts, each still exact-matched, so a true finding may
+quote more and a fabricated one gains nothing.
+
+AND THE OVER-WIDE FIX PASSED THE TEST WRITTEN TO CATCH IT. Planting
+`excerpt.lower() in part.lower()` left all 30 green: the fabricated list
+held only strings differing in CONTENT, while the docstring named
+`UID=0(ROOT)` as the hazard. The comment stated the invariant and the test
+did not hold it - the same defect this session keeps fixing, in a test
+written to guard against it. Three case-variants of recorded bytes added,
+and the plant is red.
+
+ALSO ASSERTED: THE TWO GATES AGREE. `add_finding` decides what may be
+recorded, `findings_bad` decides what still verifies on re-read, and a
+disagreement either way is a defect - accept-then-refuse makes `argus
+verify` report a tampered finding on a session nobody edited, and
+refuse-then-accept makes the gate narrower than the verifier. 7 forms,
+identical before and after the fix, now held by the relation rather than by
+whichever test covers one side.
+
+AND THE MEASUREMENT TOOK FIVE WRONG HARNESSES. `Set-Cookie` was picked
+first - a credential header, redacted by design - and its refusal read as
+"headers cannot be cited at all". Then three wrong paths
+(`findings.json`, `transcript.jsonl`, `findings_bad`'s arity), and finally
+a hand-built finding dict with no `severity`, which `findings_bad` requires:
+every row came back refused, including a quote verbatim in the body.
+
+That impossible row is what saved the measurement. A result that cannot be
+wrong and is wrong anyway is evidence against the instrument, not against
+the subject - and reading only the header rows would have reported an
+asymmetry between the two gates that does not exist, which would have
+sounded more serious than the real finding.
+
+### A confident negative from a clock, in two probes, now one function
+
+`probe_ssrf_oob` and the stored-XSS collector both slept the whole settle
+window and then checked for a callback ONCE. A callback arriving at the
+window plus anything was missed, and the probe reported that the target did
+not call back - so a real finding was not found.
+
+The XSS site had a comment four lines above it naming that exact failure:
+"the probe then reported 'reflected but did not execute' about a page it had
+never actually visited, which is the worst shape of wrong: a confident
+negative". It then produced the same confident negative from a clock instead
+of from a wrong URL. SETTLE_SECONDS is 3.0, so a page whose payload fires on
+a timer, an animation frame or a deferred script had one chance to be inside
+it.
+
+ONE DEFINITION NOW, `wait_for_callback`, because the fix existed in one
+probe and not the other - the fifth time in this session that a defect was
+already fixed on a sibling path. Three properties, each asserted:
+
+    a hit inside the window is SEEN, whenever it arrives
+    a hit arriving early is acted on early, not waited out
+    the window is still a CEILING when nothing calls back
+
+The third is the one a fix must not trade away, or this is a timeout
+increase wearing a different name. And it is testable without a browser,
+which the XSS path is not - so extracting it is what made the stored-XSS
+behaviour coverable at all.
+
+AND THE CEILING TEST HUNG INSTEAD OF FAILING. Planting an unbounded wait
+left the call never returning, so the assertion that computed the elapsed
+time was never reached: the test blocked rather than failed, which in CI
+burns the job's whole timeout and names nothing. The check stated the bound
+and did not enforce it - the same defect as the rest of this session, one
+level up. A thread with a join timeout, stdlib only, turns it back into a
+failure: 1 failed in five seconds instead of a hang.
+
+### A gate run that was falsely RED, from the same mistake as the falsely green one
+
+Gate 101 reported three failures in `test_proof.py` - the crlf control, the
+upload canary, the race baseline - with assertion messages quoting source
+lines from the wrong functions entirely:
+
+    assert 'clean control' in '        "verdict": verdict,\n'
+    assert '_marker("argusupl")' in '   "similarity_to_base": fsim,\n'
+
+Those tests read a probe's source with `inspect.getsource`, which reads the
+CURRENT file from disk using the line number recorded when the module was
+imported. `probes.py` was edited while that pytest was running - 48 lines
+inserted for `wait_for_callback` - so every function after the insertion
+point reported source belonging to a different one. All three pass on the
+settled tree.
+
+THE SAME MISTAKE AS THE FALSELY GREEN RUN, and the lesson is sharper for it.
+Earlier in this session a gate reported 164/164 about a tree state that
+never existed, because pytest and selftest ran against different versions of
+the files. The discipline taken from that was: never edit the tree while a
+gate runs. This is that rule broken again, and this time it produced a red
+run instead of a green one.
+
+Red is the gentler outcome ONLY BY LUCK. The two runs are the same error,
+and a falsely red gate costs a wasted investigation while a falsely green
+one ships a defect - so the direction the coin lands is not a property of
+the mistake. The rule is not "do not break a gate", it is "a gate run is a
+statement about one tree state", and an edit mid-run makes it a statement
+about none.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1152 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1159 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

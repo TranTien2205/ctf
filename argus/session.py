@@ -467,6 +467,36 @@ def _evidence_parts_of_entry(entry: dict | None) -> list[str]:
     if isinstance(hdrs, dict) and hdrs:
         parts.append(json.dumps(hdrs, ensure_ascii=False))
         parts.extend(f"{k}: {v}" for k, v in hdrs.items())
+        # AND THE SAME LINES WITH THE HEADER NAME AS HTTP WRITES IT. The
+        # recorded keys are lowercased, so the three classes named above -
+        # CRLF injection, security headers, server disclosure - could only
+        # cite their proof if the quote happened to be lowercased too.
+        # Measured, each in a fresh session:
+        #
+        #   x-powered-by: PHP/5.6.40        accepted
+        #   X-Powered-By: PHP/5.6.40        REFUSED
+        #   Server: Apache/2.4.49           REFUSED
+        #   PHP/5.6.40                      accepted
+        #   uid=0(root) gid=0 (fabricated)  refused
+        #
+        # The refused forms are how the header appears on the wire, in
+        # `curl -i`, and in every browser's network panel. The refusal
+        # message says the excerpt "is not a verbatim substring of any
+        # cited response", which tells an agent that its REAL evidence is
+        # fabricated - the direction of error this repository treats as the
+        # one that matters.
+        #
+        # Added as SEPARATE parts, still exact-matched, so this widens what
+        # a true finding may quote and widens fabrication by nothing: a
+        # string that matches no part still matches no part. `.title()` is
+        # a reconstruction, not a record - it gives `X-Powered-By` and
+        # `Strict-Transport-Security` correctly and `Etag` for `ETag`, so
+        # the lowercase forms above stay as well.
+        parts.extend(f"{k.title()}: {v}" for k, v in hdrs.items()
+                     if k.title() != k)
+        titled = {k.title(): v for k, v in hdrs.items()}
+        if titled != hdrs:
+            parts.append(json.dumps(titled, ensure_ascii=False))
     parts.append(str(body or "") or str(entry.get("output") or ""))
     return [p for p in parts if p]
 

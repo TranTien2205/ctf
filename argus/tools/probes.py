@@ -237,8 +237,20 @@ def _prove_execution(ctx: Context, url: str, param: str, method: str,
             nav = _browser.visit(target)
             # The navigation command returns when the page has loaded, which
             # can be before a deferred or event-driven payload has run.
-            time.sleep(_browser.SETTLE_SECONDS)
-            for hit in col.hits_for(shape["nonce"], after=at):
+            #
+            # POLLED, NOT SLEPT, for the reason the comment above this block
+            # already states: a confident negative is the worst shape of
+            # wrong. Sleeping the whole window and then checking ONCE misses
+            # a callback that arrives at SETTLE_SECONDS plus anything, and
+            # the probe then reports "reflected but did not execute" about a
+            # payload that did execute - the same confident negative, from a
+            # clock instead of from a wrong URL.
+            #
+            # The window stays a ceiling: a page that never calls back costs
+            # exactly what it did before. Same shape as `probe_ssrf_oob`,
+            # which had this defect and this fix.
+            for hit in wait_for_callback(col, shape["nonce"], at,
+                                         _browser.SETTLE_SECONDS):
                 req, resp = col.as_exchange(hit)
                 rid = ctx.session.record_exchange(
                     "collector", req, resp,
@@ -2733,6 +2745,39 @@ def probe_websocket(ctx: Context, url: str, message: str = "") -> dict:
 
 
 
+def wait_for_callback(col, nonce: str, after: float,
+                      window: float) -> list:
+    """Hits for `nonce` after `at`, polled until the window closes.
+
+    ONE DEFINITION, because this existed twice. `probe_ssrf_oob` and the
+    stored-XSS collector both slept the whole settle window and then checked
+    ONCE, so a callback arriving at the window plus anything was missed and
+    the probe reported that the target did not call back. The XSS site had a
+    comment four lines above it naming that exact failure - "the probe then
+    reported 'reflected but did not execute' about a page it had never
+    actually visited, which is the worst shape of wrong: a confident
+    negative" - and then produced the same confident negative from a clock.
+
+    Two properties the sleep did not have:
+
+      a hit inside the window is SEEN, whenever it arrives
+      a hit arriving early is acted on early, instead of waiting out a
+      window sized for the slowest case
+
+    And one it keeps: the window is a CEILING. A target that never calls
+    back costs exactly what it did before, so this is not a timeout
+    increase wearing a different name.
+    """
+    deadline = time.time() + max(0.0, float(window))
+    while True:
+        hits = col.hits_for(nonce, after=after)
+        if hits:
+            return list(hits)
+        if time.time() >= deadline:
+            return list(col.hits_for(nonce, after=after))
+        time.sleep(0.05)
+
+
 def probe_ssrf_oob(ctx: Context, url: str, param: str,
                    method: str = "GET", data: str | None = None,
                    settle_s: float = 4.0) -> dict:
@@ -2797,15 +2842,8 @@ def probe_ssrf_oob(ctx: Context, url: str, param: str,
         # The window is still a ceiling, so a target that never calls back
         # costs exactly what it did before. Nothing waits longer than it
         # used to; a hit is just acted on when it arrives.
-        deadline = time.time() + max(0.0, float(settle_s))
-        while True:
-            if col.hits_for(nonce, after=at):
-                break
-            if time.time() >= deadline:
-                break
-            time.sleep(0.05)
         hits = []
-        for hit in col.hits_for(nonce, after=at):
+        for hit in wait_for_callback(col, nonce, at, settle_s):
             req, resp = col.as_exchange(hit)
             rid = ctx.session.record_exchange(
                 "collector", req, resp,

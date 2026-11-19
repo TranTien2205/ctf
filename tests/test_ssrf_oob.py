@@ -178,3 +178,114 @@ def test_the_probe_is_on_the_tool_table():
     the same shape of missing as a module nothing imports."""
     from argus.tools import registry
     assert "probe_ssrf_oob" in {t["name"] for t in registry.TOOL_SCHEMAS}
+
+
+# ---- one definition of waiting, shared by both callback probes
+
+class _LateCollector:
+    """A collector whose hit appears partway through the window."""
+
+    def __init__(self, at_second: float):
+        import time as _t
+        self._due = _t.time() + at_second
+        self.polls = 0
+
+    def hits_for(self, nonce, after=0.0):
+        import time as _t
+        self.polls += 1
+        if _t.time() >= self._due:
+            return [{"peer": "10.0.0.9", "nonce": nonce}]
+        return []
+
+
+def test_a_callback_inside_the_window_is_seen_whenever_it_arrives():
+    """THE DEFECT BOTH CALLBACK PROBES HAD, and the reason this is one
+    function rather than two copies.
+
+    Each slept the whole settle window and then checked ONCE, so a callback
+    arriving at the window plus anything was missed and the probe reported
+    that the target did not call back. The stored-XSS site had a comment
+    four lines above it naming that failure - "the probe then reported
+    'reflected but did not execute' ... the worst shape of wrong: a
+    confident negative" - and then produced the same confident negative
+    from a clock instead of from a wrong URL.
+
+    A hit at 0.35s of a 2s window must be returned, which a
+    sleep-then-check-once cannot do and a poll does.
+    """
+    import time
+
+    from argus.tools.probes import wait_for_callback
+
+    col = _LateCollector(0.35)
+    started = time.time()
+    hits = wait_for_callback(col, "n0nce", started, 2.0)
+    assert hits, "a callback inside the window was not seen"
+    assert col.polls > 1, "a single check cannot observe a late hit"
+
+
+def test_an_early_callback_does_not_pay_the_whole_window():
+    """The second property: a hit is acted on when it arrives.
+
+    A 20-second window for a target that answers in 50ms used to cost 20
+    seconds, which is how a settle window becomes something an operator
+    shortens below what a slow target needs.
+    """
+    import time
+
+    from argus.tools.probes import wait_for_callback
+
+    col = _LateCollector(0.0)
+    started = time.time()
+    hits = wait_for_callback(col, "n0nce", started, 30.0)
+    assert hits
+    assert time.time() - started < 5.0, "an immediate hit waited anyway"
+
+
+def test_the_window_is_still_a_ceiling_when_nothing_calls_back():
+    """The property the sleep DID have, and which a fix must not trade away:
+    a target that never calls back costs what it did before. Otherwise this
+    is a timeout increase wearing a different name."""
+    import time
+
+    from argus.tools.probes import wait_for_callback
+
+    class _Silent:
+        def hits_for(self, nonce, after=0.0):
+            return []
+
+    # ENFORCED, NOT ASSERTED. The first version of this computed `waited`
+    # and asserted it was under 3s - and when the ceiling was removed as a
+    # plant, the call never returned, so the assertion was never reached:
+    # the test HUNG instead of failing. A hang is worse than a red test,
+    # because in CI it burns the job's whole timeout and names nothing.
+    #
+    # Same defect as everything else found today, one level up: the check
+    # stated the bound and did not hold it. A thread with a join timeout
+    # turns an unbounded wait back into a failure, with the stdlib only.
+    import threading
+
+    out: list = []
+    started = time.time()
+    worker = threading.Thread(
+        target=lambda: out.append(
+            wait_for_callback(_Silent(), "n0nce", started, 0.4)),
+        daemon=True)
+    worker.start()
+    worker.join(timeout=5.0)
+    assert not worker.is_alive(), \
+        "the window is not a ceiling - the wait never returned"
+    assert out == [[]]
+    waited = time.time() - started
+    assert 0.3 <= waited < 3.0, f"waited {waited:.2f}s for a 0.4s window"
+
+
+def test_a_zero_or_negative_window_still_checks_once():
+    """A window of 0 must not mean "never look": the callback may already
+    have arrived during the request itself, which is the common case for a
+    fast loopback target."""
+    from argus.tools.probes import wait_for_callback
+
+    col = _LateCollector(0.0)
+    assert wait_for_callback(col, "n0nce", 0.0, 0.0)
+    assert wait_for_callback(_LateCollector(0.0), "n0nce", 0.0, -5.0)
