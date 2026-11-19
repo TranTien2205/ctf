@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T06:14:44",
+  "generated_at": "2026-11-20T06:31:06",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -760,10 +760,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 84,
+      "lines": 97,
       "actionability": "operational",
       "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.173,
+      "overlap": 0.141,
       "trust": "catalogue-or-unreviewed"
     },
     {

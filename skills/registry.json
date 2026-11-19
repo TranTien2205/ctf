@@ -1482,9 +1482,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1023,
-      "depth_files": 3,
-      "depth_tokens": 844,
+      "skill_tokens": 1380,
+      "depth_files": 3051,
+      "depth_tokens": 87038,
       "use_when": [
         "a probe or source read produced this class's signal: confirm the runtime from the header and quote the bytes -- a PE with a non-zero CLR data directory, or the 0xCAFEBABE magic -- then decompile with what exists here: ilspycmd for .NET, javap plus unzip for Java. jadx, procyon and mono are absent"
       ],

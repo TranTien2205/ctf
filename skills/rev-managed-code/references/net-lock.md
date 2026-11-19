@@ -1,0 +1,3 @@
+# lock(){}
+
+A synchronized check.

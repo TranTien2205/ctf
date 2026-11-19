@@ -73,6 +73,19 @@ Depth, one named file at a time:
 
 | Any managed-runtime question | `references/decompile-and-inspect.md` |
 
+## The corpus — the workflow's anchors
+
+`references/` carries ~3,050 modules in base/deep/checklist/map form.
+Start from these:
+
+- The route — `references/the-workflow.md`, `references/the-map-index.md`, `references/the-detection.md`
+- .NET — `references/the-runtime.md`, `references/the-clr-dir.md`, `references/the-ecma335.md`, `references/the-us-heap.md`, `references/the-typedef.md`, `references/the-ldstr.md`, `references/the-il-ops.md`, `references/the-ilspy.md`, `references/the-single-file.md`, `references/the-aot.md`, `references/the-worked-dotnet.md`
+- Java / Android — `references/the-cafebabe.md`, `references/the-const-pool.md`, `references/the-javap.md`, `references/the-jvm-ops.md`, `references/the-jar.md`, `references/the-apk.md`, `references/the-smali-ops.md`, `references/the-worked-java.md`, `references/the-worked-apk.md`
+- The check — `references/the-check-locate.md`, `references/the-verdict-branch.md`, `references/the-transform-il.md`, `references/the-hash-check.md`, `references/the-replicate.md`
+- Obfuscation — `references/the-obfusc-dot.md`, `references/the-confuser.md`, `references/the-obfusc-java.md`
+- Discipline — `references/the-evidence.md`, `references/the-falsifier.md`, `references/the-boundary.md`, `references/the-checklist.md`
+- Opcode detail — the il-, jvm-, sm- and chk- module families under `references/` cover CIL, JVM, Dalvik opcodes and check shapes
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

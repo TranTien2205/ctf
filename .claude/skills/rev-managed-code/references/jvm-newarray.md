@@ -1,0 +1,3 @@
+# JVM op: newarray
+
+The JVM opcode `newarray` — one instruction in the Java stack machine; read it inside the check method as part of the transform or the deciding branch.
