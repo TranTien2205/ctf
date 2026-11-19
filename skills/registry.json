@@ -1790,8 +1790,8 @@
       "evidence_level": "catalogue",
       "verified_by": [],
       "skill_tokens": 1060,
-      "depth_files": 3,
-      "depth_tokens": 738,
+      "depth_files": 53,
+      "depth_tokens": 134392,
       "use_when": [
         "a probe or source read produced this class's signal: send the request twice, once with a controlled X-Forwarded-Host and once with a swapped Host — a reset-link or redirect reflecting your host is the signal"
       ],
