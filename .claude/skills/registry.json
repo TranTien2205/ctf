@@ -1328,9 +1328,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 938,
-      "depth_files": 3,
-      "depth_tokens": 922,
+      "skill_tokens": 3315,
+      "depth_files": 1327,
+      "depth_tokens": 81100,
       "use_when": [
         "a probe or source read produced this class's signal: this class presupposes control of the instruction pointer, so confirm that first; then read the protections to decide whether a leak is needed at all, and build the leak chain and verify the leaked value looks like a libc address before chaining further"
       ],
