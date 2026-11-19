@@ -788,3 +788,72 @@ def test_the_full_views_bullet_promises_only_fields_it_returns():
     assert not overpromised, (
         f"report.md promises {overpromised} from read_findings_full; it "
         f"returns {sorted(returned)}")
+
+
+# ------------------------------- 6. no tool the registry holds is an orphan
+
+def test_every_registered_tool_is_reachable_by_some_role():
+    """TWO LISTS, ONE CONCEPT, and nothing asserted the relation.
+
+    Registering a tool and granting it to a role are separate edits in
+    separate files, and the registry is what `dispatch` resolves while the
+    card is what decides whether a worker may ask. A tool in the registry
+    that no card grants is reachable by nobody: it imports, it passes its
+    own unit tests, and no worker can call it. This repository has shipped
+    three components in exactly that state, one of which said so in its own
+    docstring.
+
+    Nearly a fourth, twice in one session: `recon_sweep` and `fanout_sweep`
+    were each registered without a grant, and each time three separate
+    gates caught it only because a skill card happened to name the tool.
+    Nothing checked the relation itself.
+
+    The reverse direction is the same assertion read backwards and is the
+    more dangerous of the two: a card naming a tool the registry does not
+    have is a grant for something `dispatch` will refuse, so the role is
+    told it has a capability that fails at the moment it is used.
+    """
+    from argus.team import cards as C
+    from argus.tools.registry import TOOL_SCHEMAS
+
+    registered = {s["name"] for s in TOOL_SCHEMAS}
+    roles = {n: getattr(C, n) for n in dir(C)
+             if n.isupper() and hasattr(getattr(C, n), "tools")}
+    assert len(roles) >= 4, f"expected the four worker roles, found {roles}"
+
+    granted: set[str] = set()
+    for card in roles.values():
+        granted |= set(card.tools)
+
+    orphans = sorted(registered - granted)
+    assert not orphans, (
+        f"{orphans} are in the registry and no role card grants them - "
+        "they import, they pass their own tests, and no worker can call "
+        "them")
+
+    ghosts = sorted(granted - registered)
+    assert not ghosts, (
+        f"{ghosts} are granted by a role card and are not in the registry "
+        "- dispatch will refuse them, so the role is promised a capability "
+        "that fails when it is used")
+
+
+def test_the_orphan_check_fails_in_both_directions():
+    """Planted on copies of the real sets, because the real ones are what
+    the check above reads and a plant that mutates them would leak."""
+    from argus.team import cards as C
+    from argus.tools.registry import TOOL_SCHEMAS
+
+    registered = {s["name"] for s in TOOL_SCHEMAS}
+    granted: set[str] = set()
+    for n in dir(C):
+        card = getattr(C, n)
+        if n.isupper() and hasattr(card, "tools"):
+            granted |= set(card.tools)
+
+    # a tool registered and granted to nobody
+    assert sorted((registered | {"_planted_orphan"}) - granted) == \
+        ["_planted_orphan"]
+    # a card granting a tool that does not exist
+    assert sorted((granted | {"_planted_ghost"}) - registered) == \
+        ["_planted_ghost"]

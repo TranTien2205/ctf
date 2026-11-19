@@ -659,8 +659,13 @@ def test_the_stylesheet_has_not_been_gutted():
 
     Measured on the committed file (`git show cda6d95:` and HEAD and the
     working tree all agree): 792 stylesheet lines, 352 rules, 43 custom
-    property declarations, 103,183 file bytes. The floors are roughly half
-    of each.
+    property declarations, 105,550 file bytes (`git cat-file -s`). The
+    floors are roughly half of each.
+
+    103,183 is the same file's CHARACTER count, and the gap is 2,367 bytes
+    of multi-byte UTF-8. Both figures are right and answer different
+    questions, which was first read as a disagreement between two
+    sessions' measurements.
 
     `43` and `36` are both right and answer different questions: 43
     declarations appear in the stylesheet, 36 of them inside `:root`. This
@@ -681,7 +686,17 @@ def test_the_stylesheet_has_not_been_gutted():
         "stylesheet lines": (css.count("\n") + 1, 420),
         "css rules":        (css.count("{"), 200),
         "custom tokens":    (len(set(re.findall(r"--[a-z0-9-]+\s*:", css))), 24),
-        "file bytes":       (len(text), 60_000),
+        # BYTES, read as bytes. This read `len(text)`, which is
+        # CHARACTERS, while being named bytes - and the file's comments are
+        # in Vietnamese, so the two diverge by 2,367 here: 105,550 bytes
+        # against 103,183 characters, from 1,534 multi-byte characters.
+        # Nothing failed, because both are far above the floor, but the
+        # drift is one-directional: characters stay flat as non-ASCII prose
+        # is added and bytes grow. A floor whose name and quantity disagree
+        # is the `--workflow` defect one level in - the number is right and
+        # the thing it claims to measure is not. Bytes is the right
+        # quantity: a deleted stylesheet is a loss of bytes on disk.
+        "file bytes":       (len(DASH.read_bytes()), 60_000),
         "@media blocks":    (css.count("@media"), 5),
     }
     short = {k: v for k, (v, floor) in floors.items() if v < floor}

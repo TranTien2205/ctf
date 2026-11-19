@@ -6309,12 +6309,97 @@ not a comfortable step, and 12px and 13px are now adjacent in one scale -
 so `.mt` joining the body tier is a single plausible edit that fits by less
 than two pixels.
 
+### Having just named a pattern is not having internalised it
+
+The stylesheet floor was labelled `file bytes` and measured `len(text)`,
+which is CHARACTERS. The dashboard's comments are in Vietnamese, so the two
+quantities diverge by 2,367 - 105,550 bytes against 103,183 characters,
+from 1,534 multi-byte characters. Nothing failed, because both sit far
+above a 60,000 floor, but the drift is one-directional: characters stay
+flat as non-ASCII prose is added and bytes grow. The floor now reads the file's length in
+bytes rather than in characters, because a deleted stylesheet is a loss of
+bytes on disk and that is what the floor protects.
+
+A floor whose name and quantity disagree is the `--workflow` defect one
+level in: the number is right and the thing it claims to measure is not.
+
+AND THE DIAGNOSIS WAS ONE PARAGRAPH LATE. Two sessions measured that file
+and reported 36 tokens against 43, and 105,550 bytes against 103,183. The
+token pair was correctly identified as one value and two questions - 36
+inside `:root`, 43 declarations in the stylesheet - and both denominators
+were written into the test so nobody would correct one into the other.
+
+Then the byte pair, in the next sentence, was read as a discrepancy in the
+other session's measurement, and written up as its measurement failing to
+match the commit it came from. Five methods settle it: `git cat-file -s`,
+`git show | wc -c`, `wc -c`, and reading the path as bytes all say
+105,550. Only measuring its decoded length in characters says 103,183.
+
+So the pattern was named accurately and applied to the next instance
+anyway, by the same reader, in the same paragraph. That is worth recording
+separately from the fix: `one-value-two-questions` is not a lesson that
+stays learned by being stated. The operational form is narrower - when two
+careful measurements of one file disagree by a fixed amount, the question
+is which quantity each one answers, BEFORE the question of which is wrong.
+
+Also corrected: a claim about another session's measurement, written into
+this file while that measurement was right.
+
+### Nothing asserted that a registered tool was reachable by anybody
+
+Registering a tool and granting it to a role are separate edits in separate
+files. The registry is what dispatch resolves; the card is what decides
+whether a worker may ask. A tool in the registry that no card grants is
+reachable by nobody - it imports, it passes its own unit tests, and no
+worker can call it.
+
+This tree has shipped three components in exactly that state, one of which
+said so in its own docstring. It nearly shipped a fourth twice in one
+session: `recon_sweep` and then `fanout_sweep` were each registered without
+a grant, and each time the miss was caught only because a skill card
+happened to name the tool and a different check reads skill cards. Nothing
+checked the relation itself, so the catch was a side effect both times.
+
+Now asserted in both directions, which is the same statement read
+backwards. A card granting a tool the registry does not have is the more
+dangerous half: dispatch refuses it, so the role is promised a capability
+that fails at the moment it is used.
+
+Measured before writing it: 60 registered, 60 reachable, four roles, zero
+orphans and zero ghosts. The invariant held, so this closes a hole with no
+current occupant.
+
+A check whose first run finds nothing reads as wasted work and is the
+opposite. Adding it while it would still fail means arguing about the
+findings instead of installing the invariant: somebody has to triage a
+backlog before the check can be green, and a check that is not green yet
+does not gate anything. Zero occupants is the only moment when the first
+run tells you nothing you did not already know, which is exactly what
+makes it cheap.
+
+AND THE TWO NEAR-MISSES WERE MINE, which the record had briefly wrong.
+`git log -S` settles it: `recon_sweep` entered at a183382 and
+`fanout_sweep` at 1dd14f1, both orchestrator-wiring commits from this
+session. The parallel session that found the shape attributed it to itself
+from a plausible reconstruction, having every particular right - two tools,
+registered without grants, rescued twice by a check that was not looking
+for them - and the owner wrong. Fourth instance today of agreement on the
+facts with the wrong story attached, and the first where the disputed
+quantity was authorship.
+
+### CI confirms the Windows fixes, which nothing local could
+
+Run #566 on `c3641c1`: 11 of 11 jobs green, including all five Windows
+jobs that had been red for thirteen consecutive runs. The newline fixture
+and the clock-resolution fix are verified by the only instrument that can
+verify them, since no local run on this machine executes Windows at all.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1090 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1092 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
