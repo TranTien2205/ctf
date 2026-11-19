@@ -42,29 +42,43 @@
 -->
 <style>
 :root{
-  /* FIELD LEDGER: warm paper deck, ink text, one deep-teal accent. The
-     record's own screens - prompt, tape, reader - stay dark, because that
-     is what a wire looks like. */
-  --v0:#e8e6dd; --v1:#f1f0e8; --v2:#faf9f3; --v3:#e9e8de; --v4:#dbd9cc;
-  --line:#d2d0c2; --line-soft:#e0dece;
-  --ink:#1f2733; --dim:#525d6b; --faint:#8d95a1;
-  --steel:#0d6e83; --steel-dim:#d7ebef;
+  /* INDIGO DECK.
 
-  --proven:#0c8f57; --candidate:#a97a0f; --unproven:#67727f; --refused:#7a5cc0;
-  --proven-b:#d8f0e2; --candidate-b:#f5ead0; --unproven-b:#e7eaee; --refused-b:#e9e3f6;
+     Năm màu neo do người vận hành chọn: nền #0b0a14, thẻ #15131f, nhấn
+     indigo #7c6cf5, proven #34d8a0, candidate #f5a524. Phần còn lại suy ra
+     từ chúng bằng số đo, không ướm mắt: bề mặt giữ nguyên hue 246° của nền
+     và chỉ đổi độ sáng, nên năm tầng là MỘT vật liệu dưới năm mức ánh sáng
+     chứ không phải năm màu khác nhau.
 
-  --sev5:#d0342c; --sev4:#e07a12; --sev3:#b7950e; --sev2:#5f87a5; --sev1:#8b96a1;
+     MỘT CĂNG THẲNG, VÀ CÁCH GIẢI. File này viết "chroma thuộc về mức bằng
+     chứng và chỉ thuộc về nó", nhưng indigo bão hoà 0.87 còn `proven` 0.68,
+     nên nếu để cạnh nhau thì chrome sẽ lấn. Giải bằng VỊ TRÍ: indigo chỉ
+     sống ở khung - logo, điều hướng, tiêu điểm, nút chính - và không bước
+     vào lớp dữ liệu. Mức bằng chứng vẫn là thứ duy nhất mang màu ở nơi
+     người đọc đi tìm phán quyết.
 
-  --hazard:#cf2f27; --hazard-deep:#f6d7d4;
-  --amb:rgba(13,110,131,.06); --amb2:rgba(169,122,15,.05);
+     `unproven` trung tính và không phát quang: một sự vắng mặt, không phải
+     một nguy hiểm. Tô đỏ nó là dạy người đọc một phán quyết chưa hề có. */
+  --v0:#0b0a14; --v1:#15131f; --v2:#1f1e27; --v3:#282732; --v4:#343240;
+  --line:#3a3949; --line-soft:#2a2936;
+  --ink:#f2f2f5; --dim:#afadc0; --faint:#807d99;
+  --steel:#7c6cf5; --steel-dim:#272442;
 
-  /* the dark face the record wears */
-  --scr:#0d1218; --scr-line:#26303e; --scr-ink:#c6d5e4; --scr-dim:#8b98a8;
+  --proven:#34d8a0; --candidate:#f5a524; --unproven:#918fa3; --refused:#cc8fd6;
+  --proven-b:#132720; --candidate-b:#272013; --unproven-b:#201f26; --refused-b:#2b172e;
+
+  --sev5:#e06979; --sev4:#e28a58; --sev3:#e4b956; --sev2:#9189ca; --sev1:#8a889d;
+
+  --hazard:#e36176; --hazard-deep:#281316;
+  --amb:rgba(124,108,245,.055); --amb2:rgba(245,165,36,.04);
+
+  /* mặt tối mà bản ghi mang: tối hơn deck, vì nó giữ byte của mục tiêu */
+  --scr:#0c0b11; --scr-line:#2b2a3a; --scr-ink:#d9d8e1; --scr-dim:#9997ad;
 
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
   --ease:cubic-bezier(.22,.61,.36,1);
-  color-scheme:light;
+  color-scheme:dark;
 }
 html[data-mode="engagement"]{
   --steel:var(--hazard); --steel-dim:var(--hazard-deep);
@@ -87,8 +101,8 @@ button{background:none;border:0;cursor:pointer}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 
 ::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-thumb{background:#c9c7b9;border-radius:6px;border:3px solid var(--v0)}
-::-webkit-scrollbar-thumb:hover{background:#b3b1a1}
+::-webkit-scrollbar-thumb{background:var(--v4);border-radius:8px;border:3px solid var(--v0)}
+::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--steel) 30%,var(--v4))}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-corner{background:transparent}
 
@@ -128,8 +142,8 @@ main::before{
    row is the mode ribbon - in engagement it becomes the hazard stripe. */
 .topbar{
   position:sticky;top:0;z-index:40;
-  background:rgba(241,240,232,.85);
-  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  background:color-mix(in srgb,var(--v1) 82%,transparent);
+  backdrop-filter:blur(14px) saturate(130%);-webkit-backdrop-filter:blur(12px);
   border-bottom:1px solid var(--line);
 }
 .trow{
@@ -141,7 +155,7 @@ main::before{
 .eye circle{transform-box:fill-box;transform-origin:center;animation:peek 8s ease-in-out infinite}
 @keyframes peek{0%,90%,100%{transform:translateX(0)}93%{transform:translateX(1.6px)}96.5%{transform:translateX(-1.1px)}}
 .brand2 h1{font-size:15px;font-weight:650;letter-spacing:.18em;line-height:1.1;color:var(--ink)}
-.brand2 .tag{font-size:10px;color:var(--faint);letter-spacing:.02em;display:block;margin-top:1px;
+.brand2 .tag{font-size:10.5px;color:var(--faint);letter-spacing:.02em;display:block;margin-top:1px;
   max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:1180px){ .brand2 .tag{display:none} }
 
@@ -152,36 +166,36 @@ main::before{
 }
 .segslide{
   position:absolute;top:3px;bottom:3px;left:0;width:60px;border-radius:999px;
-  background:#fff;border:1px solid var(--line);
-  box-shadow:0 1px 2px rgba(31,39,51,.1), inset 0 1px 0 #fff;
+  background:var(--v4);border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(0,0,0,.45), inset 0 1px 0 color-mix(in srgb,var(--steel) 22%,transparent);
   transition:transform .3s var(--ease),width .3s var(--ease);
 }
 .nav2{
   position:relative;z-index:1;display:flex;align-items:center;gap:8px;
-  padding:6px 15px;border-radius:999px;color:var(--dim);font-size:12.5px;
+  padding:6px 15px;border-radius:999px;color:var(--dim);font-size:13px;
   transition:color .16s;
 }
 .nav2:hover{color:var(--ink)}
 .nav2[aria-selected="true"]{color:var(--ink);font-weight:550}
 .nav2 svg{width:14px;height:14px;opacity:.85}
 .nav2 .ct{
-  font:500 10px/1 var(--mono);color:var(--faint);
+  font:500 10.5px/1 var(--mono);color:var(--faint);
   background:var(--v0);border:1px solid var(--line);border-radius:999px;
   padding:2.5px 6px;min-width:20px;text-align:center;font-variant-numeric:tabular-nums;
 }
 .nav2[aria-selected="true"] .ct{color:var(--steel);border-color:var(--steel)}
-.nav2 kbd{font:500 9.5px/1 var(--mono);color:var(--faint)}
+.nav2 kbd{font:500 10.5px/1 var(--mono);color:var(--faint)}
 
 .tbar-right{display:flex;align-items:center;gap:13px;flex:none}
 .lamps2{display:flex;align-items:center;gap:11px;padding-right:13px;border-right:1px solid var(--line-soft)}
-.lamp{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);white-space:nowrap}
+.lamp{display:flex;align-items:center;gap:5px;font-size:10.5px;color:var(--dim);white-space:nowrap}
 .lamp i{
   width:6px;height:6px;border-radius:50%;flex:none;
-  background:#cfcdbec0;box-shadow:inset 0 0 0 1px rgba(31,39,51,.2);
+  background:color-mix(in srgb,var(--faint) 55%,transparent);box-shadow:inset 0 0 0 1px rgba(31,39,51,.2);
   transition:background .4s,box-shadow .4s;
 }
 .lamp.on i{background:var(--proven);box-shadow:0 0 6px -1px rgba(12,143,87,.6)}
-.lamp.off i{background:#d9b0ac;box-shadow:inset 0 0 0 1px rgba(31,39,51,.2)}
+.lamp.off i{background:color-mix(in srgb,var(--hazard) 34%,var(--v3));box-shadow:inset 0 0 0 1px rgba(31,39,51,.2)}
 .lamp.off{color:var(--faint)}
 @media (max-width:1180px){ .lamps2{display:none} }
 #pulse{width:7px;height:7px;border-radius:50%;background:var(--v4);flex:none}
@@ -190,30 +204,37 @@ main::before{
   0%{background:var(--steel);box-shadow:0 0 10px var(--steel)}
   100%{background:var(--v4);box-shadow:none}
 }
-#wallclock{font:500 11px/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
-#ver{font:400 10px/1 var(--mono);color:var(--faint)}
+#wallclock{font:500 12px/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+#ver{font:400 10.5px/1 var(--mono);color:var(--faint)}
 
 /* the mode ribbon: one line that says whose rules this page is playing by */
 .mrow{
   display:flex;align-items:center;gap:10px;
   padding:5px 22px;max-width:1560px;margin:0 auto;
   border-top:1px solid var(--line-soft);
-  font-size:11.5px;color:var(--faint);
+  font-size:12px;color:var(--faint);
 }
 .mrow b{
-  font:600 10px/1 var(--mono);letter-spacing:.1em;
+  font:600 10.5px/1 var(--mono);letter-spacing:.1em;
   padding:4px 8px;border-radius:3px;
   background:var(--v3);color:var(--dim);border:1px solid var(--line);
 }
 html[data-mode="engagement"] .topbar{
-  background:rgba(251,238,236,.9);border-bottom-color:#e2b3ae;
+  background:color-mix(in srgb,var(--hazard-deep) 70%,var(--v1));
+  border-bottom-color:color-mix(in srgb,var(--hazard) 55%,transparent);
 }
+/* Dải gạch chéo cảnh báo: trên deck tối thì vạch phải SÁNG hơn nền chứ
+   không tối hơn, nếu không nó chìm thành một dải xám. */
 html[data-mode="engagement"] .mrow{
-  background:repeating-linear-gradient(135deg,#f4cdc9 0 11px,#eeb8b3 11px 22px);
-  border-top-color:#e2b3ae;color:#8c1d18;
+  background:repeating-linear-gradient(135deg,
+    color-mix(in srgb,var(--hazard) 26%,var(--v0)) 0 11px,
+    color-mix(in srgb,var(--hazard) 13%,var(--v0)) 11px 22px);
+  border-top-color:color-mix(in srgb,var(--hazard) 50%,transparent);
+  color:color-mix(in srgb,var(--hazard) 18%,var(--ink));
 }
 html[data-mode="engagement"] .mrow b{
-  background:var(--hazard);color:#fff;border-color:#b02418;
+  background:var(--hazard);color:var(--hazard-deep);
+  border-color:color-mix(in srgb,var(--hazard) 75%,var(--ink));font-weight:700;
 }
 
 .wrap{max-width:1560px;margin:0 auto;padding:22px 24px 44px;position:relative;z-index:1}
@@ -226,7 +247,7 @@ html[data-mode="engagement"] .mrow b{
     repeating-linear-gradient(90deg,transparent 0 23px,rgba(31,39,51,.028) 23px 24px),
     linear-gradient(180deg,var(--v2),var(--v1));
   border:1px solid var(--line);border-top:2px solid var(--steel);
-  border-radius:10px;
+  border-radius:12px;
   box-shadow:0 1px 2px rgba(31,39,51,.05), 0 14px 30px -22px rgba(31,39,51,.4);
   display:grid;grid-template-columns:auto 1fr auto;gap:30px;
   padding:24px 26px;align-items:center;
@@ -262,7 +283,7 @@ html[data-mode="engagement"] .mrow b{
 .gauge .seg.refused{filter:drop-shadow(0 0 4px rgba(122,92,192,.32))}
 .gauge .tick{stroke:var(--line);stroke-width:1}
 .gauge.hot .trk{animation:trkhot 1.8s ease-in-out infinite}
-@keyframes trkhot{0%,100%{stroke:var(--v4)}50%{stroke:#b9c8c4}}
+@keyframes trkhot{0%,100%{stroke:var(--v4)}50%{stroke:var(--proven)}}
 .gcent{
   position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;text-align:center;pointer-events:none;
@@ -272,11 +293,9 @@ html[data-mode="engagement"] .mrow b{
   font-variant-numeric:tabular-nums;
   text-shadow:0 0 18px rgba(12,143,87,.28);
 }
-.gof{font-size:11.5px;color:var(--dim);margin-top:5px;max-width:128px;line-height:1.35}
+.gof{font-size:12px;color:var(--dim);margin-top:5px;max-width:128px;line-height:1.35}
 
 .hmid{min-width:0}
-.overline{font:550 10px/1 var(--sans);letter-spacing:.22em;color:var(--steel);margin-bottom:7px}
-.overline::before{content:"";display:inline-block;width:7px;height:7px;background:var(--steel);margin-right:9px;vertical-align:1px}
 .hmid h2{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
 .hmid .sub{color:var(--dim);font-size:12px;margin-top:3px}
 
@@ -296,13 +315,13 @@ html[data-mode="engagement"] .mrow b{
 .cell:hover{transform:scaleY(1.14);filter:brightness(1.08)}
 .cell.on{box-shadow:0 0 0 2px var(--v2),0 0 0 3px currentColor}
 
-.striplegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11.5px;color:var(--dim)}
+.striplegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--dim)}
 .lg{
   display:flex;align-items:baseline;gap:7px;border-radius:3px;
   padding:3px 5px;margin:-3px -5px;transition:background .14s;
 }
 .lg:hover{background:var(--v3)}
-.lg b{font:600 12.5px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+.lg b{font:600 13px/1 var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
 .lg i{width:9px;height:9px;border-radius:2px;flex:none;align-self:center}
 .lg em{font-style:normal;color:var(--faint)}
 .lg[aria-pressed="true"]{background:var(--v3);color:var(--ink)}
@@ -313,10 +332,10 @@ html[data-mode="engagement"] .mrow b{
 .mix{min-width:196px}
 .mix h3{font-size:10.5px;color:var(--faint);font-weight:550;letter-spacing:.14em;margin-bottom:10px}
 .meter{display:grid;grid-template-columns:60px 1fr 22px;align-items:center;gap:9px;padding:3px 0;transition:opacity .3s}
-.meter span{font-size:11.5px;color:var(--dim)}
+.meter span{font-size:12px;color:var(--dim)}
 .meter .bar{height:8px;background:var(--v3);border-radius:3px;overflow:hidden}
 .meter .fil{height:100%;width:0;border-radius:3px;transition:width .9s var(--ease)}
-.meter b{font:500 11.5px/1 var(--mono);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+.meter b{font:500 12px/1 var(--mono);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
 
 /* =============================================== EVIDENCE PIPELINE =====
    The record as a flow: accepted runs become graded findings become sealed
@@ -327,18 +346,18 @@ html[data-mode="engagement"] .mrow b{
   margin-top:16px;display:grid;grid-template-columns:180px 1fr;gap:16px;
   align-items:center;
   background:linear-gradient(180deg,var(--v2),var(--v1));
-  border:1px solid var(--line);border-radius:10px;padding:14px 20px;
+  border:1px solid var(--line);border-radius:12px;padding:14px 20px;
   box-shadow:0 1px 2px rgba(31,39,51,.04);
 }
 @media (max-width:900px){ .flowband{grid-template-columns:1fr} }
-.flcap h2{font-size:11px;font-weight:600;letter-spacing:.16em;color:var(--dim)}
-.flcap p{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.45}
+.flcap h2{font-size:12px;font-weight:600;letter-spacing:.16em;color:var(--dim)}
+.flcap p{font-size:12px;color:var(--faint);margin-top:6px;line-height:1.45}
 .flcap p b{color:var(--dim);font-weight:550}
 #flowsvg{width:100%;height:96px;display:block}
 .fnode rect{fill:var(--v1);stroke:var(--line);stroke-width:1}
 .fnode.hotn rect{stroke:var(--steel);filter:drop-shadow(0 0 6px rgba(13,110,131,.18))}
-.flab{font:550 8.5px var(--sans);letter-spacing:.16em;fill:var(--faint)}
-.fcap{font:400 8.5px var(--sans);fill:var(--faint)}
+.flab{font:600 10.5px var(--sans);letter-spacing:.005em;fill:var(--dim)}
+.fcap{font:400 10.5px var(--sans);fill:var(--faint)}
 .fnum{font:600 21px var(--mono);fill:var(--ink);font-variant-numeric:tabular-nums}
 .flink{fill:none;stroke:var(--v4);stroke-width:1.5}
 #flowsvg.hot .flink{stroke:var(--steel);transition:stroke .5s}
@@ -350,24 +369,26 @@ html[data-mode="engagement"] .fdot{filter:drop-shadow(0 0 3px rgba(207,47,39,.5)
 @media (max-width:1100px){ .grid{grid-template-columns:1fr} }
 
 .panel{
-  background:linear-gradient(180deg,var(--v2),var(--v1) 140%);
-  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  background:linear-gradient(168deg,
+    color-mix(in srgb,var(--steel) 4%,var(--v2)) 0%,
+    var(--v1) 62%, var(--v1) 100%);
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;
   box-shadow:0 1px 2px rgba(31,39,51,.05);
   transition:transform .22s var(--ease),box-shadow .22s var(--ease),border-color .22s;
 }
-.panel:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(31,39,51,.06),0 14px 30px -16px rgba(31,39,51,.3);border-color:#c2c0b1}
+.panel:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(31,39,51,.06),0 14px 30px -16px rgba(31,39,51,.3);border-color:color-mix(in srgb,var(--steel) 34%,var(--line))}
 .phead{
   display:flex;align-items:center;gap:10px;justify-content:space-between;
   padding:13px 16px;border-bottom:1px solid var(--line-soft);
 }
 .phead h2{font-size:13px;font-weight:600;display:flex;align-items:center;gap:9px}
 .phead h2::before{content:"";width:7px;height:7px;background:var(--steel);flex:none}
-.phead .note{color:var(--faint);font-size:11.5px}
+.phead .note{color:var(--faint);font-size:12px}
 .pbody{padding:16px}
 
 .k{
   border:1px solid var(--line);background:var(--v3);color:var(--ink);
-  border-radius:5px;padding:7px 12px;font-size:12.5px;position:relative;overflow:hidden;
+  border-radius:6px;padding:7px 12px;font-size:13px;position:relative;overflow:hidden;
   transition:background .14s,border-color .14s,transform .08s;
 }
 .k::after{
@@ -379,63 +400,81 @@ html[data-mode="engagement"] .fdot{filter:drop-shadow(0 0 3px rgba(207,47,39,.5)
 .k:hover:not(:disabled)::after{transform:translateX(130%)}
 .k:active:not(:disabled){transform:translateY(1px)}
 .k:disabled{opacity:.4;cursor:not-allowed}
-.k.sm{padding:4px 9px;font-size:11.5px}
-.k.go{background:var(--steel-dim);border-color:var(--steel);font-weight:600}
-.k.go:hover:not(:disabled){background:var(--steel);color:#fff}
-html[data-mode="engagement"] .k.go{background:var(--hazard-deep);border-color:var(--hazard);color:#8c1d18}
-html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard);color:#fff}
+.k.sm{padding:4px 9px;font-size:12px}
+/* ĐO ĐƯỢC 1.29 sau khi đổi bảng màu: `--steel-dim` từ một màu nhạt của
+   tông giấy thành một màu rất tối của deck, nên chữ tối trên nó gần như vô
+   hình. Nút khởi chạy là nút quan trọng nhất trên trang này. */
+/* Quầng indigo chỉ sáng khi nút ĐANG SẴN SÀNG. `:disabled` không có quầng,
+   nên ánh sáng ở đây là một trạng thái đọc được từ xa, không phải trang trí:
+   mục tiêu đã nhập thì nút sáng lên, chưa nhập thì nó tắt. */
+.k.go{background:linear-gradient(180deg,
+        color-mix(in srgb,var(--steel) 26%,var(--steel-dim)), var(--steel-dim));
+      border-color:color-mix(in srgb,var(--steel) 70%,transparent);
+      color:color-mix(in srgb,var(--steel) 30%,var(--ink));font-weight:700}
+.k.go:not(:disabled){box-shadow:0 0 0 1px color-mix(in srgb,var(--steel) 26%,transparent),
+                                0 4px 20px -6px color-mix(in srgb,var(--steel) 62%,transparent)}
+.k.go:disabled{box-shadow:none;opacity:.5}
+.k.go:hover{background:color-mix(in srgb,var(--steel) 22%,var(--steel-dim));color:var(--v0)}
+.k.go:hover:not(:disabled){background:var(--steel);color:var(--v0)}
+/* `--hazard-deep` cũng đổi từ một màu nhạt sang một màu rất tối, nên chữ
+   `color-mix(in srgb,var(--hazard) 70%,var(--ink))` trên nó đo được 1.29 - cùng một lỗi với `.k.go` ở chế độ lab,
+   và nó ẩn sau một selector cụ thể hơn nên bản sửa kia không tới được. */
+html[data-mode="engagement"] .k.go{background:var(--hazard-deep);
+  border-color:var(--hazard);color:color-mix(in srgb,var(--hazard) 22%,var(--ink));
+  text-shadow:0 0 12px color-mix(in srgb,var(--hazard) 50%,transparent)}
+html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard);color:var(--v0)}
 
 .modes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .pos{
-  border:1px solid var(--line);background:var(--v1);border-radius:6px;
+  border:1px solid var(--line);background:var(--v1);border-radius:8px;
   padding:11px 12px;cursor:pointer;display:block;
   transition:border-color .18s,background .18s,transform .18s;
 }
 .pos:hover{border-color:var(--v4);transform:translateY(-1px)}
-.pos.on{border-color:var(--steel);background:#eef4f3}
-.pos.arm.on{border-color:var(--hazard);background:#fdeeec}
+.pos.on{border-color:var(--steel);background:color-mix(in srgb,var(--steel) 13%,var(--v2))}
+.pos.arm.on{border-color:var(--hazard);background:color-mix(in srgb,var(--hazard) 14%,var(--v2))}
 .pos .top{display:flex;align-items:center;gap:8px}
 .pos .top i{width:8px;height:8px;border-radius:50%;background:var(--v4);flex:none}
 .pos.on .top i{background:var(--steel);box-shadow:0 0 7px -1px var(--steel)}
 .pos.arm.on .top i{background:var(--hazard);box-shadow:0 0 7px -1px var(--hazard);animation:beat 1.9s infinite}
 @keyframes beat{0%,100%{opacity:1}50%{opacity:.4}}
-.pos .top b{font-size:12.5px;font-weight:600}
-.pos p{color:var(--dim);font-size:11.5px;margin-top:5px;line-height:1.4}
+.pos .top b{font-size:13px;font-weight:600}
+.pos p{color:var(--dim);font-size:12px;margin-top:5px;line-height:1.4}
 
 .fld{margin-top:14px}
-.fld label{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px}
+.fld label{display:block;font-size:12px;color:var(--dim);margin-bottom:5px}
 .fld label em{color:var(--hazard);font-style:normal;font-size:10.5px;margin-left:5px}
 .fld input,.fld textarea{
-  width:100%;background:var(--v1);border:1px solid var(--line);border-radius:5px;
-  padding:8px 10px;font-family:var(--mono);font-size:12.5px;transition:border-color .15s,box-shadow .15s;
+  width:100%;background:var(--v1);border:1px solid var(--line);border-radius:6px;
+  padding:8px 10px;font-family:var(--mono);font-size:13px;transition:border-color .15s,box-shadow .15s;
 }
 .fld input:focus,.fld textarea:focus{border-color:var(--steel);outline:none;box-shadow:0 0 0 3px rgba(13,110,131,.16)}
 .fld textarea{resize:vertical;min-height:62px;font-family:var(--sans)}
 .fld input::placeholder,.fld textarea::placeholder{color:var(--faint)}
 
-#auth{border:1px solid var(--hazard);border-radius:6px;padding:13px;margin-top:14px;background:#fbeeec}
-#auth > p{color:#8c1d18;font-size:11.5px;line-height:1.45}
-#auth > p b{color:#5f110c}
-.confirm{display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:11.5px;color:#8c1d18}
+#auth{border:1px solid var(--hazard);border-radius:8px;padding:13px;margin-top:14px;background:color-mix(in srgb,var(--hazard) 9%,var(--v1))}
+#auth > p{color:color-mix(in srgb,var(--hazard) 70%,var(--ink));font-size:12px;line-height:1.45}
+#auth > p b{color:color-mix(in srgb,var(--hazard) 48%,var(--ink))}
+.confirm{display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:12px;color:color-mix(in srgb,var(--hazard) 70%,var(--ink))}
 .confirm input{margin-top:2px;accent-color:var(--hazard);flex:none}
 
 .errs{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .errs li{
-  display:flex;gap:9px;background:#fdeeed;border-left:2px solid var(--hazard);
-  border-radius:0 5px 5px 0;padding:8px 10px;font-size:11.5px;color:#7c1f1a;line-height:1.45;
+  display:flex;gap:9px;background:color-mix(in srgb,var(--hazard) 11%,var(--v1));border-left:2px solid var(--hazard);
+  border-radius:0 6px 6px 0;padding:8px 10px;font-size:12px;color:color-mix(in srgb,var(--hazard) 72%,var(--ink));line-height:1.45;
   animation:tabin .25s var(--ease);
 }
-.errs li .tagw{font:600 10px/1 var(--mono);color:var(--hazard);letter-spacing:.07em;flex:none;padding-top:2px}
-.ok{margin-top:12px;background:#e0f2e7;border-left:2px solid var(--proven);
-  border-radius:0 5px 5px 0;padding:8px 10px;font-size:11.5px;color:#155c39;line-height:1.45}
-.warn{margin-top:12px;background:#fdf4da;border-left:2px solid var(--candidate);
-  border-radius:0 5px 5px 0;padding:9px 11px;font-size:11.5px;color:#7c5f0e;line-height:1.5}
+.errs li .tagw{font:600 10.5px/1 var(--mono);color:var(--hazard);letter-spacing:.07em;flex:none;padding-top:2px}
+.ok{margin-top:12px;background:color-mix(in srgb,var(--proven) 10%,var(--v1));border-left:2px solid var(--proven);
+  border-radius:0 6px 6px 0;padding:8px 10px;font-size:12px;color:var(--proven);line-height:1.45}
+.warn{margin-top:12px;background:color-mix(in srgb,var(--candidate) 11%,var(--v1));border-left:2px solid var(--candidate);
+  border-radius:0 6px 6px 0;padding:9px 11px;font-size:12px;color:var(--candidate);line-height:1.5}
 .acts{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
 
 /* the record's own screens keep a dark face - they hold wire bytes */
 pre.prompt{
-  margin-top:6px;background:var(--scr);border:1px solid var(--scr-line);border-radius:5px;
-  padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;
+  margin-top:6px;background:var(--scr);border:1px solid var(--scr-line);border-radius:6px;
+  padding:12px;font-family:var(--mono);font-size:12px;line-height:1.6;
   white-space:pre-wrap;word-break:break-word;max-height:330px;overflow:auto;color:var(--scr-ink);
 }
 
@@ -444,7 +483,7 @@ pre.prompt{
    answers, so an empty table never reads as "nothing recorded" while it is
    really "not asked yet" */
 .tw[data-busy]::after{
-  content:"";display:block;height:56px;margin:6px 12px 14px;border-radius:5px;
+  content:"";display:block;height:56px;margin:6px 12px 14px;border-radius:6px;
   background:linear-gradient(90deg,var(--v1) 25%,var(--v3) 50%,var(--v1) 75%);
   background-size:220% 100%;animation:shimmer 1.3s linear infinite;
 }
@@ -456,9 +495,9 @@ pre.prompt{
    layout with a colgroup makes the columns deterministic, and it is the
    right default for a data table anyway: content can no longer blow a
    column out, which is what forced the page to scroll sideways. */
-table{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:fixed}
+table{width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed}
 thead th{
-  text-align:left;font-size:11px;font-weight:500;color:var(--faint);
+  text-align:left;font-size:12px;font-weight:500;color:var(--faint);
   padding:9px 12px;border-bottom:1px solid var(--line);white-space:nowrap;
 }
 tbody td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
@@ -468,16 +507,16 @@ td.r{text-align:right}
 /* With table-layout:fixed a cell does not widen for its content, it
    OVERFLOWS into the next column - a timestamp ran into Elapsed and
    read "04:54:010s", two values welded into one. Clip instead. */
-td.mt{font-family:var(--mono);font-size:11.5px;white-space:nowrap;
+td.mt{font-family:var(--mono);font-size:12px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 td.b{font-weight:600}
 /* `break-all` chopped `http://127.0.0.1:65501` into "http://1 / 27.0.0. /
    1:65501", which is unreadable and makes a target look like three. Break
    only where there is nowhere else to break. */
-.url{font-family:var(--mono);font-size:11.5px;color:#3d5f77;overflow-wrap:anywhere;word-break:normal}
-.sub2{color:var(--faint);font-size:11px;margin-top:2px;font-family:var(--mono)}
+.url{font-family:var(--mono);font-size:12px;color:var(--steel);overflow-wrap:anywhere;word-break:normal}
+.sub2{color:var(--faint);font-size:12px;margin-top:2px;font-family:var(--mono)}
 
-.st{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;white-space:nowrap}
+.st{display:inline-flex;align-items:center;gap:7px;font-size:12px;white-space:nowrap}
 .st i{width:7px;height:7px;border-radius:50%;flex:none;background:var(--v4)}
 .st.live i{background:var(--steel);box-shadow:0 0 7px -1px var(--steel);animation:beat 1.6s infinite}
 .st.done i{background:var(--proven)}
@@ -486,12 +525,12 @@ td.b{font-weight:600}
 
 .gr{display:inline-block;font:600 10.5px/1 var(--mono);letter-spacing:.06em;
   padding:4px 7px;border-radius:3px;border:1px solid transparent}
-.gr.proven{background:var(--proven-b);color:var(--proven);border-color:#8fcfae}
-.gr.candidate{background:var(--candidate-b);color:var(--candidate);border-color:#e0c98b}
-.gr.unproven{background:var(--unproven-b);color:var(--unproven);border-color:#c9d1da}
-.gr.refused{background:var(--refused-b);color:var(--refused);border-color:#c4b3e8}
+.gr.proven{background:var(--proven-b);color:var(--proven);border-color:color-mix(in srgb,var(--proven) 46%,transparent)}
+.gr.candidate{background:var(--candidate-b);color:var(--candidate);border-color:color-mix(in srgb,var(--candidate) 46%,transparent)}
+.gr.unproven{background:var(--unproven-b);color:var(--unproven);border-color:color-mix(in srgb,var(--unproven) 52%,transparent)}
+.gr.refused{background:var(--refused-b);color:var(--refused);border-color:color-mix(in srgb,var(--refused) 50%,transparent)}
 
-.sv{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;white-space:nowrap}
+.sv{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
 .sv i{width:3px;height:12px;border-radius:1px;flex:none}
 .sv.critical i{background:var(--sev5);box-shadow:0 0 6px -1px var(--sev5)}
 .sv.high i{background:var(--sev4)}
@@ -500,35 +539,35 @@ td.b{font-weight:600}
 .sv.info i{background:var(--sev1)}
 
 .ev{
-  font-family:var(--mono);font-size:11.5px;color:#3a4a5c;
-  background:#f1efe6;border-left:2px solid var(--v4);
-  padding:6px 9px;border-radius:0 3px 3px 0;
+  font-family:var(--mono);font-size:12px;color:var(--scr-ink);
+  background:var(--scr);border-left:2px solid var(--v4);
+  padding:6px 9px;border-radius:0 4px 4px 0;
   word-break:break-all;max-width:420px;line-height:1.5;
 }
 tbody.row.proven .ev{border-left-color:var(--proven)}
 tbody.row.candidate .ev{border-left-color:var(--candidate)}
 
-.why{background:#fdf6de;border-left:2px solid var(--candidate);
-  padding:8px 11px;font-size:11.5px;color:#7a5d0d;line-height:1.5;border-radius:0 3px 3px 0}
+.why{background:color-mix(in srgb,var(--candidate) 11%,var(--v1));border-left:2px solid var(--candidate);
+  padding:8px 11px;font-size:12px;color:var(--candidate);line-height:1.5;border-radius:0 4px 4px 0}
 
-.empty{padding:28px 15px;text-align:center;color:var(--faint);font-size:12.5px}
+.empty{padding:28px 15px;text-align:center;color:var(--faint);font-size:13px}
 .empty b{display:block;color:var(--dim);font-size:13px;margin-bottom:5px;font-weight:550}
 
 .filt{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .filt select,.filt input{
-  background:var(--v1);border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12px;
+  background:var(--v1);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;
 }
 .filt input{font-family:var(--mono);min-width:170px}
 .filt input:focus,.filt select:focus{border-color:var(--steel);outline:none}
 
 .cls{display:flex;flex-direction:column;gap:7px}
 .crow{display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:center}
-.crow span{font:500 11.5px/1 var(--mono);color:var(--dim)}
+.crow span{font:500 12px/1 var(--mono);color:var(--dim)}
 .cbar{height:16px;display:flex;gap:1.5px}
 .cbar i{display:block;width:9px;border-radius:1px}
 .anim .cbar i{animation:pop .3s var(--ease) backwards}
 @keyframes pop{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
-.crow b{font:500 11.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+.crow b{font:500 12px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
 
 /* -------------------------------------------------- run windows (Gantt)
    The table says WHERE each run is; this says WHEN, which the table cannot:
@@ -538,7 +577,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 .tlcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);padding:6px 2px 8px}
 #tlsvg{width:100%;display:block}
 .tgrid{stroke:var(--line-soft);stroke-width:1;vector-effect:non-scaling-stroke}
-.tlb{fill:#a9b3c2;cursor:pointer;transition:opacity .2s,filter .2s}
+.tlb{fill:var(--faint);cursor:pointer;transition:opacity .2s,filter .2s}
 .tlb:hover{filter:brightness(.92)}
 .tlb.done{fill:var(--proven);opacity:.55}
 .tlb.failed{fill:var(--hazard);opacity:.85}
@@ -554,43 +593,43 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 .mxh{font:500 10px/30px var(--sans);color:var(--faint);text-align:center;letter-spacing:.06em}
 .mxl{font:500 11px/34px var(--sans);color:var(--dim)}
 .mxc{
-  border:1px solid var(--line);border-radius:6px;background:var(--v1);
-  font:600 13px/32px var(--mono);color:var(--faint);text-align:center;
+  border:1px solid var(--line);border-radius:8px;background:var(--v1);
+  font:600 13px/32px var(--mono);color:var(--dim);text-align:center;
   font-variant-numeric:tabular-nums;
   transition:border-color .15s,background .15s,transform .1s,box-shadow .15s;
 }
 .mxc:hover{transform:translateY(-1px)}
 .mxc.lit{color:var(--ink)}
-.mxc.proven.lit{background:var(--proven-b);border-color:#8fcfae;color:var(--proven)}
-.mxc.candidate.lit{background:var(--candidate-b);border-color:#e0c98b;color:var(--candidate)}
-.mxc.unproven.lit{background:var(--unproven-b);border-color:#c9d1da;color:#4d5865}
-.mxc.refused.lit{background:var(--refused-b);border-color:#c4b3e8;color:var(--refused)}
+.mxc.proven.lit{background:var(--proven-b);border-color:color-mix(in srgb,var(--proven) 46%,transparent);color:var(--proven)}
+.mxc.candidate.lit{background:var(--candidate-b);border-color:color-mix(in srgb,var(--candidate) 46%,transparent);color:var(--candidate)}
+.mxc.unproven.lit{background:var(--unproven-b);border-color:color-mix(in srgb,var(--unproven) 52%,transparent);color:var(--dim)}
+.mxc.refused.lit{background:var(--refused-b);border-color:color-mix(in srgb,var(--refused) 50%,transparent);color:var(--refused)}
 .mxc[aria-pressed="true"]{box-shadow:0 0 0 2px var(--v2),0 0 0 3px currentColor}
 .mxc.refused{background-image:repeating-linear-gradient(135deg,transparent 0 4px,rgba(31,39,51,.04) 4px 8px)}
 
 .drawer{
-  border:1px solid var(--line);border-radius:10px;background:var(--v2);
+  border:1px solid var(--line);border-radius:12px;background:var(--v2);
   margin-top:16px;overflow:hidden;animation:slide .26s var(--ease);
 }
 @keyframes slide{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
 .tape{
-  background:var(--scr);font-family:var(--mono);font-size:11.5px;line-height:1.7;
+  background:var(--scr);font-family:var(--mono);font-size:12px;line-height:1.7;
   padding:12px 15px;max-height:280px;overflow:auto;color:var(--scr-ink);
 }
 .tape div{display:flex;gap:11px}
 .tape em{color:var(--scr-dim);font-style:normal;flex:none}
 .reader{
-  background:var(--scr);font-family:var(--mono);font-size:11.5px;line-height:1.65;
+  background:var(--scr);font-family:var(--mono);font-size:12px;line-height:1.65;
   padding:16px 18px;max-height:62vh;overflow:auto;white-space:pre-wrap;
   word-break:break-word;color:var(--scr-ink);
 }
 
 .foot{
   margin-top:28px;padding-top:16px;border-top:1px solid var(--line-soft);
-  color:var(--faint);font-size:11.5px;line-height:1.6;max-width:84ch;
+  color:var(--faint);font-size:12px;line-height:1.6;max-width:84ch;
 }
 .foot .keys{margin-top:9px;color:var(--faint);font-size:10.5px}
-.foot kbd{font:500 10px/1 var(--mono);border:1px solid var(--line);border-radius:3px;padding:2px 5px;color:var(--dim);background:var(--v1)}
+.foot kbd{font:500 10.5px/1 var(--mono);border:1px solid var(--line);border-radius:3px;padding:2px 5px;color:var(--dim);background:var(--v1)}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
@@ -604,6 +643,194 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
   .wrap{padding:16px}
   .grid{grid-template-columns:1fr}
 }
+/* ══ LỚP KHÔNG KHÍ PHÒNG ĐIỀU HÀNH ════════════════════════════════════════
+   Thêm vào khi bảng màu chuyển sang deck tối. Mỗi mục dưới đây hoặc là
+   KHÔNG KHÍ TĨNH (không tốn khung hình, không nhấp nháy) hoặc là chuyển
+   động MANG THÔNG TIN. Không có hiệu ứng nào chỉ để trông động: một console
+   nhấp nháy vô cớ là một console người vận hành nhìn đi chỗ khác ở giờ thứ
+   sáu, và đó là lúc họ cần nó nhất. */
+
+/* Lưới kỹ thuật + vignette: tĩnh hoàn toàn, chỉ để deck có chiều sâu thay
+   vì là một mảng phẳng. `fixed` nên nó không trượt theo nội dung. */
+body::before{
+  /* ĐÃ BỎ LƯỚI. Thử rồi bỏ: lưới kỹ thuật phủ toàn trang là sáo ngữ của giao
+     diện tối, và trên nền graphite trung tính nó đọc ra "ảnh nền" chứ không
+     ra "thiết bị". Chiều sâu giờ đến từ bước sáng giữa các tầng bề mặt, là
+     thứ MANG THÔNG TIN: tầng nào nổi lên là tầng đang được chú ý. */
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:linear-gradient(180deg,
+    color-mix(in srgb,var(--steel) 7%,transparent) 0%, transparent 46%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(90% 60% at 8% -8%,color-mix(in srgb,var(--steel) 10%,transparent),transparent 60%),
+    radial-gradient(70% 50% at 100% 0%,color-mix(in srgb,var(--refused) 7%,transparent),transparent 55%);
+}
+body>*{position:relative;z-index:1}
+
+/* Tiêu điểm bàn phím phát sáng theo màu tín hiệu - vừa là thẩm mỹ vừa là
+   khả dụng: viền mảnh trên nền tối rất dễ mất dấu. */
+:focus-visible{
+  outline:2px solid var(--steel);outline-offset:2px;
+  box-shadow:0 0 0 5px color-mix(in srgb,var(--steel) 20%,transparent);
+}
+
+/* Chip grade khi sáng thì phát quang theo đúng màu của mức đó. Quầng sáng
+   là cùng một thông tin với màu, nói to hơn - không phải một màu thứ hai. */
+.mxc.proven.lit{box-shadow:0 0 18px -4px color-mix(in srgb,var(--proven) 55%,transparent)}
+.mxc.candidate.lit{box-shadow:0 0 18px -4px color-mix(in srgb,var(--candidate) 45%,transparent)}
+.mxc.refused.lit{box-shadow:0 0 18px -4px color-mix(in srgb,var(--refused) 40%,transparent)}
+/* `unproven` KHÔNG phát quang, và đó là chủ ý: nó là một sự vắng mặt, nên
+   nó không được tranh sự chú ý với ba mức kia. */
+
+/* Đường quét: chỉ chạy khi CÓ một lượt đang trên dây. Nó là tín hiệu trạng
+   thái, không phải đồ trang trí - deck im lặng khi không có gì đang chạy. */
+.topbar{overflow:hidden}
+.topbar::after{
+  content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;
+  background:linear-gradient(90deg,transparent,var(--steel),transparent);
+  opacity:0;transform:translateX(-100%);
+}
+@media (prefers-reduced-motion:no-preference){
+  html[data-live="1"] .topbar::after{
+    opacity:.9;animation:scanline 2.6s linear infinite;
+  }
+  @keyframes scanline{to{transform:translateX(100%)}}
+}
+html[data-live="1"] .topbar::after{opacity:.55}
+
+/* Chế độ engagement: dải cảnh báo đậm hơn trên deck tối, vì trên nền sáng
+   nó đã đủ gắt còn trên nền tối thì chìm. */
+html[data-mode="engagement"]{
+  --amb:rgba(244,63,94,.07);
+}
+html[data-mode="engagement"] body::after{
+  background:
+    radial-gradient(90% 60% at 50% -10%,color-mix(in srgb,var(--hazard) 16%,transparent),transparent 62%);
+}
+/* ═══ THIẾT KẾ LẠI: THANG CHỮ, NHỊP, VÀ SỰ PHÂN TẦNG ═══════════════════
+   Đo trước khi sửa, và phép đo chỉ ra vấn đề không phải bảng màu: toàn bộ
+   cỡ chữ của trang nằm trong 10-15px. Chín cỡ cách nhau chưa tới 5px, nên
+   không có gì to, không có gì nhỏ, và mắt không có chỗ bám. Đổi màu ba lần
+   không chạm tới khuyết điểm đó.
+
+   Thang mới theo tỉ lệ ~1.32, từ 11 đến 68. Khoảng cách giữa các bậc đủ
+   lớn để mỗi bậc nói một việc khác nhau.
+
+   NỐI THÊM, KHÔNG CẮT. Lớp này đứng cuối stylesheet và thắng nhờ thứ tự,
+   nên không một quy tắc cũ nào bị đụng vào. Hôm nay tôi mất 521 dòng vì
+   một lát cắt sai; cách viết này không thể gây ra điều đó. */
+:root{
+  --t-data:11px; --t-body:13px; --t-lead:15.5px;
+  --t-sec:20px;  --t-say:27px;  --t-big:44px; --t-huge:68px;
+}
+
+/* Nền có không khí: một vầng sáng lớn rất nhạt thay cho mảng phẳng. Màu
+   nền phẳng là thứ làm giao diện tối trông như chưa hoàn thiện. */
+body{
+  background:
+    radial-gradient(120% 70% at 18% -12%, color-mix(in srgb,var(--steel) 13%,transparent), transparent 62%),
+    radial-gradient(95% 55% at 92% 2%, color-mix(in srgb,var(--refused) 8%,transparent), transparent 58%),
+    var(--v0);
+  background-attachment:fixed;
+}
+
+/* ── HERO: để bản ghi tự nói ────────────────────────────────────────────
+   Hero cũ là vòng tròn + số to + nhãn in hoa, tức đúng cách trình bày mặc
+   định mà mọi dashboard đều dùng. Ở đây thứ đặc trưng không phải "một con
+   số", mà là HÌNH DẠNG CỦA BẢN GHI: bao nhiêu phát hiện mang được bằng
+   chứng, bao nhiêu thì không. Nên dải ô là nhân vật chính, và câu khẳng
+   định được đặt ở cỡ trưng bày. */
+.hero{
+  background:none;border:0;box-shadow:none;
+  padding:30px 0 34px;
+  border-bottom:1px solid var(--line-soft);
+  border-radius:0;
+}
+.hero h2{
+  font-size:var(--t-say);line-height:1.16;font-weight:680;
+  letter-spacing:-.022em;max-width:27ch;margin:0 0 9px;
+  color:var(--ink);
+}
+.hero .sub{font-size:var(--t-lead);color:var(--dim);max-width:52ch;line-height:1.5}
+.gnum{font-size:var(--t-huge);font-weight:700;letter-spacing:-.045em;line-height:.92}
+.gof{font-size:var(--t-data);color:var(--faint);letter-spacing:0;max-width:15ch;line-height:1.4}
+
+/* Dải ô: ô cao hơn, khe hẹp hơn, nên cả dải đọc ra MỘT thanh ghi liên tục
+   chứ không phải mười viên gạch rời. */
+.strip{gap:3px;margin-top:20px}
+.strip > *{border-radius:3px;min-height:34px}
+
+/* Chú giải mức: cỡ chữ tăng, chữ số tách khỏi nhãn bằng trọng lượng chứ
+   không bằng màu - màu ở đây đã có nghĩa khác rồi. */
+.striplegend{margin-top:16px;gap:7px 20px}
+.lg{font-size:var(--t-body)}
+.lg b{font-size:var(--t-lead);font-weight:700}
+.lg em{font-size:var(--t-data);color:var(--faint)}
+
+/* ── PHÂN TẦNG KHUNG ────────────────────────────────────────────────────
+   Bốn thẻ bo cùng một bán kính, cùng một viền, cùng một bóng là bộ khung
+   mặc định ai cũng dựng. Ở đây khung được phân theo CHỨC NĂNG: nơi người
+   vận hành gõ vào thì có hộp thật (viền, nền nổi), nơi chỉ để đọc thì mở
+   ra, ngăn nhau bằng một đường kẻ mảnh và khoảng trống. */
+.panel{border-radius:14px}
+#launchmode, .panel:has(#target){
+  background:linear-gradient(172deg, color-mix(in srgb,var(--steel) 7%,var(--v2)), var(--v1) 70%);
+  border-color:color-mix(in srgb,var(--steel) 24%,var(--line));
+}
+
+/* Tiêu đề mục: cỡ thật, chữ thường, không giãn. Một tiêu đề đủ to thì
+   không cần nhãn phía trên nó. */
+.panel > h2, .panel > header h2, .ph{
+  font-size:var(--t-sec);font-weight:660;letter-spacing:-.016em;color:var(--ink);
+}
+
+/* Số liệu ở dải dòng chảy. ĐÃ SỬA SAU KHI ĐO: bản đầu tôi đoán tên phần tử
+   và sai hai lần. `#t-runs`/`#t-finds`/`#t-reps` hoá ra là ba cái BẢNG, nên
+   cỡ trưng bày rơi xuống từng ô dữ liệu; và `.fnum` là chữ số nằm TRONG SVG,
+   nơi baseline bị JS ghim ở y=63 trong khung cao 92 với nhãn ở y=35 - cỡ 44
+   làm chữ số trào lên đè nhãn. Cỡ dưới đây là cỡ lớn nhất còn lọt khoảng
+   28 đơn vị giữa hai baseline đó. CSS không được cãi hình học mà JS đã đặt. */
+.fnum{font-size:26px;font-weight:700;letter-spacing:-.03em}
+
+/* Bảng: dòng thoáng hơn, tiêu đề cột nhạt đi để dữ liệu nổi lên. */
+table{font-size:var(--t-body)}
+thead th{font-size:var(--t-data);color:var(--faint);font-weight:600;padding-bottom:9px}
+tbody td{padding-top:11px;padding-bottom:11px}
+
+/* Chân trang: dòng chữ dài thì giới hạn bề ngang, nếu không mắt lạc dòng. */
+footer, .foot{font-size:var(--t-body);line-height:1.6}
+footer p, .foot p{max-width:74ch}
+
+@media (max-width:720px){
+  :root{--t-huge:52px; --t-big:34px; --t-say:22px; --t-sec:17px}
+  .hero{padding:22px 0 26px}
+}
+/* Ô dấu thời gian thiếu đúng 3px sau khi gom thang chữ, nên nó cắt thành
+   "01:53:…". Trên một bảng bằng chứng, mất giây là mất dữ liệu: hai lượt
+   cách nhau 40 giây sẽ đọc thành cùng một thời điểm. Đặt theo ĐỘ RỘNG KÝ TỰ
+   của chính chuỗi đó, nên nó đúng ở mọi cỡ chữ về sau thay vì đúng một lần. */
+/* Dòng định danh ở đầu trang bị cắt giữa từ ("...does not alre..."), đọc ra
+   như một lỗi chứ không như một lựa chọn. Ở màn hình rộng thì cho nó đủ chỗ;
+   hẹp lại thì nó mới được phép rút, vì lúc đó chỗ thật sự không còn. */
+/* TRÀN NGANG Ở BỀ NGANG ĐIỆN THOẠI - đo được 590px nội dung trong khung 390.
+   `.tw` đã có `overflow-x:auto` từ trước, nên thoạt nhìn tưởng đã xử lý rồi.
+   Nó không chạy vì một phần tử của lưới/flex mặc định là `min-width:auto`:
+   nó TỪ CHỐI co xuống dưới bề ngang nội dung, nên cái bảng rộng 572px đẩy
+   ô lưới ra, và ô lưới đẩy cả trang. `overflow` chỉ có hiệu lực khi phần tử
+   bị buộc phải hẹp hơn nội dung của nó.
+
+   Bảng dùng `table-layout:fixed` với `<colgroup>` cộng lại 572px, nên nó
+   KHÔNG thể vừa 390px - và nó không nên vừa: nén cột xuống là cắt mất dấu
+   thời gian, đúng lỗi vừa sửa ở trên. Nó cuộn trong khung của nó. */
+.grid > *, .wrap > *, .deck > *, .panel, .tw{min-width:0}
+/* `.grid > *` là mắt xích thật, tìm được bằng cách truy ngược chuỗi tổ tiên
+   chứ không đoán: giữa `.grid` và `.panel` có một div không class, và nó
+   giữ `min-width:auto`. Track của lưới vì thế tính ra 574px trong một lưới
+   rộng 358px. Bản sửa đầu của tôi liệt kê `.wrap > *` và `.deck > *` nên
+   bỏ sót đúng phần tử đang gây ra chuyện. */
+.tw{max-width:100%}
 </style>
 </head>
 <body>
@@ -617,7 +844,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       </svg>
       <div>
         <h1>ARGUS</h1>
-        <span class="tag">nothing is recorded that the transcript does not already prove</span>
+        <span class="tag">nothing recorded that the transcript does not prove</span>
       </div>
     </div>
 
@@ -669,7 +896,6 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       </div>
 
       <div class="hmid">
-        <div class="overline">PROOF RECORD</div>
         <h2>Every finding, graded against the bytes on record</h2>
         <p class="sub">One cell per finding. Click a grade to filter the record.</p>
         <div class="strip" id="strip"></div>
@@ -690,7 +916,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       </div>
 
       <div class="mix">
-        <h3>IF TRUE, HOW BAD</h3>
+        <h3>If true, how bad</h3>
         <div id="sevmix"></div>
       </div>
       <i class="tick2" aria-hidden="true"></i>
@@ -698,7 +924,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 
     <section class="flowband rise" style="--d:.1s" aria-label="Evidence pipeline">
       <div class="flcap">
-        <h2>THE RECORD, MOVING</h2>
+        <h2>The record, moving</h2>
         <p id="livesay">idle - nothing in flight</p>
         <p id="toolsay">tools unknown</p>
       </div>
@@ -780,7 +1006,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
               <table id="t-runs">
                 <colgroup>
                   <col style="width:92px"><col><col style="width:96px">
-                  <col style="width:158px"><col style="width:76px">
+                  <col style="width:174px"><col style="width:76px">
                   <col style="width:70px"><col style="width:64px">
                 </colgroup>
                 <thead><tr>
@@ -1667,7 +1893,7 @@ var FLOW = { svg: null, links: [], lens: [], dots: [], nums: [], nodes: [],
              t: 0, last: 0, speed: 0.00016 };
 function buildFlow() {
   var s = clear($('flowsvg')), H = 92, NH = 58, NW = 152, Y = (H - NH) / 2;
-  var xs = [10, 304, 598], words = ['RUNS', 'FINDINGS', 'REPORTS'],
+  var xs = [10, 304, 598], words = ['Runs', 'Findings', 'Reports'],
       caps = ['accepted', 'graded', 'sealed'];
   FLOW.svg = s; FLOW.links = []; FLOW.lens = []; FLOW.dots = [];
   FLOW.nums = []; FLOW.nodes = [];
@@ -1707,6 +1933,16 @@ function paintFlow() {
     ? live + (live === 1 ? ' run' : ' runs') + ' live on the wire'
     : 'idle - nothing in flight');
   FLOW.svg.classList.toggle('hot', live > 0);
+  /* The chassis learns it, so CSS can say "something is on the wire" without
+     asking the DOM. The scan line under the top bar is keyed to this and to
+     nothing else: a console that animates when nothing is running teaches
+     the operator to ignore the animation, which costs exactly when it
+     matters. Added with the rule that reads it - a selector whose attribute
+     nobody sets is dead CSS carrying a claim. */
+  if (D.documentElement) {
+    if (live > 0) D.documentElement.setAttribute('data-live', '1');
+    else D.documentElement.removeAttribute('data-live');
+  }
   FLOW.nodes.forEach(function (g, i) { g.classList.toggle('hotn', i === 0 && live > 0); });
   var gb = $('gaugebox'); if (gb) gb.classList.toggle('hot', live > 0);
   FLOW.speed = live ? 0.0005 : 0.00016;
