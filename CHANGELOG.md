@@ -7972,6 +7972,41 @@ so joining it inserted a space between every character. Fifteenth shape
 assumption in this session, caught the same way as the other fourteen - by
 running it.
 
+### The whole finding pipeline, cold-started on the final tree
+
+Around twenty edits landed today across the evidence store, the proof
+matrix, the judge case file, the replay layer and four renderers. A passing
+suite says each piece still works; it does not say the path through them
+does. So: fresh lab on loopback, fresh engagement against it, every layer
+and every artifact, from nothing.
+
+    matrix          6 findings, 5 proven + 1 candidate, graded from bytes
+    re-verification 5 reproduced, 1 inconclusive with its reason
+    cross-read      dry run, 8892 bytes, no first-model reasoning in it
+    artifacts       report.md, report.html, report-h1.html, report.sarif,
+                    summary.json all rendered
+    coverage        all three layers stated, including the zero
+    verify          73 chained entries anchored to summary.json,
+                    6 findings re-validated, artifacts sealed
+
+The zero is the line worth keeping in view: the cross-read column reads
+0 of 6 on evidence produced without a model endpoint, and the report says
+so and names the command that would change it. Every defect fixed today
+was a variant of that column being silently absent instead.
+
+WHAT THIS DOES AND DOES NOT ESTABLISH. It establishes that the path holds
+end to end after a day of edits, that the seal survives a replay, and that
+the artifacts agree with each other. It does not establish that a second
+model would dispute nothing - that needs an endpoint, and it would measure
+models rather than this code. Nor does it settle the two decisions left for
+a person: whether three authentication aliases should carry their own
+weakness identifiers instead of their proof-shape class's, and one line of
+product copy that is now a universal claim over a count that can contradict
+it.
+
+Both were reported rather than taken, because each one changes what the
+system claims rather than whether it keeps its claims.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
