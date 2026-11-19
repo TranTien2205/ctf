@@ -83,7 +83,22 @@ Depth, one named file at a time:
 
 | Signal or task | Open |
 |---|---|
-| Boundary, amount, sequence or identity assumption | `references/boundary-and-flow.md` |
+| The shape in one screen / first probes | `references/summary.md`, `references/quick-reference.md`, `references/onboarding.md` |
+| The full mechanism list | `references/mechanism-alphabet.md` |
+| Extra field the form doesn't send | `references/mass-assignment.md`, `references/mass-assignment-deep.md` |
+| Skipped step / out-of-order flow | `references/workflow-skip.md`, `references/workflow-skip-deep.md` |
+| One-time action replayed | `references/state-replay.md`, `references/state-replay-deep.md`, `references/idempotency-deep.md` |
+| Boundary, amount, sequence or identity assumption | `references/boundary-and-flow.md`, `references/numeric-boundary.md`, `references/sequence-and-time.md` |
+| Checked value transformed before use (Pachinko shape) | `references/two-validator-gap.md`, `references/transform-math.md` |
+| Privileged field at registration | `references/role-assignment.md` |
+| Value minted upstream trusted downstream | `references/trust-in-earlier-step.md` |
+| Observation → mechanism → probe | `references/detection.md`, `references/detection-workflows.md` |
+| The probe library | `references/payload-variants.md`, `references/extended-corpus.md` |
+| Chains to the flag | `references/exploitation.md`, `references/multi-step-chains.md` |
+| The verified anchor | `references/verified-chains.md` |
+| What proves / what kills | `references/evidence-rules.md`, `references/falsifiers.md` |
+| Timed engagement | `references/first-hour.md` |
+| Full file index | `references/README.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

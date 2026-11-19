@@ -1,56 +1,80 @@
-# Boundary and flow flaws
+# Boundary and flow — the original reference, expanded
 
-Logic flaws are validated by *comparison*, not by payload: a correct input and
-one input that crosses a documented boundary, side by side.
+The two shapes this skill was founded on: arithmetic boundaries in
+flow arithmetic (`quantity=-1` → negative total) and flow-order
+boundaries (skipped steps). This module is the deep read of both —
+kept for continuity with the original SKILL.md routing.
 
-## Probe that worked (Pachinko / Pachinko Revisited)
+## The arithmetic boundary in a flow
 
-Submit the minimal correct circuit, then the same circuit with one node id
-just past the checker's documented limit, and compare the two responses:
+A flow `cart → checkout` computes `total = Σ qty·price`. The boundary
+question: what does the arithmetic produce for values the flow never
+intended?
 
-```text
-arm A: valid minimal circuit          -> accepted
-arm B: same circuit, node id = max+1  -> ?
+```
+quantity=-1  → item contributes -price → total can go negative
+quantity=0   → free item
+discount=200 → total -100
+price=-1     → negative per-unit
+qty=0.1      → fractional — totals rounding
+qty=NaN      → total=NaN — comparison-false propagation
+qty=1e309    → total=Infinity — overflow propagation
+qty=2147483648 → int32 wrap → negative total via overflow
 ```
 
-Expected: arm B is accepted or processed past the guard — the check compared
-against the wrong bound (`<` vs `<=`, off-by-one in id space, or a limit read
-from a different field than the one validated). Falsifier: arm B is rejected
-with the same shape as every other invalid input — the boundary is enforced.
+Each value tests a different invariant: sign, zero, type, NaN-
+semantics, float-overflow, int-width. The verbatim evidence is the
+impossible total in a read-back — `total:-50` on the cart, and
+`charged:-50` or `refunded:50` at checkout for impact.
 
-## The boundary alphabet
+## The order boundary in a flow
 
-| Boundary | The probe pair |
+A flow `cart → pay → confirm → flag` is a line in `Σ*`; the handlers
+permit a graph. The order-boundary probes:
+
+| Probe | Edge tested |
 |---|---|
-| documented max / limit | value at limit, value at limit+1 |
-| integer width | `2^31-1` vs `2^31`, negative where unsigned is assumed |
-| array length | exactly N, N+1 |
-| uniqueness | submit twice, interleaved |
-| price/quantity/amount | 0, negative, very large, float vs int |
-| step order | skip a step, reorder steps, replay a step |
+| `POST /confirm` bare | terminal with no precondition |
+| `POST /confirm` on unpaid order | skipped `pay` |
+| `GET /flag` bare | terminal-of-terminals, zero steps |
+| `step=3` forged | client-writable state |
+| `pay → confirm → pay` | re-entry after terminal |
 
-## The flow questions
+## The combined shape — the boundary at a skipped step
 
-Every business flow has assumptions the code never states — find them:
+The flows compose: skip to `confirm` on a `total:-50` cart — the
+checkout's own validator may be the SECOND check the boundary has to
+pass. Two layers of arithmetic checks, one boundary value probing both.
 
-- **Sequence**: can step 3 run before step 1? Can a step repeat?
-- **Amount**: does the server recompute price, or trust a client field?
-- **Identity**: whose record does the action touch — is ownership re-checked
-  on *this* step?
-- **State**: does a flag set by step A survive when step B fails?
+## Evidence
 
-The pattern is always the pair: the intended input, then the input that
-violates exactly one assumption — and the comparison of the two responses is
-the evidence.
+```
+cart read-back:   {"items":[{"qty":-1,"price":50}], "total":-50}
+checkout result:  {"status":"confirmed","charged":-50}
+order read-back:  {"status":"confirmed","paid":false,"flag":"..."}
+```
 
-## Falsifier
+The three-field verbatim: transition ran (`confirmed`), precondition
+absent (`paid:false`), sink reached (`flag`).
 
-Every out-of-bounds or out-of-order input is rejected with the same uniform
-error — the assumption is enforced server-side on all paths.
+## Falsifiers
 
-## Traps
+- `400 quantity must be positive` / silent clamp → arithmetic guarded
+- `302`/`400` to earlier step / `paid required` → ordering enforced
+- `/confirm` 200 but `status` unchanged → soft no-op — negative, not
+  confirm
 
-- A `200` that does nothing is not a bypass — the effect must land in state
-  (re-read the object).
-- Two different error shapes for "invalid" is already signal: the inputs took
-  different code paths.
+## The layer questions
+
+- WHERE does `total` compute — client JS (forge), server from cart
+  (boundary must enter via items), or server from a carried `total`
+  field (trust-in-earlier-step)?
+- WHERE does `paid` flip — a webhook (callback trust), the `/pay`
+  handler (skip target), or client state (forge)?
+- WHERE does the flag read — a field on the confirmed order (chain:
+  boundary→checkout→read-back), or a gated endpoint (chain: role/
+  skip→surface→flag)?
+
+This module anchors the original `boundary-and-flow.md` routing —
+the full mechanism coverage lives in `mechanism-alphabet.md` and the
+per-mechanism modules.

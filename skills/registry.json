@@ -1870,9 +1870,9 @@
       "verified_by": [
         "pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
       ],
-      "skill_tokens": 959,
-      "depth_files": 3,
-      "depth_tokens": 1240,
+      "skill_tokens": 1317,
+      "depth_files": 93,
+      "depth_tokens": 96048,
       "use_when": [
         "a probe or source read produced this class's signal: one extra field the model has but the form does not send, or one step of the flow skipped",
         "a chain card already proves this class here: pico-pachinko-revisited-node-offset-scale-wrap-instruction-overwrite"
