@@ -8091,12 +8091,51 @@ Seventeenth shape assumption on the way there - the action record's field
 is not called what I typed - and the same remedy as the other sixteen:
 print the real fields.
 
+### Every artifact must report the same findings - the relation nothing asserted
+
+Having argued that per-finding verification cannot see a defect in the
+RELATION between findings, the next question is what else of that class is
+unguarded. Measured on a live session: all five artifacts agree on the
+count, and the summary's severity tally equals the findings' own. The
+relation holds - and nothing asserted it.
+
+Both failure modes of that relation have already happened in this project.
+Two rows for one bug: a REST path subject keyed separately from a
+query-string subject, fixed an hour ago. One row dropped: a console filter
+that rendered one of ten findings, found by the session that owns that file.
+Each passed every per-finding check.
+
+Asserted now, in two tests: every artifact reports the same count and
+carries every finding id, the summary's tally equals the findings'
+severities, and the bug-bounty page - the one that leaves the building -
+carries every title. Planted a renderer dropping its last result and
+another dropping its first: both red.
+
+FIVE WRONG SHAPES ON THE WAY, which is the part worth recording, because
+the test was harder to write than the fix it guards:
+
+The command entry point and a module were not in scope at the top of that
+file. The demo writes into a timestamped SUBDIRECTORY, so every path was
+one level off. The summary's `findings` key holds the LIST, not a count -
+and the measurement I had run minutes earlier printed its length through an
+isinstance branch that existed precisely because it is a list. The session
+was reopened on the parent rather than the session directory, which
+produced a page with no findings at all - and I diagnosed that as a wrong
+target twice before reading the line numbers. And the last assertion
+demanded a finding title appear RAW in an HTML page, which the renderer
+escapes - correctly, since emitting a title unescaped would be an injection
+hole in the deliverable. So the test, as first written, was asking for a
+defect.
+
+Nineteen shape assumptions in this session. The remedy has been the same
+every time and it is cheap: print the real thing before asserting about it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1181 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1183 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

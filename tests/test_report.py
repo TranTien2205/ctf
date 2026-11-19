@@ -1005,3 +1005,109 @@ def test_a_plural_count_reads_correctly():
 
     line = _grade_line([{"grade": "proven"}, {"id": "a"}, {"id": "b"}])
     assert "1 of 3" in line and "2 carry no grade" in line, line
+
+
+def test_every_artifact_reports_the_same_findings(tmp_path):
+    """THE CLASS OF DEFECT PER-FINDING VERIFICATION CANNOT SEE, asserted.
+
+    Each of the three verification layers answers a question about ONE
+    finding: did the target produce these bytes, do they demonstrate this
+    class, does the target still do it. None of them can see a relation
+    BETWEEN findings - so a store holding two rows for one bug, or a
+    renderer dropping one row, passes every per-finding check while the
+    deliverable is wrong.
+
+    Both failure modes have occurred in this project. Two rows for one bug:
+    a REST path subject keyed separately from a query-string subject, so an
+    engagement against N enumerable subjects produced N findings. One row
+    dropped: a console filter that rendered one of ten findings.
+
+    Nothing asserted the relation. This does: every artifact must report the
+    same count, carry every finding id, and the summary's severity tally
+    must equal the findings' own severities.
+    """
+    import json
+    import re
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    # the demo writes into a timestamped SUBDIRECTORY, as the tests above do
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+
+    findings = json.loads((sdir / "findings.json").read_text(
+        encoding="utf-8"))
+    ids = [str(f.get("id")) for f in findings]
+    assert len(ids) >= 2, "premise: the demo records more than one finding"
+
+    summary = json.loads((sdir / "summary.json").read_text(
+        encoding="utf-8"))
+    sarif = json.loads((sdir / "report.sarif").read_text(
+        encoding="utf-8"))
+    md = (sdir / "report.md").read_text(encoding="utf-8")
+    html = (sdir / "report.html").read_text(encoding="utf-8")
+
+    counted = {
+        "summary.json": len(summary.get("findings") or []),
+        "report.sarif": len(sarif.get("runs", [{}])[0].get("results", [])),
+        "report.md": len(re.findall(r"^#{2,4}\s*F\d+\b", md, re.M)),
+    }
+    for name, n in counted.items():
+        assert n == len(ids), (
+            f"{name} reports {n} findings, findings.json holds {len(ids)}")
+
+    for fid in ids:
+        assert fid in md, f"{fid} is missing from report.md"
+        assert fid in html, f"{fid} is missing from report.html"
+
+    from collections import Counter
+    own = dict(Counter(str(f.get("severity")) for f in findings))
+    assert summary.get("counts") == own, (
+        f"summary.json tallies {summary.get('counts')} against the "
+        f"findings' own {own}")
+
+
+def test_the_bug_bounty_artifact_carries_every_finding(tmp_path):
+    """Rendered on request rather than by the run, so it is checked
+    separately - and it is the artifact that leaves the building."""
+    import json
+    import pathlib
+    import re
+
+    from argus.cli import _reopen, main
+    from argus.config import Config
+    from argus.report.hackerone import render_hackerone
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+    findings = json.loads((sdir / "findings.json").read_text(
+        encoding="utf-8"))
+    summary = json.loads((sdir / "summary.json").read_text(
+        encoding="utf-8"))
+
+    # THE SESSION DIRECTORY, not its parent, and the target from meta.json,
+    # which is where it lives - summary.json has no such key. Reopening the
+    # parent gave a session with no transcript, so the page rendered with no
+    # findings on it, and the first version of this test read that as the
+    # renderer dropping them. The diagnosis was wrong twice before the line
+    # numbers settled it.
+    meta = json.loads((sdir / "meta.json").read_text(encoding="utf-8"))
+    session = _reopen(sdir, "")
+    path = render_hackerone(
+        session, Config(target=str(meta.get("target") or "http://t/")),
+        "summary")
+    page = pathlib.Path(path).read_text(encoding="utf-8")
+
+    # COMPARED IN THE FORM IT APPEARS. One demo title contains angle
+    # brackets, which the page escapes - correctly, since a report that
+    # emitted a finding title raw would be an injection hole in the
+    # deliverable. The first version asserted the raw title, so it was
+    # asking the renderer NOT to escape.
+    import html as _html
+
+    for f in findings:
+        title = str(f.get("title") or "")
+        assert title, f"{f.get('id')} has no title"
+        assert title in page or _html.escape(title) in page, \
+            f"{f.get('id')} ({title[:40]}) is missing from report-h1.html"
+    assert len(re.findall(r"PROOF:", page)) == len(findings)
