@@ -88,8 +88,51 @@ shared instance applies to it too.
 
 - `references/webdriver-api.md` — endpoint cheat sheet for driving the protocol
   directly with `curl`
+- `references/mechanism.md` — the two uses and the WebDriver model
+- `references/detection.md` — is an endpoint exposed / is a bot worth it
+- `references/library-drivers.md` — Selenium / Playwright / curl
+- `references/local-bot.md` — reproduce the challenge's bot
+- `references/attack-surface.md` — the endpoint as file-read/loopback target
+- `references/observability.md` — console, errors, DOM, network
+- `references/payload-development.md` — the debug loop
+- `references/payload-variants.md` — the exfil and probe payload library
+- `references/capabilities.md` — the session capability reference
+- `references/chrome-flags.md` — the flags and their reproduction
+- `references/session-management.md` — lifecycle, leaks, shared instances
+- `references/cdp.md` — DevTools protocol when WebDriver is not enough
+- `references/grid-remote.md` — the Grid/shared variant
+- `references/multi-page.md` — frames, pages, contexts
+- `references/headless-detection.md` — is the visitor a real browser
+- `references/workflow.md` — the ordered run
+- `references/evidence-rules.md` — what counts as proof
+- `references/falsifiers.md` — what kills the class
+- `references/troubleshoot.md` — the failure modes and fixes
+- `references/edge-cases.md` — the unusual states
+- `references/common-mistakes.md` — the misapplications
+- `references/class-boundary.md` — where this skill ends
+- `references/negative-results.md` — recording dead ends
+- `references/evasion.md` — blocked-channel pivots
+- `references/attack-shapes.md` — the named exploit patterns
+- `references/case-studies.md` — the solved anchors
+- `references/per-mechanism.md`, `references/per-check.md`,
+  `references/per-route.md`, `references/per-endpoint.md`,
+  `references/per-surface.md`, `references/per-boundary.md`,
+  `references/per-vector.md`, `references/per-falsifier.md` — the per-axis maps
+- `references/detection-matrix.md`, `references/detection-surface.md`,
+  `references/detection-index.md`, `references/detection-checklist.md`
+  — the detection maps
+- `references/theory.md`, `references/glossary.md`, `references/summary.md`,
+  `references/onboarding.md`, `references/first-hour.md`,
+  `references/preconditions.md`, `references/common-questions.md`,
+  `references/checklist.md`, `references/quick-reference.md`,
+  `references/field-manual.md`, `references/verified-chains.md` — the
+  reference set
+- `references/README.md` — the full index of ~120 reference files,
+  including `*-deep` variants of every module
 
 ## Routing
 
 Client-side payload work: `../web-xss/`. Bot-delivered state change:
-`../web-csrf/`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
+`../web-csrf/`. A `file://` read's targets: `../file-read-primitives/`.
+A server-side fetch mistaken for a bot: `../web-ssrf/`.
+Budget and escalation: `../LOOP_DISCIPLINE.md`.

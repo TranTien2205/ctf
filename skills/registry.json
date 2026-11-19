@@ -1593,9 +1593,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1023,
-      "depth_files": 1,
-      "depth_tokens": 651,
+      "skill_tokens": 1696,
+      "depth_files": 120,
+      "depth_tokens": 95497,
       "use_when": [
         "a challenge has an admin bot and a client-side payload needs debugging",
         "the challenge itself exposes a WebDriver or Selenium endpoint"
