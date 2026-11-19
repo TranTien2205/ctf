@@ -580,9 +580,10 @@ def _finding_key(category: str, url: str) -> tuple:
     # `/api/user/2` stays apart from `/api/order/2`. A uuid segment is also
     # an identifier, and merging those is a larger claim with its own
     # evidence, so it is left for one.
-    segments = tuple("{id}" if seg.isdigit() else seg
-                     for seg in (p.path or "/").split("/"))
-    return (cat, host, "/".join(segments) or "/", params)
+    # Through the shared helper, so the ledger's "already recorded" test and
+    # this dedup key cannot drift apart - they did, and the disagreement
+    # produced a recommendation this function then refused.
+    return (cat, host, proof.endpoint_key(p.path or "/"), params)
 
 
 # Audit-grade reports carry standard identifiers; the category the model

@@ -366,8 +366,14 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
     # Per (class, endpoint), not per class: an `rce` recorded on /a used to
     # hide an unrecorded `rce` proof on /b for the rest of the run, because
     # the class was "already recorded". Two endpoints are two findings.
+    # KEYED THE WAY THE STORE KEYS IT. This used the raw path while
+    # `add_finding` normalises subject values out, so after the store began
+    # merging two subjects into one finding, this set did not know the
+    # second was covered - and rule 1 kept recommending a record the store
+    # then refused as a duplicate. An agent following the ledger would loop.
     recorded = {(proof.normalize(str(f.get("vuln_class") or "")),
-                 _endpoint(f) or _shape_of_url(str(f.get("url") or "")))
+                 proof.endpoint_key(
+                     _endpoint(f) or _shape_of_url(str(f.get("url") or ""))))
                 for f in findings}
 
     # Rule 1 - evidence already on disk that meets a proof requirement, with
@@ -612,7 +618,8 @@ def _unrecorded_proof(exchanges: list[dict], recorded: set[str],
     by_shape = by_shape if by_shape is not None else {}
     for entry in reversed(exchanges[-max_scan:]):
         klass = PROBE_CLASS.get(_tool_of(entry))
-        if not klass or (klass, _endpoint(entry)) in recorded:
+        if not klass or (klass,
+                         proof.endpoint_key(_endpoint(entry))) in recorded:
             continue
         if str(entry.get("id")) in claimed_ids:
             continue

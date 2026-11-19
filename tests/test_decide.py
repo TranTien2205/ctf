@@ -1004,3 +1004,111 @@ def test_the_exit_names_re_verifiable_findings_without_blocking_on_them(
     # F02 was re-verified; F01 never was and F03's question never reached
     # the target, which is not a re-verification
     assert action.detail["re_verifiable"] == ["F01", "F03"]
+
+
+def test_the_ledger_and_the_store_agree_on_already_recorded():
+    """TWO LISTS, ONE CONCEPT - and this one produced a loop.
+
+    The store's dedup key drops subject values: one bug reached through two
+    ids is one finding. The ledger's "is this already recorded" test used
+    the raw path. So once the store began merging two subjects, the ledger
+    did not know the second was covered, and rule 1 kept recommending a
+    record that `add_finding` then refused as a duplicate. An agent
+    following the ledger would loop: recommend, refuse, recommend.
+
+    Asserted between the real functions rather than against a fixture, so a
+    change to either definition fails here instead of in an engagement.
+    """
+    from argus.proof import endpoint_key, normalize
+    from argus.session import _finding_key
+
+    pairs = (
+        ("http://t.test/api/user/2", "http://t.test/api/user/3", True),
+        ("http://t.test/page/1", "http://t.test/page/2", True),
+        ("http://t.test/api/user/2", "http://t.test/api/order/2", False),
+        ("http://t.test/api/v2/u", "http://t.test/api/v3/u", False),
+        ("http://t.test/api/2fa/x", "http://t.test/api/3fa/x", False),
+        ("http://t.test/a", "http://t.test/b", False),
+    )
+    for first, second, same_bug in pairs:
+        store_merges = _finding_key("idor", first) == _finding_key("idor",
+                                                                   second)
+        ledger_same = ((normalize("idor"), endpoint_key(first))
+                       == (normalize("idor"), endpoint_key(second)))
+        assert store_merges == ledger_same, (
+            f"{first} vs {second}: the store merges={store_merges} while the "
+            f"ledger calls them the same endpoint={ledger_same} - one of "
+            "them will recommend what the other refuses")
+        assert store_merges == same_bug, (
+            f"{first} vs {second}: expected same_bug={same_bug}")
+
+
+def test_the_ledger_moves_on_once_a_subject_is_covered():
+    """The behaviour that matters, not just the key agreement: with a
+    finding recorded for one subject, the ledger must not offer the next
+    subject as new work.
+    """
+    from argus.proof import endpoint_key, normalize
+
+    findings = [{"vuln_class": "idor", "url": "http://t.test/api/user/2"}]
+    recorded = {(normalize(str(f.get("vuln_class") or "")),
+                 endpoint_key(str(f.get("url") or "")))
+                for f in findings}
+    assert (normalize("idor"),
+            endpoint_key("http://t.test/api/user/3")) in recorded
+    assert (normalize("idor"),
+            endpoint_key("http://t.test/api/order/3")) not in recorded
+
+
+def test_the_ledger_does_not_recommend_what_the_store_would_refuse(tmp_path):
+    """THROUGH THE REAL CALL, because the key-agreement test above missed
+    the defect it was written for.
+
+    Reverting the comparison in `next_action` to the raw path left that test
+    green: it compares the two key FUNCTIONS, and both still went through
+    the shared helper. The defect was at the CALL SITE. Same shape as a
+    ceiling test earlier today that asserted a bound without enforcing it -
+    a check on the definition instead of on the behaviour.
+
+    So this drives `next_action` itself: a finding recorded for one subject,
+    an uncited exchange for the next subject, and the ledger must not offer
+    that subject as new work - because `add_finding` would refuse it as a
+    duplicate, and an agent following the ledger would loop.
+
+    ASSERTED ON THE SOURCE, after two attempts that could not fail.
+
+    The first drove `next_action` with a hand-built session and guarded the
+    assertion behind "if the action is record_finding" - and the fixture
+    produced `widen_surface`, so the branch never ran and the test passed
+    whatever the code did. A vacuous test, which is the shape this session
+    asserted an invariant against a few hours earlier in the grader.
+
+    Reproducing rule 1 needs an exchange that grades proven for a class on
+    its own, which means encoding one class's requirement into a fixture -
+    and a fixture that drifts from the matrix would start passing again for
+    the wrong reason.
+
+    So this asserts the CALL SITES instead: both the set of recorded
+    endpoints and the comparison against it must go through the shared
+    helper. That is what diverged, and it is the thing a future edit can
+    break without any test noticing.
+    """
+    import pathlib as _pl
+
+    src = (_pl.Path(__file__).resolve().parent.parent / "argus" /
+           "decide.py").read_text(encoding="utf-8")
+
+    assert "proof.endpoint_key(" in src, \
+        "the ledger does not use the shared endpoint key at all"
+    # the comparison and the set construction, both of them
+    assert src.count("proof.endpoint_key(") >= 2, (
+        "only one of the two sites uses the shared key - the recorded set "
+        "and the comparison against it must agree, or the ledger offers "
+        "what the store refuses")
+    import re as _re
+    for pattern, what in (
+            (r"\(klass,\s*\n?\s*proof\.endpoint_key\(_endpoint\(entry\)\)\)",
+             "the comparison in the unrecorded-proof scan"),
+            (r"recorded = \{\(proof\.normalize[\s\S]{0,200}?"
+             r"proof\.endpoint_key\(", "the recorded-set construction")):
+        assert _re.search(pattern, src), f"{what} bypasses the shared key"

@@ -4376,6 +4376,33 @@ def normalize(category: str) -> str:
     return re.sub(r"[^a-z0-9]", "-", str(category or "").strip().lower()).strip("-")
 
 
+def endpoint_key(url: str) -> str:
+    """One endpoint identity for `url`, with subject values removed.
+
+    ONE DEFINITION, because there were two and they disagreed. The evidence
+    store's dedup key drops query parameter VALUES - so one bug reached
+    through `?id=1` and `?id=9` is one finding - and the ledger's
+    "is this already recorded" test used the raw path. So the same bug
+    written as a REST path parameter was two findings to the store and, once
+    the store started merging them, an endless recommendation from the
+    ledger: record this, refused as a duplicate, record this.
+
+    All-digit segments only. Over-merging hides a second real finding, which
+    is worse than the duplicate it prevents: a version segment keeps two
+    APIs apart, two collections with one subject id stay apart, and a
+    segment that merely begins with a digit is not an id.
+    """
+    import urllib.parse as _up
+
+    parts = _up.urlsplit(str(url or ""))
+    path = parts.path or "/"
+    shaped = "/".join("{id}" if seg.isdigit() else seg
+                      for seg in path.split("/")) or "/"
+    if not parts.netloc:
+        return shaped
+    return f"{parts.scheme}://{parts.netloc}{shaped}"
+
+
 def canonical(category: str) -> str:
     """The class this category names, or the normalized text when it names none.
 

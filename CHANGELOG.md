@@ -8047,12 +8047,56 @@ finding has no second-family reading was added earlier today and its output
 had only been reasoned about, never read. The first thing it actually said
 was about something else entirely.
 
+### The fix created a loop, and the test for it took three attempts to fail
+
+Merging two subjects into one finding closed the inflation at the store and
+opened something worse at the ledger. Two definitions of "already
+recorded": the store's dedup key, which now drops subject values, and the
+ledger's scan, which used the raw path. So the ledger kept recommending a
+record that `add_finding` then refused as a duplicate - recommend, refuse,
+recommend. An agent following the ledger would not get out.
+
+Found by running both sides together. Reading either alone looks correct,
+and each is correct about its own question.
+
+ONE DEFINITION NOW, in the module both planes already import, because the
+ledger deliberately imports nothing from the evidence store - it reads
+artifacts, the store writes them, and that separation is worth keeping. The
+ledger still prints the concrete URL as the target, since an operator acts
+on a real address rather than on a template; only the comparison is shaped.
+
+Verified against the live and the sealed sessions: the recommendation is
+gone and the ledger moves to the next genuine action, which is the proof
+gap on the xss candidate with the missing check named.
+
+AND THE TEST TOOK THREE ATTEMPTS, each failing in a way worth keeping.
+
+The first compared the two key FUNCTIONS and agreed - but reverting the
+ledger's call site left it green, because both functions still went through
+the shared helper. It tested the definitions; the defect was at the call.
+
+The second drove the ledger for real and guarded the assertion behind "if
+the action is record_finding". The hand-built session produced a different
+action, so the branch never ran and the test passed whatever the code did -
+a VACUOUS test, hours after this session asserted an invariant against
+exactly that shape in the grader. Reproducing the rule needs an exchange
+that grades proven on its own, which means encoding a class requirement
+into a fixture, and a fixture that drifts from the matrix starts passing
+for the wrong reason.
+
+The third asserts the call sites: both the recorded set and the comparison
+against it must route through the shared key. Both plants are red now.
+
+Seventeenth shape assumption on the way there - the action record's field
+is not called what I typed - and the same remedy as the other sixteen:
+print the real fields.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1178 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1181 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
