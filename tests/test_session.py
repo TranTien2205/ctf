@@ -684,3 +684,78 @@ def test_the_redaction_check_sees_an_unredacted_upgrade(tmp_path):
     assert upgraded["title"] != str(raw_title).strip(), \
         "the upgrade path stored the caller's prose unchanged"
     assert "redacted" in upgraded["title"]
+
+
+def test_an_excerpt_the_transcript_does_not_hold_cannot_be_recorded(tmp_path):
+    """THE PROPERTY THAT REFUTED TWO HIGH-SEVERITY AUDIT CLAIMS, asserted
+    rather than relied on.
+
+    Both claims were that a finding's grade can rest on bytes the artifact
+    does not keep, so `argus verify` would report TAMPERED on a session
+    nobody edited - once via the 2000-character excerpt cap, once via
+    `BODY_CAP`. Neither is reachable, and the reason is the same: the
+    verbatim check runs against the STORED entry, not against what the
+    live response contained.
+
+    Measured against a real 210KB response with the proving token placed
+    past the cap:
+
+        BODY_CAP            200,000
+        send() returned      12,000 bytes   token absent
+        transcript stored   200,000 bytes   token absent, truncated=True
+        add_finding         REFUSED
+
+    So an excerpt the record does not hold cannot be cited in the first
+    place. The same universal check that stops a fabricated excerpt stops
+    this, and the audit's verifiers could not see it because they read the
+    code paths and not what the recorder keeps.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from argus.httpclient import BODY_CAP, GuardedClient, RateLimiter
+    from argus.scope import ScopeGuard
+
+    token = "PROOF-TOKEN-PAST-THE-CAP"
+
+    class _Big(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = (b"A" * (BODY_CAP + 10_000)) + token.encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _Big)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}/"
+    try:
+        s = Session(tmp_path, base, {"target": base})
+        client = GuardedClient(ScopeGuard(base), s, RateLimiter(50.0))
+        result = client.send("GET", base + "big")
+        rid = result["request_id"]
+        stored = s.get_exchange(rid)["response"]
+
+        assert stored.get("truncated") is True, \
+            "premise: the response exceeded the cap and was truncated"
+        assert token not in str(stored.get("body")), \
+            "premise: the token is past what the record keeps"
+
+        with pytest.raises(ValueError, match="verbatim substring"):
+            s.add_finding("past the cap", "high", "disclosure",
+                          base + "big", [rid], token, "d", "r")
+
+        # and a quote from within the kept bytes IS accepted, so the
+        # refusal above is about the record and not about size
+        kept = str(stored.get("body"))[:40]
+        assert kept, "premise: something was kept"
+        ok = s.add_finding("within the record", "low", "disclosure",
+                           base + "big", [rid], kept, "d", "r")
+        assert ok["evidence_excerpt"] == kept
+    finally:
+        srv.shutdown()
+        srv.server_close()

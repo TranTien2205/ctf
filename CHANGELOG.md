@@ -7195,12 +7195,47 @@ The same error as the checks this session keeps fixing, in a test about
 them: asserting the presence of a string rather than the form of the
 claim.
 
+### Two high-severity audit claims, refuted by the same property
+
+Both said a finding's grade can rest on bytes the artifact does not keep,
+so `argus verify` would report TAMPERED on a session nobody edited - once
+through the 2000-character excerpt cap, once through `BODY_CAP`. Neither is
+reachable, and the reason is one property neither verifier saw.
+
+Measured against a real 210KB response with the proving token placed past
+the cap:
+
+    BODY_CAP             200,000
+    send() returned       12,000 bytes   token absent
+    transcript stored    200,000 bytes   token absent, truncated=True
+    add_finding          REFUSED: not a verbatim substring
+
+THE VERBATIM CHECK RUNS AGAINST THE STORED ENTRY, not against what the live
+response contained. So an excerpt the record does not hold cannot be cited
+in the first place: the same universal check that stops a fabricated
+excerpt stops this. And the excerpt-cap claim fell the same way - across
+all 29 classes with the token past the cap, two read different checks and
+no class changes its grade, while the longest excerpt across 22 real
+findings is 40 characters.
+
+Asserted now rather than relied on, including the direction that keeps the
+refusal meaningful: a quote from WITHIN the kept bytes is still accepted,
+so the refusal is about the record and not about size.
+
+Worth separating from the fixes, because the audit was useful and this is
+what it could not do. Every structural claim its dimensions made was
+correct - the grade is computed before the truncation, the cap does cut the
+body, the entries do exist. What it could not establish is whether any of
+that reaches a finding, because reaching a finding requires knowing what
+the recorder keeps and what 22 real findings actually look like. Code tells
+you the first; only evidence tells you the second.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1141 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1142 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
