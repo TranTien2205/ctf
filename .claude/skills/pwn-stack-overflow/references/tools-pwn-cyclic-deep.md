@@ -1,0 +1,36 @@
+# tools/pwn_cyclic.py — offset measurement driver — deep
+
+The De Bruijn pattern generator + finder: emit a pattern, send it, read the faulting 4 bytes back to the offset.
+
+## Mechanism internals
+
+The chain is a layout, not a payload: each qword on the smashed stack is either a gadget address or a consumed argument, in order. The three invariants: (1) the offset to saved RIP is measured, not assumed — every build can shift it; (2) each gadget's consumed stack slots must be filled before the next address; (3) the chain ends only on an address that exists at runtime — PIE means base+offset.
+
+## Boundary conditions
+
+- The canary is the countermeasure: a leak or a write-around is required, else __stack_chk_fail.
+- PIE + no leak means every address is unknown — a leak or a partial-overwrite trick is mandatory.
+- Bad bytes in the read path (\x00 \x0a \x20 for most fgets/scanf) kill addresses containing them — pick different gadgets.
+- movaps alignment inside libc faults on a misaligned stack — an extra ret gadget fixes parity.
+- One-shot services can't re-trigger — the leak and the smash compose in one input, or the chain must be leak-free.
+
+## Falsifier
+
+Falsifier — --find returns -1 for a value you THOUGHT was in the pattern: the faulting register didn't hold pattern bytes; the write didn't reach saved state.
+
+## Highest-cost traps
+
+- The needle is 4 bytes — on x64, the faulting RIP's low 4 bytes.
+- Pattern works on any endian — pass the bytes as they appear in the register.
+
+## Commands
+
+```bash
+python3 tools/pwn_cyclic.py 300
+python3 tools/pwn_cyclic.py --find 0x6161616c
+python3 tools/pwn_cyclic.py --selftest
+```
+
+## Cross-references
+
+`offset-measurement.md` · `cyclic-offset.md`

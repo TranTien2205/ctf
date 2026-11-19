@@ -72,6 +72,23 @@ Depth, one named file at a time:
 - `skills/ctf-pwn/overflow-basics.md`
 - `skills/pwn-binary-triage/SKILL.md`
 
+The corpus under `references/` (~500 modules) is indexed by job:
+
+| Need | Module |
+|---|---|
+| The ordered path | `references/workflow.md` → `references/field-manual.md` |
+| Detect / measure the offset | `references/detection.md` · `references/cyclic-offset.md` · `references/offset-measurement.md` · `references/frame-analysis.md` |
+| The tools | `references/tools-pwn-triage.md` · `references/tools-pwn-cyclic.md` · `references/tools-sc-gen.md` · `references/tools-radare2.md` |
+| Protections | `references/protection-modes.md` · `references/canary-bypass.md` · `references/pie-leak.md` · `references/seccomp.md` |
+| The chains | `references/ret2win.md` · `references/ret2plt.md` · `references/ret2libc.md` · `references/ret2shellcode.md` · `references/rop-basics.md` · `references/ret2csu.md` · `references/srop.md` · `references/stack-pivot.md` · `references/ret2dlresolve.md` |
+| Inputs & edges | `references/read-family.md` · `references/bad-chars.md` · `references/input-transports.md` · `references/boundary-cases.md` |
+| Composition & hard cases | `references/second-stage.md` · `references/one-shot-constraints.md` · `references/remote-vs-local.md` · `references/fork-bruteforce.md` |
+| Discipline | `references/evidence.md` · `references/falsifiers.md` · `references/troubleshoot.md` · `references/anti-patterns.md` · `references/class-boundary.md` · `references/when-all-closed.md` |
+
+Full index: `references/closing-index.md`. Each module carries a `-deep`
+(boundary conditions), `-checklist` (operational), `-catalogue` (cases),
+`-map`, and `-index` companion.
+
 | Any stack-corruption question | `references/control-flow.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
