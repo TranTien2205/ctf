@@ -1,0 +1,5 @@
+# .init_array — the startup list — deep
+
+Companion to `the-init-array.md`.
+
+ROP composes ret-terminated gadgets into a program on the stack — the chain is addresses and argument values; rop_chain.py assembles the three common shapes, the rest is struct.pack.

@@ -1,0 +1,5 @@
+# The /bin/sh address — the arg's value — deep
+
+Companion to `the-binsh-addr.md`.
+
+ROP composes ret-terminated gadgets into a program on the stack — the chain is addresses and argument values; rop_chain.py assembles the three common shapes, the rest is struct.pack.

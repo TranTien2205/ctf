@@ -1405,9 +1405,9 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 2056,
-      "depth_files": 3,
-      "depth_tokens": 1746,
+      "skill_tokens": 4886,
+      "depth_files": 1455,
+      "depth_tokens": 76982,
       "use_when": [
         "control of the instruction pointer is proven and NX forces code reuse"
       ],

@@ -1,0 +1,5 @@
+# The remote libc — matching the build — deep
+
+Companion to `the-remote-libc.md`.
+
+ROP composes ret-terminated gadgets into a program on the stack — the chain is addresses and argument values; rop_chain.py assembles the three common shapes, the rest is struct.pack.
