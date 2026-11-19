@@ -463,9 +463,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1142,
-      "depth_files": 3,
-      "depth_tokens": 639,
+      "skill_tokens": 1757,
+      "depth_files": 275,
+      "depth_tokens": 89825,
       "use_when": [
         "a probe or source read produced this class's signal: frequency analysis before any key guess — monoalphabetic spikes vs flattened vigenere polygraphs separate the families in seconds"
       ],

@@ -86,10 +86,55 @@ because it was an encoding, not a cipher.
 
 Shares signals with: `../misc-encoding-carrier/`, `../crypto-symmetric-oracle/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time — the corpus by question:
 
-- `skills/crypto-classical/references/README.md`
-- `skills/crypto-classical/references/cipher-identification.md`
+**Read the ciphertext first:** `references/detection.md`,
+`references/detection-deep.md`, `references/cipher-identification.md`,
+`references/detection-checklist.md`, `references/detection-playbook-variant.md`.
+`tools/cipher_id.py --text` carries the IC/chi-squared/Kasiski/frequency tuple;
+`tools/enc_detect` separates an encoding from a cipher before any
+cipher statistic runs.
+
+**Which family:** `references/detection-matrix*.md`,
+`references/per-family-*.md`, `references/cipher-identification.md`. IC ~0.066
+monoalphabetic (`caesar`/`subst`/`atbash`), ~0.038 polyalphabetic (`vigenere`),
+~0.05 transposition (`railfence`); chi-squared splits the monoalphabetic three;
+Kasiski names the period.
+
+**Per-family depth:**
+
+- `caesar`/ROT/`atbash` — `references/caesar-*.md`, `references/atbash-*.md`,
+  `references/shift-variants*.md`.
+- `subst`/affine/keyword — `references/subst-*.md`,
+  `references/monoalphabetic-variants*.md`, `references/language-scoring*.md`.
+- `vigenere`/beaufort/autokey — `references/vigenere-*.md`,
+  `references/polyalphabetic-variants*.md`, `references/beaufort-autokey*.md`,
+  `references/key-length*.md`.
+- `railfence`/columnar/route — `references/railfence-*.md`,
+  `references/transposition-variants*.md`.
+- playfair/polybius/adfgvx/hill — `references/playfair-polybius*.md`,
+  `references/other-ciphers*.md`.
+- encoding-vs-cipher — `references/encoding-*.md`, `references/class-boundary.md`.
+
+**Analysis machinery:** `references/frequency-analysis*.md`,
+`references/language-scoring*.md`, `references/key-length*.md`,
+`references/known-plaintext*.md`, `references/theory*.md`,
+`references/mechanism*.md`, `references/glossary*.md`.
+
+**Workflow, evidence, and discipline:** `references/workflow*.md`,
+`references/payload-dictionary*.md`, `references/probe-*.md`,
+`references/evidence*.md`, `references/verify*.md`, `references/falsifiers*.md`,
+`references/boundary-cases*.md`, `references/edge-cases*.md`,
+`references/anti-patterns*.md`, `references/common-mistakes*.md`,
+`references/troubleshoot*.md`, `references/evasion*.md`,
+`references/negative-*.md`, `references/checklist*.md`,
+`references/field-notes*.md`, `references/multi-step-chains*.md`,
+`references/lead-grammar*.md`.
+
+**Cases, examples, and indexes:** `references/case-studies*.md`,
+`references/worked-examples*.md`, `references/real-world-cases.md`,
+`references/scenarios*.md`, `references/verified-chains*.md`,
+`references/README.md`, `references/summary*.md`, `references/closing-index.md`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
