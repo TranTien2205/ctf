@@ -2012,8 +2012,8 @@
         "htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
       ],
       "skill_tokens": 1057,
-      "depth_files": 6,
-      "depth_tokens": 9498,
+      "depth_files": 70,
+      "depth_tokens": 104095,
       "use_when": [
         "a probe or source read produced this class's signal: send the same authenticated-only request twice, once normally and once with the proxy header named in the Connection header",
         "a chain card already proves this class here: htb-novacore-hopbyhop-cache-overflow-domclobber-polyglot-rce"
