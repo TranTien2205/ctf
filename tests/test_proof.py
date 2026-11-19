@@ -5517,3 +5517,114 @@ def test_the_fingerprint_matches_the_forms_that_name_an_engine_and_no_others():
     mysql = ("You have an error in your SQL syntax; check the manual that "
              "corresponds to your MySQL server version")
     assert DBMS_RE.search(mysql), "the measured MySQL error form must match"
+
+
+# ------- the grade rests on exactly the bytes the artifact keeps
+
+def test_the_grade_is_computed_over_the_stored_excerpt(tmp_path):
+    """FOUND BY AUDIT, LATENT RATHER THAN REALISED, and the fix is a
+    reordering.
+
+    `add_finding` used to call `proof.grade(category, excerpt, cited)` on
+    the FULL excerpt and then store `excerpt[:2000]`. A finding whose
+    proof-critical token sat past 2000 would carry a grade resting on bytes
+    the artifact does not keep - and `argus verify`, which re-validates the
+    stored excerpt, could then disagree with the grade printed beside it on
+    a session nobody had edited.
+
+    Measured before fixing: across all 22 findings in this repository's four
+    sealed sessions and its checked-in sample, the longest excerpt is 40
+    characters. Two orders of magnitude under the cap, because a proof
+    excerpt is the quoted proving bytes and not a page dump. So this was
+    never realised, and the audit's verifiers could not have established
+    that - they read code, not evidence.
+
+    The invariant asserted here is the exact one: whatever
+    `evidence_excerpt` a finding carries, re-grading THAT STRING against
+    the same cited entries reproduces the grade the finding claims.
+    """
+    from argus import session as session_mod
+    from argus.session import Session
+
+    cap = session_mod._EXCERPT_CAP
+    nonce = "zz9y8x7w"
+    # the proving bytes sit PAST the cap, which is the shape that bit
+    body = ("<pre>" + "F" * (cap + 200) + f"\nuid=0(root) gid=0(root)\n"
+            f"{nonce}</pre>")
+    excerpt = "F" * (cap + 200) + f"\nuid=0(root) gid=0(root)\n{nonce}"
+    assert len(excerpt) > cap, "premise: the excerpt exceeds the cap"
+
+    s = Session(tmp_path, "http://t.test/", {"target": "http://t.test/"})
+    rid = s.record_exchange(
+        "probe_rce",
+        {"method": "GET", "url": f"http://t.test/p?c=;id;echo+{nonce}",
+         "headers": {}, "body": ""},
+        {"status": 200, "headers": {}, "body": body,
+         "final_url": "http://t.test/p", "elapsed_ms": 9,
+         "truncated": False})
+
+    finding = s.add_finding("long proof", "high", "rce", "http://t.test/p",
+                            [rid], excerpt, "d", "r")
+    stored = finding["evidence_excerpt"]
+    assert len(stored) == cap, f"stored {len(stored)}, cap {cap}"
+
+    # THE INVARIANT: re-grading the stored string reproduces the grade
+    again = proof.grade("rce", stored, [s.get_exchange(rid)])
+    assert again.grade == finding["grade"], (
+        f"the finding claims {finding['grade']!r} and its own stored "
+        f"excerpt grades {again.grade!r} - the grade rests on bytes the "
+        "artifact does not keep")
+
+
+def test_truncation_changes_what_the_matrix_reads(tmp_path):
+    """WHAT WAS ACTUALLY ESTABLISHED, which is less than the audit claimed.
+
+    The audit reported this as high severity with the consequence that
+    `argus verify` would print TAMPERED on a session nobody edited. THAT
+    WAS NOT REPRODUCED. Measured across all 29 classes in the matrix with
+    the proving token placed past the cap: two classes read different
+    CHECKS for the full and the truncated excerpt, and NO class changes its
+    GRADE. So a grade disagreeing with its own stored evidence could not be
+    constructed, and no real finding comes near the cap - the longest
+    excerpt across 22 findings in four sealed sessions and the sample is 40
+    characters.
+
+    What this asserts is the weaker, measured fact that justifies the
+    reordering anyway: truncation is not provably inert. At least one class
+    reads the excerpt in a way the cap changes, so grading the full string
+    and storing a prefix leaves the grade resting on bytes the artifact
+    discards - which is a property of the arrangement, not of any finding
+    that exists. The fix costs one line and removes the question.
+    """
+    from argus import session as session_mod
+    from argus.session import Session
+
+    cap = session_mod._EXCERPT_CAP
+    tok = "zz9y8x7w"
+    tail = f"\n{tok}\nroot:x:0:0:\nuid=0(root)\n'OR'1'='1"
+    full = "F" * (cap + 200) + tail
+    body = "<pre>" + full + "</pre>"
+    assert tok in full and tok not in full[:cap], \
+        "premise: the token is past the cap"
+
+    s = Session(tmp_path, "http://t.test/", {"target": "http://t.test/"})
+    rid = s.record_exchange(
+        "probe",
+        {"method": "GET", "url": f"http://t.test/p?q={tok}", "headers": {},
+         "body": ""},
+        {"status": 200, "headers": {}, "body": body,
+         "final_url": "http://t.test/p", "elapsed_ms": 9,
+         "truncated": False})
+    cited = [s.get_exchange(rid)]
+
+    moved = []
+    for klass in proof.classes():
+        on_full = proof.grade(klass, full, cited)
+        on_prefix = proof.grade(klass, full[:cap], cited)
+        if tuple(c["ok"] for c in on_full.checks) != \
+                tuple(c["ok"] for c in on_prefix.checks):
+            moved.append(klass)
+    assert moved, (
+        "no class in the matrix reads the excerpt in a way the cap changes, "
+        "so truncating after grading would have been inert and this test is "
+        "the wrong guard for the reordering")

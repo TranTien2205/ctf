@@ -24,6 +24,40 @@ _KIND = {"proven": "fail", "candidate": "review", "unproven": "review",
          "refused": "informational"}
 
 
+def _replay_history(f: dict) -> list[dict]:
+    hist = [r for r in (f.get("replays") or []) if isinstance(r, dict)]
+    if not hist and isinstance(f.get("replay"), dict):
+        hist = [f["replay"]]
+    return hist
+
+
+def _replay_state(f: dict) -> str:
+    """One of `reproduced`, `not_reproduced`, `not_re_verified`.
+
+    An `inconclusive` replay reports as `not_re_verified`, because the
+    question never reached the target - the same rule the coverage table
+    and the badges apply. A failure outranks a later success: a target
+    answering differently on two replays is information about the target,
+    not a correction.
+    """
+    real = [r for r in _replay_history(f)
+            if r.get("outcome") in ("reproduced", "not_reproduced")]
+    if not real:
+        return "not_re_verified"
+    if any(r.get("outcome") == "not_reproduced" for r in real):
+        return "not_reproduced"
+    return "reproduced"
+
+
+def _replay_reason(f: dict) -> str:
+    hist = _replay_history(f)
+    if not hist:
+        return ""
+    gone = [r for r in hist if r.get("outcome") == "not_reproduced"]
+    shown = gone[0] if gone else hist[-1]
+    return str(shown.get("reason") or "")[:500]
+
+
 def render_sarif(session: Session, extra: dict | None = None) -> Path:
     """The machine contract. Two fields in it were invented on every render.
 
@@ -111,6 +145,15 @@ def render_sarif(session: Session, extra: dict | None = None) -> Path:
                 "argus-judge-model": str(judged.get("judge_model") or ""),
                 "argus-judge-reason": str(judged.get("reason") or "")[:500],
                 "argus-class-disputed": str(f.get("class_disputed") or ""),
+                # THE THIRD READING, which reached no artifact but
+                # report.md. A machine consumer of this file - the reason
+                # SARIF exists - could not tell a finding the target still
+                # does from one `argus replay` established it no longer
+                # does. `not_re_verified` is its own value and not a
+                # synonym for reproduced: an inconclusive replay never
+                # reached the target.
+                "argus-re-verified": _replay_state(f),
+                "argus-replay-reason": _replay_reason(f),
                 "argus-severity-claimed": str(f.get("severity_claimed") or ""),
                 "argus-vuln-class": f.get("vuln_class", ""),
                 "argus-proof-requirement": str(verdict.get("requirement") or ""),

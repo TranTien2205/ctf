@@ -573,3 +573,114 @@ def test_a_quote_must_be_contiguous_in_ONE_part_of_the_response(tmp_path):
         assert findings_bad(s._transcript, [{
             "id": "F01", "severity": "high", "evidence_ids": [rid],
             "evidence_excerpt": straddle}]) == ["F01"], straddle
+
+
+# ---- a declared secret, through BOTH doors into a finding's prose
+
+_LEAK_SECRET = "SuperSecret123"
+
+
+def _leaky_session(tmp_path):
+    """A session with one declared secret and the exchanges an upgrade
+    needs, built against the measured `sqli` requirement."""
+    s = Session(tmp_path, "http://t.test/", {"target": "http://t.test/"},
+                secrets=[_LEAK_SECRET])
+    control = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1", "headers": {},
+         "body": ""},
+        {"status": 200, "headers": {}, "body": "<p>Widget list</p>",
+         "final_url": "http://t.test/p?q=1", "elapsed_ms": 5,
+         "truncated": False})
+    weak = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1'", "headers": {},
+         "body": ""},
+        {"status": 500, "headers": {},
+         "body": "You have an error in your SQL syntax near ''",
+         "final_url": "http://t.test/p?q=1'", "elapsed_ms": 7,
+         "truncated": False})
+    strong = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET",
+         "url": "http://t.test/p?q=1'+UNION+SELECT+email,name+FROM+users--",
+         "headers": {}, "body": ""},
+        {"status": 200, "headers": {},
+         "body": "8.0.36-MySQL\nadmin|a@x.io\nbob|b@x.io",
+         "final_url": "http://t.test/p", "elapsed_ms": 9,
+         "truncated": False})
+    return s, control, weak, strong
+
+
+def test_a_declared_secret_is_redacted_on_both_paths_into_a_finding(tmp_path):
+    """MEASURED LEAK, AND A FIXED DEFECT RETURNING THROUGH A SECOND DOOR.
+
+    `title`, `description` and `remediation` are free prose and the model
+    routinely writes observed values into them. The creation path redacts
+    them against the declared secrets, and the comment beside that code
+    records the measurement that produced the fix - notes.md, agent.log and
+    transcript.jsonl clean while findings.json carried the value verbatim.
+
+    The UPGRADE path wrote the same three fields raw. Measured before the
+    fix, one declared secret:
+
+        created finding   title: sqli, logged in as •••redacted•••
+        upgraded finding  title: sqli upgraded, cookie SuperSecret123
+
+    From findings.json that reaches report.md, report.html, report-h1.html
+    and report.sarif - including the artifact submitted outside. The helper
+    was defined BELOW one branch while the other wrote the fields itself:
+    one concept, two definitions, and the second carried no redaction at
+    all.
+
+    Both paths are asserted here, because asserting one is what let this
+    come back.
+    """
+    s, control, weak, strong = _leaky_session(tmp_path)
+
+    created = s.add_finding(
+        f"sqli, logged in as {_LEAK_SECRET}", "high", "sqli",
+        "http://t.test/p?q=1", [weak],
+        "You have an error in your SQL syntax near ''",
+        f"used {_LEAK_SECRET}", f"rotate {_LEAK_SECRET}")
+    assert created["grade"] == "candidate", created["grade"]
+    for field in ("title", "description", "remediation"):
+        assert _LEAK_SECRET not in str(created.get(field)), \
+            f"the creation path leaked the secret into {field}"
+
+    upgraded = s.add_finding(
+        f"sqli upgraded, cookie {_LEAK_SECRET}", "high", "sqli",
+        "http://t.test/p?q=1", [strong, control],
+        "admin|a@x.io\nbob|b@x.io",
+        f"desc {_LEAK_SECRET}", f"fix {_LEAK_SECRET}")
+    assert upgraded["grade"] == "proven", \
+        f"premise: the upgrade branch was taken ({upgraded['grade']})"
+    for field in ("title", "description", "remediation"):
+        assert _LEAK_SECRET not in str(upgraded.get(field)), \
+            f"the upgrade path leaked the secret into {field}"
+
+    # and the file a report is rendered from carries none of it
+    import json as _json
+    assert _LEAK_SECRET not in _json.dumps(s.findings)
+
+
+def test_the_redaction_check_sees_an_unredacted_upgrade(tmp_path):
+    """The direction that matters: with the upgrade path writing the field
+    raw, the assertion above must fail. Planted on a copy of the finding
+    rather than by editing session.py, so the test needs no fixture
+    surgery and still shows the shape it refuses."""
+    s, control, weak, strong = _leaky_session(tmp_path)
+    s.add_finding(f"sqli {_LEAK_SECRET}", "high", "sqli",
+                  "http://t.test/p?q=1", [weak],
+                  "You have an error in your SQL syntax near ''", "d", "r")
+    raw_title = f"sqli upgraded, cookie {_LEAK_SECRET}"
+    # what the old code stored: the caller's string, stripped and nothing else
+    assert _LEAK_SECRET in str(raw_title).strip(), \
+        "premise: the raw write carries the secret"
+    # what the current code stores
+    upgraded = s.add_finding(raw_title, "high", "sqli",
+                             "http://t.test/p?q=1", [strong, control],
+                             "admin|a@x.io\nbob|b@x.io", "d", "r")
+    assert upgraded["title"] != str(raw_title).strip(), \
+        "the upgrade path stored the caller's prose unchanged"
+    assert "redacted" in upgraded["title"]

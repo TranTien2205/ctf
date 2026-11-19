@@ -2190,11 +2190,48 @@ def _cmd_judge(args) -> int:
     # every keyed session is accused of having been edited. `_seal_key(args)`
     # is already resolved above for `_reopen`; pass it on.
     v = verify_transcript(sdir, seal_key=seal)
-    if not v.get("chained") or v.get("tail_truncated") or v.get("bad_lines"):
-        print("warning: transcript chain check failed - judging an edited "
-              "transcript (run 'argus verify')"
+    # EVERY FLAG, AND THE RE-SEAL RECORDED. This checked three of the nine
+    # ways `verify_transcript` reports an untrustworthy record - `chained`,
+    # `tail_truncated`, `bad_lines` - and `artifact_mismatch` was not among
+    # them. So a session whose report.md, meta.json, notes.md or agent.log
+    # had been edited after sealing passed silently, had a judge verdict
+    # written into findings.json, and was RE-SEALED over the edit: the
+    # tampering ended up covered by a fresh seal with nothing saying so.
+    #
+    # Measured on a copy of docs/sample-session with one line appended to
+    # report.md: `chain_ok` is False and this condition was True.
+    #
+    # `argus report` already had the honest shape for a command that
+    # re-seals - warn, proceed, and RECORD `reseal_over_mismatch` in the
+    # chain so the digests after that point are known to cover edited
+    # bytes. This now does the same. It warns rather than refusing because
+    # that is this command's existing contract; `argus replay` refuses
+    # because it had no such contract to keep.
+    from .session import chain_ok
+    _flags = [k for k in ("error", "bad_lines", "tail_truncated",
+                          "anchor_missing", "findings_bad",
+                          "findings_overgraded", "key_required",
+                          "artifact_mismatch") if v.get(k)]
+    if not chain_ok(v):
+        print(f"warning: the record does not verify "
+              f"({', '.join(_flags) or 'not chained'}) - judging it anyway, "
+              "and the re-seal afterwards will cover the current bytes "
+              "(run 'argus verify')"
               + ("" if seal else "; if this session was sealed with a key, "
                  "pass --seal-key"), file=sys.stderr)
+        try:
+            session.record_event("reseal_over_mismatch", {
+                "files": v.get("artifact_mismatch") or "",
+                "flags": _flags,
+                "chained_before": bool(v.get("chained")),
+                "detail": "`argus judge` wrote a cross-verification verdict "
+                          "into a session whose record did not verify, and "
+                          "re-sealed it; the digests after this point cover "
+                          "the current bytes",
+            })
+        except Exception as exc:          # a read-only dir must not fail
+            print(f"warning: could not record the re-seal over a mismatch: "
+                  f"{exc}", file=sys.stderr)
     bad = findings_bad(session._transcript, session.findings)
 
     wanted = {x.strip() for x in str(args.only or "").split(",") if x.strip()}

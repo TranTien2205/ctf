@@ -654,3 +654,271 @@ def test_an_unreachable_judge_is_reported_as_no_verdict_not_a_dispute(
     assert "NO VERDICT" in printed, printed
     assert "1 disputed" not in printed, printed
     assert "0 agreed, 0 disputed" in printed, printed
+
+
+# ---------- the one-way door, across the module that does not own it
+
+def _judged_then_upgraded(tmp_path, judged_severity="low",
+                          upgrade_severity="critical"):
+    """A finding a judge lowered, then upgraded by a later worker.
+
+    The real sequence: `argus run` records a candidate, `argus judge`
+    disputes it and lowers the severity, `argus run --resume` reloads
+    findings.json and a worker collects the missing checks, so
+    `add_finding` takes the UPGRADE branch for the same (class, url).
+
+    The fixture was built against the MEASURED requirement rather than
+    guessed - three attempts failed first. `argus proof sqli` wants a
+    fingerprint plus a row from a named table, and reaching `proven` needs
+    all four of: a CONTROL exchange cited alongside the injection (the
+    request without a table is what separates a read from the page's own
+    furniture), the table named in the request, the DBMS fingerprint in the
+    EXCHANGE, and the excerpt quoting THE ROWS - an excerpt carrying the
+    fingerprint matches `DBMS_RE` and is rejected as "an error or a
+    refusal, not data".
+    """
+    from argus.session import Session
+
+    s = Session(tmp_path, "http://t.test/", {"target": "http://t.test/"})
+    control = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1", "headers": {},
+         "body": ""},
+        {"status": 200, "headers": {}, "body": "<p>Widget list</p>",
+         "final_url": "http://t.test/p?q=1", "elapsed_ms": 5,
+         "truncated": False})
+    weak = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1'", "headers": {},
+         "body": ""},
+        {"status": 500, "headers": {},
+         "body": "You have an error in your SQL syntax near ''",
+         "final_url": "http://t.test/p?q=1'", "elapsed_ms": 7,
+         "truncated": False})
+    first = s.add_finding("sqli in q", "critical", "sqli",
+                          "http://t.test/p?q=1", [weak],
+                          "You have an error in your SQL syntax near ''",
+                          "d", "r")
+    assert first["grade"] == "candidate", first["grade"]
+
+    # the judge lowers it, exactly the way apply_verdict does
+    lowered = dict(s.findings[0])
+    lowered["severity_claimed"] = lowered["severity"]
+    lowered["severity"] = judged_severity
+    lowered["disputed"] = True
+    lowered["judges"] = [{"judge_model": "other-1", "agrees": False,
+                          "reason": "an error is not a row"}]
+    s.findings = [lowered]
+
+    # a later worker collects the missing checks for the SAME bug
+    strong = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET",
+         "url": "http://t.test/p?q=1'+UNION+SELECT+email,name+FROM+users--",
+         "headers": {}, "body": ""},
+        {"status": 200, "headers": {},
+         "body": "8.0.36-MySQL\nadmin|a@x.io\nbob|b@x.io\ncarol|c@x.io",
+         "final_url": "http://t.test/p", "elapsed_ms": 9,
+         "truncated": False})
+    s.add_finding("sqli in q", upgrade_severity, "sqli",
+                  "http://t.test/p?q=1", [strong, control],
+                  "admin|a@x.io\nbob|b@x.io", "d", "r")
+    out = s.findings[0]
+    assert out["grade"] == "proven", f"the upgrade did not take: {out['grade']}"
+    return out
+
+
+def test_an_upgrade_does_not_undo_a_severity_a_judge_lowered(tmp_path):
+    """MEASURED HOLE, and the rule was enforced in the wrong module.
+
+    `judge.apply_verdict` documents three one-way doors and writes
+    `severity_claimed` only when it LOWERS a severity - so that key is the
+    reliable marker that a model from another family read this evidence and
+    found the claim over-stated.
+
+    `session.add_finding`'s upgrade branch wrote the caller's severity
+    unconditionally when the grade improved, so the sequence run -> judge
+    -> run --resume restored the severity the judge had reduced. The
+    invariant was enforced in judge.py and violated in session.py, and the
+    violating place is the one nobody looks at.
+    """
+    out = _judged_then_upgraded(tmp_path)
+    assert out["severity"] == "low", (
+        f"an upgrade raised the severity back to {out['severity']!r} over a "
+        "judge's reduction")
+    assert out["severity_claimed"] == "critical", \
+        "the original claim must stay on record"
+    assert out["disputed"] is True, "a dispute is a one-way door"
+    # and the upgrade still did its job
+    assert out["grade"] == "proven", out["grade"]
+    assert "admin|a@x.io" in out["evidence_excerpt"], \
+        "the upgrade's better evidence replaced the weaker excerpt"
+
+
+def test_an_upgrade_may_still_raise_a_severity_no_judge_touched(tmp_path):
+    """The direction that keeps the fix from being a blanket freeze.
+
+    Better evidence showing worse impact SHOULD raise a severity. What may
+    not happen is undoing a reduction, and the discriminator is
+    `severity_claimed` - absent here, because no judge ran.
+    """
+    from argus.session import Session
+
+    s = Session(tmp_path, "http://t.test/", {"target": "http://t.test/"})
+    control = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1", "headers": {},
+         "body": ""},
+        {"status": 200, "headers": {}, "body": "<p>Widget list</p>",
+         "final_url": "http://t.test/p?q=1", "elapsed_ms": 5,
+         "truncated": False})
+    weak = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET", "url": "http://t.test/p?q=1'", "headers": {},
+         "body": ""},
+        {"status": 500, "headers": {},
+         "body": "You have an error in your SQL syntax near ''",
+         "final_url": "http://t.test/p?q=1'", "elapsed_ms": 7,
+         "truncated": False})
+    s.add_finding("sqli in q", "low", "sqli", "http://t.test/p?q=1", [weak],
+                  "You have an error in your SQL syntax near ''", "d", "r")
+    assert "severity_claimed" not in s.findings[0]
+
+    strong = s.record_exchange(
+        "probe_sqli",
+        {"method": "GET",
+         "url": "http://t.test/p?q=1'+UNION+SELECT+email,name+FROM+users--",
+         "headers": {}, "body": ""},
+        {"status": 200, "headers": {},
+         "body": "8.0.36-MySQL\nadmin|a@x.io\nbob|b@x.io",
+         "final_url": "http://t.test/p", "elapsed_ms": 9,
+         "truncated": False})
+    s.add_finding("sqli in q", "critical", "sqli", "http://t.test/p?q=1",
+                  [strong, control], "admin|a@x.io\nbob|b@x.io", "d", "r")
+    assert s.findings[0]["grade"] == "proven"
+    assert s.findings[0]["severity"] == "critical", \
+        "an upgrade with no judge in the history must be free to raise"
+
+
+def test_an_upgrade_may_lower_further_after_a_judge(tmp_path):
+    """One-way means one DIRECTION, not frozen. A later worker that reads
+    the impact as smaller still may say so."""
+    out = _judged_then_upgraded(tmp_path, judged_severity="medium",
+                               upgrade_severity="info")
+    assert out["severity"] == "info", out["severity"]
+
+
+# --------- amending a record that does not verify, and saying so
+
+def _sealed_copy(tmp_path):
+    import pathlib as _pl
+    import shutil
+    root = _pl.Path(__file__).resolve().parents[1]
+    src = root / "docs" / "sample-session"
+    if not src.exists():
+        pytest.skip("no checked-in sample session")
+    dst = tmp_path / "s"
+    shutil.copytree(src, dst)
+    return dst
+
+
+def test_judge_checked_three_of_the_nine_ways_a_record_fails(tmp_path):
+    """MEASURED HOLE, and the shared definition already existed.
+
+    `argus judge` tested `chained`, `tail_truncated` and `bad_lines` -
+    three of the nine flags `verify_transcript` returns - and
+    `artifact_mismatch` was not among them. So a session whose report.md,
+    meta.json, notes.md or agent.log had been edited after sealing passed
+    silently, had a verdict written into findings.json, and was RE-SEALED
+    over the edit: the tampering ended up covered by a fresh seal with
+    nothing saying so.
+
+    Measured on a copy of `docs/sample-session` with one line appended to
+    report.md - `chain_ok` False, the old condition True - which is this
+    test.
+
+    `chain_ok` is the single definition of "this record is trustworthy",
+    already used by `argus verify --json` and `argus replay`. This is one
+    concept with four definitions, and the one that admitted a mismatch was
+    the one that writes.
+    """
+    from argus.session import chain_ok, verify_transcript
+
+    sdir = _sealed_copy(tmp_path)
+    assert chain_ok(verify_transcript(sdir, "")), "premise: starts clean"
+
+    (sdir / "report.md").write_text(
+        (sdir / "report.md").read_text(encoding="utf-8")
+        + "\nedited after sealing\n", encoding="utf-8")
+
+    v = verify_transcript(sdir, "")
+    assert v.get("artifact_mismatch"), \
+        "premise: editing a sealed artifact raises artifact_mismatch"
+    assert chain_ok(v) is False, "the shared definition must refuse this"
+    # the condition the command used to apply, restated: it passes
+    old_condition = not (not v.get("chained") or v.get("tail_truncated")
+                         or v.get("bad_lines"))
+    assert old_condition is True, (
+        "if the narrow condition now refuses this, the hole is closed "
+        "elsewhere and this test is measuring nothing")
+
+
+def test_the_nine_flags_are_one_list_not_four(tmp_path):
+    """The relation between the real lists, so a tenth flag added to
+    `verify_transcript` reaches the commands that must honour it.
+
+    `CHAIN_FAILURES` is the list `chain_ok` consults. Any command that
+    AMENDS a session has to consider all of them; a command that only
+    renders may warn on a subset. The failure this guards is a flag added
+    to one place and not the other, which is how three of nine happened.
+    """
+    from argus.session import CHAIN_FAILURES, chain_ok
+
+    assert len(CHAIN_FAILURES) >= 8, CHAIN_FAILURES
+    assert "artifact_mismatch" in CHAIN_FAILURES
+    # every member must be able to fail chain_ok on its own
+    for flag in CHAIN_FAILURES:
+        res = {"chained": True, flag: "something"}
+        assert chain_ok(res) is False, (
+            f"{flag} is in CHAIN_FAILURES and does not fail chain_ok, so a "
+            "command consulting it would admit a record the list refuses")
+    assert chain_ok({"chained": True}) is True
+    assert chain_ok({"chained": False}) is False
+
+
+def test_judge_itself_consults_the_shared_definition(tmp_path, capsys,
+                                                     monkeypatch):
+    """THE WIRING, NOT THE LOGIC - and a plant proved the difference.
+
+    The two tests above assert the relation between the real lists and the
+    construction of a mismatch, and both of them PASSED while
+    `argus judge`'s own condition was reverted to the narrow three. So
+    nothing held that the command consults `chain_ok` at all: logic and
+    wiring are different claims, and this repository has been caught
+    shipping the second without the first.
+
+    Driven through `cli.main` rather than by reading the source, because a
+    source grep cannot tell a call from a mention. The warning is emitted
+    before the judge model is picked and long before a credential is
+    needed, so this reaches it with no API key present.
+    """
+    from argus import cli
+
+    sdir = _sealed_copy(tmp_path)
+    (sdir / "report.md").write_text(
+        (sdir / "report.md").read_text(encoding="utf-8")
+        + "\nedited after sealing\n", encoding="utf-8")
+
+    # no credential: the command will stop later, after the check under test
+    for var in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN",
+                "CLAUDE_CODE_OAUTH_TOKEN"):
+        monkeypatch.delenv(var, raising=False)
+
+    cli.main(["judge", str(sdir), "--dry-run"])
+    out = capsys.readouterr()
+    said = out.out + out.err
+    assert "does not verify" in said, said[-400:]
+    assert "artifact_mismatch" in said, (
+        "the warning must NAME the flag - a session edited after sealing is "
+        "a different problem from a broken chain, and the operator cannot "
+        "act on 'something is wrong'")

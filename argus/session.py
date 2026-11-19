@@ -70,6 +70,22 @@ def _chain(prev: str, entry: dict, key: str = "") -> str:
 _REDACTED = "•••redacted•••"
 _EVENT_VALUE_CAP = 60_000
 
+#: What a finding's quoted proof may hold. The GRADE IS COMPUTED OVER
+#: EXACTLY THESE BYTES, which is the point of naming the cap: the previous
+#: code graded the full excerpt and then stored `excerpt[:2000]`, so a
+#: finding whose proof-critical token sat past 2000 would carry a grade
+#: resting on bytes the artifact does not keep, and `argus verify`
+#: re-validating the stored excerpt could disagree with the grade beside
+#: it on a session nobody edited.
+#:
+#: Latent rather than realised: measured across all 22 findings in this
+#: repository's sealed sessions and its checked-in sample, the longest
+#: excerpt is 40 characters - two orders of magnitude under the cap -
+#: because a proof excerpt is the quoted proving bytes and not a page. The
+#: fix is a reordering, not a rescue, and it makes the invariant exact
+#: instead of merely very likely: truncate first, then grade.
+_EXCERPT_CAP = 2000
+
 
 def _bound_value(v):
     if isinstance(v, str):
@@ -1103,9 +1119,29 @@ class Session:
             raise ValueError(
                 "cvss must be a base vector like "
                 "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H")
-        excerpt = str(evidence_excerpt or "").strip()
+        # Truncated HERE, before anything reads it, so the grade below is
+        # computed over exactly the bytes that will be stored. See
+        # `_EXCERPT_CAP`.
+        excerpt = str(evidence_excerpt or "").strip()[:_EXCERPT_CAP]
         if not excerpt:
             raise ValueError("evidence_excerpt must quote the proving bytes")
+
+        # DEFINED HERE, ABOVE BOTH BRANCHES, because it was defined below
+        # one of them and the other wrote the same three fields raw.
+        # Measured with one declared secret: a newly recorded finding read
+        # `logged in as •••redacted•••` and an UPGRADED one read
+        # `cookie SuperSecret123` - verbatim, in title, description and
+        # remediation, and from findings.json into all four rendered
+        # artifacts including the one submitted outside.
+        #
+        # The leak this repairs had already been found once and fixed in
+        # the creation path, with the measurement written into the comment
+        # beside it. The upgrade path was missed, so this is a fixed defect
+        # returning through a second door - one concept, two definitions,
+        # and the second one carried no redaction at all.
+        def _r(value):
+            return _redact_obj(str(value or "").strip(), self.secret_values)
+
         with self._lock:  # snapshot: other workers keep appending mid-check
             transcript_snapshot = dict(self._transcript)
         if not evidence_ids:
@@ -1182,11 +1218,44 @@ class Session:
                 # transcript still resolve.
                 if _GRADE_RANK.get(verdict.grade, 0) > \
                         _GRADE_RANK.get(existing.get("grade", ""), 0):
+                    # A JUDGE'S LOWERING IS A ONE-WAY DOOR AND THIS BRANCH
+                    # DID NOT KNOW IT. `judge.apply_verdict` writes
+                    # `severity_claimed` only when it LOWERS a severity, so
+                    # that key is the reliable marker that a second-family
+                    # model read this evidence and decided the claim was
+                    # over-stated. Writing the caller's severity here
+                    # unconditionally reopened it: run -> judge (critical ->
+                    # low) -> run --resume, and a worker upgrading the GRADE
+                    # restored the severity the judge had reduced.
+                    #
+                    # `judge.py`'s own docstring says a severity can only
+                    # move down. The rule was enforced in one place and
+                    # violated in another, and the violating place is the
+                    # one nobody looks at.
+                    #
+                    # Better evidence may still RAISE a severity that no
+                    # judge has touched - that is what an upgrade is for.
+                    # It may not undo a reduction.
+                    # SEVERITIES runs most severe to least, so a LOWER
+                    # index is a MORE severe rating. `_RANK` lives in
+                    # judge.py and not here, which the first version of
+                    # this got wrong.
+                    def _sev_rank(name: str) -> int:
+                        try:
+                            return SEVERITIES.index(str(name or ""))
+                        except ValueError:
+                            return len(SEVERITIES)
+
+                    kept_severity = severity
+                    if existing.get("severity_claimed") and \
+                            _sev_rank(severity) < _sev_rank(
+                                existing.get("severity")):
+                        kept_severity = str(existing.get("severity") or "")
                     fields = {
-                        "title": str(title or "").strip() or existing.get("title"),
-                        "severity": severity,
+                        "title": _r(title) or existing.get("title"),
+                        "severity": kept_severity,
                         "evidence_ids": evidence_ids,
-                        "evidence_excerpt": excerpt[:2000],
+                        "evidence_excerpt": excerpt,
                         "grade": verdict.grade,
                         "proof": verdict.to_dict(),
                         "upgraded_from": existing.get("grade", ""),
@@ -1209,9 +1278,9 @@ class Session:
                         fields["agent"] = agent
                     existing.update(fields)
                     if description:
-                        existing["description"] = str(description).strip()
+                        existing["description"] = _r(description)
                     if remediation:
-                        existing["remediation"] = str(remediation).strip()
+                        existing["remediation"] = _r(remediation)
                     _atomic_write(
                         self.findings_path,
                         json.dumps(self.findings, indent=2, ensure_ascii=False))
@@ -1235,10 +1304,6 @@ class Session:
             # are rendered from, which are the files that get emailed and
             # filed. The redaction held for the three artifacts an auditor
             # reads least.
-            def _r(value):
-                return _redact_obj(str(value or "").strip(),
-                                   self.secret_values)
-
             finding = {
                 "id": f"F{len(self.findings) + 1:02d}",
                 "title": _r(title),
@@ -1246,7 +1311,7 @@ class Session:
                 "category": str(category or "").strip(),
                 "url": _redact_url(url),
                 "evidence_ids": evidence_ids,
-                "evidence_excerpt": excerpt[:2000],
+                "evidence_excerpt": excerpt,
                 "vuln_class": vuln_class,
                 "grade": verdict.grade,
                 "proof": verdict.to_dict(),

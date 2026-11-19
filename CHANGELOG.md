@@ -6950,6 +6950,21 @@ Three changes, and the third is the one that matters:
   encoding is now explicit; and the 30-second timeout became 90, because a
   cold Windows runner's first git invocation is slow and a timeout here
   degrades the floor instead of failing.
+
+  AND ONE OF THOSE TWO IS ELIMINATED BY THE FAILURE MODE, from evidence
+  already in hand rather than from a Windows box. The failing version
+  caught `(OSError, subprocess.SubprocessError)`, and a cp1252 decode
+  raises `UnicodeDecodeError`, which is a `ValueError` and neither of
+  those - so it would have PROPAGATED and produced a test error. What was
+  observed is an AssertionError, meaning the helper returned an empty
+  string quietly. The encoding was never the cause.
+
+  That leaves three ways to return "" - git absent, a non-zero exit, or a
+  timeout - and only the timeout was changed. CI is now 11 of 11 green
+  including every Windows job, so either the timeout was it or the cause
+  was transient. The symptom could not distinguish those; the exception
+  hierarchy could, and it ruled out the hypothesis the symptom had made
+  look most plausible.
 - The negative test now SKIPS WITH THE REASON when the scale is degraded,
   the same shape `require_node` already uses in this file: a run that drops
   a proof says which one. With the floor at its absolute values a 521-line
@@ -6966,12 +6981,157 @@ Verified by substituting a failing HEAD read: the negative test skips
 naming the reason, the degradation guard fails naming the reason, and with
 HEAD readable both pass.
 
+### An expired finding, published as current
+
+Two audit findings verified by hand, both on the finding axis, both real.
+
+A FINDING THE TARGET NO LONGER DOES REACHED ONLY report.md. Counted per
+renderer:
+
+    markdown  17 mentions    html  0    hackerone  0    sarif  0
+
+So after `argus replay` established that the target no longer produces the
+quoted bytes, the artifact submitted to a bug-bounty triager published the
+finding unchanged, under `PROOF: PROVEN`, with no sign of it. Not a
+fabricated finding - an EXPIRED one presented as current, which is
+assertion-beyond-the-evidence one field over. The gap was mine, made an
+hour earlier by adding the per-finding replay line to markdown alone.
+
+All four now carry it: a badge on the bug-bounty artifact, a line in the
+html verification box, and `argus-re-verified` plus `argus-replay-reason`
+in SARIF so a machine consumer can tell the two apart. `inconclusive`
+reports as `not_re_verified` rather than as reproduced, because the
+question never reached the target - the same rule the coverage table and a
+judge's failed call already follow. A failure outranks a later success on
+every artifact.
+
+AND THE HTML BLOCK WAS WIRED UNDER THE EXIT RATHER THAN INTO IT. The replay
+line sat fifteen lines below an early return that fires when no judge
+verdict exists, so a finding with a replay outcome and no judge took the
+return and never reached it. That function is no longer "the judge box" -
+it carries the second and third readings - and its exit now says so.
+
+### A judge's lowering was a one-way door the upgrade branch did not know
+
+`judge.apply_verdict` documents three one-way doors and writes
+`severity_claimed` ONLY when it lowers a severity, so that key is the
+reliable marker that a model from another family found a claim overstated.
+
+`session.add_finding`'s upgrade branch wrote the caller's severity
+unconditionally whenever the grade improved. So the sequence `argus run` ->
+`argus judge` (critical -> low) -> `argus run --resume`, where a worker
+collects the missing checks for the same bug, restored the severity the
+judge had reduced. The invariant was enforced in judge.py and violated in
+session.py, and the violating place is the one nobody looks at.
+
+The fix respects the marker and nothing more: better evidence may still
+RAISE a severity no judge has touched, which is what an upgrade is for, and
+may still lower one further - one-way means one direction, not frozen.
+Plant-tested in both directions, including the OVER-correction: restoring
+the unconditional write fails one test and freezing the severity entirely
+fails two.
+
+Building the fixture took four attempts and the fourth was measured rather
+than guessed. Reaching `proven` for sqli needs all of: a CONTROL exchange
+cited beside the injection, because "a request to the same endpoint WITHOUT
+a table in it is what separates a read from the page's own furniture"; the
+table named in the request; the DBMS fingerprint in the EXCHANGE; and the
+excerpt quoting THE ROWS - an excerpt carrying the fingerprint matches
+`DBMS_RE` and is rejected as "an error or a refusal, not data". Reading the
+verifier was faster than the three guesses before it.
+
+AND THE SUBSTRING DEFECT RECURRED IN A SIBLING TEST. Adding the replay
+absence to the html box broke `test_html_states_that_no_second_model_read_
+the_evidence`, which asserted `"not performed" not in` - exactly the
+assertion fixed in the markdown test an hour earlier, with the fix already
+known. Thirty-fifth instance. The lesson is not "name the claim once": it
+is that adding ANY second absence to a block invalidates every
+bare-substring assertion about the first.
+
+### A declared secret, verbatim in the artifact submitted outside
+
+The most serious thing the audit found, reported as medium and measured as
+worse. A run started with `--secret <value>` has that value redacted from a
+newly recorded finding's prose and written VERBATIM into an upgraded one:
+
+    created finding   title: sqli, logged in as •••redacted•••
+    upgraded finding  title: sqli upgraded, cookie SuperSecret123
+
+All three free-prose fields - title, description, remediation - and from
+findings.json that reaches report.md, report.html, report-h1.html and
+report.sarif, including the artifact a bug-bounty triager receives.
+
+A FIXED DEFECT RETURNING THROUGH A SECOND DOOR. This leak had already been
+found once and closed in the creation path, and the comment beside that
+code records the measurement that produced the fix: "notes.md, agent.log
+and transcript.jsonl were clean while findings.json carried it verbatim -
+and findings.json is what report.md and summary.json are rendered from,
+which are the files that get emailed and filed."
+
+The upgrade path was missed, and the mechanism is structural rather than
+careless: the redaction helper was defined INSIDE the creation branch,
+below the upgrade branch, so the upgrade branch could not have called it
+and wrote `str(title or "").strip()` itself. One concept, two definitions,
+and the second carried no redaction at all.
+
+The helper now sits above both branches. Verified by construction before
+and after: the same sequence that produced `cookie SuperSecret123` now
+produces `cookie •••redacted•••`, the upgrade still reaches `proven`, and
+`json.dumps(findings)` contains none of it.
+
+Asserted on BOTH paths, because asserting one is what let it come back.
+Plant-tested three ways - a raw title on the upgrade path, a raw title on
+the creation path, and a raw description on the upgrade path - each fails.
+
+### Three of the nine ways a record fails, in the command that writes
+
+`argus judge` tested `chained`, `tail_truncated` and `bad_lines` - three of
+the nine flags `verify_transcript` returns - and `artifact_mismatch` was
+not among them. So a session whose report.md, meta.json, notes.md or
+agent.log had been edited after sealing passed silently, had a
+cross-verification verdict written into findings.json, and was RE-SEALED
+over the edit. The tampering ended up covered by a fresh seal with nothing
+saying so.
+
+Measured by construction on a copy of `docs/sample-session` with one line
+appended to report.md:
+
+    artifact_mismatch   set
+    chain_ok            False   (the shared definition refuses it)
+    judge's condition   True    (it admitted it)
+
+`chain_ok` is the single definition of a trustworthy record and already had
+two callers. Five commands call `verify_transcript` and only two consulted
+it - one concept with four definitions, and the one that admitted a
+mismatch was the one that WRITES.
+
+THE LINE IS WHETHER A COMMAND AMENDS OR RENDERS. `argus report` re-seals
+too, and its handling was already honest: warn, proceed, and record
+`reseal_over_mismatch` in the chain so the digests after that point are
+known to cover edited bytes. `argus findings` only reads, so a warning is
+enough. `argus judge` now does what report does rather than refusing,
+because warning is this command's existing contract - `argus replay`
+refuses because it had no contract to keep.
+
+AND A PLANT SHOWED THE TESTS HELD THE LOGIC AND NOT THE WIRING. Two tests
+assert the relation between the real lists and the construction of the
+mismatch, and BOTH PASSED with the command's own condition reverted to the
+narrow three. Nothing held that `argus judge` consults `chain_ok` at all.
+
+The third test drives `cli.main(["judge", ...])` with no credential in the
+environment - the warning is emitted 57 lines into the command and the key
+is not needed until line 141 - and asserts both that it fires and that it
+NAMES the flag. "Something is wrong" is not something an operator can act
+on; a session edited after sealing is a different problem from a broken
+chain. Re-planting the reverted condition now fails, where it passed
+before.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1122 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1136 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

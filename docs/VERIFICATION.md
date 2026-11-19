@@ -10,7 +10,7 @@ suggestion, so every row names a code path.
 
 ```bash
 python selftest.py          # 164 offline end-to-end checks, no API key
-python -m pytest tests/ -q  # 1122 unit + live-lab + loop tests
+python -m pytest tests/ -q  # 1136 unit + live-lab + loop tests
 python -m argus demo        # offline single-agent run against the lab
 python -m argus verify docs/sample-session   # sealed artifact walk-through
 ```

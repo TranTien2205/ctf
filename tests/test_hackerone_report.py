@@ -213,12 +213,21 @@ def test_html_states_that_no_second_model_read_the_evidence():
 
     blank = html_mod._judge_html(_finding())
     assert blank, "an unreviewed finding still renders nothing"
-    assert "not performed" in blank.lower()
+    assert "Cross-verification: not performed" in blank
     assert "another family" in blank
 
+    # NAMED, not the bare substring - and this broke for the SECOND time
+    # the same way. The markdown test asserted `"not performed" not in` and
+    # broke when a second absence used those words; this one then did the
+    # same when the replay absence was added to the html box an hour later.
+    # Thirty-fifth instance, with the fix already known and applied next
+    # door. The lesson is not "name the claim once": it is that adding ANY
+    # second absence to a block invalidates every bare-substring assertion
+    # about the first.
     agreed = html_mod._judge_html(_finding(
         judge={"judge_model": "other-1", "agrees": True, "reason": "ok"}))
-    assert "not performed" not in agreed.lower()
+    assert "Cross-verification: not performed" not in agreed
+    assert "Cross-verification: agreed" in agreed
 
 
 def test_the_bug_bounty_artifact_badges_the_second_reading_or_its_absence():
@@ -311,3 +320,80 @@ def test_the_two_absences_are_distinguishable():
         judge={"judge_model": "other-1", "agrees": True, "reason": "ok"},
         replay={"outcome": "reproduced", "reason": "bytes came back"})))
     assert "not performed" not in neither_absent, neither_absent
+
+
+# --- a finding the target no longer does, on every artifact a reader gets
+
+_GONE = {"outcome": "not_reproduced",
+         "reason": "the request was sent and answered HTTP 200, and the "
+                   "quoted bytes were not in the response"}
+_BACK = {"outcome": "reproduced", "reason": "the target returned the "
+                                            "quoted bytes again (HTTP 200)"}
+_UNASKED = {"outcome": "inconclusive", "reason": "no credential supplied"}
+
+
+def test_a_failed_re_verification_reaches_every_artifact():
+    """MEASURED GAP, and the worst shape on this axis.
+
+    `argus replay` writes `replay`/`replays` and a one-way `replay_failed`
+    into findings.json. Measured by counting mentions per renderer:
+
+        markdown   17        html   0        hackerone   0        sarif   0
+
+    So a finding the operator has evidence the target NO LONGER DOES was
+    published unchanged to the one artifact that leaves this machine. Not a
+    fabricated finding - an EXPIRED one presented as current, which is
+    assertion-beyond-the-evidence one field over, and a bug-bounty triager
+    reading `PROOF: PROVEN` has no way to know.
+    """
+    from argus.report import hackerone as h1
+    from argus.report import html as html_mod
+    from argus.report import markdown as md
+    from argus.report import sarif as sarif_mod
+
+    gone = _finding(replay=_GONE)
+    assert "DID NOT REPRODUCE" in h1._badges(gone)
+    assert "DID NOT REPRODUCE" in html_mod._judge_html(gone)
+    assert "DID NOT REPRODUCE" in "\n".join(md._proof_block(gone))
+    assert sarif_mod._replay_state(gone) == "not_reproduced"
+    assert "quoted bytes were not" in sarif_mod._replay_reason(gone)
+
+
+def test_a_reproduced_finding_says_so_on_every_artifact():
+    from argus.report import hackerone as h1
+    from argus.report import html as html_mod
+    from argus.report import markdown as md
+    from argus.report import sarif as sarif_mod
+
+    back = _finding(replay=_BACK)
+    assert "RE-VERIFIED: REPRODUCED" in h1._badges(back)
+    assert "reproduced" in html_mod._judge_html(back).lower()
+    assert "reproduced" in "\n".join(md._proof_block(back)).lower()
+    assert sarif_mod._replay_state(back) == "reproduced"
+    for rendered in (h1._badges(back), html_mod._judge_html(back),
+                     "\n".join(md._proof_block(back))):
+        assert "DID NOT REPRODUCE" not in rendered
+
+
+def test_an_inconclusive_replay_is_not_reported_as_re_verified():
+    """The question never reached the target, so it is not coverage - the
+    same rule the coverage table and the judge's error case apply."""
+    from argus.report import hackerone as h1
+    from argus.report import sarif as sarif_mod
+
+    unasked = _finding(replay=_UNASKED)
+    assert sarif_mod._replay_state(unasked) == "not_re_verified"
+    assert "NOT RE-VERIFIED" in h1._badges(unasked)
+    assert "DID NOT REPRODUCE" not in h1._badges(unasked)
+
+
+def test_a_failure_outranks_a_later_success_on_every_artifact():
+    """A target answering differently on two replays is information about
+    the target, not a correction - so the failure is what a reader sees."""
+    from argus.report import hackerone as h1
+    from argus.report import sarif as sarif_mod
+
+    both = _finding(replays=[_GONE, _BACK])
+    assert sarif_mod._replay_state(both) == "not_reproduced"
+    assert "DID NOT REPRODUCE" in h1._badges(both)
+    assert "RE-VERIFIED: REPRODUCED" not in h1._badges(both)

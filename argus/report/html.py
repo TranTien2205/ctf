@@ -108,7 +108,16 @@ def _judge_html(f: dict) -> str:
     disputed = bool(f.get("disputed"))
     claimed = f.get("severity_claimed")
     klass = f.get("class_disputed")
-    if not (j or disputed or claimed or klass):
+    # BOTH ABSENCES, ALWAYS. This function is no longer "the judge box" -
+    # it carries the second AND third readings - so the early return had to
+    # stop being conditional on the judge alone. Measured: a finding with a
+    # replay outcome and no judge verdict took this return and its replay
+    # line, added fifteen lines below, was never reached. The block was
+    # wired under the exit rather than into it.
+    rh_pre = [r for r in (f.get("replays") or []) if isinstance(r, dict)]
+    if not rh_pre and isinstance(f.get("replay"), dict):
+        rh_pre = [f["replay"]]
+    if not (j or disputed or claimed or klass or rh_pre):
         # ABSENCE PRINTED, rather than an empty string. Returning "" made a
         # finding nobody cross-read look identical to one this renderer does
         # not discuss, under a PROOF badge that reads as the whole
@@ -146,8 +155,28 @@ def _judge_html(f: dict) -> str:
                     + (" (unrated before the judge)"
                        if f.get("severity_was_unrated") else "")
                     + f", shown as <code>{_esc(f.get('severity') or '')}</code>")
+    # The third layer, which reached no renderer but markdown. A finding
+    # `argus replay` established the target no longer does was rendered
+    # here exactly like one it still does.
+    rh = [r for r in (f.get("replays") or []) if isinstance(r, dict)]
+    if not rh and isinstance(f.get("replay"), dict):
+        rh = [f["replay"]]
+    real_r = [r for r in rh
+              if r.get("outcome") in ("reproduced", "not_reproduced")]
+    gone = [r for r in real_r if r.get("outcome") == "not_reproduced"]
+    if gone:
+        bits.append("<b>DID NOT REPRODUCE</b> against the live target: "
+                    + _esc(str(gone[0].get("reason", ""))[:300]))
+    elif real_r:
+        bits.append("Re-verified against the target: reproduced"
+                    + (f" - {_esc(str(real_r[-1].get('reason', ''))[:300])}"
+                       if real_r[-1].get("reason") else ""))
+    else:
+        bits.append("Re-verification: not performed - the target has not "
+                    "been asked whether it still does this")
     style = ("border-left:6px solid #c0392b;background:#fdf2f0"
-             if disputed else "border-left:6px solid #999;background:#f4f4f4")
+             if disputed or gone
+             else "border-left:6px solid #999;background:#f4f4f4")
     return (f"<div style=\"{style};padding:.6rem .9rem;margin:.8rem 0\">"
             + "<br>".join(bits) + "</div>")
 

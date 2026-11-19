@@ -225,6 +225,30 @@ def _badges(finding: dict) -> str:
         else:
             out.append('<span class="b" style="background:#2b7a4b">'
                        f'CROSS-VERIFIED BY {_esc(who.upper())}</span>')
+    # A BADGE FOR THE THIRD READING. `argus replay` can establish that the
+    # target NO LONGER DOES THIS, and that outcome reached only report.md -
+    # so the artifact actually submitted to a triager published a finding
+    # the operator had evidence no longer reproduces, with no sign of it.
+    # Not a fabricated finding: an EXPIRED one presented as current, which
+    # is the same assertion-beyond-the-evidence one field over.
+    rh = [r for r in (finding.get("replays") or []) if isinstance(r, dict)]
+    if not rh and isinstance(finding.get("replay"), dict):
+        rh = [finding["replay"]]
+    real = [r for r in rh
+            if r.get("outcome") in ("reproduced", "not_reproduced")]
+    if not real:
+        out.append('<span class="b" style="background:#6b6b6b">'
+                   'NOT RE-VERIFIED</span>')
+    else:
+        # A failure to reproduce outranks a later success: a target
+        # answering differently twice is information, not a correction.
+        gone = [r for r in real if r.get("outcome") == "not_reproduced"]
+        if gone:
+            out.append('<span class="b" style="background:#8e1b1b">'
+                       'DID NOT REPRODUCE</span>')
+        else:
+            out.append('<span class="b" style="background:#2b7a4b">'
+                       'RE-VERIFIED: REPRODUCED</span>')
     for label, key in (("CVSS", "cvss"), ("CWE", "cwe"), ("OWASP", "owasp")):
         value = str(finding.get(key) or "")
         if value:
