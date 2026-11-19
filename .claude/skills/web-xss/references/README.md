@@ -9,6 +9,7 @@ these files carry the payload-level depth.
 | File | When to open |
 |---|---|
 | `workflow.md` | the end-to-end procedure: probe → context → payload → proof |
+| `operator-checklist.md` | the engagement checklist — intake, context, evasion ladder, bot check, exfil, stop |
 | `detection.md` | you don't yet know WHERE the value lands — marker protocol + context probes |
 | `contexts.md` | the reflection is visible but the context is unclear — five-context map |
 | `dom-xss.md` | the value never reaches the response — JS-side source→sink flows |

@@ -55,6 +55,7 @@ is the operational corpus — pick the file for the stage you're in.
 | `payload-dictionary.md` | The payload bank — by engine, by goal |
 | `cheatsheet.md` | One-page-per-engine compact tables |
 | `workflow.md` | End-to-end playbook — phases, falsifiers, evidence |
+| `operator-checklist.md` | The engagement checklist — intake, engine ID, sandbox ladder, evidence, stop |
 | `sandbox-taxonomy.md` | The four sandbox failure-modes — which you're in |
 | `engine-quirks.md` | Per-engine edge-cases that break payloads |
 | `framework-contexts.md` | Where SSTI lives in Flask/Spring/Rails/Express code |
