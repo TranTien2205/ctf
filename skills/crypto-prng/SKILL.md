@@ -78,7 +78,25 @@ Depth, one named file at a time:
 - `skills/ctf-crypto/prng-attacks.md`
 - `skills/ctf-crypto/prng.md`
 
-| Any predictable-random question | `references/state-recovery.md` |
+## The reference corpus — read the file for the job
+
+| Job | File |
+|---|---|
+| name the generator / fingerprint | `references/detection.md`, `references/cipher-identification.md`, `references/detection-deep.md`, `references/lead-grammar.md` |
+| observation → attack | `references/detection-matrix.md`, `references/decision-table-deep.md`, `references/attack-catalogue.md` |
+| the count floor | `references/per-check.md`, `references/boundary-cases.md`, `references/per-boundary.md` |
+| which family | `references/per-family-lcg.md`, `references/per-family-lfsr.md`, `references/per-family-mt-xorshift.md`, `references/per-family-seed.md` + `*-deep` |
+| which attack | `references/per-attack-lcg-recover.md`, `references/per-attack-lcg-unknown-modulus.md`, `references/per-attack-lcg-truncated.md`, `references/per-attack-berlekamp-massey.md`, `references/per-attack-lfsr-recover.md`, `references/per-attack-lfsr-predict.md`, `references/per-attack-mt19937-clone.md`, `references/per-attack-xorshift128.md` + `*-deep` |
+| the command / flags | `references/payload-dictionary.md`, `references/payload-map.md`, `references/payload-index.md`, `references/operator-notes.md` |
+| the math | `references/theory.md`, `references/mechanism.md`, `references/lcg-deep.md`, `references/lfsr-deep.md`, `references/mt19937-deep.md`, `references/xorshift-deep.md`, `references/seed-search-deep.md` |
+| the gates | `references/boundary-cases-deep.md`, `references/edge-cases-deep.md`, `references/preconditions.md`, `references/condition-map.md` |
+| the accept gate | `references/verify-deep.md`, `references/evidence-deep.md` |
+| the failure path | `references/falsifiers-deep.md`, `references/negative-results-deep.md`, `references/troubleshoot-deep.md`, `references/common-mistakes-deep.md`, `references/anti-patterns-deep.md`, `references/evasion-deep.md` |
+| the order | `references/workflow.md`, `references/workflow-playbook-deep.md`, `references/recon-order.md`, `references/probe-order.md`, `references/first-hour.md` |
+| the solves | `references/case-studies-deep.md`, `references/worked-examples-deep.md`, `references/scenarios-deep.md`, `references/real-world-cases-deep.md`, `references/multi-step-chains-deep.md` |
+| the index / card | `references/coverage-map.md`, `references/closing-index.md`, `references/quick-reference.md`, `references/field-manual.md`, `references/skill-status.md` |
+| is this even PRNG | `references/class-boundary-deep.md` |
+| the `references/` variants | a base file and its `-deep`/`-variant`/`-catalogue`/`-map`/`-index`/`-playbook` suffixes cover the same topic at different depth — open the deepest |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

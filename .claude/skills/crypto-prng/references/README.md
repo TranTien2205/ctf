@@ -1,17 +1,29 @@
-# PRNG reference map
+# crypto-prng references — index
 
-This directory belongs to the canonical `crypto-prng` class skill.
-Open the named file after the first probe; do not read the whole directory.
+## The map
 
-## Choose by observed signal
+- **`detection*`/`cipher-identification*`/`lead-grammar`** — name the
+  generator.
+- **`per-attack-*`** + `*-deep` — the attack ids.
+- **`per-family-*`** + `*-deep` — the generator families.
+- **`payload-*`/`operator-notes*`/`payload-map/index`** — the commands.
+- **`theory*`/`mechanism*`/`glossary*`** — the math.
+- **`boundary*`/`edge-*`/`condition*`/`per-boundary/check/condition`** —
+  the gates.
+- **`verify*`/`evidence*`/`checklist*`/`field-manual`** — the close.
+- **`falsifiers*`/`negative-*`/`troubleshoot*`/`common-mistakes*`/
+  `anti-patterns*`/`evasion*`** — the failure paths.
+- **`workflow*`/`recon-order*`/`probe-order*`/`first-hour`** — the order.
+- **`case-studies*`/`worked-examples*`/`scenarios*`/`real-world*`/
+  `multi-step-chains*`/`attack-catalogue`/`decision-table*`/`quick-
+  reference*`/`detection-*`** — the cases + indexes.
+- **`class-boundary*`/`verified-chains*`/`preconditions`** — the scope.
 
-| Signal or task | Open |
-|---|---|
-| Any predictable-random question | `state-recovery.md` |
+## The honest status
 
-## Loading rule
+Catalogue class — no local chain cards. `predict==held` is the only proof.
 
-The `../SKILL.md` file is enough for routine recognition and the first probe.
-Open `state-recovery.md` when the generator needs a concrete recovery shape.
-This class has no solved chain here yet — technique guidance, not a verified
-claim.
+## The one rule
+
+Name the generator → meet the count → normalize to raw → the matching
+attack → `predict==held` → use → flag.

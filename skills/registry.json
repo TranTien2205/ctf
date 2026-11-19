@@ -516,9 +516,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 970,
-      "depth_files": 3,
-      "depth_tokens": 968,
+      "skill_tokens": 1617,
+      "depth_files": 196,
+      "depth_tokens": 85321,
       "use_when": [
         "a probe or source read produced this class's signal: name the generator from source, count how many consecutive outputs you hold, then run the matching attack id (lcg-recover, lcg-unknown-modulus, lcg-truncated, berlekamp-massey, lfsr-recover, lfsr-predict, mt19937-clone)"
       ],
