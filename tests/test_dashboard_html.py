@@ -738,6 +738,16 @@ _ABSOLUTE_FLOOR = {"stylesheet lines": 120, "css rules": 60,
                    "@media blocks": 2}
 
 
+#: Why the last `_committed_page()` call returned nothing, or "" if it
+#: returned content. Recorded rather than discarded because a silent
+#: fallback is how a check loses sensitivity without going red: every
+#: Windows CI job failed the negative floor test with
+#: `have={'stylesheet lines': 509, ...}` against floors that could only
+#: have been the absolute ones, and nothing in the failure said the HEAD
+#: copy had not been read. The cause was unknowable from the message.
+_LAST_HEAD_ERROR = ""
+
+
 def _committed_page() -> str:
     """HEAD's copy of the page, for SCALE ONLY.
 
@@ -748,6 +758,7 @@ def _committed_page() -> str:
     such thing available offline.
     """
     import subprocess
+    global _LAST_HEAD_ERROR
     try:
         # `relative_to` raises ValueError for a path outside ROOT, which the
         # first version did not catch - so instead of falling back to the
@@ -756,13 +767,29 @@ def _committed_page() -> str:
         # parametrised test would use.
         rel = DASH.relative_to(ROOT).as_posix()
     except ValueError:
+        _LAST_HEAD_ERROR = f"{DASH} is not under {ROOT}"
         return ""
     try:
+        # `encoding="utf-8"` explicitly, because `text=True` decodes with
+        # the platform's preferred encoding - cp1252 on Windows - and this
+        # file carries Vietnamese comments. 90s rather than 30 because a
+        # cold Windows runner's first git call is slow and a timeout here
+        # degrades the floor silently.
         out = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=ROOT,
-                             capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=90)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        _LAST_HEAD_ERROR = f"{type(exc).__name__}: {exc}"
         return ""
-    return out.stdout if out.returncode == 0 else ""
+    if out.returncode != 0:
+        _LAST_HEAD_ERROR = (f"git show exited {out.returncode}: "
+                            f"{(out.stderr or '').strip()[:200]}")
+        return ""
+    if not out.stdout.strip():
+        _LAST_HEAD_ERROR = "git show returned an empty blob"
+        return ""
+    _LAST_HEAD_ERROR = ""
+    return out.stdout
 
 
 def _metrics(text: str) -> dict:
@@ -772,6 +799,17 @@ def _metrics(text: str) -> dict:
             "custom tokens": len(set(re.findall(r"--[a-z0-9-]+\s*:", css))),
             "file bytes": len(text.encode("utf-8")),
             "@media blocks": css.count("@media")}
+
+
+def _floor_source() -> str:
+    """"HEAD", or why the scale could not be read from it.
+
+    The same shape as `require_node` in this file: a run that drops a
+    proof says which one. A floor silently degraded to its absolute values
+    is a check that still passes and no longer catches what it exists for -
+    which is precisely what happened on every Windows CI job.
+    """
+    return "HEAD" if _committed_page() else (_LAST_HEAD_ERROR or "unknown")
 
 
 def _floors() -> dict:
@@ -824,6 +862,16 @@ def test_the_floor_catches_a_gross_deletion():
     negative direction written as a test and not as a comment is what makes
     a silent loss of sensitivity speak.
     """
+    source = _floor_source()
+    if source != "HEAD":
+        # NOT A FAILURE AND NOT A PASS. With the scale degraded to the
+        # absolute floor, a 521-line cut genuinely does clear it at this
+        # file size, so the assertion below is correct and measures
+        # nothing. Every Windows CI job reported exactly that and read as a
+        # defect in the floor rather than as a missing input.
+        pytest.skip(f"the floor is degraded to its absolute values and "
+                    f"cannot catch a 521-line cut at this size; HEAD copy "
+                    f"unavailable: {source}")
     text = DASH.read_text(encoding="utf-8")
     css = _stylesheet(text)
     lines = css.split("\n")
@@ -1163,3 +1211,30 @@ def test_matches_really_rejects_everything_once_given_an_index(
     assert out[1]["v"] is True, "index 0 is falsy, so the first row survived"
     assert out[2]["v"] is False, "index 1 made F.grade undefined"
     assert out[3]["v"] is False, "and every index after it"
+
+
+def test_the_floor_is_not_silently_degraded_in_this_checkout():
+    """THE DIRECTION THAT KEEPS THE SKIP HONEST.
+
+    The negative test above skips when the HEAD copy cannot be read, which
+    is right - the floor really cannot catch a 521-line cut once it has
+    fallen back to its absolute values. But a skip is also how a check
+    disappears: if every run degraded, the suite would be green and the
+    floor would be catching nothing, and the only evidence would be a
+    skipped test nobody reads.
+
+    So in a checkout where git works - which is every development run and
+    every Linux CI job - the scale MUST come from HEAD. If this fails, the
+    floor is operating at its absolute values and the reason is printed
+    rather than left to be inferred from a `have=` dict.
+    """
+    import shutil
+
+    if shutil.which("git") is None:
+        pytest.skip("no git in this environment")
+    if not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    source = _floor_source()
+    assert source == "HEAD", (
+        f"the structural floor fell back to its absolute values, so it is "
+        f"no longer scaled to the file: {source}")

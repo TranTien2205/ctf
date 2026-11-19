@@ -6920,12 +6920,58 @@ failing plants invent a flag after an argus invocation, once through
 `python -m` and once through the console script directly - so both argus
 entry points are covered and neither is excused by the interpreter rule.
 
+### A silent fallback is how a check loses its sensitivity
+
+Every Windows CI job failed the derived floor's negative test:
+
+    have={'stylesheet lines': 509, 'css rules': 247, ...}
+    assert {}      # nothing caught
+
+And the test was RIGHT. Locally the same cut is caught - HEAD and the
+working tree both measure 1030 stylesheet lines, the floors are 669 and
+269, and a 521-line cut leaves 509 and 247, under both. On Windows the
+floors could only have been the absolute ones, which means the HEAD copy
+was never read and the scale silently degraded.
+
+Nothing in the failure said that. The message named the measurements and
+the floors and gave no hint that an input was missing, so it read as a
+defect in the floor rather than as a missing scale - and the cause is still
+not determined from here, because the instrument did not record it.
+
+Three changes, and the third is the one that matters:
+
+- `_LAST_HEAD_ERROR` records WHY the read returned nothing: a non-zero exit
+  with git's stderr, an empty blob, a timeout, a path outside the repo.
+  The next failure will name its cause instead of being inferred from a
+  `have=` dict.
+- Two plausible causes fixed on the way, both platform defaults rather than
+  logic: `text=True` decodes with the platform's preferred encoding, which
+  is cp1252 on Windows while this file carries Vietnamese comments, so the
+  encoding is now explicit; and the 30-second timeout became 90, because a
+  cold Windows runner's first git invocation is slow and a timeout here
+  degrades the floor instead of failing.
+- The negative test now SKIPS WITH THE REASON when the scale is degraded,
+  the same shape `require_node` already uses in this file: a run that drops
+  a proof says which one. With the floor at its absolute values a 521-line
+  cut genuinely does clear it, so the assertion was correct and measured
+  nothing.
+
+AND A SKIP IS ALSO HOW A CHECK DISAPPEARS. If every run degraded, the suite
+would be green, the floor would catch nothing, and the only evidence would
+be a skipped test nobody reads. So the opposite direction is asserted too:
+in a checkout where git works - every development run and every Linux CI
+job - the scale MUST come from HEAD, and the failure prints why it did not.
+
+Verified by substituting a failing HEAD read: the negative test skips
+naming the reason, the degradation guard fails naming the reason, and with
+HEAD readable both pass.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1121 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1122 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
