@@ -75,6 +75,62 @@ def _tool_surface(meta: dict) -> str:
     return "all"
 
 
+def _verification_coverage(findings: list | None) -> dict:
+    """How many findings each verification layer actually REACHED.
+
+    MEASURED ON THIS REPOSITORY'S OWN SEALED EVIDENCE, which is why this
+    exists: across four sessions and 16 findings, 14 proven and 2 candidate,
+    every finding carried a CWE and cited evidence ids - and ZERO had been
+    read by a second model, and zero had been re-verified against the
+    target. Both layers existed, were tested, and had never touched a real
+    finding.
+
+    Nothing in any report said so. A reader saw `proven` beside each
+    finding and had no way to learn that `proven` was the whole of the
+    verification. The three layers answer three different questions:
+
+      the matrix   did the target produce the quoted bytes?
+      a judge      do those bytes demonstrate the class claimed?
+      a replay     does the target still do it?
+
+    A verdict carrying an `error` is NOT coverage for either layer - the
+    question was asked and did not arrive - and an `inconclusive` replay is
+    not coverage, for the same reason.
+    """
+    rows = [f for f in (findings or []) if isinstance(f, dict)]
+    total = len(rows)
+
+    def _judged(f: dict) -> bool:
+        hist = [v for v in (f.get("judges") or []) if isinstance(v, dict)]
+        if not hist and isinstance(f.get("judge"), dict):
+            hist = [f["judge"]]
+        return any(not v.get("error") for v in hist)
+
+    def _replayed(f: dict) -> bool:
+        hist = [r for r in (f.get("replays") or []) if isinstance(r, dict)]
+        if not hist and isinstance(f.get("replay"), dict):
+            hist = [f["replay"]]
+        return any(r.get("outcome") in ("reproduced", "not_reproduced")
+                   for r in hist)
+
+    judged = [f for f in rows if _judged(f)]
+    replayed = [f for f in rows if _replayed(f)]
+    disputed = [f for f in judged if f.get("disputed")]
+    failed = [f for f in replayed if f.get("replay_failed")]
+    return {
+        "findings": total,
+        "graded": sum(1 for f in rows if f.get("grade")),
+        "cross_read": len(judged),
+        "cross_read_disputed": len(disputed),
+        "re_verified": len(replayed),
+        "re_verification_failed": len(failed),
+        "not_cross_read": [str(f.get("id") or "") for f in rows
+                           if not _judged(f)],
+        "not_re_verified": [str(f.get("id") or "") for f in rows
+                            if not _replayed(f)],
+    }
+
+
 def _coverage(session: Session, findings: list | None = None) -> dict:
     """What the run exercised, and what it looked for and did not settle.
 
@@ -117,7 +173,8 @@ def _coverage(session: Session, findings: list | None = None) -> dict:
     return {"requests_by_tool": dict(sorted(tools.items())),
             "endpoints": sorted(endpoints),
             "probes": sorted(probes),
-            "open_proof_gaps": _open_proof_gaps(entries, findings)}
+            "open_proof_gaps": _open_proof_gaps(entries, findings),
+            "verification": _verification_coverage(findings)}
 
 
 def _open_proof_gaps(entries, findings) -> list[dict]:
@@ -318,6 +375,35 @@ def _proof_block(f: dict) -> list[str]:
         if f.get("severity_claimed"):
             out += [f"> Severity lowered from `{f['severity_claimed']}` on "
                     f"the judge's reading.", ""]
+    # THE THIRD LAYER, per finding. `argus replay` writes `replay`/`replays`
+    # and a one-way `replay_failed` into findings.json, and no renderer read
+    # any of it - so a verification layer's outcome reached no reader at
+    # all, which is the same defect as the silence about the judge one layer
+    # over, introduced in the hour after fixing that one.
+    rhist = [r for r in (f.get("replays") or []) if isinstance(r, dict)]
+    if not rhist and isinstance(f.get("replay"), dict):
+        rhist = [f["replay"]]
+    real = [r for r in rhist
+            if r.get("outcome") in ("reproduced", "not_reproduced")]
+    if not real:
+        why = ""
+        incon = [r for r in rhist if r.get("outcome") == "inconclusive"]
+        if incon:
+            why = f" - {incon[-1].get('reason', '')}"
+        out += [f"> **Re-verification: not performed**{why}. The target has "
+                "not been asked whether it still does this.", ""]
+    else:
+        # A failure to reproduce is a one-way door and outranks a later
+        # success: a target answering differently on two replays is
+        # information about the target, not a correction.
+        failed = [r for r in real if r.get("outcome") == "not_reproduced"]
+        shown = failed[0] if failed else real[-1]
+        if failed:
+            out += ["> **DID NOT REPRODUCE** - "
+                    f"{shown.get('reason', '')}", ""]
+        else:
+            out += ["> **Re-verified against the target: reproduced** - "
+                    f"{shown.get('reason', '')}", ""]
     if verdict.get("requirement"):
         out += [f"_Requirement for {verdict.get('vuln_class', '')}:_ "
                 f"{verdict['requirement']}", ""]
@@ -466,6 +552,45 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         for g in ("proven", "candidate", "unproven", "refused", "ungraded"):
             if grades.get(g):   # "ungraded" is counted above, not skipped
                 lines.append(f"| **{g}** | {grades[g]} | {_GRADE_MEANING[g]} |")
+
+    # WHAT THE GRADE IS NOT. A number nobody can see is not a measurement,
+    # and this is the one a reader most needs: measured across this
+    # repository's own four sealed sessions, all 16 findings were graded,
+    # all 16 cited evidence, and ZERO had been read by a second model or
+    # re-verified against the target. Both layers existed, were tested, and
+    # had never touched a real finding - and no report said so, so `proven`
+    # read as the whole of the verification when it is one third of it.
+    vc = _verification_coverage(findings)
+    if vc["findings"]:
+        lines += ["", "| Verification | Findings | What it answers |",
+                  "|---|---|---|",
+                  f"| graded by the matrix | {vc['graded']}/{vc['findings']} "
+                  "| did the target produce the quoted bytes |",
+                  f"| read by a second model | {vc['cross_read']}/"
+                  f"{vc['findings']} | do those bytes demonstrate the class "
+                  "claimed |",
+                  f"| re-verified against the target | {vc['re_verified']}/"
+                  f"{vc['findings']} | does the target still do it |"]
+        if vc["cross_read_disputed"]:
+            lines.append(f"| disputed by a second model | "
+                         f"{vc['cross_read_disputed']}/{vc['findings']} | "
+                         "printed next to the grade it disputes |")
+        if vc["re_verification_failed"]:
+            lines.append(f"| did not reproduce | "
+                         f"{vc['re_verification_failed']}/{vc['findings']} | "
+                         "not a retraction - see the finding |")
+        gaps = []
+        if not vc["cross_read"]:
+            gaps.append("No finding here has been read by a model from "
+                        "another family. `argus judge <session>` does that; "
+                        "it can dispute or lower, never promote.")
+        if not vc["re_verified"]:
+            gaps.append("No finding here has been re-verified against the "
+                        "target. `argus replay <session>` does that; an "
+                        "authenticated target needs the credential supplied "
+                        "again with `--header`.")
+        if gaps:
+            lines += [""] + [f"> {g}" for g in gaps]
     def _o(f):
         return f.get("owasp") or _owasp_of(
             f.get("cwe") or _cwe_of(f.get("category")))

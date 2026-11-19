@@ -79,18 +79,58 @@ def extract_styles(html: str) -> list[str]:
     return re.findall(r"<style\b[^>]*>(.*?)</style>", html, re.S | re.I)
 
 
-def strip_block_comments(js: str) -> str:
-    """Drop /* ... */ only.
+def strip_comments(js: str) -> str:
+    """The script with comments blanked and newlines preserved.
 
-    Line comments are left in place on purpose: a `//` inside a string
-    literal (`https://...`) would make a line-comment stripper eat real code
-    to the end of the line, and a checker that quietly deletes the thing it
-    is looking for reports a clean file. Block comments are enough, because
-    the dashboard keeps its contract listing in one - if the endpoint
-    literals were only in that comment, test_speaks_every_endpoint would
-    pass on documentation instead of on call sites.
+    THIS REPLACED A WEAKER VERSION AND ITS REASON, which is the part worth
+    recording. `strip_block_comments` dropped `/* ... */` only, and said
+    why: "a `//` inside a string literal (`https://...`) would make a
+    line-comment stripper eat real code to the end of the line, and a
+    checker that quietly deletes the thing it is looking for reports a clean
+    file." That hazard is real and the conclusion drawn from it was to AVOID
+    line comments rather than to handle them.
+
+    Then a new check - no multi-parameter function passed bare to an array
+    method - fired on its first run against a `/* */` comment that QUOTED
+    the defect in order to explain it, and I wrote a second comment
+    stripper to fix it rather than calling the one three lines up. Two
+    implementations of one concept, by the same hand, minutes apart.
+
+    So this is the scanner, and it handles the hazard instead of avoiding
+    it: it tracks string state, so `//` inside `"https://..."` is not a
+    comment, and real code after such a string survives. Verified in both
+    directions - a quoted call in a block comment and in a line comment are
+    both ignored, while a call after a `https://` string and a call followed
+    by a trailing comment are both still seen.
     """
-    return re.sub(r"/\*.*?\*/", " ", js, flags=re.S)
+    out, i, n = [], 0, len(js)
+    quote = None
+    while i < n:
+        c = js[i]
+        if quote:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(js[i + 1]); i += 2; continue
+            if c == quote:
+                quote = None
+            i += 1
+            continue
+        if c in "'\"`":
+            quote = c; out.append(c); i += 1; continue
+        if c == "/" and i + 1 < n and js[i + 1] == "/":
+            while i < n and js[i] != "\n":
+                i += 1
+            continue
+        if c == "/" and i + 1 < n and js[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (js[i] == "*" and js[i + 1] == "/"):
+                if js[i] == "\n":
+                    out.append("\n")
+                i += 1
+            i += 2
+            continue
+        out.append(c); i += 1
+    return "".join(out)
 
 
 # attributes that can fetch something; `placeholder` and `title` hold URLs as
@@ -191,7 +231,7 @@ def external_resources(html: str) -> list[str]:
             # a local @font-face still needs a src; none of them are bundled
             out.append("stylesheet @font-face")
     for js in extract_scripts(html):
-        body = strip_block_comments(js)
+        body = strip_comments(js)
         for m in re.finditer(r"['\"]((?:[a-z][a-z0-9+.-]*:)?//[^'\"]{1,80})['\"]", body, re.I):
             if m.group(1) in _NAMESPACE_URIS:
                 continue      # an XML namespace is never fetched
@@ -204,7 +244,7 @@ _SINKS = ("innerHTML", "outerHTML", "insertAdjacentHTML", "document.write",
 
 
 def unsafe_sinks(js: str) -> list[str]:
-    body = strip_block_comments(js)
+    body = strip_comments(js)
     out = [name for name in _SINKS if name in body]
     # setTimeout/setInterval with a string argument is eval in a trench coat
     if re.search(r"set(?:Timeout|Interval)\s*\(\s*['\"]", body):
@@ -217,7 +257,7 @@ def inline_handlers(html: str) -> list[str]:
 
 
 def missing_endpoints(js: str, wanted: list[str]) -> list[str]:
-    body = strip_block_comments(js)
+    body = strip_comments(js)
     return [w for w in wanted if w not in body]
 
 
@@ -300,13 +340,13 @@ def test_the_only_absolute_url_in_the_script_is_the_svg_namespace(dash: str):
     identifier - nothing ever fetches it. Every OTHER absolute URL in the
     script would be a network call, so the check allows exactly that one and
     names anything else."""
-    js = strip_block_comments(extract_scripts(dash)[0])
+    js = strip_comments(extract_scripts(dash)[0])
     urls = set(re.findall(r"['\"](https?://[^'\"]+)['\"]", js))
     assert urls <= {"http://www.w3.org/2000/svg"}, sorted(urls)
 
 
 def test_the_namespace_allowance_does_not_hide_a_real_url(dash: str):
-    js = strip_block_comments(extract_scripts(dash)[0])
+    js = strip_comments(extract_scripts(dash)[0])
     js += "\nvar beacon = 'https://telemetry.example/collect';"
     urls = set(re.findall(r"['\"](https?://[^'\"]+)['\"]", js))
     assert urls - {"http://www.w3.org/2000/svg"} == {"https://telemetry.example/collect"}
@@ -317,7 +357,7 @@ def test_the_namespace_allowance_does_not_hide_a_real_url(dash: str):
 def test_no_html_sinks(dash: str):
     """Finding titles and evidence excerpts are bytes the target chose. With
     no innerHTML in the file there is no place to forget to escape one."""
-    assert unsafe_sinks(strip_block_comments(extract_scripts(dash)[0])) == []
+    assert unsafe_sinks(strip_comments(extract_scripts(dash)[0])) == []
 
 
 @pytest.mark.parametrize("find,repl,named", [
@@ -328,7 +368,7 @@ def test_no_html_sinks(dash: str):
 ])
 def test_sink_check_names_what_was_planted(dash: str, find, repl, named):
     assert find in dash, "anchor moved; re-aim this test rather than deleting it"
-    found = unsafe_sinks(strip_block_comments(extract_scripts(dash.replace(find, repl, 1))[0]))
+    found = unsafe_sinks(strip_comments(extract_scripts(dash.replace(find, repl, 1))[0]))
     assert any(named in s for s in found), found
 
 
@@ -396,7 +436,7 @@ def test_state_explanation_check_catches_a_missing_state(dash: str):
 
 def test_says_so_when_no_model_is_configured(dash: str):
     """Honest degradation: the operator must not believe an agent will run."""
-    js = strip_block_comments(extract_scripts(dash)[0])
+    js = strip_comments(extract_scripts(dash)[0])
     assert "model_configured" in js
     assert "blocked" in js and "ANTHROPIC_API_KEY" in js
 
@@ -652,72 +692,156 @@ def test_the_var_resolution_check_sees_a_root_block_deletion():
         "check is not measuring what it claims")
 
 
+#: The floor is a FRACTION of the committed size, not a constant.
+#:
+#: Constants were the original design and they decayed out from under the
+#: incident they were built for, silently. Reported by the session that owns
+#: the file, measured: the stylesheet grew from 791 to 953 lines with NO
+#: deletion involved, and a 521-line cut - the real incident - then left 432
+#: lines and 211 rules, above both the 420-line and 200-rule floors. Neither
+#: fired. The check had stopped catching the only thing it exists to catch,
+#: and nothing went red to say so.
+#:
+#: A floor expressed as a constant has a sensitivity that decreases with
+#: every addition to the thing it guards. The quantity it should compare
+#: against is the file's own previous size, which is what HEAD holds.
+#:
+#: Why 0.65: at today's size a 521-line cut leaves 45% of the lines and 57%
+#: of the rules, so the fraction has to sit above 57% to catch it on both
+#: measures, and below 100% minus whatever a legitimate refactor removes.
+#: 0.65 catches the incident with margin on both and leaves a third of the
+#: file removable before it complains.
+#:
+#: WHAT SCALING FROM HEAD COSTS, stated as the trade it is rather than left
+#: to be discovered. Each commit may remove up to 35% without tripping, and
+#: the floor then follows it down - 948 lines to 171 in four commits, 18%
+#: remaining, nothing ever red, with `_ABSOLUTE_FLOOR` stopping it one step
+#: later. That path did not exist with constants; constants had the decay
+#: instead. The trade was taken because erosion needs four sustained
+#: deliberate commits each removing a third, while decay needed only
+#: ordinary growth and arrived on its own. Scaling from the MAXIMUM over
+#: recent commits would close it and would hold a legitimate shrink red for
+#: several commits - a real cost against an implausible threat.
+#:
+#: Comment-heavy additions WIDEN the margin rather than eroding it, which
+#: is the opposite of the intuition: measured at 0.10-0.15 rules per line
+#: against the file's 0.407, the remaining fraction after the cut moves
+#: from 54.4% toward 49%. Prose does not add rules.
+_FLOOR_FRACTION = 0.65
+
+#: A last-resort absolute floor, and it is honest about what it cannot do:
+#: it catches "the stylesheet has essentially vanished" and it CANNOT catch
+#: the 432-line state above, because catching that absolutely would require
+#: the decaying constant this replaces. Only the ratio catches a gutting.
+_ABSOLUTE_FLOOR = {"stylesheet lines": 120, "css rules": 60,
+                   "custom tokens": 12, "file bytes": 20_000,
+                   "@media blocks": 2}
+
+
+def _committed_page() -> str:
+    """HEAD's copy of the page, for SCALE ONLY.
+
+    The content every check reads is the WORKING TREE's: a gate must check
+    what is about to be committed, or it goes green on a file nobody has
+    looked at. But the floor that content is measured against has to come
+    from something that moves when the file moves, and HEAD is the only
+    such thing available offline.
+    """
+    import subprocess
+    try:
+        # `relative_to` raises ValueError for a path outside ROOT, which the
+        # first version did not catch - so instead of falling back to the
+        # absolute floor the whole test crashed. Found by a plant harness
+        # pointing DASH at a temp file, which is exactly the shape a future
+        # parametrised test would use.
+        rel = DASH.relative_to(ROOT).as_posix()
+    except ValueError:
+        return ""
+    try:
+        out = subprocess.run(["git", "show", f"HEAD:{rel}"], cwd=ROOT,
+                             capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return out.stdout if out.returncode == 0 else ""
+
+
+def _metrics(text: str) -> dict:
+    css = _stylesheet(text)
+    return {"stylesheet lines": css.count("\n") + 1,
+            "css rules": css.count("{"),
+            "custom tokens": len(set(re.findall(r"--[a-z0-9-]+\s*:", css))),
+            "file bytes": len(text.encode("utf-8")),
+            "@media blocks": css.count("@media")}
+
+
+def _floors() -> dict:
+    """What each metric must stay above, derived per commit.
+
+    With no git and no HEAD copy - a fresh checkout, a first commit of the
+    file - this falls back to the absolute floor and says so by returning
+    it unchanged. That is weaker, and it is better than a constant that
+    pretends to a sensitivity it lost.
+    """
+    committed = _committed_page()
+    if not committed:
+        return dict(_ABSOLUTE_FLOOR)
+    scaled = _metrics(committed)
+    return {k: max(_ABSOLUTE_FLOOR[k], int(scaled[k] * _FLOOR_FRACTION))
+            for k in _ABSOLUTE_FLOOR}
+
+
 def test_the_stylesheet_has_not_been_gutted():
-    """A structural floor, set WELL below the current values so that
-    ordinary work - and a palette rewrite in particular, which replaces
-    values and not structure - never trips it.
+    """A structural floor, derived from the committed size each run so its
+    sensitivity does not decay as the file grows.
 
-    Measured on the committed file (`git show cda6d95:` and HEAD and the
-    working tree all agree): 792 stylesheet lines, 352 rules, 43 custom
-    property declarations, 105,550 file bytes (`git cat-file -s`). The
-    floors are roughly half of each.
-
-    103,183 is the same file's CHARACTER count, and the gap is 2,367 bytes
-    of multi-byte UTF-8. Both figures are right and answer different
-    questions, which was first read as a disagreement between two
-    sessions' measurements.
-
-    `43` and `36` are both right and answer different questions: 43
-    declarations appear in the stylesheet, 36 of them inside `:root`. This
-    check counts declarations, because a rule that defines a token outside
-    `:root` is stylesheet that can be deleted too. Written down because the
-    two figures were read as a disagreement once.
-
-    They were first set from 672/327/36/97,398, which was a MID-EDIT state
-    of another session's work and never a committed one - the commit before
-    it had 565 lines and the one after has 792. The floors were safely
-    below both, so the numbers were wrong without the check being wrong,
-    which is the quiet way for a figure cited as a basis to be false.
+    The content is the WORKING TREE's, always: a gate checks what is about
+    to be committed. Only the SCALE comes from HEAD. See `_FLOOR_FRACTION`
+    for why the constants this replaces stopped catching the incident they
+    were built for.
     """
     text = DASH.read_text(encoding="utf-8")
     css = _stylesheet(text)
     assert css, "no <style> block at all"
-    floors = {
-        "stylesheet lines": (css.count("\n") + 1, 420),
-        "css rules":        (css.count("{"), 200),
-        "custom tokens":    (len(set(re.findall(r"--[a-z0-9-]+\s*:", css))), 24),
-        # BYTES, read as bytes. This read `len(text)`, which is
-        # CHARACTERS, while being named bytes - and the file's comments are
-        # in Vietnamese, so the two diverge by 2,367 here: 105,550 bytes
-        # against 103,183 characters, from 1,534 multi-byte characters.
-        # Nothing failed, because both are far above the floor, but the
-        # drift is one-directional: characters stay flat as non-ASCII prose
-        # is added and bytes grow. A floor whose name and quantity disagree
-        # is the `--workflow` defect one level in - the number is right and
-        # the thing it claims to measure is not. Bytes is the right
-        # quantity: a deleted stylesheet is a loss of bytes on disk.
-        "file bytes":       (len(DASH.read_bytes()), 60_000),
-        "@media blocks":    (css.count("@media"), 5),
-    }
-    short = {k: v for k, (v, floor) in floors.items() if v < floor}
+
+    have, floors = _metrics(text), _floors()
+    short = {k: (have[k], floors[k]) for k in floors if have[k] < floors[k]}
     assert not short, (
-        f"the file lost structure: {short} - floors are "
-        f"{ {k: f for k, (_, f) in floors.items()} }")
+        f"the file lost structure, measured as (have, floor): {short}. If "
+        "this deletion is deliberate, the floor recalibrates on the next "
+        "commit - it is 65% of what HEAD holds")
     assert css.count("{") == css.count("}"), (
         f"unbalanced braces: {css.count('{')} open, {css.count('}')} close "
         "- a slice cut through a rule")
 
 
 def test_the_floor_catches_a_gross_deletion():
-    """521 lines, the size actually reported."""
-    css = _stylesheet(DASH.read_text(encoding="utf-8"))
+    """521 lines, the size actually reported, against the floor as it is
+    DERIVED RIGHT NOW rather than as a literal.
+
+    This test is the only reason the decay was ever noticed. The positive
+    floor above went on passing - the file is large and the floor was low -
+    while a 521-line cut had quietly risen above both constants. A check's
+    negative direction written as a test and not as a comment is what makes
+    a silent loss of sensitivity speak.
+    """
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
     lines = css.split("\n")
     assert len(lines) > 521, "premise: the stylesheet is larger than the cut"
-    gutted = "\n".join(lines[:len(lines) - 521])
-    assert (gutted.count("\n") + 1) < 420, \
-        "a 521-line deletion must fall under the line floor"
-    assert gutted.count("{") < 200, \
-        "and under the rule floor"
+
+    gutted_css = "\n".join(lines[:len(lines) - 521])
+    gutted = _metrics(text.replace(css, gutted_css, 1))
+    floors = _floors()
+    caught = {k: (gutted[k], floors[k]) for k in floors
+              if gutted[k] < floors[k]}
+    assert caught, (
+        f"a 521-line deletion passes every floor: have={gutted}, "
+        f"floors={floors}. That is the incident this check exists for")
+    # on both size measures, not just whichever happens to be tighter
+    for metric in ("stylesheet lines", "css rules"):
+        assert metric in caught, (
+            f"{metric} does not catch the cut: {gutted[metric]} against a "
+            f"floor of {floors[metric]}")
 
 
 def test_every_grade_and_severity_name_has_a_rule():
@@ -777,8 +901,17 @@ def test_the_grade_rule_check_catches_a_deleted_grade_rule():
     styled = set(re.findall(r"\.([a-z][a-z0-9_-]*)", cut))
     assert "proven" not in styled, \
         "the planted deletion must remove the rule this check looks for"
-    assert (cut.count("\n") + 1) >= 420 and cut.count("{") >= 200, \
-        "and it must stay above every floor, or the floor would catch it"
+    # DERIVED, not 420 and 200. This was the same two constants the
+    # structural floor used, in a second place - so the decay that blinded
+    # that floor was present here too, and this assertion would have gone
+    # on claiming "stays above every floor" against floors that no longer
+    # existed at those values. One concept, two definitions.
+    floors = _floors()
+    assert cut.count("\n") + 1 >= floors["stylesheet lines"] \
+        and cut.count("{") >= floors["css rules"], (
+            "the planted cut must stay above every size floor, or the size "
+            "floor would catch it and this test would not be measuring the "
+            f"grade-rule check at all (floors: {floors})")
 
 
 # -------------------------- 10. the evidence table must not clip a timestamp
@@ -919,3 +1052,114 @@ def test_the_timestamp_width_check_catches_a_font_size_increase():
         f"({need2:.1f}px). If the column was widened deliberately this "
         "bound follows it; if it narrowed, the clipping is closer than it "
         "was")
+
+
+# -------- 11. the thing tested and the thing used are not the same thing
+
+#: Array methods that invoke their callback with (element, index, array).
+#: `sort` and `reduce` are deliberately absent: their callbacks take more
+#: than one argument BY CONTRACT, so a two-parameter function is correct
+#: there and flagging it would be a false positive.
+_ARRAY_METHODS = ("filter", "map", "forEach", "some", "every", "find",
+                  "findIndex", "findLast", "flatMap")
+
+
+def _bare_callbacks(js: str) -> list[tuple[str, str]]:
+    """(method, function name) for every bare named callback."""
+    return re.findall(
+        r"\.(" + "|".join(_ARRAY_METHODS) + r")\(\s*([A-Za-z_$][\w$]*)\s*\)",
+        js)
+
+
+def _param_count(js: str, name: str) -> int | None:
+    m = re.search(rf"function\s+{re.escape(name)}\s*\(([^)]*)\)", js)
+    if m is None:
+        return None
+    inner = m.group(1).strip()
+    return len([p for p in inner.split(",") if p.strip()]) if inner else 0
+
+
+def test_no_multi_parameter_function_is_passed_bare_to_an_array_method():
+    """MEASURED FUNCTIONAL DEFECT, found by the session that owns this file
+    and present since this console was written: the Findings table rendered
+    EXACTLY ONE FINDING OUT OF TEN.
+
+        /api/findings        10 findings
+        #t-finds tbody        1 row
+
+    `var list = (S.findings || []).filter(matches)` - and `matches(f, filt)`
+    takes two parameters with `var F = filt || S.filt`. `filter` invokes its
+    callback with (element, index, array), so `filt` received the INDEX.
+    Element 0 got `0`, falsy, fell through to `S.filt` and rendered.
+    Element 1 onward got a truthy number, `F.grade` was `undefined`,
+    `undefined !== 'all'` was true, and every remaining finding was
+    discarded. One row, always the first, whatever the data.
+
+    WHY NOTHING CAUGHT IT is the part worth the invariant. The unit tests
+    call `matches(f)` with one argument, so the function is correct and its
+    tests are correct; the defect lives entirely in the CALL SITE. And it
+    only misbehaves with more than one finding, so a single-finding fixture
+    passes forever.
+
+    This is the arity form of a shape this repository keeps producing: the
+    thing tested and the thing used are not the same thing. The rule is
+    general - a function with an optional second parameter must never be
+    passed bare to an array method, because the array method always
+    supplies one - so it is asserted over the whole script rather than at
+    the one site.
+    """
+    js = strip_comments(extract_scripts(DASH.read_text(encoding="utf-8"))[0])
+    bad = []
+    for method, fn in _bare_callbacks(js):
+        n = _param_count(js, fn)
+        if n is not None and n > 1:
+            bad.append(f".{method}({fn}) - {fn} takes {n} parameters")
+    assert not bad, (
+        "a multi-parameter function passed bare to an array method receives "
+        "the index as its second argument: " + "; ".join(bad))
+
+
+def test_the_arity_check_catches_the_defect_it_was_written_for():
+    """The exact call site, restored. Without this the rule above is a
+    claim about a shape nobody has seen fail."""
+    js = strip_comments(extract_scripts(DASH.read_text(encoding="utf-8"))[0])
+    assert _param_count(js, "matches") == 2, \
+        "premise: matches still takes an optional second parameter"
+
+    planted = js.replace("filter(function (f) { return matches(f); })",
+                         "filter(matches)", 1)
+    assert planted != js, "anchor moved: the call site is no longer wrapped"
+    found = [(m, f) for m, f in _bare_callbacks(planted) if f == "matches"]
+    assert found == [("filter", "matches")], found
+
+    # and the single-parameter callbacks in this file stay clean, so the
+    # rule is not merely refusing every bare callback
+    for method, fn in _bare_callbacks(js):
+        n = _param_count(js, fn)
+        assert n is None or n <= 1, f".{method}({fn}) takes {n}"
+
+
+def test_matches_really_rejects_everything_once_given_an_index(
+        dash: str, tmp_path: Path):
+    """Driven under node, because the arithmetic above is a reading of the
+    source and this is the behaviour it predicts.
+
+    Shows WHY the call site must wrap rather than the function being made
+    index-tolerant: with a number as `filt`, `F.grade` is `undefined` and
+    the function rejects every finding. The first element survives only
+    because index 0 is falsy, which is why the symptom was "one row" and
+    not "no rows" - and a symptom of one row reads as data, not as a bug.
+    """
+    call = _pure(dash, tmp_path)
+    f = {"id": "F01", "grade": "proven", "severity": "high",
+         "vuln_class": "sqli", "title": "t", "url": "http://t/a",
+         "evidence_excerpt": "x"}
+    out = call([{"fn": "matches", "args": [f]},
+                {"fn": "matches", "args": [f, 0]},
+                {"fn": "matches", "args": [f, 1]},
+                {"fn": "matches", "args": [f, 7]}])
+    assert all(r["ok"] for r in out), out
+    assert out[0]["v"] is True, "a finding with no filter must match"
+    assert out[1]["v"] is True, "index 0 is falsy, so the first row survived"
+    assert out[2]["v"] is False, "index 1 made F.grade undefined"
+    assert out[3]["v"] is False, "and every index after it"

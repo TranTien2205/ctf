@@ -6732,12 +6732,200 @@ which has no settle window and is slow because a connect to an unroutable
 address times out. The variation was never mine. A number that moved after
 a change is not a number the change moved.
 
+### Proven is one third of the verification, and no report said so
+
+Measured on this repository's own sealed evidence, four sessions and 16
+findings:
+
+    graded by the matrix            16/16
+    carrying a CWE                  16/16
+    citing evidence ids             16/16
+    read by a second model           0/16
+    re-verified against the target   0/16
+    severity critical               10/16
+
+So both verification layers beyond the matrix - `argus judge`, which exists
+and has 39 tests, and `argus replay`, written hours ago - had never touched
+a single real finding. Nothing in any report said so, and a reader seeing
+`proven` had no way to learn that `proven` was the whole of the
+verification when it is one of three answers to three different questions:
+
+    the matrix   did the target produce the quoted bytes?
+    a judge      do those bytes demonstrate the class claimed?
+    a replay     does the target still do it?
+
+Every report now carries that table with the counts and the questions, and
+when a layer is at zero it says which command would fill it. A verdict
+carrying an `error` is not coverage and an `inconclusive` replay is not
+coverage - the question was asked and did not arrive.
+
+AND THE PER-FINDING REPLAY OUTCOME REACHED NO RENDERER AT ALL. `argus
+replay` writes `replay`, `replays` and a one-way `replay_failed` into
+findings.json; markdown, html and sarif mentioned none of them, and
+hackerone's two mentions were about not synthesising a curl command. A
+verification layer's outcome reached no reader, which is the same defect as
+the silence about the judge - introduced in the hour after fixing that one.
+
+### A floor expressed as a constant decays, and nothing goes red to say so
+
+Reported by the session that owns the dashboard. The stylesheet grew from
+791 to 953 lines with NO deletion involved, and a 521-line cut - the real
+incident the floor exists for - then left 432 lines and 211 rules, above
+both the 420-line and 200-rule floors. NEITHER FIRED.
+
+A floor written as a constant has a sensitivity that decreases with every
+addition to the thing it guards. The quantity it should compare against is
+the file's own previous size, which is what HEAD holds. So the floor is now
+0.65 of the committed size: content from the WORKING TREE, because a gate
+checks what is about to be committed, and HEAD for SCALE only. Proved by
+substituting a grown HEAD - the floors rise from 580 and 240 to 944 and
+577, and the 521-line cut is still caught on both measures at the larger
+size.
+
+Not a bumped constant, which was the obvious fix and would have decayed
+again on the next addition. The trade that WAS taken is recorded: scaling
+from HEAD permits erosion, four deliberate commits each removing a third
+taking 948 lines to 171 with nothing ever red, where the absolute backstop
+stops it one step later. Erosion needs a sustained intentional act; decay
+needed only ordinary growth and arrived unbidden.
+
+THE SAME TWO CONSTANTS WERE IN A SECOND PLACE. A different test asserted
+its planted cut "stays above every floor" against the literal 420 and 200,
+so that assertion had also stopped meaning what it said. One concept, two
+definitions - and the second definition is the one nobody is looking at.
+
+AND THE FALLBACK I WROTE TO BE THE SAFE PATH WAS THE UNSAFE ONE.
+`_committed_page` called `DASH.relative_to(ROOT)`, which raises ValueError
+for a path outside the repo, while the handler caught OSError and
+SubprocessError - so instead of falling back to the absolute floor the test
+crashed. Found by a plant harness pointing the path at a temp file. A
+fallback nobody has executed is a claim, not a behaviour.
+
+### Two absences, one substring
+
+Adding the per-finding replay line broke `test_markdown_states_the_absence_too`,
+which asserted `"not performed" not in agreed` for a finding whose judge
+agreed. It still passes its positive direction; what broke is that a SECOND
+absence now uses the same words - a finding with a judge verdict and no
+replay prints "Re-verification: not performed" - so the substring stopped
+discriminating between two different claims.
+
+Twenty-eighth instance this session of a check keyed on words rather than
+on the form of the claim, and the first one written and broken by the same
+hand inside an hour. Both assertions now name the claim
+("Cross-verification: not performed"), and a new test holds that the two
+absences are distinguishable in all four combinations, because they answer
+different questions and a finding can have either, both or neither.
+
+The pair structure is what surfaced it, for the second time today: the
+positive direction goes on being true while the thing it is paired with
+stops being true, and only the negative direction speaks.
+
+### The findings table showed one finding out of ten
+
+Found by the session that owns the console, and it is from this side of the
+history: present in `a183382` at 13:29 and carried through every commit
+since.
+
+    /api/findings        10 findings
+    #t-finds tbody        1 row
+
+`var list = (S.findings || []).filter(matches)`, where `matches(f, filt)`
+takes two parameters and opens `var F = filt || S.filt`. `filter` invokes
+its callback with (element, index, array), so `filt` received the INDEX.
+Element 0 got `0`, falsy, fell through to `S.filt` and rendered. Element 1
+onward got a truthy number, `F.grade` was `undefined`, `undefined !== 'all'`
+was true, and every remaining finding was discarded.
+
+One row, always the first, whatever the data - and "one finding" reads as
+DATA, not as a bug. On a console whose job is to show what was found, the
+findings view understated the record by ninety percent and looked like an
+answer.
+
+WHY NOTHING CAUGHT IT. The unit tests call `matches(f)` with one argument,
+so the function is correct and its tests are correct; the defect lives
+entirely in the CALL SITE. And it only misbehaves with more than one
+finding, so a single-finding fixture passes forever. This is the arity form
+of the shape this repository keeps producing: the thing tested and the
+thing used are not the same thing.
+
+Asserted as the general rule rather than at the one site, because the rule
+is general: a function with an optional second parameter must never be
+passed bare to `filter`/`map`/`forEach`/`some`/`every`/`find`, because the
+array method always supplies a second argument. `sort` and `reduce` are
+deliberately exempt - their callbacks take more than one argument by
+contract, so flagging a two-parameter function there would be a false
+positive.
+
+Plus the behaviour the reading predicts, driven under node: `matches(f)` and
+`matches(f, 0)` both match, `matches(f, 1)` and `matches(f, 7)` do not.
+That is why the symptom was one row and not zero.
+
+AND THE CHECK FIRED ON A COMMENT ON ITS FIRST RUN. The only
+`.filter(matches)` left in the file is inside the comment that QUOTES the
+broken code in order to explain the fix, and a regex over the script
+reported it as a live call site. Twenty-ninth instance of a mention read as
+a claim this session, inside the check written to catch a different shape.
+
+Fixed with a scanner rather than a wider regex: a naive `//`-to-end-of-line
+strip would blank real code after every `https://` in the file, trading a
+false positive for a false negative, which is the worse direction for a
+check. Verified in both directions - a quoted call in a block comment and
+in a line comment are ignored, a call after a `https://` string and a call
+followed by a comment are both still found, and the line count is
+unchanged so failure messages still point at the right place.
+
+### A habit that fails five times is a mechanism that does not exist
+
+The doc test count went stale FIVE TIMES in one session. Every time the
+cause was identical: the number was taken by a separate `pytest
+--collect-only` call, tests were added before the gate ran, and
+`doc pytest count matches collection` failed. Each failure cost a full gate
+run - six minutes - and each fix was the same two edits typed again.
+
+Four times the number was fixed. The fifth time the mechanism was:
+`scripts/refresh-counts.py` measures and writes in ONE step, with
+`--check` to report staleness and exit 1 without writing. It does not get
+to assert that it worked - `selftest.py` still checks the result
+independently, which is the whole point of having the check at all.
+
+Verified in all three directions rather than by running it once: on the
+stale tree `--check` names both documents and exits 1, the write moves
+them, and `--check` then exits 0.
+
+AND DOCUMENTING IT TURNED THE GATE RED, which exposed a real hole rather
+than a nuisance. `python scripts/refresh-counts.py --check` in AGENTS.md
+had its flag attributed to argus, because flag ownership resolved
+`python -m X` to X and this form has no `-m`: the first token is `python`,
+which counts as argus's own invocation. Thirtieth instance this session of
+a mention read as a claim.
+
+The fix is the rule generalised, not an exemption added: an interpreter is
+never the owner of a flag, so `python <path>.py` belongs to that script
+exactly as `python -m X` belongs to X. Adding `--check` to an exemption
+list would have gone green in ten seconds and left the hole for the next
+script.
+
+Plant-tested four ways, and DESCRIBED rather than quoted, because the
+first version of this paragraph quoted all four planted strings and made
+the gate red three times over - an invented subcommand, two invented flags,
+and a count. An entry documenting a plant test must not contain the plants:
+writing the literal into a gated document IS the claim the plant was.
+Thirty-first through thirty-third instance this session, in one paragraph,
+and the check was right every time.
+
+The two passing plants invoke another script through the interpreter, once
+with `python` and once with `python3`, each with a flag of its own. The two
+failing plants invent a flag after an argus invocation, once through
+`python -m` and once through the console script directly - so both argus
+entry points are covered and neither is excused by the interpreter rule.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1117 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1121 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

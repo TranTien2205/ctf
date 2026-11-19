@@ -987,9 +987,21 @@ def _doc_consistency() -> None:
         for i, t in enumerate(toks):
             if t.startswith("-"):
                 continue
-            if t in ("python", "python3", "py") and "-m" in toks[i:i + 3]:
-                j = toks.index("-m", i)
-                return toks[j + 1] if j + 1 < len(toks) else t
+            if t in ("python", "python3", "py"):
+                # `python -m X` belongs to X, and so does `python x/y.py` -
+                # the interpreter is never the owner of a flag. The second
+                # form was missed: `python scripts/refresh-counts.py
+                # --check` in AGENTS.md attributed that script's flag to
+                # argus, because the first token is `python` and only the
+                # `-m` form was resolved. Thirtieth instance this session
+                # of a mention read as a claim, and the fix is the rule
+                # generalised rather than an exemption added.
+                if "-m" in toks[i:i + 3]:
+                    j = toks.index("-m", i)
+                    return toks[j + 1] if j + 1 < len(toks) else t
+                for nxt in toks[i + 1:i + 3]:
+                    if nxt.endswith(".py"):
+                        return nxt
             return t
         return ""
 

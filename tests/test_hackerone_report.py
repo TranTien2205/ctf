@@ -268,10 +268,46 @@ def test_markdown_states_the_absence_too():
     from argus.report import markdown as md
 
     blank = "\n".join(md._proof_block(_finding()))
-    assert "not performed" in blank.lower(), blank
+    assert "Cross-verification: not performed" in blank, blank
     assert "another family" in blank
 
     agreed = "\n".join(md._proof_block(_finding(
         judge={"judge_model": "other-1", "agrees": True, "reason": "ok"})))
-    assert "not performed" not in agreed.lower()
-    assert "agreed" in agreed.lower()
+    # NAMED, not "not performed". This asserted the bare substring and broke
+    # the moment a SECOND absence used the same words: a finding with a
+    # judge verdict and no replay prints "Re-verification: not performed",
+    # so the string stopped discriminating between two different claims.
+    # Twenty-eighth instance this session of a check keyed on words rather
+    # than on the claim's form, and the first one I wrote and broke myself
+    # inside an hour.
+    assert "Cross-verification: not performed" not in agreed
+    assert "Cross-verification: agreed" in agreed
+
+
+def test_the_two_absences_are_distinguishable():
+    """One block now carries two independent absences - no second model has
+    read the evidence, and the target has not been asked again - and a
+    reader must be able to tell which is which. They answer different
+    questions, and a finding can have either, both or neither.
+    """
+    from argus.report import markdown as md
+
+    both = "\n".join(md._proof_block(_finding()))
+    assert "Cross-verification: not performed" in both
+    assert "Re-verification: not performed" in both
+
+    judged_only = "\n".join(md._proof_block(_finding(
+        judge={"judge_model": "other-1", "agrees": True, "reason": "ok"})))
+    assert "Cross-verification: agreed" in judged_only
+    assert "Re-verification: not performed" in judged_only
+
+    replayed_only = "\n".join(md._proof_block(_finding(
+        replay={"outcome": "reproduced", "reason": "bytes came back"})))
+    assert "Cross-verification: not performed" in replayed_only
+    assert "reproduced" in replayed_only
+    assert "Re-verification: not performed" not in replayed_only
+
+    neither_absent = "\n".join(md._proof_block(_finding(
+        judge={"judge_model": "other-1", "agrees": True, "reason": "ok"},
+        replay={"outcome": "reproduced", "reason": "bytes came back"})))
+    assert "not performed" not in neither_absent, neither_absent

@@ -13,6 +13,22 @@ python -m pytest tests/ -q  # unit + live-lab + loop + proof-matrix tests
 python -m argus demo        # the full pipeline against the lab, graded
 ```
 
+Before the second of those, if you added or removed tests:
+
+```bash
+python scripts/refresh-counts.py          # measure, write, report
+python scripts/refresh-counts.py --check  # report only, exit 1 if stale
+```
+
+`selftest.py` checks that the documents claiming a test count agree with
+what pytest collects, and that count went stale FIVE TIMES in one session -
+every time because the number was measured by a separate `--collect-only`
+call, then tests were added before the gate ran. Each failure cost a full
+gate run and each fix was the same two edits typed again. A habit that
+fails five times is a mechanism that does not exist, so the measurement and
+the write now happen in one step. The script does not get to assert that it
+worked: `selftest.py` still checks the result independently.
+
 All three must stay green, AND THEY ARE NOT THE GATE. `.github/workflows/
 test.yml` runs ten jobs: those checks on five Python versions across ubuntu
 AND windows, plus a `wheel` job. Two things the three commands above cannot
