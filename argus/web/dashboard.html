@@ -881,6 +881,23 @@ body::before{background:none}
              linear-gradient(135deg,var(--line),var(--line-soft)) border-box;
   box-shadow:0 0 28px rgba(4,5,13,.6);
 }
+/* ĐO ĐƯỢC: panel khởi chạy KHÔNG nhận viền gradient, và thủ phạm là quy tắc
+   của chính tôi từ lần thiết kế trước - `.panel:has(#target)`. `:has(#target)`
+   mang độ cụ thể của một ID, nên nó thắng `.panel` thường dù đứng trước.
+   Viết lại ở đúng độ cụ thể đó, và giữ sắc cyan ấm hơn cho panel thao tác
+   bằng cách pha vào lớp padding-box thay vì bằng một quy tắc riêng. */
+/* `#launchmode` ĐÃ BỊ BỎ khỏi selector này. Tôi bê nó sang từ quy tắc cũ
+   mà không kiểm nó là gì: nó là `<span class="note" id="launchmode">lab</span>`,
+   một cái NHÃN, không phải một panel. Ở quy tắc cũ nó chỉ nhận một sắc nền
+   nhạt nên không ai thấy; với viền gradient nó thành một cái hộp quanh chữ
+   "lab". Một selector kế thừa là một selector chưa được kiểm. */
+.panel:has(#target){
+  border:1px solid transparent;
+  background:
+    linear-gradient(145deg,color-mix(in srgb,var(--g1) 9%,var(--v2)),var(--v1)) padding-box,
+    linear-gradient(135deg,var(--g1),var(--g2),var(--g3)) border-box;
+  box-shadow:0 0 26px rgba(0,229,255,.20), 0 0 44px rgba(255,46,151,.12);
+}
 
 /* CHỮ GRADIENT cho số trưng bày. Bản mẫu: trắng -> cyan 55% -> violet. */
 .gnum{
@@ -928,6 +945,53 @@ tbody tr:hover{background:rgba(139,108,255,.06)}
 thead th{border-bottom:1px solid var(--line-soft)}
 
 @media (prefers-reduced-motion:reduce){*{animation:none !important}}
+/* ── THANH ĐO, THEO BẢN MẪU ──────────────────────────────────────────────
+   Bản mẫu vẽ mỗi thanh severity là một dải gradient bo tròn hai đầu, nằm
+   trong một rãnh tối. Ở đây màu của thanh do JS đặt inline theo mức, nên
+   CSS không được ghi đè nó - thay vào đó rãnh được tối đi, hai đầu bo tròn,
+   và thanh được cho một quầng sáng CÙNG MÀU, tức quầng không thêm thông
+   tin nào mà chỉ nói to hơn điều màu đã nói. */
+.bar{background:rgba(4,5,13,.55);border-radius:999px;overflow:hidden;
+     box-shadow:inset 0 0 0 1px var(--line-soft)}
+.fil{border-radius:999px;filter:saturate(1.08) brightness(1.04);
+     box-shadow:0 0 12px -2px currentColor}
+.meter span{color:var(--dim)}
+.meter b{color:var(--ink);font-variant-numeric:tabular-nums}
+.meter[data-sev="critical"] .fil{box-shadow:0 0 14px -2px var(--sev5)}
+.meter[data-sev="high"] .fil{box-shadow:0 0 14px -2px var(--sev4)}
+.meter[data-sev="medium"] .fil{box-shadow:0 0 14px -2px var(--sev3)}
+
+/* Ô đánh dấu theo lớp: bo nhẹ và phát quang theo màu mức, như các khối nhỏ
+   trong bản mẫu. Màu vẫn do JS đặt theo mức bằng chứng. */
+.cbar i{border-radius:3px}
+.cbar i[title="proven"]{box-shadow:0 0 10px -1px var(--proven)}
+.cbar i[title="candidate"]{box-shadow:0 0 10px -1px var(--candidate)}
+.cbar i[title="refused"]{box-shadow:0 0 10px -1px var(--refused)}
+
+/* Dải ô bằng chứng ở hero: bản mẫu dùng khe hẹp và khối cao, đọc ra một
+   thanh ghi liên tục. */
+.strip > *{border-radius:4px}
+
+/* Thanh dòng thời gian của các lượt: bo tròn hai đầu như bản mẫu. */
+.tlb,.tlwrap rect{rx:3}
+
+/* Nút: viên thuốc, và nút chính mang gradient của bản mẫu khi SẴN SÀNG. */
+.k{border-radius:999px}
+.k.go:not(:disabled){
+  background:linear-gradient(135deg,color-mix(in srgb,var(--g1) 26%,var(--steel-dim)),var(--steel-dim)) padding-box,
+             linear-gradient(135deg,var(--g1),var(--g2)) border-box;
+  border:1px solid transparent;color:#EAFBFF;
+  box-shadow:0 0 0 1px rgba(0,229,255,.18), 0 6px 26px -8px rgba(0,229,255,.55);
+}
+.k.go:disabled{box-shadow:none;opacity:.45}
+
+/* Thanh điều hướng: viên thuốc trượt mang gradient. */
+.segslide{
+  background:linear-gradient(135deg,color-mix(in srgb,var(--g1) 20%,var(--v3)),var(--v3)) padding-box,
+             linear-gradient(135deg,var(--g1),var(--g2)) border-box;
+  border:1px solid transparent;
+  box-shadow:0 0 18px -4px rgba(0,229,255,.45);
+}
 </style>
 </head>
 <body>
