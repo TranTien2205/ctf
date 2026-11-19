@@ -89,6 +89,60 @@ def _started_text(session: Session) -> str:
     return "unknown (this session's meta.json carries no start time)"
 
 
+#: Bookkeeping on every transcript entry; not evidence a reader needs.
+_ENTRY_META = ("id", "ts", "chain", "agent", "kind", "tool", "note",
+               "request", "response")
+
+
+def _citation(session, rid: str) -> str:
+    """One cited entry, rendered as what it IS.
+
+    MEASURED IN THE COMMITTED REFERENCE ARTIFACT.
+    `docs/sample-session/report.html` showed, for the proven jwt finding's
+    cited event r62:
+
+        Transcript r62:   ->
+        <pre></pre>
+
+    The citation was built unconditionally from `request.method`,
+    `request.url`, `response.status` and `response.body`, and an EVENT
+    entry has none of those - it has `kind` and its own recorded fields. So
+    the operator-facing report rendered an empty box for evidence whose
+    content its own narrative paragraph describes two lines below:
+    "r62 set ['role','user'], echoed 'admin'".
+
+    `report-h1.html` already had the honest shape for this - it prints
+    "r62 is a jwt_forge event, which carries no request - its output is
+    evidence but it is not a step" - so this renderer was the one missing
+    it, which is the fourth fixed-elsewhere defect found in a sibling
+    renderer today.
+
+    Extracted rather than inlined so it can be called alone: the inline
+    comprehension could only be tested by rendering a whole report.
+    """
+    entry = session.get_exchange(rid) or {}
+    req = entry.get("request") if isinstance(entry.get("request"), dict) else None
+    if req:
+        resp = entry.get("response") if isinstance(
+            entry.get("response"), dict) else {}
+        return (f"<details><summary>Transcript {_esc(rid)}: "
+                f"{_esc(req.get('method'))} {_esc(req.get('url'))} -> "
+                f"{_esc(resp.get('status'))}</summary>"
+                f"<pre>{_esc(str(resp.get('body') or '')[:4000])}</pre>"
+                "</details>")
+
+    kind = str(entry.get("kind") or entry.get("tool") or "event")
+    fields = {k: v for k, v in entry.items() if k not in _ENTRY_META}
+    if not fields:
+        body = ("this entry carries no request and no recorded fields, so "
+                "there is nothing to show beyond its id")
+    else:
+        body = "\n".join(f"{k}: {v}" for k, v in sorted(fields.items()))
+    return (f"<details><summary>Transcript {_esc(rid)}: "
+            f"{_esc(kind)} event - no request, so no status</summary>"
+            f"<pre>{_esc(body[:4000])}</pre></details>")
+
+
 def _judge_html(f: dict) -> str:
     """What cross-verification decided, in the artifact the client reads.
 
@@ -253,13 +307,7 @@ def render_html(session: Session, cfg: Config, summary: str = "",
 
     cards = []
     for f in findings:
-        ex = "".join(
-            f"<details><summary>Transcript {_esc(rid)}: "
-            f"{_esc((session.get_exchange(rid) or {}).get('request', {}).get('method'))} "
-            f"{_esc((session.get_exchange(rid) or {}).get('request', {}).get('url'))} -> "
-            f"{_esc(((session.get_exchange(rid) or {}).get('response') or {}).get('status'))}"
-            f"</summary><pre>{_esc(((session.get_exchange(rid) or {}).get('response') or {}).get('body', '')[:4000])}</pre></details>"
-            for rid in f["evidence_ids"])
+        ex = "".join(_citation(session, rid) for rid in f["evidence_ids"])
         cards.append(
             f"<div class='finding' style='border-left-color:"
             f"{_SEV_COLOR.get(f['severity'], '#999')}'>"

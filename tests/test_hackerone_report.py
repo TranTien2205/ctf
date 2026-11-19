@@ -484,3 +484,105 @@ def test_a_dispute_with_no_disputed_flag_is_still_a_dispute():
     rendered = html_mod._judge_html(_finding(judges=_DISPUTE_THEN_AGREE))
     assert "DISPUTED" in rendered
     assert "other-1" in rendered
+
+
+# ------------- a cited event, rendered as what it is
+
+class _FakeSession:
+    def __init__(self, entries):
+        self._e = entries
+
+    def get_exchange(self, rid):
+        return self._e.get(rid)
+
+
+_HTTP_ENTRY = {
+    "id": "r1", "ts": 1.0, "chain": "deadbeef" * 8, "agent": "agent",
+    "tool": "probe_sqli",
+    "request": {"method": "GET", "url": "http://t.test/p?q=1",
+                "headers": {}, "body": ""},
+    "response": {"status": 200, "headers": {}, "body": "admin|a@x.io",
+                 "final_url": "http://t.test/p?q=1", "elapsed_ms": 9,
+                 "truncated": False},
+}
+
+_EVENT_ENTRY = {
+    "id": "r62", "ts": 2.0, "chain": "cafebabe" * 8, "agent": "agent",
+    "kind": "jwt_forge",
+    "claims_set": {"user": "admin", "role": "admin"},
+    "alg_in": "HS256", "weak_secret_used": True,
+    "token_sha256_16": {"resigned": "217f52fcd4a6fb35"},
+}
+
+
+def test_a_cited_event_is_rendered_as_what_it_is():
+    """MEASURED IN THE COMMITTED REFERENCE ARTIFACT.
+    `docs/sample-session/report.html` showed, for the proven jwt finding's
+    cited event r62:
+
+        Transcript r62:   ->
+        <pre></pre>
+
+    The citation was built unconditionally from `request.method`,
+    `request.url`, `response.status` and `response.body`, and an event
+    entry has none of those. So the operator-facing report rendered an
+    empty box for evidence its own narrative describes two lines below:
+    "r62 set ['role','user'], echoed 'admin'".
+
+    `report-h1.html` already said "r62 is a jwt_forge event, which carries
+    no request - its output is evidence but it is not a step", so this
+    renderer was the one missing it: the fourth fixed-elsewhere defect
+    found in a sibling renderer today.
+    """
+    from argus.report import html as html_mod
+
+    out = html_mod._citation(_FakeSession({"r62": _EVENT_ENTRY}), "r62")
+    assert "jwt_forge event" in out, out
+    assert "no request, so no status" in out
+    assert "HS256" in out, "the recorded evidence must be shown"
+    assert "role" in out and "admin" in out
+    assert ":   -&gt;" not in out and ":   ->" not in out, \
+        "the empty-arrow shape is what this replaces"
+
+
+def test_a_cited_event_does_not_print_bookkeeping():
+    """`chain` is a digest, `ts` a float, `agent` a role name - none is
+    evidence, and the chain digest in particular invites a reader to treat
+    it as part of the proof."""
+    from argus.report import html as html_mod
+
+    out = html_mod._citation(_FakeSession({"r62": _EVENT_ENTRY}), "r62")
+    for noise in ("cafebabe", "chain", "1.0", "2.0"):
+        assert noise not in out, f"{noise} is bookkeeping, not evidence"
+
+
+def test_an_http_citation_still_renders_the_exchange():
+    """The direction that keeps the event branch from swallowing the
+    ordinary case, which is 64 of the 66 entries in the sample session."""
+    from argus.report import html as html_mod
+
+    out = html_mod._citation(_FakeSession({"r1": _HTTP_ENTRY}), "r1")
+    assert "GET" in out and "http://t.test/p?q=1" in out
+    assert "200" in out
+    assert "admin|a@x.io" in out
+    assert "event" not in out
+
+
+def test_an_entry_with_nothing_recorded_says_so():
+    """Absence printed rather than an empty box - the same rule, one level
+    down: an entry really carrying nothing must say that, not render blank."""
+    from argus.report import html as html_mod
+
+    bare = {"id": "r9", "ts": 3.0, "chain": "ab" * 32, "agent": "agent",
+            "kind": "marker"}
+    out = html_mod._citation(_FakeSession({"r9": bare}), "r9")
+    assert "nothing to show" in out, out
+    assert "marker event" in out
+
+
+def test_a_missing_entry_does_not_render_a_blank_citation():
+    from argus.report import html as html_mod
+
+    out = html_mod._citation(_FakeSession({}), "r404")
+    assert "r404" in out
+    assert "nothing to show" in out or "no request" in out

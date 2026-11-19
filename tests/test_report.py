@@ -845,3 +845,96 @@ def test_a_partial_team_total_says_it_is_partial(tmp_path):
     # and the no-figure branch still names its reason, as before
     none_line = cost_line({"usd": None, "basis": "nothing to price"}, "none")
     assert "not priced - nothing to price" in none_line, none_line
+
+
+def test_the_target_line_names_what_was_tested_not_the_directory(tmp_path):
+    """MEASURED ACROSS EVERY SEALED SESSION IN THE REPOSITORY, 0 of 5 right.
+
+    The Target line was `session.dir.name.split('-', 2)[-1]`, so the
+    report's claim about WHAT WAS TESTED - the authorisation boundary in a
+    system whose whole premise is authorised testing - was parsed out of a
+    filename:
+
+        directory          meta.json                   rendered
+        sample-session     http://127.0.0.1:43673      "session"
+        argus-lab          http://192.168.223.221:8777 "lab"
+        argus-lab-team     http://192.168.223.221:8777 "team"
+        dvwa               http://192.168.223.221:8081 "dvwa"
+        bwapp              http://192.168.223.221:8080 "bwapp"
+
+    The two that look right drop the scheme and the port. It was correct
+    only by coincidence of the live naming convention, and a directory that
+    is renamed, copied or moved - which is what re-rendering a checked-in
+    example does - names a target that was never tested.
+
+    Found by re-rendering the committed reference session rather than by
+    reading the renderer: the bug is invisible while the directory still
+    carries the host.
+    """
+    from argus.report.markdown import _target_of
+
+    class _S:
+        dir = tmp_path / "20261116-043207-127.0.0.1"
+
+    assert _target_of(_S(), {"target": "http://127.0.0.1:43673"}) == \
+        "http://127.0.0.1:43673"
+    # the derivation would have produced the host without scheme or port
+    assert _target_of(_S(), {"target": "http://10.0.0.9:8080"}) == \
+        "http://10.0.0.9:8080", "a recorded target must win over the path"
+
+
+def test_a_target_with_no_record_says_it_was_derived(tmp_path):
+    """The fallback must not pass itself off as a recorded fact.
+
+    Printing nothing would be worse than printing the convention, so the
+    parse stays - but a reader has to be able to tell a target the run
+    recorded from one this renderer inferred, which is the same rule as
+    every other absence in these reports.
+    """
+    from argus.report.markdown import _target_of
+
+    class _S:
+        dir = tmp_path / "20261116-043207-10.1.1.5"
+
+    for meta in ({}, None, {"target": ""}, {"target": "   "}):
+        out = _target_of(_S(), meta)
+        assert "10.1.1.5" in out, out
+        assert "directory name" in out, \
+            "a derived target that looks recorded is the defect restated"
+
+
+def test_two_sessions_against_one_target_render_one_target(tmp_path):
+    """THE STRUCTURAL FORM, and it is stronger than the 0-of-5 tally.
+
+    `argus-lab` and `argus-lab-team` are two sealed sessions in this
+    repository with ONE recorded target, `http://192.168.223.221:8777` -
+    two runs against the same application. Under
+    `session.dir.name.split('-', 2)[-1]` they rendered "lab" and "team".
+
+    So the defect did not merely mangle a label: it MANUFACTURED A
+    DISTINCTION THE EVIDENCE DOES NOT CONTAIN, presenting one target as
+    two. The directory name cannot be the target even in principle here,
+    because the mapping is not one-to-one - which is why this assertion
+    fails on the name-split for a structural reason rather than a cosmetic
+    one.
+
+    Raised by the session that owns the console, which checked its own
+    renderer for the same bug (it reads `r.target`, 4 of 4 exact) and then
+    pointed out that this pair makes the fix unarguable.
+    """
+    from argus.report.markdown import _target_of
+
+    one_target = "http://192.168.223.221:8777"
+
+    class _Lab:
+        dir = tmp_path / "argus-lab"
+
+    class _Team:
+        dir = tmp_path / "argus-lab-team"
+
+    rendered = {_target_of(_Lab(), {"target": one_target}),
+                _target_of(_Team(), {"target": one_target})}
+    assert rendered == {one_target}, (
+        "two runs against one target rendered as "
+        f"{sorted(rendered)} - the report invents a distinction the "
+        "evidence does not contain")

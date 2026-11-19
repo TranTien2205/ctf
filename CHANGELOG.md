@@ -7230,12 +7230,85 @@ that reaches a finding, because reaching a finding requires knowing what
 the recorder keeps and what 22 real findings actually look like. Code tells
 you the first; only evidence tells you the second.
 
+### The Target line named the directory, not the target
+
+The report's Target line - its claim about WHAT WAS TESTED, which in a
+system whose premise is authorised testing is the authorisation boundary -
+read `session.dir.name.split('-', 2)[-1]`. Measured across every sealed
+session in this repository, 0 of 5 rendered correctly:
+
+    directory          meta.json                   rendered
+    sample-session     http://127.0.0.1:43673      "session"
+    argus-lab          http://192.168.223.221:8777 "lab"
+    argus-lab-team     http://192.168.223.221:8777 "team"
+    dvwa               http://192.168.223.221:8081 "dvwa"
+    bwapp              http://192.168.223.221:8080 "bwapp"
+
+The two that look right drop the scheme and the port. It was correct only
+by coincidence of the live naming convention, and a directory that is
+renamed, copied or moved names something that was never tested.
+
+AND THE LAST TWO ROWS MAKE IT STRUCTURAL, not cosmetic. `argus-lab` and
+`argus-lab-team` are two runs against ONE target. The name-split renders
+them as "lab" and "team", so the defect does not merely mangle a label - it
+MANUFACTURES A DISTINCTION THE EVIDENCE DOES NOT CONTAIN, presenting one
+target as two. The mapping is not one-to-one, so a directory name cannot be
+the target even in principle. Asserted in that form: two sessions sharing a
+recorded target must render one Target line.
+
+Now read from `meta.json`, which holds it in all five, with the derivation
+kept as a last resort and MARKED as derived - a reader must be able to tell
+a recorded target from an inferred one, which is the same rule as every
+other absence in these reports.
+
+FOUND BY RE-RENDERING THE COMMITTED REFERENCE, not by reading the renderer,
+and that is the whole lesson. The bug is invisible while the directory
+still carries the host. It surfaced only because re-rendering a checked-in
+example puts the session in a directory with a different name - and the
+first attempt at that re-render was worse: rendering with a hand-built
+Config replaced the recorded `scripted-demo` with the configured default,
+`claude-sonnet-5-5`, a model that never ran. Three recorded facts
+overwritten by defaults, in a reference artifact, by the step meant to fix
+one of them. The renderer is only as honest as what is handed to it.
+
+The committed example is therefore LEFT AS IT WAS. It is a sealed
+historical artifact; re-rendering it would require reconstructing its
+original config exactly, and getting that wrong writes a false model name
+into the repository's own evidence. Every report rendered from here on shows
+the event citation and the recorded target.
+
+### A cited event rendered as an empty box
+
+`docs/sample-session/report.html` showed, for the proven jwt finding's cited
+event r62:
+
+    Transcript r62:   ->
+    <pre></pre>
+
+The citation was built unconditionally from `request.method`, `request.url`,
+`response.status` and `response.body`, and an event entry has none of those:
+r62 is a `jwt_forge` event carrying `claims_set`, `payload_used`, `alg_in`
+and a hashed token. So the operator-facing report rendered an empty box for
+evidence its own narrative describes two lines below - "r62 set
+['role','user'], echoed 'admin'".
+
+`report-h1.html` already had the honest shape, printing "r62 is a jwt_forge
+event, which carries no request - its output is evidence but it is not a
+step". So this renderer was the one missing it: the fourth fixed-elsewhere
+defect found in a sibling renderer in one session.
+
+Extracted as `_citation` rather than fixed inline, because the inline
+comprehension could only be tested by rendering a whole report. Bookkeeping
+is excluded - `chain` is a digest and inviting a reader to treat it as part
+of the proof is its own hazard - and an entry that really carries nothing
+says so.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1142 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1152 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

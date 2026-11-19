@@ -415,6 +415,27 @@ def _proof_block(f: dict) -> list[str]:
     return out
 
 
+def _target_of(session, meta: dict | None) -> str:
+    """What was tested, from the record, with the derivation last.
+
+    Order matters: `meta.json` is written by the run and is the only
+    statement of the target that the run itself made. The directory parse
+    stays as a last resort because a very old session may predate the key,
+    and printing nothing would be worse than printing the convention - but
+    it is marked, so a reader can tell a recorded target from a guess.
+    """
+    if isinstance(meta, dict):
+        recorded = str(meta.get("target") or "").strip()
+        if recorded:
+            return recorded
+    for attr in ("target",):
+        value = str(getattr(session, attr, "") or "").strip()
+        if value:
+            return value
+    derived = session.dir.name.split("-", 2)[-1]
+    return f"{derived} (from the directory name; meta.json names no target)"
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
@@ -471,7 +492,29 @@ def render_report(session: Session, cfg: Config, summary: str = "",
     lines = [
         f"# Penetration Test Report - {session.id}",
         "",
-        f"- **Target:** `{session.dir.name.split('-', 2)[-1]}` ({session.dir.name})",
+        # THE RECORD, NOT THE FILENAME. This read
+        # `session.dir.name.split('-', 2)[-1]`, so the Target line - the
+        # report's claim about WHAT WAS TESTED, which in an
+        # authorised-testing system is the authorisation boundary - was
+        # parsed out of the directory name. It was right only by
+        # coincidence of the naming convention, and measured across every
+        # sealed session in this repository, 0 of 5 rendered correctly:
+        #
+        #   directory          meta.json                   derived
+        #   sample-session     http://127.0.0.1:43673      "session"
+        #   argus-lab          http://192.168.223.221:8777 "lab"
+        #   argus-lab-team     http://192.168.223.221:8777 "team"
+        #   dvwa               http://192.168.223.221:8081 "dvwa"
+        #   bwapp              http://192.168.223.221:8080 "bwapp"
+        #
+        # The two that look right drop the scheme and the port, and a
+        # session directory that is renamed, copied or moved names
+        # something that was never tested. `meta.json` holds the real
+        # target in all five, which is why `argus replay` reads it there.
+        #
+        # The directory name is kept in parentheses: it identifies the
+        # artifact, which is a different question from what was tested.
+        f"- **Target:** `{_target_of(session, meta)}` ({session.dir.name})",
         # `started` is 0.0 on a reopen whose meta.json is missing, corrupt
         # or lacks the stamp, and this line printed `1970-01-01 00:00:00`
         # for it - the same defect as the duration below, one line up.
