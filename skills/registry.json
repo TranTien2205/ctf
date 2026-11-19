@@ -2073,8 +2073,8 @@
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
       "skill_tokens": 980,
-      "depth_files": 3,
-      "depth_tokens": 2426,
+      "depth_files": 65,
+      "depth_tokens": 100817,
       "use_when": [
         "a probe or source read produced this class's signal: two interleaved requests, not a flood: the point is to land the second commit inside the window, and a flood hides which one did",
         "a chain card already proves this class here: htb-apexsurvive-profile-race-template-literal-xss-template-overwrite-rce, htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
