@@ -319,9 +319,30 @@ def test_the_report_distinguishes_no_verdict_from_a_dispute():
     assert "DISPUTED" not in block
 
 
-def test_an_unjudged_finding_renders_exactly_as_before():
+def test_an_unjudged_finding_says_so_and_claims_no_verdict():
+    """This asserted the OPPOSITE until the absence had to be printed, and
+    the change was deliberate - so the retired half is written down here
+    rather than quietly dropped.
+
+    It was named `..._renders_exactly_as_before` and required the string
+    "Cross-verification" to be absent. That was the right guard WHEN THE
+    JUDGE WAS INTRODUCED: it proved the new feature leaked no markup into
+    findings that have no verdict. It is the wrong guard now, because
+    silence is what made a finding nobody cross-read indistinguishable from
+    one the format does not discuss, under a proof grade that reads as the
+    whole verification.
+
+    The half that still holds, and the half that mattered: an unjudged
+    finding must not read as AGREED or DISPUTED. Saying a check was not
+    performed and implying its outcome are different claims.
+    """
     from argus.report.markdown import _proof_block
-    assert "Cross-verification" not in "\n".join(_proof_block(FINDING))
+
+    text = "\n".join(_proof_block(FINDING))
+    assert "not performed" in text.lower(), text
+    for implied in ("agreed", "DISPUTED", "no verdict"):
+        assert implied not in text, (
+            f"an unreviewed finding must not read as {implied!r}")
 
 
 def test_sanitized_findings_keeps_the_judge_fields():

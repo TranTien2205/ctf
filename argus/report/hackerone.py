@@ -180,6 +180,59 @@ def _steps(session, rids: list[str]) -> tuple[list[str], list[str]]:
     return steps, gaps
 
 
+def _badges(finding: dict) -> str:
+    """The badge row, as its own unit.
+
+    Extracted from `_one` because it is a pure function of the finding
+    and because the defect it now guards was invisible per renderer:
+    markdown discussed the second reading, html returned an empty
+    string for its absence, and this artifact - the one that leaves the
+    machine for a bug-bounty reader - printed a PROOF badge and never
+    mentioned cross-verification at all. A unit nobody can call alone
+    is a unit nobody tests alone.
+    """
+    sev = str(finding.get("severity") or "")
+    grade = str(finding.get("grade") or "")
+    out: list[str] = []
+    out.append('<div class="badges">')
+    if sev:
+        out.append(f'<span class="b" style="background:{_SEV_COLOR.get(sev, "#666")}">'
+                   f'{_esc(sev.upper())}</span>')
+    if grade:
+        out.append(f'<span class="b" style="background:{_GRADE_COLOR.get(grade, "#666")}">'
+                   f'PROOF: {_esc(grade.upper())}</span>')
+    # A badge for the second reading, beside the badge for the first. The
+    # PROOF badge is the matrix on the recorded BYTES: a fabricated excerpt
+    # fails "the target produced the quoted bytes" and cannot reach
+    # `proven`. It says nothing about whether the READING is right, and on
+    # the artifact that leaves this machine for a bug-bounty reader, a proof
+    # badge with no second opinion beside it reads as more verification than
+    # was done. So the absence is a badge too.
+    history = [v for v in (finding.get("judges") or []) if isinstance(v, dict)]
+    if not history and isinstance(finding.get("judge"), dict):
+        history = [finding["judge"]]
+    real = [v for v in history if not v.get("error")]
+    if not real:
+        out.append('<span class="b" style="background:#6b6b6b">'
+                   'NOT CROSS-VERIFIED</span>')
+    else:
+        disputes = [v for v in real if not v.get("agrees")]
+        shown = disputes[0] if disputes else real[-1]
+        who = str(shown.get("judge_model") or "another family")
+        if disputes:
+            out.append('<span class="b" style="background:#c0392b">'
+                       f'DISPUTED BY {_esc(who.upper())}</span>')
+        else:
+            out.append('<span class="b" style="background:#2b7a4b">'
+                       f'CROSS-VERIFIED BY {_esc(who.upper())}</span>')
+    for label, key in (("CVSS", "cvss"), ("CWE", "cwe"), ("OWASP", "owasp")):
+        value = str(finding.get(key) or "")
+        if value:
+            out.append(f'<span class="b b-out">{label} {_esc(value)}</span>')
+    out.append("</div>")
+    return "".join(out)
+
+
 def _one(session, finding: dict) -> str:
     fid = str(finding.get("id") or "")
     title = str(finding.get("title") or "")
@@ -192,18 +245,8 @@ def _one(session, finding: dict) -> str:
     out.append(f"<h2>{_esc(fid)}{' &mdash; ' if fid and title else ''}"
                f"{_esc(title) or '<em>no title was recorded</em>'}</h2>")
 
-    out.append('<div class="badges">')
-    if sev:
-        out.append(f'<span class="b" style="background:{_SEV_COLOR.get(sev, "#666")}">'
-                   f'{_esc(sev.upper())}</span>')
-    if grade:
-        out.append(f'<span class="b" style="background:{_GRADE_COLOR.get(grade, "#666")}">'
-                   f'PROOF: {_esc(grade.upper())}</span>')
-    for label, key in (("CVSS", "cvss"), ("CWE", "cwe"), ("OWASP", "owasp")):
-        value = str(finding.get(key) or "")
-        if value:
-            out.append(f'<span class="b b-out">{label} {_esc(value)}</span>')
-    out.append("</div>")
+    out.append(_badges(finding))
+
 
     out.append("<dl>")
     out.append(f"<dt>Asset</dt><dd>{_esc(finding.get('url') or '(not recorded)')}</dd>")

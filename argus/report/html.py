@@ -109,7 +109,20 @@ def _judge_html(f: dict) -> str:
     claimed = f.get("severity_claimed")
     klass = f.get("class_disputed")
     if not (j or disputed or claimed or klass):
-        return ""
+        # ABSENCE PRINTED, rather than an empty string. Returning "" made a
+        # finding nobody cross-read look identical to one this renderer does
+        # not discuss, under a PROOF badge that reads as the whole
+        # verification. It is not: the matrix proved the BYTES, and a
+        # fabricated excerpt fails "the target produced the quoted bytes"
+        # and cannot reach `proven` - but nobody checked the READING, which
+        # is where a wrong class or an inflated severity lives.
+        return ('<div style="border-left:6px solid #999;background:#f4f4f4;'
+                'padding:.6rem .9rem;margin:.8rem 0">'
+                "<b>Cross-verification: not performed</b><br>"
+                "The proof grade is the matrix reading the recorded bytes. "
+                "No model from another family has read this evidence, so the "
+                "class and severity are this run&#39;s own reading of it."
+                "</div>")
     bits = []
     if disputed:
         bits.append("<b>DISPUTED by cross-verification</b>"

@@ -128,6 +128,21 @@ _STATIC_RE = re.compile(
     r"mp4|webm|pdf|zip|gz)(?:$|\?)", re.I)
 
 
+def _reviewed(finding: dict) -> bool:
+    """Has a model from another family read this finding's evidence?
+
+    Reads the HISTORY first, the same way the markdown renderer does, so a
+    finding judged once is not asked for again. A verdict that carries an
+    `error` is NOT a review: the judge was asked and could not answer (no
+    credential, a refusal, a timeout), and treating a failed call as a
+    completed check is how an unchecked finding would look checked.
+    """
+    history = [v for v in (finding.get("judges") or []) if isinstance(v, dict)]
+    if not history and isinstance(finding.get("judge"), dict):
+        history = [finding["judge"]]
+    return any(not v.get("error") for v in history)
+
+
 @dataclass
 class Action:
     """One computed next move. `why` always names the observation."""
@@ -373,8 +388,11 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
 
     # Rule 2 - a recorded finding the matrix does not grade proven, where the
     # matrix names what is missing. The gap is the next probe.
+    unreviewed: list[dict] = []
     for finding in findings:
         grade = str(finding.get("grade") or "")
+        if grade == "proven" and not _reviewed(finding):
+            unreviewed.append(finding)
         if grade in ("proven", "refused"):
             continue
         missing = [m for m in (finding.get("proof") or {}).get("missing", [])
@@ -503,11 +521,50 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
                         {_endpoint(e) for e in exchanges if _endpoint(e)})[:20],
                     "parameterised": sorted(surface)})
 
+    # Rule 6b - PROVEN BY THE MATRIX, READ BY NOBODY ELSE.
+    #
+    # The matrix proves a claim's BYTES: "the target produced the quoted
+    # bytes" is a universal check and a fabricated excerpt fails it, so an
+    # invented command output cannot reach `proven`. Measured: an `id`
+    # output that no recorded response contains grades `unproven` and names
+    # three failing checks.
+    #
+    # What the matrix does not read is the INTERPRETATION. Bytes that really
+    # came off the wire can still be the wrong class, or a lower severity
+    # than claimed, or a reflection presented as execution. `argus judge`
+    # exists for exactly that - a model from a different family reads the
+    # cited evidence records and never the first model's reasoning - and
+    # nothing ever asked for it. Rule 2 above skips a `proven` finding as
+    # finished, so an engagement could seal with every finding's bytes
+    # verified and no finding's reading checked by anyone.
+    #
+    # Placed immediately before the only exit, and not earlier. Breadth is
+    # still the engagement's job, so `widen_surface` and the class-gap rules
+    # keep their priority; what changes is that the exit is no longer
+    # reachable while a finding this run will REPORT has been read by one
+    # model only. Rule 7's own sentence names the distinction it was missing:
+    # it said every finding is "graded", and graded is not reviewed.
+    if unreviewed:
+        finding = unreviewed[0]
+        fid = str(finding.get("id") or "")
+        klass = proof.normalize(str(finding.get("vuln_class") or ""))
+        return Action(
+            "cross_verify",
+            f"{fid} is proven: the target produced the bytes it quotes. No "
+            f"second model has read those bytes, so its reading as {klass} "
+            f"is the first model's alone. `argus judge <session>` picks a "
+            f"judge from another family; it cannot change the grade, only "
+            f"dispute the class, the severity or the conclusion.",
+            vuln_class=klass, finding_id=fid,
+            detail={"unreviewed": [str(f.get("id") or "") for f in unreviewed],
+                    "reviewed_by": [], "grade": "proven"})
+
     # Rule 7 - the only exit.
     return Action(
         "report",
         "every parameterised endpoint in the transcript has been probed for "
-        "the first-pass classes, and every recorded finding is graded. Write "
+        "the first-pass classes, every recorded finding is graded, and every "
+        "proven one has been read by a model from another family. Write "
         "the report: proven findings with their proofs, candidates with the "
         "exact missing check, and what was ruled out.",
         detail={"endpoints": len(surface), "findings": len(findings),

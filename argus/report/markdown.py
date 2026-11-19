@@ -285,6 +285,18 @@ def _proof_block(f: dict) -> list[str]:
                     + ("no verdict" if v.get("error") else
                        "agreed" if v.get("agrees") else "disputed")
                     for v in history) + ")", ""]
+    if not history:
+        # ABSENCE PRINTED. Without this line a finding nobody cross-read is
+        # indistinguishable from one this format does not discuss, and the
+        # grade above it reads as the whole verification. It is not: the
+        # matrix proved the BYTES - a fabricated excerpt fails "the target
+        # produced the quoted bytes" and cannot reach `proven` - and nobody
+        # checked the READING, which is where a wrong class or an inflated
+        # severity lives.
+        out += ["> **Cross-verification: not performed** - the proof grade "
+                "above is the matrix reading the recorded bytes. No model "
+                "from another family has read this evidence, so the class "
+                "and severity are this run's own reading of it.", ""]
     if judged:
         model = str(judged.get("judge_model") or "a second model")
         if judged.get("error"):

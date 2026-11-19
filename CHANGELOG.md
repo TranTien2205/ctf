@@ -6394,12 +6394,141 @@ jobs that had been red for thirteen consecutive runs. The newline fixture
 and the clock-resolution fix are verified by the only instrument that can
 verify them, since no local run on this machine executes Windows at all.
 
+### A race that only CI could see, and the test was the thing that was wrong
+
+CI on aea6273: 8 jobs green, 3 red, and the pattern ruled out every simple
+explanation. ubuntu 3.10, 3.11 and 3.13 failed while ubuntu 3.12 AND 3.14
+passed between them, and all five Windows jobs passed on the same
+versions. A version boundary cannot skip 3.12; a platform cannot be the
+cause when the other platform passes everywhere. So: a race.
+
+`test_a_chunked_body_is_refused` raised BrokenPipeError inside
+`conn.request()`, before `getresponse()` was ever reached. The test is
+older than this commit and the previous commit passed 11 of 11, so it had
+been flaky all along and nothing had looked.
+
+AND THE SERVER IS RIGHT. It answers 411 and closes as soon as it sees no
+Content-Length, which is exactly what the test asserts. `http.client` with
+an iterator body performs four separate writes - head, chunk-size line,
+chunk, terminator - and if the close lands between two of them the client
+fails on the write, discarding a response the server had already written.
+A correct refusal broke the test that checks the refusal.
+
+Rewritten at the socket, tolerating BrokenPipeError and ConnectionReset on
+the write, then reading to EOF because 411 closes the connection.
+
+MEASURED, BECAUSE 15 GREEN RUNS PROVE NOTHING HERE. The race reproduced
+locally at 1 in 12. At that rate fifteen consecutive passes happen 28% of
+the time by luck, so the fix was run 60 times: 60 green, which luck would
+manage 0.7% of the time.
+
+AND THE FIRST PLANT PASSED, WHICH WAS THE PLANT'S FAULT. Replacing the
+chunked test with `if False:` let control fall to the next check, where a
+chunked request has no Content-Length either - so the server still
+answered 411, with a different message that also contains the words
+`Content-Length`. The plant had not created the shape it was named for.
+Planting the real shape - the server accepting a chunked body and
+answering 200 - fails the test as it must. Fifth time in this repository
+that a plant's own failure to apply was mistaken for a check that cannot
+fail.
+
+### Proven by the matrix, read by nobody else
+
+Raised as a supervisor's objection to agent findings in general: an agent
+can invent a command's output and call the exploit a success. Measured
+against this gate first, because the answer decides what is worth building.
+
+THE FABRICATION CASE IS ALREADY CLOSED, and demonstrably. Grading an `id`
+output that no recorded response contains:
+
+    [x] proof read from the wire
+    [ ] the target produced the quoted bytes
+    [x] a benign command was sent
+    [ ] identity output returned by the target
+    [ ] the quoted bytes are the command output
+    [ ] the probe nonce came back in the output
+    -> unproven
+
+An invented excerpt cannot reach `proven`, the gate names the three checks
+it failed, and `tests/test_proof.py` already asserts that universal check
+for every class in the matrix. The same evidence with the bytes really on
+the wire grades `candidate`, held back by the nonce check - the gate wants
+the value to have been SENT in an earlier recorded request, not merely to
+appear.
+
+WHAT WAS NOT CLOSED is the second half of the objection. The matrix reads
+BYTES; it does not read the INTERPRETATION. Bytes that really came off the
+wire can still be the wrong class, a reflection presented as execution, or
+a severity nobody can support. `argus/judge.py` exists for exactly that -
+a model from another family reads the cited evidence records and never the
+first model's reasoning, because "two models that agree because they share
+a prior are not a check" - it has 39 tests, and NOTHING EVER ASKED FOR IT.
+
+Three measurements of that gap:
+
+- `argus judge` is a manual subcommand. No code path calls it after a
+  finding is recorded.
+- A sealed, verifying session's `proven` finding carries no `judge` key at
+  all. Its bytes are verified; its reading was never reviewed.
+- `next_action` rule 2 skips a `proven` finding as finished, and rule 7 -
+  "the only exit" - said every recorded finding is "graded". Graded is not
+  reviewed, and that sentence was the whole of the difference.
+
+Rule 6b now stands in front of the only exit: a `proven` finding no model
+from another family has read is unfinished work, named by id. Placed there
+and not earlier on purpose - breadth stays the engagement's job, so
+`widen_surface` and the class-gap rules keep their priority; what changes
+is that an engagement can no longer SEAL while a finding it will report has
+been read by one model only. A judged finding exits normally whether the
+judge agreed or disputed: a dispute is a completed review, and asking again
+until a judge agrees is shopping for the answer.
+
+A VERDICT CARRYING AN ERROR IS NOT A REVIEW. The judge was asked and could
+not answer - no credential for that family, a refusal, a timeout - and
+counting a failed call as a completed check is how an unchecked finding
+would look checked. Same shape as a dead run that seals and verifies clean.
+
+### And the absence had to be printed on all three artifacts
+
+The renderers disagreed about a finding nobody cross-read, each silently:
+
+- markdown discussed a verdict that exists and printed nothing when none did
+- `html._judge_html` returned the empty string for that case
+- the bug-bounty artifact never mentioned cross-verification at all, while
+  printing a `PROOF: PROVEN` badge
+
+So on the one artifact that leaves this machine for an outside reader, a
+proof badge stood alone and read as the whole verification. All three now
+say it: "Cross-verification: not performed - the proof grade is the matrix
+reading the recorded bytes", and the badge row carries NOT CROSS-VERIFIED,
+CROSS-VERIFIED BY <model>, or DISPUTED BY <model>, with a dispute
+outranking any later agreement.
+
+The badge row was extracted from `_one` into `_badges(finding)` to be
+callable alone, because a unit nobody can call alone is a unit nobody tests
+alone - and the first version of that test called a markdown helper that
+does not exist, which is the same defect one layer out.
+
+Plant-tested four ways: markdown silent again, html returning "" again, a
+judge error counted as a review, and a later agreement hiding an earlier
+dispute. Each fails.
+
+AND ONE TEST ASSERTED THE OPPOSITE, correctly, until now.
+`test_an_unjudged_finding_renders_exactly_as_before` required the string
+"Cross-verification" to be ABSENT from an unjudged finding. That was the
+right guard when the judge was introduced - it proved the new feature
+leaked no markup into findings with no verdict - and it is the wrong guard
+once silence is the defect. Rewritten rather than deleted, with the retired
+premise written into it, and keeping the half that still holds and always
+mattered: an unjudged finding must not read as AGREED or DISPUTED. Saying a
+check was not performed and implying its outcome are different claims.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1092 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1099 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

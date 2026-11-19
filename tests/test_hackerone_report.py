@@ -188,3 +188,90 @@ def test_it_is_reachable_as_a_served_format_and_from_render_report():
     assert api.REPORT_FORMATS["h1"][0] == "report-h1.html"
     assert "render_hackerone" in inspect.getsource(md.render_report), \
         "a renderer nothing calls is the defect this session kept finding"
+
+
+# ------------- the second reading, and the absence of it, on every artifact
+
+def _finding(**over):
+    base = {"id": "F01", "title": "SQL injection in q", "severity": "high",
+            "category": "sqli", "vuln_class": "sqli", "grade": "proven",
+            "url": "http://t.test/a?q=1", "evidence_ids": ["r1"],
+            "evidence_excerpt": "root@localhost", "cwe": "CWE-89",
+            "description": "d", "remediation": "r",
+            "proof": {"requirement": "a row from a named table",
+                      "missing": []}}
+    base.update(over)
+    return base
+
+
+def test_html_states_that_no_second_model_read_the_evidence():
+    """MEASURED: `_judge_html` returned "" for a finding with no verdict, so
+    a finding nobody cross-read was indistinguishable from one the renderer
+    does not discuss - under a PROOF badge that reads as the whole
+    verification."""
+    from argus.report import html as html_mod
+
+    blank = html_mod._judge_html(_finding())
+    assert blank, "an unreviewed finding still renders nothing"
+    assert "not performed" in blank.lower()
+    assert "another family" in blank
+
+    agreed = html_mod._judge_html(_finding(
+        judge={"judge_model": "other-1", "agrees": True, "reason": "ok"}))
+    assert "not performed" not in agreed.lower()
+
+
+def test_the_bug_bounty_artifact_badges_the_second_reading_or_its_absence():
+    """The artifact that leaves this machine. A proof badge with no second
+    opinion beside it claims more verification than was done."""
+    from argus.report import hackerone as h1
+
+    none = h1._badges(_finding())
+    assert "NOT CROSS-VERIFIED" in none
+    assert "PROOF: PROVEN" in none, "the first reading is still shown"
+
+    agreed = h1._badges(_finding(
+        judge={"judge_model": "other-1", "agrees": True}))
+    assert "CROSS-VERIFIED BY OTHER-1" in agreed
+    assert "NOT CROSS-VERIFIED" not in agreed
+
+    disputed = h1._badges(_finding(
+        judge={"judge_model": "other-1", "agrees": False,
+               "reason": "reflected, not executed"}))
+    assert "DISPUTED BY OTHER-1" in disputed
+
+    # a judge that could not answer is not a review
+    failed = h1._badges(_finding(
+        judges=[{"judge_model": "other-1", "error": "no credential"}]))
+    assert "NOT CROSS-VERIFIED" in failed, \
+        "a failed judge call must not read as a completed review"
+
+
+def test_a_dispute_outranks_a_later_agreement_on_the_badge():
+    """Same rule the markdown renderer already applied to its history: a
+    later agreement must not present itself as the whole story over a
+    finding an earlier judge disputed."""
+    from argus.report import hackerone as h1
+
+    badges = h1._badges(_finding(judges=[
+        {"judge_model": "other-1", "agrees": False, "reason": "no row"},
+        {"judge_model": "other-2", "agrees": True, "reason": "looks fine"},
+    ]))
+    assert "DISPUTED BY OTHER-1" in badges
+    assert "CROSS-VERIFIED" not in badges.replace("NOT CROSS-VERIFIED", "")
+
+
+def test_markdown_states_the_absence_too():
+    """The third renderer. It already discussed a verdict that exists; the
+    gap was the same one in all three - silence for a finding nobody read,
+    under a grade that reads as the whole verification."""
+    from argus.report import markdown as md
+
+    blank = "\n".join(md._proof_block(_finding()))
+    assert "not performed" in blank.lower(), blank
+    assert "another family" in blank
+
+    agreed = "\n".join(md._proof_block(_finding(
+        judge={"judge_model": "other-1", "agrees": True, "reason": "ok"})))
+    assert "not performed" not in agreed.lower()
+    assert "agreed" in agreed.lower()

@@ -346,12 +346,97 @@ def test_a_fully_probed_surface_with_no_gap_says_report(tmp_path):
             entries.append(_exchange(f"{ep}{tool}", ep, tool=tool))
     for n, e in enumerate(entries):
         e["id"] = f"r{n}"
+    # A proven finding a second model has read. WITHOUT the judge verdict
+    # this is `cross_verify`, which is the test below: the exit is no longer
+    # reachable while a finding this run will report has been read by one
+    # model only.
+    findings = [{"id": "F01", "vuln_class": "sqli", "grade": "proven",
+                 "url": "http://t/a?q=1", "evidence_ids": [],
+                 "proof": {"missing": []},
+                 "judge": {"judge_model": "other-family-1", "agrees": True,
+                           "reason": "the row is from a named table"}}]
+    action = decide.next_action(_session(tmp_path, entries, findings))
+    assert action.action == "report", action.render()
+    assert action.detail["endpoints"] == 2
+
+
+def test_a_proven_finding_no_second_model_read_blocks_the_exit(tmp_path):
+    """MEASURED GAP. The matrix proves a claim's BYTES - a fabricated
+    command output fails the universal check "the target produced the quoted
+    bytes" and cannot reach `proven`. What it does not read is the
+    INTERPRETATION: bytes that really came off the wire can still be the
+    wrong class or a lower severity than claimed.
+
+    `argus judge` exists for that and nothing ever asked for it. Rule 2
+    skips a `proven` finding as finished and Rule 7's sentence said every
+    finding is "graded" - so an engagement could seal with every finding's
+    bytes verified and no finding's reading checked by anybody.
+    """
+    entries = []
+    for ep in ("http://t/a?q=1", "http://t/b?q=1"):
+        entries.append(_exchange(f"base{ep}", ep))
+        for tool in decide._FIRST_PASS:
+            entries.append(_exchange(f"{ep}{tool}", ep, tool=tool))
+    for n, e in enumerate(entries):
+        e["id"] = f"r{n}"
     findings = [{"id": "F01", "vuln_class": "sqli", "grade": "proven",
                  "url": "http://t/a?q=1", "evidence_ids": [],
                  "proof": {"missing": []}}]
     action = decide.next_action(_session(tmp_path, entries, findings))
-    assert action.action == "report", action.render()
-    assert action.detail["endpoints"] == 2
+    assert action.action == "cross_verify", action.render()
+    assert action.finding_id == "F01"
+    assert "second model" in action.why
+    assert action.detail["unreviewed"] == ["F01"]
+
+
+def test_a_judge_that_could_not_answer_is_not_a_review(tmp_path):
+    """A verdict carrying an `error` means the judge was ASKED and could not
+    answer - no credential, a refusal, a timeout. Counting a failed call as
+    a completed check is how an unchecked finding would look checked, which
+    is the same shape as a dead run that seals and verifies clean."""
+    entries = []
+    for ep in ("http://t/a?q=1", "http://t/b?q=1"):
+        entries.append(_exchange(f"base{ep}", ep))
+        for tool in decide._FIRST_PASS:
+            entries.append(_exchange(f"{ep}{tool}", ep, tool=tool))
+    for n, e in enumerate(entries):
+        e["id"] = f"r{n}"
+    base = {"id": "F01", "vuln_class": "sqli", "grade": "proven",
+            "url": "http://t/a?q=1", "evidence_ids": [],
+            "proof": {"missing": []}}
+
+    failed = dict(base, judges=[{"judge_model": "other-1",
+                                 "error": "no credential for that family"}])
+    assert decide.next_action(
+        _session(tmp_path / "failed", entries, [failed])).action \
+        == "cross_verify"
+
+    # and a real verdict after the failed one IS a review
+    both = dict(base, judges=[{"judge_model": "other-1", "error": "timeout"},
+                              {"judge_model": "other-2", "agrees": False,
+                               "reason": "reflected, not executed"}])
+    assert decide.next_action(
+        _session(tmp_path / "both", entries, [both])).action == "report"
+
+
+def test_a_disputing_judge_still_counts_as_read(tmp_path):
+    """A dispute is a completed review, not a missing one. The grade belongs
+    to the matrix and the judge cannot change it, so asking again until a
+    judge agrees would be shopping for the answer."""
+    entries = []
+    for ep in ("http://t/a?q=1", "http://t/b?q=1"):
+        entries.append(_exchange(f"base{ep}", ep))
+        for tool in decide._FIRST_PASS:
+            entries.append(_exchange(f"{ep}{tool}", ep, tool=tool))
+    for n, e in enumerate(entries):
+        e["id"] = f"r{n}"
+    findings = [{"id": "F01", "vuln_class": "sqli", "grade": "proven",
+                 "url": "http://t/a?q=1", "evidence_ids": [],
+                 "proof": {"missing": []},
+                 "judge": {"judge_model": "other-1", "agrees": False,
+                           "reason": "the bytes show an error, not a row"}}]
+    assert decide.next_action(
+        _session(tmp_path, entries, findings)).action == "report"
 
 
 # --- the shape of the answer -----------------------------------------------

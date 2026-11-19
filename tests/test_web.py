@@ -1055,15 +1055,56 @@ def test_a_body_just_under_the_cap_is_read(web):
 
 def test_a_chunked_body_is_refused(web):
     """No declared length means no cap before the read, and the console has
-    no need for a streamed request."""
-    conn = http.client.HTTPConnection("127.0.0.1",
-                                      web.srv.server_address[1], timeout=10)
-    conn.request("POST", "/api/prompt", body=iter([b'{"mode":"lab"}']),
-                 headers={"Content-Type": "application/json"})
-    resp = conn.getresponse()
-    data = json.loads(resp.read().decode())
-    conn.close()
-    assert resp.status == 411
+    no need for a streamed request.
+
+    WRITTEN AT THE SOCKET AND TOLERATING A BROKEN PIPE, because the server
+    is RIGHT to refuse before the body arrives and the first version of
+    this test could not survive it. `http.client` with an iterator body
+    sends the head, then a chunk-size line, then the chunk, then the
+    terminator - and the server answers 411 and closes as soon as it sees
+    no Content-Length, which is the whole point of the test. If that close
+    lands between two of those writes, `conn.request()` raises
+    BrokenPipeError before `getresponse()` is ever reached.
+
+    Measured: 1 failure in 12 local runs, and 3 of 5 ubuntu CI jobs on one
+    commit while all 5 Windows jobs passed - a race, not a platform or a
+    version. The pattern that ruled those out was ubuntu 3.12 and 3.14
+    passing between 3.11 and 3.13 failing.
+
+    So the write may fail, and the response may still be readable: the
+    server wrote it before closing. Reading to EOF is correct here because
+    411 closes the connection.
+    """
+    sock = socket.create_connection(
+        ("127.0.0.1", web.srv.server_address[1]), timeout=10)
+    try:
+        body = b'{"mode":"lab"}'
+        req = (b"POST /api/prompt HTTP/1.1\r\n"
+               b"Host: 127.0.0.1\r\n"
+               b"Content-Type: application/json\r\n"
+               b"Transfer-Encoding: chunked\r\n\r\n"
+               + f"{len(body):x}".encode() + b"\r\n" + body
+               + b"\r\n0\r\n\r\n")
+        try:
+            sock.sendall(req)
+        except (BrokenPipeError, ConnectionResetError):
+            pass            # refused mid-write, which is the behaviour asserted
+        raw = b""
+        while True:
+            try:
+                chunk = sock.recv(4096)
+            except (ConnectionResetError, TimeoutError):
+                break
+            if not chunk:
+                break
+            raw += chunk
+    finally:
+        sock.close()
+
+    assert raw, "the server closed without answering at all"
+    head, _, payload = raw.partition(b"\r\n\r\n")
+    assert b"411" in head.split(b"\r\n")[0], head.split(b"\r\n")[0]
+    data = json.loads(payload.decode())
     assert "Content-Length" in data["error"]
 
 
