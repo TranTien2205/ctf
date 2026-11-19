@@ -20,53 +20,55 @@
      next person to forget to escape.
 
   3. THE TWO MODES ARE NOT A LABEL. `data-mode` on <html> re-themes the whole
-     chassis. Lab is steel; engagement is hazard-striped and red-bezelled,
+     chassis. Lab is teal-on-paper; engagement is hazard-striped and red,
      and will not arm until four authorisation fields and a confirmation are
      in.
 
-  TYPOGRAPHY CARRIES THE ARGUMENT. Monospace is reserved for bytes that came
-  off the wire - targets, excerpts, ids, clock readings. Sans is what argus
-  itself says. The boundary between "the target produced this" and "we claim
-  this" is the whole product, so the page draws it in type.
+  THE SCHEME IS A FIELD LEDGER: warm paper for what argus says, dark screens
+  for what the wire said - the prompt preview, the event tape and the
+  rendered report keep a dark face because they hold bytes the target chose.
 
-  COLOUR CARRIES THE SAME DISCIPLINE. Chroma belongs to the grade and only to
-  the grade. `unproven` is deliberately NOT red: it means nothing in the
-  cited evidence met the requirement, which is an absence, not a danger -
-  painting it red would teach a judgement the system never made. Severity
-  gets its own ordinal ramp, because "how bad if true" and "do we know it is
-  true" are different questions and the previous console blurred them.
+  COLOUR CARRIES DISCIPLINE. Chroma belongs to the grade and only to the
+  grade. `unproven` is deliberately NOT red: it means nothing in the cited
+  evidence met the requirement, which is an absence, not a danger - painting
+  it red would teach a judgement the system never made. Severity gets its
+  own ordinal ramp, because "how bad if true" and "do we know it is true"
+  are different questions.
 
-  MOTION CARRIES THE LAST ONE. Every animation on this page either carries
-  information - a dot moving along the pipeline is evidence moving through
-  it, a live bar pulsing is a run still on the wire - or is entrance
-  choreography that plays once and stops. Nothing loops idly except the
-  lamp that means something is alive, and prefers-reduced-motion stills
-  all of it.
+  MOTION CARRIES THE LAST ONE. Every animation either carries information -
+  a dot moving along the pipeline is evidence moving through it, a live bar
+  pulsing is a run still on the wire - or is entrance choreography that
+  plays once and stops. prefers-reduced-motion stills all of it.
 -->
 <style>
 :root{
-  --v0:#0a0e13; --v1:#0f141b; --v2:#151c25; --v3:#1c2530; --v4:#273446;
-  --line:#26303d; --line-soft:#1a222c;
-  --ink:#e4eaf2; --dim:#8f9cad; --faint:#5d6b7c;
-  --steel:#5fd0e8; --steel-dim:#1d4855;
+  /* FIELD LEDGER: warm paper deck, ink text, one deep-teal accent. The
+     record's own screens - prompt, tape, reader - stay dark, because that
+     is what a wire looks like. */
+  --v0:#e8e6dd; --v1:#f1f0e8; --v2:#faf9f3; --v3:#e9e8de; --v4:#dbd9cc;
+  --line:#d2d0c2; --line-soft:#e0dece;
+  --ink:#1f2733; --dim:#525d6b; --faint:#8d95a1;
+  --steel:#0d6e83; --steel-dim:#d7ebef;
 
-  --proven:#3ddc97; --candidate:#f0b429; --unproven:#7f8c9e; --refused:#9b86c7;
-  --proven-b:#0f3a2b; --candidate-b:#3a2e0d; --unproven-b:#222a34; --refused-b:#241e33;
+  --proven:#0c8f57; --candidate:#a97a0f; --unproven:#67727f; --refused:#7a5cc0;
+  --proven-b:#d8f0e2; --candidate-b:#f5ead0; --unproven-b:#e7eaee; --refused-b:#e9e3f6;
 
-  --sev5:#ff6b5e; --sev4:#ff9f45; --sev3:#e8c33c; --sev2:#6d9bb5; --sev1:#5b6775;
+  --sev5:#d0342c; --sev4:#e07a12; --sev3:#b7950e; --sev2:#5f87a5; --sev1:#8b96a1;
 
-  --hazard:#ff5a52; --hazard-deep:#43110e;
-  --amb:rgba(95,208,232,.065); --amb2:rgba(155,134,199,.045);
+  --hazard:#cf2f27; --hazard-deep:#f6d7d4;
+  --amb:rgba(13,110,131,.06); --amb2:rgba(169,122,15,.05);
+
+  /* the dark face the record wears */
+  --scr:#0d1218; --scr-line:#26303e; --scr-ink:#c6d5e4; --scr-dim:#8b98a8;
 
   --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
-  --nav:238px;
   --ease:cubic-bezier(.22,.61,.36,1);
-  color-scheme:dark;
+  color-scheme:light;
 }
 html[data-mode="engagement"]{
   --steel:var(--hazard); --steel-dim:var(--hazard-deep);
-  --amb:rgba(255,90,82,.075); --amb2:rgba(255,159,69,.04);
+  --amb:rgba(207,47,39,.06); --amb2:rgba(224,122,18,.05);
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
@@ -75,7 +77,6 @@ body{
   background:var(--v0); color:var(--ink);
   font:400 13px/1.55 var(--sans);
   -webkit-font-smoothing:antialiased;
-  display:grid; grid-template-columns:var(--nav) 1fr;
 }
 ::selection{background:var(--steel-dim);color:var(--ink)}
 .mono{font-family:var(--mono)}
@@ -86,36 +87,32 @@ button{background:none;border:0;cursor:pointer}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 
 ::-webkit-scrollbar{width:10px;height:10px}
-::-webkit-scrollbar-thumb{background:var(--v4);border-radius:6px;border:3px solid var(--v0)}
-::-webkit-scrollbar-thumb:hover{background:#33425a}
+::-webkit-scrollbar-thumb{background:#c9c7b9;border-radius:6px;border:3px solid var(--v0)}
+::-webkit-scrollbar-thumb:hover{background:#b3b1a1}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-corner{background:transparent}
 
 /* ----------------------------------------------------- ambient layers
-   Two effects, both behind the content: an aurora wash that drifts on a
-   26-second cycle (steel, or ember-red in engagement mode - the ambient
-   light in the room changes with the mode, which is the point of having a
-   mode) and a dot grid confined to the main column so the rail reads as a
-   instrument face. Neither is content, so neither is in the DOM. */
+   A washed field-map glow drifting on a 26s cycle (teal and ochre on paper,
+   ember under engagement) plus a faint registration-dot grid. Neither is
+   content, so neither is in the DOM. */
 body::before{
   content:"";position:fixed;inset:-18%;z-index:0;pointer-events:none;
   background:
-    radial-gradient(40% 44% at 28% 18%, var(--amb), transparent 68%),
-    radial-gradient(32% 38% at 80% 78%, var(--amb2), transparent 70%);
+    radial-gradient(42% 46% at 24% 12%, var(--amb), transparent 68%),
+    radial-gradient(34% 40% at 82% 80%, var(--amb2), transparent 70%);
   animation:drift 26s ease-in-out infinite alternate;
 }
 @keyframes drift{
   from{transform:translate3d(0,0,0) scale(1)}
   to{transform:translate3d(3.5%,2.5%,0) scale(1.07)}
 }
-main{position:relative;z-index:0;min-width:0;display:flex;flex-direction:column}
+main{position:relative;z-index:0}
 main::before{
-  content:"";position:absolute;inset:0;pointer-events:none;opacity:.55;
-  background-image:radial-gradient(circle,#ffffff07 1px,transparent 1.4px);
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.6;
+  background-image:radial-gradient(circle,rgba(31,39,51,.055) 1px,transparent 1.4px);
   background-size:27px 27px;
 }
-.rail{position:relative;z-index:1}
-.wrap,.moderail{position:relative;z-index:1}
 
 /* entrance choreography: plays once, staggered by --d set inline */
 .rise{animation:enter .58s var(--ease) backwards;animation-delay:var(--d,0s)}
@@ -123,118 +120,136 @@ main::before{
 [role="tabpanel"]{animation:tabin .3s var(--ease)}
 @keyframes tabin{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
 
-/* ======================================================= LEFT RAIL ===== */
-.rail{
-  background:linear-gradient(180deg,var(--v1),#0d1218 70%);
-  border-right:1px solid var(--line);
-  display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+/* ======================================================== TOP BAR =====
+   The chassis header: identity left, the three screens as a sliding-pill
+   switch centre, instrument lamps and the wall clock right. It is sticky
+   because on a long record the operator should never have to scroll up to
+   know which screen they are on or whether the host is armed. The second
+   row is the mode ribbon - in engagement it becomes the hazard stripe. */
+.topbar{
+  position:sticky;top:0;z-index:40;
+  background:rgba(241,240,232,.85);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
 }
-.brand{padding:18px 18px 16px;border-bottom:1px solid var(--line-soft)}
-.brand h1{
-  font-size:17px;font-weight:650;letter-spacing:.16em;
-  display:flex;align-items:center;gap:9px;
+.trow{
+  display:flex;align-items:center;gap:18px;
+  padding:10px 22px;max-width:1560px;margin:0 auto;
 }
-.eye{width:15px;height:15px;flex:none;color:var(--steel);transition:color .3s var(--ease)}
+.brand2{display:flex;align-items:center;gap:11px;min-width:0}
+.eye{width:22px;height:22px;flex:none;color:var(--steel);transition:color .3s var(--ease)}
 .eye circle{transform-box:fill-box;transform-origin:center;animation:peek 8s ease-in-out infinite}
 @keyframes peek{0%,90%,100%{transform:translateX(0)}93%{transform:translateX(1.6px)}96.5%{transform:translateX(-1.1px)}}
-.brand p{color:var(--faint);font-size:11px;margin-top:5px;line-height:1.4}
+.brand2 h1{font-size:15px;font-weight:650;letter-spacing:.18em;line-height:1.1;color:var(--ink)}
+.brand2 .tag{font-size:10px;color:var(--faint);letter-spacing:.02em;display:block;margin-top:1px;
+  max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1180px){ .brand2 .tag{display:none} }
 
-nav{padding:12px 10px;display:flex;flex-direction:column;gap:2px}
-.nav{
-  display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:10px;
-  padding:9px 10px;border-radius:4px;color:var(--dim);
-  text-align:left;font-size:13px;position:relative;
-  transition:background .15s,color .15s;
+.seg{
+  position:relative;display:flex;gap:2px;margin:0 auto;
+  background:var(--v3);border:1px solid var(--line);border-radius:999px;
+  padding:3px;
 }
-.nav:hover{background:var(--v2);color:var(--ink)}
-.nav[aria-selected="true"]{background:var(--v3);color:var(--ink);font-weight:550}
-.nav[aria-selected="true"]::before{
-  content:"";position:absolute;left:-10px;top:7px;bottom:7px;width:2px;
-  background:var(--steel);border-radius:0 2px 2px 0;
-  box-shadow:0 0 8px -1px var(--steel);
+.segslide{
+  position:absolute;top:3px;bottom:3px;left:0;width:60px;border-radius:999px;
+  background:#fff;border:1px solid var(--line);
+  box-shadow:0 1px 2px rgba(31,39,51,.1), inset 0 1px 0 #fff;
+  transition:transform .3s var(--ease),width .3s var(--ease);
 }
-.nav svg{width:16px;height:16px;opacity:.85}
-.nav .ct{
-  font:500 11px/1 var(--mono);color:var(--faint);
-  background:var(--v1);border:1px solid var(--line);border-radius:999px;
-  padding:3px 7px;min-width:22px;text-align:center;
-  font-variant-numeric:tabular-nums;
+.nav2{
+  position:relative;z-index:1;display:flex;align-items:center;gap:8px;
+  padding:6px 15px;border-radius:999px;color:var(--dim);font-size:12.5px;
+  transition:color .16s;
 }
-.nav[aria-selected="true"] .ct{color:var(--ink);border-color:var(--v4)}
-.nav kbd{
+.nav2:hover{color:var(--ink)}
+.nav2[aria-selected="true"]{color:var(--ink);font-weight:550}
+.nav2 svg{width:14px;height:14px;opacity:.85}
+.nav2 .ct{
   font:500 10px/1 var(--mono);color:var(--faint);
-  border:1px solid var(--line);border-radius:3px;padding:2px 4px;
+  background:var(--v0);border:1px solid var(--line);border-radius:999px;
+  padding:2.5px 6px;min-width:20px;text-align:center;font-variant-numeric:tabular-nums;
 }
+.nav2[aria-selected="true"] .ct{color:var(--steel);border-color:var(--steel)}
+.nav2 kbd{font:500 9.5px/1 var(--mono);color:var(--faint)}
 
-.railgap{flex:1}
-.status{padding:14px 16px;border-top:1px solid var(--line-soft)}
-.status h2{font-size:11px;color:var(--faint);font-weight:500;margin-bottom:9px}
-.lamp{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:11.5px;color:var(--dim)}
+.tbar-right{display:flex;align-items:center;gap:13px;flex:none}
+.lamps2{display:flex;align-items:center;gap:11px;padding-right:13px;border-right:1px solid var(--line-soft)}
+.lamp{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dim);white-space:nowrap}
 .lamp i{
-  width:7px;height:7px;border-radius:50%;flex:none;
-  background:var(--v4);box-shadow:inset 0 0 0 1px #000;
+  width:6px;height:6px;border-radius:50%;flex:none;
+  background:#cfcdbec0;box-shadow:inset 0 0 0 1px rgba(31,39,51,.2);
   transition:background .4s,box-shadow .4s;
 }
-.lamp.on i{background:var(--proven);box-shadow:0 0 7px -1px var(--proven)}
-.lamp.off i{background:#3a2326;box-shadow:inset 0 0 0 1px #000}
+.lamp.on i{background:var(--proven);box-shadow:0 0 6px -1px rgba(12,143,87,.6)}
+.lamp.off i{background:#d9b0ac;box-shadow:inset 0 0 0 1px rgba(31,39,51,.2)}
 .lamp.off{color:var(--faint)}
-.lamp .mono{font-size:11px}
-.ver{padding:10px 16px 14px;color:var(--faint);font:400 10.5px/1 var(--mono)}
-
-/* ========================================================== CHASSIS ==== */
-.moderail{
-  display:flex;align-items:center;gap:12px;
-  padding:9px 24px;border-bottom:1px solid var(--line);
-  background:var(--v1);
-  font-size:12px;color:var(--dim);
-}
-html[data-mode="engagement"] .moderail{
-  background:repeating-linear-gradient(135deg,var(--hazard-deep) 0 11px,#2a0b09 11px 22px);
-  border-bottom-color:#5e1a16; color:#ffd7d4;
-}
-.moderail b{
-  font:600 11px/1 var(--mono);letter-spacing:.1em;
-  padding:5px 9px;border-radius:3px;
-  background:var(--v3);color:var(--ink);border:1px solid var(--line);
-}
-html[data-mode="engagement"] .moderail b{
-  background:var(--hazard);color:#2a0705;border-color:#ff8f89;
-}
-.mr{flex:1}
-.mrs{display:flex;align-items:center;gap:9px}
-#pulse{
-  width:7px;height:7px;border-radius:50%;background:var(--v4);flex:none;
-}
+@media (max-width:1180px){ .lamps2{display:none} }
+#pulse{width:7px;height:7px;border-radius:50%;background:var(--v4);flex:none}
 #pulse.on{animation:ping .7s var(--ease)}
 @keyframes ping{
   0%{background:var(--steel);box-shadow:0 0 10px var(--steel)}
   100%{background:var(--v4);box-shadow:none}
 }
-#wallclock{font:500 11px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
+#wallclock{font:500 11px/1 var(--mono);color:var(--dim);font-variant-numeric:tabular-nums}
+#ver{font:400 10px/1 var(--mono);color:var(--faint)}
 
-.wrap{padding:22px 24px 40px;max-width:1480px;width:100%}
+/* the mode ribbon: one line that says whose rules this page is playing by */
+.mrow{
+  display:flex;align-items:center;gap:10px;
+  padding:5px 22px;max-width:1560px;margin:0 auto;
+  border-top:1px solid var(--line-soft);
+  font-size:11.5px;color:var(--faint);
+}
+.mrow b{
+  font:600 10px/1 var(--mono);letter-spacing:.1em;
+  padding:4px 8px;border-radius:3px;
+  background:var(--v3);color:var(--dim);border:1px solid var(--line);
+}
+html[data-mode="engagement"] .topbar{
+  background:rgba(251,238,236,.9);border-bottom-color:#e2b3ae;
+}
+html[data-mode="engagement"] .mrow{
+  background:repeating-linear-gradient(135deg,#f4cdc9 0 11px,#eeb8b3 11px 22px);
+  border-top-color:#e2b3ae;color:#8c1d18;
+}
+html[data-mode="engagement"] .mrow b{
+  background:var(--hazard);color:#fff;border-color:#b02418;
+}
+
+.wrap{max-width:1560px;margin:0 auto;padding:22px 24px 44px;position:relative;z-index:1}
 
 /* ============================================================ HERO ===== */
 .hero{
-  background:linear-gradient(180deg,var(--v2),var(--v1));
-  border:1px solid var(--line);border-radius:8px;
-  box-shadow:inset 0 1px 0 #ffffff08, 0 14px 34px -22px #000;
-  display:grid;grid-template-columns:auto 1fr auto;gap:26px;
-  padding:20px 22px;align-items:center;position:relative;overflow:hidden;
+  position:relative;overflow:hidden;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 23px,rgba(31,39,51,.028) 23px 24px),
+    repeating-linear-gradient(90deg,transparent 0 23px,rgba(31,39,51,.028) 23px 24px),
+    linear-gradient(180deg,var(--v2),var(--v1));
+  border:1px solid var(--line);border-top:2px solid var(--steel);
+  border-radius:10px;
+  box-shadow:0 1px 2px rgba(31,39,51,.05), 0 14px 30px -22px rgba(31,39,51,.4);
+  display:grid;grid-template-columns:auto 1fr auto;gap:30px;
+  padding:24px 26px;align-items:center;
 }
-/* one light pass every 12s - reads as the instrument settling, not a loop
-   asking to be watched */
+/* blueprint corner ticks: this is an instrument face, draw it like one */
+.hero::before,.hero .tick2{
+  content:"";position:absolute;width:14px;height:14px;pointer-events:none;
+  border:1px solid var(--steel);opacity:.45;
+}
+.hero::before{top:11px;left:10px;border-right:0;border-bottom:0}
+.hero .tick2{top:11px;right:10px;border-left:0;border-bottom:0}
 .hero::after{
   content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(105deg,transparent 42%,#ffffff07 50%,transparent 58%);
-  transform:translateX(-130%);animation:sheen 12s ease-in-out infinite;
+  background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.4) 50%,transparent 58%);
+  transform:translateX(-130%);animation:sheen 13s ease-in-out infinite;
 }
 @keyframes sheen{0%,55%{transform:translateX(-130%)}78%,100%{transform:translateX(130%)}}
 @media (max-width:1180px){ .hero{grid-template-columns:auto 1fr;gap:20px} .hero .mix{grid-column:1/-1} }
 @media (max-width:820px){ .hero{grid-template-columns:1fr} }
 
-.gauge{position:relative;width:172px;height:172px;flex:none}
+.gauge{position:relative;width:182px;height:182px;flex:none}
 .gauge svg{width:100%;height:100%;display:block;overflow:visible}
+.gauge .halo{fill:none;stroke:var(--line-soft);stroke-width:1}
 .gauge .trk{fill:none;stroke:var(--v4);stroke-width:11}
 .gauge .seg{fill:none;stroke-width:11;stroke-linecap:round;transition:d .9s var(--ease)}
 /* pathLength=1 lets the whole arc draw itself in with a single dash
@@ -242,28 +257,30 @@ html[data-mode="engagement"] .moderail b{
 .gauge .seg{stroke-dasharray:1;stroke-dashoffset:0}
 .anim .seg{animation:draw 1.05s var(--ease) backwards}
 @keyframes draw{from{stroke-dashoffset:1}}
-.gauge .seg.proven{filter:drop-shadow(0 0 4px rgba(61,220,151,.4))}
-.gauge .seg.candidate{filter:drop-shadow(0 0 4px rgba(240,180,41,.35))}
-.gauge .seg.refused{filter:drop-shadow(0 0 4px rgba(155,134,199,.35))}
+.gauge .seg.proven{filter:drop-shadow(0 0 4px rgba(12,143,87,.35))}
+.gauge .seg.candidate{filter:drop-shadow(0 0 4px rgba(169,122,15,.32))}
+.gauge .seg.refused{filter:drop-shadow(0 0 4px rgba(122,92,192,.32))}
 .gauge .tick{stroke:var(--line);stroke-width:1}
 .gauge.hot .trk{animation:trkhot 1.8s ease-in-out infinite}
-@keyframes trkhot{0%,100%{stroke:var(--v4)}50%{stroke:#31465e}}
+@keyframes trkhot{0%,100%{stroke:var(--v4)}50%{stroke:#b9c8c4}}
 .gcent{
   position:absolute;inset:0;display:flex;flex-direction:column;
   align-items:center;justify-content:center;text-align:center;pointer-events:none;
 }
 .gnum{
-  font:600 52px/1 var(--mono);letter-spacing:-.03em;color:var(--proven);
+  font:600 54px/1 var(--mono);letter-spacing:-.03em;color:var(--proven);
   font-variant-numeric:tabular-nums;
-  text-shadow:0 0 22px rgba(61,220,151,.35);
+  text-shadow:0 0 18px rgba(12,143,87,.28);
 }
-.gof{font-size:11.5px;color:var(--dim);margin-top:5px;max-width:124px;line-height:1.35}
+.gof{font-size:11.5px;color:var(--dim);margin-top:5px;max-width:128px;line-height:1.35}
 
 .hmid{min-width:0}
-.hmid h2{font-size:14px;font-weight:600;letter-spacing:-.01em}
+.overline{font:550 10px/1 var(--sans);letter-spacing:.22em;color:var(--steel);margin-bottom:7px}
+.overline::before{content:"";display:inline-block;width:7px;height:7px;background:var(--steel);margin-right:9px;vertical-align:1px}
+.hmid h2{font-size:14.5px;font-weight:600;letter-spacing:-.01em}
 .hmid .sub{color:var(--dim);font-size:12px;margin-top:3px}
 
-.strip{display:flex;gap:2px;margin:14px 0 10px;height:34px;align-items:stretch}
+.strip{display:flex;gap:2px;margin:15px 0 11px;height:38px;align-items:stretch}
 .cell{
   flex:1 1 0;min-width:5px;border-radius:2px;
   background:var(--unproven-b);transform-origin:bottom;
@@ -276,8 +293,8 @@ html[data-mode="engagement"] .moderail b{
 .cell.unproven{background:var(--unproven);color:var(--unproven)}
 .cell.refused{color:var(--refused);background:repeating-linear-gradient(135deg,
   var(--refused) 0 3px, var(--refused-b) 3px 6px)}
-.cell:hover{transform:scaleY(1.14);filter:brightness(1.25)}
-.cell.on{box-shadow:0 0 0 2px var(--v1),0 0 0 3px currentColor}
+.cell:hover{transform:scaleY(1.14);filter:brightness(1.08)}
+.cell.on{box-shadow:0 0 0 2px var(--v2),0 0 0 3px currentColor}
 
 .striplegend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:11.5px;color:var(--dim)}
 .lg{
@@ -293,12 +310,12 @@ html[data-mode="engagement"] .moderail b{
 .lg.u i{background:var(--unproven)}
 .lg.r i{background:repeating-linear-gradient(135deg,var(--refused) 0 3px,var(--refused-b) 3px 6px)}
 
-.mix{min-width:190px}
-.mix h3{font-size:11px;color:var(--faint);font-weight:500;margin-bottom:9px}
-.meter{display:grid;grid-template-columns:60px 1fr 22px;align-items:center;gap:9px;padding:2.5px 0;transition:opacity .3s}
+.mix{min-width:196px}
+.mix h3{font-size:10.5px;color:var(--faint);font-weight:550;letter-spacing:.14em;margin-bottom:10px}
+.meter{display:grid;grid-template-columns:60px 1fr 22px;align-items:center;gap:9px;padding:3px 0;transition:opacity .3s}
 .meter span{font-size:11.5px;color:var(--dim)}
-.meter .bar{height:7px;background:var(--v4);border-radius:2px;overflow:hidden}
-.meter .fil{height:100%;width:0;border-radius:2px;transition:width .9s var(--ease)}
+.meter .bar{height:8px;background:var(--v3);border-radius:3px;overflow:hidden}
+.meter .fil{height:100%;width:0;border-radius:3px;transition:width .9s var(--ease)}
 .meter b{font:500 11.5px/1 var(--mono);color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
 
 /* =============================================== EVIDENCE PIPELINE =====
@@ -307,55 +324,55 @@ html[data-mode="engagement"] .moderail b{
    its motion - evidence moving through the pipeline, faster while a run is
    live on the wire. */
 .flowband{
-  margin-top:16px;display:grid;grid-template-columns:172px 1fr;gap:14px;
+  margin-top:16px;display:grid;grid-template-columns:180px 1fr;gap:16px;
   align-items:center;
   background:linear-gradient(180deg,var(--v2),var(--v1));
-  border:1px solid var(--line);border-radius:8px;padding:13px 18px;
-  box-shadow:inset 0 1px 0 #ffffff07;
+  border:1px solid var(--line);border-radius:10px;padding:14px 20px;
+  box-shadow:0 1px 2px rgba(31,39,51,.04);
 }
 @media (max-width:900px){ .flowband{grid-template-columns:1fr} }
-.flcap h2{font-size:12px;font-weight:600;letter-spacing:.02em}
-.flcap p{font-size:11.5px;color:var(--faint);margin-top:5px;line-height:1.4}
+.flcap h2{font-size:11px;font-weight:600;letter-spacing:.16em;color:var(--dim)}
+.flcap p{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.45}
 .flcap p b{color:var(--dim);font-weight:550}
-#flowsvg{width:100%;height:92px;display:block}
+#flowsvg{width:100%;height:96px;display:block}
 .fnode rect{fill:var(--v1);stroke:var(--line);stroke-width:1}
-.fnode.hotn rect{stroke:var(--steel);filter:drop-shadow(0 0 6px rgba(95,208,232,.18))}
+.fnode.hotn rect{stroke:var(--steel);filter:drop-shadow(0 0 6px rgba(13,110,131,.18))}
 .flab{font:550 8.5px var(--sans);letter-spacing:.16em;fill:var(--faint)}
 .fcap{font:400 8.5px var(--sans);fill:var(--faint)}
 .fnum{font:600 21px var(--mono);fill:var(--ink);font-variant-numeric:tabular-nums}
 .flink{fill:none;stroke:var(--v4);stroke-width:1.5}
 #flowsvg.hot .flink{stroke:var(--steel);transition:stroke .5s}
-.fdot{fill:var(--steel)}
-.fdot{filter:drop-shadow(0 0 3px rgba(95,208,232,.55))}
-html[data-mode="engagement"] .fdot{filter:drop-shadow(0 0 3px rgba(255,90,82,.55))}
+.fdot{fill:var(--steel);filter:drop-shadow(0 0 3px rgba(13,110,131,.5))}
+html[data-mode="engagement"] .fdot{filter:drop-shadow(0 0 3px rgba(207,47,39,.5))}
 
 /* ========================================================== PANELS ===== */
-.grid{display:grid;grid-template-columns:356px 1fr;gap:16px;margin-top:16px;align-items:start}
+.grid{display:grid;grid-template-columns:368px 1fr;gap:16px;margin-top:16px;align-items:start}
 @media (max-width:1100px){ .grid{grid-template-columns:1fr} }
 
 .panel{
-  background:linear-gradient(180deg,var(--v2),#141b23 120%);
-  border:1px solid var(--line);border-radius:8px;overflow:hidden;
-  box-shadow:inset 0 1px 0 #ffffff06;
+  background:linear-gradient(180deg,var(--v2),var(--v1) 140%);
+  border:1px solid var(--line);border-radius:10px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(31,39,51,.05);
   transition:transform .22s var(--ease),box-shadow .22s var(--ease),border-color .22s;
 }
-.panel:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #ffffff06,0 12px 30px -16px #000b;border-color:#2c3a4c}
+.panel:hover{transform:translateY(-2px);box-shadow:0 2px 4px rgba(31,39,51,.06),0 14px 30px -16px rgba(31,39,51,.3);border-color:#c2c0b1}
 .phead{
   display:flex;align-items:center;gap:10px;justify-content:space-between;
-  padding:12px 15px;border-bottom:1px solid var(--line-soft);
+  padding:13px 16px;border-bottom:1px solid var(--line-soft);
 }
-.phead h2{font-size:13px;font-weight:600}
+.phead h2{font-size:13px;font-weight:600;display:flex;align-items:center;gap:9px}
+.phead h2::before{content:"";width:7px;height:7px;background:var(--steel);flex:none}
 .phead .note{color:var(--faint);font-size:11.5px}
-.pbody{padding:15px}
+.pbody{padding:16px}
 
 .k{
   border:1px solid var(--line);background:var(--v3);color:var(--ink);
-  border-radius:4px;padding:7px 12px;font-size:12.5px;position:relative;overflow:hidden;
+  border-radius:5px;padding:7px 12px;font-size:12.5px;position:relative;overflow:hidden;
   transition:background .14s,border-color .14s,transform .08s;
 }
 .k::after{
   content:"";position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(105deg,transparent 40%,#ffffff10 50%,transparent 60%);
+  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.55) 50%,transparent 60%);
   transform:translateX(-130%);transition:transform .5s var(--ease);
 }
 .k:hover:not(:disabled){background:var(--v4);border-color:var(--v4)}
@@ -364,23 +381,23 @@ html[data-mode="engagement"] .fdot{filter:drop-shadow(0 0 3px rgba(255,90,82,.55
 .k:disabled{opacity:.4;cursor:not-allowed}
 .k.sm{padding:4px 9px;font-size:11.5px}
 .k.go{background:var(--steel-dim);border-color:var(--steel);font-weight:600}
-.k.go:hover:not(:disabled){background:var(--steel);color:#06181d}
-html[data-mode="engagement"] .k.go{background:var(--hazard-deep);border-color:var(--hazard);color:#ffd9d6}
-html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard);color:#2a0705}
+.k.go:hover:not(:disabled){background:var(--steel);color:#fff}
+html[data-mode="engagement"] .k.go{background:var(--hazard-deep);border-color:var(--hazard);color:#8c1d18}
+html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard);color:#fff}
 
 .modes{display:grid;grid-template-columns:1fr 1fr;gap:9px}
 .pos{
-  border:1px solid var(--line);background:var(--v1);border-radius:5px;
+  border:1px solid var(--line);background:var(--v1);border-radius:6px;
   padding:11px 12px;cursor:pointer;display:block;
   transition:border-color .18s,background .18s,transform .18s;
 }
 .pos:hover{border-color:var(--v4);transform:translateY(-1px)}
-.pos.on{border-color:var(--steel);background:var(--v3)}
-.pos.arm.on{border-color:var(--hazard);background:#1f0f0e}
+.pos.on{border-color:var(--steel);background:#eef4f3}
+.pos.arm.on{border-color:var(--hazard);background:#fdeeec}
 .pos .top{display:flex;align-items:center;gap:8px}
 .pos .top i{width:8px;height:8px;border-radius:50%;background:var(--v4);flex:none}
-.pos.on .top i{background:var(--steel);box-shadow:0 0 8px -1px var(--steel)}
-.pos.arm.on .top i{background:var(--hazard);box-shadow:0 0 8px -1px var(--hazard);animation:beat 1.9s infinite}
+.pos.on .top i{background:var(--steel);box-shadow:0 0 7px -1px var(--steel)}
+.pos.arm.on .top i{background:var(--hazard);box-shadow:0 0 7px -1px var(--hazard);animation:beat 1.9s infinite}
 @keyframes beat{0%,100%{opacity:1}50%{opacity:.4}}
 .pos .top b{font-size:12.5px;font-weight:600}
 .pos p{color:var(--dim);font-size:11.5px;margin-top:5px;line-height:1.4}
@@ -389,36 +406,37 @@ html[data-mode="engagement"] .k.go:hover:not(:disabled){background:var(--hazard)
 .fld label{display:block;font-size:11.5px;color:var(--dim);margin-bottom:5px}
 .fld label em{color:var(--hazard);font-style:normal;font-size:10.5px;margin-left:5px}
 .fld input,.fld textarea{
-  width:100%;background:var(--v1);border:1px solid var(--line);border-radius:4px;
+  width:100%;background:var(--v1);border:1px solid var(--line);border-radius:5px;
   padding:8px 10px;font-family:var(--mono);font-size:12.5px;transition:border-color .15s,box-shadow .15s;
 }
-.fld input:focus,.fld textarea:focus{border-color:var(--steel);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--steel) 18%,transparent)}
+.fld input:focus,.fld textarea:focus{border-color:var(--steel);outline:none;box-shadow:0 0 0 3px rgba(13,110,131,.16)}
 .fld textarea{resize:vertical;min-height:62px;font-family:var(--sans)}
 .fld input::placeholder,.fld textarea::placeholder{color:var(--faint)}
 
-#auth{border:1px solid var(--hazard);border-radius:5px;padding:13px;margin-top:14px;background:#190b0a}
-#auth > p{color:#ffc9c5;font-size:11.5px;line-height:1.45}
-#auth > p b{color:#fff}
-.confirm{display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:11.5px;color:#ffc9c5}
+#auth{border:1px solid var(--hazard);border-radius:6px;padding:13px;margin-top:14px;background:#fbeeec}
+#auth > p{color:#8c1d18;font-size:11.5px;line-height:1.45}
+#auth > p b{color:#5f110c}
+.confirm{display:flex;gap:9px;align-items:flex-start;margin-top:12px;font-size:11.5px;color:#8c1d18}
 .confirm input{margin-top:2px;accent-color:var(--hazard);flex:none}
 
 .errs{list-style:none;margin-top:12px;display:flex;flex-direction:column;gap:7px}
 .errs li{
-  display:flex;gap:9px;background:#1d1210;border-left:2px solid var(--hazard);
-  border-radius:0 4px 4px 0;padding:8px 10px;font-size:11.5px;color:#ffcfcb;line-height:1.45;
+  display:flex;gap:9px;background:#fdeeed;border-left:2px solid var(--hazard);
+  border-radius:0 5px 5px 0;padding:8px 10px;font-size:11.5px;color:#7c1f1a;line-height:1.45;
   animation:tabin .25s var(--ease);
 }
 .errs li .tagw{font:600 10px/1 var(--mono);color:var(--hazard);letter-spacing:.07em;flex:none;padding-top:2px}
-.ok{margin-top:12px;background:#0d2419;border-left:2px solid var(--proven);
-  border-radius:0 4px 4px 0;padding:8px 10px;font-size:11.5px;color:#bff0d8;line-height:1.45}
-.warn{margin-top:12px;background:#231a06;border-left:2px solid var(--candidate);
-  border-radius:0 4px 4px 0;padding:9px 11px;font-size:11.5px;color:#f3dca2;line-height:1.5}
+.ok{margin-top:12px;background:#e0f2e7;border-left:2px solid var(--proven);
+  border-radius:0 5px 5px 0;padding:8px 10px;font-size:11.5px;color:#155c39;line-height:1.45}
+.warn{margin-top:12px;background:#fdf4da;border-left:2px solid var(--candidate);
+  border-radius:0 5px 5px 0;padding:9px 11px;font-size:11.5px;color:#7c5f0e;line-height:1.5}
 .acts{display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap}
 
+/* the record's own screens keep a dark face - they hold wire bytes */
 pre.prompt{
-  margin-top:6px;background:var(--v0);border:1px solid var(--line);border-radius:4px;
+  margin-top:6px;background:var(--scr);border:1px solid var(--scr-line);border-radius:5px;
   padding:12px;font-family:var(--mono);font-size:11.5px;line-height:1.6;
-  white-space:pre-wrap;word-break:break-word;max-height:330px;overflow:auto;color:#c9d6e4;
+  white-space:pre-wrap;word-break:break-word;max-height:330px;overflow:auto;color:var(--scr-ink);
 }
 
 .tw{overflow-x:auto;position:relative}
@@ -427,7 +445,7 @@ pre.prompt{
    really "not asked yet" */
 .tw[data-busy]::after{
   content:"";display:block;height:56px;margin:6px 12px 14px;border-radius:5px;
-  background:linear-gradient(90deg,var(--v2) 25%,var(--v3) 50%,var(--v2) 75%);
+  background:linear-gradient(90deg,var(--v1) 25%,var(--v3) 50%,var(--v1) 75%);
   background-size:220% 100%;animation:shimmer 1.3s linear infinite;
 }
 @keyframes shimmer{to{background-position:-220% 0}}
@@ -445,7 +463,7 @@ thead th{
 }
 tbody td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
 tbody.row{transition:background .15s}
-tbody.row:hover td{background:#ffffff05}
+tbody.row:hover td{background:rgba(13,110,131,.045)}
 td.r{text-align:right}
 /* With table-layout:fixed a cell does not widen for its content, it
    OVERFLOWS into the next column - a timestamp ran into Elapsed and
@@ -456,7 +474,7 @@ td.b{font-weight:600}
 /* `break-all` chopped `http://127.0.0.1:65501` into "http://1 / 27.0.0. /
    1:65501", which is unreadable and makes a target look like three. Break
    only where there is nowhere else to break. */
-.url{font-family:var(--mono);font-size:11.5px;color:#bcd3e6;overflow-wrap:anywhere;word-break:normal}
+.url{font-family:var(--mono);font-size:11.5px;color:#3d5f77;overflow-wrap:anywhere;word-break:normal}
 .sub2{color:var(--faint);font-size:11px;margin-top:2px;font-family:var(--mono)}
 
 .st{display:inline-flex;align-items:center;gap:7px;font-size:11.5px;white-space:nowrap}
@@ -468,10 +486,10 @@ td.b{font-weight:600}
 
 .gr{display:inline-block;font:600 10.5px/1 var(--mono);letter-spacing:.06em;
   padding:4px 7px;border-radius:3px;border:1px solid transparent}
-.gr.proven{background:var(--proven-b);color:var(--proven);border-color:#1d6b4f}
-.gr.candidate{background:var(--candidate-b);color:var(--candidate);border-color:#6b561a}
-.gr.unproven{background:var(--unproven-b);color:var(--unproven);border-color:var(--v4)}
-.gr.refused{background:var(--refused-b);color:var(--refused);border-color:#473a63}
+.gr.proven{background:var(--proven-b);color:var(--proven);border-color:#8fcfae}
+.gr.candidate{background:var(--candidate-b);color:var(--candidate);border-color:#e0c98b}
+.gr.unproven{background:var(--unproven-b);color:var(--unproven);border-color:#c9d1da}
+.gr.refused{background:var(--refused-b);color:var(--refused);border-color:#c4b3e8}
 
 .sv{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;white-space:nowrap}
 .sv i{width:3px;height:12px;border-radius:1px;flex:none}
@@ -482,23 +500,23 @@ td.b{font-weight:600}
 .sv.info i{background:var(--sev1)}
 
 .ev{
-  font-family:var(--mono);font-size:11.5px;color:#cfe0ef;
-  background:var(--v0);border-left:2px solid var(--v4);
+  font-family:var(--mono);font-size:11.5px;color:#3a4a5c;
+  background:#f1efe6;border-left:2px solid var(--v4);
   padding:6px 9px;border-radius:0 3px 3px 0;
   word-break:break-all;max-width:420px;line-height:1.5;
 }
 tbody.row.proven .ev{border-left-color:var(--proven)}
 tbody.row.candidate .ev{border-left-color:var(--candidate)}
 
-.why{background:#1a1407;border-left:2px solid var(--candidate);
-  padding:8px 11px;font-size:11.5px;color:#f0dcae;line-height:1.5;border-radius:0 3px 3px 0}
+.why{background:#fdf6de;border-left:2px solid var(--candidate);
+  padding:8px 11px;font-size:11.5px;color:#7a5d0d;line-height:1.5;border-radius:0 3px 3px 0}
 
 .empty{padding:28px 15px;text-align:center;color:var(--faint);font-size:12.5px}
 .empty b{display:block;color:var(--dim);font-size:13px;margin-bottom:5px;font-weight:550}
 
 .filt{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
 .filt select,.filt input{
-  background:var(--v1);border:1px solid var(--line);border-radius:4px;padding:6px 9px;font-size:12px;
+  background:var(--v1);border:1px solid var(--line);border-radius:5px;padding:6px 9px;font-size:12px;
 }
 .filt input{font-family:var(--mono);min-width:170px}
 .filt input:focus,.filt select:focus{border-color:var(--steel);outline:none}
@@ -513,21 +531,20 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 .crow b{font:500 11.5px/1 var(--mono);color:var(--faint);font-variant-numeric:tabular-nums}
 
 /* -------------------------------------------------- run windows (Gantt)
-   One bar per run from its first to its last recorded second; the needle
-   is now. A sealed session reads as a settled block, a live one breathes -
-   same state vocabulary as the table above it, drawn in time instead of
-   words. */
-.tlwrap{padding:4px 15px 14px}
+   The table says WHERE each run is; this says WHEN, which the table cannot:
+   two runs a minute apart and two runs a day apart read identically as rows
+   and completely differently as windows. Bars click through to the tape. */
+.tlwrap{padding:4px 15px 15px}
 .tlcap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);padding:6px 2px 8px}
 #tlsvg{width:100%;display:block}
 .tgrid{stroke:var(--line-soft);stroke-width:1;vector-effect:non-scaling-stroke}
-.tlb{fill:#46536a;cursor:pointer;transition:opacity .2s,filter .2s}
-.tlb:hover{filter:brightness(1.35)}
-.tlb.done{fill:var(--proven);opacity:.5}
+.tlb{fill:#a9b3c2;cursor:pointer;transition:opacity .2s,filter .2s}
+.tlb:hover{filter:brightness(.92)}
+.tlb.done{fill:var(--proven);opacity:.55}
 .tlb.failed{fill:var(--hazard);opacity:.85}
 .tlb.blocked{fill:var(--candidate);opacity:.75}
 .tlb.live{fill:var(--steel);animation:beat 1.7s infinite}
-.tlnow{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;opacity:.6}
+.tlnow{stroke:var(--ink);stroke-width:1;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;opacity:.55}
 
 /* -------------------------------------------- proof x severity matrix
    The strip counts grades; the meters count severities. A finding lives at
@@ -537,51 +554,53 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 .mxh{font:500 10px/30px var(--sans);color:var(--faint);text-align:center;letter-spacing:.06em}
 .mxl{font:500 11px/34px var(--sans);color:var(--dim)}
 .mxc{
-  border:1px solid var(--line);border-radius:5px;background:var(--v1);
+  border:1px solid var(--line);border-radius:6px;background:var(--v1);
   font:600 13px/32px var(--mono);color:var(--faint);text-align:center;
   font-variant-numeric:tabular-nums;
   transition:border-color .15s,background .15s,transform .1s,box-shadow .15s;
 }
 .mxc:hover{transform:translateY(-1px)}
 .mxc.lit{color:var(--ink)}
-.mxc.proven.lit{background:var(--proven-b);border-color:#1d6b4f;color:var(--proven)}
-.mxc.candidate.lit{background:var(--candidate-b);border-color:#6b561a;color:var(--candidate)}
-.mxc.unproven.lit{background:var(--unproven-b);border-color:var(--v4);color:#aab6c4}
-.mxc.refused.lit{background:var(--refused-b);border-color:#473a63;color:var(--refused)}
+.mxc.proven.lit{background:var(--proven-b);border-color:#8fcfae;color:var(--proven)}
+.mxc.candidate.lit{background:var(--candidate-b);border-color:#e0c98b;color:var(--candidate)}
+.mxc.unproven.lit{background:var(--unproven-b);border-color:#c9d1da;color:#4d5865}
+.mxc.refused.lit{background:var(--refused-b);border-color:#c4b3e8;color:var(--refused)}
 .mxc[aria-pressed="true"]{box-shadow:0 0 0 2px var(--v2),0 0 0 3px currentColor}
-.mxc.refused{background-image:repeating-linear-gradient(135deg,transparent 0 4px,#ffffff05 4px 8px)}
+.mxc.refused{background-image:repeating-linear-gradient(135deg,transparent 0 4px,rgba(31,39,51,.04) 4px 8px)}
 
 .drawer{
-  border:1px solid var(--line);border-radius:8px;background:var(--v2);
+  border:1px solid var(--line);border-radius:10px;background:var(--v2);
   margin-top:16px;overflow:hidden;animation:slide .26s var(--ease);
 }
 @keyframes slide{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
 .tape{
-  background:var(--v0);font-family:var(--mono);font-size:11.5px;line-height:1.7;
-  padding:12px 15px;max-height:280px;overflow:auto;color:#b9cadb;
+  background:var(--scr);font-family:var(--mono);font-size:11.5px;line-height:1.7;
+  padding:12px 15px;max-height:280px;overflow:auto;color:var(--scr-ink);
 }
 .tape div{display:flex;gap:11px}
-.tape em{color:var(--faint);font-style:normal;flex:none}
+.tape em{color:var(--scr-dim);font-style:normal;flex:none}
 .reader{
-  background:var(--v0);font-family:var(--mono);font-size:11.5px;line-height:1.65;
+  background:var(--scr);font-family:var(--mono);font-size:11.5px;line-height:1.65;
   padding:16px 18px;max-height:62vh;overflow:auto;white-space:pre-wrap;
-  word-break:break-word;color:#c6d5e4;
+  word-break:break-word;color:var(--scr-ink);
 }
 
 .foot{
-  margin-top:26px;padding-top:15px;border-top:1px solid var(--line-soft);
+  margin-top:28px;padding-top:16px;border-top:1px solid var(--line-soft);
   color:var(--faint);font-size:11.5px;line-height:1.6;max-width:84ch;
 }
+.foot .keys{margin-top:9px;color:var(--faint);font-size:10.5px}
+.foot kbd{font:500 10px/1 var(--mono);border:1px solid var(--line);border-radius:3px;padding:2px 5px;color:var(--dim);background:var(--v1)}
 
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001ms !important;animation-iteration-count:1 !important;
     transition-duration:.001ms !important}
 }
-@media (max-width:760px){
-  body{grid-template-columns:1fr}
-  .rail{position:static;height:auto}
-  nav{flex-direction:row;overflow-x:auto}
-  .railgap,.status,.ver{display:none}
+@media (max-width:860px){
+  .trow{flex-wrap:wrap;gap:10px}
+  .seg{order:3;margin:0;flex:1}
+  .seg .nav2{flex:1;justify-content:center}
+  .nav2 kbd{display:none}
   .wrap{padding:16px}
   .grid{grid-template-columns:1fr}
 }
@@ -589,56 +608,55 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
 </head>
 <body>
 
-<div class="rail">
-  <div class="brand">
-    <h1>
+<header class="topbar">
+  <div class="trow">
+    <div class="brand2">
       <svg class="eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
         <path d="M1.8 12S5.5 5 12 5s10.2 7 10.2 7-3.7 7-10.2 7S1.8 12 1.8 12Z"/>
         <circle cx="12" cy="12" r="2.8"/>
       </svg>
-      ARGUS
-    </h1>
-    <p>Nothing is recorded that the transcript does not already prove.</p>
+      <div>
+        <h1>ARGUS</h1>
+        <span class="tag">nothing is recorded that the transcript does not already prove</span>
+      </div>
+    </div>
+
+    <nav class="seg" id="seg" role="tablist" aria-label="Screens">
+      <i class="segslide" id="segslide" aria-hidden="true"></i>
+      <button class="nav2" id="tab-dash" role="tab" aria-selected="true" aria-controls="panel-dash">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M4 14a8 8 0 0 1 16 0"/><path d="m12 14 4-4"/><path d="M4 14h2M18 14h2M12 6V4"/>
+        </svg>
+        <span>Deck</span><kbd>1</kbd>
+      </button>
+      <button class="nav2" id="tab-find" role="tab" aria-selected="false" aria-controls="panel-find">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 5.8 5.8"/>
+        </svg>
+        <span>Findings</span><span class="ct" id="ct-find">0</span><kbd>2</kbd>
+      </button>
+      <button class="nav2" id="tab-rep" role="tab" aria-selected="false" aria-controls="panel-rep">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+          <path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>
+        </svg>
+        <span>Reports</span><span class="ct" id="ct-rep">0</span><kbd>3</kbd>
+      </button>
+    </nav>
+
+    <div class="tbar-right">
+      <div class="lamps2" id="lamps"></div>
+      <i id="pulse" aria-hidden="true"></i>
+      <span id="wallclock">--:--:--</span>
+      <span id="ver">argus</span>
+    </div>
   </div>
-
-  <nav role="tablist" aria-label="Screens">
-    <button class="nav" id="tab-dash" role="tab" aria-selected="true" aria-controls="panel-dash">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-        <path d="M4 14a8 8 0 0 1 16 0"/><path d="m12 14 4-4"/><path d="M4 14h2M18 14h2M12 6V4"/>
-      </svg>
-      <span>Deck</span><kbd>1</kbd>
-    </button>
-    <button class="nav" id="tab-find" role="tab" aria-selected="false" aria-controls="panel-find">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-        <circle cx="10.5" cy="10.5" r="6.2"/><path d="m15.2 15.2 5.8 5.8"/>
-      </svg>
-      <span>Findings</span><span class="ct" id="ct-find">0</span>
-    </button>
-    <button class="nav" id="tab-rep" role="tab" aria-selected="false" aria-controls="panel-rep">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
-        <path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>
-      </svg>
-      <span>Reports</span><span class="ct" id="ct-rep">0</span>
-    </button>
-  </nav>
-
-  <div class="railgap"></div>
-
-  <div class="status">
-    <h2>This host</h2>
-    <div id="lamps"></div>
-  </div>
-  <div class="ver mono" id="ver">argus</div>
-</div>
-
-<main>
-  <div class="moderail">
+  <div class="mrow">
     <b id="armtag">lab / ctf</b>
     <span id="armsay">practice target you own - no authorisation note required</span>
-    <span class="mr"></span>
-    <span class="mrs"><i id="pulse"></i><span id="wallclock">--:--:--</span></span>
   </div>
+</header>
 
+<main>
   <div class="wrap">
 
     <section class="hero rise" aria-label="Proof record">
@@ -651,6 +669,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       </div>
 
       <div class="hmid">
+        <div class="overline">PROOF RECORD</div>
         <h2>Every finding, graded against the bytes on record</h2>
         <p class="sub">One cell per finding. Click a grade to filter the record.</p>
         <div class="strip" id="strip"></div>
@@ -671,14 +690,15 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       </div>
 
       <div class="mix">
-        <h3>If true, how bad</h3>
+        <h3>IF TRUE, HOW BAD</h3>
         <div id="sevmix"></div>
       </div>
+      <i class="tick2" aria-hidden="true"></i>
     </section>
 
     <section class="flowband rise" style="--d:.1s" aria-label="Evidence pipeline">
       <div class="flcap">
-        <h2>The record, moving</h2>
+        <h2>THE RECORD, MOVING</h2>
         <p id="livesay">idle - nothing in flight</p>
         <p id="toolsay">tools unknown</p>
       </div>
@@ -885,6 +905,7 @@ tbody.row.candidate .ev{border-left-color:var(--candidate)}
       proven with <span class="mono">id; echo &lt;nonce&gt;</span> and stops there.
       The engagement tier refuses to open without an authorisation note naming who
       authorised it and over what window.
+      <span class="keys">keys: <kbd>1</kbd> deck <kbd>2</kbd> findings <kbd>3</kbd> reports <kbd>/</kbd> filter <kbd>esc</kbd> close</span>
     </p>
   </div>
 </main>
@@ -1071,7 +1092,7 @@ function rawget(path) {
     .catch(function (e) { return { _ok: false, text: '', error: String(e && e.message) }; });
 }
 
-/* The pinprick flash in the mode rail each time a poll answers. It is the
+/* The pinprick flash in the top bar each time a poll answers. It is the
    difference between "the page is quiet" and "the page is dead". */
 function pulse() {
   var p = $('pulse'); if (!p) return;
@@ -1082,7 +1103,7 @@ function tickClock() {
   setText($('wallclock'), pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()));
 }
 
-/* ---------------------------------------------------------- rail lamps */
+/* ----------------------------------------------------- top-bar lamps */
 function buildLamps() {
   var host = clear($('lamps')), rec = {};
   rec.model = put(host, el('div', 'lamp'));
@@ -1111,7 +1132,7 @@ function loadHealth() {
     }
     var ok = !!r.model_configured;
     setCls(L.model, 'lamp ' + (ok ? 'on' : 'off'));
-    setText(L.modelTxt, ok ? 'model configured' : 'no model');
+    setText(L.modelTxt, ok ? 'model' : 'no model');
     var tools = (r.tools && typeof r.tools === 'object') ? r.tools : {};
     var on = 0;
     TOOLS.forEach(function (n) { if (tools[n]) on++; setCls(L[n], 'lamp ' + (tools[n] ? 'on' : 'off')); });
@@ -1144,6 +1165,7 @@ function arcPath(from, to) {
 }
 function buildGauge() {
   var g = clear($('gsvg'));
+  put(g, svgn('circle', { 'class': 'halo', cx: ARC.cx, cy: ARC.cy, r: ARC.r + 17 }));
   put(g, svgn('path', { 'class': 'trk', d: arcPath(ARC.start, ARC.start + ARC.sweep) }));
   S.arc = {};
   GRADES.forEach(function (k, i) {
@@ -1529,7 +1551,7 @@ function buildMatrix() {
   SEVS.forEach(function (sv) {
     put(host, el('span', 'mxl', sv));
     GRADES.forEach(function (g) {
-      var c = put(host, el('button', 'mxc ' + g, '\u00B7'));
+      var c = put(host, el('button', 'mxc ' + g, '·'));
       c.type = 'button';
       c.setAttribute('aria-pressed', 'false');
       c.title = 'no ' + g + ' ' + sv + ' findings';
@@ -1554,7 +1576,7 @@ function paintMatrix() {
   SEVS.forEach(function (sv) {
     GRADES.forEach(function (g) {
       var n = cell[sv][g], c = MX[sv][g];
-      setText(c, n ? String(n) : '\u00B7');
+      setText(c, n ? String(n) : '·');
       c.classList.toggle('lit', n > 0);
       c.setAttribute('aria-pressed',
         (S.filt.grade === g && S.filt.sev === sv) ? 'true' : 'false');
@@ -1859,6 +1881,15 @@ function launch() {
 }
 
 /* =============================================================== TABS == */
+function placeSeg() {
+  /* The pill under the active screen name. It is a real element rather than
+     a per-button background so the selection can TRAVEL between tabs - the
+     eye follows it and registers the move as a move. */
+  var slide = $('segslide'), btn = $('tab-' + S.tab);
+  if (!slide || !btn) return;
+  slide.style.width = btn.offsetWidth + 'px';
+  slide.style.transform = 'translateX(' + btn.offsetLeft + 'px)';
+}
 function showTab(name) {
   S.tab = name;
   ['dash', 'find', 'rep'].forEach(function (n) {
@@ -1866,6 +1897,7 @@ function showTab(name) {
     if (b) b.setAttribute('aria-selected', n === name ? 'true' : 'false');
     if (p) p.hidden = (n !== name);
   });
+  placeSeg();
   if (name === 'find') loadFindings();
   if (name === 'rep') loadReports();
 }
@@ -1930,10 +1962,12 @@ function boot() {
     else if (e.key === '/') { e.preventDefault(); showTab('find'); $('q').focus(); }
     else if (e.key === 'Escape') { show($('recorder'), false); show($('reader'), false); }
   });
+  D.defaultView.addEventListener('resize', placeSeg);
 
   setMode('lab');
   paintGauge();
   tickClock();
+  placeSeg();
 
   loadHealth();
   loadRuns();
