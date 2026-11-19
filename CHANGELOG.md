@@ -6629,12 +6629,84 @@ skipped, selftest 164/164.
 A 44x-slower run is better evidence for a race fix than ten fast ones, and
 the instinct is to discard it as noise.
 
+### Asking the target again, with no model in the loop
+
+The matrix reads a finding's BYTES. A judge from another family reads its
+INTERPRETATION. Neither asks whether the target still does it, which is the
+question a reader of a report cannot answer for themselves and the one an
+outside reviewer applies first. `argus replay` sends the cited request
+again through the same scoped, recording client and reports whether the
+quoted bytes come back.
+
+Three outcomes, and `inconclusive` is first-class rather than a soft
+`not_reproduced`. A finding that fails to reproduce may be entirely real -
+a target patched between the run and the replay, a stateful exploit, a
+value that occurs once - and reporting those as refutations would make a
+verification tool a generator of false retractions.
+
+REDACTION MAKES MOST REAL ENGAGEMENTS INCONCLUSIVE, and the measurement
+decided the design before a line was written:
+
+    argus-lab        64 requests,  2 carry a credential   (3%)
+    argus-lab-team   74 requests,  2 carry a credential   (2%)
+    bwapp           23 requests, 23 carry a credential (100%)
+    dvwa            18 requests, 18 carry a credential (100%)
+
+A recorded request keeps `credential_sha256_16` - the HASH - so an
+authenticated request cannot be replayed from the record. The self-written
+lab barely authenticates; both third-party applications authenticate on
+every request. A naive implementation would have reported both bwapp
+findings as `not_reproduced` and retracted two real ones; the command
+reports what it is, names the header that would settle it, and sends
+nothing. Credential headers are dropped rather than replayed: the recorded
+value is a hash, and a 16-hex string where a session cookie belongs is a
+different request refused for a different reason.
+
+FOUR SHAPE ASSUMPTIONS, EACH CAUGHT BY RUNNING IT RATHER THAN READING IT,
+and the third would have been the worst defect in the module:
+
+- `client.default_headers` does not exist; it is `_default_headers`. Every
+  supplied credential was reported missing, so an authenticated finding
+  could never reproduce. A test now pins the attribute name.
+- `session.meta` and `session.target` do not exist on a reopened session.
+  The target is in meta.json.
+- **THE CLIENT DOES NOT RAISE ON A TRANSPORT FAILURE.** It returns
+  `{"error": "ConnectError: ...", "status": 0, "body": ""}`, measured
+  against a dead port on a real socket. So the `except` branch never fired
+  for the commonest reason a replay cannot be performed, and an unreachable
+  target produced `not_reproduced` for every finding - a target that was
+  merely DOWN would have retracted an entire engagement. Only the error's
+  TYPE is repeated, because a transport message can carry a URL and a URL
+  can carry a credential.
+- `verify_transcript` returns the FLAGS, not a verdict. Reading a `v["ok"]`
+  that does not exist made the command refuse every session it was pointed
+  at.
+
+That last one had a second half worth more than the fix. The success
+criterion was computed inline inside `argus verify --json` as nine
+conditions, so a second reader had to restate it - and restating it is how
+two callers come to disagree about what "verifies" means. Now
+`session.chain_ok(res)` is the single definition and both use it.
+
+AND THE COMMAND BROKE THE SEAL OF EVERY SESSION IT TOUCHED. `record_event`
+appends a transcript entry, the tail moves past the chain head recorded in
+summary.json, and `argus verify` answered MISMATCH - a command whose whole
+purpose is verification invalidating the record it verifies. Re-render and
+re-seal, the same trade `argus judge` makes. Now 26 chained entries verify
+where there were 24, and a test holds it.
+
+Reported in `next_action`'s exit and NOT blocking it, unlike the cross-read
+rule. A judge needs only its own API credential; a replay needs the network
+and, on an authenticated target, a credential the transcript deliberately
+does not keep. A rule that blocked the exit on that would strand every
+engagement whose target went down.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1099 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1117 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

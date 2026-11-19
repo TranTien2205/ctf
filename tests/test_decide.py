@@ -964,3 +964,43 @@ def test_a_class_tool_chain_names_only_registered_tools():
              for cls, tools in CLASS_TOOL_CHAIN.items()}
     bogus = {k: v for k, v in bogus.items() if v}
     assert not bogus, f"chains name tools that are not registered: {bogus}"
+
+
+def test_the_exit_names_re_verifiable_findings_without_blocking_on_them(
+        tmp_path):
+    """Asymmetry with the cross-read rule above, and it is deliberate.
+
+    A second model reading recorded bytes needs nothing but a credential
+    for its own API, so Rule 6b blocks the exit until it has happened.
+    `argus replay` needs the network AND, on an authenticated target, a
+    credential the transcript deliberately does not keep - 100% of requests
+    on both third-party applications in this tree carry one. A rule that
+    blocked the exit on that would strand every engagement whose target
+    went down, so the exit NAMES the work and lets the run finish.
+    """
+    entries = []
+    for ep in ("http://t/a?q=1", "http://t/b?q=1"):
+        entries.append(_exchange(f"base{ep}", ep))
+        for tool in decide._FIRST_PASS:
+            entries.append(_exchange(f"{ep}{tool}", ep, tool=tool))
+    for n, e in enumerate(entries):
+        e["id"] = f"r{n}"
+    judged = {"judge_model": "other-1", "agrees": True, "reason": "ok"}
+    findings = [
+        {"id": "F01", "vuln_class": "sqli", "grade": "proven",
+         "url": "http://t/a?q=1", "evidence_ids": [], "proof": {"missing": []},
+         "judge": judged},
+        {"id": "F02", "vuln_class": "xss", "grade": "proven",
+         "url": "http://t/b?q=1", "evidence_ids": [], "proof": {"missing": []},
+         "judge": judged,
+         "replay": {"outcome": "reproduced", "reason": "bytes came back"}},
+        {"id": "F03", "vuln_class": "rce", "grade": "proven",
+         "url": "http://t/b?q=1", "evidence_ids": [], "proof": {"missing": []},
+         "judge": judged,
+         "replay": {"outcome": "inconclusive", "reason": "no credential"}},
+    ]
+    action = decide.next_action(_session(tmp_path, entries, findings))
+    assert action.action == "report", action.render()
+    # F02 was re-verified; F01 never was and F03's question never reached
+    # the target, which is not a re-verification
+    assert action.detail["re_verifiable"] == ["F01", "F03"]

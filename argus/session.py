@@ -129,6 +129,30 @@ def _redact_obj(obj, secrets: set[str]):
     return obj
 
 
+#: Every way `verify_transcript` reports that a session's record is not
+#: trustworthy. Named once because it had two readers computing it
+#: separately: `argus verify --json` built the boolean inline, and the next
+#: command that needed it - `argus replay` - guessed at an `ok` key that
+#: verify_transcript does not return, so it refused every session it was
+#: pointed at. A criterion with two definitions has two meanings.
+CHAIN_FAILURES = ("error", "bad_lines", "tail_truncated", "anchor_missing",
+                  "findings_bad", "findings_overgraded", "key_required",
+                  "artifact_mismatch")
+
+
+def chain_ok(res: dict) -> bool:
+    """Does this `verify_transcript` result say the record is trustworthy?
+
+    `chained` must be true and every failure flag false. Anything that
+    amends a session - a judge verdict, a replay outcome, a re-render -
+    asks this first: attaching a fresh verdict to a record already in
+    doubt presents the verdict as covering something it does not.
+    """
+    if not isinstance(res, dict) or not res.get("chained"):
+        return False
+    return not any(res.get(flag) for flag in CHAIN_FAILURES)
+
+
 def verify_transcript(sdir: Path, seal_key: str = "") -> dict:
     """Recompute the hash chain over transcript.jsonl. Detects edited,
     inserted or mid-deleted entries, and tail truncation when

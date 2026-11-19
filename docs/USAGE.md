@@ -376,6 +376,65 @@ Measured against the lab's bWAPP: reflection confirmed with every
 metacharacter unescaped, two of three payload shapes executed, callbacks
 recorded, and the class graded `proven` on all four checks.
 
+## Asking the target again (`argus replay`)
+
+```bash
+python -m argus replay <session>                       # every finding
+python -m argus replay <session> --only F01,F03
+python -m argus replay <session> --header 'Cookie: PHPSESSID=...'
+python -m argus replay <session> --rps 1.0             # slower against the target
+```
+
+No model is involved. The request a finding cites is sent again through the
+same scoped, recording client, and the only question is whether the quoted
+bytes come back. Three outcomes, and the third is first-class:
+
+| outcome | what it means |
+|---|---|
+| `reproduced` | the target produced the quoted bytes again |
+| `not_reproduced` | the request was sent and answered, and the bytes did not come back |
+| `inconclusive` | the question never reached the target |
+
+**`inconclusive` is not a soft `not_reproduced`.** A finding that fails to
+reproduce may be entirely real: the target may have been patched between the
+run and the replay, the exploit may be stateful, or the proof may rest on a
+value that occurs once. Reporting those as refutations would make a
+verification tool into a generator of false retractions.
+
+### Why most real engagements need `--header`
+
+A recorded request stores `credential_sha256_16` — the **hash** of each
+credential header, never the value. So an authenticated request cannot be
+replayed from the record alone. Measured on this repository's own sealed
+sessions:
+
+| session | requests | carrying a credential |
+|---|---|---|
+| `argus-lab` | 64 | 2 (3%) |
+| `argus-lab-team` | 74 | 2 (2%) |
+| `bwapp` | 23 | 23 (100%) |
+| `dvwa` | 18 | 18 (100%) |
+
+The self-written lab barely authenticates; both third-party applications
+authenticate on every request. On the targets that look like real work, a
+replay without the credential re-supplied says nothing at all — and it says
+so, rather than reporting a target that refused an unauthenticated request
+as a finding that did not hold.
+
+The hash is never put on the wire where a value belongs: credential headers
+are dropped from the replay and whatever `--header` supplies is sent
+instead.
+
+### What it cannot do
+
+Like `argus judge`, it can never promote a finding, it never touches
+`grade`, and a `not_reproduced` is recorded once and not cleared by a later
+success — a target that answers differently on two replays is information
+about the target, not a correction. The replay's own exchange is recorded in
+the transcript, so the verification is auditable rather than asserted, and
+the session is re-rendered and re-sealed afterwards so `argus verify` still
+passes.
+
 ## A second model on the evidence (`argus judge`)
 
 ```bash

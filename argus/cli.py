@@ -180,6 +180,23 @@ def main(argv: list[str] | None = None) -> int:
     p_judge.add_argument("--only", default="",
                          help="comma-separated finding ids (default: all)")
     p_judge.add_argument("--seal-key", default=None)
+
+    p_replay = sub.add_parser(
+        "replay", help="send each finding's cited request again and report "
+                       "whether the target still produces the quoted bytes. "
+                       "No model involved; it can never promote a finding")
+    p_replay.add_argument("session_dir")
+    p_replay.add_argument("--header", action="append",
+                          help="'Name: value' sent on every replayed "
+                               "request. REQUIRED for an authenticated "
+                               "finding: the transcript stores a "
+                               "credential's hash, not its value, so "
+                               "without it the replay is inconclusive")
+    p_replay.add_argument("--only", default="",
+                          help="comma-separated finding ids (default: all)")
+    p_replay.add_argument("--rps", type=float, default=2.0,
+                          help="requests per second against the target")
+    p_replay.add_argument("--seal-key", default=None)
     p_judge.add_argument("--json", action="store_true")
     p_judge.add_argument("--dry-run", action="store_true",
                          help="print the case file a judge would be sent and "
@@ -512,6 +529,9 @@ def main(argv: list[str] | None = None) -> int:
                       f" ({f.get('url', '')}){cwe}{ow}{cvss}{flag}")
         return 0
 
+    if args.cmd == "replay":
+        return _cmd_replay(args)
+
     if args.cmd == "judge":
         return _cmd_judge(args)
 
@@ -824,14 +844,8 @@ def main(argv: list[str] | None = None) -> int:
             pass
         if args.json:
             # machine-readable verdict for CI: ok mirrors the exit code
-            res["ok"] = not (res.get("error") or not res.get("chained")
-                             or res.get("bad_lines")
-                             or res.get("tail_truncated")
-                             or res.get("anchor_missing")
-                             or res.get("findings_bad")
-                             or res.get("findings_overgraded")
-                             or res.get("key_required")
-                             or res.get("artifact_mismatch"))
+            from .session import chain_ok
+            res["ok"] = chain_ok(res)
             print(json.dumps(res, indent=2, ensure_ascii=False))
             return 0 if res["ok"] else 1
         if res.get("error"):
@@ -1999,6 +2013,146 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
     if singles:
         print(f"\nn=1 for {', '.join(singles)}: a single trial has no median. "
               f"EXPERIMENTS suggests 5.")
+    return 0
+
+
+def _cmd_replay(args) -> int:
+    """Ask the target again, with no model in the loop.
+
+    The proof matrix reads the recorded BYTES and `argus judge` reads the
+    INTERPRETATION. Neither asks whether the target still does it, which is
+    the one question a reader of a report cannot answer for themselves and
+    the criterion an outside reviewer applies first.
+
+    Verifies the chain before touching anything, the same order `argus
+    judge` uses: amending findings.json over a transcript that does not
+    verify would attach a fresh verdict to a record already in doubt.
+    """
+    from . import replay as replay_mod
+    from .config import Config, _seal_key
+    from .httpclient import GuardedClient, RateLimiter
+    from .scope import ScopeGuard
+    from .session import _atomic_write, verify_transcript
+
+    sdir = Path(args.session_dir)
+    if not sdir.exists():
+        print(f"no such session dir: {sdir}")
+        return 2
+    seal = _seal_key(args)
+    session = _reopen(sdir, seal)
+
+    # `verify_transcript` returns the FLAGS, not a verdict - the first
+    # version of this read a `v["ok"]` that does not exist and therefore
+    # refused every session. `chain_ok` is the one definition both this and
+    # `argus verify --json` use.
+    from .session import chain_ok
+    res = verify_transcript(sdir, seal_key=seal)
+    if not chain_ok(res):
+        bad = [k for k in ("error", "bad_lines", "tail_truncated",
+                           "anchor_missing", "findings_bad",
+                           "findings_overgraded", "key_required",
+                           "artifact_mismatch") if res.get(k)]
+        print(f"refusing to replay: the record does not verify "
+              f"({', '.join(bad) or 'not chained'}) - run 'argus verify'")
+        return 1
+
+    rows = [f for f in session.findings if isinstance(f, dict)]
+    only = {x.strip() for x in str(args.only or "").split(",") if x.strip()}
+    if only:
+        rows = [f for f in rows if str(f.get("id")) in only]
+    if not rows:
+        print("no findings to replay")
+        return 0
+
+    headers = {}
+    for raw in (args.header or []):
+        name, _, value = str(raw).partition(":")
+        if name.strip() and value.strip():
+            headers[name.strip()] = value.strip()
+
+    # A REOPENED SESSION CARRIES NEITHER. Measured: `vars()` on one holds
+    # dir, id, started, findings and the chain state - no `target`, no
+    # `meta`. The target lives in meta.json, which is also where `argus
+    # verify` reads the version it prints.
+    meta = {}
+    mpath = sdir / "meta.json"
+    if mpath.exists():
+        try:
+            loaded = json.loads(mpath.read_text(encoding="utf-8"))
+            if isinstance(loaded, dict):
+                meta = loaded
+        except (ValueError, OSError):
+            meta = {}
+    target = str(meta.get("target") or "")
+    if not target:
+        print("meta.json names no target, so there is nothing to replay "
+              "against")
+        return 2
+    client = GuardedClient(ScopeGuard(target), session,
+                           RateLimiter(max(0.2, float(args.rps))),
+                           default_headers=headers)
+    try:
+        updated, results = [], []
+        for finding in session.findings:
+            if not isinstance(finding, dict) or finding not in rows:
+                updated.append(finding)
+                continue
+            # Only the cited exchanges, fetched through the session's own
+            # accessor rather than by re-reading the file: the finding
+            # names its evidence, and `witness_for` picks the one whose
+            # RESPONSE carries the quoted bytes.
+            cited = [e for e in (session.get_exchange(str(r))
+                                 for r in (finding.get("evidence_ids") or []))
+                     if isinstance(e, dict)]
+            out = replay_mod.replay_finding(client, finding, cited)
+            results.append(out)
+            updated.append(replay_mod.apply_replay(finding, out))
+    finally:
+        client.close()
+
+    session.findings = updated
+    session.record_event("re_verification",
+                         {"results": [r.to_dict() for r in results]})
+    _atomic_write(session.findings_path,
+                  json.dumps(session.findings, indent=2, ensure_ascii=False))
+
+    # RE-RENDER AND RE-SEAL, the same trade `argus judge` makes. Measured
+    # without this: `record_event` appends a transcript entry, the tail
+    # moves past the chain head recorded in summary.json, and `argus
+    # verify` answers MISMATCH - so a command whose whole purpose is
+    # verification invalidated the record of every session it touched.
+    try:
+        from .report.markdown import render_report
+        prior = {}
+        spath = session.dir / "summary.json"
+        if spath.exists():
+            try:
+                loaded = json.loads(spath.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    prior = loaded
+            except (ValueError, OSError):
+                prior = {}
+        render_report(session, Config(target=target),
+                      str(prior.get("agent_summary") or ""),
+                      extra={"re_verified_at": int(time.time())})
+    except Exception as exc:                                  # noqa: BLE001
+        # a render failure must not lose the outcomes already written
+        print(f"warning: report re-render failed after replay: {exc}; "
+              "findings.json holds the outcomes", file=sys.stderr)
+    try:
+        session.seal_artifacts()
+    except OSError as exc:
+        print(f"warning: re-seal failed: {exc}", file=sys.stderr)
+
+    counts = {}
+    for r in results:
+        counts[r.outcome] = counts.get(r.outcome, 0) + 1
+    for r in results:
+        print(f"{r.finding_id}: {r.outcome} - {r.reason}")
+    print("\n" + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
+    if counts.get("inconclusive"):
+        print("inconclusive is not a refutation: the question did not reach "
+              "the target. A credential one needs is supplied with --header.")
     return 0
 
 

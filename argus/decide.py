@@ -143,6 +143,20 @@ def _reviewed(finding: dict) -> bool:
     return any(not v.get("error") for v in history)
 
 
+def _reverified(finding: dict) -> bool:
+    """Has the TARGET been asked again about this finding?
+
+    `inconclusive` is not a re-verification - the question never reached
+    the target - which is the same rule `_reviewed` applies to a judge
+    whose call failed.
+    """
+    history = [r for r in (finding.get("replays") or []) if isinstance(r, dict)]
+    if not history and isinstance(finding.get("replay"), dict):
+        history = [finding["replay"]]
+    return any(r.get("outcome") in ("reproduced", "not_reproduced")
+               for r in history)
+
+
 @dataclass
 class Action:
     """One computed next move. `why` always names the observation."""
@@ -567,7 +581,19 @@ def next_action(sdir: Path | str, *, max_scan: int = 150) -> Action:
         "proven one has been read by a model from another family. Write "
         "the report: proven findings with their proofs, candidates with the "
         "exact missing check, and what was ruled out.",
+        # RE-VERIFICATION IS NAMED HERE AND DOES NOT BLOCK. Unlike the
+        # cross-read above, `argus replay` needs the network and, on an
+        # authenticated target, a credential the transcript deliberately
+        # does not keep - measured at 100% of requests on both third-party
+        # applications in this tree. A rule that blocked the exit on it
+        # would strand every engagement whose target went down or whose
+        # operator has gone home, so it is reported as available work
+        # rather than as unfinished work.
         detail={"endpoints": len(surface), "findings": len(findings),
+                "re_verifiable": [
+                    str(f.get("id") or "") for f in findings
+                    if str(f.get("grade") or "") == "proven"
+                    and not _reverified(f)],
                 "grades": sorted({str(f.get("grade")) for f in findings}),
                 "probe_requests": sum(counts.values())})
 
