@@ -1111,3 +1111,78 @@ def test_the_bug_bounty_artifact_carries_every_finding(tmp_path):
         assert title in page or _html.escape(title) in page, \
             f"{f.get('id')} ({title[:40]}) is missing from report-h1.html"
     assert len(re.findall(r"PROOF:", page)) == len(findings)
+
+
+def test_a_cross_host_diff_says_so_on_stdout_and_in_json(tmp_path, capsys):
+    """MEASURED, and found by a grep of mine that lied.
+
+    A diff across hosts reads every finding as fixed AND new, because the
+    two runs are different applications rather than a retest. The code knew
+    that and warned - on stderr. Stdout carried "N fixed, 0 still present,
+    N new" with nothing saying why, and a diff is normally captured by
+    redirecting stdout, so whoever reads the file sees a retraction of N
+    findings and N discoveries as if they were facts about the world.
+
+    The JSON carried both targets, from which a reader could INFER it.
+    Inference is not a statement, and a machine consumer comparing hostnames
+    is doing the tool's work.
+
+    An earlier pass of mine concluded stdout already said it, because a
+    grep for host-related words matched two lines - both of them the word
+    "host" inside a finding TITLE. Twentieth wrong instrument in this
+    session and the mirror of the worst one: that nearly published a false
+    positive, this nearly retracted a real finding.
+    """
+    import json
+
+    from argus.cli import main
+
+    before = tmp_path / "b"
+    after = tmp_path / "a"
+    assert main(["demo", "--session-dir", str(before), "--quiet"]) == 0
+    assert main(["demo", "--session-dir", str(after), "--quiet"]) == 0
+    bdir = next(q for q in before.iterdir() if q.is_dir())
+    adir = next(q for q in after.iterdir() if q.is_dir())
+
+    # make the two runs look like different hosts, in meta only
+    meta = json.loads((adir / "meta.json").read_text(encoding="utf-8"))
+    meta["target"] = "http://other.test:8080"
+    (adir / "meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["diff", str(bdir), str(adir)]) == 0
+    out = capsys.readouterr()
+    assert "targets differ" in out.out, \
+        "the caveat reaches stderr only; a redirected diff loses it"
+    assert "fixed AND new" in out.out
+
+    capsys.readouterr()
+    assert main(["diff", str(bdir), str(adir), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload.get("cross_host") is True, \
+        "a machine reader should not have to compare hostnames itself"
+
+
+def test_a_same_host_diff_is_not_qualified(tmp_path, capsys):
+    """The direction that keeps the caveat off an ordinary retest, where it
+    would teach a reader to ignore it."""
+    import json
+
+    from argus.cli import main
+
+    before = tmp_path / "b"
+    after = tmp_path / "a"
+    assert main(["demo", "--session-dir", str(before), "--quiet"]) == 0
+    assert main(["demo", "--session-dir", str(after), "--quiet"]) == 0
+    bdir = next(q for q in before.iterdir() if q.is_dir())
+    adir = next(q for q in after.iterdir() if q.is_dir())
+
+    capsys.readouterr()
+    assert main(["diff", str(bdir), str(adir)]) == 0
+    out = capsys.readouterr()
+    assert "targets differ" not in out.out
+    assert "targets differ" not in out.err
+
+    capsys.readouterr()
+    assert main(["diff", str(bdir), str(adir), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out).get("cross_host") is False

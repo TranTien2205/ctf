@@ -1031,7 +1031,16 @@ def main(argv: list[str] | None = None) -> int:
         mb, ma = _meta(args.before), _meta(args.after)
         hb = _up.urlparse(str(mb.get("target") or "")).hostname
         ha = _up.urlparse(str(ma.get("target") or "")).hostname
-        if hb and ha and hb.lower() != ha.lower():
+        # THE CAVEAT HAS TO REACH THE OUTPUT, not only the terminal.
+        # Measured: with the hosts differing, this printed the warning on
+        # stderr and then "6 fixed, 0 still present, 6 new" on stdout - and
+        # a diff is normally captured by redirecting stdout, so whoever
+        # reads the file gets a retraction of six findings and six
+        # discoveries with nothing saying the two runs were different
+        # applications. The JSON carried both targets, from which a reader
+        # could infer it; inference is not a statement.
+        cross_host = bool(hb and ha and hb.lower() != ha.lower())
+        if cross_host:
             print(f"warning: targets differ ({hb} vs {ha}) - a diff "
                   "across hosts reads every finding as fixed+new; "
                   "compare retests on the same host", file=sys.stderr)
@@ -1065,6 +1074,7 @@ def main(argv: list[str] | None = None) -> int:
                 "after": {"dir": Path(args.after).name,
                           "target": ma.get("target"),
                           "argus_version": ma.get("argus_version")},
+                "cross_host": cross_host,
                 "fixed": fixed, "new": new,
                 "still_present": [
                     {"id_before": b.get("id"), "id_after": a.get("id"),
@@ -1076,6 +1086,10 @@ def main(argv: list[str] | None = None) -> int:
             }, indent=2, ensure_ascii=False))
             return 0
         print(f"--- {Path(args.before).name} -> {Path(args.after).name} ---")
+        if cross_host:
+            print(f"!!! targets differ ({hb} vs {ha}): every finding below "
+                  "reads as fixed AND new because the two runs are "
+                  "different applications, not a retest")
         for f in fixed:
             print(f"[FIXED ] {f.get('id')} {f.get('title')} "
                   f"({f.get('severity')})")

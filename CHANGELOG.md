@@ -8130,12 +8130,43 @@ defect.
 Nineteen shape assumptions in this session. The remedy has been the same
 every time and it is cheap: print the real thing before asserting about it.
 
+### A diff across hosts retracted six findings, and only stderr said why
+
+Ran the retest diff, which had never been run. Between two runs of the same
+application on different ports it correctly reports every finding as still
+present - the port is normalised, which is right for a retest. Across
+different HOSTS it reports every finding as fixed AND new, because the two
+runs are different applications.
+
+The code knew that and warned. On stderr. Stdout carried "6 fixed, 0 still
+present, 6 new" with nothing saying why, and a diff is normally captured by
+redirecting stdout - so whoever reads the file gets a retraction of six
+findings and six discoveries presented as facts about the world. The JSON
+carried both targets, from which a reader could INFER it; inference is not
+a statement, and a machine consumer comparing hostnames is doing the tool's
+work.
+
+The caveat now reaches all three channels from one flag, and does not
+appear on an ordinary retest, where it would teach a reader to ignore it.
+Three plants: removing it from stdout fails, removing the flag from the
+JSON fails, printing it on every diff fails.
+
+AND MY OWN CHECK OF THIS LIED, in the exact pattern this session keeps
+paying for. A first pass concluded stdout already said it, because a search
+for host-related words found two matches - both the word "host" inside a
+finding TITLE, "OS command injection in /ping host parameter". Twentieth
+wrong instrument here, and the mirror of the worst one: that nearly
+published a false positive, this nearly retracted a real finding. Same
+cause both times - a pattern matching content where a claim was wanted -
+and the same remedy: look at what the matches actually are before believing
+the count.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1183 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1185 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
