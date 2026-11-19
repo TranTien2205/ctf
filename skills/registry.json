@@ -490,9 +490,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 974,
-      "depth_files": 3,
-      "depth_tokens": 898,
+      "skill_tokens": 1306,
+      "depth_files": 259,
+      "depth_tokens": 81700,
       "use_when": [
         "a probe or source read produced this class's signal: decide the discriminator first: a nonce REUSED across two signatures recovers the key in closed form with ecdsa-nonce-reuse and needs no lattice, a merely BIASED nonce is hnp or hnp-ecdsa, and a plain discrete log needs the smoothness check before bsgs or pohlig-hellman"
       ],

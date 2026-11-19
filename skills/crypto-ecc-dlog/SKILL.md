@@ -76,7 +76,22 @@ Depth, one named file at a time:
 - `skills/ctf-crypto/ecc-attacks.md`
 - `skills/ctf-crypto/lattice-and-lwe.md`
 
-| Any curve/nonce/dlog question | `references/curve-and-nonce.md` |
+The corpus below is the depth — pick the file for the question you're asking:
+
+| Question | File |
+|---|---|
+| the card + the gates | `references/quick-reference.md`, `references/field-manual.md` |
+| read the handout / oracle | `references/detection.md`, `references/recon-order.md`, `references/probe-order.md` |
+| observation → attack | `references/cipher-identification.md`, `references/detection-matrix.md` |
+| which family / attack | `references/per-family-*.md`, `references/per-attack-*.md` |
+| every command + flag | `references/payload-dictionary.md` |
+| the full attack detail | `references/*-deep.md` (one per attack) |
+| verify + evidence | `references/verify.md`, `references/evidence.md` |
+| bounds / kills / no's | `references/boundary-cases.md`, `references/per-boundary*.md`, `references/falsifiers.md`, `references/negative-results.md` |
+| fixes / traps | `references/troubleshoot.md`, `references/common-mistakes.md`, `references/anti-patterns.md` |
+| cases / chains / cues | `references/case-studies.md`, `references/worked-examples.md`, `references/scenarios.md`, `references/multi-step-chains.md`, `references/lead-grammar.md` |
+| theory / terms | `references/theory.md`, `references/mechanism.md`, `references/glossary.md` |
+| indexes / wrap | `references/README.md`, `references/map-index.md`, `references/summary.md`, `references/closing-index.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
