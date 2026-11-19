@@ -7936,12 +7936,48 @@ What caught it was re-measuring with a bounded request and reading the
 target's own documentation of its routes. Not scepticism in the abstract -
 a second instrument.
 
+### A reproduction that needed a credential now says so, correcting a claim of mine
+
+Rendered the bug-bounty artifact from the live session - the first time that
+renderer has been checked against real replay data rather than fixtures. Per
+finding it states both halves honestly: re-verified against the target on
+all six, and not cross-verified on all six, since no model has read any of
+them.
+
+But one finding reproduced only AFTER a credential was supplied, and
+neither artifact said so. Its first replay was inconclusive - the recorded
+request carried a credential and the transcript keeps only its digest - and
+both the report and the badge row showed just "reproduced".
+
+THAT CORRECTS SOMETHING I WROTE. A commit message earlier today said both
+attempts stay in the history "so a reader can see that the first answer was
+could not ask rather than did not hold". True of findings.json; false of
+the report a reader actually gets. The distinction is material: for whoever
+triages this, "it still works, with a valid session" is a different report
+from "it still works", and the severity conversation differs.
+
+Both artifacts now carry it - a line naming the earlier attempt and its
+reason in the report, a neutral badge beside the success in the bug-bounty
+page - and only when the history holds one, because qualifying a clean
+result is its own form of misreporting. Three plants: removing the badge
+fails, printing it on every finding fails, and removing the report line
+fails.
+
+A failure to reproduce still outranks everything, unchanged: an earlier
+inconclusive does not soften a target that answered and did not produce the
+bytes.
+
+AND THE TEST READ `_badges` AS A LIST when it returns an assembled string,
+so joining it inserted a space between every character. Fifteenth shape
+assumption in this session, caught the same way as the other fourteen - by
+running it.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1173 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1176 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

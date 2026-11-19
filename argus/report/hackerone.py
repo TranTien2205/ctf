@@ -249,6 +249,17 @@ def _badges(finding: dict) -> str:
         else:
             out.append('<span class="b" style="background:#2b7a4b">'
                        'RE-VERIFIED: REPRODUCED</span>')
+            # AND WHETHER IT TOOK A CREDENTIAL TO GET THERE. Measured on a
+            # live session: a finding whose first replay was inconclusive
+            # because the recorded request carried a credential and the
+            # transcript keeps only its digest, and which reproduced once
+            # the credential was supplied. The badge row showed only the
+            # success, so a triager could not tell it from one that
+            # reproduces for anyone - and "it still works, with a valid
+            # session" is a different report from "it still works".
+            if any(r.get("outcome") == "inconclusive" for r in rh):
+                out.append('<span class="b" style="background:#5a5f6a">'
+                           'EARLIER ATTEMPT COULD NOT ASK</span>')
     for label, key in (("CVSS", "cvss"), ("CWE", "cwe"), ("OWASP", "owasp")):
         value = str(finding.get(key) or "")
         if value:

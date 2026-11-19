@@ -586,3 +586,73 @@ def test_a_missing_entry_does_not_render_a_blank_citation():
     out = html_mod._citation(_FakeSession({}), "r404")
     assert "r404" in out
     assert "nothing to show" in out or "no request" in out
+
+
+_TWO_ATTEMPTS = [
+    {"outcome": "inconclusive",
+     "reason": "the recorded request carried authorization and the "
+               "transcript stores the hash, not the value"},
+    {"outcome": "reproduced",
+     "reason": "the target returned the quoted bytes again (HTTP 200)"},
+]
+
+
+def test_a_reproduction_that_needed_a_credential_says_so():
+    """MEASURED ON A LIVE SESSION, and it corrects a claim of mine.
+
+    A finding's first replay was inconclusive - the recorded request carried
+    a credential and the transcript keeps only its digest - and it
+    reproduced once the credential was supplied. Both artifacts showed only
+    "reproduced", so a reader could not tell it apart from a finding that
+    reproduces unauthenticated.
+
+    That difference is material: for whoever triages this, "it still works,
+    with a valid session" is a different report from "it still works". The
+    history already held the distinction, and a commit message of mine
+    claimed a reader could see it - true of findings.json, false of the
+    report.
+    """
+    from argus.report import hackerone as h1
+    from argus.report import markdown as md
+
+    f = _finding(replays=list(_TWO_ATTEMPTS), replay=_TWO_ATTEMPTS[-1])
+
+    badges = h1._badges(f)   # an assembled HTML string, not a list
+    assert "RE-VERIFIED: REPRODUCED" in badges
+    assert "EARLIER ATTEMPT COULD NOT ASK" in badges, badges
+
+    block = "\n".join(md._proof_block(f))
+    assert "reproduced" in block
+    assert "An earlier re-verification could not reach the target" in block
+    assert "stores the hash" in block, "the reason must be carried over"
+
+
+def test_a_clean_reproduction_is_not_qualified():
+    """The direction that keeps the note from appearing on every finding:
+    with one attempt and no inconclusive in the history, nothing is added,
+    because qualifying a clean result is its own form of misreporting."""
+    from argus.report import hackerone as h1
+    from argus.report import markdown as md
+
+    one = {"outcome": "reproduced", "reason": "the bytes came back"}
+    f = _finding(replays=[one], replay=one)
+
+    badges = h1._badges(f)   # an assembled HTML string, not a list
+    assert "RE-VERIFIED: REPRODUCED" in badges
+    assert "COULD NOT ASK" not in badges
+
+    block = "\n".join(md._proof_block(f))
+    assert "An earlier re-verification" not in block
+
+
+def test_a_failure_still_outranks_everything():
+    """Unchanged: a target that answered and did not produce the bytes is a
+    one-way door, and an earlier inconclusive does not soften it."""
+    from argus.report import hackerone as h1
+
+    hist = [{"outcome": "inconclusive", "reason": "could not ask"},
+            {"outcome": "not_reproduced", "reason": "answered 200, no bytes"},
+            {"outcome": "reproduced", "reason": "came back later"}]
+    badges = h1._badges(_finding(replays=hist, replay=hist[-1]))
+    assert "DID NOT REPRODUCE" in badges
+    assert "RE-VERIFIED: REPRODUCED" not in badges

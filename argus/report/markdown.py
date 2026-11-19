@@ -404,6 +404,24 @@ def _proof_block(f: dict) -> list[str]:
         else:
             out += ["> **Re-verified against the target: reproduced** - "
                     f"{shown.get('reason', '')}", ""]
+            # AN EARLIER ATTEMPT THAT COULD NOT ASK IS PART OF THE ANSWER.
+            # Measured on a live session: a finding whose first replay was
+            # inconclusive - the recorded request carried a credential and
+            # the transcript keeps only its digest - and which reproduced
+            # once the credential was supplied. The report showed only
+            # "reproduced", so a reader could not tell it apart from one
+            # that reproduced unauthenticated.
+            #
+            # That difference is material. For whoever triages this, "it
+            # still works, with a valid session" is a different finding from
+            # "it still works for anyone", and the history already held the
+            # distinction - a commit message of mine claimed a reader could
+            # see it, which was true of findings.json and not of the report.
+            earlier = [r for r in rhist
+                       if r.get("outcome") == "inconclusive"]
+            if earlier:
+                out += ["> An earlier re-verification could not reach the "
+                        f"target: {earlier[0].get('reason', '')}", ""]
     if verdict.get("requirement"):
         out += [f"_Requirement for {verdict.get('vuln_class', '')}:_ "
                 f"{verdict['requirement']}", ""]
