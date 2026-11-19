@@ -1,61 +1,104 @@
-# web-source-map — references index
+# references/ — web-source-map corpus index
 
-Front-end bundle and source-map recon — mine the shipped JavaScript for
-endpoints, routes, secrets, flags, and (via `.map` `sourcesContent`)
-the original source. Catalogue class: no local verified solve yet.
+Front-end bundle + source-map recon. A bundle is a map to the surface —
+this corpus is the read of it. Every lead is a candidate until verified
+live; every dead lead is a recorded negative. **Catalogue class** — no
+local verified solve; `verified-chains.md` is the honest record.
 
-## The core
+## Mechanism
 
-| Module | Covers |
-|---|---|
-| `mechanism.md` / `mechanism-deep.md` | what a bundle and a `.map` are; the v3 spec, `sourcesContent`, scheme handling, traversal rejection |
-| `detection.md` / `detection-matrix.md` / `detection-index.md` / `detection-checklist.md` / `detection-surface.md` | bundle/map signatures, framework fingerprints, signal→state→action, the per-file surface |
-| `extraction.md` / `extraction-deep.md` | `bundle_miner` usage + the grep grammar for endpoints/params/secrets/flags |
-| `source-maps.md` | the `.map` recovery mechanism in detail |
-| `secrets.md` | secret candidates, the entropy+context filter, the live-verify rule |
-| `frameworks.md` | webpack/CRA/Next/Vite/Vue/Angular bundle and map shapes |
-| `workflow.md` / `first-hour.md` / `field-manual.md` | the ordered pass: inventory→map→mine→verify→route |
+`mechanism.md`, `mechanism-deep.md` — what a bundle and a `.map` are;
+the v3 spec, `sources`/`names`/`mappings`/`sourcesContent`, scheme
+handling, the traversal rejection, why the map is attacker-controlled.
+`bundle-lifecycle.md` — the build pipeline (transpile→bundle→minify→
+map→split→hash→deploy) and what each stage leaves. `mechanism-index.md`,
+`mechanism-index-deep.md`, `mechanism-map.md`, `mechanism-catalogue.md` —
+the sub-mechanism index and the per-mechanism detail.
 
-## The leads → classes
+## Detection and inventory
 
-| Module | Covers |
-|---|---|
-| `per-target.md` / `per-check.md` / `per-route.md` / `per-surface.md` / `per-vector.md` | what each mined artifact/route/surface/vector is worth and which class it feeds |
-| `attack-shapes.md` | how the map feeds the exploit |
-| `multi-step-chains.md` | map→IDOR, map→secret→auth, map→flag-gate, map→SSRF, map→source→sink |
-| `extended-corpus.md` | manifest/`__NEXT_DATA__`/env/comment/sink grep corpus |
-| `mechanism-index.md` | the recon sub-mechanisms |
+`detection.md`, `detection-deep.md`, `detection-matrix.md`,
+`detection-index.md`, `detection-index-deep.md`, `detection-checklist.md`,
+`detection-checklist-deep.md`, `detection-surface.md`,
+`detection-surface-deep.md`, `detection-map.md`, `detection-playbook.md`,
+`per-file.md`, `per-artifact.md`, `bundle-formats.md`, `frameworks.md`.
 
-## The discipline
+## The `.map` and source recovery
 
-| Module | Covers |
-|---|---|
-| `evidence-rules.md` | leads vs findings; the verbatim-excerpt and pre-flag gates |
-| `falsifiers.md` / `per-falsifier.md` | one kill per claim |
-| `negative-results.md` | recording the mined-but-empty bundle |
-| `edge-cases.md` | inline maps, obfuscation, WASM, no-map, dev bundles |
-| `common-mistakes.md` / `anti-patterns.md` | the ways the pass goes wrong / must not be done |
-| `troubleshoot.md` | when the map does not cooperate |
-| `evasion.md` | the bundle's resistance + adjacent disclosure |
-| `case-studies.md` / `real-world-cases.md` / `verified-chains.md` | published shapes + honest evidence status |
+`source-maps.md`, `source-maps-deep.md`, `map-playbook.md` — the
+`sourceMappingURL` comment, the sibling `.map`, the `SourceMap` header,
+`/static/maps/`, the inline `data:` map; `sourcesContent` reconstruction;
+the catch-all and the scheme/traversal reject.
 
-## The reference
+## Extraction and mining
 
-| Module | Covers |
-|---|---|
-| `theory.md` | the shipped-source principle, minification fiction, trust-boundary inversion |
-| `glossary.md` | the vocabulary |
-| `summary.md` / `onboarding.md` / `checklist.md` / `quick-reference.md` | orientation and the operator lists |
-| `preconditions.md` / `class-boundary.md` | when the route applies / what it feeds |
-| `common-questions.md` | the FAQ |
-| `bundle-mining.md` | the original thin reference |
+`extraction.md`, `extraction-deep.md`, `extraction-index.md`,
+`extraction-playbook.md`, `extended-greps.md`, `bundle-mining.md`,
+`bundle-mining-deep.md`, `endpoint-inventory.md`,
+`endpoint-inventory-deep.md`, `endpoint-playbook.md`,
+`per-endpoint-class.md`, `param-surface.md`, `per-param.md`,
+`secrets.md`, `secrets-deep.md`, `secrets-catalogue.md`,
+`secrets-playbook.md`, `per-secret-class.md`, `flag-mining.md`,
+`flag-playbook.md`, `route-guard.md`, `route-table.md`, `per-route.md`,
+`per-route-deep.md`, `config-mining.md`, `per-prefix.md`,
+`structure-mining.md`, `comment-mining.md`, `sink-mining.md`,
+`per-sink.md`, `graphql-surface.md`, `service-worker-mining.md`,
+`adjacent-disclosure.md`, `authenticated-bundle.md`, `dev-build.md`,
+`deobfuscation.md`, `obfuscation-formats.md`.
+
+## Framework internals
+
+`webpack-internals.md`, `nextjs-internals.md`, `vite-internals.md`,
+`vue-internals.md`, `angular-internals.md` — the per-build artifact
+names, the manifest shapes, the lazy-chunk layout, the env-inline style.
+
+## Workflow
+
+`workflow.md`, `workflow-deep.md`, `workflow-checklist.md`,
+`workflow-playbook.md`, `workflow-map.md`, `playbook.md`,
+`first-hour.md`, `first-hour-deep.md`, `field-manual.md`,
+`field-manual-deep.md`, `field-manual-map.md`, `checklist.md`,
+`checklist-deep.md`, `field-checklist.md`, `quick-reference.md`,
+`quick-reference-deep.md`, `quick-map.md`, `preconditions.md`,
+`preconditions-deep.md`, `onboarding.md`, `onboarding-deep.md`,
+`probe-catalogue.md`, `payload-patterns.md`, `decision-table.md`,
+`operator-notes.md`, `closing-notes.md`, `worked-examples.md`,
+`lead-grammar.md`, `recon-order.md`, `extended-corpus.md`, `index.md`.
+
+## Lead → class routing
+
+`lead-triage.md`, `per-target.md`, `per-target-deep.md`, `per-check.md`,
+`per-check-deep.md`, `per-surface.md`, `per-surface-deep.md`,
+`per-surface-map.md`, `per-vector.md`, `per-vector-deep.md`,
+`per-boundary.md`, `per-mechanism-deep.md`, `attack-shapes.md`,
+`attack-shapes-deep.md`, `multi-step-chains.md`,
+`multi-step-chains-deep.md`, `scenarios.md`, `class-boundary.md`,
+`class-boundary-deep.md`, `field-notes-deep.md`.
+
+## Discipline
+
+`evidence-rules.md`, `evidence-deep.md`, `evidence-map.md`,
+`evidence-playbook.md`, `verification-protocol.md`, `falsifiers.md`,
+`falsifiers-deep.md`, `per-falsifier.md`, `per-falsifier-deep.md`,
+`falsifier-map.md`, `negative-results.md`, `negative-results-deep.md`,
+`negative-map.md`, `edge-cases.md`, `edge-cases-deep.md`,
+`common-mistakes.md`, `common-mistakes-deep.md`, `anti-patterns.md`,
+`troubleshoot.md`, `troubleshoot-deep.md`, `troubleshooting-map.md`,
+`evasion.md`, `evasion-deep.md`, `evasion-deep-2.md`,
+`case-studies.md`, `case-studies-deep.md`, `real-world-cases.md`,
+`real-world-deep.md`, `verified-chains.md`.
+
+## Reference
+
+`theory.md`, `theory-deep.md`, `glossary.md`, `glossary-deep.md`,
+`summary.md`, `summary-deep.md`, `common-questions.md`,
+`common-questions-deep.md`, `mechanism-index.md`,
+`mechanism-index-deep.md`, `mechanism-map.md`, `mechanism-catalogue.md`.
 
 ## The rules
 
-1. the map is **recon, not the exploit** — it names targets, the routed
-   class closes them
-2. **verify every lead live** — a bundle string is a claim, not a fact
-3. a **secret is a candidate** — it leaks only if it authenticates
-4. the source is **attacker-controlled** — read it, never execute it; a
-   `sources` traversal is rejected, not recovered
-5. **catalogue** — no local verified solve; standard published knowledge
+1. the map is **recon**, not the exploit
+2. **verify every lead live**
+3. a **secret is a candidate** until it authenticates
+4. **never execute** the recovered source
+5. **catalogue** — no local verified solve

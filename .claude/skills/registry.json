@@ -2125,9 +2125,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 1127,
-      "depth_files": 48,
-      "depth_tokens": 25769,
+      "skill_tokens": 1925,
+      "depth_files": 158,
+      "depth_tokens": 96423,
       "use_when": [
         "the front-end is a bundled SPA and the only available source",
         "a sourceMappingURL or /_next/static/ or /static/js/ bundle is present"

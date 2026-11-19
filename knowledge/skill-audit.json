@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T13:41:04",
+  "generated_at": "2026-11-19T14:01:41",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,7 +8,7 @@
   "summary": {
     "skills": 95,
     "review": 0,
-    "warn": 2,
+    "warn": 1,
     "local_evidence_present": 22,
     "local_evidence_stub": 37,
     "local_evidence_missing": 0,
@@ -17,8 +17,7 @@
   },
   "review": [],
   "warn": [
-    "crypto-triage",
-    "web-source-map"
+    "crypto-triage"
   ],
   "skills": [
     {
@@ -1081,14 +1080,11 @@
       "id": "web-source-map",
       "layer": "depth",
       "path": "skills/web-source-map/SKILL.md",
-      "flags": [
-        "corpus of 25815 tokens with no stop condition",
-        "corpus of 25815 tokens with no budget"
-      ],
+      "flags": [],
       "score": null,
-      "verdict": "warn",
+      "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 87
+      "lines": 104
     },
     {
       "id": "web-sqli",
