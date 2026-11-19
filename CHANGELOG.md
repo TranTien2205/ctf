@@ -7833,6 +7833,36 @@ The invariant has no occupant today, which is the reason to assert it now
 rather than later - the next class added with no checks is the one it is
 for, and nobody sees a vacuous truth when it breaks.
 
+### The de facto cap is disclosed, and the eighth hypothesis of mine refuted
+
+Swept the last proof-matrix dimension reachable from here: classes that
+cannot reach `proven`. No class carries a ceiling - which confirms the
+earlier sweep that emptied that list - but one needs an external tool, and
+that is a cap the ceiling field cannot see. On a machine without it, the
+second required check for that class can never pass, so every finding of
+that class stays a candidate.
+
+The hypothesis was that a reader could not tell two very different
+situations apart: the browser ran and nothing executed, which is evidence
+AGAINST the finding, versus there was no browser, which is a missing
+capability. Those are the same distinction as `not_reproduced` against
+`inconclusive`, and getting them confused is how a real finding looks like
+a refuted one.
+
+Measured on the live session, the report already says all of it: that
+execution is not shown because the engagement had no browser and the class
+therefore stays a candidate; that reflection is visible in the bytes while
+execution is not; that the tool is not on PATH; that it is an external tool
+like the scanners; and how to install it or point at a local copy.
+
+So the cap is fully disclosed, in the one place where a missing capability
+could otherwise read as a negative result. Eighth refutation in this
+session, and the fourth of a hypothesis of mine rather than an audit's.
+
+Worth recording as a negative result for the same reason as the orphan
+sweep: a dimension that comes back clean is information, and leaving it
+unwritten makes the next sweep pay for it again.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
