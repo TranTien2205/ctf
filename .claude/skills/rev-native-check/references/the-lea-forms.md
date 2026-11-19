@@ -1,0 +1,6 @@
+# lea forms — the address arithmetic
+
+
+- lea rax, [rip+disp] — a static address.
+- lea rax, [rbp-0x40] — a stack slot.
+- lea rax, [rax+rbx*4] — an indexed slot — the array indexing.

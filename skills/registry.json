@@ -1509,9 +1509,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 908,
-      "depth_files": 3,
-      "depth_tokens": 992,
+      "skill_tokens": 3813,
+      "depth_files": 1818,
+      "depth_tokens": 83702,
       "use_when": [
         "a probe or source read produced this class's signal: locate the input read, follow the value to the comparison, and quote the disassembly that carries it: a described check is not a measured one. r2 -A then afl then pdf @ main; gdb is absent, so r2 -d is the debugger"
       ],
