@@ -1955,9 +1955,9 @@
       "verified_by": [
         "htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
       ],
-      "skill_tokens": 1022,
-      "depth_files": 3,
-      "depth_tokens": 2205,
+      "skill_tokens": 2792,
+      "depth_files": 90,
+      "depth_tokens": 102524,
       "use_when": [
         "a probe or source read produced this class's signal: walk the whole flow once and record every redirect, parameter and cookie set, before changing any of them",
         "a chain card already proves this class here: htb-ssos-oauth-registration-race-cookie-swap-json-csrf"
