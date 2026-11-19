@@ -1841,9 +1841,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 866,
-      "depth_files": 3,
-      "depth_tokens": 1013,
+      "skill_tokens": 1541,
+      "depth_files": 427,
+      "depth_tokens": 97568,
       "use_when": [
         "the flag or the next step may sit in an exposed file or debug endpoint",
         "a 403, verbose error, debug header, or a shipped .git or archive is observed"

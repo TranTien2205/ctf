@@ -81,7 +81,22 @@ path is a falsifier; check the content, not the status.
 Shares signals with: `../file-read-primitives/`, `../web-auth-session/`,
 `../web-source-map/`. Depth, one named file at a time:
 
-| Exposed-artifact sweep | `references/exposed-artifacts.md` |
+| Question | File |
+|---|---|
+| The ordered pass | `references/workflow.md` `references/recon-order.md` `references/bounded-sweep.md` |
+| The catch-all baseline — before anything | `references/catchall-falsifier.md` `references/response-anatomy.md` |
+| Which channel is open | `references/detection-matrix.md` `references/per-signal.md` `references/per-path.md` |
+| .git / VCS | `references/git-exposure.md` `references/version-control-metadata.md` `references/tools-git-dumper.md` |
+| Config / secrets / keys | `references/env-config-leaks.md` `references/env-file-variants.md` `references/pem-key-files.md` `references/secrets-in-js.md` |
+| Archives / dumps / manifests | `references/backup-archives.md` `references/sql-dump-read.md` `references/manifest-files.md` `references/static-config-files.md` `references/ide-and-ci-files.md` |
+| Source / leftovers / maps | `references/source-disclosure.md` `references/static-leftovers.md` `references/swp-and-temp.md` `references/ds-store-parse.md` `references/source-maps.md` `references/sourcemap-sibling.md` |
+| Debug / errors / ops surfaces | `references/debug-endpoints.md` `references/error-pages.md` `references/framework-debug.md` `references/spring-actuator-deep.md` `references/django-debug.md` `references/laravel-debug.md` `references/werkzeug-debug.md` `references/phpinfo-read.md` `references/status-pages.md` `references/apache-nginx-status.md` `references/prometheus-metrics.md` `references/health-endpoints.md` `references/log-exposure.md` |
+| Route discovery | `references/robots-sitemap.md` `references/api-docs-exposure.md` `references/graphql-introspection.md` `references/oauth-wellknown.md` `references/redirect-leaks.md` `references/comment-leaks.md` `references/internal-vhosts.md` `references/header-disclosure.md` `references/header-leaks-deep.md` `references/well-known-and-meta.md` `references/cloud-metadata.md` `references/wayback-and-cache.md` `references/graphql-and-ws-endpoints.md` |
+| A 403 on something real | `references/alternate-verbs.md` `references/host-header-probes.md` `references/error-timing.md` |
+| Chain the find | `references/chaining.md` `references/multi-step-chains.md` |
+| Tools | `references/tools-git-dumper.md` `references/tools-bundle-miner.md` `references/tools-http-probe.md` `references/tools-read-loop.md` `references/tools-id-sweep.md` |
+| Discipline | `references/evidence.md` `references/falsifiers.md` `references/preconditions.md` `references/negative-results.md` `references/anti-patterns.md` `references/boundary-cases.md` `references/troubleshoot.md` `references/operator-notes.md` `references/glossary.md` `references/field-manual.md` `references/worked-examples.md` `references/case-studies.md` `references/closing-index.md` |
+
 `../ctf-web/server-side-advanced.md`.
 
 ## Field notes

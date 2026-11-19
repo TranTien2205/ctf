@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-19T20:47:48",
+  "generated_at": "2026-11-20T03:51:19",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,7 +8,7 @@
   "summary": {
     "skills": 95,
     "review": 0,
-    "warn": 2,
+    "warn": 3,
     "local_evidence_present": 22,
     "local_evidence_stub": 37,
     "local_evidence_missing": 0,
@@ -18,6 +18,7 @@
   "review": [],
   "warn": [
     "crypto-triage",
+    "web-info-disclosure",
     "web-websocket"
   ],
   "skills": [
@@ -183,10 +184,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 102,
+      "lines": 147,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-prng",
-      "overlap": 0.168,
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 0.135,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -199,10 +200,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 89,
+      "lines": 104,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.195,
+      "nearest_neighbour": "rev-native-check",
+      "overlap": 0.153,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -215,10 +216,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 91,
+      "lines": 109,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.192,
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 0.136,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -231,10 +232,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 99,
+      "lines": 117,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.177,
+      "nearest_neighbour": "pwn-heap-corruption",
+      "overlap": 0.146,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -247,10 +248,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 86,
+      "lines": 106,
       "actionability": "operational",
       "nearest_neighbour": "crypto-ecc-dlog",
-      "overlap": 0.195,
+      "overlap": 0.132,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -517,8 +518,8 @@
       "local_evidence": "stub",
       "lines": 112,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.152,
+      "nearest_neighbour": "misc-constraint-puzzle",
+      "overlap": 0.15,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -559,8 +560,8 @@
       "local_evidence": "stub",
       "lines": 89,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
-      "overlap": 0.191,
+      "nearest_neighbour": "rev-native-check",
+      "overlap": 0.186,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -591,7 +592,7 @@
       "local_evidence": "stub",
       "lines": 95,
       "actionability": "operational",
-      "nearest_neighbour": "crypto-symmetric-oracle",
+      "nearest_neighbour": "misc-constraint-puzzle",
       "overlap": 0.176,
       "trust": "catalogue-or-unreviewed"
     },
@@ -941,11 +942,14 @@
       "id": "web-info-disclosure",
       "layer": "depth",
       "path": "skills/web-info-disclosure/SKILL.md",
-      "flags": [],
+      "flags": [
+        "corpus of 97568 tokens with no stop condition",
+        "corpus of 97568 tokens with no budget"
+      ],
       "score": null,
-      "verdict": "reference",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 91
+      "lines": 106
     },
     {
       "id": "web-logic-flaw",
@@ -1015,10 +1019,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 96,
+      "lines": 124,
       "actionability": "operational",
-      "nearest_neighbour": "rev-native-check",
-      "overlap": 0.175,
+      "nearest_neighbour": "web-web3",
+      "overlap": 0.123,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -1141,8 +1145,8 @@
       "local_evidence": "stub",
       "lines": 171,
       "actionability": "operational",
-      "nearest_neighbour": "rev-native-check",
-      "overlap": 0.106,
+      "nearest_neighbour": "web-open-redirect",
+      "overlap": 0.116,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -1155,10 +1159,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 93,
+      "lines": 101,
       "actionability": "operational",
       "nearest_neighbour": "rev-native-check",
-      "overlap": 0.171,
+      "overlap": 0.131,
       "trust": "catalogue-or-unreviewed"
     },
     {
