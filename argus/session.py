@@ -541,7 +541,14 @@ _CWE = {
     # finding carried no CWE and no OWASP row in the report.
     "rce": "CWE-78", "sqli": "CWE-89", "nosqli": "CWE-943", "ssti": "CWE-1336",
     "time": "CWE-78", "cmdinjection": "CWE-78", "lfi": "CWE-22",
-    "rfi": "CWE-98", "xss": "CWE-79", "reflection": "CWE-79",
+    # "rfi" was here as CWE-98 and could never be read: `proof.canonical`
+    # maps rfi to lfi, so a finding recorded as remote file inclusion is
+    # reported as lfi's CWE-22 (path traversal). The entry stated a mapping
+    # that does not happen, which is worse than no entry - a reader of this
+    # table would conclude an RFI finding carries CWE-98. The taxonomy
+    # decision (whether rfi should be its own class) belongs to the matrix
+    # and is not made here; what is removed is the false statement about it.
+     "xss": "CWE-79", "reflection": "CWE-79",
     "idor": "CWE-639", "enum": "CWE-204", "enumeration": "CWE-204",
     "lockout": "CWE-307", "massassign": "CWE-915",
     "massassignment": "CWE-915", "ssrf": "CWE-918", "xxe": "CWE-611",

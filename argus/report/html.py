@@ -104,8 +104,27 @@ def _judge_html(f: dict) -> str:
     Cross-verification exists so a second model's disagreement reaches a
     human. In the one artifact handed to that human it reached nobody.
     """
-    j = f.get("judge") if isinstance(f.get("judge"), dict) else {}
-    disputed = bool(f.get("disputed"))
+    # THE HISTORY, NOT THE LATEST. Reading `judge` alone named the WRONG
+    # MODEL as the disputer: `apply_verdict` keeps every verdict in
+    # `judges` and overwrites `judge` with the newest, while `disputed` is
+    # a one-way flag. So judge #1 disputing and judge #2 agreeing left
+    # `disputed` true and `judge` pointing at the one that agreed, and this
+    # renderer printed "DISPUTED by cross-verification (other-2)" - sending
+    # a reader to ask other-2 about a dispute it never raised.
+    #
+    # Measured against markdown on the same finding: markdown said
+    # "DISPUTED (other-1) - an error is not a row", html said other-2 and
+    # showed no reason. `apply_verdict`'s own comment records this hazard
+    # being found and fixed for markdown; this renderer was missed, which
+    # is the same shape as a redaction that held in one branch and not the
+    # other.
+    history = [v for v in (f.get("judges") or []) if isinstance(v, dict)]
+    if not history and isinstance(f.get("judge"), dict):
+        history = [f["judge"]]
+    _disputes = [v for v in history
+                 if not v.get("agrees") and not v.get("error")]
+    j = _disputes[0] if _disputes else (history[-1] if history else {})
+    disputed = bool(f.get("disputed")) or bool(_disputes)
     claimed = f.get("severity_claimed")
     klass = f.get("class_disputed")
     # BOTH ABSENCES, ALWAYS. This function is no longer "the judge box" -

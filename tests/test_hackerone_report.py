@@ -397,3 +397,90 @@ def test_a_failure_outranks_a_later_success_on_every_artifact():
     assert sarif_mod._replay_state(both) == "not_reproduced"
     assert "DID NOT REPRODUCE" in h1._badges(both)
     assert "RE-VERIFIED: REPRODUCED" not in h1._badges(both)
+
+
+# -------- a dispute, attributed to the model that actually raised it
+
+_DISPUTE_THEN_AGREE = [
+    {"judge_model": "other-1", "agrees": False,
+     "reason": "an error is not a row"},
+    {"judge_model": "other-2", "agrees": True, "reason": "looks fine"},
+]
+
+
+def test_a_dispute_names_the_model_that_raised_it_on_every_renderer():
+    """MEASURED, and a fixed defect surviving in a sibling renderer.
+
+    `apply_verdict` keeps every verdict in `judges` and overwrites `judge`
+    with the newest, while `disputed` is a one-way flag. So judge #1
+    disputing and judge #2 agreeing leaves `disputed` true and `judge`
+    pointing at the one that AGREED.
+
+    `report.html` read `judge` alone and printed "DISPUTED by
+    cross-verification (other-2)" - sending a reader to ask other-2 about a
+    dispute it never raised, with no reason shown. markdown, on the same
+    finding, said "DISPUTED (other-1) - an error is not a row".
+
+    `apply_verdict`'s own comment records this hazard being found and fixed
+    once: "A second judge that agrees used to replace the first one's
+    block, so a report read 'Cross-verification: agreed' over a finding
+    whose `disputed` flag was still set - telling the reader the opposite
+    of the record." It was fixed for markdown and missed here, which is the
+    same shape as a redaction holding in one branch and not the other.
+    """
+    from argus.report import html as html_mod
+    from argus.report import markdown as md
+
+    f = _finding(disputed=True, judges=_DISPUTE_THEN_AGREE,
+                 judge=_DISPUTE_THEN_AGREE[-1])
+
+    # ASSERTED ON THE DISPUTE LINE, not on the whole document - and the
+    # first version of this got it wrong in the direction the whole session
+    # has been about. It required `other-2` to be absent, and markdown
+    # DELIBERATELY lists both: "(2 judges read this evidence: other-1
+    # disputed, other-2 agreed)", precisely so a later agreement cannot
+    # present itself as the whole story. Mentioning the agreeing model is
+    # correct; attributing the dispute to it is not.
+    for name, rendered in (("html", html_mod._judge_html(f)),
+                           ("markdown", "\n".join(md._proof_block(f)))):
+        # The ATTRIBUTION line, not every line containing the word.
+        # markdown prints a roll-call too - "(2 judges read this evidence:
+        # other-1 disputed, other-2 agreed)" - which legitimately names
+        # both, so a filter on "disput" catches it and the assertion below
+        # then reads the roll-call as the attribution. Third filter
+        # attempt; the first two were too broad in the same way.
+        lines = [ln for ln in rendered.replace("<br>", "\n").splitlines()
+                 if "DISPUTED by cross-verification" in ln]
+        assert lines, f"{name} does not report the dispute at all"
+        line = " ".join(lines)
+        assert "other-1" in line, (
+            f"{name} does not name the model that raised the dispute: "
+            f"{line[:200]}")
+        assert "other-2" not in line, (
+            f"{name} attributes the dispute to the model that agreed: "
+            f"{line[:200]}")
+        assert "an error is not a row" in rendered, \
+            f"{name} shows no reason, or the wrong one"
+
+
+def test_a_lone_agreement_is_still_reported_as_agreement():
+    """The direction that keeps the fix from reading every finding as
+    disputed: with no dispute in the history, the latest verdict stands."""
+    from argus.report import html as html_mod
+
+    agreed = html_mod._judge_html(_finding(
+        judge={"judge_model": "other-9", "agrees": True, "reason": "ok"}))
+    assert "other-9" in agreed
+    assert "DISPUTED" not in agreed
+    assert "Cross-verification: not performed" not in agreed
+
+
+def test_a_dispute_with_no_disputed_flag_is_still_a_dispute():
+    """`disputed` is written by `apply_verdict`, so a findings.json edited
+    by hand or produced by an older version can carry the verdict without
+    the flag. The history is the record; the flag is a convenience."""
+    from argus.report import html as html_mod
+
+    rendered = html_mod._judge_html(_finding(judges=_DISPUTE_THEN_AGREE))
+    assert "DISPUTED" in rendered
+    assert "other-1" in rendered

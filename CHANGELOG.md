@@ -7126,12 +7126,81 @@ on; a session edited after sealing is a different problem from a broken
 chain. Re-planting the reverted condition now fails, where it passed
 before.
 
+### A CWE the finding will not carry
+
+`_CWE` is keyed on the category name a model writes, and `add_finding`
+canonicalises before looking it up - so a name that is an ALIAS of another
+class inherits that class's identifier and its own entry is never read.
+
+Measured: `rfi` mapped to CWE-98, PHP remote file inclusion, while
+`proof.canonical("rfi")` is `lfi`, whose identifier is CWE-22, path
+traversal. An RFI finding carried CWE-22 and the table said CWE-98.
+
+Removed rather than corrected, because the entry was not a wrong value but
+a statement about behaviour that does not happen - and a reader of the
+table concludes a finding carries what it says. The taxonomy question,
+whether `rfi` should be its own class with its own requirement, belongs to
+whoever owns the matrix and is not answered here. What is removed is the
+false claim about it.
+
+Asserted as the relation rather than the case: no `_CWE` entry may state an
+identifier that disagrees with the one its canonical class supplies. One
+occupant today, and the next alias added with its own CWE will fail it.
+
+WHAT IS DELIBERATELY NOT CHANGED, and the distinction matters.
+`session-fixation`, `mfa-bypass` and `auth-bypass` are aliases of `jwt` and
+therefore carry CWE-347, improper verification of a cryptographic
+signature. A session-fixation finding is conventionally CWE-384 and an MFA
+bypass CWE-287 or CWE-304. But the matrix treats six names as that one
+class, with one requirement, on purpose - `jwt` has six aliases, `lfi` has
+seven, `rce` has seven - so this is a question about the matrix's taxonomy
+and not a mapping bug. Changing which weaknesses count as one class
+changes what the gate proves, and that is not a decision to make from a
+CWE table. Reported rather than altered.
+
+### A dispute attributed to the model that agreed
+
+`apply_verdict` keeps every verdict in `judges`, overwrites `judge` with
+the newest, and sets `disputed` as a one-way flag. So judge #1 disputing
+and judge #2 agreeing leaves `disputed` true and `judge` pointing at the
+one that AGREED.
+
+`report.html` read `judge` alone. Measured on that finding, against
+markdown on the same one:
+
+    html       DISPUTED by cross-verification (other-2)   no reason shown
+    markdown   DISPUTED by cross-verification (other-1) - an error is not a row
+
+So a reader of the html report would go to other-2 to ask about a dispute
+it never raised. `apply_verdict`'s own comment records this hazard being
+found and fixed - "a report read 'Cross-verification: agreed' over a
+finding whose `disputed` flag was still set, telling the reader the
+opposite of the record" - and it was fixed for markdown and missed here.
+The third fixed defect today surviving in a sibling renderer.
+
+html now reads the history and prefers the first dispute, and treats a
+dispute in the history as a dispute even when the flag is absent, because
+the history is the record and the flag is a convenience.
+
+AND THE TEST OVER-ASSERTED THREE TIMES, each one broader than the claim.
+First it required the agreeing model's name to be absent from the whole
+document - but markdown deliberately prints a roll-call, "(2 judges read
+this evidence: other-1 disputed, other-2 agreed)", precisely so a later
+agreement cannot present itself as the whole story. Mentioning the
+agreeing model is correct; attributing the dispute to it is not. Then the
+filter caught every line containing "disput", which includes that
+roll-call. Only the third filter names the attribution line itself.
+
+The same error as the checks this session keeps fixing, in a test about
+them: asserting the presence of a string rather than the form of the
+claim.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1136 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1141 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

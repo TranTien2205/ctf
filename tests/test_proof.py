@@ -5628,3 +5628,64 @@ def test_truncation_changes_what_the_matrix_reads(tmp_path):
         "no class in the matrix reads the excerpt in a way the cap changes, "
         "so truncating after grading would have been inert and this test is "
         "the wrong guard for the reordering")
+
+
+def test_no_cwe_entry_promises_an_identifier_a_finding_will_not_carry():
+    """FOUND BY AUDIT, one occupant, and the entry was worse than nothing.
+
+    `_CWE` is keyed on the category name a model writes. But `add_finding`
+    canonicalises first, so a name that is an ALIAS of another class
+    inherits that class's CWE and its own entry is never read.
+
+    Measured: `rfi` mapped to CWE-98 (PHP remote file inclusion) while
+    `proof.canonical("rfi")` is `lfi`, whose CWE is CWE-22 (path
+    traversal). So an RFI finding carried CWE-22 and the table said CWE-98.
+    A mapping nobody can read is not harmless - a reader of the table
+    concludes the finding carries what it says.
+
+    This asserts the relation rather than the one case: for every key, if
+    it canonicalises elsewhere, the entry must not disagree with what the
+    finding will actually get.
+
+    NOT asserted here, because it is a taxonomy decision and not a defect:
+    that `session-fixation`, `mfa-bypass` and `auth-bypass` are aliases of
+    `jwt` and therefore carry CWE-347. The matrix deliberately treats six
+    names as that one class. Whether a session-fixation finding should
+    carry CWE-384 instead is a question about the matrix's classes, which
+    belongs to whoever owns the taxonomy.
+    """
+    from argus.session import _CWE
+
+    wrong = []
+    for name, cwe in sorted(_CWE.items()):
+        canon = proof.canonical(name)
+        if canon == name:
+            continue
+        inherited = _CWE.get(canon)
+        if inherited and inherited != cwe:
+            wrong.append(f"{name}={cwe} but canonicalises to {canon}"
+                         f"={inherited}")
+    assert not wrong, (
+        "these entries state a CWE the finding will not carry: "
+        + "; ".join(wrong))
+
+
+def test_the_cwe_relation_check_sees_a_planted_dead_entry():
+    """The direction that matters: the check must fail on exactly the shape
+    it was written for, which is an alias entry disagreeing with its
+    canonical class."""
+    from argus.session import _CWE
+
+    planted = dict(_CWE)
+    alias = next((n for n in _CWE if proof.canonical(n) != n), None)
+    assert alias, "premise: some key canonicalises elsewhere"
+    canon = proof.canonical(alias)
+    planted[alias] = "CWE-0000"          # cannot match the canonical's
+
+    wrong = [n for n, c in planted.items()
+             if proof.canonical(n) != n
+             and planted.get(proof.canonical(n))
+             and planted[proof.canonical(n)] != c]
+    assert alias in wrong, (
+        f"a planted disagreement on {alias} (canonical {canon}) is not "
+        "detected, so the relation above is not being checked")
