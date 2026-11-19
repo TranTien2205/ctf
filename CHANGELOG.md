@@ -7683,6 +7683,41 @@ reproduced findings print nothing". They print the success wording, which is
 a different string. A pattern narrower than the thing it looks for, for the
 second time today.
 
+### The documented remedy, exercised: a supplied credential closes the gap
+
+The live end-to-end run left one finding `inconclusive` - its recorded
+request carried a credential header and the transcript keeps only the
+digest, so the replay could not ask. The reason text names the remedy: pass
+the credential at replay time. That path had never been run against a live
+target either.
+
+Minted the same credential the engagement forged, confirmed the target
+accepts it, and replayed that one finding with it supplied:
+
+    without a credential   inconclusive   the question did not reach the target
+    with one supplied      reproduced     the target returned the quoted bytes again
+
+So the coverage table reads 6/6 re-verified, and the loop the module's
+docstring describes is closed by measurement rather than by assertion.
+
+THREE PROPERTIES HELD, each of which had only unit coverage before:
+
+The history keeps BOTH attempts - inconclusive then reproduced - so a
+reader can see that the first answer was "could not ask" and not "did not
+hold". `replay_failed` stays false, because an inconclusive is not a
+failure to clear.
+
+`supplied_headers` reads what the client will actually put on the wire.
+This is the shape the first version of that function got wrong: it read a
+public attribute that does not exist, and therefore reported every supplied
+credential as missing. A test holds the private name for exactly this
+reason, and this run is the first time the correct reading has been
+exercised against a target that checks the credential.
+
+`argus verify` is clean after two replays of the same session - 76 chained
+entries anchored to summary.json, 6 findings re-validated - so the
+re-render-and-re-seal holds across repeated runs, not just the first.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
