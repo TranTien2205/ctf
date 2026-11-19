@@ -7576,12 +7576,44 @@ Reproduced without Windows, by planting the transient directly - two raises
 then a value - which is the only honest way to test it from here. The fix
 is verified on POSIX and its platform-specific half is verified by CI.
 
+### A universal coverage claim, four lines from the count that refutes it
+
+Raised against the console's hero line by the session that owns that file,
+and flagged rather than edited because it is product copy. The same shape
+turned out to be in the REPORT, which is this side's to fix.
+
+Planted a row with no `grade` key in the sample session and re-rendered.
+The report printed, four lines apart:
+
+    | **ungraded** | 1 | recorded before grading existed |
+    Every finding is graded against the proof requirement for its class
+
+`ungraded` is a real bucket in `_GRADE_MEANING` - "recorded before grading
+existed" - so a resumed session, or a findings.json written by an older
+version, holds rows the matrix never graded. The sentence now carries the
+count: "5 of 6 findings are graded ... and 1 carries no grade at all -
+counted as `ungraded` above, never as a verdict about its evidence", and it
+stays universal when every row is graded, because replacing a true claim
+with a count makes it read as a qualified one.
+
+A NUMBER CANNOT QUIETLY BECOME FALSE, which is the property this whole
+system is built to have. That is the argument for stating one, and it is
+also what makes the two NEIGHBOURING claims worth leaving alone. Both are
+about CITATION, and both are enforced: `add_finding` refuses an excerpt
+that is not a verbatim substring of a cited response, and `findings_bad`
+re-validates every one on re-read. Grading is the one that can be absent,
+so it is the only sentence that needed changing. Planted in that direction
+too: weakening a citation claim to "some" fails.
+
+The console's line remains the user's call, with the same recommendation -
+state the number.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1165 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1169 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

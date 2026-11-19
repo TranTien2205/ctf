@@ -436,6 +436,32 @@ def _target_of(session, meta: dict | None) -> str:
     return f"{derived} (from the directory name; meta.json names no target)"
 
 
+def _grade_line(findings: list | None) -> str:
+    """How many findings are graded, stated rather than assumed.
+
+    `ungraded` is a real bucket in `_GRADE_MEANING` - "recorded before
+    grading existed" - so a session resumed from an older run, or a
+    findings.json written by a previous version, holds rows the matrix never
+    graded. Saying "every finding is graded" over such a row tells the
+    reader the opposite of the table four lines below it.
+    """
+    rows = [f for f in (findings or []) if isinstance(f, dict)]
+    graded = [f for f in rows if str(f.get("grade") or "").strip()]
+    missing = len(rows) - len(graded)
+    if not rows or not missing:
+        return ("Every finding is graded against the proof requirement for "
+                "its class")
+    carries = "carries" if missing == 1 else "carry"
+    return (f"{len(graded)} of {len(rows)} findings are graded against the "
+            f"proof requirement for their class, and {missing} {carries} no "
+            "grade at all - counted as `ungraded` above, never as a verdict "
+            "about its evidence" if missing == 1 else
+            f"{len(graded)} of {len(rows)} findings are graded against the "
+            f"proof requirement for their class, and {missing} {carries} no "
+            "grade at all - counted as `ungraded` above, never as a verdict "
+            "about their evidence")
+
+
 def render_report(session: Session, cfg: Config, summary: str = "",
                   extra: dict | None = None) -> Path:
     extra = dict(extra or {})
@@ -848,7 +874,23 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "The complete request/response transcript is in `transcript.jsonl`,",
         f"({session._seq} entries). Working notes are in `notes.md`.",
         "",
-        "Every finding is graded against the proof requirement for its class",
+        # THE COUNT, NOT THE UNIVERSAL. Measured by planting a row with no
+        # `grade` key in the sample session and re-rendering: the report
+        # printed, four lines apart,
+        #
+        #   | **ungraded** | 1 | recorded before grading existed |
+        #   Every finding is graded against the proof requirement for its class
+        #
+        # A deliverable stating a universal claim and, in the same document,
+        # a count that contradicts it. The two neighbouring claims about
+        # CITATION are deliberately left universal, because those ARE
+        # enforced - `add_finding` refuses an excerpt that is not a verbatim
+        # substring of a cited response, and `findings_bad` re-validates
+        # every one on re-read. Grading is the one that can be absent.
+        #
+        # A number cannot quietly become false, which is the property this
+        # whole system is built to have.
+        _grade_line(findings),
         "(`argus proof <class>`): **proven** means the class-specific artifact",
         "and its control are both on record; **candidate** means a real signal",
         "with a named check still missing. A candidate is reported because it",

@@ -938,3 +938,70 @@ def test_two_sessions_against_one_target_render_one_target(tmp_path):
         "two runs against one target rendered as "
         f"{sorted(rendered)} - the report invents a distinction the "
         "evidence does not contain")
+
+
+def test_the_grading_claim_states_the_count_when_a_row_is_ungraded():
+    """MEASURED BY PLANTING, in the deliverable's own prose.
+
+    The report printed, four lines apart:
+
+        | **ungraded** | 1 | recorded before grading existed |
+        Every finding is graded against the proof requirement for its class
+
+    A universal claim and, in the same document, a count contradicting it.
+    `ungraded` is a real bucket in `_GRADE_MEANING` - "recorded before
+    grading existed" - so a resumed session or a findings.json from an older
+    version holds rows the matrix never graded.
+
+    A number cannot quietly become false, which is the property this whole
+    system is built to have, so the sentence now carries one.
+    """
+    from argus.report.markdown import _grade_line
+
+    rows = [{"grade": "proven"}, {"grade": "candidate"}, {"id": "F03"}]
+    line = _grade_line(rows)
+    assert "2 of 3" in line, line
+    assert "1 carries no grade" in line, line
+    assert "Every finding is graded" not in line
+    assert "never as a verdict" in line, \
+        "an ungraded row must not read as a claim about its evidence"
+
+
+def test_the_grading_claim_stays_universal_when_it_is_true():
+    """The direction that keeps the fix from hedging a true statement.
+
+    With every row graded the universal sentence is correct, and replacing
+    it with a count would make a true claim read as a qualified one.
+    """
+    from argus.report.markdown import _grade_line
+
+    for rows in ([{"grade": "proven"}], [{"grade": "refused"},
+                                         {"grade": "unproven"}], [], None):
+        line = _grade_line(rows)
+        assert line == ("Every finding is graded against the proof "
+                        "requirement for its class"), (rows, line)
+
+
+def test_the_citation_claims_are_left_universal():
+    """DELIBERATELY NOT WEAKENED, and the distinction is the point.
+
+    The two neighbouring claims are about CITATION, and those are enforced:
+    `add_finding` refuses an excerpt that is not a verbatim substring of a
+    cited response, and `findings_bad` re-validates every one on re-read.
+    Grading is the one that can be absent, so it is the only sentence that
+    needed a number.
+    """
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parent.parent / "argus" /
+           "report" / "markdown.py").read_text(encoding="utf-8")
+    assert "_All findings cite verbatim response excerpts verified" in src
+    assert "_grade_line(findings)" in src, \
+        "the grading sentence must be the computed one"
+
+
+def test_a_plural_count_reads_correctly():
+    from argus.report.markdown import _grade_line
+
+    line = _grade_line([{"grade": "proven"}, {"id": "a"}, {"id": "b"}])
+    assert "1 of 3" in line and "2 carry no grade" in line, line
