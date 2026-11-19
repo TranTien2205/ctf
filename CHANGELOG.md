@@ -7537,12 +7537,51 @@ the two halves disagreed about one string, which is as clear a statement as
 this check can make: an example and an assertion are the same bytes, and
 only the form around them says which one it is.
 
+### A poll that read a file mid-write, red on Windows only
+
+CI #590 went red on one of eleven jobs, windows-latest/3.10:
+
+    tests/test_web.py:439: in a condition that parses the run's state
+        file, read through pathlib with an explicit encoding
+    E   PermissionError: [Errno 13] Permission denied: 'C:\\Users\\...'
+
+The condition READS a file the worker thread is WRITING. On POSIX a reader
+may open a file mid-write and a rename is atomic, so the poll sees either
+the old content or the new one. On Windows the file is briefly unopenable -
+during the write, and during the replace that puts the new content in
+place - and the read raises.
+
+DESCRIBED, NOT QUOTED, and this is the FIFTH instance in one session - the
+second with this exact identifier. Quoting the failing line reproduced a
+pathlib method name that the tool check reads as a claim about an argus
+tool. The right fix was settled mid-session and written down: 31 argus
+tools ARE named with parentheses in the docs, so narrowing the checker
+would drop half the tool table's coverage, which means the prose is what
+changes. Knowing which string is the landmine is evidently not the same as
+not typing it.
+
+"The file is momentarily unreadable" is not "the condition is false". It is
+the same not-yet the loop exists to wait through, which makes this the same
+shape as the callback polling fixed in `probes.py` an hour earlier: a check
+treating an in-progress state as a verdict. Three instances of that shape
+in one session, in three unrelated files.
+
+An OSError is now swallowed while there is time left and RE-RAISED if the
+deadline passes without one clean evaluation, because a persistent
+permission problem must arrive as itself rather than as a confusing
+assertion about None further up the test. Both directions are planted:
+removing the tolerance fails, and swallowing the persistent error fails.
+
+Reproduced without Windows, by planting the transient directly - two raises
+then a value - which is the only honest way to test it from here. The fix
+is verified on POSIX and its platform-specific half is verified by CI.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1162 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1165 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

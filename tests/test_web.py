@@ -456,12 +456,43 @@ def _until(cond, timeout: float = 10.0, step: float = 0.02):
 
     Returns the condition's last value either way, so the caller asserts on
     it and gets the real value in the failure message rather than `False`.
+
+    AND A TRANSIENT OSError IS "NOT YET", NOT A FAILURE. CI #590 went red on
+    windows-latest/3.10 only:
+
+        tests/test_web.py:439: state = _until(lambda: json.loads(
+            side.read_text(encoding="utf-8")).get("state") == "failed")
+        E   PermissionError: [Errno 13] Permission denied:
+            'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\pytest-of-...'
+
+    The condition READS a file the worker thread is WRITING. On POSIX a
+    reader may open a file mid-write and a rename is atomic, so the poll
+    either sees the old content or the new one. On Windows the file is
+    briefly unopenable - during the write, and during the replace that puts
+    the new content in place - and `read_text` raises.
+
+    "The file is momentarily unreadable" is not "the condition is false";
+    it is the same not-yet the loop already exists to wait through. So an
+    OSError is swallowed WHILE THERE IS TIME LEFT and re-raised if the
+    deadline passes without one clean evaluation - a persistent permission
+    problem must still surface as itself, not as a confusing assertion on
+    None.
+
+    This is the same shape as the callback polling fixed in `probes.py`: a
+    check that treats an in-progress state as a verdict.
     """
     deadline = time.time() + timeout
-    value = cond()
-    while not value and time.time() < deadline:
+    value, failure = None, None
+    while True:
+        try:
+            value, failure = cond(), None
+        except OSError as exc:
+            value, failure = None, exc
+        if value or time.time() >= deadline:
+            break
         time.sleep(step)
-        value = cond()
+    if failure is not None:
+        raise failure
     return value
 
 
@@ -1702,3 +1733,49 @@ def test_the_cookie_reader_tolerates_a_renamed_internal():
         _default_headers = {"Cookie": "SID=legacy"}
     assert _client_cookie_header(Legacy()) == "SID=legacy", \
         "the old path stays as a fallback rather than being deleted"
+
+
+def test_until_waits_through_a_transient_read_error():
+    """The Windows failure, reproduced without Windows.
+
+    CI #590 went red on windows-latest/3.10 only: a condition that reads a
+    file the worker thread is writing raised `PermissionError`, because on
+    Windows the file is briefly unopenable during the write and during the
+    replace. On POSIX the same poll silently sees old content or new.
+
+    So this plants the transient directly - two raises, then a value - and
+    requires the poll to wait through them.
+    """
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise PermissionError(13, "Permission denied")
+        return "failed"
+
+    assert _until(flaky, timeout=5.0, step=0.01) == "failed"
+    assert calls["n"] == 3
+
+
+def test_until_surfaces_an_error_that_never_clears():
+    """The direction that keeps the tolerance from hiding a real problem.
+
+    A permission error that persists for the whole window is not a slow
+    condition - it is a broken one, and it must arrive as itself rather
+    than as an assertion about None further up the test.
+    """
+    import pytest as _pytest
+
+    def always():
+        raise PermissionError(13, "Permission denied")
+
+    with _pytest.raises(PermissionError):
+        _until(always, timeout=0.3, step=0.01)
+
+
+def test_until_still_returns_a_falsy_value_for_the_caller():
+    """Unchanged contract: the condition's last value comes back either
+    way, so a failing assertion names the real value and not `False`."""
+    assert _until(lambda: 0, timeout=0.2, step=0.01) == 0
+    assert _until(lambda: "ready", timeout=0.2, step=0.01) == "ready"
