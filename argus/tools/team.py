@@ -144,6 +144,57 @@ def read_findings(ctx: Context) -> dict:
             "note": "last 200 shown; dedup by category+url anyway"}
 
 
+def read_findings_full(ctx: Context) -> dict:
+    """The view the REPORT role's job needs, which the slim one is not.
+
+    `read_findings` is a dedup view and says so: "workers only need
+    class+endpoint+id to skip already-proven work". The report role uses it
+    for a different job - `report-writing.md` instructs that "every claim
+    traces to an id" and that "the grade is not decoration" - and the slim
+    view carries neither `evidence_ids` nor `grade` nor the excerpt. So the
+    role was told to trace claims to ids by a card whose tools could not
+    show it an id, and `report.md` honestly documented the dead end:
+    "no tool of yours returns them ... write the sentence without the quote".
+
+    The data was never missing. It is in findings.json, and the
+    deterministic renderer reads all of it - the one agent whose whole job
+    is the narrative was the one denied it.
+
+    NOT by widening `read_findings`: that view's cap and narrowness are
+    deliberate, and every recon and exploit worker pays for whatever it
+    returns. A separate tool, granted to the roles that write prose, so the
+    restriction stays in the card where `dispatch` enforces it rather than
+    in a prompt.
+    """
+    from ..session import sanitized_findings
+
+    rows = sanitized_findings(ctx.session.findings)
+    out = []
+    for f in rows[-60:]:
+        proof = f.get("proof") or {}
+        out.append({
+            "id": f.get("id"), "title": f.get("title"),
+            "severity": f.get("severity"), "category": f.get("category"),
+            "vuln_class": f.get("vuln_class"), "url": f.get("url"),
+            "grade": f.get("grade"),
+            # The ids a claim must trace to, and the bytes already quoted.
+            "evidence_ids": list(f.get("evidence_ids") or []),
+            "evidence_excerpt": str(f.get("evidence_excerpt") or "")[:600],
+            "description": str(f.get("description") or "")[:1200],
+            "remediation": str(f.get("remediation") or "")[:600],
+            # What the gate said it was short of, so a sentence about a
+            # candidate can name the reason instead of hedging.
+            "proof_requirement": str(proof.get("requirement") or "")[:400],
+            "proof_missing": [str(m) for m in (proof.get("missing") or [])],
+        })
+    return {"findings": out, "count": len(rows), "returned": len(out),
+            "note": ("full records, newest 60. Cite an evidence id in every "
+                     "claim that needs one, and read_response(<id>) for the "
+                     "bytes. A grade below `proven` has `proof_missing`: say "
+                     "what is missing rather than implying the finding is "
+                     "weak.")}
+
+
 def finish_engagement(ctx: Context, summary: str) -> dict:
     board = _board(ctx)
     board.leads.close()

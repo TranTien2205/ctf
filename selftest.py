@@ -939,14 +939,91 @@ def _doc_consistency() -> None:
     # cheapest moment to close one.
     doc_flags = set()
     flag_re = _re.compile(r"(?<![\w-])(--[a-z][a-z0-9-]{2,})")
-    for name, text in texts.items():
+    # PER UNIT, AND THE UNIT IS NOT A LINE. The exemption asks whether the
+    # text names another program, and a sentence that does can WRAP, putting
+    # the flag on a line that does not. Measured: AGENTS.md's
+    # `gh run list --workflow test.yml` was excused correctly, while the
+    # CHANGELOG sentence DESCRIBING that fix wrapped so that its line began
+    # with the flag and carried no `gh` - and the check reported a flag
+    # argus does not accept, from a sentence explaining that very mistake.
+    # The same wrap once put a subcommand name at the start of a line, away
+    # from the word that made it an example. So the unit
+    # is the paragraph: lines joined until a blank one, which is the
+    # smallest span that holds a whole sentence in these documents.
+    def _paras(text: str) -> list[str]:
+        out, cur = [], []
         for line in text.splitlines():
-            found = set(flag_re.findall(line))
+            if line.strip():
+                cur.append(line)
+            elif cur:
+                out.append(" ".join(cur)); cur = []
+        if cur:
+            out.append(" ".join(cur))
+        return out
+
+    # AND THE EXEMPTION IS NO LONGER A LIST OF PROGRAM NAMES. A name list
+    # closes one program per failure, forever: it held until a document
+    # wrote `pytest --last-failed`, measured, and `pytest` was not on it -
+    # so a real flag of the program this repository's own gate instructions
+    # invoke was reported as a flag argus had invented.
+    #
+    # A flag belongs to the command it follows. In a fenced block that is
+    # the first token of its line; in an inline span, the first token of the
+    # span. A flag in bare prose has no command and stays argus's, which is
+    # the conservative end - the sentences that really are claims about
+    # argus keep being checked.
+    _ARGUS_CMDS = {"argus", "python", "python3", "py"}
+
+    def _owner(span):
+        # The program a flag in this span belongs to: its first non-flag
+        # token, except that `python -m X` is a span belonging to X and not
+        # to python. Measured: `python -m pip wheel . --no-deps` was read as
+        # argus's because its first token is `python`, and pip's flag was
+        # reported as one argus had invented. `python -m argus` is the
+        # canonical argus invocation and must stay argus's, so the module
+        # after -m is the discriminator, not the interpreter.
+        toks = [t for t in (x.strip("`$#*(),;").lstrip("./")
+                            for x in span.split()) if t]
+        for i, t in enumerate(toks):
+            if t.startswith("-"):
+                continue
+            if t in ("python", "python3", "py") and "-m" in toks[i:i + 3]:
+                j = toks.index("-m", i)
+                return toks[j + 1] if j + 1 < len(toks) else t
+            return t
+        return ""
+
+    def _foreign_flags(text):
+        # flags in this document that belong to some program other than argus
+        out, fenced, prose, in_fence = set(), [], [], False
+        for ln in text.splitlines():
+            if ln.lstrip().startswith("```"):
+                in_fence = not in_fence
+                continue
+            (fenced if in_fence else prose).append(ln)
+        for ln in fenced:
+            if flag_re.search(ln) and _owner(ln) not in _ARGUS_CMDS:
+                out |= set(flag_re.findall(ln))
+        for para in _paras("\n".join(prose)):
+            for span in _re.findall(r"`([^`]+)`", para):
+                if flag_re.search(span) and _owner(span) not in _ARGUS_CMDS:
+                    out |= set(flag_re.findall(span))
+        return out
+
+    for name, text in texts.items():
+        foreign = _foreign_flags(text)
+        for line in _paras(text):
+            found = set(flag_re.findall(line)) - foreign
             if not found:
                 continue
-            if any(t in line for t in _ALLOWED_TOOLS) \
-                    or "docker" in line or "pip " in line or "npm " in line:
-                continue          # this line is about another tool
+            if any(t in line for t in _ALLOWED_TOOLS):
+                continue          # this paragraph is about another tool
+            # `gh ` was added for `gh run list --workflow test.yml` in
+            # AGENTS.md - a flag of the GitHub CLI, written into the very
+            # edit that was fixing this document for naming things that are
+            # not true. Twentieth instance in one session of a checker
+            # reading a mention as a claim.
+            #
             # `npm` joins `docker` and `pip ` here and NOT `_ALLOWED_TOOLS`,
             # and the difference matters. `_ALLOWED_TOOLS` is what
             # `run_external` may invoke; adding `agent-browser` or `npm`
@@ -1565,7 +1642,7 @@ def _doc_consistency() -> None:
                            pyproject.read_text(encoding="utf-8"), _re.M)
         if block:
             for spec in _re.findall(r'"([^"]+)"', block.group(1)):
-                declared.add(_re.split(r"[<>=!\[ ]", spec, 1)[0]
+                declared.add(_re.split(r"[<>=!\[ ]", spec, maxsplit=1)[0]
                              .strip().replace("-", "_").lower())
     ok_names = set(_sys.stdlib_module_names) | declared | {"argus"}
     undeclared: dict[str, set] = {}

@@ -79,7 +79,14 @@ EXPLOIT = RoleCard(
 REPORT = RoleCard(
     name="report",
     tools=_COMMON | frozenset({
-        "read_findings", "finish",
+        "read_findings",
+        # The view this role's job needs. `read_findings` is a dedup view
+        # for workers deciding what to skip, and carries no evidence id, no
+        # grade and no excerpt - so the role instructed by
+        # `report-writing.md` that "every claim traces to an id" had no tool
+        # that could show it one.
+        "read_findings_full",
+        "finish",
     }),
     prompt_file="report.md",
     turns=15,                 # report reads, summarizes, exits
@@ -90,6 +97,9 @@ LEAD = RoleCard(
     tools=_COMMON | frozenset({
         "http_request", "fingerprint", "crawl", "js_recon",
         "spawn_worker", "list_workers", "read_findings",
+        # the lead writes the executive summary when no report worker ran,
+        # so it needs the same view for the same reason
+        "read_findings_full",
         "emit_lead", "finish_engagement",
         # the ledger belongs to the role whose job is deciding what happens
         # next: it answers from recorded evidence rather than from the

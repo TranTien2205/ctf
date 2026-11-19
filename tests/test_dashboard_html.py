@@ -588,3 +588,319 @@ def test_pyproject_declares_the_console_as_package_data():
     server - the worst shape of missing, because the port answers."""
     data = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
     assert "web/*.html" in data, "the console is not in package-data"
+
+
+# ---------------------------------- 9. the file has not been quietly gutted
+#
+# MEASURED, AND REPORTED BY THE SESSION THAT OWNS THIS FILE: a bad slice
+# deleted 521 of the stylesheet's 672 lines and all of the checks above
+# passed. Every one of them asks a QUALITATIVE question - is there an
+# external resource, is there an HTML sink, are the two modes confusable -
+# and 151 lines of stylesheet answers all of them exactly as 672 lines do.
+#
+# So the suite could not see three quarters of the file disappear. That is
+# the same hole as a proof gate that grades a finding with no evidence: the
+# checks were sound and the thing they were silent about was the size of
+# what they were checking.
+
+def _stylesheet(text: str) -> str:
+    return "\n".join(re.findall(r"<style\b[^>]*>(.*?)</style>", text, re.S))
+
+
+def test_every_var_reference_without_a_fallback_resolves():
+    """The check with diagnostic power, and the one a line count misses.
+
+    A slice that removes the `:root` block takes 1863 bytes and 38 lines -
+    under any floor worth setting - leaves the braces BALANCED, and breaks
+    every colour on the page, because `var(--v0)` with no definition is
+    invalid at computed-value time and the property falls back to inherited
+    or initial. Measured on that exact cut: 33 references stop resolving
+    while a brace count and a line count both still pass.
+
+    `var(--x, fallback)` is NOT a requirement and is not counted. The file
+    uses exactly one - `animation-delay:var(--d,0s)`, where `--d` is set
+    per element by an inline `style="--d:.1s"` to stagger the entrance - and
+    counting a conditional reference as an unconditional one would have
+    reported a defect in correct, idiomatic CSS. That error was made and
+    caught here before this test was written, by measuring the one
+    violation rather than accepting the count.
+    """
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", css))
+    for attr in re.findall(r'style="([^"]*)"', text):
+        defined |= set(re.findall(r"(--[a-z0-9-]+)\s*:", attr))
+    required = set(re.findall(r"var\((--[a-z0-9-]+)\s*\)", css))
+    assert not sorted(required - defined), (
+        f"these var() references resolve to nothing: "
+        f"{sorted(required - defined)}")
+
+
+def test_the_var_resolution_check_sees_a_root_block_deletion():
+    """The direction that matters. Plants the cut that keeps the braces
+    balanced and stays above the line floor, measured rather than assumed."""
+    css = _stylesheet(DASH.read_text(encoding="utf-8"))
+    i = css.index(":root{")
+    j = css.index("}", css.index("color-scheme", i)) + 1
+    cut = css[:i] + css[j:]
+    assert cut.count("{") == cut.count("}"), \
+        "premise: the planted cut leaves the braces balanced"
+    defined = set(re.findall(r"(--[a-z0-9-]+)\s*:", cut))
+    required = set(re.findall(r"var\((--[a-z0-9-]+)\s*\)", cut))
+    assert len(required - defined) > 20, (
+        "the planted :root deletion must break many references, or this "
+        "check is not measuring what it claims")
+
+
+def test_the_stylesheet_has_not_been_gutted():
+    """A structural floor, set WELL below the current values so that
+    ordinary work - and a palette rewrite in particular, which replaces
+    values and not structure - never trips it.
+
+    Measured on the committed file (`git show cda6d95:` and HEAD and the
+    working tree all agree): 792 stylesheet lines, 352 rules, 43 custom
+    property declarations, 103,183 file bytes. The floors are roughly half
+    of each.
+
+    `43` and `36` are both right and answer different questions: 43
+    declarations appear in the stylesheet, 36 of them inside `:root`. This
+    check counts declarations, because a rule that defines a token outside
+    `:root` is stylesheet that can be deleted too. Written down because the
+    two figures were read as a disagreement once.
+
+    They were first set from 672/327/36/97,398, which was a MID-EDIT state
+    of another session's work and never a committed one - the commit before
+    it had 565 lines and the one after has 792. The floors were safely
+    below both, so the numbers were wrong without the check being wrong,
+    which is the quiet way for a figure cited as a basis to be false.
+    """
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    assert css, "no <style> block at all"
+    floors = {
+        "stylesheet lines": (css.count("\n") + 1, 420),
+        "css rules":        (css.count("{"), 200),
+        "custom tokens":    (len(set(re.findall(r"--[a-z0-9-]+\s*:", css))), 24),
+        "file bytes":       (len(text), 60_000),
+        "@media blocks":    (css.count("@media"), 5),
+    }
+    short = {k: v for k, (v, floor) in floors.items() if v < floor}
+    assert not short, (
+        f"the file lost structure: {short} - floors are "
+        f"{ {k: f for k, (_, f) in floors.items()} }")
+    assert css.count("{") == css.count("}"), (
+        f"unbalanced braces: {css.count('{')} open, {css.count('}')} close "
+        "- a slice cut through a rule")
+
+
+def test_the_floor_catches_a_gross_deletion():
+    """521 lines, the size actually reported."""
+    css = _stylesheet(DASH.read_text(encoding="utf-8"))
+    lines = css.split("\n")
+    assert len(lines) > 521, "premise: the stylesheet is larger than the cut"
+    gutted = "\n".join(lines[:len(lines) - 521])
+    assert (gutted.count("\n") + 1) < 420, \
+        "a 521-line deletion must fall under the line floor"
+    assert gutted.count("{") < 200, \
+        "and under the rule floor"
+
+
+def test_every_grade_and_severity_name_has_a_rule():
+    """The precise invariant, and the one a floor cannot state.
+
+    REPORTED BY THE SESSION THAT OWNS THIS FILE, about the floor above: a
+    slice that eats three rules is invisible to a floor set well below
+    current values. Correct. This is the complement, and it fails at any
+    size.
+
+    The names are READ FROM THE FILE's own `var GRADES` and `var SEVS`, not
+    listed here, so a renamed grade moves both sides together. They reach
+    the DOM by concatenation - `el('button', 'cell ' + g)`, `setCls(root,
+    'row ' + g)` - so a missing rule is not a style regression: a `proven`
+    finding renders identically to an `unproven` one, which is a false
+    verdict in a tool whose entire claim is that it does not assert what it
+    has not proven.
+
+    Scoped deliberately to grades and severities rather than to every class
+    in the file. Those two lists are argus's vocabulary and survive a
+    layout change; `.panel` or `.hero` can be legitimately renamed by a
+    redesign, and a check that forbids that would be a check against work.
+
+    Four extraction attempts preceded this one, each wrong in the same
+    direction - treating a syntactic shape as a claim. `'nmap '`, `'the '`
+    and `'of '` were read as class prefixes because they sit before a `+`;
+    a 400-character window attributed `className =` to seven functions that
+    do not set it. The scope here is what could actually be measured.
+    """
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    js = "\n".join(re.findall(r"<script\b[^>]*>(.*?)</script>", text, re.S))
+
+    names: dict[str, list[str]] = {}
+    for const in ("GRADES", "SEVS"):
+        m = re.search(rf"var {const} = \[([^\]]*)\]", js)
+        assert m, f"var {const} is gone from the dashboard's script"
+        names[const] = re.findall(r"'([a-z][a-z0-9_-]*)'", m.group(1))
+        assert names[const], f"var {const} parsed empty"
+
+    styled = set(re.findall(r"\.([a-z][a-z0-9_-]*)", css))
+    unstyled = {c: [n for n in v if n not in styled] for c, v in names.items()}
+    bad = {c: v for c, v in unstyled.items() if v}
+    assert not bad, (
+        f"these names come from data and become class names, and have no "
+        f"CSS rule: {bad} - a finding of that grade or severity would "
+        f"render as though it were another one")
+
+
+def test_the_grade_rule_check_catches_a_deleted_grade_rule():
+    """One rule, deleted. Under every floor in this file, and the direction
+    that matters - this is the check that fails on a three-rule cut."""
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    assert ".proven" in css, "premise: the grade has a rule to delete"
+    cut = re.sub(r"\.proven\b", ".PROVEN_DELETED", css)
+    styled = set(re.findall(r"\.([a-z][a-z0-9_-]*)", cut))
+    assert "proven" not in styled, \
+        "the planted deletion must remove the rule this check looks for"
+    assert (cut.count("\n") + 1) >= 420 and cut.count("{") >= 200, \
+        "and it must stay above every floor, or the floor would catch it"
+
+
+# -------------------------- 10. the evidence table must not clip a timestamp
+#
+# REPORTED BY THE SESSION THAT OWNS THIS FILE, from a real regression:
+# collapsing nine font sizes into three steps clipped `Started` to
+# `01:53:...`, so two runs forty seconds apart read as the same instant.
+#
+# That is not a style regression. It is the display asserting something the
+# data does not support, which is the failure the proof gate exists to
+# prevent - recorded there, rendered here. A reader comparing two runs would
+# draw a conclusion the bytes do not carry.
+#
+# `table-layout: fixed` is why no CSS rule records the dependency: a `td`'s
+# own width is ignored, the `<colgroup>` is the only control, and a
+# font-size change in the stylesheet silently outgrows a width declared in
+# the markup. Nothing connects the two but arithmetic, so the arithmetic is
+# the test.
+
+def _px(text: str, pat: str) -> int:
+    m = re.search(pat, text)
+    assert m, f"no match for {pat}"
+    return int(m.group(1))
+
+
+def test_the_started_column_is_wide_enough_for_the_whole_timestamp():
+    """Every quantity is read from the file, including the 19.
+
+    The column is located by its HEADER TEXT and not by index, so
+    reordering the table cannot leave this measuring a different column
+    while still passing. The format length is summed from `clock()`'s own
+    return expression - `getFullYear()` is 4, each `pad()` is 2, each string
+    literal is its own length - so changing the format moves the
+    requirement with it.
+    """
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    js = "\n".join(re.findall(r"<script\b[^>]*>(.*?)</script>", text, re.S))
+
+    # 1. the rendered width of a timestamp, in characters, from the formatter
+    body = re.search(r"function clock\(ts\) \{(.*?)\n\}", js, re.S)
+    assert body, "the dashboard no longer has a clock() formatter"
+    # the LAST return, not the first: `clock()` opens with an early
+    # `return '--'` guard for a missing timestamp, and matching the first
+    # one computed a requirement of 2 characters. The `chars == 19`
+    # assertion below is what caught that - without it this test would have
+    # demanded room for two characters and passed forever, which is the
+    # shape of check that measures nothing.
+    rets = [r for r in re.findall(r"return ([^;]*);", body.group(1), re.S)
+            if "getFullYear" in r]
+    assert len(rets) == 1, (
+        f"expected exactly one formatting return in clock(), found "
+        f"{len(rets)}")
+    expr = rets[0]
+    chars = (4 * len(re.findall(r"getFullYear\(\)", expr))
+             + 2 * len(re.findall(r"\bpad\(", expr))
+             + sum(len(s) for s in re.findall(r"'([^']*)'", expr)))
+    assert chars == 19, (
+        f"clock() renders {chars} characters, not 19 - if the format "
+        "changed deliberately, this number follows it; the check below "
+        "uses the measured value either way")
+
+    # 2. the cell's font size and the table's horizontal padding
+    size = _px(css, r"td\.mt\{[^}]*font-size:(\d+)px")
+    pad_x = _px(css, r"tbody td\{[^}]*padding:\d+px (\d+)px")
+
+    # 3. the declared width of the column whose header says Started
+    i = text.find('id="tw-runs"')
+    assert i > 0, "the runs table is gone"
+    tbl = text[i:text.find("</table>", i)]
+    cols = re.findall(r"<col\b[^>]*>", re.search(
+        r"<colgroup>(.*?)</colgroup>", tbl, re.S).group(1))
+    heads = [re.sub(r"<[^>]+>", "", h).strip() for h in
+             re.findall(r"<th\b[^>]*>(.*?)</th>",
+                        re.search(r"<thead>(.*?)</thead>", tbl, re.S).group(1),
+                        re.S)]
+    assert len(cols) == len(heads), (
+        f"{len(cols)} <col> for {len(heads)} <th> - the column-to-header "
+        "mapping this check depends on is broken")
+    assert "Started" in heads, f"no Started column in {heads}"
+    col = cols[heads.index("Started")]
+    width = _px(col, r"width:(\d+)px")
+
+    # 4. the arithmetic table-layout:fixed leaves unrecorded.
+    #    0.6em is the advance width of the monospace faces in this file's
+    #    stack (DejaVu Sans Mono 0.602, Menlo and SF Mono 0.600); Consolas
+    #    is narrower at 0.55, so 0.6 is the conservative side.
+    needed = chars * size * 0.6 + 2 * pad_x
+    assert width >= needed, (
+        f"the Started column declares {width}px and needs {needed:.0f}px "
+        f"for {chars} characters at {size}px plus {pad_x}px padding each "
+        "side - the timestamp will be clipped, and two runs seconds apart "
+        "will read as the same instant")
+
+
+def test_the_timestamp_width_check_catches_a_font_size_increase():
+    """The direction that matters, and the regression that was reported:
+    a font-size change in CSS against a width declared in the markup."""
+    text = DASH.read_text(encoding="utf-8")
+    css = _stylesheet(text)
+    size = _px(css, r"td\.mt\{[^}]*font-size:(\d+)px")
+    pad_x = _px(css, r"tbody td\{[^}]*padding:\d+px (\d+)px")
+    i = text.find('id="tw-runs"')
+    tbl = text[i:text.find("</table>", i)]
+    cols = re.findall(r"<col\b[^>]*>", tbl)
+    heads = [re.sub(r"<[^>]+>", "", h).strip() for h in
+             re.findall(r"<th\b[^>]*>(.*?)</th>", tbl, re.S)]
+    width = _px(cols[heads.index("Started")], r"width:(\d+)px")
+    # MEASURED THREE TIMES, and the first two were wrong in opposite ways.
+    #
+    # First version asserted that a one-pixel increase breaks the column.
+    # It does not: 172.2px needed against 174px declared.
+    #
+    # Second version said the headroom is 13.2px, "one step and a little",
+    # and concluded the reported regression could not have been one step on
+    # `td.mt` alone. Measured in the live page by the session that hit it,
+    # that conclusion is FALSE, and the error was the anchor: 174px is the
+    # width that session had ALREADY WIDENED THE COLUMN TO while fixing the
+    # regression. It was 158px when it broke. At 158, 11.5px needs 155.1px
+    # and fits; 12px needs 160.8px and clips by 2.8px. So the trigger was
+    # 11.5px -> 12px: a HALF step, not one.
+    #
+    # The post-fix file cannot reproduce its own regression, which is why
+    # this is written down. Anyone measuring headroom now gets 13.2px and
+    # concludes the column was never tight. It was tight by 2.8px in the
+    # other direction.
+    #
+    # And the margin is thinner than 13.2px makes it sound. One step up is
+    # 13px, which needs 172.2px against 174px declared: 1.8px of margin,
+    # and 12px and 13px are now adjacent steps in one scale, so `.mt`
+    # joining the body tier is a plausible single edit. This bound is what
+    # catches that.
+    need1 = 19 * (size + 1) * 0.6 + 2 * pad_x
+    need2 = 19 * (size + 2) * 0.6 + 2 * pad_x
+    assert need1 <= width < need2, (
+        f"headroom moved: at {size}px the column has {width - need1 + 0:.1f}"
+        f"px spare after one step ({need1:.1f}px needed) and breaks at two "
+        f"({need2:.1f}px). If the column was widened deliberately this "
+        "bound follows it; if it narrowed, the clipping is closer than it "
+        "was")

@@ -96,6 +96,7 @@ def _impl(name: str) -> Callable:
         "spawn_worker": team.spawn_worker,
         "list_workers": team.list_workers,
         "read_findings": team.read_findings,
+        "read_findings_full": team.read_findings_full,
         "finish_engagement": team.finish_engagement,
         "wordlist_fuzz": team.wordlist_fuzz,
         "run_exploit": team.run_exploit,
@@ -856,6 +857,17 @@ TOOL_SCHEMAS: list[dict] = [
     _schema(
         "read_findings",
         "List every recorded finding (id, severity, category, url, evidence).",
+        {},
+        [],
+    ),
+    _schema(
+        "read_findings_full",
+        "Every recorded finding IN FULL - evidence ids, grade, the quoted "
+        "excerpt, the description, and for a grade below `proven` the "
+        "requirement and the checks it was short of. `read_findings` is a "
+        "dedup view for workers deciding what to skip; this is the view for "
+        "writing prose about findings, where every claim has to trace to an "
+        "id and a grade is not decoration. Newest 60.",
         {},
         [],
     ),

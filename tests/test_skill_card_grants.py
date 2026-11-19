@@ -702,3 +702,89 @@ def test_every_gradeable_class_is_taught_by_some_card():
         assert any(t.startswith(teacher) for t in covered.get(klass, [])), (
             f"{klass} is no longer reached through {teacher}; "
             f"covered by {covered.get(klass)}")
+
+
+def full_finding_keys() -> set[str]:
+    """What `read_findings_full` returns per row - measured the same way.
+
+    Measured, not read off a docstring, and for the same reason the slim
+    helper above is: the prompt and the tool are two documents that landed
+    in one worker's context and once described the same tool in opposite
+    ways.
+    """
+    from types import SimpleNamespace
+
+    from argus.tools.team import read_findings_full
+
+    full = {
+        "id": "F01", "title": "t", "severity": "high",
+        "category": "sqli", "vuln_class": "sqli", "url": "http://127.0.0.1/x",
+        "evidence_excerpt": "bytes", "evidence_ids": ["R1"],
+        "grade": "candidate", "description": "d", "remediation": "r",
+        "cvss": "7.5",
+        "proof": {"requirement": "a row from a named table",
+                  "missing": ["the query named its target"]},
+    }
+    ctx = SimpleNamespace(session=SimpleNamespace(findings=[full]))
+    rows = read_findings_full(ctx)["findings"]
+    assert rows, "read_findings_full returned nothing"
+    return set(rows[0])
+
+
+def test_the_full_view_carries_what_the_report_skill_demands():
+    """MEASURED GAP this closes. `read_findings` is a dedup view and says so:
+    "workers only need class+endpoint+id to skip already-proven work". The
+    report role used it for a different job - `report-writing.md` instructs
+    that "every claim traces to an id" and that "the grade is not
+    decoration" - and the slim view carries neither an evidence id nor a
+    grade nor the excerpt.
+
+    So the role was told to trace claims to ids by a card whose tools could
+    not show it one, and `report.md` documented the dead end honestly:
+    "no tool of yours returns them ... write the sentence without the
+    quote". The data was never missing - it is in findings.json and the
+    deterministic renderer reads all of it. The one agent whose whole job is
+    the narrative was the one denied it.
+    """
+    returned = full_finding_keys()
+    for needed in ("evidence_ids", "evidence_excerpt", "grade",
+                   "proof_missing", "proof_requirement"):
+        assert needed in returned, (
+            f"{needed} is what the report skill asks the role to use; "
+            f"read_findings_full returns {sorted(returned)}")
+    # and the slim view is still slim, so widening it was not the fix
+    assert "evidence_ids" not in slim_finding_keys(), (
+        "read_findings was widened instead - every recon and exploit worker "
+        "pays for whatever that view returns, which is why its narrowness is "
+        "deliberate")
+
+
+def test_the_report_role_holds_the_full_view_and_is_told_to_start_there():
+    from argus.team.cards import LEAD, REPORT
+
+    assert "read_findings_full" in REPORT.tools
+    # the lead writes the executive summary when no report worker ran, so it
+    # needs the same view for the same reason
+    assert "read_findings_full" in LEAD.tools
+
+    card = read(ROLES / "report.md")
+    bullet = bullet_for(card, "read_findings_full")
+    assert bullet, "report.md does not describe the tool it was granted"
+    assert "START HERE" in bullet, \
+        "a role that holds a tool and is not told to use it holds it the " \
+        "way the registry held the orchestrator"
+
+
+def test_the_full_views_bullet_promises_only_fields_it_returns():
+    """The same invariant as the slim one, for the tool that replaced it in
+    this role's workflow. Without this, the new bullet is unguarded - and
+    the old bullet was guarded precisely because two documents once
+    described one tool in opposite ways."""
+    returned = full_finding_keys()
+    bullet = bullet_for(read(ROLES / "report.md"), "read_findings_full")
+    promised = {_FIELD_WORDS[w] for w in re.findall(r"[a-z]+", bullet.lower())
+                if w in _FIELD_WORDS}
+    overpromised = sorted(promised - returned)
+    assert not overpromised, (
+        f"report.md promises {overpromised} from read_findings_full; it "
+        f"returns {sorted(returned)}")

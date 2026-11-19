@@ -91,7 +91,7 @@ unless the bytes that prove it are already in the transcript.**
 └───────────────────────────────────┬───────────────────────────────────────┘
                                     │ tool_use
 ┌───────────────────────────────────▼───────────────────────────────────────┐
-│ 2. TOOLS           tools/registry.py  ── 59 tools, role-gated             │
+│ 2. TOOLS           tools/registry.py  ── 60 tools, role-gated             │
 │    web.py        recon: http_request, crawl, js_recon, fingerprint …      │
 │    probes.py     27 probes, one per bug class (sqli, cmdi, idor, xxe …)   │
 │    analysis.py   jwt_decode/forge, run_external (sqlmap|nuclei|nmap|ffuf) │
@@ -289,7 +289,7 @@ the assessment, over MCP:
 python -m argus mcp-serve https://app.example --scope api.example     --require-proof
 ```
 
-49 of the 59 tools are served over newline-delimited stdio JSON-RPC. Register
+50 of the 60 tools are served over newline-delimited stdio JSON-RPC. Register
 it with any MCP host — Claude Code, an MCP-speaking IDE, an agent runtime:
 
 ```json

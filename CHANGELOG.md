@@ -84,7 +84,7 @@ system. All notable milestones on `agent-v2`.
   accepted", which cited `GET /api/user/1` — a request carrying no token.
 
 ### argus as an MCP server (`argus mcp-serve`)
-- `user -> LLM -> MCP -> tool`: 49 of the 59 tools served over
+- `user -> LLM -> MCP -> tool`: 50 of the 60 tools served over
   newline-delimited stdio JSON-RPC, symmetric with the client in
   `argus/mcp.py`, so both halves of the protocol are testable against each
   other. Register it with any MCP host.
@@ -5637,7 +5637,7 @@ things that exist. That direction cannot fail by neglect - it fires when
 somebody writes a command that is not there. The direction that CAN is a
 thing that exists and is documented nowhere, and nothing checked it.
 
-Applied to the two user-facing surfaces: all 59 tools appear in a gated
+Applied to the two user-facing surfaces: every tool appeared in a gated
 document. One of the 18 subcommands did not - **`argus web`**, the console
 that binds a port, starts scans with no authentication, and renders bytes a
 target chose. Its refusal explains the bind guard when it fires, and nothing
@@ -5966,12 +5966,355 @@ command claim - so it reported a subcommand named `stores`. Not the content,
 the line wrapping. Sixteenth instance, and the fix was to rewrite the
 sentence so no line opens with that word.
 
+### The agent whose job is the narrative was the one denied the evidence
+
+`read_findings` is a dedup view and its docstring says so: "workers only
+need class+endpoint+id to skip already-proven work". The REPORT role used
+that same tool for a different job. `report-writing.md` instructs it that
+"every claim traces to an id" and that "the grade is not decoration" - and
+the slim view carries no evidence id, no grade and no excerpt.
+
+So a role was told to trace claims to ids by a card whose tools could not
+show it one. `report.md` documented the dead end honestly rather than
+hiding it - "no tool of yours returns them ... write the sentence without
+the quote" - which is why this survived: the contradiction was written down
+as a limitation instead of read as a defect.
+
+The data was never missing. It is in findings.json, the deterministic
+renderer reads all of it, and the one agent whose whole job is the narrative
+was the one that could not see it.
+
+`read_findings_full` is the view that job needs: the evidence ids, the
+grade, the excerpt, and for a grade below `proven` the requirement and the
+checks it was short of - so a sentence about a candidate can name the reason
+instead of hedging. "Candidate because no row was read from a named table"
+is a result a reader can act on; "possible SQL injection" is not.
+
+NOT BY WIDENING THE SLIM VIEW, and a test holds that too: every recon and
+exploit worker pays for whatever that view returns, which is why its
+narrowness is deliberate. A separate tool, granted to the roles that write
+prose - report, and lead for the fallback summary - so the restriction stays
+in the card where `dispatch` enforces it rather than in a prompt.
+
+All three steps in the same edit this time: registered, granted, and taught
+as START HERE on the card, because a role that holds a tool and is not told
+to use it holds it the way the registry held the orchestrator.
+
+AND THE INVARIANT THAT GUARDED THE OLD BULLET CAUGHT THE NEW ONE. A test
+asserts the report prompt promises only fields the tool returns, parsing
+only that tool's bullet - and its docstring warns why: the card names
+`excerpts` in order to say they are NOT in the slim view, "which a
+word-level check would read backwards". The new bullet said the slim view
+"carries no evidence id and no grade", so the check read those words as
+promises. Seventeenth instance this session of a mention read as a claim,
+and the first where the test's own docstring predicted the failure mode
+before it happened. The bullet points at the other tool instead of naming
+what it lacks, and a parallel invariant now guards the new bullet, measured
+by CALLING the tool rather than reading its docstring.
+
+Plant-tested four ways: dropping evidence_ids from the new view, widening
+the slim view instead (the wrong fix), not granting it, and granting
+without teaching each fail.
+
+### I ran my own gate twenty times and never ran the project's
+
+The repository's CI is ten jobs: five Python versions across ubuntu AND
+windows. The gate I ran all session was `pytest` plus `selftest` on Linux,
+and it was green every time. Windows had been red since my first commit of
+the session, and the README carries the badge that says so.
+
+Found because the user asked why it was failing. Measured from the API: the
+last green run was the remote commit I merged in; the first red one was my
+merge, and the commit it brought was mine. Thirteen consecutive failing
+runs, every one of them after a local gate I had just watched pass.
+
+That is the `count-the-gate-against-reality` shape, and this time the
+denominator was not a check's file list - it was my idea of what "the gate"
+meant. A subset measured carefully is still a subset.
+
+THREE FAILURES, ALL WINDOWS-ONLY, AND NONE A PRODUCTION DEFECT.
+
+Two were one line of a TEST FIXTURE: `write_text("# report\n",
+encoding="utf-8")` with no `newline=""`, so Windows translated the newline
+and every byte-level assertion about that file was off by one per line.
+`test_reports_listing_names_the_formats_present` failed with
+`b"# report\r\n" != b"# report\n"` and
+`test_head_is_routed_and_sends_no_body` with a Content-Length of 10 against
+9 - two failures, one line.
+
+The third is more interesting, and it is a measurement smaller than its
+instrument. `test_exploit_fanout_really_runs_endpoints_concurrently` proves
+concurrency twice: a barrier a serial implementation deadlocks on, and then
+the recorded `[started, started+seconds]` windows, which must intersect.
+Windows' `time.monotonic()` has ~15.6ms granularity against ~1ns on Linux,
+and the runs recorded `[(260.89, 0.016), (260.89, 0.016), (260.906, 0.0)]` -
+a run faster than one tick records a duration of ZERO, and a zero-length
+window cannot strictly intersect anything.
+
+The fix is NOT a looser comparison. A tick of slack on both sides would make
+the SERIAL case overlap too, and that is the direction that matters - the
+test next to it exists to fail if the overlap check could pass without
+concurrency. So the measurement was made resolvable instead: the barrier
+already proves all three are in flight, and the mock now holds for 150ms
+after it, which is about ten ticks of the coarsest clock in the matrix.
+
+Verified by simulating the coarse clock rather than by pushing and hoping:
+quantised to 15.6ms, the held windows intersect, the old unheld ones do not
+(which is the CI failure reproduced), and the serial windows still do not.
+
+### Twenty-nine checks could not see three quarters of the file disappear
+
+Reported by the parallel session that owns `argus/web/dashboard.html`: a bad
+slice deleted 521 of the stylesheet's 672 lines and all of its checks still
+passed. Taken as work on this side, because the test file is not that HTML
+file and a suite blind to a deletion that size is a gate defect, not a style
+question.
+
+Why they were blind: every one of the twenty-nine asks a QUALITATIVE
+question - is there an external resource, is there an HTML sink, are the two
+modes confusable, can an engagement launch without its authorisation fields.
+151 lines of stylesheet answers all of them exactly as 672 lines do. The
+checks were sound; what they were silent about was the SIZE of the thing
+they were checking. Same hole as a proof gate that grades a finding with no
+evidence attached.
+
+Two checks, and the second is the one with diagnostic power. A structural
+floor - stylesheet lines, rules, tokens, file bytes, @media blocks, each set
+near half of the committed values so a rewrite never trips it - plus brace
+balance. The first version of those figures was taken from a MID-EDIT state
+of a parallel session's file and matched no commit; the floors sat below
+every version either way, so a number cited as the basis was false while
+the check was sound. Then: every `var(--x)` WITHOUT a fallback must resolve to a token
+defined in the stylesheet or in an inline `style=` attribute. A cut that
+removes the `:root` block is 1863 bytes and 38 lines, leaves the braces
+balanced, stays above the line floor, and breaks every colour on the page,
+because an unresolvable `var()` is invalid at computed-value time.
+
+AND THE CHECK'S FIRST VERSION REPORTED A DEFECT IN CORRECT CSS. It read
+`animation-delay:var(--d,0s)` as a requirement for a token named `--d` and
+found it undefined. But that reference carries a fallback, and `--d` is set
+per element by an inline `style="--d:.1s"` to stagger the entrance - a
+conditional reference, counted as an unconditional one. Eighteenth instance
+this session of a mention read as a claim, and the first caught BEFORE the
+test was written, by going to look at the single violation instead of
+accepting the count. Every grep for it came back empty, which is what said
+the measurement was wrong rather than the file.
+
+Then the comment on the new check over-claimed in the other direction - it
+said the var() check was the only one that catches a `:root` deletion, and
+the plant showed the token floor catches it too, since 32 of the 36 tokens
+live in that block. Corrected to what it is: not the only check that fires,
+the one that names WHICH references broke instead of reporting a number that
+got smaller.
+
+Plant-tested four ways against a REDIRECTED COPY, never against the file
+itself, because another session has uncommitted work in it: a 521-line cut,
+a `:root` deletion, a mid-rule cut, and the real file passing. Wiring as
+well as logic - the test module's `DASH` constant was pointed at each
+gutted copy and the function called directly, so the proof is that the check
+reads the file, not merely that its arithmetic is right.
+
+### AGENTS.md named a gate that was not the gate
+
+Three defects in seventeen lines of the contributor-facing document, all of
+them the class this repository's doc gate exists to catch - documentation
+naming something other than what is true:
+
+- "Windows-compatible" as a flat claim, while Windows CI was red.
+- Three commands presented as the verification step, when CI runs ten jobs:
+  those checks on five Python versions across ubuntu AND windows, plus a
+  `wheel` job none of the three commands exercises.
+- "Both must stay green" counting two for a list of three.
+
+A contributor following that document is blind exactly where I was blind,
+which is how a local gate stayed green for twenty runs while five of ten CI
+jobs were red. Rewritten to name the real gate, to say what the local
+commands cannot see (newline translation and a ~15.6ms clock on Windows),
+and to give the wheel job as three runnable lines - including `cd` out of
+the repo first, because Python puts the tree on `sys.path` and you measure
+the tree while believing you measured the wheel.
+
+RAN THE WHEEL JOB FOR THE FIRST TIME. It passes: 107 files, all six data
+files the tools resolve, the console script works from site-packages, the
+demo produces a summary.json, and the checked-in sample session still
+verifies (66 chained entries, 6 findings re-validated).
+
+And measuring it produced three measurement errors in a row, each caught by
+going to look at the specific instance rather than accepting a count:
+
+- `TOOL_SCHEMAS` is a LIST of 60 schemas, and `"read_findings_full" in
+  TOOL_SCHEMAS` asked a containment question of the wrong container type.
+  Reported the new tool as missing from the wheel; it ships.
+- The first check ran with the repo on `sys.path`, so it read the tree while
+  claiming to read the installed wheel - which is now a warning in AGENTS.md.
+- `'nmap '`, `'the '` and `'of '` were extracted as CSS class prefixes for
+  sitting before a `+`, and a 400-character window attributed `className =`
+  to seven functions that do not set it.
+
+Then the edit that fixed the document broke the document gate: an invocation of the GitHub CLI, with its
+own flag, went into a file the check reads for argus's own flags. Twentieth instance this session, introduced while
+writing about naming only what is true. `gh ` joins `docker`, `pip ` and
+`npm ` in the line-level exemption and NOT `_ALLOWED_TOOLS`, which is what
+`run_external` may invoke.
+
+### A floor cannot see a three-rule cut
+
+The session that owns the dashboard read the structural floor and named its
+limit precisely: it catches a 521-line deletion and is blind to the same
+mistake at a tenth of the size.
+
+The complement is `test_every_grade_and_severity_name_has_a_rule`, and it
+fails at any size. It reads `var GRADES` and `var SEVS` out of the file's
+own script - 9 names, not a list typed here - and requires each to have a
+CSS rule. They reach the DOM by concatenation (`el('button', 'cell ' + g)`,
+`setCls(root, 'row ' + g)`), so a missing rule is not a style regression: a
+`proven` finding renders identically to an `unproven` one. That is a false
+verdict in a tool whose whole claim is that it does not assert what it has
+not proven.
+
+Scoped to grades and severities and NOT to `.panel` or `.hero`, although
+those were suggested. Those are layout classes, that session is mid-redesign,
+and a check that forbids renaming them is a check against work. Grades are
+argus's vocabulary: rename one and `var GRADES` has to move too, and the
+check follows.
+
+### The checker read lines; the discriminator was in the sentence
+
+`docs name only real flags` reported `--workflow` as a flag argus does not
+accept. It does not: the text was `gh run list --workflow test.yml`, the
+GitHub CLI's own flag, in AGENTS.md's new paragraph about reading CI after a
+push. The first fix added `"gh "` to the line-level other-program exemption,
+beside `docker`, `pip ` and `npm `, and AGENTS.md was then excused
+correctly.
+
+IT STILL FAILED, from the CHANGELOG sentence describing that fix. The
+sentence names `gh run list`, and it WRAPPED, so the line began with
+`--workflow test.yml` and carried no `gh`. The checker reported a flag argus
+does not accept, out of a sentence explaining that exact mistake.
+
+So the durable fix is neither keying on the token nor keying on the command:
+the token and its command were in one SENTENCE and two LINES. The unit was
+the defect. The check now runs per paragraph - lines joined until a blank
+one, the smallest span that holds a whole sentence in these documents -
+which closes the `gh` case, the `docker build --platform` case nobody has
+written yet, and the case this repository already hit where a wrap put a
+subcommand name at the start of a line, away from the quotation marks
+that made it an example - the fix there was the same one as here: do
+not let the example wear the punctuation of a command.
+
+Twenty-fourth instance this session of a mention read as a claim, and the
+third to arrive by line-wrapping specifically. Every earlier fix treated the
+WORDS; this one treats the unit the words are read in, which is why it
+covers the cases not yet written.
+
+PLANT-TESTED, AND ONE PLANT NAMES THE COST. A fake `--invented-flag` in an
+argus-only paragraph is caught. `gh run list --workflow` with the sentence
+wrapped passes. And a fake `--invented-flag` in the SAME PARAGRAPH as a
+`docker build` line is now EXEMPTED, which the line-based version would have
+caught.
+
+That hole is kept deliberately. A flag check that cannot survive a line wrap
+produces false failures on correct documentation, and a false failure costs
+more than this hole: it teaches the next reader to edit the check instead of
+reading it. The same reasoning as declining to freeze `.panel` and `.hero` -
+a check that fires on correct work gets edited, and then it is not a check.
+
+### A flag belongs to the command it follows, not to a list of names
+
+The paragraph fix above made the unit right and left the exemption an
+ad-hoc list of program names: `docker`, `pip `, `npm `, and `gh ` added
+that same hour. A name list closes one program per failure, forever, and
+the next failure was already written - a document line reading `pytest
+--last-failed`, whose flag belongs to the program this repository's own
+gate instructions invoke, reported as a flag argus had invented.
+
+So the exemption now asks who the flag belongs to. In a fenced block that
+is the first token of its line; in an inline span, the first token of the
+span; a flag in bare prose has no command and stays argus's, which keeps
+the sentences that really are claims about argus under the check.
+
+AND `python` IS NOT A PROGRAM FOR THIS PURPOSE. First version read
+`python -m pip wheel . --no-deps` as argus's, because its first token is
+`python`, and reported pip's flag as invented. `python -m argus` is the
+canonical argus invocation and has to stay argus's, so the module after
+`-m` is the discriminator and the interpreter is not.
+
+Plant-tested serially - six shapes, one selftest run each - after two
+concurrent plant loops mutating one document returned OPPOSITE verdicts for
+the same planted line. Two measurements that disagree are two measurements
+to discard, not one to pick.
+
+### The subcommand check was right and the markup was mine
+
+Reported as the same defect needing the same fix: `docs name only real
+subcommands` failing on `stores`. It is not. That check keys on markdown's
+own convention for "this is a command" - a backtick, then `argus`, then a
+word - and the sentence that tripped it was mine, written minutes earlier,
+with backticks around an example of a thing that is NOT a command.
+
+The repository had already decided this, in the entry recording the first
+instance: the fix there was to take the backticks off and let the example
+wear quotation marks instead. Applied the same way rather than widening a
+check that was reading the markup correctly. Twenty-fifth instance, and the
+third where the text explaining the defect reproduced it.
+
+### The evidence table could clip a timestamp and nothing would say so
+
+Reported from a real regression by the session that owns the dashboard:
+collapsing nine font sizes into three steps clipped `Started` to
+`01:53:...`, and two runs forty seconds apart read as the same instant.
+
+Not a style regression. The display asserted something the data does not
+support, which is the failure the proof gate exists to prevent - recorded
+there, rendered here.
+
+`table-layout: fixed` is why nothing connected the two: a cell's own width
+is ignored, the `<colgroup>` in the markup is the only control, and a
+font-size change in the stylesheet silently outgrows it. Nothing links them
+but arithmetic, so the arithmetic is the test. Every quantity is read from
+the file - the character count summed from `clock()`'s own return
+expression, the font size from `td.mt`, the padding from `tbody td`, the
+width from the column whose HEADER SAYS `Started` rather than from an index,
+so reordering the table cannot leave the check measuring a different column
+while still passing.
+
+TWO OF MY OWN ERRORS, BOTH CAUGHT BY ASSERTIONS ON DERIVED VALUES:
+
+- The character count came out as 2. `clock()` opens with an early
+  `return '--'` guard for a missing timestamp, and the first `return` is
+  that one. Without the `chars == 19` assertion this test would have
+  demanded room for two characters and passed forever.
+- The negative direction asserted that a one-pixel font increase breaks the
+  column. It does not: 172.2px needed against 174px declared.
+
+AND THE CORRECTED VERSION WAS ALSO WRONG, IN THE OTHER DIRECTION. From
+13.2px of headroom it concluded the reported regression could not have been
+one step on `td.mt` alone. Measured in the live page by the session that hit
+it: 174px is the width that session had ALREADY WIDENED THE COLUMN TO while
+fixing it. It was 158px when it broke. At 158px, 11.5px needs 155.1px and
+fits, 12px needs 160.8px and clips by 2.8px - so the trigger was 11.5 ->
+12px, a HALF step.
+
+The anchor was the defect, and the anchor was a post-fix value. A fixed file
+cannot reproduce its own regression: anyone measuring that column now reads
+13.2px of headroom and concludes it was never tight, when it was tight by
+2.8px in the other direction four hours earlier. Two independent
+measurements of the bound AGREED - 160.8px needed, 13.2px spare, breaks at
+two steps - while the history those numbers were used to reconstruct was
+wrong. Agreement on a quantity is not agreement about what it explains.
+
+One figure neither side had claimed, and it is the one worth keeping: one
+step up is 13px, needing 172.2px against 174px. That is 1.8px of margin,
+not a comfortable step, and 12px and 13px are now adjacent in one scale -
+so `.mt` joining the body tier is a single plausible edit that fits by less
+than two pixels.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1079 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1090 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

@@ -1,8 +1,9 @@
 # AGENTS.md — working in this repository
 
 Argus is an LLM-driven agent for authorized web penetration testing.
-Single dependency: `httpx`. Python 3.10+. Windows-compatible (stdlib-only
-lab, pathlib everywhere).
+Single dependency: `httpx`. Python 3.10-3.14. Windows support is a claim
+this repository makes (stdlib-only lab, pathlib everywhere) and only CI can
+check it — see below.
 
 ## Verify before/after a change
 
@@ -12,9 +13,38 @@ python -m pytest tests/ -q  # unit + live-lab + loop + proof-matrix tests
 python -m argus demo        # the full pipeline against the lab, graded
 ```
 
-Both must stay green. The lab (`argus/lab/vulnapp.py`, shimmed at
-`lab/vulnapp.py`) plants one bug per probe family — if you change a
-probe, update the lab and its test together.
+All three must stay green, AND THEY ARE NOT THE GATE. `.github/workflows/
+test.yml` runs ten jobs: those checks on five Python versions across ubuntu
+AND windows, plus a `wheel` job. Two things the three commands above cannot
+see:
+
+- **Windows.** Different newline translation and a ~15.6ms `time.monotonic()`
+  resolution against ~1ns on Linux. Both have cost this repository real
+  failures: a fixture writing `"\n"` without `newline=""` broke two
+  byte-level assertions, and a concurrency test's recorded windows collapsed
+  to zero duration. A green Linux run says nothing about either.
+- **The built wheel.** Packaging regressions are invisible from the repo
+  tree, because the tree has the data files whether or not the wheel ships
+  them. Run that job locally before a change that adds a module or a data
+  file:
+
+  ```bash
+  python -m pip wheel . -w /tmp/w --no-deps -q
+  python -m venv /tmp/v && /tmp/v/bin/pip install -q /tmp/w/*.whl
+  cd /tmp && /tmp/v/bin/argus skills | grep -q sqli   # from site-packages, not the tree
+  ```
+
+  `cd` out of the repo first or Python puts the repo on `sys.path` and you
+  measure the tree while believing you measured the wheel.
+
+Read the badge in README.md, or
+`gh run list --workflow test.yml` / the Actions API, after you push. A local
+gate green for twenty runs in a row while five of ten CI jobs were red is
+how this was found; a subset measured carefully is still a subset.
+
+The lab (`argus/lab/vulnapp.py`, shimmed at `lab/vulnapp.py`) plants one bug
+per probe family — if you change a probe, update the lab and its test
+together.
 
 ## Layout
 

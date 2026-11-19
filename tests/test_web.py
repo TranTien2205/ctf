@@ -109,7 +109,15 @@ def _plant_session(root, target=LAB_TARGET, *, transcript=True,
         (session.dir / "findings.json").write_text(
             json.dumps(findings), encoding="utf-8")
     if report:
-        (session.dir / "report.md").write_text("# report\n", encoding="utf-8")
+        # `newline=""` or Windows translates the "\n" to "\r\n" and every
+        # byte-level assertion about this file is off by one per line.
+        # MEASURED: this fixture failed `test_reports_listing_names_the_
+        # formats_present` with b"# report\r\n" != b"# report\n" and
+        # `test_head_is_routed_and_sends_no_body` with Content-Length 10
+        # against 9 - two failures, one line, on every Windows job of the
+        # project's own CI while the Linux gate here stayed green.
+        (session.dir / "report.md").write_text("# report\n", encoding="utf-8",
+                                               newline="")
     if sidecar is not None:
         (session.dir / api.WEB_STATE_FILE).write_text(
             json.dumps(sidecar), encoding="utf-8")
@@ -837,7 +845,8 @@ def test_report_html_cannot_execute_in_the_dashboard_origin(web):
 def test_traversal_on_the_reports_route_is_refused(web, rid):
     outside = web.root.parent / "secret"
     outside.mkdir(exist_ok=True)
-    (outside / "report.md").write_text("TOP SECRET\n", encoding="utf-8")
+    (outside / "report.md").write_text("TOP SECRET\n", encoding="utf-8",
+                                   newline="")
     status, body, _ = _req(f"{web.base}/api/reports/{rid}?fmt=md")
     assert status in (400, 404), (rid, status)
     assert b"TOP SECRET" not in body
@@ -851,7 +860,8 @@ def test_a_session_dir_symlinked_out_of_root_is_refused(web):
     serve any file on the box that happens to be called report.md."""
     outside = web.root.parent / "elsewhere"
     outside.mkdir(exist_ok=True)
-    (outside / "report.md").write_text("TOP SECRET\n", encoding="utf-8")
+    (outside / "report.md").write_text("TOP SECRET\n", encoding="utf-8",
+                                   newline="")
     (outside / "meta.json").write_text("{}", encoding="utf-8")
     link = web.root / "20261118-000000-linked"
     try:

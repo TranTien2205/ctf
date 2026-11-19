@@ -650,6 +650,12 @@ def test_a_failed_spawn_is_a_skipped_run(monkeypatch, tmp_path):
 # -------------------------------------------------------- concurrency
 
 
+#: Long enough that a recorded window survives the coarsest clock in the
+#: matrix. Windows' `time.monotonic()` resolution is ~15.6ms; this is about
+#: ten ticks of it, and still a tenth of a second of test time.
+_HOLD_S = 0.15
+
+
 def test_exploit_fanout_really_runs_endpoints_concurrently(monkeypatch,
                                                            tmp_path):
     """Asserted twice, because wall-clock alone proves nothing.
@@ -669,6 +675,20 @@ def test_exploit_fanout_really_runs_endpoints_concurrently(monkeypatch,
 
     def on_wait(proc, timeout):
         barrier.wait()                  # BrokenBarrierError if serialised
+        # Then HOLD, so the recorded windows are wider than the clock can
+        # quantise. MEASURED on the project's Windows CI jobs, where
+        # `time.monotonic()` has ~15.6ms granularity against ~1ns on Linux:
+        # the three runs recorded [(260.89, 0.016), (260.89, 0.016),
+        # (260.906, 0.0)] - a run faster than one tick records a duration of
+        # ZERO, and a zero-length window cannot strictly intersect anything.
+        #
+        # The fix is not a looser comparison. Adding a tick of slack to both
+        # sides would make the SERIAL case below overlap too, and that is
+        # the direction that matters. So the measurement is made resolvable
+        # instead: the barrier already proves all three are in flight, and
+        # this hold makes the overlap an order of magnitude wider than the
+        # coarsest clock either platform has.
+        time.sleep(_HOLD_S)
 
     spawns = Spawns(stdout=b"HTTP/1.1 200 OK\r\n\r\nok", on_wait=on_wait)
     monkeypatch.setattr(orch.subprocess, "Popen", spawns)
