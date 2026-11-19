@@ -5689,3 +5689,61 @@ def test_the_cwe_relation_check_sees_a_planted_dead_entry():
     assert alias in wrong, (
         f"a planted disagreement on {alias} (canonical {canon}) is not "
         "detected, so the relation above is not being checked")
+
+
+def test_a_class_with_no_required_checks_can_never_grade_proven():
+    """THE VACUOUS-TRUTH TRAP, asserted because nobody sees it when it
+    breaks.
+
+    `_grade` reads `if required and all(name in passed for name in
+    required)`. Remove the leading `required and` and the expression becomes
+    `all(... for ... in ())`, which is **True** - so a class with an empty
+    `required` tuple would grade EVERY record `proven`, including a record
+    holding nothing at all.
+
+    Measured in this tree: 28 of 29 classes carry at least two required
+    checks, and exactly one carries none - `dos`, which is also the only
+    REFUSED class ("Denial of service is out of scope by construction: the
+    proof is the damage"). So the hazard has no occupant today, and
+    `add_finding` refuses that class outright before grading is reached.
+
+    What this holds is the next class someone adds. A new entry with no
+    checks and no refusal is unprovable by construction, and must grade
+    `unproven` rather than inherit a vacuous `proven`.
+    """
+    from argus.proof import _grade
+
+    assert _grade([], ()) == "unproven"
+    assert _grade([{"check": "x", "ok": True}], ()) == "unproven"
+    assert _grade([{"check": "x", "ok": True}], ("x",)) == "proven", \
+        "premise: a real requirement still grades proven when met"
+
+
+def test_the_only_class_without_required_checks_is_the_refused_one():
+    """ONE CONCEPT, TWO LISTS - asserted between them.
+
+    "Cannot be proven" and "is refused" must name the same class. A class
+    with no checks that is not refused would be offered to an agent as
+    something to prove and could never reach `proven`; a refused class WITH
+    checks would imply it can be proven while policy says the proof is the
+    damage.
+
+    Found while measuring whether every requirement demands a control. The
+    keyword search that started it was useless - controls are written in
+    each class's own language ("the rows are not what the page serves
+    anyway", "another credential refused on the same endpoint"), so a word
+    list reported 16 of 29 classes missing one. The check-count is the
+    measure that does not depend on vocabulary.
+    """
+    from argus import proof
+
+    specs = {}
+    for spec in proof.MATRIX.values():
+        specs.setdefault(spec.vuln_class, spec)
+
+    checkless = {c for c, s in specs.items() if not (s.required or ())}
+    refused = {c for c, s in specs.items() if str(s.refusal or "").strip()}
+    assert checkless == refused, (
+        f"classes with no required checks {sorted(checkless)} and refused "
+        f"classes {sorted(refused)} must be the same set")
+    assert refused, "premise: this tree refuses at least one class"

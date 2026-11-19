@@ -7773,12 +7773,72 @@ class. So a tampered findings.json cannot soften the bar it is judged
 against - asserted now by planting "any 200 response will do" as a
 finding's own requirement and requiring the real one to appear instead.
 
+### The vacuous-truth trap in the grader, and the invariant that has no occupant
+
+Asked the question the supervisor's MITRE point implies: does every class's
+proof requirement demand evidence of the WEAKNESS, or only of a symptom -
+which means, does each one require a control as well as an artifact?
+
+THE FIRST INSTRUMENT WAS USELESS, and that is the finding about method.
+A keyword search over the requirement prose reported 16 of 29 classes
+missing a control, including sqli, rce, xss and idor, which plainly have
+one. Controls are written in each class's own language: "the rows are not
+what the page serves anyway", "another credential refused on the same
+endpoint", "a nonce that was never sent". A word list cannot see them.
+Thirteenth wrong instrument in this session, same shape as the rest - a
+pattern narrower than the concept.
+
+THE MEASURE THAT DOES NOT DEPEND ON VOCABULARY is the check count, since a
+class with one required check cannot hold both an artifact and a control:
+
+    four required checks   5 of them
+    three                  7
+    two                    16
+    none                   1   <- dos, and it is the only REFUSED class
+
+DESCRIBED, NOT TABULATED, and the first version of that table broke the
+gate: the class-count check reads a number followed by the plural of the
+word "class" as a claim about how many of them exist, so a distribution
+tabulated in that form reads as several competing claims about the total.
+
+Sixth time in this session that a write-up broke the gate it was
+describing, and the first where the reproduced thing was a NUMBER rather
+than a name. THEN THE PARAGRAPH EXPLAINING THAT broke it again, by
+tabulating the offending form inside quotation marks to show what not to
+write - in the same sentence that states the rule "anything a gate scans
+for is unsafe to reproduce, whatever its type". Seventh instance, inside
+the explanation of the sixth.
+
+There is no clever version of this. The only form that survives is to
+describe the shape in words and never to lay it out.
+
+So 28 of 29 are structurally capable of an asymmetry, and the 29th cannot
+be proven at all because policy says the proof is the damage.
+`add_finding` refuses that class outright before grading is reached.
+
+AND THE GRADER ALREADY GUARDS THE TRAP THAT ZERO CHECKS OPENS. `_grade`
+reads `if required and all(name in passed for name in required)`. Without
+the leading `required and`, the expression is `all(... for ... in ())`,
+which is True - so a class with an empty requirement would grade EVERY
+record `proven`, including a record holding nothing. Confirmed by removing
+the guard: the test goes red.
+
+TWO LISTS, ONE CONCEPT, asserted between them: "cannot be proven" and "is
+refused" must name the same set. A checkless class that is not refused
+would be offered to an agent as something to prove and could never reach
+`proven`; a refused class with checks would imply it can be proven while
+policy says otherwise. Planted both directions.
+
+The invariant has no occupant today, which is the reason to assert it now
+rather than later - the next class added with no checks is the one it is
+for, and nobody sees a vacuous truth when it breaks.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1171 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1173 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
