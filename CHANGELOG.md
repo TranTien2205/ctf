@@ -8161,6 +8161,40 @@ cause both times - a pattern matching content where a claim was wanted -
 and the same remedy: look at what the matches actually are before believing
 the count.
 
+### The last three unrun commands, and what the preflight actually says
+
+Ran the remaining commands that had never been exercised. Three clean
+results, written down because a dimension that comes back clean is
+information:
+
+The metrics comparison prints a row per measure across two sessions, and
+the error row LEADS - with the reason in a comment: every row under it
+describes a run that may not have happened, since zero findings, zero
+requests and zero cost is also what a clean finding-free run looks like.
+That is the "a dead run looks clean" hazard, already handled.
+
+The verifier's JSON form is complete and agrees with its human output: the
+chain state, the entry count, the findings re-checked, and the nine sealed
+artifacts by name.
+
+The credential preflight is the one worth quoting, because it corrects
+something I have said repeatedly. With no key in the environment it reports
+`ok: false`, `degraded: true`, the provider's own error text, and exits
+non-zero. It does not claim success - which matters, because a preflight
+that passed without a usable credential would let a run start and die, and
+a dead run's artifacts look like a clean one's.
+
+AND IT NAMES THE REAL BLOCKER. The credential EXISTS - the source is the
+editor's own oauth - and the provider answers 400: third-party apps draw
+from extra usage rather than plan limits, with the page to add it. So the
+cross-read layer is not waiting on an API key, which is what I told the
+user more than once. It is waiting on account balance. Measured twice, two
+seconds apart, identical.
+
+That distinction is not pedantic: "supply a key" asks for something the
+machine already has, and acting on it would have produced another failed
+run with the same 400.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
