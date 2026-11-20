@@ -8396,12 +8396,65 @@ window either way.
 Planted to confirm the widened test still catches the real thing: with the
 process-group kill removed, the orphan survives and the test is red.
 
+### A finding dropped for bad evidence, and nothing said it existed
+
+Swept the generalisation of the diff-caveat fix: where else does the tool
+know something and only stderr say it? Eighteen warnings qualify by
+wording; the ones that matter are the exclusions that change a number.
+
+The strongest is on the finding axis. The render drops findings whose cited
+evidence no longer re-validates - correctly - and warns on stderr.
+Measured: six findings recorded, five rendered, and the document mentioned
+the sixth ZERO times. Not a finding that looked wrong; a finding that
+DISAPPEARED, with a tally and a count that silently described five.
+
+Both renderers now name it, through one function, and the omission notice
+is absent on a clean render where it would teach a reader to skip it.
+
+AND THE CROSS-ARTIFACT TEST I ADDED EARLIER ASSERTED THE WRONG INVARIANT.
+It required every id in findings.json to appear in every artifact, which
+would fail a render that was behaving correctly - the one session where the
+test matters is the one where an exclusion is right. The correct invariant
+is that an id is either SHOWN or NAMED AS OMITTED.
+
+Holding that is what caught the html renderer still being silent after
+markdown was fixed: the fifth time in this session a fix landed in one
+renderer and missed its sibling, and the FIRST caught by an invariant added
+earlier the same day rather than by a later audit. That is the first
+evidence in this session that the invariants are doing work after the fact
+and not only describing fixes already made.
+
+Three plants: markdown silent fails, html silent fails, and claiming
+verified over an omission fails.
+
+AND THE GATE CAUGHT THE INTERACTION. A pre-existing test asserted the
+dropped id appears NOWHERE in the report - `"F99" not in rep` - which the
+omission notice violates by naming it. The old assertion was the coarse
+form of a real concern: an id in the report could be mistaken for a
+reported finding.
+
+Naming is the more honest form in both cases that test covers. For a row
+planted by a tamperer, naming it says someone added F99 and it was
+rejected; for a real finding whose evidence broke, naming it says a
+recorded claim was dropped. And the notice reads "recorded in findings.json
+and NOT shown here", so the form cannot be read as a reported finding -
+which is exactly what the old assertion was protecting.
+
+So the assertion moved from presence to FORM: the id must not head a
+finding block, and it must be named as omitted. Planted the defect that
+test exists for - not excluding a tampered finding at all - and it is red,
+so the stronger assertion did not cost the original coverage.
+
+Third time today an assertion of the shape "this string is absent" had to
+become "this claim is not made in this form", after the cross-verification
+absence line and the dispute attribution.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1191 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1193 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

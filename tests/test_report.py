@@ -19,7 +19,25 @@ def test_report_excludes_tampered_findings(tmp_path, capsys):
     err = capsys.readouterr().err
     assert "F99" in err and "re-validation" in err
     rep = (sdir / "report.md").read_text(encoding="utf-8")
-    assert "F99" not in rep and "F01" in rep
+    # NOT AS A FINDING, and NAMED as omitted. The assertion here was
+    # `"F99" not in rep`, which forbade the id anywhere - and the report now
+    # names what it dropped, because a reader who sees five findings where
+    # six were recorded cannot otherwise tell the sixth existed.
+    #
+    # Naming is the more honest form in BOTH cases this covers. For a row
+    # planted by a tamperer, naming it says someone added F99 and it was
+    # rejected; for a real finding whose evidence broke, naming it says a
+    # recorded claim was dropped. The notice reads "recorded in
+    # findings.json and NOT shown here", so the form cannot be mistaken for
+    # a reported finding - which is what the old assertion was protecting.
+    import re as _re
+
+    assert not _re.search(r"^#{2,4}\s*F99\b", rep, _re.M), \
+        "the fabricated finding is rendered as a finding"
+    assert "F99" in rep and "NOT shown" in rep, \
+        "the report drops F99 without telling the reader it existed"
+    assert _re.search(r"^#{2,4}\s*F01\b", rep, _re.M), \
+        "a real finding must still be rendered as one"
     # `argus findings` keeps the forensic listing but flags the bad row
     assert main(["findings", str(sdir)]) == 0
     out = capsys.readouterr()
@@ -1056,8 +1074,14 @@ def test_every_artifact_reports_the_same_findings(tmp_path):
         assert n == len(ids), (
             f"{name} reports {n} findings, findings.json holds {len(ids)}")
 
+    # EVERY FINDING, OR THE OMISSION NAMED - which is the correct invariant
+    # and not the one this test first asserted. The render deliberately
+    # drops findings whose evidence no longer re-validates, so "all ids
+    # appear" is wrong on exactly the session where it matters: it would
+    # fail a render that was behaving correctly. What must hold is that an
+    # id is either shown or named as omitted.
     for fid in ids:
-        assert fid in md, f"{fid} is missing from report.md"
+        assert fid in md, f"{fid} is neither rendered nor named in report.md"
         assert fid in html, f"{fid} is missing from report.html"
 
     from collections import Counter
@@ -1247,3 +1271,56 @@ def test_the_verified_line_names_what_it_checked(tmp_path):
     nums = [int(n) for n in re.findall(r"(\d+)", line)]
     assert len(nums) >= 2, line
     assert nums[0] > 0 and nums[1] > 0, line
+
+
+def test_a_finding_dropped_for_bad_evidence_is_named(tmp_path, capsys):
+    """THE STRONGEST FORM of a deliverable not saying what it knows: a
+    finding did not merely look wrong, it DISAPPEARED.
+
+    The render drops findings whose cited evidence no longer re-validates -
+    correctly - and warned on stderr. Measured: six findings recorded, five
+    rendered, and the document mentioned the sixth zero times. A reader saw
+    five findings and nothing saying a sixth existed.
+
+    And the cross-artifact test added earlier asserted "every id appears",
+    which is the WRONG invariant: it would fail a render that was behaving
+    correctly. The right one is that an id is either shown or named as
+    omitted - and holding it is what caught the html renderer still being
+    silent after markdown was fixed, the fifth sibling-renderer miss of the
+    session and the first caught by an invariant rather than an audit.
+    """
+    import json
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+
+    rows = json.loads((sdir / "findings.json").read_text(encoding="utf-8"))
+    victim = str(rows[-1]["id"])
+    rows[-1]["evidence_excerpt"] = "NEVER APPEARED IN ANY RESPONSE"
+    (sdir / "findings.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["report", str(sdir)]) == 0
+    assert "re-validation" in capsys.readouterr().err
+
+    for name in ("report.md", "report.html"):
+        text = (sdir / name).read_text(encoding="utf-8")
+        assert victim in text, (
+            f"{name} dropped {victim} without naming it - a reader cannot "
+            "tell a finding existed")
+        assert "NOT shown" in text, f"{name} does not say what it omitted"
+
+
+def test_nothing_is_named_as_omitted_when_nothing_was(tmp_path):
+    """The direction that keeps the notice off a clean render, where it
+    would teach a reader to skip it."""
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+    for name in ("report.md", "report.html"):
+        text = (sdir / name).read_text(encoding="utf-8")
+        assert "NOT shown" not in text
+        assert "Record verified" in text or "verified:" in text.lower()

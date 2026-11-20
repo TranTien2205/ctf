@@ -502,6 +502,33 @@ def _record_state(session) -> list[str]:
         problems.append("this record was re-sealed over a mismatch, so the "
                         "current digests do not attest the original run")
 
+    # AND WHAT THIS RENDER LEFT OUT. The caller drops findings whose
+    # evidence no longer re-validates - correctly - by filtering the list
+    # before rendering, and warns on stderr. So a reader of this document
+    # saw five findings where six were recorded, with nothing naming the
+    # sixth: the strongest form of the deliverable not saying what it
+    # knows, because a finding did not merely look wrong, it DISAPPEARED.
+    #
+    # Computed here rather than plumbed through, so it holds for any caller
+    # that filters before rendering: the ids on disk minus the ids being
+    # rendered are exactly what this render omits.
+    dropped: list[str] = []
+    try:
+        on_disk = json.loads((Path(session.dir) / "findings.json").read_text(
+            encoding="utf-8"))
+        shown = {str(f.get("id")) for f in (session.findings or [])
+                 if isinstance(f, dict)}
+        dropped = sorted(str(f.get("id")) for f in on_disk
+                         if isinstance(f, dict)
+                         and str(f.get("id")) not in shown)
+    except Exception:                                         # noqa: BLE001
+        dropped = []
+    if dropped:
+        problems.append(
+            f"{', '.join(dropped)} recorded in findings.json and NOT shown "
+            "here, because the cited evidence no longer re-validates "
+            "against the transcript")
+
     if not problems:
         return [f"_Record verified: {v.get('entries', 0)} chained transcript "
                 f"entries, {v.get('findings_checked', 0)} findings "
