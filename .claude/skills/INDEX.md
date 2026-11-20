@@ -19,8 +19,8 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 6,574,000 tokens across 60041 files. Opening
-`skills/web-host-header/` alone is about 135,000. A router is 100–1,300 tokens and a
+The depth corpus is roughly 6,719,000 tokens across 60965 files. Opening
+`skills/ctf-osint/` alone is about 160,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
 whatever that file happened to describe.
@@ -201,7 +201,7 @@ that file and this table would drift.
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.8k | the primitive parameters are collected |
 | `skills/ctf-forensics/SKILL.md` | depth | ~2.8k | the artifact type is identified |
 | `skills/ctf-malware/SKILL.md` | depth | ~2.1k | obfuscated script, PE/.NET sample, or captured C2 traffic |
-| `skills/ctf-osint/SKILL.md` | depth | ~2.4k | one unique pivot is extracted |
+| `skills/ctf-osint/SKILL.md` | depth | ~3.2k | one unique pivot is extracted |
 | `skills/ctf-pwn/SKILL.md` | depth | ~4.8k | the crash is reproduced and a named technique is needed |
 | `skills/ctf-reverse/SKILL.md` | depth | ~3.3k | the runtime or packer is named |
 | `skills/ctf-web/SKILL.md` | depth | ~2.8k | a narrower web class lacked the variant; open one named file |

@@ -1,0 +1,12 @@
+# Trap: protected-profile assumptions
+
+Depth module for `ctf-osint`. Open `../SKILL.md` for the quick-reference
+index first; this file is one named piece of the corpus - never a
+finding by itself. Every claim still needs the live source that
+produced it.
+
+A protected account's public metadata (avatar, bio, join date) still leaks - the protected posts aren't the only surface.
+
+## Pivot
+
+Module read -> the shared file or class skill it names.

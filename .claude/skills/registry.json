@@ -676,9 +676,9 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 2402,
-      "depth_files": 3,
-      "depth_tokens": 13065,
+      "skill_tokens": 3164,
+      "depth_files": 927,
+      "depth_tokens": 156707,
       "use_when": [
         "one unique pivot has been extracted and a specific source has to be worked"
       ],

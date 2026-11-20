@@ -197,3 +197,27 @@ Lookup usernames across gaming platforms (Steam, Xbox, PSN, MMOs) for character 
 - **VirusTotal** - File/URL reputation
 - **WHOIS** - Domain registration
 - **Wayback Machine** - Historical snapshots
+
+## references/ corpus
+
+The generated depth modules - open one named module after the quick
+reference above has picked the family. Each `*-route.md` is the
+routing card for its base module.
+
+- `references/work-*.md` - reading order, pivot discipline, evidence standard
+- `references/meth-*.md` - methods: carrier identification, elimination, unique pivot, source order, timelines, cross-referencing, image inventory, crop strategy, sign OCR, infrastructure matching, panorama matching, coordinate decode, handle enrichment, email formats, breach correlation, timestamp merge, elimination grid, second-source rule
+- `references/geo-*.md` - geolocation features: driving side, road lines, signs, vegetation, architecture, plates, power lines, language, sun, terrain, bollards, domains, phones, street view coverage, panoramas, Overpass/OpenInfraMap, plus codes, MGRS, what3words, Baidu/Yandex, crowd photos, landmark matching, geo-to-flag encodings
+- `references/soc-*.md` - platforms: twitter ID/snowflake/nitter/memory.lol, tumblr, bluesky API, discord, telegram, github, username enumeration, strava, gaming, linkedin, reddit, instagram, tiktok, youtube, keybase, email reputation, avatar reverse search
+- `references/dns-*.md` - records: TXT, AXFR, CT logs, passive DNS, WHOIS, reverse WHOIS, ASN, shodan, censys, SSH fingerprint, subdomain enum, DNS history, MX/SPF pivots, tor relays
+- `references/meta-*.md` - metadata: EXIF, XMP, PDF, office, video, audio, git, image strings, hash lookups, IOC pivots
+- `references/arch-*.md` - archives: wayback, CDX API, archive.today, common crawl, github history, caches, wayback diffs, newspaper, WHOIS history, certificate history
+- `references/plat-*.md` - search surfaces: operators, TBS filters, lens, tineye, yandex/baidu images, gdocs endpoints, maps layers, OSM, government records
+- `references/pp-*.md` - platform deep-dives: twitter advanced/metadata/archives, reddit, github code/gists, linkedin, discord invites, telegram channels, mastodon, pastebins, forums, pinterest, flickr, steam
+- `references/scen-*.md` - scenarios: photo->location, handle->person, domain->flag, hidden data, deleted content, hash->identity, WHOIS history, email/phone/IP pivots, cert siblings, multi-image decode, chained pivots, event tracing, timeline questions
+- `references/gx-*.md` - geo feature x question matrix (34 features x 3 granularities)
+- `references/px-*.md` - platform x attribute matrix (18 platforms x 5 attribute families)
+- `references/rx-*.md` - record x question matrix (20 record types x 4 questions)
+- `references/tool-*.md` - exiftool, dig, whois, shodan, ffuf vhosts, imagemagick, archive fetch, gh api, reverse image, jq
+- `references/q-*.md`, `references/trap-*.md`, `references/neg-*.md` - questions, traps (reissued handles, stock photos, AI images, game scenes, timezone, expired domains, protected profiles, aggregator freshness, bots), negatives
+- `references/cross-*.md` - handoffs to osint-* class skills, forensics, web
+- `references/agg-*.md` - corpus index
