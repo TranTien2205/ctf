@@ -871,9 +871,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5031,
-      "depth_files": 1,
-      "depth_tokens": 158,
+      "skill_tokens": 5268,
+      "depth_files": 2841,
+      "depth_tokens": 54927,
       "use_when": [
         "a probe or source read produced this class's signal: build a bodyfile from the filesystem metadata and read the entries inside the intrusion window in chronological order"
       ],

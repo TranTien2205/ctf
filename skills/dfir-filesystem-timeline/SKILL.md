@@ -263,8 +263,28 @@ with its inode and attribute source; a bare filename match is surface evidence.
 
 Shares signals with `../dfir-antiforensics-trace/` (the divergence itself is the question) and
 `../dfir-execution-trace/` (the file is only evidence a process ran); check those first. Depth, one file
-at a time: `../dfir-sherlock-triage/filesystem-timeline.md`, then `../ctf-forensics/windows.md`. Signals
-are in `knowledge/bug-classes.json`; classify with `python3 tools/classify.py`.
+at a time: `../dfir-sherlock-triage/filesystem-timeline.md`, then `../ctf-forensics/windows.md`.
+
+This skill's own corpus — route first:
+
+- `references/the-state-vs-order.md` — `$MFT` is state, `$J` is order
+- `references/the-map-index.md` — the full reference map
+
+Concept guides — the-model modules: `references/the-4+4.md`,
+`references/the-reason-bits.md`, `references/the-utc-clock.md`,
+`references/the-deleted-file.md`, `references/the-merge.md`,
+`references/the-worked.md`. The artifact modules (`mft-`, `usn-`,
+`recycle-`, `info2-`, `lnk-`, `destlist-`, `shellbags-`, `zone-`,
+`logfile-`, `objid-`, `secure-`, `boot-`, `fsevents-`, `ext4-`,
+`indx-`, `thumbcache-`) cover artifact x question pairs; the `tool-`
+modules cover sleuthkit/stdlib-tool x artifact pairs.
+
+Discipline — the-standard modules: `references/the-confirm.md`,
+`references/the-falsifier.md`, `references/the-evidence.md`,
+`references/the-traps.md`, `references/the-checklist.md`,
+`references/the-boundary.md`, `references/the-detection.md`.
+
+Signals are in `knowledge/bug-classes.json`; classify with `python3 tools/classify.py`.
 
 ## Discipline
 
