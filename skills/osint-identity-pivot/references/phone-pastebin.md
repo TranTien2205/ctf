@@ -1,0 +1,7 @@
+# a phone number pivoted via Pastebin/pastes
+
+**Pivot:** a phone number — messaging-app profiles + breaches.
+
+**Source:** Pastebin/pastes — posted secrets/keys.
+
+Normalise the pivot, then one query per source with a verbatim note; corroborate across two attributes.

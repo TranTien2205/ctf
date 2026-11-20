@@ -1248,9 +1248,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 963,
-      "depth_files": 3,
-      "depth_tokens": 796,
+      "skill_tokens": 1059,
+      "depth_files": 2751,
+      "depth_tokens": 59240,
       "use_when": [
         "a probe or source read produced this class's signal: extract the single most UNIQUE pivot and normalise it -- compute the key fingerprint rather than eyeballing it -- then produce an ordered plan of at most six queries, each with its source and the one fact it would confirm, for ctf-writeup-scout to run"
       ],

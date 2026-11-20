@@ -73,6 +73,11 @@ Depth, one named file at a time:
 - `skills/osint-triage/references/legal-considerations.md`
 
 | Any handle/identity pivot question | `references/handle-pivot.md` |
+| The workflow | `references/the-workflow.md` |
+| Choosing + normalising the pivot | `references/the-pivot.md`, `references/the-normalise.md` |
+| The plan + corroboration | `references/the-plan.md`, `references/the-corroborate.md` |
+| Pivot → source and source → attribute matrices | per-pivot/src modules under `references/` |
+| Corpus map | `references/the-map-index.md` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
