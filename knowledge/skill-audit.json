@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T06:55:27",
+  "generated_at": "2026-11-20T07:09:50",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -470,8 +470,8 @@
       "local_evidence": "stub",
       "lines": 250,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-stego",
-      "overlap": 0.069,
+      "nearest_neighbour": "forensics-pcap-carve",
+      "overlap": 0.072,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -516,10 +516,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 112,
+      "lines": 122,
       "actionability": "operational",
       "nearest_neighbour": "misc-constraint-puzzle",
-      "overlap": 0.15,
+      "overlap": 0.129,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -534,8 +534,8 @@
       "local_evidence": "stub",
       "lines": 147,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.111,
+      "nearest_neighbour": "forensics-pcap-carve",
+      "overlap": 0.114,
       "trust": "catalogue-or-unreviewed"
     },
     {

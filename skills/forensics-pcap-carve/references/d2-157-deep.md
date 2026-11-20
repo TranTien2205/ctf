@@ -1,0 +1,5 @@
+# Pcap encoding note 157 — deep
+
+Companion to `d2-157.md`.
+
+An encoding detail — the carved bytes may be hex/b32/b64/xor — decode the reassembled stream.

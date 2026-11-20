@@ -1063,9 +1063,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1276,
-      "depth_files": 3,
-      "depth_tokens": 675,
+      "skill_tokens": 1605,
+      "depth_files": 2521,
+      "depth_tokens": 69609,
       "use_when": [
         "a probe or source read produced this class's signal: protocol-hierarchy count first, then follow the protocol that dominates — the flag rides the busiest channel"
       ],

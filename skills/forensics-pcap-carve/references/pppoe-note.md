@@ -1,0 +1,3 @@
+# PPPoE
+
+The discovery/session.

@@ -101,6 +101,16 @@ Depth, one named file at a time:
 - `skills/forensics-pcap-carve/references/README.md`
 - `skills/forensics-pcap-carve/references/extraction-order.md`
 
+## The corpus — the workflow's anchors
+
+`references/` carries ~2,520 modules. Start from these:
+
+- The route — `references/the-workflow.md`, `references/the-hierarchy.md`, `references/the-map-index.md`, `references/the-detection.md`, `references/the-common-hides.md`
+- Carriers — `references/the-export.md`, `references/the-field-carve.md`, `references/the-follow.md`, `references/the-dns.md`, `references/the-icmp.md`, `references/the-usb.md`, `references/the-rtp.md`, `references/the-har.md`, `references/the-data-proto.md`, `references/the-split-flag.md`, `references/the-reassembly-note.md`
+- Detail indexes — the `proto-` modules name every protocol's carve surface, the `fld-` modules every field carrier, the `shape-` modules every split/chunk/tunnel shape, all under `references/`
+- Field matrix — `references/the-field-matrix.md`, `references/the-tunnel-note.md`, `references/the-object-note.md`, `references/the-stream-note.md`
+- Discipline — `references/the-verify.md`, `references/the-falsifier.md`, `references/the-evidence.md`, `references/the-boundary.md`, `references/the-traps.md`, `references/the-checklist.md`, `references/the-worked-dns.md`, `references/the-worked-usb.md`, `references/the-worked-http.md`, `references/the-worked-icmp.md`, `references/the-worked-field.md`
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

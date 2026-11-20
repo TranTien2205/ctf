@@ -1,0 +1,3 @@
+# WireGuard
+
+Encrypted — metadata only.
