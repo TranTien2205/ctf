@@ -40,13 +40,13 @@ the output, not on the input.
 
 | Layer stack | Recognize |
 |---|---|
-| base64 → base32 → hex → text | the shrinking alphabet ladder |
-| compressed → base64 | `PK`, `1f 8b`, `BZh` magic under the base64 |
+| base64 -> base32 -> hex -> text | the shrinking alphabet ladder |
+| compressed -> base64 | `PK`, `1f 8b`, `BZh` magic under the base64 |
 | charset-substituted base64 | same alphabet, wrong order — solve the map first |
 | whitespace/zero-width | `xxd -g1` shows the bytes the terminal hides |
 | emoji/unicode-encoded | zero-width joiner and regional-indicator tricks |
-| audio → morse / spectral | `sox`, spectogram view in Audacity |
-| image → LSB / palette | `zsteg`, `stegsolve`, `steghide` |
+| audio -> morse / spectral | `sox`, spectogram view in Audacity |
+| image -> LSB / palette | `zsteg`, `stegsolve`, `steghide` |
 
 ## Falsifier
 

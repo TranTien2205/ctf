@@ -74,13 +74,34 @@ a decode chain.
 
 Shares signals with: `../misc-interpreter-escape/`, `../crypto-symmetric-oracle/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time. Route first:
 
-- `skills/ctf-misc/encoding-and-cipher.md`
-- `skills/ctf-misc/encodings.md`
-- `skills/ctf-crypto/classic-ciphers.md`
+- `skills/ctf-misc/encoding-and-cipher.md`, `skills/ctf-misc/encodings.md`,
+  `skills/ctf-crypto/classic-ciphers.md` — the ctf-misc/crypto corpus
+- `references/layer-identification.md` — the layer table
+- `references/the-id-first.md` — identify the carrier before decoding
+- `references/the-map-index.md` — the full reference map
 
-| Any encoding/carrier question | `references/layer-identification.md` |
+Method guides — the-method modules: `references/the-id-first.md`,
+`references/the-decoders.md`, `references/the-decode-twice.md`,
+`references/the-ic.md`, `references/the-alphabet.md`,
+`references/the-urlsafe.md`, `references/the-esolang.md`,
+`references/the-workflow.md`, `references/the-order.md`. The carrier
+modules (`hex-`, `b64-`, `b32-`, `b85-`, `b58-`, `url-`, `html-`,
+`unicode-`, `bin-`, `oct-`, `dec-`, `morse-`, `gzip-`, `zip-`, `uu-`,
+`rot13-`, `base65536-`, `base91-`, `quoted-`, `brainfuck-`) cover
+carrier x layer pairs; the `ct-` modules cover cipher-test x carrier.
+
+Discipline — the-standard modules: `references/the-confirm.md`,
+`references/the-falsifier.md`, `references/the-traps.md`,
+`references/the-evidence.md`, `references/the-checklist.md`,
+`references/the-boundary.md`, `references/the-detection.md`,
+`references/the-worked.md`, `references/the-magic.md`,
+`references/the-odd-length.md`, `references/the-nibble.md`,
+`references/the-container.md`, `references/the-proof.md`,
+`references/the-stuck.md`, `references/the-note.md`,
+`references/the-neg.md`, `references/the-close-enc.md`,
+`references/the-budget-enc.md`, `references/the-last-enc.md`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
