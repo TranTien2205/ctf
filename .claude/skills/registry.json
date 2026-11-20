@@ -761,9 +761,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5722,
-      "depth_files": 1,
-      "depth_tokens": 161,
+      "skill_tokens": 5899,
+      "depth_files": 491,
+      "depth_tokens": 90502,
       "use_when": [
         "a probe or source read produced this class's signal: look for Security 1102 and, whether or not it is present, read the event record identifiers in order and report the largest discontinuity"
       ],

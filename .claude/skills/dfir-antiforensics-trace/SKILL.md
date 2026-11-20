@@ -218,6 +218,15 @@ Shares signals with `../dfir-filesystem-timeline/` - when the question wants *wh
 `../dfir-persistence-trace/`, because a stopped service can be persistence rather than tampering. Check both first. Depth, one file at a time:
 `../dfir-sherlock-triage/windows-event-logs.md`, then `../ctf-forensics/windows.md:481-498`. Signals are in `knowledge/bug-classes.json`; classify with `python3 tools/classify.py`.
 
+The `references/` corpus (490 files, ~10k lines) is indexed at
+`references/corpus-index.md`; question-shaped lookup at `references/question-map.md`;
+`references/cheat-sheet.md` is the one-page command sheet. Prefixes: `evt-` clear/disable events,
+`ts-` timestomping, `del-` deletion/wiping, `def-` Defender events and keys, `qar-` quarantine/MPLog,
+`vss-` shadows and journals, `reg-` registry tampering, `rec-` recovery-table rows, `mx-` destroyed x
+recovery cells (`*-deep` companions), `sig-` command signatures, `q-` question procedures,
+`scen-` scenarios, `deep-` format internals, `meth-` method, `trap-` measured traps, `tool-`
+local tooling, `work-`/`edge-` workflow and boundary cases.
+
 ## Discipline
 
 One artifact family per probe, three attempts, then pivot to the next column of the recovery table rather than a fourth variant of the same query. Quote the artifact and the field
