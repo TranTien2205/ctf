@@ -1,0 +1,7 @@
+# IntegrityLevel on PS classic 400
+
+**Field:** IntegrityLevel — Low/Medium/High/System.
+
+**Artifact:** PS classic 400 — HostApplication verbatim.
+
+The field's presence/absence is itself evidence — a blank CommandLine is policy, not a missing record.

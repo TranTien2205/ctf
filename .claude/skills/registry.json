@@ -844,9 +844,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5830,
-      "depth_files": 1,
-      "depth_tokens": 157,
+      "skill_tokens": 6273,
+      "depth_files": 2720,
+      "depth_tokens": 55904,
       "use_when": [
         "a probe or source read produced this class's signal: filter to Sysmon event 1 or Security 4688 and read the CommandLine and ParentImage of the first match"
       ],

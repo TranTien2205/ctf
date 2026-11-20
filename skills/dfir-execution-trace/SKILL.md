@@ -247,6 +247,39 @@ and prefetch tooling), `../dfir-sherlock-triage/method.md:63-82` (the execution 
 `../ctf-forensics/windows.md:294-354` (timestomping, USN parser), `../ctf-forensics/windows.md:457-479` (MPLog,
 DetectionHistory). Classify with `python3 tools/classify.py`.
 
+This skill's own corpus — route first:
+
+- `references/the-map-index.md` — the full reference map
+- `references/the-pguid-join.md`, `references/the-blank-cmdline.md`,
+  `references/the-4688-versions.md` — the three reads that decide the trace
+
+Artifact guides — the-record modules: `references/the-prefetch-table.md`,
+`references/the-mam.md`, `references/the-prefetch-two.md`,
+`references/the-file-list.md`, `references/the-amcache-sha1.md`,
+`references/the-shimcache-proof.md`, `references/the-userassist.md`,
+`references/the-runmru.md`, `references/the-recentdocs.md`,
+`references/the-pshistory.md`, `references/the-transcripts.md`,
+`references/the-bam.md`, `references/the-sysmon5.md`. The artifact
+modules (`sysmon1-`, `sec4688-`, `ps4104-`, `ps400-`, `prefetch-`,
+`amcache-`, `shimcache-`, `userassist-`, `runmru-`, `recentdocs-`,
+`pshistory-`, `transcript-`, `bam-`, `sysmon3-`, `sysmon11-`,
+`sysmon22-`) cover artifact x question pairs; the `fld-` modules
+cover field x artifact pairs.
+
+Mechanism guides — the-shape modules: `references/the-lolbas.md`,
+`references/the-enc-command.md`, `references/the-4104-parts.md`,
+`references/the-split-4104.md`, `references/the-parent-pair.md`,
+`references/the-hash-field.md`, `references/the-origname.md`,
+`references/the-token.md`, `references/the-sysmon-fields.md`.
+
+Tool/discipline modules: `references/the-jsonl-first.md`,
+`references/the-gap.md`, `references/the-timecol.md`,
+`references/the-confirm.md`, `references/the-falsifier.md`,
+`references/the-evidence.md`, `references/the-traps.md`,
+`references/the-checklist.md`, `references/the-boundary.md`,
+`references/the-detection.md`, `references/the-worked.md`,
+`references/the-close-exec.md`, `references/the-last-exec.md`.
+
 ## Discipline
 
 One field per answer, quoted verbatim. "It was executed" is not a finding unless the record saying so is in the
