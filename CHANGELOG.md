@@ -8333,6 +8333,37 @@ added to this document cited four tests from memory and none existed - the
 gate named all four. Reading them out of the test files first, the doc gate
 passed on the first attempt.
 
+### A test that raced a thread it could simply wait for
+
+CI went red on two of five Windows jobs, same test both times, with the
+sidecar state file still reading `running` where the assertion wanted
+`failed`.
+
+That test asserts a cross-party claim: the API row is derived from the
+directory and turns terminal as soon as the runner returns, while the state
+file is written by the WORKER THREAD. The first remedy for the race was a
+ten-second poll, and the comment recording it said one Windows job had
+failed while ten passed. Two jobs of one run then failed, which settles
+that the window was never the problem - a longer timeout would have made
+the flake rarer and no less wrong.
+
+The registry already joins its worker threads, and that is what the test
+should have done. After the join the flush has happened or the thread is
+gone, so the assertion is exact instead of probable: the sidecar ends up
+terminal, with no claim about when. Five consecutive local runs green.
+
+WHY THE RACE EXISTS, since the fix is only honest with the mechanism named:
+`_set_state` ends by logging the transition, and `log` is what mirrors the
+record to the state file. So the write happens inside the worker thread at
+the transition, after the directory has already become derivable - exactly
+the gap the test was sitting in.
+
+AND THE FIRST PLANT TESTED SOMETHING THE TEST DOES NOT CLAIM. Removing the
+belt-and-braces flush in the worker's `finally` left the test green, which
+looked like a hole until the mechanism above explained it: the transition
+had already written the file. The plant that matters is the one this test
+exists for - making a dead run report `done` - and that one is red.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

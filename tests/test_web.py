@@ -428,17 +428,23 @@ def test_a_runner_that_records_nothing_is_not_reported_done(tmp_path):
         # terminal state skips the stale check, so a `done` written there
         # was permanent.
         #
-        # POLLED, because the API row and this FILE are written by different
-        # parties. The row above is derived from the directory and is
-        # terminal as soon as the runner returns; the sidecar is flushed by
-        # the WORKER THREAD, and asserting it in the same breath read
-        # `'running' == 'failed'` on one Windows CI job while ten others
-        # passed. The claim is that the sidecar ends up terminal, not that
-        # it is written before the response is read.
+        # JOINED, NOT POLLED. The API row and this FILE are written by
+        # different parties: the row is derived from the directory and is
+        # terminal as soon as the runner returns, while the sidecar is
+        # flushed by the WORKER THREAD in its `finally`. Asserting both in
+        # one breath read `'running' == 'failed'` on one Windows CI job; a
+        # 10-second poll was the first remedy and it failed on TWO Windows
+        # jobs of the same run, so the window was never the problem - the
+        # test was racing a thread it can simply wait for.
+        #
+        # `registry.wait()` joins the worker threads, which is what it
+        # exists for. After it returns, the flush has happened or the
+        # thread is gone, and the assertion is exact rather than probable:
+        # the sidecar ends up terminal, with no claim about when.
+        w.registry.wait(30)
         side = root / run_id / api.WEB_STATE_FILE
-        state = _until(lambda: json.loads(
-            side.read_text(encoding="utf-8")).get("state") == "failed")
-        assert state, json.loads(side.read_text(encoding="utf-8"))
+        written = json.loads(side.read_text(encoding="utf-8"))
+        assert written.get("state") == "failed", written
     finally:
         w.srv.shutdown()
         w.srv.server_close()
