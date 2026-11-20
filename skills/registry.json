@@ -1115,9 +1115,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1645,
-      "depth_files": 4,
-      "depth_tokens": 3631,
+      "skill_tokens": 2290,
+      "depth_files": 485,
+      "depth_tokens": 79656,
       "use_when": [
         "the challenge target is an LLM, an agent, or a tool server",
         "an external skill or MCP bundle is being reviewed before install"

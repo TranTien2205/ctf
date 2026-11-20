@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 6,879,000 tokens across 61955 files. Opening
+The depth corpus is roughly 6,956,000 tokens across 62436 files. Opening
 `skills/ctf-osint/` alone is about 160,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -205,7 +205,7 @@ that file and this table would drift.
 | `skills/ctf-pwn/SKILL.md` | depth | ~4.8k | the crash is reproduced and a named technique is needed |
 | `skills/ctf-reverse/SKILL.md` | depth | ~3.3k | the runtime or packer is named |
 | `skills/ctf-web/SKILL.md` | depth | ~2.8k | a narrower web class lacked the variant; open one named file |
-| `skills/mcp-agent-security/SKILL.md` | depth | ~1.6k | the target is an LLM, an agent, or a tool server |
+| `skills/mcp-agent-security/SKILL.md` | depth | ~2.3k | the target is an LLM, an agent, or a tool server |
 | `skills/pwn-rop/SKILL.md` | depth | ~4.9k | instruction-pointer control is proven and NX forces code reuse |
 | `skills/web-chromedriver/SKILL.md` | depth | ~1.7k | an admin bot exists and a client-side payload needs debugging |
 | `skills/web-info-disclosure/SKILL.md` | depth | ~1.5k | an exposed file, debug route, or verbose error is observed |

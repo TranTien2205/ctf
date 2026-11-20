@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T08:31:43",
+  "generated_at": "2026-11-20T18:44:42",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -72,7 +72,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 138
+      "lines": 153
     },
     {
       "id": "dfir-sherlock-triage",
@@ -202,8 +202,8 @@
       "local_evidence": "stub",
       "lines": 104,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.151,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.143,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -234,8 +234,8 @@
       "local_evidence": "stub",
       "lines": 117,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.142,
+      "nearest_neighbour": "crypto-ecc-dlog",
+      "overlap": 0.14,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -262,7 +262,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 125
+      "lines": 146
     },
     {
       "id": "ctf-crypto",
@@ -292,7 +292,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 187
+      "lines": 212
     },
     {
       "id": "ctf-osint",
@@ -302,7 +302,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 200
+      "lines": 224
     },
     {
       "id": "ctf-pwn",
@@ -344,10 +344,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 229,
+      "lines": 238,
       "actionability": "operational",
       "nearest_neighbour": "dfir-filesystem-timeline",
-      "overlap": 0.027,
+      "overlap": 0.025,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -358,10 +358,10 @@
       "score": 90,
       "verdict": "pass",
       "local_evidence": "present",
-      "lines": 232,
+      "lines": 284,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.017,
+      "nearest_neighbour": "misc-encoding-carrier",
+      "overlap": 0.02,
       "trust": "local-confirmed"
     },
     {
@@ -374,10 +374,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 213,
+      "lines": 243,
       "actionability": "operational",
       "nearest_neighbour": "forensics-log-analysis",
-      "overlap": 0.026,
+      "overlap": 0.022,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -390,10 +390,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 255,
+      "lines": 288,
       "actionability": "operational",
-      "nearest_neighbour": "dfir-antiforensics-trace",
-      "overlap": 0.017,
+      "nearest_neighbour": "misc-interpreter-escape",
+      "overlap": 0.022,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -406,10 +406,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 276,
+      "lines": 296,
       "actionability": "operational",
-      "nearest_neighbour": "dfir-antiforensics-trace",
-      "overlap": 0.027,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.031,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -422,7 +422,7 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 229,
+      "lines": 239,
       "actionability": "operational",
       "nearest_neighbour": "forensics-memory-analysis",
       "overlap": 0.032,
@@ -438,9 +438,9 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 214,
+      "lines": 244,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
+      "nearest_neighbour": "dfir-cloud-audit-trace",
       "overlap": 0.02,
       "trust": "catalogue-or-unreviewed"
     },
@@ -518,8 +518,8 @@
       "local_evidence": "stub",
       "lines": 122,
       "actionability": "operational",
-      "nearest_neighbour": "misc-constraint-puzzle",
-      "overlap": 0.129,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.126,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -546,7 +546,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 134
+      "lines": 166
     },
     {
       "id": "misc-constraint-puzzle",
@@ -558,10 +558,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 89,
+      "lines": 129,
       "actionability": "operational",
       "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.183,
+      "overlap": 0.147,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -574,10 +574,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 93,
+      "lines": 114,
       "actionability": "operational",
-      "nearest_neighbour": "misc-constraint-puzzle",
-      "overlap": 0.175,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.15,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -590,10 +590,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 95,
+      "lines": 128,
       "actionability": "operational",
-      "nearest_neighbour": "misc-constraint-puzzle",
-      "overlap": 0.176,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.143,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -606,10 +606,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 87,
+      "lines": 107,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.186,
+      "overlap": 0.154,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -624,8 +624,8 @@
       "local_evidence": "stub",
       "lines": 90,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.181,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.172,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -640,8 +640,8 @@
       "local_evidence": "stub",
       "lines": 92,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.186,
+      "nearest_neighbour": "osint-media-metadata",
+      "overlap": 0.176,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -704,8 +704,8 @@
       "local_evidence": "stub",
       "lines": 101,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.146,
+      "nearest_neighbour": "pwn-format-string",
+      "overlap": 0.145,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -730,8 +730,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.144,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.138,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -746,8 +746,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "misc-constraint-puzzle",
-      "overlap": 0.139,
+      "nearest_neighbour": "rev-managed-code",
+      "overlap": 0.131,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -762,8 +762,8 @@
       "local_evidence": "stub",
       "lines": 97,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.141,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.135,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -846,8 +846,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.172,
+      "nearest_neighbour": "web-graphql",
+      "overlap": 0.164,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -902,7 +902,7 @@
       "local_evidence": "present",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
+      "nearest_neighbour": "web-cors",
       "overlap": 0.164,
       "trust": "local-confirmed"
     },
@@ -918,8 +918,8 @@
       "local_evidence": "stub",
       "lines": 95,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.17,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.159,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -934,8 +934,8 @@
       "local_evidence": "stub",
       "lines": 105,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.042,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.041,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -977,8 +977,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.158,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.152,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -1161,8 +1161,8 @@
       "local_evidence": "stub",
       "lines": 101,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.129,
+      "nearest_neighbour": "web-cors",
+      "overlap": 0.127,
       "trust": "catalogue-or-unreviewed"
     },
     {

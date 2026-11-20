@@ -8,6 +8,13 @@ description: >
 tags: [ai, agent, mcp, prompt-injection, tool-permissions, ctf]
 environment: [ctf, lab, authorized-testing]
 evidence_level: catalogue
+budget:
+  stuck_threshold: 2
+  on_stuck: pivot
+  stop_conditions:
+    - "a second reference file is about to be opened before any probe has run"
+    - "reading has replaced probing: no new observation since this file was opened"
+    - "tools/decide.py returns switch_class or stop_report for this challenge"
 ---
 
 # Agent and tool-surface security
@@ -126,6 +133,31 @@ third-party MCP server you do not operate.
 - `references/prompt-injection-testing.md` — payload shapes and how to read a result
 - `references/tool-permission-audit.md` — tool capability audit checklist
 - `references/adapter-selection.md` — when a docs, browser, proxy, OOB or code-index adapter earns its permissions
+
+## Reference corpus
+
+The three files above are the spine; `references/` carries ~480 named modules
+around them. Open the one the task names - never browse the directory.
+
+| Prefix | Content |
+|---|---|
+| `references/kb-index-of-index.md` | the high-level family map; start here if the task does not name a module |
+| `references/work-*` | reading order, evidence rules, the corpus frame |
+| `references/meth-*` | offensive and audit methods (tool map, injection shapes, exfil, audit shape, protocol internals, schema abuse, confused deputy) |
+| `references/inj-*` | injection vector families (system extract, persona, encoding, split, translate, summarize, completion, few-shot, negation, overflow, format, tag-spoof, unicode) |
+| `references/exf-*` | exfil channel families (tool-arg, URL param, image render, DNS, answer text, file write, tool chain, side channel) |
+| `references/perm-*` | permission audit rows (inventory, fs, net, shell, cred, auto-exec, untrusted input, narrow-vs-broad, default-deny) |
+| `references/mcp-*` | protocol internals (JSON-RPC, tools/list, tools/call, resources, prompts, sampling, roots, notifications, auth, server trust) |
+| `references/tool-*` | adapter inventory (browser, proxy, shell, OOB, docs, code-index) and the audit output shape |
+| `references/scen-*` | challenge scenarios (flag-in-prompt, behind-tool, file-via-agent, exfil-via-fetch, indirect-doc, audit, tool-enum) |
+| `references/def-*` | defensive audit modules (provenance, perm-gap, injection surface, auto-exec, supply, schema truth, secrets, logging) |
+| `references/wf-*` | workflow modules (offensive loop, map-first, injection order, exfil choice, evidence, audit loop, field notes) |
+| `references/ev-*` | evidence shapes (tool result, verifier, model-assertion-never, callback, file bytes, state change) |
+| `references/kb-*` | knowledge bank (confused deputy, lethal trifecta, tool poisoning, rug pull, sampling abuse, shadowing, context integrity, multi-agent) |
+| `references/tx-*` | tool-type x risk matrix cells |
+| `references/vx-*` | injection-vector x channel matrix cells |
+| `references/fx-*` | flag-location x reach-method matrix cells |
+| `references/` -route companions | one per module, naming when to open it |
 
 ## Routing
 
