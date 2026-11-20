@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T06:43:40",
+  "generated_at": "2026-11-20T06:55:27",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -470,8 +470,8 @@
       "local_evidence": "stub",
       "lines": 250,
       "actionability": "operational",
-      "nearest_neighbour": "rev-managed-code",
-      "overlap": 0.068,
+      "nearest_neighbour": "forensics-stego",
+      "overlap": 0.069,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -532,10 +532,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 135,
+      "lines": 147,
       "actionability": "operational",
       "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.127,
+      "overlap": 0.111,
       "trust": "catalogue-or-unreviewed"
     },
     {

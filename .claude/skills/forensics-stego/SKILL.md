@@ -124,6 +124,18 @@ Depth, one named file at a time:
 - `skills/forensics-stego/references/README.md`
 - `skills/forensics-stego/references/carrier-table.md`
 
+## The corpus — the workflow's anchors
+
+`references/` carries ~2,630 modules. Start from these:
+
+- The route — `references/the-workflow.md`, `references/the-carrier.md`, `references/the-map-index.md`, `references/the-detection.md`
+- Cheap channels first — `references/the-appended.md`, `references/the-embedded.md`, `references/the-metadata.md`, `references/the-carve-scan.md`, `references/the-img-struct.md`
+- PNG — `references/the-png-lsb.md`, `references/the-png-chunks.md`, `references/the-broken-png.md`, `references/the-lsb-scan.md`, `references/the-png-fix.md`
+- JPEG — `references/the-jpeg.md`, `references/the-steghide-pass.md`, `references/the-outguess.md`, `references/stegdetect.md`
+- Audio — `references/the-wav.md`, `references/the-dtmf.md`, `references/the-spectro.md`, `references/the-rtp.md`, `references/the-lsb-scan.md`
+- The LSB matrix — `references/the-planes.md`, `references/the-channel.md`, `references/the-order.md`, `references/the-noise-test.md`, and the mx- cell modules under `references/`
+- Discipline — `references/the-verify.md`, `references/the-falsifier.md`, `references/the-evidence.md`, `references/the-boundary.md`, `references/the-traps.md`, `references/the-checklist.md`, `references/the-worked-png.md`, `references/the-worked-jpg.md`, `references/the-worked-wav.md`, `references/the-worked-app.md`
+
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
 

@@ -1,0 +1,5 @@
+# LSB matrix b1 bgr yx msb on wav — deep
+
+Companion to `mx-b1-bgr-yx-msb-wav.md`.
+
+The `b1` plane, `bgr` channel, `yx` order, `msb` endianness — one cell of the LSB sweep matrix on a wav carrier. zsteg -a / lsb_scan walks this grid; a stream that decodes printable here is the channel that yielded.

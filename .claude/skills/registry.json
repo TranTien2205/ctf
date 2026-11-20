@@ -1090,9 +1090,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1580,
-      "depth_files": 3,
-      "depth_tokens": 701,
+      "skill_tokens": 1922,
+      "depth_files": 2631,
+      "depth_tokens": 88486,
       "use_when": [
         "a probe or source read produced this class's signal: file + binwalk + strings on the carrier first — the answer is often appended, not encoded"
       ],
