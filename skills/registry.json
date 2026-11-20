@@ -656,9 +656,9 @@
         "rev",
         "forensics"
       ],
-      "skill_tokens": 2126,
-      "depth_files": 3,
-      "depth_tokens": 7596,
+      "skill_tokens": 2868,
+      "depth_files": 469,
+      "depth_tokens": 84012,
       "use_when": [
         "an obfuscated script, a PE/.NET sample, or captured C2 traffic has to be understood"
       ],
