@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T07:40:31",
+  "generated_at": "2026-11-20T07:52:32",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -654,10 +654,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 90,
+      "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.187,
+      "overlap": 0.175,
       "trust": "catalogue-or-unreviewed"
     },
     {

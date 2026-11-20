@@ -78,6 +78,12 @@ Depth, one named file at a time:
 - `skills/osint-triage/references/tool-commands.md`
 
 | Any media metadata question | `references/exif-and-document.md` |
+| The workflow | `references/the-workflow.md` |
+| EXIF / GPS / thumbnail | `references/the-exif.md`, `references/the-gps.md`, `references/the-thumb.md` |
+| Appended/embedded data | `references/the-appended.md`, `references/the-carve.md` |
+| Document properties | `references/the-doc.md`, `references/the-office.md` |
+| Corpus map | `references/the-map-index.md` |
+| Format × group and format × question matrices | per-format modules under `references/` |
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

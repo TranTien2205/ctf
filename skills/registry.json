@@ -1301,9 +1301,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1013,
-      "depth_files": 3,
-      "depth_tokens": 913,
+      "skill_tokens": 1129,
+      "depth_files": 3123,
+      "depth_tokens": 65573,
       "use_when": [
         "a probe or source read produced this class's signal: run exiftool and read ALL of its output rather than grepping one tag, then binwalk and strings for appended or embedded data; steghide, zsteg and outguess are absent here, so never claim an extraction with them"
       ],

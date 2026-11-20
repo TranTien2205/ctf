@@ -1,0 +1,7 @@
+# embedded thumbnail in a BMP image
+
+**File:** BMP image — minimal metadata; trailing data.
+
+**Metadata group:** embedded thumbnail — what it showed before an edit.
+
+Read all of it (meta_read.py --raw / exiftool -a -u -g1), not one guessed tag. The answer is often in an odd corner.

@@ -1,0 +1,7 @@
+# the flag from a legacy .doc
+
+**File:** legacy .doc — OLE summary streams.
+
+**Question:** the flag — a planted tag/comment.
+
+meta_read.py + exiftool -a -u -g1 for the tags; carve_scan.py + strings for appended data. Quote the verbatim field value.
