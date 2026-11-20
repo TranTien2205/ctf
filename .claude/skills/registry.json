@@ -2539,9 +2539,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2070,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 2501,
+      "depth_files": 760,
+      "depth_tokens": 124644,
       "use_when": [
         "a web target with recon done and no strong chain match, so several bug-class families each need their own bounded measurement",
         "a web challenge is being worked one hypothesis at a time and the clock is the blocker"

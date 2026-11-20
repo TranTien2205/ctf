@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 7,155,000 tokens across 63476 files. Opening
+The depth corpus is roughly 7,280,000 tokens across 64236 files. Opening
 `skills/web-triage/` alone is about 203,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -217,7 +217,7 @@ that file and this table would drift.
 | `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.1k | see registry use_when |
 | `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.3k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |
-| `skills/web-parallel-sweep/SKILL.md` | reference | ~2.1k | see registry use_when |
+| `skills/web-parallel-sweep/SKILL.md` | reference | ~2.5k | see registry use_when |
 
 ## Skills that are not routed to automatically
 

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T19:43:48",
+  "generated_at": "2026-11-20T20:08:48",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -1288,7 +1288,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 159
+      "lines": 184
     }
   ]
 }

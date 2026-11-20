@@ -156,3 +156,28 @@ offline before you trust one:
 Every `ctf-web-*` agent is a `reader` and a `writer` in the `AGENTS.md` sense.
 None is the machine that verifies. The agent proposes; `tools/hooks.py` and
 `tools/decide.py` decide.
+
+## Reference corpus
+
+`references/` carries ~750 named method modules - open the one the live
+question names, never browse. The corpus details the method; it does not
+replace `tools/subagent_fanout.py` or the contract.
+
+| Prefix | Content |
+|---|---|
+| `references/` fam-* | one module per family: what it owns, what it returns, its independence boundary |
+| `references/` cls-* | per-class family assignment and the probe-shape reason for it |
+| `references/` brief-* | the brief's fields: falsifier, signals_fired, kill-map entries, blast_radius, evidence_level, contract, scope |
+| `references/` merge-* | validate-then-merge procedure, dispositions, ledger writes, merge order |
+| `references/` fail-* | the six failure modes and which guard sits on each one's path |
+| `references/` tool-* | the web speed primitives each family reaches for, per tool |
+| `references/` when-* | use vs skip decisions: recon done, no strong card, independent families, time pressure, shared instances |
+| `references/` orc-* | orchestration order: recon first, bundle second, parallel read-only, race exception, serial merge |
+| `references/` err-* | error shapes: spawn failure, timeout, invalid report, partial evidence |
+| `references/` ex-*/scen-* | the measured examples and per-target scenarios |
+| `references/` qx-* | class x sweep-question matrix cells (24 classes x 12 questions) |
+| `references/` tx-* | family x tool matrix cells |
+| `references/` dx-* | family x disposition matrix cells |
+| `references/` mx-*/cx-* | family x question and failure x guard cells |
+| `references/` work-*/trap-*/neg-*/q-*/kb-*/agg-* | frame modules |
+| `references/` -route companions | one per hand-written module |
