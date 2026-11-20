@@ -73,10 +73,50 @@ python3 tools/net_dialog.py host 31337 --steps 'wait:> ; send:1\n ; dump'
 
 Shares signals with: `../misc-interpreter-escape/`, `../misc-encoding-carrier/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time. Route first:
 
-- `skills/misc-constraint-puzzle/references/README.md`
-- `skills/misc-constraint-puzzle/references/protocol-first.md`
+- `references/README.md` — the corpus index
+- `references/protocol-first.md` — a stdlib client skeleton + format edges
+- `references/the-capture-first.md` — capture the protocol before solving
+- `references/the-map-index.md` — the full reference map
+
+Protocol guides — the-wire modules: `references/the-stream.md`,
+`references/the-terminator.md`, `references/the-recv-loop.md`,
+`references/the-fixed-frames.md`, `references/the-binary-proto.md`,
+`references/the-telnet-neg.md`, `references/the-nc-banner.md`,
+`references/the-recv-returns.md`, `references/the-sendall.md`,
+`references/the-banner-skip.md`, `references/the-promptless.md`,
+`references/the-multiline-question.md`, `references/the-crlf.md`,
+`references/the-unicode-round.md`, `references/the-telnet-neg.md`,
+`references/the-half-question.md`, `references/the-two-questions.md`,
+`references/the-prompt-echo.md`, `references/the-wrapped-lines.md`.
+The step modules (`capture-`, `parse-`, `compute-`, `reply-`,
+`buffer-`, `loop-`, `timeout-`, `batch-`, `resume-`, `drift-`) cover
+step x puzzle-type pairs; the `edge-` modules cover puzzle x
+format-edge pairs.
+
+Solver guides — the-round modules: `references/the-math-parse.md`,
+`references/the-math-eval.md`, `references/the-operator-drift.md`,
+`references/the-maze.md`, `references/the-captcha.md`,
+`references/the-crypto-round.md`, `references/the-sort-rounds.md`,
+`references/the-grid-puzzles.md`, `references/the-count-rounds.md`,
+`references/the-logic-rounds.md`, `references/the-regex-rounds.md`,
+`references/the-trivia.md`, `references/the-solver-shape.md`,
+`references/the-solve-pure.md`.
+
+Discipline — the-standard modules: `references/the-confirm.md`,
+`references/the-falsifier.md`, `references/the-evidence.md`,
+`references/the-traps.md`, `references/the-checklist.md`,
+`references/the-boundary.md`, `references/the-detection.md`,
+`references/the-worked.md`, `references/the-net-dialog.md`,
+`references/the-timeout-setsockopt.md`, `references/the-deadline.md`,
+`references/the-difficulty-ramp.md`, `references/the-perf.md`,
+`references/the-batching-check.md`, `references/the-pipelining.md`,
+`references/the-reconnect.md`, `references/the-stuck-round.md`,
+`references/the-replay.md`, `references/the-verify.md`,
+`references/the-parser-tests.md`, `references/the-neg-result.md`,
+`references/the-field-notes.md`, `references/the-budget.md`,
+`references/the-close-puz.md`, `references/the-last-puz.md`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
