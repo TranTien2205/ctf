@@ -8617,6 +8617,36 @@ was not. A swallowed error in a fixture is as capable of hiding a defect as
 one in the product - it just hides it from the test rather than from the
 operator.
 
+### The README did not answer the question the system exists to answer
+
+Measured: the README mentioned the re-verification layer ZERO times and
+cross-verification zero times, and had no section on the three layers at
+all. The layer built today was absent from the document a reviewer reads
+first - the gate was satisfied because other gated documents name the
+command, so nothing failed; it was simply missing where it matters.
+
+Added as a direct answer rather than a feature list, because the question
+people actually ask is whether the agent can make a finding up. The answer
+is structural and short: `grade` is not a parameter, so an invented command
+output grades `unproven` - the excerpt it quotes is in no recorded
+response.
+
+Then the three questions, one per layer, with what each blocks. The
+cross-read's adversarial design is stated where a reader will see it: a
+different model family, shown the evidence and the matrix's requirement but
+never the first model's reasoning, able only to lower or dispute. And
+replay's third outcome is named as first-class, because reporting a
+question that never reached the target as a refutation is a fabricated
+finding pointed the other way.
+
+The closing point is the one this session kept re-learning: what the report
+says when a layer has NOT run. The cross-read column reads 0/N on evidence
+produced without an endpoint, and the report prints that zero and names the
+command that would change it instead of omitting the column.
+
+Written with the test names read off the files - the doc gate passed on the
+first attempt, which it has done every time since that lesson was paid for.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

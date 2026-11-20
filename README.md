@@ -70,6 +70,45 @@ evidence gate, the proof grading and the renderers are all live, the tool
 choices are fixed. Five of its six findings grade `proven`; the reflected-XSS
 one stays a `candidate` and the report says why.
 
+## Can the agent just make a finding up?
+
+No, and the reason is structural rather than a promise: **`grade` is not a
+parameter.** A finding is recorded with the request ids it rests on and a
+verbatim excerpt, and the proof matrix grades it from the bytes already in
+the transcript. An invented command output grades `unproven`, because the
+excerpt it quotes is in no recorded response.
+
+That answers one question. Three are worth asking, each answered by a
+different layer, and the report prints all three counts including the
+zeroes:
+
+| Layer | Question | Who answers | What it blocks |
+|---|---|---|---|
+| proof matrix | did the target produce the quoted bytes | deterministic, no model | an agent writing its own command output and calling it success |
+| `argus judge` | do those bytes demonstrate the class claimed | a model from another family, reading evidence only | the wrong class, and a severity the evidence does not carry |
+| `argus replay` | does the target still do it | deterministic, no model | a finding fixed since the run, published as if current |
+
+The cross-read is deliberately adversarial: the judge is picked from a
+different model family than the author, is shown the finding, the matrix's
+requirement and the raw records but **never the first model's reasoning**,
+and can only lower a grade or dispute it - never raise one. The requirement
+it judges against comes from the matrix, so an edited findings file cannot
+soften the bar.
+
+`argus replay` sends each finding's cited request again. Three outcomes,
+and the third is first-class: `reproduced`, `not_reproduced`, and
+`inconclusive` for a question that never reached the target - a credential
+the transcript stores only as a digest, or a host that did not answer.
+Reporting those as refutations would generate false retractions, which is a
+fabricated finding pointed the other way.
+
+What the report says when a layer has not run is the point. On evidence
+produced without a model endpoint the cross-read column reads `0/N`, and
+the report prints that zero and names the command that would change it,
+rather than omitting the column.
+
+`docs/VERIFICATION.md` lists each property with the test that holds it.
+
 ## Architecture
 
 ### System diagram
