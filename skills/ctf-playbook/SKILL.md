@@ -107,6 +107,16 @@ python3 -c "from pwn import *;print(cyclic_find(b'aaXX'))"
 
 More in `references/common-tools.md`.
 
+## Reference corpus
+
+`references/` carries ~790 named entry modules - open the one the live
+decision names: `cat-*` per-category route detail, `cls-*` per-tool usage,
+`time-*` contest clock, `flag-*`/`verif-*` flag and verification,
+`step0-*` per-input step-0 detail, `search-*` search discipline,
+`tool-*` first-pass one-liners, `rx-*`/`cx-*` signal x router and
+category x tool cells, `work-*/trap-*/neg-*/q-*/agg-*` frame modules,
+plus `-route` companions.
+
 ## Discipline
 
 - Route to the right category, then let that router lead. Do not solve here.

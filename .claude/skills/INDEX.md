@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 7,280,000 tokens across 64236 files. Opening
+The depth corpus is roughly 7,393,000 tokens across 65023 files. Opening
 `skills/web-triage/` alone is about 203,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on

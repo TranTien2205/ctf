@@ -38,9 +38,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1509,
-      "depth_files": 3,
-      "depth_tokens": 2010,
+      "skill_tokens": 1627,
+      "depth_files": 790,
+      "depth_tokens": 114431,
       "use_when": [
         "a new challenge starts and the category is not yet fixed",
         "several challenges compete for time in a timed contest"
