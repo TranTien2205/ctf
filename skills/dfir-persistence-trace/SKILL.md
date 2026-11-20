@@ -188,7 +188,7 @@ python3 tools/forensics/artifact_inventory.py --path <bundle> --hash
 Record: `ServiceName`, `ImagePath`, `ServiceType`, `StartType`, `AccountName`
 from each 7045; registry autostart values verbatim (full path, not the trimmed
 display name). A confirmed persistence claim names the mechanism AND quotes the
-record — a suspicious-looking path with no write record is a candidate.
+record  -  a suspicious-looking path with no write record is a candidate.
 
 ## Routing
 
@@ -197,6 +197,36 @@ Shares signals with `../dfir-execution-trace/` (what ran, once) and `../dfir-ant
 authenticated* - `../dfir-authentication-trace/`. Router: `../dfir-sherlock-triage/method.md`. Already
 written, do not restate: `../dfir-sherlock-triage/registry-and-execution.md`, `../ctf-forensics/linux-forensics.md:42-64`,
 `../dfir-sherlock-triage/windows-event-logs.md:173-189`.
+
+## Corpus index (references/)
+
+450+ depth modules; open `references/agg-index.md` for the family map. By family:
+
+| Family | Prefix | Covers |
+|---|---|---|
+| Services | `svc-*` | 7045/4697/7034/7036/7040 fields, Services key anatomy, Start semantics, svchost ServiceDll, unquoted paths, FailureCommand |
+| Tasks | `task-*` | XML fields, TaskCache GUID joins, DynamicInfo offsets, 4698-4702, Operational 106/140/141/200/201/129, triggers, LogonType |
+| Registry | `run-*` | Run/RunOnce/RunOnceEx, Policies, Winlogon, AppInit, AppCertDlls, BootExecute, IFEO, SilentProcessExit, COM hijack, ScreenSaver, LSA, Netsh, print monitors, time providers, AMSI providers, ControlSet |
+| WMI | `wmi-*` | three-object subscription model, OBJECTS.DATA layout, Sysmon 19-21, WMI-Activity 5857-5861, WQL trigger shapes |
+| Misc | `misc-*` | startup folders, Office add-ins/templates/COM, BITS jobs and qmgr.db, PowerShell profiles, KnownDLLs |
+| Linux | `lnx-*` | systemd unit precedence, user units, timers, generators, cron fields, at/anacron, authorized_keys, ld.so.preload, shell rc, sysvinit/xdg, auditd records |
+| macOS | `mac-*` | LaunchDaemons/Agents, plist keys, LoginItems/BTM, emond, periodic, cron |
+| Questions | `q-*` | one module per Sherlock phrasing shape |
+| Methods | `meth-*` | sweep order, inventory-first, multi-hive, timestamp pairing, baseline diffing, parentage tells |
+| Traps | `trap-*` | Start=3/4, 4697 absence, Notify XP-era, Secure Boot AppInit, one-timestamp keys, r+b parser, regf check, 4702-vs-4698, prefetch!=mechanism, InteractiveToken scope, hive prefix, dormant ControlSet |
+| Scenarios | `scen-*` | bundle shapes: full Windows, evtx-only, hives-only, deleted task, Linux rootfs, multi-mechanism, falsifier exit |
+| Deep | `deep-*` | SDDL decoding, DynamicInfo semantics, GlobalFlag bits, svchost groups, OBJECTS.DATA structure, userinit comma, Policies-vs-Run, orphaned consumers, LNK internals |
+| Signatures | `sig-*` | operator-side commands: sc, New-Service, schtasks, reg add, wmic/mofcomp, bitsadmin, at, netsh helper, crontab, systemctl enable, launchctl |
+| Tools | `tool-*` | evtx_query, artifact_inventory, registry-read.py, timeline_merge, lnk_parse, MFT/USN, strings, journalctl |
+| Matrix | `mx-*` | mechanism x question cells  -  which artifact answers which question per family |
+| Workflow | `work-*` | discipline modules, answer unit, scope checklist, closing checklist, class boundary |
+| Aggregators | `agg-*` | corpus/event/artifact/timestamp/falsifier/field/answer/pivot indexes |
+| Recovery | `rec-*` | degraded-bundle fallbacks per missing artifact |
+| Field tables | `fld-*` | per-event field name and type maps |
+| Negatives | `neg-*` | what a clean family looks like, recorded |
+
+Cross-skill: `cross-execution`, `cross-antiforensics`, `cross-fs-timeline`,
+`cross-network`, `cross-auth`.
 
 ## Discipline
 

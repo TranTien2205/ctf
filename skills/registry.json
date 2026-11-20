@@ -925,9 +925,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 5166,
-      "depth_files": 1,
-      "depth_tokens": 157,
+      "skill_tokens": 5883,
+      "depth_files": 458,
+      "depth_tokens": 102836,
       "use_when": [
         "a probe or source read produced this class's signal: read the Run and RunOnce values and the Services subkeys from the SOFTWARE and SYSTEM hives, and compare each image path against the intrusion window"
       ],
