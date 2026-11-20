@@ -217,3 +217,11 @@ Related: [[web-parallel-sweep]] for the same method on a live web target,
 [[parallel-layer-sweep]] for a white-box handout split into generic layers, and
 [[ir-live-estate-triage]] when the estate is live and compromised rather than
 handed over as a bundle.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` steps, `family-*`
+artifact families, `contract-*`/`report-*` shapes, `q-*-detail` question
+types, `corr-*`/`ioc-*`/`timeline-*` merge mechanics, plus `fq-*` family
+x question, `af-*`/`at-*` artifact matrices, `am-*` answer types and
+`vf-*`/`qb-*` verdict dispositions, each with a `-route` companion.

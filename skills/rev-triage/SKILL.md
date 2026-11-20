@@ -140,6 +140,14 @@ prevent.
 | Firmware or IoT image | `references/firmware-analysis.md` |
 | Anything narrower | one named file in `../ctf-reverse/` |
 
+## Corpus index
+
+`references/` carries ~600 route modules: `work-*`/`step-*` pipeline,
+`fmt-*` formats, `check-*` deciding-check shapes, `pack-*`, `anti-*`,
+`tool-*`, `trap-*`, `neg-*`, `q-*`, plus `fx-*` format x tool,
+`cx-*` check x technique and `tx-*` artifact x route matrices, each
+with a `-route` companion.
+
 ## Discipline
 
 - Trace before you decompile.

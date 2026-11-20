@@ -217,6 +217,15 @@ card. A measurement that has been run exactly once is a hypothesis.
 - A timeout or a connection reset is evidence about availability. It is never a
   confirm, and `tools/hooks.py post-probe` will refuse it.
 
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` stages, `dep-*`
+dependency types, `oracle-*`/`measure-*`/`boundary-*` mechanics,
+`case-*` worked shapes, `trust-*`/`write-*`/`bound-*` reporting, plus
+`dx-*`/`dv-*`/`dc-*` dependency matrices, `ox-*`/`se-*` access and
+drift, `bx-*`/`bt-*`/`nb-*` boundary tables, each with a `-route`
+companion.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time a measurement decides a

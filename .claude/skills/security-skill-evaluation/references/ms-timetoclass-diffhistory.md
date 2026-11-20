@@ -1,0 +1,12 @@
+# Metric source: time-to-class / diff-history
+
+Method module for `security-skill-evaluation`. Whether a skill
+in this library is actually getting better: measured by what it
+changes in sessions, never by how much text it holds.
+
+Whether `diff-history` supplies evidence for `time-to-class`.
+
+## Read
+
+Primary-source, corroborating, or irrelevant - which record
+actually proves this metric moved.

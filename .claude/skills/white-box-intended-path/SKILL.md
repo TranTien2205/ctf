@@ -177,6 +177,14 @@ This skill sends nothing, so it has none of its own. Two second-order risks:
 - A comment that explains a defence is evidence about the author's intent, not
   about the code. Confirm it against the running system before trusting it.
 
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` stages, `odd-*`
+oddity types, `reach-*` reachability checks, `chain-*`/`case-*` worked
+shapes, `stack-*` diff approaches, plus `ox-*`/`os-*`/`oe-*` oddity
+matrices, `sf-*` stage x failure, `cf-*`/`fc-*` chain and falsifier
+dispositions, each with a `-route` companion.
+
 ## Field notes
 
 `field-notes.md` in this directory grows every time this method decides a

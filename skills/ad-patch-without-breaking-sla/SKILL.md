@@ -126,3 +126,11 @@ cp <file>.orig.<stamp> <file> && <restart> # the undo, written in advance
 `echo $?` printed 0 or 2, the comparison's `regressions` list is empty, the undo
 command is written down, and the service is green on the organiser's own scoreboard
 — not only on yours. Anything else and you are still mid-patch.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` stages, `patch-*`
+shapes, `four-bad-*` anti-patterns, `bracket-*`/`rollback-*`/`verify-*`
+mechanics plus `px-*`/`sx-*`/`cx-*`/`pk-*`/`rk-*`/`cs-*`/`pq-*`/`ep-*`/
+`st-*`/`va-*`/`pt-*`/`tv-*`/`fb-*`/`rq-*`/`ca-*` matrices, each with a
+`-route` companion.

@@ -62,6 +62,13 @@ tshark -r challenge.pcap --export-objects http,./exported_files
 - `references/malware-analysis.md` - Basic malware triage
 - `references/document-analysis.md` - PE and document (Office/PDF) analysis
 
+## Corpus index
+
+`references/` carries ~870 route modules: `art-*` artifact intake,
+`sig-*` magic signatures, `tool-*` tool selection, `route-*` family
+routes, `fal-*` falsifiers, plus `at-*` artifact x tool, `ax-*`
+artifact x route and `mx-*` magic x family matrices.
+
 ## Discipline
 
 - Collect every parameter and size before choosing an attack; a named attack on

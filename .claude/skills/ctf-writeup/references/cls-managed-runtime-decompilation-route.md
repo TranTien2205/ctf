@@ -1,0 +1,8 @@
+# Route companion: cls-managed-runtime-decompilation
+
+Open `cls-managed-runtime-decompilation.md` when this
+writeup section or evidence rule is live.
+
+## Exit
+
+Section complete -> the next sec-* or cls-* module.

@@ -111,6 +111,13 @@ Parking a question and reviving it after a later one supplies the pivot is the
 normal path. Questions are ordered as a narrative; question N-1 usually hands back
 what question N needs.
 
+## Corpus index
+
+`references/` carries route modules: `art-*` artifact intake, `q-*`
+question types, `tool-*` tool selection, `fal-*` falsifiers, plus
+`aq-*` artifact x question, `at-*` artifact x tool and `qx-*`
+question x depth-file matrices, each with a `-route` companion.
+
 ## Discipline
 
 - **Nothing in the bundle is executed.** HTB states a bundle may contain real

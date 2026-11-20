@@ -1,0 +1,14 @@
+# Stock diff: Go
+
+Method module for `white-box-intended-path`. Find the ONE
+vulnerability the author wrote: diff against stock, map every
+author-deliberate oddity, run the cheapest reachability
+falsifier before committing to a chain.
+
+go.sum versions + main.go/handlers; the diff is
+usually small - a single added handler is the
+whole anomaly map.
+
+## Exit
+
+Named next step -> that module.

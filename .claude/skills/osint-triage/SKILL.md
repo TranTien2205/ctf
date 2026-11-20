@@ -76,6 +76,14 @@ OSINT chain built on a half-remembered match is how a wrong answer gets
 submitted with confidence. Use `references/output-template.md` for the report
 shape.
 
+## Corpus index
+
+`references/` carries ~1,170 route modules: `piv-*` pivot types,
+`src-*` sources, `ver-*` verification, `geo-*` geolocation, `case-*`
+chain flows, `fail-*`/`deep-*` per-source detail, plus `px-*` pivot x
+source, `sx-*` platform x attribute and `gx-*` feature x narrowing
+matrices.
+
 ## Discipline
 
 - One pivot at a time. Two half-followed pivots are worth less than one followed

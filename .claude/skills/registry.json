@@ -70,9 +70,9 @@
       "categories": [
         "ad"
       ],
-      "skill_tokens": 1456,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 1544,
+      "depth_files": 961,
+      "depth_tokens": 71935,
       "use_when": [
         "an attack-defense contest starts and a service needs triage",
         "every team runs an identical copy of the service you are defending"
@@ -123,8 +123,8 @@
         "crypto"
       ],
       "skill_tokens": 4532,
-      "depth_files": 8,
-      "depth_tokens": 5368,
+      "depth_files": 847,
+      "depth_tokens": 132306,
       "use_when": [
         "ciphertext, a modulus, a nonce, a key, or a hash is supplied",
         "a custom encryption routine must be broken rather than reversed"
@@ -171,9 +171,9 @@
       "categories": [
         "dfir"
       ],
-      "skill_tokens": 1797,
-      "depth_files": 11,
-      "depth_tokens": 42945,
+      "skill_tokens": 1868,
+      "depth_files": 537,
+      "depth_tokens": 99696,
       "use_when": [
         "a bundle of honest system artifacts is supplied and the task is a numbered list of investigation questions",
         "EVTX, registry hives, $MFT, prefetch, a KAPE triage collection or CloudTrail logs are present"
@@ -201,9 +201,9 @@
       "categories": [
         "forensics"
       ],
-      "skill_tokens": 849,
-      "depth_files": 7,
-      "depth_tokens": 4971,
+      "skill_tokens": 918,
+      "depth_files": 869,
+      "depth_tokens": 102935,
       "use_when": [
         "a PCAP, disk image, memory dump, log set, document, or media file is supplied",
         "something is believed to be hidden inside a container format"
@@ -225,8 +225,8 @@
         "ir"
       ],
       "skill_tokens": 1941,
-      "depth_files": 1,
-      "depth_tokens": 371,
+      "depth_files": 769,
+      "depth_tokens": 89815,
       "use_when": [
         "a live estate has already been hit and both recovery and investigation are scored",
         "services are down, files are encrypted, and a clock is running"
@@ -254,9 +254,9 @@
       "categories": [
         "osint"
       ],
-      "skill_tokens": 1111,
-      "depth_files": 9,
-      "depth_tokens": 7961,
+      "skill_tokens": 1188,
+      "depth_files": 1171,
+      "depth_tokens": 116194,
       "use_when": [
         "the challenge supplies a name, handle, photo, domain, or document and the answer lives in public sources"
       ],
@@ -306,9 +306,9 @@
       "categories": [
         "rev"
       ],
-      "skill_tokens": 1798,
-      "depth_files": 6,
-      "depth_tokens": 4210,
+      "skill_tokens": 1879,
+      "depth_files": 613,
+      "depth_tokens": 91945,
       "use_when": [
         "a binary, bytecode, managed assembly, packed sample, or firmware image must be understood",
         "a check function or embedded algorithm has to be replicated"
@@ -388,9 +388,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1484,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 1567,
+      "depth_files": 968,
+      "depth_tokens": 71288,
       "use_when": [
         "a bug is understood and a patch is about to go onto a live scored service",
         "a patch has just been applied and nothing has verified the feature still works"
@@ -412,9 +412,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1594,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 1671,
+      "depth_files": 960,
+      "depth_tokens": 70291,
       "use_when": [
         "every team booted an identical image and it may carry a planted foothold",
         "credentials have just been rotated and the first thirty minutes are free"
@@ -437,9 +437,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1608,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 1699,
+      "depth_files": 1000,
+      "depth_tokens": 71286,
       "use_when": [
         "another team is already attacking your service and the capture holds their payload",
         "source reading has produced no hypothesis and the clock is the blocker"
@@ -2403,9 +2403,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 3317,
-      "depth_files": 1,
-      "depth_tokens": 165,
+      "skill_tokens": 3410,
+      "depth_files": 801,
+      "depth_tokens": 81581,
       "use_when": [
         "a chain turns on what a pinned, vendored or containerised dependency actually does",
         "a negative result has to be recordable as a measured boundary, not an opinion"
@@ -2427,9 +2427,9 @@
       "categories": [
         "web"
       ],
-      "skill_tokens": 2626,
-      "depth_files": 1,
-      "depth_tokens": 162,
+      "skill_tokens": 2713,
+      "depth_files": 811,
+      "depth_tokens": 77818,
       "use_when": [
         "a high-value, low-solve white-box challenge whose author-deliberate oddities are unexplained",
         "one mechanism budget is spent with no impact and no anomaly newly explained"
@@ -2450,9 +2450,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1934,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 2010,
+      "depth_files": 892,
+      "depth_tokens": 72848,
       "use_when": [
         "a flag has been verified and the chain must be written down as a reusable card"
       ],
@@ -2468,9 +2468,9 @@
       "categories": [
         "dfir"
       ],
-      "skill_tokens": 3107,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 3202,
+      "depth_files": 1173,
+      "depth_tokens": 138884,
       "use_when": [
         "an artifact bundle with many questions over one collection, so several artifact families each need their own bounded measurement",
         "a Sherlock is being worked one artifact family at a time and the clock is the blocker"
@@ -2494,9 +2494,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1257,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 1362,
+      "depth_files": 854,
+      "depth_tokens": 98855,
       "use_when": [
         "a multi-layer white-box handout and no strong chain match, so several independent mechanism layers each need their own falsifier",
         "a session is walking layers one at a time and the clock is the blocker"
@@ -2520,9 +2520,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1032,
-      "depth_files": 2,
-      "depth_tokens": 2104,
+      "skill_tokens": 1104,
+      "depth_files": 886,
+      "depth_tokens": 82731,
       "use_when": [
         "a skill is being added, promoted, or considered for deletion",
         "a field note is being reviewed, or a class raised from catalogue"

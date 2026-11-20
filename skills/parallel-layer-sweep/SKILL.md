@@ -108,3 +108,12 @@ measure.
 
 A prober is a `reader` and a `writer` in the `AGENTS.md` sense. It never becomes
 the machine that verifies. The agent proposes; `hooks.py` and `decide.py` decide.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*`/`workflow-*` steps,
+`contract-*`/`brief-*`/`report-*` shapes, `layer-*` types, `evidence-*`
+rules, `fail-*/trap-*/neg-*` failure handling, plus `lf-*`/`la-*`/`lw-*`
+layer matrices, `fs-*` falsifier x tool, `le-*` evidence shapes,
+`sf-*` step x failure, `bf-*` brief fields, `mc-*`/`qb-*` merge
+dispositions, each with a `-route` companion.

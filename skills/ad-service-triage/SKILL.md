@@ -116,3 +116,11 @@ The service is green and a baseline is saved; the flag store and every path to i
 are named with a file and a line; the team host list is transcribed from the
 official brief; and exactly one depth skill is open. Anything else is still
 triage.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` stages, `store-*`
+flag stores, `checker-*`/`tick-*`/`q-*` intake questions, `attack-*/
+defense-*` shapes, `tools-*`/`subagent-*`/`decide-*`/`flow-*`/`handoff-*`
+plus `sx-*`/`st-*`/`dx-*`/`sq-*`/`pv-*`/`ph-*`/`eq-*`/`eu-*`/`es-*`/`td-*`
+matrices, each with a `-route` companion.

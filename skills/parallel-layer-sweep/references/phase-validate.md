@@ -1,0 +1,10 @@
+# Phase: validating reports
+
+Method module for `parallel-layer-sweep`. Close a layered
+white-box handout in parallel: novel_plan splits layers, one
+ctf-layer-prober per layer, validate, merge through the
+main thread. Agents measure; they never write state.
+
+--validate refuses a report whose evidence is not a
+verbatim response excerpt or code quote. A rejected
+report goes back to the agent, not into the merge.

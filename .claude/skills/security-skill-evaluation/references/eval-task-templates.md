@@ -48,7 +48,7 @@
   rather than from a pattern, since that does not transfer to the next binary
 ```
 
-## Scope-and-Rules Eval Example (Negative Test — Should Refuse/Ask)
+## Scope-and-Rules Eval Example (Negative Test - Should Refuse/Ask)
 ```markdown
 ## Eval Task: scope-and-rules - Ambiguous Authorization Request
 - Setup: N/A (prompt-only test, no target needed)

@@ -1,0 +1,18 @@
+# Tool cell: lattice-hnp / numpy-linalg
+
+Routing module for `crypto-triage`. The router maps one observable
+to one named attack, its seconds-fast falsifier, one
+`tools/crypto_attack.py` invocation, and one depth file. It never
+derives the mathematics - `../ctf-crypto/` owns that.
+
+The `numpy-linalg` tool's role on the `lattice-hnp` attack.
+
+## Fit
+
+Implements, assists, or no-role - and for assist, which step
+it performs. The cheapest fitting tool runs first; a no-role
+pairing is stated so the list is complete.
+
+## Invocation
+
+The one-line command or call for fitting pairings.

@@ -94,3 +94,10 @@ cannot catch.
 
 Learning loop and review flow: `../../LEARNING_LOOP.md`. Registry and load policy:
 `../INDEX.md`.
+
+## Corpus index
+
+`references/` carries the method corpus: `principle-*`/`metric-*`/
+`verdict-*`/`eval-*`/`promote-*`/`demote-*`/`deep-*`/`act-*`/`kind-*`
+modules plus `mx-*`/`vx-*`/`tx-*`/`ms-*`/`vr-*`/`ar-*`/`pm-*`/`ce-*`/
+`vf-*`/`sa-*` matrices, each with a `-route` companion.

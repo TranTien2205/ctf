@@ -190,3 +190,10 @@ any disagreement is a defect to fix in the evidence, not in the prose.
 ## Challenge
 
 $ARGUMENTS
+
+## Corpus index
+
+`references/` carries the writeup material: `sec-*` section guides,
+`cat-*`/`cls-*`/`cls2-*` per-class evidence shapes, `evidence-*`/
+`verbatim-*`/`neg-*`/`fmt-*`/`submit-*`/`length-*` rules, plus `sx-*`/
+`qx-*`/`sa-*`/`fe-*`/`cq-*` matrices, each with a `-route` companion.

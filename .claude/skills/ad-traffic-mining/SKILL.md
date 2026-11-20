@@ -122,3 +122,11 @@ steal, and none of them is worth more than five minutes:
 - Accept that it will be stolen anyway, and spend the time on the next bug instead
   of on hiding this one. The `immune` list cuts both ways: once you patch, you have
   told everyone what the bug was.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` pipeline, `cap-*`/
+`split-*`/`rank-*`/`replay-*`/`farm-*` mechanics, `steal-*`/`sd-*`
+anti-theft, `baseline-*`/`noise-*`/`neg-*`/`trap-*` plus `rx-*`/`mx-*`/
+`tx-*`/`rf-*`/`ps-*`/`rc-*`/`ex-*`/`pm-*`/`tc-*`/`mt-*`/`tq-*`/`er-*`/
+`fl-*`/`bm-*` matrices, each with a `-route` companion.

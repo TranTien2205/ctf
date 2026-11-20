@@ -1,0 +1,8 @@
+# Route companion: odd-constant
+
+When to open `odd-constant.md`: when this method step,
+oddity type, or measurement rule is live. Family `odd-*`.
+
+## Exit
+
+Named next step -> that module or the decision table.

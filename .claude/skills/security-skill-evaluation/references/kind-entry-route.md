@@ -1,0 +1,8 @@
+# Route companion: kind-entry
+
+Open `kind-entry.md` when its
+metric, verdict, or skill kind is live.
+
+## Exit
+
+Named matrix -> its cells.

@@ -129,3 +129,11 @@ Every enabled unit, timer, cron entry, `authorized_keys` line, set-id binary,
 loader hook and listening socket is either explained by a vendor package or written
 on the list with its removal command. The baseline file is saved off the box. The
 clock stopped at thirty minutes whether or not the list is empty.
+
+## Corpus index
+
+`references/` carries the method corpus: `phase-*` stages, `loc-*`
+locations, `sweep-*`/`diff-*`/`found-*`/`verify-*` mechanics, `neg-*/
+trap-*` plus `lx-*`/`cx-*`/`sx-*`/`lc-*`/`fv-*`/`fx-*`/`lp-*`/`fc-*`/
+`rm-*`/`sc-*`/`lv-*`/`tm-*`/`af-*` matrices, each with a `-route`
+companion.

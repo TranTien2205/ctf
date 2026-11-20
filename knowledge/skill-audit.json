@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T20:08:48",
+  "generated_at": "2026-11-20T21:36:18",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -8,7 +8,7 @@
   "summary": {
     "skills": 95,
     "review": 0,
-    "warn": 3,
+    "warn": 5,
     "local_evidence_present": 22,
     "local_evidence_stub": 37,
     "local_evidence_missing": 0,
@@ -19,7 +19,9 @@
   "warn": [
     "crypto-triage",
     "web-info-disclosure",
-    "web-websocket"
+    "web-websocket",
+    "ctf-writeup",
+    "security-skill-evaluation"
   ],
   "skills": [
     {
@@ -30,7 +32,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 120
+      "lines": 130
     },
     {
       "id": "ad-service-triage",
@@ -40,7 +42,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 119
+      "lines": 127
     },
     {
       "id": "ai-iot-triage",
@@ -50,7 +52,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 68
+      "lines": 77
     },
     {
       "id": "crypto-triage",
@@ -82,7 +84,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 128
+      "lines": 135
     },
     {
       "id": "forensics-triage",
@@ -92,7 +94,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 73
+      "lines": 80
     },
     {
       "id": "ir-live-estate-triage",
@@ -112,7 +114,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 88
+      "lines": 96
     },
     {
       "id": "pwn-binary-triage",
@@ -122,7 +124,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 85
+      "lines": 96
     },
     {
       "id": "rev-triage",
@@ -132,7 +134,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 152
+      "lines": 160
     },
     {
       "id": "web-triage",
@@ -152,7 +154,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 129
+      "lines": 137
     },
     {
       "id": "ad-planted-backdoor-hunt",
@@ -162,7 +164,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 132
+      "lines": 140
     },
     {
       "id": "ad-traffic-mining",
@@ -172,7 +174,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 125
+      "lines": 133
     },
     {
       "id": "crypto-classical",
@@ -1228,7 +1230,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 225
+      "lines": 234
     },
     {
       "id": "white-box-intended-path",
@@ -1238,17 +1240,19 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 185
+      "lines": 193
     },
     {
       "id": "ctf-writeup",
       "layer": "reference",
       "path": "skills/ctf-writeup/SKILL.md",
-      "flags": [],
+      "flags": [
+        "corpus of 72848 tokens with no stop condition"
+      ],
       "score": null,
-      "verdict": "reference",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 193
+      "lines": 200
     },
     {
       "id": "dfir-parallel-sweep",
@@ -1258,7 +1262,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 220
+      "lines": 228
     },
     {
       "id": "parallel-layer-sweep",
@@ -1268,17 +1272,20 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 111
+      "lines": 120
     },
     {
       "id": "security-skill-evaluation",
       "layer": "reference",
       "path": "skills/security-skill-evaluation/SKILL.md",
-      "flags": [],
+      "flags": [
+        "corpus of 82731 tokens with no stop condition",
+        "corpus of 82731 tokens with no budget"
+      ],
       "score": null,
-      "verdict": "reference",
+      "verdict": "warn",
       "local_evidence": "not-applicable",
-      "lines": 97
+      "lines": 104
     },
     {
       "id": "web-parallel-sweep",

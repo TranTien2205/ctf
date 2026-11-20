@@ -1,0 +1,8 @@
+# Route companion: px-handle-mapsstreetview
+
+When to open `px-handle-mapsstreetview.md`: when this module's pivot,
+source, chain step or failure mode is the live one. Family `px-*`.
+
+## Exit
+
+Named source -> run it; exhausted pivot -> a different piv-*.
