@@ -213,7 +213,7 @@ that file and this table would drift.
 | `skills/web-websocket/SKILL.md` | depth | ~2.1k | a ws:// channel or realtime feature carries the flag path |
 | `skills/white-box-dependency-measurement/SKILL.md` | depth | ~3.3k | see registry use_when |
 | `skills/white-box-intended-path/SKILL.md` | depth | ~2.6k | see registry use_when |
-| `skills/ctf-writeup/SKILL.md` | reference | ~1.2k | a flag is verified and the chain must be recorded |
+| `skills/ctf-writeup/SKILL.md` | reference | ~1.9k | a flag is verified and the chain must be recorded |
 | `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.1k | see registry use_when |
 | `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.3k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.0k | a skill is being added, promoted, or removed |

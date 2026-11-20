@@ -134,6 +134,59 @@ Before finalizing the writeup, verify:
 - Include irrelevant tangents that don't contribute to the solution
 - Assume the reader knows the specific challenge setup
 
+## Repository integration
+
+In this tree a writeup is not the end of a solve - it is one output of it. Two
+things must happen alongside it, or the solve does not feed the knowledge base:
+
+1. **The flag must have passed the write gate.** A writeup documents a flag
+   that went through `tools/hooks.py pre-flag` from a live response or a
+   supplied artifact. If the flag was never gated, the writeup is premature -
+   verify first, write after.
+2. **The chain card comes first.** `tools/classify_solve.py --chain <id>`
+   files the solve into the right bug-class skill and the card lands in
+   `knowledge/chains/`. The writeup is the human-readable companion of that
+   card - card first, writeup second, never writeup instead of card.
+
+### Solved-challenge ancestry
+
+A solved challenge lives under `solved/` with its evidence ancestry - the
+probe responses and artifacts the flag was read from. The writeup's Flag
+section should cite that ancestry (the response file or artifact path), not
+just the flag string, so a reviewer can re-derive the proof rather than trust
+the text.
+
+### What the writeup must never contain
+
+- A flag the write gate never saw, presented as solved.
+- A claimed mechanism the evidence does not show - if the writeup says
+  "SSTI via Jinja2", the Solution section must quote the response that proved
+  it (the evaluated marker), not only the payload that worked.
+- Negative results erased from the timeline. A dead end that burned budget
+  belongs in the Timeline as a proved negative - the next solver of a similar
+  challenge needs to know it was closed and by which measurement.
+- Tool output the tool did not produce. If `sqlmap` or `radare2` output is
+  quoted, it is pasted verbatim from a run that happened; a reconstructed
+  "typical output" is fabrication and fails the evidence policy.
+
+### Category-specific evidence rows
+
+| Category | The writeup's proving excerpt |
+|---|---|
+| web | the verbatim response bytes carrying the flag or the confirming oracle delta |
+| pwn | the transcript showing the flag read (e.g. `cat flag` output) from the exploited service |
+| rev | the recovered key/flag check passing, or the decompiled predicate that produces it |
+| crypto | the decryption output from the derived key/params, with the math stated once |
+| forensics/osint | the artifact + tool invocation whose output contains the answer |
+| misc | the interpreter/carrier output producing the flag bytes |
+
+### Where it lands
+
+Write the writeup beside the challenge state (`challenges/<name>/` is the
+working dir; `solved/<name>/` holds the evidence ancestry). The card, the
+ancestry, and the writeup are three views of one solve - they must agree, and
+any disagreement is a defect to fix in the evidence, not in the prose.
+
 ## Challenge
 
 $ARGUMENTS
