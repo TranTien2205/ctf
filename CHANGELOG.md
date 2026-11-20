@@ -8264,12 +8264,52 @@ a reader needs when a findings file has been edited by hand.
 
 Twenty-first shape assumption on the way, a helper name typed from memory.
 
+### The report did not say whether its own record verifies
+
+Three commands treat an unverifiable record three ways, measured on one
+tampered copy: the replay refuses and exits non-zero, because it writes new
+evidence into the session; the judge warns, proceeds, and records that it
+re-sealed over a mismatch; the render warns twice and writes the report.
+Each is coherent for what that command writes, so the difference is
+deliberate rather than an oversight - but nothing said so, and nothing said
+it in the document.
+
+AND THE EDIT REACHED THE DELIVERABLE AS FACT. Changing one finding from
+medium to critical in findings.json renders as "Severity: Critical", raises
+the critical count in the tally by one, and sits beside its unchanged
+"proof: candidate". The seal catches the edit and the render warns on
+stderr; neither reached the report. A report read away from the terminal
+that produced it could not say whether its own record verifies, which is
+exactly the diff-caveat shape from an hour ago.
+
+`findings_bad` does not catch this and should not be asked to: it validates
+EVIDENCE - the cited ids exist, the excerpt is verbatim - and an edited
+severity leaves the evidence intact. Severity is partly a judgement, so
+editing it is not necessarily tampering. Saying the file changed is not
+optional.
+
+The report now states its record's verification state in BOTH directions,
+because a line that appears only on failure teaches a reader that its
+absence means verified. The verified form carries the counts it checked, so
+it reads as a measurement rather than a badge; the failing form names each
+problem and says to read what follows as a claim about the file rather than
+about the target.
+
+Both planted: removing the line fails, and claiming verified over a
+mismatch fails.
+
+AND I MEASURED A STATE I HAD ALREADY CHANGED. The first reading of the
+verification flags came back clean on the tampered copy, with the mismatch
+key absent entirely - because my own earlier render of that copy had
+re-sealed it. Twenty-second wrong instrument, and a new kind: not a bad
+pattern but an observation taken after the observer had altered the thing.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1189 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1191 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

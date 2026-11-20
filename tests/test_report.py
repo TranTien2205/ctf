@@ -1186,3 +1186,64 @@ def test_a_same_host_diff_is_not_qualified(tmp_path, capsys):
     capsys.readouterr()
     assert main(["diff", str(bdir), str(adir), "--json"]) == 0
     assert json.loads(capsys.readouterr().out).get("cross_host") is False
+
+
+def test_the_report_says_whether_its_own_record_verifies(tmp_path, capsys):
+    """MEASURED. A hand-edited severity reached the deliverable as fact.
+
+    Editing one finding from medium to critical in findings.json renders as
+    "Severity: Critical", raises the critical count in the tally by one, and
+    sits beside its unchanged "proof: candidate" with nothing saying the
+    file was edited after sealing. The seal catches it and the render warns
+    on stderr; neither reached the document. A report read away from the
+    terminal that produced it could not say whether its own record verifies
+    - the same shape as a diff whose caveat went to stderr while its
+    conclusion went to stdout.
+
+    `findings_bad` does not catch this and should not be asked to: it
+    validates EVIDENCE, and an edited severity leaves the evidence intact.
+    Severity is partly a judgement, so editing it is not necessarily
+    tampering. Saying that the file changed is not optional.
+    """
+    import json
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+
+    clean = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "Record verified:" in clean, \
+        "a verified record must say so, or absence reads as verified"
+    assert "does not verify" not in clean
+
+    rows = json.loads((sdir / "findings.json").read_text(encoding="utf-8"))
+    rows[0]["severity"] = "critical"
+    (sdir / "findings.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["report", str(sdir)]) == 0
+    capsys.readouterr()
+
+    edited = (sdir / "report.md").read_text(encoding="utf-8")
+    assert "does not verify" in edited, \
+        "an edited findings file is reported as fact with no marker"
+    assert "findings.json" in edited
+    assert "Record verified:" not in edited
+
+
+def test_the_verified_line_names_what_it_checked(tmp_path):
+    """Not a badge: the line carries the counts, so a reader can tell it
+    apart from a sentence that merely asserts confidence."""
+    import re
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    sdir = next(q for q in tmp_path.iterdir() if q.is_dir())
+    text = (sdir / "report.md").read_text(encoding="utf-8")
+
+    line = next(ln for ln in text.splitlines() if "Record verified:" in ln)
+    nums = [int(n) for n in re.findall(r"(\d+)", line)]
+    assert len(nums) >= 2, line
+    assert nums[0] > 0 and nums[1] > 0, line

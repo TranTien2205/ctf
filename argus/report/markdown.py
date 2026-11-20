@@ -454,6 +454,66 @@ def _target_of(session, meta: dict | None) -> str:
     return f"{derived} (from the directory name; meta.json names no target)"
 
 
+def _record_state(session) -> list[str]:
+    """Whether this report's own record still verifies, stated in the report.
+
+    MEASURED. A hand-edited severity reaches the deliverable as fact: a
+    finding edited from medium to critical in findings.json renders as
+    "Severity: Critical", raises the critical count in the tally by one,
+    and sits beside its unchanged "proof: candidate" with nothing saying
+    the file was edited after sealing.
+
+    The seal catches it - `argus verify` reports the file as edited - and
+    the render warns on stderr. Neither reaches the document. A report read
+    away from the terminal that produced it could not say whether its own
+    record verifies, which is the same shape as a diff whose caveat went to
+    stderr while its conclusion went to stdout.
+
+    `findings_bad` does not catch this and should not be asked to: it
+    validates EVIDENCE - that the cited ids exist and the excerpt is
+    verbatim - and an edited severity leaves the evidence intact. Severity
+    is partly a judgement, so editing it is not necessarily tampering. What
+    is not optional is saying that the file changed.
+
+    Stated in BOTH directions, because a line that appears only on failure
+    teaches a reader that its absence means verified.
+    """
+    from ..session import verify_transcript
+
+    try:
+        v = verify_transcript(session.dir)
+    except Exception:                                         # noqa: BLE001
+        return ["_The verification state of this record could not be read._"]
+
+    problems = []
+    if not v.get("chained"):
+        problems.append("the transcript hash chain does not verify")
+    if v.get("tail_truncated"):
+        problems.append("the transcript tail is truncated")
+    if v.get("bad_lines"):
+        problems.append(f"{len(v['bad_lines'])} transcript line(s) unparseable")
+    for key, text in (("artifact_mismatch", "edited since the run was sealed"),
+                      ("unsealed_additions", "added after the run was sealed "
+                                             "and covered by no digest")):
+        named = v.get(key)
+        if named:
+            problems.append(f"{', '.join(sorted(named))} {text}")
+    if v.get("resealed_over_mismatch"):
+        problems.append("this record was re-sealed over a mismatch, so the "
+                        "current digests do not attest the original run")
+
+    if not problems:
+        return [f"_Record verified: {v.get('entries', 0)} chained transcript "
+                f"entries, {v.get('findings_checked', 0)} findings "
+                "re-validated against them, artifacts matching their "
+                "digests._"]
+    return ["> **This record does not verify.** "
+            + "; ".join(problems)
+            + ". Everything above is reported from it anyway, so read it as "
+              "a claim about the file rather than about the target - "
+              "`argus verify` gives the detail."]
+
+
 def _grade_line(findings: list | None) -> str:
     """How many findings are graded, stated rather than assumed.
 
@@ -916,6 +976,8 @@ def render_report(session: Session, cfg: Config, summary: str = "",
         "",
         "_All findings cite verbatim response excerpts verified against the",
         "recorded transcript at write time._",
+        "",
+        *_record_state(session),
     ]
 
     notes_path = session.dir / "notes.md"
