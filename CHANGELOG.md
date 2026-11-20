@@ -8482,12 +8482,42 @@ Reading the code's own partial solution first is what kept this honest: the
 all-or-nothing list already existed, with a comment explaining the bias, so
 the question was never "is this checked" but "which six are outside it".
 
+### A diff that reported a finding it could not stand behind
+
+Fourth and strongest instance of one shape in this sweep. The other three
+qualified a whole run - a diff across hosts, a render that dropped a
+finding, a median under the wrong denominator. This one qualifies ONE NAMED
+FINDING.
+
+The diff printed "[STILL ] F03 ... (medium)" inside "6 still present" - a
+per-finding claim about the target - while F03's cited evidence no longer
+re-validated against its transcript. The caveat naming F03 went to stderr;
+the claim went to stdout. Whoever captures a diff, which is the normal way
+to keep one, got the claim without the condition.
+
+Marked on the row, not only in a header: a reader scanning for one finding
+sees it beside that finding rather than carrying a list down from six lines
+up. The ids also reach the JSON as a map per side, so a machine consumer
+does not have to parse prose. Nothing is marked when both sessions are
+sound.
+
+Three plants: removing the row mark fails, removing the stdout header
+fails, marking every row fails.
+
+THE FOUR ARE ONE DESIGN CONVENTION MEETING ONE FACT. Warnings go to stderr,
+and the deliverable gets read away from the terminal that produced it - in
+a file, in a report next week, in a CSV handed to someone else. A warning
+on stderr is not a disclosure; it is a message to whoever is watching. That
+is the family every defect in this session belongs to: not an agent
+inventing a finding, which the architecture blocks, but the artifact not
+carrying what the system knows.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1195 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1197 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

@@ -1324,3 +1324,76 @@ def test_nothing_is_named_as_omitted_when_nothing_was(tmp_path):
         text = (sdir / name).read_text(encoding="utf-8")
         assert "NOT shown" not in text
         assert "Record verified" in text or "verified:" in text.lower()
+
+
+def test_a_diff_marks_findings_whose_evidence_stopped_verifying(tmp_path,
+                                                                capsys):
+    """FOURTH AND STRONGEST instance of one shape in this sweep.
+
+    The others qualified a whole run - a diff across hosts, a render that
+    dropped a finding, a median under the wrong denominator. This one
+    qualifies ONE NAMED FINDING: the diff printed "[STILL ] F03 ...
+    (medium)" inside "6 still present", a per-finding claim about the
+    target, while F03's cited evidence no longer re-validated. The caveat
+    was on stderr; the claim was on stdout.
+
+    Marked on the row rather than only in a header, so a reader scanning
+    for one finding sees it beside that finding instead of carrying a list
+    down from six lines up.
+    """
+    import json
+    import shutil
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    before = next(q for q in tmp_path.iterdir() if q.is_dir())
+    after = tmp_path / "after-copy"
+    shutil.copytree(before, after)
+
+    rows = json.loads((after / "findings.json").read_text(encoding="utf-8"))
+    victim = str(rows[0]["id"])
+    rows[0]["evidence_excerpt"] = "NEVER APPEARED IN ANY RESPONSE"
+    (after / "findings.json").write_text(json.dumps(rows), encoding="utf-8")
+
+    capsys.readouterr()
+    assert main(["diff", str(before), str(after)]) == 0
+    out = capsys.readouterr()
+    assert "fail evidence re-validation" in out.err
+
+    assert "evidence no longer re-validates" in out.out, \
+        "the caveat reaches stderr only; a captured diff loses it"
+    row = next(ln for ln in out.out.splitlines()
+               if ln.startswith("[") and victim in ln)
+    assert "(!)" in row, f"the row makes a claim it cannot stand behind: {row}"
+
+    capsys.readouterr()
+    assert main(["diff", str(before), str(after), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert victim in payload.get("unverified_findings", {}).get("after", []), \
+        "a machine reader cannot tell which findings stopped verifying"
+
+
+def test_a_diff_of_sound_sessions_marks_nothing(tmp_path, capsys):
+    """The direction that keeps the mark meaningful: on two sound sessions
+    no row is flagged and no header appears."""
+    import json
+    import shutil
+
+    from argus.cli import main
+
+    assert main(["demo", "--session-dir", str(tmp_path), "--quiet"]) == 0
+    before = next(q for q in tmp_path.iterdir() if q.is_dir())
+    after = tmp_path / "after-copy"
+    shutil.copytree(before, after)
+
+    capsys.readouterr()
+    assert main(["diff", str(before), str(after)]) == 0
+    out = capsys.readouterr()
+    assert "(!)" not in out.out
+    assert "evidence no longer re-validates" not in out.out
+
+    capsys.readouterr()
+    assert main(["diff", str(before), str(after), "--json"]) == 0
+    assert json.loads(capsys.readouterr().out).get(
+        "unverified_findings") == {}

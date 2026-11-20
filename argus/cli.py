@@ -1048,6 +1048,16 @@ def main(argv: list[str] | None = None) -> int:
         # stored claims fail evidence re-validation (same check as
         # `findings`/`report`)
         from .session import findings_bad
+        # KEPT, not only warned about. This printed the ids on stderr and
+        # then reported them on stdout as facts about the target: a finding
+        # whose evidence no longer validates still appeared as
+        # "[STILL ] F03 ... (medium)" inside "6 still present". A reader of
+        # the captured output got a per-finding claim with no sign that its
+        # proof had stopped verifying - fourth instance in this sweep of a
+        # caveat on stderr beside a conclusion on stdout, and the strongest,
+        # because the other three qualified a whole run and this one
+        # qualifies one named finding.
+        unverified: dict[str, list[str]] = {}
         for label, d in (("before", args.before), ("after", args.after)):
             try:
                 bad = findings_bad(
@@ -1057,9 +1067,11 @@ def main(argv: list[str] | None = None) -> int:
             except Exception:
                 bad = []
             if bad:
+                unverified[label] = list(bad)
                 print(f"warning: {label} session has findings {bad} that "
                       "fail evidence re-validation - diff may be "
                       "misleading", file=sys.stderr)
+        unverified_ids = {str(i) for ids in unverified.values() for i in ids}
         fixed = [before[k] for k in sorted(set(before) - set(after))]
         still = [(before[k], after[k])
                  for k in sorted(set(before) & set(after))]
@@ -1075,6 +1087,7 @@ def main(argv: list[str] | None = None) -> int:
                           "target": ma.get("target"),
                           "argus_version": ma.get("argus_version")},
                 "cross_host": cross_host,
+                "unverified_findings": unverified,
                 "fixed": fixed, "new": new,
                 "still_present": [
                     {"id_before": b.get("id"), "id_after": a.get("id"),
@@ -1086,18 +1099,34 @@ def main(argv: list[str] | None = None) -> int:
             }, indent=2, ensure_ascii=False))
             return 0
         print(f"--- {Path(args.before).name} -> {Path(args.after).name} ---")
+        if unverified_ids:
+            print("!!! evidence no longer re-validates for "
+                  + ", ".join(f"{k}: {', '.join(v)}"
+                              for k, v in sorted(unverified.items()))
+                  + " - rows marked (!) below are claims this diff cannot "
+                    "stand behind")
         if cross_host:
             print(f"!!! targets differ ({hb} vs {ha}): every finding below "
                   "reads as fixed AND new because the two runs are "
                   "different applications, not a retest")
+        def _flag(*ids) -> str:
+            """(!) when any id on this row no longer re-validates.
+
+            On the row, not only in the header: a reader scanning for one
+            finding sees the mark beside it rather than having to carry a
+            list from six lines up.
+            """
+            return " (!)" if any(str(i) in unverified_ids for i in ids) else ""
+
         for f in fixed:
             print(f"[FIXED ] {f.get('id')} {f.get('title')} "
-                  f"({f.get('severity')})")
+                  f"({f.get('severity')}){_flag(f.get('id'))}")
         for b, a in still:
             drift = (f" severity {b.get('severity')}->{a.get('severity')}"
                      if b.get("severity") != a.get("severity") else "")
             print(f"[STILL ] {b.get('id')}->{a.get('id')} {a.get('title')}"
-                  f" ({a.get('severity')}){drift}")
+                  f" ({a.get('severity')}){drift}"
+                  f"{_flag(b.get('id'), a.get('id'))}")
         for f in new:
             print(f"[NEW   ] {f.get('id')} {f.get('title')} "
                   f"({f.get('severity')})")
