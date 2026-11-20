@@ -1992,7 +1992,18 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
                 vals = _values(arms[arm], key)
                 if not vals:
                     continue
-                print(f"{arm},{len(arms[arm])},{key},"
+                # THE COUNT THE MEDIAN WAS COMPUTED OVER, not the arm's
+                # row count. `_values` SKIPS a trial with no value for this
+                # key, and only the eight all-or-nothing metrics suppress
+                # the median when one is missing - so for the six count
+                # metrics (proven, candidate, unproven, findings, requests,
+                # coverage) this printed n=10 beside a median over six.
+                # Measured: those six are exactly the numbers a reader uses
+                # to judge whether the system finds things.
+                #
+                # The warning about it went to stderr while the CSV went to
+                # stdout, which is the third instance of that shape today.
+                print(f"{arm},{len(vals)},{key},"
                       f"{statistics.median_low(vals)},{min(vals)},{max(vals)}")
         return 0
 
@@ -2015,7 +2026,11 @@ def _compare_by_arm(dirs, summarise, host_of, csv: bool = False) -> int:
             med = statistics.median_low(vals)
             lo, hi = min(vals), max(vals)
             spread = "" if lo == hi else f"  [{lo}-{hi}]"
-            cells.append(f"{med}{spread}")
+            # and say so when fewer trials contributed than the arm holds,
+            # for the same reason as the CSV: a median whose denominator is
+            # not the stated N is a different measurement.
+            short = "" if len(vals) == len(arms[arm]) else f" (n={len(vals)})"
+            cells.append(f"{med}{spread}{short}")
         print(f"{label:<26}" + "".join(f"{c:<{width}}" for c in cells))
     print()
     print("median is median_low: on an even N the mean of the middle two "

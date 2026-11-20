@@ -738,3 +738,73 @@ def test_demo_says_so_when_the_target_is_not_reachable(tmp_path, capsys):
                    "--session-dir", str(tmp_path)])
     assert rc == 2
     assert "cannot reach" in capsys.readouterr().err
+
+
+def test_by_arm_states_the_count_each_median_was_computed_over(tmp_path,
+                                                               capsys):
+    """MEASURED. The N beside a median was the arm's row count, not the
+    number of values the median used.
+
+    `_values` SKIPS a trial with no value for the key, and only the eight
+    all-or-nothing metrics suppress the median when one is missing. For the
+    other six - proven, candidate, unproven, findings, requests, coverage -
+    an arm of four trials where two died printed its median over two values
+    under N=4.
+
+    Those six are exactly the numbers a reader uses to judge whether the
+    system finds anything, and the warning about the skew went to stderr
+    while the CSV went to stdout - the third instance of that shape in this
+    session.
+
+    THE RESIDUAL IS NAMED RATHER THAN FIXED, because it is a policy call.
+    The skipped subset is systematically the trials that COMPLETED, so an
+    arm that crashes more often still reports better finding counts - word
+    for word the bias the sibling test above describes for `ttf`. Making
+    these all-or-nothing too would suppress the median whenever one trial
+    died, which loses what the surviving trials measured. This change makes
+    the denominator truthful; whether a partial arm should report at all is
+    a decision about the experiment, not about this function.
+    """
+    _fake_session(tmp_path, "single", 1, proven=1)
+    _fake_session(tmp_path, "single", 2, proven=3)
+    _fake_session(tmp_path, "single", 3, proven=0, summary=False)
+    _fake_session(tmp_path, "single", 4, proven=0, summary=False)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", "--csv", *dirs]) == 0
+    csv_out = capsys.readouterr().out
+    rows = [ln.split(",") for ln in csv_out.splitlines() if "," in ln]
+    by_key = {r[2]: r for r in rows if len(r) >= 4 and r[0] == "single"}
+
+    assert "proven" in by_key, csv_out
+    assert by_key["proven"][1] == "2", (
+        f"the CSV reports n={by_key['proven'][1]} for a median over two "
+        "values")
+
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    table = capsys.readouterr().out
+    line = next(ln for ln in table.splitlines() if ln.startswith("proven"))
+    assert "(n=2)" in line, line
+
+
+def test_by_arm_does_not_qualify_a_complete_arm(tmp_path, capsys):
+    """The direction that keeps the note off a full arm, where it would
+    teach a reader to ignore it."""
+    _fake_session(tmp_path, "single", 1, proven=1)
+    _fake_session(tmp_path, "single", 2, proven=3)
+    dirs = [str(p) for a in sorted(tmp_path.iterdir()) for p in a.iterdir()]
+
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", *dirs]) == 0
+    table = capsys.readouterr().out
+    line = next(ln for ln in table.splitlines() if ln.startswith("proven"))
+    assert "(n=" not in line, line
+
+    capsys.readouterr()
+    assert main(["compare", "--by-arm", "--csv", *dirs]) == 0
+    rows = [ln.split(",") for ln in capsys.readouterr().out.splitlines()
+            if "," in ln]
+    proven = next(r for r in rows if len(r) >= 4 and r[2] == "proven")
+    assert proven[1] == "2", proven

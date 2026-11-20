@@ -8449,12 +8449,45 @@ Third time today an assertion of the shape "this string is absent" had to
 become "this claim is not made in this form", after the cross-verification
 absence line and the dispute attribution.
 
+### A median under a denominator that was not its own
+
+Continuing the sweep for "the tool knows and only stderr says it": the
+benchmark comparison printed each median beside the arm's ROW COUNT, while
+`_values` skips a trial that has no value for that key.
+
+Only eight of the fourteen metrics are all-or-nothing - they suppress the
+median when a trial is missing. The other six are `proven`, `candidate`,
+`unproven`, `findings`, `requests` and `coverage`: exactly the numbers a
+reader uses to judge whether the system finds anything. Measured on an arm
+of four trials where two died: the median was computed over two values and
+printed under N=4, and the warning about the skew went to stderr while the
+CSV went to stdout.
+
+Both outputs now state the count the median was computed over, and say
+nothing extra on a complete arm where it would teach a reader to skip it.
+Three plants: the row count back in the CSV fails, the table omitting the
+short count fails, and printing it on every arm fails.
+
+THE RESIDUAL IS NAMED RATHER THAN FIXED, because it is a decision about the
+experiment and not about this function. The skipped subset is
+systematically the trials that COMPLETED, so an arm that crashes more often
+still reports better finding counts - word for word the bias the sibling
+test describes for time-to-first-finding, where "the arm that fails more
+often reports the better time". Making these six all-or-nothing too would
+suppress the median whenever one trial died, which throws away what the
+surviving trials measured. This change makes the denominator truthful;
+whether a partial arm should report at all is the user's call.
+
+Reading the code's own partial solution first is what kept this honest: the
+all-or-nothing list already existed, with a comment explaining the bias, so
+the question was never "is this checked" but "which six are outside it".
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1193 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1195 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +
