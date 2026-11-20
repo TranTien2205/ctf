@@ -80,7 +80,7 @@ def test_the_timeout_kills_what_the_tool_spawned_not_just_the_tool():
     marker = os.path.join(tempfile.mkdtemp(), "orphan-was-alive")
     # a child that spawns a grandchild due to touch the marker shortly,
     # then sleeps long enough that the timeout always fires first
-    cmd = ["sh", "-c", f"( sleep 2; touch {marker} ) & sleep 30"]
+    cmd = ["sh", "-c", f"( sleep 1; touch {marker} ) & sleep 30"]
     started = time.monotonic()
     with pytest.raises(subprocess.TimeoutExpired):
         _subproc.run_capped(cmd, timeout_s=0.5)
@@ -88,7 +88,14 @@ def test_the_timeout_kills_what_the_tool_spawned_not_just_the_tool():
     # into {"error": "timed out after Ns"}
     assert time.monotonic() - started < 5.0
 
-    time.sleep(3.0)
+    # THE MARGIN, STATED. The grandchild touches the marker 1s in and the
+    # parent is killed at 0.5s, so this looks 5s in: a delay of up to 4s
+    # still produces a red test. With the write at 2s and the look at 3s
+    # the margin was 1 second, which a loaded runner can close - and this
+    # assertion's only failure mode is passing wrongly, so a thin margin
+    # here hides an orphan that still holds the target and the unlinked
+    # stdout fd.
+    time.sleep(5.0)
     assert not os.path.exists(marker), (
         "a process the timed-out tool spawned outlived the timeout: it "
         "still has the target, the unlinked stdout fd, and no place in "

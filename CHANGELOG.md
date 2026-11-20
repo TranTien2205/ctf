@@ -8364,6 +8364,38 @@ looked like a hole until the mechanism above explained it: the transition
 had already written the file. The plant that matters is the one this test
 exists for - making a dead run report `done` - and that one is red.
 
+### Two negative assertions with one second of margin
+
+Generalising the fix above - if one timed wait was the wrong shape, where
+are the others - found thirteen in the server tests and two elsewhere. The
+thirteen are fine; the two are the opposite problem and worth the
+arithmetic.
+
+Both guard process cleanup: a tool times out, or an MCP server closes, and
+the test asserts that a grandchild the subject spawned did NOT survive. For
+a negative claim a timed wait is the right instrument - there is nothing to
+join, since the process should not exist - but the risk inverts. A short
+wait makes the test PASS WRONGLY, and these guard an invariant the tests'
+own messages call out: an orphan "still has the target, the unlinked stdout
+fd, and no place in the transcript".
+
+Measured: the grandchild wrote its marker 2s in, the parent was killed at
+0.5s, and the test looked 3s in. ONE SECOND OF MARGIN. A loaded runner can
+close that, and the test would then report cleanup working while the orphan
+was alive.
+
+The write moved to 1s - it only has to outlive a kill at 0.5s - and the
+look to 5s, so a delay of up to four seconds still produces a red test. Two
+seconds added to the suite for four times the margin, and the arithmetic is
+in the comment so the next person shaving it can see what they are
+spending.
+
+A poll would not help: concluding "it never appeared" means waiting out the
+window either way.
+
+Planted to confirm the widened test still catches the real thing: with the
+process-group kill removed, the orphan survives and the test is red.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift

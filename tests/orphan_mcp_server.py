@@ -24,7 +24,10 @@ if MARKER:
     subprocess.Popen(
         [sys.executable, "-c",
          "import time, sys, pathlib\n"
-         "time.sleep(2)\n"
+         # 1s, not 2: it only has to outlive the parent's kill at 0.5s, and
+         # writing sooner widens the margin before the test looks without
+         # costing the suite anything. See the arithmetic in the test.
+         "time.sleep(1)\n"
          f"pathlib.Path({MARKER!r}).write_text('alive')\n"
          "time.sleep(30)\n"])
 

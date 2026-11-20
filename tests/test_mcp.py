@@ -331,7 +331,17 @@ def test_closing_a_server_kills_what_it_spawned_not_just_what_it_started():
     assert c.tools() == [], "the stub server did not complete a handshake"
     c.close()
 
-    time.sleep(3.0)
+    # THE MARGIN, STATED, because this is a negative assertion and its only
+    # failure mode is passing wrongly. The grandchild writes the marker 1s
+    # after it starts; `close()` has already returned; this looks 5s in. So
+    # a delay of up to 4s in the grandchild still produces a red test,
+    # against the 1s of margin this had when the write was at 2s and the
+    # look at 3s - a gap a loaded CI runner can close, and the test would
+    # then pass while the orphan was alive.
+    #
+    # A poll cannot help here: concluding "it never appeared" requires
+    # waiting out the window either way. The cost is 2 extra seconds.
+    time.sleep(5.0)
     assert not marker.exists(), (
         "a process the MCP server spawned outlived close(): it still has "
         "the target and no place in the transcript, while the run's record "
