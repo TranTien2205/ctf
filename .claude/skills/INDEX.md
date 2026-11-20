@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 7,393,000 tokens across 65023 files. Opening
+The depth corpus is roughly 7,581,000 tokens across 67049 files. Opening
 `skills/web-triage/` alone is about 203,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -57,14 +57,14 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | Observed evidence | Router | Tokens | Next |
 |---|---|---|---|
 | ad-service-triage | `skills/ad-service-triage/SKILL.md` | ~1.5k | `ad-traffic-mining`, `ad-patch-without-breaking-sla`, `ad-planted-backdoor-hunt` … |
-| LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~0.9k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
+| LLM endpoint, model file, IoT firmware or protocol | `skills/ai-iot-triage/SKILL.md` | ~1.0k | `ctf-ai-ml`, `mcp-agent-security`, `web-deserialization` … |
 | ciphertext, modulus, nonce, hash | `skills/crypto-triage/SKILL.md` | ~4.5k | `crypto-classical`, `crypto-ecc-dlog`, `crypto-prng` … |
 | jail, encoding chain, game or VM, programming task | `skills/ctf-misc/SKILL.md` | ~3.0k | `misc-constraint-puzzle`, `misc-encoding-carrier`, `misc-interpreter-escape` |
 | artifact bundle plus numbered investigation questions: EVTX, Sysmon, hives, $MFT, prefetch, KAPE, CloudTrail | `skills/dfir-sherlock-triage/SKILL.md` | ~1.8k | `dfir-antiforensics-trace`, `dfir-authentication-trace`, `dfir-cloud-audit-trace` … |
 | PCAP, disk, memory, media, logs | `skills/forensics-triage/SKILL.md` | ~0.8k | `ctf-forensics`, `ctf-malware` |
 | ir-live-estate-triage | `skills/ir-live-estate-triage/SKILL.md` | ~1.9k | `dfir-authentication-trace`, `dfir-execution-trace`, `dfir-persistence-trace` … |
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-geolocation`, `osint-identity-pivot`, `osint-infra-records` … |
-| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.1k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
+| ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.2k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.8k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
 | HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.5k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 

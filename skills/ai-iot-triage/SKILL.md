@@ -56,6 +56,15 @@ challenge's own scope.
 `binwalk`, `unblob`, `qemu-user-static`, `mosquitto_sub`, `strings`. Confirm each
 with `which` before relying on it.
 
+## Reference corpus
+
+`references/` carries ~990 named routing modules - open the one the carrier
+names: `work-*`/`ai-*`/`iot-*` branch detail, `proto-*`/`fmt-*`/`fw-*`/`hw-*`
+artifact detail, `att-*` attack-family detail, `rt-*` boundary handoffs,
+`tool-*` tool usage, `cx-*`/`aq*`/`iq-*`/`fq-*` carrier x owner and
+technique x surface cells, `trap-*/neg-*/q-*/kb-*/agg-*` frame modules,
+plus `-route` companions.
+
 ## Discipline
 
 - Fix the sub-type first. Read what the challenge actually supplies: source, a

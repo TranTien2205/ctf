@@ -98,9 +98,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 878,
-      "depth_files": 0,
-      "depth_tokens": 0,
+      "skill_tokens": 984,
+      "depth_files": 996,
+      "depth_tokens": 91282,
       "use_when": [
         "an LLM/chatbot endpoint, a model file, or an embedded/IoT firmware or protocol capture is supplied"
       ],
@@ -279,9 +279,9 @@
       "categories": [
         "pwn"
       ],
-      "skill_tokens": 1067,
-      "depth_files": 1,
-      "depth_tokens": 219,
+      "skill_tokens": 1216,
+      "depth_files": 1031,
+      "depth_tokens": 97432,
       "use_when": [
         "an ELF/PE binary accepts input and the goal is memory corruption",
         "a crash, checksec output, or libc version is part of the evidence"

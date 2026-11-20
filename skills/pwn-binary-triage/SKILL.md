@@ -70,6 +70,17 @@ Full technique depth is in `../ctf-pwn/`; its `SKILL.md` indexes every file in
 that directory. That whole corpus is behind a manual gate — reach it from a named
 row above, not by browsing.
 
+## Reference corpus
+
+`references/` carries ~1,020 named routing modules - open the one the
+observation names: `prot-*` per-protection detail, `ipctl-*` control proofs,
+`crash-*` crash signatures, `conv-*`/`arch-*` calling conventions,
+`depth-*`/`scen-*` depth routes and scenarios, `tech-*`/`leak-*`/`heap-*`/
+`fmt-*`/`arb-*`/`gadget-*` technique detail, `input-*` surfaces,
+`env-*`/`rem-*`/`strip-*`/`static-*` environment notes, `mit-*` bypass
+shapes, `px-*/ix-*/pq-*/cq2-*/gq-*/rq-*/sq-*` condition matrices,
+`trap-*/neg-*/q-*/kb-*/agg-*` frame modules, plus `-route` companions.
+
 ## Discipline
 
 - Prove instruction-pointer control before building any chain. A crash is not

@@ -1,0 +1,8 @@
+# Route companion: att-rag
+
+When to open `att-rag.md`: at intake when this module's
+question is the open one. Family `att-*`.
+
+## Exit
+
+Owner named -> that router/skill takes over.
