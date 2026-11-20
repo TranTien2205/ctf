@@ -1275,9 +1275,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 933,
-      "depth_files": 3,
-      "depth_tokens": 928,
+      "skill_tokens": 1039,
+      "depth_files": 2606,
+      "depth_tokens": 58791,
       "use_when": [
         "a probe or source read produced this class's signal: query TXT first because that is where a flag is actually planted, then sweep the record types that can carry data, then whois, then the certificate and its subject alternative names, which routinely leak the sibling hostname that is the real next step"
       ],

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T07:52:32",
+  "generated_at": "2026-11-20T08:17:48",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -202,8 +202,8 @@
       "local_evidence": "stub",
       "lines": 104,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.152,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.151,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -234,8 +234,8 @@
       "local_evidence": "stub",
       "lines": 117,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.143,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.142,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -424,7 +424,7 @@
       "local_evidence": "stub",
       "lines": 229,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
+      "nearest_neighbour": "forensics-memory-analysis",
       "overlap": 0.032,
       "trust": "catalogue-or-unreviewed"
     },
@@ -560,8 +560,8 @@
       "local_evidence": "stub",
       "lines": 89,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.184,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.183,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -608,8 +608,8 @@
       "local_evidence": "stub",
       "lines": 87,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.2,
+      "nearest_neighbour": "osint-identity-pivot",
+      "overlap": 0.19,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -638,10 +638,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 85,
+      "lines": 92,
       "actionability": "operational",
       "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.2,
+      "overlap": 0.186,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -657,7 +657,7 @@
       "lines": 96,
       "actionability": "operational",
       "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.175,
+      "overlap": 0.176,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -704,8 +704,8 @@
       "local_evidence": "stub",
       "lines": 101,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.148,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.146,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -730,8 +730,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.146,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.144,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -846,8 +846,8 @@
       "local_evidence": "stub",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.173,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.172,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -902,8 +902,8 @@
       "local_evidence": "present",
       "lines": 102,
       "actionability": "operational",
-      "nearest_neighbour": "osint-infra-records",
-      "overlap": 0.165,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.164,
       "trust": "local-confirmed"
     },
     {
