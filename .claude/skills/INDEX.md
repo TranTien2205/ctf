@@ -19,7 +19,7 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 6,719,000 tokens across 60965 files. Opening
+The depth corpus is roughly 6,802,000 tokens across 61489 files. Opening
 `skills/ctf-osint/` alone is about 160,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
@@ -197,7 +197,7 @@ that file and this table would drift.
 | `skills/ad-patch-without-breaking-sla/SKILL.md` | depth | ~1.5k | see registry use_when |
 | `skills/ad-planted-backdoor-hunt/SKILL.md` | depth | ~1.6k | see registry use_when |
 | `skills/ad-traffic-mining/SKILL.md` | depth | ~1.6k | see registry use_when |
-| `skills/ctf-ai-ml/SKILL.md` | depth | ~1.8k | the AI/IoT sub-type is decided |
+| `skills/ctf-ai-ml/SKILL.md` | depth | ~2.5k | the AI/IoT sub-type is decided |
 | `skills/ctf-crypto/SKILL.md` | depth | ~2.8k | the primitive parameters are collected |
 | `skills/ctf-forensics/SKILL.md` | depth | ~2.8k | the artifact type is identified |
 | `skills/ctf-malware/SKILL.md` | depth | ~2.1k | obfuscated script, PE/.NET sample, or captured C2 traffic |

@@ -122,3 +122,24 @@ print(f'Shape: {img.shape}, Range: [{img.min():.3f}, {img.max():.3f}]')
 
 - **Gradient-based input recovery:** Using model gradients to reconstruct private training data from shared gradients (federated learning attacks). See [model-attacks.md](model-attacks.md#ml-model-inversion-via-gradient-descent-bsidessf-2025).
 - **Activation maximization:** Optimizing input to maximize a specific neuron's activation, revealing what the network has learned.
+
+## references/ corpus
+
+The generated depth modules - open one named module after the quick
+reference above has picked the family. Each `*-route.md` is the
+routing card for its base module.
+
+- `references/work-*.md` - reading order and the carrier boundary
+- `references/meth-*.md` - methods: model identification, pickle shape, weight manipulation, extraction, inversion, membership inference, backdoor detection, FGSM/PGD/C&W/patch/poison, prompt injection, jailbreak taxonomy, tool abuse, context manipulation
+- `references/pk-*.md` - model-file formats: opcode stream, GLOBAL+REDUCE, BUILD/setstate, safe inspection, RCE chains, safetensors, torch zip, ONNX, joblib/numpy, SavedModel/h5, GGUF, diffusers
+- `references/adv-*.md` - adversarial budgets and attacks: Linf/L2/L0, deepfool, JSMA, one-pixel, boundary, ZOO, square, hopskipjump, transferability, universal, EOT, text/audio/malware-classifier, defense evaluation
+- `references/llm-*.md` - LLM attack families: system-prompt leak, roleplay, encoding, split, suffix, few-shot, indirect injection, tool chains, exfil shapes, guard bypass, language/ascii/format confusion, context window, RAG poisoning, MCP abuse, session tricks, image injection
+- `references/mdl-*.md` - model internals: weight negation, weights-as-carrier, architecture reading, LoRA surgery, hash collision, linear/DNN extraction, inversion setup, membership threshold, backdoor scan, quantization, shuffled recovery, watermarks, tokenizer, safetensors header, model diffing
+- `references/ax-*.md` - attack x model-type matrix (14 attacks x 8 model types)
+- `references/ix-*.md` - injection family x surface matrix (12 families x 7 surfaces)
+- `references/dx-*.md` - defense x evasion matrix (8 defenses x 8 evasions)
+- `references/scen-*.md` - scenarios: pickle RCE, chat->flag, budget attack, weight flag, extraction, doc injection, membership, trigger recovery, quantized channels, tool exfil, guard bypass, vision injection, adapter surgery, surrogate transfer, model diff, trigger recovery
+- `references/q-*.md`, `references/q2-*.md`, `references/trap-*.md`, `references/trap3-*.md`, `references/neg-*.md` - questions, traps (load-before-inspect, quantized weights, gradient-free assumption, filter layers, seed dependence, format/output filters, mock classifiers, load-order exec, norm mismatch, tokenizer boundary, cached completions), negatives
+- `references/tool-*.md` - pickletools, fickling, safetensors, torch.load discipline, attack libraries, onnx inspection
+- `references/cross-*.md` - handoffs to misc, rev, crypto, web
+- `references/agg-*.md` - corpus index

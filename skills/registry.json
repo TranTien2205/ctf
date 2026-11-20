@@ -593,9 +593,9 @@
       "categories": [
         "ai"
       ],
-      "skill_tokens": 1829,
-      "depth_files": 3,
-      "depth_tokens": 16482,
+      "skill_tokens": 2486,
+      "depth_files": 527,
+      "depth_tokens": 98886,
       "use_when": [
         "the sink is a model, a prompt pipeline, or a serialised model format and the sub-type is already identified"
       ],
