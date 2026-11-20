@@ -19,8 +19,8 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 6,956,000 tokens across 62436 files. Opening
-`skills/ctf-osint/` alone is about 160,000. A router is 100–1,300 tokens and a
+The depth corpus is roughly 7,155,000 tokens across 63476 files. Opening
+`skills/web-triage/` alone is about 203,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
 whatever that file happened to describe.
@@ -66,7 +66,7 @@ loop in `LEARNING_LOOP.md`, never by editing the label.
 | name, handle, photo, domain in public sources | `skills/osint-triage/SKILL.md` | ~1.1k | `osint-geolocation`, `osint-identity-pivot`, `osint-infra-records` … |
 | ELF/PE plus input, crash, checksec | `skills/pwn-binary-triage/SKILL.md` | ~1.1k | `pwn-code-reuse`, `pwn-format-string`, `pwn-heap-corruption` … |
 | binary, bytecode or firmware to understand | `skills/rev-triage/SKILL.md` | ~1.8k | `rev-bytecode-vm`, `rev-managed-code`, `rev-native-check` … |
-| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.1k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
+| HTTP target, web framework, web source | `skills/web-triage/SKILL.md` | ~2.5k | `file-read-primitives`, `web-auth-session`, `web-cache-poisoning` … |
 
 `ctf-misc` is both router and depth for its category, and it is the last
 resort: try a named category first.

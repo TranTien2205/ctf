@@ -123,3 +123,22 @@ grep -ril "<keyword>" skills/ctf-web/ | head
 - `references/http-parser-differential.md` — proxy versus backend parsing
 - `references/laravel-session-cookie-sqli.md` — leaked key to session forgery to
   a query fragment
+
+## Routing corpus
+
+`references/` carries ~1000 named discrimination modules - open the one the
+observation names, never browse the directory. The corpus discriminates
+between classes; exploitation depth stays in the depth skill the route names.
+
+| Prefix | Content |
+|---|---|
+| `references/` sig-* | one module per discriminating signal: what it looks like white-box vs black-box, which classes it raises and rules out |
+| `references/` pair-* | confusable-class disambiguation (sqli vs nosqli, ssti vs cmdi, xss vs xs-leaks, ssrf vs open-redirect, and more) |
+| `references/` probe-* | the cheapest discriminating request per class, its confirming oracle and its falsifier |
+| `references/` stack-* | stack fingerprint to likely-class ordering (Express+Mongo, Django, Flask+Jinja, Laravel, Spring, Rails, PHP, Next.js, GraphQL, API-only, cache-front, proxy-WAF) |
+| `references/` flag-* | flag-location reach analysis: which classes can reach an env var, a db row, a file, a privileged route |
+| `references/` recon-* | step-0 detail: JS endpoint enumeration, header/error/comment fingerprinting, field-removal deltas, the second identity |
+| `references/` sx-* | signal x class matrix cells - whether one signal raises or rules out one class |
+| `references/` fx-* | flag-location x class reach cells - whether a class can touch the flag's position at all |
+| `references/` work-*/trap-*/neg-*/q-*/agg-* | frame modules: reading order, traps, negative shapes, routing questions, corpus index |
+| `references/` -route companions | one per hand-written module, naming when to open it |

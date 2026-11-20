@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T18:44:42",
+  "generated_at": "2026-11-20T19:43:48",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -142,7 +142,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 126
+      "lines": 145
     },
     {
       "id": "ad-patch-without-breaking-sla",
@@ -1248,7 +1248,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 140
+      "lines": 193
     },
     {
       "id": "dfir-parallel-sweep",
