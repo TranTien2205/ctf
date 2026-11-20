@@ -149,9 +149,9 @@
       "categories": [
         "misc"
       ],
-      "skill_tokens": 2527,
-      "depth_files": 18,
-      "depth_tokens": 51148,
+      "skill_tokens": 3029,
+      "depth_files": 422,
+      "depth_tokens": 108645,
       "use_when": [
         "the challenge is a jail, an encoding chain, a game or VM, a DNS puzzle, or a programming constraint"
       ],
@@ -614,8 +614,8 @@
         "crypto"
       ],
       "skill_tokens": 2758,
-      "depth_files": 23,
-      "depth_tokens": 99172,
+      "depth_files": 104,
+      "depth_tokens": 111729,
       "use_when": [
         "the primitive and its parameters are collected and a named attack has to be implemented"
       ],
@@ -635,8 +635,8 @@
         "forensics"
       ],
       "skill_tokens": 2813,
-      "depth_files": 20,
-      "depth_tokens": 87175,
+      "depth_files": 188,
+      "depth_tokens": 109668,
       "use_when": [
         "the artifact type is identified and a container-specific extraction is required"
       ],
@@ -697,8 +697,8 @@
         "pwn"
       ],
       "skill_tokens": 4792,
-      "depth_files": 18,
-      "depth_tokens": 111773,
+      "depth_files": 89,
+      "depth_tokens": 122371,
       "use_when": [
         "the primitive is known and a specific heap, kernel, format-string, or sandbox technique is needed"
       ],
@@ -718,8 +718,8 @@
         "rev"
       ],
       "skill_tokens": 3253,
-      "depth_files": 18,
-      "depth_tokens": 99378,
+      "depth_files": 68,
+      "depth_tokens": 107822,
       "use_when": [
         "a specific language runtime, packer, VM obfuscator, or anti-analysis trick has been identified"
       ],
@@ -739,8 +739,8 @@
         "web"
       ],
       "skill_tokens": 2775,
-      "depth_files": 18,
-      "depth_tokens": 95949,
+      "depth_files": 169,
+      "depth_tokens": 117610,
       "use_when": [
         "the web depth skill did not contain the specific variant, filter bypass, or CVE the evidence points to"
       ],

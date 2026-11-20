@@ -1,0 +1,16 @@
+# Technique: Protocol padding
+
+Depth module for `ctf-misc`. Open `../SKILL.md` for the shared-file
+index first; this file is one named piece of the corpus - never a
+finding by itself.
+
+Unused/reserved fields in a binary protocol carry bytes - the spec diff names the channel.
+
+## Evidence rule
+
+The technique claim still needs the verbatim output - a technique
+name is routing information, not a finding.
+
+## Pivot
+
+Technique identified -> the shared file carrying its detail.

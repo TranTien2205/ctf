@@ -131,6 +131,21 @@ Open one, by name, after the table has picked it.
 - [games-and-vms-4.md](games-and-vms-4.md) - Part 4 (2018-era): XSLT as Turing-complete VM, JavaScript MAX_SAFE_INTEGER successor equality, binary search oracle in comparison-only DSL, blind SQLi via script-engine timeout error, OEIS sequence lookup automation, QR code reassembly from format-string constraints, matrix exponentiation for Fibonacci recurrence, Tribonacci for frog-jump counting, Selenium + Tesseract dynamic CAPTCHA, Brainfuck→Piet multi-layer polyglot, bytebeat synth code recognition
 - [ctfd-navigation.md](ctfd-navigation.md) - CTFd platform API navigation without browser: detection, token auth, challenge listing, file download, flag submission, scoreboard, hints, notifications, Python client class
 
+## references/ corpus
+
+The generated depth modules - open one named module after the table above has
+picked the family. Each `*-route.md` is the routing card for its base module.
+
+- `references/work-*.md` - reading order and the class boundary
+- `references/meth-*.md` - method modules: carrier identification, jail probing, layered decoding, VM mapping, RF flow, puzzle client build, platform recon, budget, evidence
+- `references/trap-*.md` - the known traps: assumed decode order, word vs char filters, esolang dialect, VM state, RF format, integer edges, base64 variant, builtins, static-only VM, platform assumption
+- `references/q-*.md` - question modules: which family/encoding/filter/modulation/hiding channel, which jail escape, where the VM win check is, what the protocol wants, when to reclassify
+- `references/tech-*.md` - technique modules: pyjail dunder/decorator/f-string/exception/codeobj/import chains, bash arithmetic/glob/rev/indirect/substr escapes, metachar/editor/env/sudo escapes, hex/base64/base58/rot/morse/brainfuck/whitespace/zerowidth/case/wordpos/dns/punycode/base91/ascii85 encodings, tap/atbash/affine/railfence/columnar/keyboard-shift/DNA/emoji/braille decodes, VM opcode dump/instrumentation/check/game-state/emulator shapes, OOK/FSK/PSK/morse-rf/SSTV/IQ/ASK/AM/FM/APRS/POCSAG/keyfob/ADS-B/USB-HID, EXIF/appended/ADS/padding/pcap/font/git/archive/DB/heap/subliminal channels, ctfd/ws/profile/hint/scoreboard surfaces, puzzle edge/speed/io/netcat/memo/symbolic shapes
+- `references/tool-*.md` - cyberchef mental model, esolang interpreters, SDR software, solver scaffolding, file carving, strings/hexdump recon
+- `references/neg-*.md` - negative shapes per family and the reclassify trigger
+- `references/cross-*.md` - handoffs to misc-encoding-carrier, misc-interpreter-escape, misc-constraint-puzzle, crypto, rev, forensics-stego, web
+- `references/agg-*.md` - aggregators: family map, question map, tool map, trap map, negative map, workflow, corpus index
+
 ## Field notes
 
 Nothing in this category has been recorded from a solve in this tree yet. When
