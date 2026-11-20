@@ -83,6 +83,34 @@ The cross-read layer needs a model endpoint, so it reads zero on evidence
 produced without one - and the report states that zero and names the
 command that would change it, rather than leaving the column out.
 
+## What each command does when the record does not verify
+
+The three differ on purpose, and the rule is what each one WRITES. Measured
+on one tampered copy of a session:
+
+| Command | On a record that does not verify | Why |
+|---|---|---|
+| re-verification | refuses, exits non-zero | it sends requests and writes new exchanges into the session, so proceeding compounds the damage |
+| cross-read | warns, proceeds, and records that it re-sealed over a mismatch | it cannot raise a grade, so it cannot launder a false finding upward - and the fact that it ran over a mismatch stays in the artifact |
+| render | warns, and states the record's verification state IN the report | it only reads; the honest move is to publish and say what the record is |
+
+| Property | Enforced in | Proven by |
+|---|---|---|
+| Re-verification refuses an unverifiable record | the chain check before any request | `test_the_command_refuses_a_record_that_does_not_verify` |
+| A cross-read over a mismatch is recorded in the artifact | the re-seal note | `test_a_reseal_over_a_mismatch_survives_the_reseal` |
+| The report states whether its own record verifies, either way | the record-state line | `test_the_report_says_whether_its_own_record_verifies` |
+| Findings whose evidence no longer validates are left out of the report | `findings_bad` at render | `test_report_excludes_tampered_findings` |
+
+An edited SEVERITY is the case that shows why the last two are different
+properties. Evidence re-validation checks that cited ids exist and that the
+excerpt is verbatim, so an edited severity passes it untouched: the finding
+stays in the report and its new severity is counted. The seal still catches
+the edit, which is why the report says so in its own text rather than
+relying on the terminal that produced it.
+
+Severity is partly a judgement, so an operator changing it is not
+necessarily tampering. Saying the file changed is not optional.
+
 ## Integrity and tamper-evidence
 
 | Property | Enforced in | Proven by |

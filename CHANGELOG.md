@@ -8304,6 +8304,35 @@ key absent entirely - because my own earlier render of that copy had
 re-sealed it. Twenty-second wrong instrument, and a new kind: not a bad
 pattern but an observation taken after the observer had altered the thing.
 
+### The documentation gap I named and then did not close
+
+The previous entry observed that three commands treat an unverifiable
+record three ways, that each is coherent for what it writes, and that
+"nothing said so, and nothing said it in the document" - and then fixed
+only the report line. The document half stayed open, named by its own
+commit message.
+
+Closed now, in the file's shape: a table of what each command does and the
+reason, keyed to what each one WRITES, plus the four properties and the
+tests that hold them. The re-verification refuses because it sends requests
+and writes exchanges, so proceeding compounds the damage. The cross-read
+proceeds because it cannot raise a grade and therefore cannot launder a
+false finding upward - and the fact that it ran over a mismatch stays in
+the artifact. The render proceeds because it only reads, and states the
+record's verification state in its own text.
+
+The edited-severity case is written out, because it is what makes two of
+those properties distinct rather than one: evidence re-validation checks
+that cited ids exist and the excerpt is verbatim, so an edited severity
+passes it untouched and is counted in the tally, while the seal still
+catches the edit. Those are different checks answering different questions,
+and a reader who conflates them will expect the wrong one to protect them.
+
+AND THE TEST NAMES WERE READ OFF THE FILES THIS TIME. The last section
+added to this document cited four tests from memory and none existed - the
+gate named all four. Reading them out of the test files first, the doc gate
+passed on the first attempt.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
