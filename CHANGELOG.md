@@ -8195,12 +8195,45 @@ That distinction is not pedantic: "supply a key" asks for something the
 machine already has, and acting on it would have produced another failed
 run with the same 400.
 
+### The console's aggregate agrees with the disk, and now something says so
+
+The last unexamined audit claim in this half: that the dashboard's API sums
+across session directories, so one bug counts twice. Refuted by running the
+server, which had never been run here.
+
+    the endpoint   16 findings, 14 proven + 2 candidate, 4 runs,
+                   no repeated (run, id) pair
+    a direct read  16 findings, 14 proven + 2 candidate
+
+Exact agreement, and it independently reproduces the measurement the
+session that owns the console reported hours earlier against the same
+evidence - two sessions, two instruments, one number.
+
+Tenth refutation here. But the relation was unasserted: a test covered ONE
+session's findings, and the multi-session aggregate is precisely where
+double counting would live, since the console reads this endpoint and an
+aggregate that walks a directory twice misreports the engagement while
+every individual finding stays correct.
+
+Asserted now in both directions - the served (run, id) pairs must equal
+what the files hold, with no repeats, and one planted session must be
+served once. Plants: scanning each run twice fails, dropping each run's
+first finding fails. The fifth invariant of this kind in this session.
+
+AND THE FIRST PLANT TOOK THREE ATTEMPTS TO LAND, none of them the code's
+fault. A pattern that occurs twice in the file, then a line filter that
+caught both occurrences, then the exact index. Each failed attempt printed
+"2 passed", which means nothing at all: a plant that does not apply is not
+evidence that the test holds. That is the same trap as a vacuous assertion,
+one level out - the check ran, the subject was never changed, and the green
+result looked identical to a real one.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1185 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1187 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

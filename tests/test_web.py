@@ -1779,3 +1779,76 @@ def test_until_still_returns_a_falsy_value_for_the_caller():
     way, so a failing assertion names the real value and not `False`."""
     assert _until(lambda: 0, timeout=0.2, step=0.01) == 0
     assert _until(lambda: "ready", timeout=0.2, step=0.01) == "ready"
+
+
+def test_the_api_aggregate_equals_what_is_on_disk(web):
+    """TWO LISTS, ONE CONCEPT, across sessions - where double counting lives.
+
+    One session's findings were covered; the multi-session aggregate was
+    not, and that is exactly where a bug counted twice would appear: the
+    console reads this endpoint, so an aggregate that sums a session into
+    itself, or drops one, misreports the engagement while every individual
+    finding is correct.
+
+    Measured against the sealed evidence before writing this: the endpoint
+    returns 16 findings over four runs with no repeated (run, id) pair, and
+    a direct read of the four findings.json files gives the same 16 and the
+    same grade split. The relation held and nothing asserted it.
+    """
+    import json as _json
+
+    a = _plant_session(web.root, findings=[
+        {"id": "F01", "title": "sqli one", "severity": "critical",
+         "category": "sqli", "vuln_class": "sqli", "grade": "proven",
+         "url": f"{LAB_TARGET}/item?id=1", "evidence_ids": ["r1"],
+         "evidence_excerpt": "sqlite"},
+        {"id": "F02", "title": "xss one", "severity": "medium",
+         "category": "xss", "vuln_class": "xss", "grade": "candidate",
+         "url": f"{LAB_TARGET}/search?q=x", "evidence_ids": ["r2"],
+         "evidence_excerpt": "<svg"},
+    ])
+    b = _plant_session(web.root, findings=[
+        {"id": "F01", "title": "rce two", "severity": "critical",
+         "category": "rce", "vuln_class": "rce", "grade": "proven",
+         "url": f"{LAB_TARGET}/ping?host=x", "evidence_ids": ["r1"],
+         "evidence_excerpt": "uid=0(root)"},
+    ])
+
+    _, flat, _ = _json_req(f"{web.base}/api/findings")
+    rows = flat["findings"]
+
+    on_disk = []
+    for sdir in (a, b):
+        for f in _json.loads((sdir / "findings.json").read_text(
+                encoding="utf-8")):
+            on_disk.append((sdir.name, str(f.get("id"))))
+
+    served = [(str(r.get("run_id")), str(r.get("id"))) for r in rows
+              if str(r.get("run_id")) in {a.name, b.name}]
+
+    assert sorted(served) == sorted(on_disk), (
+        f"the endpoint serves {sorted(served)} against {sorted(on_disk)} "
+        "on disk")
+    assert len(served) == len(set(served)), \
+        "a (run, id) pair appears twice - one finding counted twice"
+
+    from collections import Counter
+    grades = Counter(str(r.get("grade")) for r in rows
+                     if str(r.get("run_id")) in {a.name, b.name})
+    assert grades == Counter({"proven": 2, "candidate": 1}), grades
+
+
+def test_one_session_is_not_summed_into_itself(web):
+    """The specific failure the audit named: a bug counted twice because an
+    aggregate walks the same directory more than once. With a single
+    session planted, the endpoint must serve exactly its findings - not
+    two of each."""
+    a = _plant_session(web.root, findings=[
+        {"id": "F01", "title": "only one", "severity": "high",
+         "category": "idor", "vuln_class": "idor", "grade": "proven",
+         "url": f"{LAB_TARGET}/api/user/2", "evidence_ids": ["r1"],
+         "evidence_excerpt": "user2@x.io"},
+    ])
+    _, flat, _ = _json_req(f"{web.base}/api/findings")
+    mine = [r for r in flat["findings"] if str(r.get("run_id")) == a.name]
+    assert len(mine) == 1, f"one finding served {len(mine)} times"
