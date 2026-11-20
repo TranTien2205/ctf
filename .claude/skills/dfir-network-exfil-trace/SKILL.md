@@ -214,6 +214,16 @@ Shares signals with `../dfir-execution-trace/` (the process behind the socket) a
 - `skills/ctf-forensics/network-advanced.md:26-63` - inter-packet timing as an encoding, with the interval-to-bit code
 - `skills/ctf-forensics/linux-forensics.md:42-63` - a Linux chain ending in a TFTP transfer out
 
+The `references/` corpus (430 files, ~10k lines) is indexed at
+`references/corpus-index.md`; question-shaped lookup lives at
+`references/question-map.md`; `references/cheat-sheet.md` is the one-page
+command sheet. Prefixes: `tap-` tshark taps, `fld-` fields (`*-route`
+companions), `q-` question procedures (`*-deep` refinements), `art-` host
+artifacts (`*-route` companions), `chan-` channel stacks (`*-route`), `mx-`
+channel x operation cells, `cook-` filter cookbook, `zeek-`/`sur-` bundle
+reading, `meth-` method, `trap-` measured traps, `tool-` local tooling,
+`beacon-` cadence, `scen-` workflows, `deep-` protocol detail.
+
 Names for a writeup, never for a verdict: T1041 exfiltration over the C2 channel, T1048 over an alternative protocol, T1567 over a web service,
 T1071.004 application-layer protocol DNS, T1572 protocol tunnelling, T1030 data transfer size limits, T1029 scheduled transfer, T1197
 transfer-service jobs (MITRE ATT&CK).
