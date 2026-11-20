@@ -817,9 +817,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 4098,
-      "depth_files": 1,
-      "depth_tokens": 156,
+      "skill_tokens": 4928,
+      "depth_files": 497,
+      "depth_tokens": 106483,
       "use_when": [
         "a probe or source read produced this class's signal: extract eventTime, eventName, sourceIPAddress and userIdentity.arn from every record, sort by time, and read the first action that is not a read"
       ],

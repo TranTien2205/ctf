@@ -198,8 +198,38 @@ trail.sort_values("ts", inplace=True)
 Shares signals with `../dfir-authentication-trace/` (a host logon, not a control-plane call) and
 `../dfir-network-exfil-trace/` (bytes on the wire, not an API call). Depth, one file at a time:
 `../dfir-sherlock-triage/network-and-cloud.md:80-123` CloudTrail, `:124-146` a Linux host in the account,
-`answer-discipline.md:60-92` UTC and precision, `method.md:37-62` the question-to-artifact index. Signals in
+`../dfir-sherlock-triage/answer-discipline.md:60-92` UTC and precision, `../dfir-sherlock-triage/method.md:37-62` the question-to-artifact index. Signals in
 `knowledge/bug-classes.json` (`python3 tools/classify.py`); budget in `../LOOP_DISCIPLINE.md`.
+
+## Corpus index (references/)
+
+480+ depth modules; open `references/agg-index.md` for the family map. By family:
+
+| Family | Prefix | Covers |
+|---|---|---|
+| CloudTrail | `ct-*` | envelope, decompress, core fields, eventSource/eventType/eventCategory, sharedEventID, errorCode, req/resp, readOnly, Insight/NetworkActivity/Aggregated, window bounds |
+| userIdentity | `ui-*` | type values, AssumedRole sessions, sourceIdentity, accessKeyId pivot, mfaAuthenticated string trap, ConsoleLogin, login region, hidden userName, Root, AWS Internal, userAgent |
+| API patterns | `api-*` | GetCallerIdentity, recon-then-act, CreateAccessKey/LoginProfile, policy edits, AssumeRole chains, secret reads, bucket opens, destruction/cover, key pivots, denied bursts |
+| S3 | `s3-*` | server access log 27 fields, Time/Operation/Requester, copy double-count, vs-CloudTrail comparison, data-events default, exfil shape, error codes, aclRequired |
+| GuardDuty | `gd-*` | finding shape, type string anatomy, mechanism caveat, severity bands, timespan fields, action types, finding-vs-record |
+| VPC flow | `vpc-*` | 14 default fields, action/log-status, per-interval bytes, no-content boundary, exfil sums, interface joins |
+| Providers | `ent-*` `m365-*` `okta-*` `gw-*` | Entra signIn fields + AADSTS map + legacy auth + CA status, M365 UAL Operations, Okta event types, GW login events - all UNVERIFIED bundle shapes |
+| Per-event cards | `ev-*` | one card per eventName: what it answers and which fields to quote (50 calls) |
+| Field tables | `fld-*` | per-field name/type/semantics (eventTime through readOnly) |
+| Questions | `q-*` | one module per Sherlock phrasing shape |
+| Methods | `meth-*` | day-zero pipeline, record counting, key grouping, error grouping, dedup, windowing, host merge, inventory, negative claims, artifact naming |
+| Traps | `trap-*` | dtype=object, header line, S3 split, mfa string, login region, hidden userName, data-events default, zcat glob, @tsv arrays, copy double-count, finding-vs-record, earliest floor, service events |
+| Scenarios | `scen-*` | trail-only, trail+S3, trail+flow, GuardDuty window, stolen key, role chain, tampered trail, mixed bundle |
+| Deep | `deep-*` | session names, sessionIssuer, federated types, org trails, Insight math, accessKeyId ages, anonymous records, bucket-owner-vs-requester, vpce events, CheckMfa scope |
+| Tools | `tool-*` | jq, pandas, artifact_inventory, timeline_merge, find+gzip, S3 regex, awk on flows, aws CLI absent |
+| Matrix | `mx-*` | artifact x question cells - which artifact answers which question |
+| Workflow | `work-*` | discipline modules: record-not-count, TSV shape, one question, no-fetch, window pairs, two-record attribution, negative shape, unverified tag, cloud/host boundary, report |
+| Recovery | `rec-*` | trail gap, corrupt gzip, no trail, missing access log, NODATA, old formats, pandas fallback, mixed timezones |
+| Negatives | `neg-*` | clean-trail, no-console, no-data-events, no-egress, quiet-finding, provider-absent shapes |
+| Aggregators | `agg-*` | corpus/event/artifact/timestamp/falsifier/answer/pivot/provider indexes |
+
+Cross-skill: `cross-auth`, `cross-network`, `cross-execution`,
+`cross-antiforensics`, `cross-persistence`, `cross-fs`.
 
 ## Discipline
 
