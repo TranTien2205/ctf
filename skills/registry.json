@@ -1009,9 +1009,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1003,
-      "depth_files": 3,
-      "depth_tokens": 634,
+      "skill_tokens": 1171,
+      "depth_files": 2771,
+      "depth_tokens": 60100,
       "use_when": [
         "a probe or source read produced this class's signal: wc -l and head/tail first — bracket the timeframe and count the volume before greping, so a count claim has a baseline"
       ],

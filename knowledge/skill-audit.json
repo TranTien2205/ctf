@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T07:24:09",
+  "generated_at": "2026-11-20T07:40:31",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -484,10 +484,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 93,
+      "lines": 101,
       "actionability": "operational",
-      "nearest_neighbour": "osint-geolocation",
-      "overlap": 0.173,
+      "nearest_neighbour": "forensics-memory-analysis",
+      "overlap": 0.166,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -503,7 +503,7 @@
       "lines": 104,
       "actionability": "operational",
       "nearest_neighbour": "forensics-log-analysis",
-      "overlap": 0.172,
+      "overlap": 0.166,
       "trust": "catalogue-or-unreviewed"
     },
     {

@@ -81,6 +81,14 @@ Depth, one named file at a time:
 
 - `skills/forensics-log-analysis/references/README.md`
 - `skills/forensics-log-analysis/references/pattern-order.md`
+- `skills/forensics-log-analysis/references/the-workflow.md` — bracket/distribute/window
+- `skills/forensics-log-analysis/references/the-logsum.md` — log_summary.py usage
+- `skills/forensics-log-analysis/references/the-distribution.md` — the outlier method
+- `skills/forensics-log-analysis/references/the-access.md` — access.log format
+- `skills/forensics-log-analysis/references/the-auth.md` — auth.log format
+- `skills/forensics-log-analysis/references/the-flag-line.md` — hunting the token
+- `skills/forensics-log-analysis/references/the-map-index.md` — corpus map
+- format matrices are named by format, question, and field prefixes in references/
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
