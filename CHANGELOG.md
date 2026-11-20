@@ -8587,6 +8587,36 @@ nothing to wait for: the right repair was to make the silent failure
 speak. A timed wait is the wrong instrument whenever the thing waited on
 has already resolved - and swallowing the error is what hid that.
 
+### Swept for swallowed observations; the package is clean and the scaffolding was not
+
+The last fix found a test fixture swallowing the error from its own fetch,
+so a failure in the test's target surfaced as an index error somewhere
+else. Generalised: where else does an exception hide something that was
+being measured?
+
+The discriminator is what the exception MEANS. "This is not that shape" is
+branch selection and `pass` is correct; "the thing you were measuring did
+not happen" is an observation, and dropping it is the defect.
+
+By that test the package is clean. The three silent handlers in the probe
+module are all branch selection: a body that is not JSON falls through to
+the urlencoded path, a cookie jar that will not convert moves to the next
+jar, a blob that is not base64 moves to the next candidate. None of them
+loses a measurement.
+
+The collector's body-read fallback looked like the dangerous kind - an
+unreadable body becomes empty - and it cannot lose a callback. The nonce is
+matched against the path AND the body, and every callback URL is built by
+one function that puts the nonce in the PATH, which comes from the request
+line rather than the body. Both call sites use it.
+
+So the one real instance of this class was in the test scaffolding, not in
+the package, which is worth stating plainly: the probes are careful about
+not discarding what they saw, and the fixture that stood in for a target
+was not. A swallowed error in a fixture is as capable of hiding a defect as
+one in the product - it just hides it from the test rather than from the
+operator.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
