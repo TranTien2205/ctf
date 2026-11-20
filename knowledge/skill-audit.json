@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-20T07:09:50",
+  "generated_at": "2026-11-20T07:24:09",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -361,7 +361,7 @@
       "lines": 232,
       "actionability": "operational",
       "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.018,
+      "overlap": 0.017,
       "trust": "local-confirmed"
     },
     {
@@ -424,8 +424,8 @@
       "local_evidence": "stub",
       "lines": 229,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.033,
+      "nearest_neighbour": "osint-infra-records",
+      "overlap": 0.032,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -441,7 +441,7 @@
       "lines": 214,
       "actionability": "operational",
       "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.021,
+      "overlap": 0.02,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -486,8 +486,8 @@
       "local_evidence": "stub",
       "lines": 93,
       "actionability": "operational",
-      "nearest_neighbour": "forensics-memory-analysis",
-      "overlap": 0.193,
+      "nearest_neighbour": "osint-geolocation",
+      "overlap": 0.173,
       "trust": "catalogue-or-unreviewed"
     },
     {
@@ -500,10 +500,10 @@
       "score": 80,
       "verdict": "pass",
       "local_evidence": "stub",
-      "lines": 94,
+      "lines": 104,
       "actionability": "operational",
       "nearest_neighbour": "forensics-log-analysis",
-      "overlap": 0.193,
+      "overlap": 0.172,
       "trust": "catalogue-or-unreviewed"
     },
     {

@@ -1036,9 +1036,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 1012,
-      "depth_files": 3,
-      "depth_tokens": 716,
+      "skill_tokens": 1247,
+      "depth_files": 2791,
+      "depth_tokens": 61930,
       "use_when": [
         "a probe or source read produced this class's signal: identify the image profile before any plugin — volatility3 imageinfo/pslist against an unidentified image lies silently"
       ],

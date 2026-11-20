@@ -82,6 +82,16 @@ Depth, one named file at a time:
 
 - `skills/forensics-memory-analysis/references/README.md`
 - `skills/forensics-memory-analysis/references/plugin-order.md`
+- `skills/forensics-memory-analysis/references/the-workflow.md` — the workflow
+- `skills/forensics-memory-analysis/references/the-profile.md` — image/profile identification
+- `skills/forensics-memory-analysis/references/the-no-vol-route.md` — crashdump+ioc_scan
+- `skills/forensics-memory-analysis/references/the-common-hides.md` — where the flag hides
+- `skills/forensics-memory-analysis/references/the-suspect-meth.md` — naming the suspect
+- `skills/forensics-memory-analysis/references/the-dump-meth.md` — dumping the suspect
+- `skills/forensics-memory-analysis/references/the-correlate.md` — multi-artifact correlation
+- `skills/forensics-memory-analysis/references/the-common-failure.md` — the frequent errors
+- `skills/forensics-memory-analysis/references/the-map-index.md` — corpus map
+- plugin modules are named pl- followed by the plugin slug; goal-by-artifact maps are named find- followed by the goal
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
