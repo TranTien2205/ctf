@@ -656,3 +656,70 @@ def test_a_failure_still_outranks_everything():
     badges = h1._badges(_finding(replays=hist, replay=hist[-1]))
     assert "DID NOT REPRODUCE" in badges
     assert "RE-VERIFIED: REPRODUCED" not in badges
+
+
+def _entry_with_banner():
+    return {
+        "id": "r1", "tool": "http_request",
+        "request": {"method": "GET", "url": "http://t.test/", "headers": {},
+                    "body": ""},
+        "response": {"status": 200,
+                     "headers": {"server": "Apache/2.4.49",
+                                 "x-powered-by": "PHP/5.6.40"},
+                     "body": "<html>ordinary page content</html>",
+                     "truncated": False},
+    }
+
+
+def test_a_header_quoted_excerpt_is_located_not_denied():
+    """MEASURED, AND REACHABLE ONLY SINCE TODAY.
+
+    Three classes have their proof in a response header. Until the evidence
+    store accepted header casing, a header-only excerpt could not be
+    recorded at all - so this renderer's note could never fire for one of
+    them. The fix that made those findings citable is what exposed this.
+
+    The note said "shown from the start of the body: the quoted excerpt was
+    not found in it verbatim". Literally true, since "it" is the body, and
+    the headers are rendered above the window - so the proof IS on the page.
+    But a triager scanning "the quoted excerpt was not found" concludes it
+    is not in the response, three lines under the header that carries it.
+    The artifact undercut its own finding.
+
+    It now says where the excerpt IS, through the evidence store's own
+    definition of an entry's citable texts - the third place that concept
+    lives, and the second one had already drifted: checking only the lines
+    rendered here missed the canonical header casing, which the store
+    accepts.
+    """
+    from argus.report.hackerone import _resp_window
+
+    entry = _entry_with_banner()
+    for quote in ("x-powered-by: PHP/5.6.40",      # as recorded
+                  "X-Powered-By: PHP/5.6.40",      # as HTTP writes it
+                  '"x-powered-by": "PHP/5.6.40"',  # the JSON shape
+                  "Server: Apache/2.4.49"):
+        _, note = _resp_window(entry, quote)
+        assert "HEADERS" in note, f"{quote!r} -> {note}"
+        assert "not found" not in note, f"{quote!r} -> {note}"
+
+
+def test_a_body_quote_is_still_centred_and_a_fabrication_still_denied():
+    """Both directions the located-note must not swallow: a real body quote
+    keeps its offset, and a quote in neither half is still reported as
+    absent - which is the sentence that matters when a findings file has
+    been edited by hand.
+    """
+    from argus.report.hackerone import _resp_window
+
+    entry = _entry_with_banner()
+
+    _, body_note = _resp_window(entry, "ordinary page content")
+    assert "offset" in body_note, body_note
+    assert "HEADERS" not in body_note
+
+    for invented in ("uid=0(root) gid=0", "Server: nginx/1.0.0",
+                     "ORDINARY PAGE CONTENT"):
+        _, note = _resp_window(entry, invented)
+        assert "not found" in note, f"{invented!r} -> {note}"
+        assert "HEADERS" not in note

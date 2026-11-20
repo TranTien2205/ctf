@@ -8228,12 +8228,48 @@ evidence that the test holds. That is the same trap as a vacuous assertion,
 one level out - the check ran, the subject was never changed, and the green
 result looked identical to a real one.
 
+### The bug-bounty page denied an excerpt it was displaying
+
+The one audit claim still refuted by READING rather than by running: that
+the bug-bounty renderer tells a reader a header-quoted excerpt was not
+found in the response. Reconstructed, and the reading was imprecise while
+the effect was real.
+
+The note says "shown from the start of the body: the quoted excerpt was not
+found in it verbatim". Literally true - "it" is the body - and the headers
+are rendered directly above the window, so the proof IS on the page. But a
+triager scanning "the quoted excerpt was not found" concludes it is not in
+the response, three lines under the header that carries it. The artifact
+undercut its own finding.
+
+AND THE PATH BECAME REACHABLE ONLY TODAY. Three classes have their proof in
+a response header, and until the evidence store accepted header casing a
+header-only excerpt could not be recorded at all - so this note could never
+fire for one of them. The fix that made those findings citable is what
+exposed this. Second time today a fix of mine opened a downstream defect:
+the first was the dedup change that set the ledger recommending what the
+store refuses.
+
+It now says where the excerpt IS, and through the evidence store's own
+definition of an entry's citable texts - the THIRD place that concept
+lives, and the second had already drifted. Checking only the lines this
+renderer prints missed the canonical header casing, which the store
+accepts, so a quote written the way HTTP writes it still got the bare
+denial. Reusing the store's function means a quote in any form it accepts
+is recognised here as the same evidence.
+
+Both directions planted: the bare note fails, and claiming HEADERS for a
+fabricated quote fails - the second matters, because that sentence is what
+a reader needs when a findings file has been edited by hand.
+
+Twenty-first shape assumption on the way, a helper name typed from memory.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1187 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1189 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

@@ -138,8 +138,38 @@ def _resp_window(entry: dict, quote: str) -> tuple[str, str]:
     at = body.find(quote) if quote else -1
     if at < 0:
         shown = body[:_WINDOW]
-        note = ("shown from the start of the body: the quoted excerpt was not "
-                "found in it verbatim")
+        # WHERE IT IS, not only where it is not. The headers are rendered
+        # above this window, so a quote drawn from them IS on the page -
+        # and the bare note read as a disclaimer about the evidence. A
+        # triager scanning "the quoted excerpt was not found" concludes it
+        # is not in the response, while it sits three lines up.
+        #
+        # Measured, and the path became reachable only today: before
+        # header casing was accepted by the evidence store, a header-only
+        # excerpt could not be recorded, so this note could never fire for
+        # one of the three classes whose proof IS a header. The fix that
+        # made those findings citable is what exposed this.
+        # THROUGH THE STORE'S OWN DEFINITION of an entry's citable texts,
+        # because this is the third place the concept lives and the second
+        # one already drifted. That function emits the headers as JSON, as
+        # wire-style lines, AND with the header name as HTTP writes it - so
+        # a quote in any of those forms is recognised here exactly as the
+        # evidence store recognised it when the finding was recorded.
+        # Checking only the lines rendered above missed the canonical
+        # casing, which the store accepts.
+        from ..session import _evidence_parts_of_entry
+
+        parts = _evidence_parts_of_entry(entry)
+        body_text = str(body or "")
+        in_head = bool(quote) and any(
+            quote in part for part in parts if part != body_text)
+        if in_head:
+            note = ("the quoted excerpt is in the response HEADERS above, "
+                    "not in the body - the body is shown from its start "
+                    "for context")
+        else:
+            note = ("shown from the start of the body: the quoted excerpt "
+                    "was not found in it verbatim")
     else:
         start = max(0, at - _WINDOW // 3)
         shown = body[start:start + _WINDOW]
