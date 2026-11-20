@@ -8512,12 +8512,87 @@ is the family every defect in this session belongs to: not an agent
 inventing a finding, which the architecture blocks, but the artifact not
 carrying what the system knows.
 
+### The verified notice could not tell verified from never-checked
+
+The last unverified candidate in the stderr sweep was "could not seal
+artifacts - this render is not digest-anchored". Chasing it found a defect
+in the record-state line added earlier today.
+
+Measured on a live session before and after sealing: the notice read
+"Record verified ... artifacts matching their digests" in BOTH cases, and
+before sealing there are no digests at all - the seal is an entry in the
+transcript and `sealed` is None without it. So a report from a run that
+died before sealing, or whose seal failed, was indistinguishable from a
+sealed one, and the sentence asserting digest agreement was false.
+
+AND THE FIRST FIX FOR IT WAS WRONG, caught by the gate on three tests.
+Flagging the absent seal as a problem made EVERY normal report say it did
+not verify, because a first render always precedes the seal: sealing is the
+last step and has to cover the files the render is writing. Measured, the
+session on disk had nine sealed artifacts while its own report said it had
+none - the render had read the transcript before the seal entry existed.
+
+What is true at render time is that the seal FOLLOWS. So the sentence now
+claims digest agreement only when there are digests, and otherwise says the
+digests are written after this file. Both directions planted: the
+unconditional claim fails, and saying "written after" over a sealed record
+fails.
+
+That is the second fix of mine today that the gate rejected before it could
+ship, after the dedup change that set the ledger recommending what the
+store refuses. Both were wrong in the same way - correct about the
+condition, wrong about WHEN it can be evaluated.
+
+FOURTH CORRECTION OF A CLAIM OF MINE in this session, and the same shape as
+the other three: the sentence described what the code intended to check
+rather than what it had checked. The verified line listed the conditions it
+examined and omitted the one that makes the rest meaningful.
+
+AND TWO WRONG DIRECTORIES ON THE WAY. The first attempt removed keys from
+summary.json, where the digests are not - they are an `artifacts_digest`
+entry in the transcript. The second called the verifier on the parent of
+the session directory, since `Session(root, ...)` creates a timestamped
+subdirectory, so it read a directory with no transcript and reported
+`chained=False` for a session whose chain was intact. Twenty-fourth shape
+assumption, and the remedy is the one that has worked every time: print the
+real thing - here `session.dir` - before asserting about it.
+
+### An IndexError where a diagnosis belonged
+
+CI failed on one Windows job of eleven: a callback test raised
+`IndexError: list index out of range` while indexing `callbacks[0]`. No
+callback had arrived, and nothing said why.
+
+The fixture is a target that fetches whatever URL lands in a query
+parameter, and it swallowed every exception from that fetch. So a failure
+in the TEST'S OWN target - a loopback urlopen that refused or exceeded its
+three-second timeout on a loaded runner - surfaced as an index error in the
+probe's result.
+
+AND WAITING LONGER CANNOT HELP, which is the part worth keeping. That fetch
+is synchronous inside the request handler, so by the time the probe's
+request returns, the callback has already arrived or already failed. The
+probe's eight-second settle window is waiting on something that has
+finished. Widening it - which is what this test's history shows being tried
+once already, from three seconds to eight - could never have worked.
+
+The fixture now records why its fetch failed and the assertion names the
+half that broke before indexing. Planted a fetch that always refuses: the
+message reads "no callback arrived; the target's fetch reported ..." rather
+than an index error.
+
+SECOND TIME TODAY THE ANSWER WAS NOT A LONGER WAIT. The first was a test
+racing a worker thread it could join. Here there is nothing to join and
+nothing to wait for: the right repair was to make the silent failure
+speak. A timed wait is the wrong instrument whenever the thing waited on
+has already resolved - and swallowing the error is what hid that.
+
 ### Verification & packaging
 Each count is stated ONCE. The merge of the two lines of work brought two
 copies of this section, each with its own figure, which is exactly the drift
 the documentation gate exists to catch - and it caught it.
 
-- `python -m pytest tests/ -q`: 1197 tests (unit + live-lab + loop + team +
+- `python -m pytest tests/ -q`: 1198 tests (unit + live-lab + loop + team +
   MCP client + MCP server + proof matrix + provider adapters + the decision
   controller + the cross-family judge + probe/matrix agreement + CLI +
   external-tool subprocess path + hardening regressions + the web console +

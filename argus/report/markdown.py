@@ -530,10 +530,26 @@ def _record_state(session) -> list[str]:
             "against the transcript")
 
     if not problems:
+        # THE DIGEST HALF ONLY WHEN THERE ARE DIGESTS, and said as a future
+        # when there are not. The first version of this sentence claimed
+        # "artifacts matching their digests" unconditionally, which is
+        # false before `seal_artifacts()` - and a first render ALWAYS
+        # precedes the seal, because sealing is the last step and has to
+        # cover the files this render is writing.
+        #
+        # So the earlier attempt to flag "no digests" as a problem was
+        # wrong in its timing and called every normal report unverified.
+        # The gate caught it on three tests; measured, the session on disk
+        # had nine sealed artifacts while its report said it had none,
+        # because the render had read the transcript before the seal entry
+        # existed. What is true at render time is that the seal follows.
+        sealed = v.get("sealed") or []
+        tail = ("artifacts matching their digests"
+                if sealed else
+                "with the artifact digests written after this file")
         return [f"_Record verified: {v.get('entries', 0)} chained transcript "
                 f"entries, {v.get('findings_checked', 0)} findings "
-                "re-validated against them, artifacts matching their "
-                "digests._"]
+                f"re-validated against them, {tail}._"]
     return ["> **This record does not verify.** "
             + "; ".join(problems)
             + ". Everything above is reported from it anyway, so read it as "

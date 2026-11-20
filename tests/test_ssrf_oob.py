@@ -73,6 +73,16 @@ class _Fetcher(http.server.BaseHTTPRequestHandler):
     positive direction can be measured without the lab."""
 
     fetch = True
+    #: why the fetch failed, if it did. The error used to be swallowed, so a
+    #: failure here surfaced as `IndexError: list index out of range` where a
+    #: test indexed `callbacks[0]` - no callback, no reason. CI failed that
+    #: way on one Windows job while ten passed.
+    #:
+    #: AND WAITING LONGER CANNOT HELP, which is the point worth keeping: this
+    #: fetch is SYNCHRONOUS inside the handler, so by the time the probe's
+    #: request returns, the callback has already arrived or already failed.
+    #: The probe's settle window is waiting on something that has finished.
+    fetch_error: str = ""
 
     def do_GET(self):
         query = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)
@@ -80,8 +90,8 @@ class _Fetcher(http.server.BaseHTTPRequestHandler):
         if self.fetch and url.startswith("http://"):
             try:
                 urllib.request.urlopen(url, timeout=3).read()
-            except Exception:                           # noqa: BLE001
-                pass
+            except Exception as exc:                    # noqa: BLE001
+                type(self).fetch_error = f"{type(exc).__name__}: {exc}"
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
@@ -135,6 +145,12 @@ def test_a_loopback_callback_is_reported_as_not_remote():
         out = dispatch(_ctx(base), "probe_ssrf_oob",
                        {"url": base + "/?u=x", "param": "u",
                         "settle_s": 8})["result"]
+        # the fixture's own fetch is the thing that can fail here, and it
+        # used to fail silently - so say which half broke before indexing
+        assert out["callbacks"], (
+            "no callback arrived; the target's fetch reported "
+            f"{type(srv.RequestHandlerClass).fetch_error or 'no error'!r} - "
+            f"probe said {out}")
         assert out["callbacks"][0]["peer"].startswith("127."), out
         assert out["callbacks"][0]["remote"] is False, out
     finally:

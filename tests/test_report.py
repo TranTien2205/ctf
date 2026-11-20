@@ -1397,3 +1397,70 @@ def test_a_diff_of_sound_sessions_marks_nothing(tmp_path, capsys):
     assert main(["diff", str(before), str(after), "--json"]) == 0
     assert json.loads(capsys.readouterr().out).get(
         "unverified_findings") == {}
+
+
+def test_an_unsealed_record_is_not_called_verified(tmp_path):
+    """A DEFECT IN THE LINE ADDED EARLIER TODAY, measured on a live session
+    before and after sealing.
+
+    The verified notice read "artifacts matching their digests" in BOTH
+    cases, and before `seal_artifacts()` there are no digests - `sealed` is
+    None. So a report from a run that died before sealing, or whose seal
+    failed (the render warns about that on stderr), was indistinguishable
+    from a sealed one: a verified notice that could not tell verified from
+    never-checked.
+
+    That is the fourth time in this session a claim of mine needed
+    correcting, and the same shape as the rest: the sentence described what
+    the code intended to check rather than what it had checked.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    from argus.httpclient import GuardedClient, RateLimiter
+    from argus.report.markdown import _record_state
+    from argus.scope import ScopeGuard
+    from argus.session import Session
+
+    class _Echo(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b"admin|a@x.io|sqlite 3.45"
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), _Echo)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    base = f"http://127.0.0.1:{srv.server_address[1]}/"
+    try:
+        session = Session(tmp_path, base, {"target": base})
+        client = GuardedClient(ScopeGuard(base), session, RateLimiter(60.0))
+        rid = client.send("GET", base)["request_id"]
+        session.add_finding("sqli", "critical", "sqli", base, [rid],
+                            "sqlite 3.45", "d", "r")
+
+        # BEFORE SEALING the notice must not claim digest agreement, and
+        # must NOT call the record unverified either: a first render always
+        # precedes the seal, because sealing is the last step and has to
+        # cover the files the render is writing. An earlier version of this
+        # flagged the absent seal as a problem, which made every normal
+        # report say it did not verify - the gate caught it on three tests,
+        # and the session on disk had nine sealed artifacts while its own
+        # report said it had none.
+        before = " ".join(_record_state(session))
+        assert "Record verified" in before, before
+        assert "written after this file" in before, before
+        assert "matching their digests" not in before, before
+
+        session.seal_artifacts()
+        after = " ".join(_record_state(session))
+        assert "Record verified" in after, after
+        assert "matching their digests" in after, after
+        assert "written after this file" not in after
+    finally:
+        srv.shutdown()
+        srv.server_close()
