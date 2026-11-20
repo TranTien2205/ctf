@@ -43,7 +43,7 @@ globals (`subprocess.Popen`, `os._wrap_close`, `warnings.catch_warnings`).
 | `sudo -l` shows one allowed cmd | that cmd's own escape — GTFOBins |
 | `$PATH` contains a writable dir | drop a fake common command |
 
-`GTFOBins` is the canonical lookup for "allowed command → escape".
+`GTFOBins` is the canonical lookup for "allowed command -> escape".
 
 ## Filter bypasses for the names themselves
 

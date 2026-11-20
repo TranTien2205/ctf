@@ -76,13 +76,46 @@ globals()               # namespace readable?
 
 Shares signals with: `../misc-encoding-carrier/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time. Route first:
 
-- `skills/ctf-misc/pyjails.md`
-- `skills/ctf-misc/jails-and-shells.md`
-- `skills/ctf-misc/bashjails.md`
+- `skills/ctf-misc/pyjails.md`, `skills/ctf-misc/jails-and-shells.md`,
+  `skills/ctf-misc/bashjails.md` — the ctf-misc corpus
+- `references/jailbreak-shapes.md` — the shape table
+- `references/the-map-first.md` — map the filter before the escape
+- `references/the-map-index.md` — the full reference map
 
-| Any jail/escape question | `references/jailbreak-shapes.md` |
+Layer guides — the-filter modules: `references/the-layers.md`,
+`references/the-word-blacklist.md`, `references/the-char-blacklist.md`,
+`references/the-ast-check.md`, `references/the-bash.md`. The filter
+modules (`words-`, `chars-`, `nodes-`, `builtin-`, `import-`, `attr-`,
+`underscore-`, `digit-`, `keyword-`, `sandbox-`) cover filter x
+escape-shape pairs; the `obj-` modules cover filter x object-chain pairs.
+
+Mechanism guides — the-shape modules: `references/the-getattr.md`,
+`references/the-chrjoin.md`, `references/the-fstring.md`,
+`references/the-mro-climb.md`, `references/the-globals-dict.md`,
+`references/the-subclasses.md`, `references/the-builtins.md`,
+`references/the-gadgets.md`, `references/the-wrap-close.md`,
+`references/the-import-star.md`, `references/the-escape-shapes.md`,
+`references/the-pyjail-gen.md`.
+
+Constraint guides — no-X modules: `references/the-no-underscore.md`,
+`references/the-no-parens.md`, `references/the-no-dots.md`,
+`references/the-decorator.md`, `references/the-with-raise.md`,
+`references/the-format-spec.md`, `references/the-lambda.md`.
+
+Bash guides — shell modules: `references/the-ifs.md`,
+`references/the-glob.md`, `references/the-slice.md`,
+`references/the-hex-esc.md`.
+
+Discipline — the-standard modules: `references/the-confirm.md`,
+`references/the-falsifier.md`, `references/the-evidence.md`,
+`references/the-traps.md`, `references/the-checklist.md`,
+`references/the-boundary.md`, `references/the-detection.md`,
+`references/the-workflow.md`, `references/the-worked.md`,
+`references/the-error-leak.md`, `references/the-index-fragile.md`,
+`references/the-flag-path.md`, `references/the-time-box.md`,
+`references/the-neg-result.md`, `references/the-close-jail.md`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.

@@ -1,0 +1,7 @@
+# error messages vs underscores blocked
+
+**Filter:** underscores blocked — no __ dunder.
+
+**Shape:** error messages — the leak channel.
+
+Map the filter first; the shape survives only if the layer does not catch its mechanism.

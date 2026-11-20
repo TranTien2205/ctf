@@ -1,0 +1,7 @@
+# error messages vs a char blacklist
+
+**Filter:** a char blacklist — bytes like () or ' blocked.
+
+**Shape:** error messages — the leak channel.
+
+Map the filter first; the shape survives only if the layer does not catch its mechanism.
