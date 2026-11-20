@@ -1221,9 +1221,9 @@
       ],
       "evidence_level": "catalogue",
       "verified_by": [],
-      "skill_tokens": 911,
-      "depth_files": 3,
-      "depth_tokens": 660,
+      "skill_tokens": 1286,
+      "depth_files": 2759,
+      "depth_tokens": 56834,
       "use_when": [
         "a probe or source read produced this class's signal: reverse image search first — a hit names the place outright; only when that fails do you match terrain and signage by hand"
       ],

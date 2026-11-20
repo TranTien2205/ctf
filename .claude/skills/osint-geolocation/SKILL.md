@@ -71,10 +71,30 @@ python3 -c "print(open('photo.jpg','rb').read()[:400])"  # sanity: real camera f
 
 Shares signals with: `../osint-media-metadata/`, `../osint-identity-pivot/`. Check those before committing to this one.
 
-Depth, one named file at a time:
+Depth, one named file at a time. Route first:
 
-- `skills/osint-geolocation/references/README.md`
-- `skills/osint-geolocation/references/visual-pivots.md`
+- `skills/osint-geolocation/references/README.md` — the corpus index
+- `skills/osint-geolocation/references/visual-pivots.md` — the per-feature table
+- `skills/osint-geolocation/references/the-workflow.md` — the order: exiftool -> reverse search -> text/cues -> sun/shadow -> confirm
+- `skills/osint-geolocation/references/the-map-index.md` — the full reference map
+
+Cue guides — the-feature guides: `references/the-exif-first.md`,
+`references/the-reverse.md`, `references/the-text.md`, `references/the-signage.md`, `references/the-plates.md`,
+`references/the-roadmarks.md`, `references/the-driveside.md`, `references/the-poles.md`,
+`references/the-terrain.md`, `references/the-vegetation.md`, `references/the-architecture.md`,
+`references/the-sun.md`, `references/the-bollards.md`, `references/the-flags.md`. The feature modules
+(`signage-`, `plates-`, `roadmarks-`, `driveside-`, `poles-`,
+`bollards-`, `vehicles-`, `terrain-`, `vegetation-`,
+`architecture-`, `signposts-`, `curbs-`, `sunshadow-`, `weather-`,
+`script-`, `shops-`, `flags-`, `uniforms-`, `bins-`, `antennas-`)
+cover feature × question pairs; the region modules (`reg-`) cover
+region × feature pairs.
+
+Discipline — the-standard modules: `references/the-confirm.md`, `references/the-lead-vs.md`,
+`references/the-planted.md`, `references/the-no-exif.md`, `references/the-falsifier.md`,
+`references/the-evidence.md`, `references/the-boundary.md`, `references/the-traps.md`,
+`references/the-checklist.md`, `references/the-detection.md`, `references/the-worked.md`,
+`references/the-close-geo.md`.
 
 Signals that route here are in `knowledge/bug-classes.json`; classify with
 `python3 tools/classify.py`. Budget and escalation: `../LOOP_DISCIPLINE.md`.
