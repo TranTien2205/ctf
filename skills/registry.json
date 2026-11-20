@@ -790,9 +790,9 @@
       "verified_by": [
         "htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"
       ],
-      "skill_tokens": 4972,
-      "depth_files": 1,
-      "depth_tokens": 1108,
+      "skill_tokens": 5677,
+      "depth_files": 2664,
+      "depth_tokens": 55110,
       "use_when": [
         "a probe or source read produced this class's signal: filter the event set to 4624 and read the LogonType and IpAddress fields of the first match",
         "a chain card already proves this class here: htb-brutus-authlog-wtmp-bruteforce-join-utc-from-wtmp"

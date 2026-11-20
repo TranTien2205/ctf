@@ -223,6 +223,58 @@ Shares signals with `../dfir-execution-trace/` (a 4688 or Sysmon 1 command line 
 address is a destination, not a source). Router and depth `../dfir-sherlock-triage/` (`SKILL.md`, `../dfir-sherlock-triage/windows-event-logs.md`,
 `../dfir-sherlock-triage/answer-discipline.md`, `../dfir-sherlock-triage/toolchain.md`); older tradecraft `../ctf-forensics/windows.md` and `../ctf-forensics/linux-forensics.md`.
 
+This skill's own corpus — route first:
+
+- `references/the-map-index.md` — the full reference map
+- `references/the-logontype.md`, `references/the-substatus.md`,
+  `references/the-join.md` — the three reads that decide the question
+
+Event/field guides — the-e* modules (`e4624-`, `e4625-`, `e4634-`,
+`e4647-`, `e4648-`, `e4672-`, `e4768-`, `e4769-`, `e4771-`, `e4776-`,
+`e4778-`, `e4779-`, `e4964-`, `e4688-`, `e21-`, `e39-`, `e40-`,
+`e1149-`) cover event-id x question pairs; the `lnx-` modules cover
+linux-line x question pairs.
+
+Windows-depth modules: `references/the-kerberos.md`,
+`references/the-4648.md`, `references/the-4672.md`,
+`references/the-4964.md`, `references/the-4769.md`,
+`references/the-4776.md`, `references/the-1149.md`,
+`references/the-rdp-table.md`, `references/the-session-end.md`,
+`references/the-4624-fields.md`, `references/the-event-id-set.md`,
+`references/the-ntlm-vs-kerb.md`, `references/the-kerb-downgrade.md`,
+`references/the-preauth.md`, `references/the-mapped-ipv4.md`,
+`references/the-workstation-blank.md`, `references/the-elevated.md`,
+`references/the-targetusersid.md`, `references/the-4625-no-target.md`,
+`references/the-lockout-end.md`, `references/the-enum-vs-spray.md`,
+`references/the-authorized-hours.md`, `references/the-expired.md`,
+`references/the-15b.md`, `references/the-disabled.md`,
+`references/the-unmapped-codes.md`, `references/the-success-after.md`,
+`references/the-delegation.md`, `references/the-notgt.md`,
+`references/the-multi-src.md`, `references/the-fast-switch.md`,
+`references/the-logonid-hex.md`.
+
+Linux-depth modules: `references/the-linux-lines.md`,
+`references/the-wtmp.md`, `references/the-utmp-fields.md`,
+`references/the-invalid-user.md`, `references/the-sudo-line.md`,
+`references/the-pam-boundary.md`, `references/the-account-created.md`,
+`references/the-publickey.md`, `references/the-btmp.md`,
+`references/the-lastlog-sparse.md`, `references/the-boot-time.md`,
+`references/the-wtmp-utline.md`, `references/the-duration.md`,
+`references/the-brutus.md`.
+
+Tool/discipline modules: `references/the-evtx-query.md`,
+`references/the-linux-auth.md`, `references/the-dayzero.md`,
+`references/the-clock.md`, `references/the-since-until.md`,
+`references/the-field-vs-contains.md`, `references/the-on-match.md`,
+`references/the-order-asc.md`, `references/the-answer-flag.md`,
+`references/the-compact.md`, `references/the-sherlock-q.md`,
+`references/the-confirm.md`, `references/the-falsifier.md`,
+`references/the-traps.md`, `references/the-checklist.md`,
+`references/the-boundary.md`, `references/the-detection.md`,
+`references/the-not-a-logon.md`, `references/the-pivot.md`,
+`references/the-evidence2.md`, `references/the-close-auth.md`,
+`references/the-last-auth.md`, `references/the-timeskew.md`.
+
 ## Discipline
 One question, one field, one verbatim record. Record with `python3 tools/hooks.py pre-flag <sherlock>-qN --value '<answer>' --source
 artifact --evidence '<the record line>'`, or paste the `pre_flag_argv` that `tools/forensics/evtx_query.py --answer FIELD` built. Three
