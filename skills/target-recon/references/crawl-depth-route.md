@@ -1,0 +1,8 @@
+# Route companion: crawl-depth
+
+When to open `crawl-depth.md`: when this intake step, signal,
+tool, or scope rule is the live question. Family `crawl-*`.
+
+## Exit
+
+Signal named -> its sx-* cell; step done -> next in the pipeline.

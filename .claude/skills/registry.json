@@ -2539,9 +2539,9 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1116,
-      "depth_files": 1424,
-      "depth_tokens": 167520,
+      "skill_tokens": 1420,
+      "depth_files": 2624,
+      "depth_tokens": 307930,
       "use_when": [
         "a live target URL, host:port or domain was just supplied and no observations exist yet for classify.py to consume",
         "the challenge is black-box and recon must produce the first signals: stack, surface, parameters, oddities"

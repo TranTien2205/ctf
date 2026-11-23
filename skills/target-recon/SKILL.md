@@ -54,6 +54,24 @@ WAF behavior, version strings, endpoint and parameter inventories.
 `references/sig-*` names each signal's class weight; `references/fx-*`
 maps fingerprint features to stacks.
 
+## Stack identified -> its playbook
+
+Once the fingerprint names a stack, open `references/stk-<stack>.md` -
+wordpress, django, drf, rails, laravel, express, nextjs, nuxt, spring,
+aspnet, flask, fastapi, graphqlsvc, grpc, phpgeneric, javageneric,
+gogeneric, nodegeneric. Each playbook carries that stack's default
+paths, auto-generated endpoints, predictable parameters, and which bug
+classes its conventions make likely. API-shaped targets get
+`references/api-*`; a login is in scope gets `references/au-*`; a
+non-HTTP banner gets `references/svc-*`.
+
+## Passive recon for domains
+
+When the input is a domain (and scope allows): crt.sh SANs, DNS
+records, PTR, whois freshness, wayback endpoints - the `pasv-*`
+modules. Passive sources yield names, params and stack hints without
+a single request to the target.
+
 ## Enumeration, bounded
 
 - `robots.txt`, `/sitemap.xml`, `/.git/HEAD`, `.env`, backups, common
@@ -87,12 +105,17 @@ fresh enumeration - run the matcher before inventing probes.
 
 ## Corpus index
 
-`references/` carries ~1,400 modules: `work-*` pipeline, `type-*` target
+`references/` carries ~2,600 modules: `work-*` pipeline, `type-*` target
 kinds, `sig-*` signals, `probe-*` commands, `finger-*`/`fx-*` fingerprinting,
-`enum-*`/`ex-*` enumeration, `js-*` front-end, `scope-*` rules, `nonweb-*`
-raw-service intake, `out-*` handoff, plus `sx-*`/`rx-*` signal x class,
-`tx-*` type x step and `dx-*` discovery x route matrices, each with a
-`-route` companion.
+`enum-*`/`ex-*`/`ex2-*` enumeration, `js-*` front-end, `scope-*` rules,
+`nonweb-*`/`svc-*` service intake, `out-*`/`obs-*` handoff, `stk-*` stack
+playbooks, `pasv-*` passive recon, `api-*` API recon, `au-*` authenticated
+recon, `pd-*`/`pe-*` param and path depth, `vh-*` vhosts, `cdn-*`/`tls-*`
+edge and transport identity, `erd-*` error depth, `rl-*` rate limits,
+`crawl-*` strategy, `ctf-*` CTF specifics, `neg-*` negatives, `trap-*`
+traps, plus `sx-*`/`rx-*`/`rx2-*` signal x class, `tx-*` type x step,
+`dx-*` discovery x route, `stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*`
+matrices, each with a `-route` companion.
 
 ## Discipline
 
