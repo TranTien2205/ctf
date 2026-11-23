@@ -2450,7 +2450,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 2010,
+      "skill_tokens": 2064,
       "depth_files": 892,
       "depth_tokens": 72848,
       "use_when": [
@@ -2520,7 +2520,7 @@
       "categories": [
         "*"
       ],
-      "skill_tokens": 1104,
+      "skill_tokens": 1156,
       "depth_files": 886,
       "depth_tokens": 82731,
       "use_when": [
@@ -2531,6 +2531,34 @@
         "a challenge is in progress: this skill solves nothing"
       ],
       "routes_to": []
+    },
+    {
+      "id": "target-recon",
+      "path": "skills/target-recon/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1116,
+      "depth_files": 1424,
+      "depth_tokens": 167520,
+      "use_when": [
+        "a live target URL, host:port or domain was just supplied and no observations exist yet for classify.py to consume",
+        "the challenge is black-box and recon must produce the first signals: stack, surface, parameters, oddities"
+      ],
+      "do_not_use_when": [
+        "source is supplied: white-box reading precedes any live probe",
+        "a bug class is already named: open that class's depth skill",
+        "recon already produced a signal list: classify it instead"
+      ],
+      "routes_to": [
+        "web-triage",
+        "pwn-binary-triage",
+        "web-info-disclosure",
+        "web-source-map",
+        "ai-iot-triage"
+      ],
+      "unlock_signals": "recon|enumerat|fingerprint|robots\\.txt|sitemap|banner grab|endpoint discovery|live target|host:port"
     },
     {
       "id": "web-parallel-sweep",

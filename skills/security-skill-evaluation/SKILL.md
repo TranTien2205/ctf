@@ -6,6 +6,12 @@ description: >
   verified, or deciding that a skill has stopped earning its place.
 tags: [meta, evaluation, skill-quality, ctf]
 environment: [ctf, lab]
+budget:
+  stuck_threshold: 2
+  on_stuck: pivot
+  stop_conditions:
+    - "the verdict's evidence requirement is met and recorded"
+    - "the metric's data source is absent: mark pending, do not guess"
 evidence_level: catalogue
 ---
 

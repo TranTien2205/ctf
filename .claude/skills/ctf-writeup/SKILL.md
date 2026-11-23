@@ -7,6 +7,12 @@ allowed-tools: Bash Read Write Edit Glob Grep Task WebFetch WebSearch
 metadata:
   user-invocable: "true"
   argument-hint: "[challenge-name]"
+budget:
+  stuck_threshold: 2
+  on_stuck: pivot
+  stop_conditions:
+    - "every claim in the draft has a verbatim evidence excerpt"
+    - "a claim cannot be backed by recorded evidence: cut it, do not soften it"
 ---
 
 # CTF Write-up Generator

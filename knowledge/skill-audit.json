@@ -1,14 +1,14 @@
 {
-  "generated_at": "2026-11-20T21:36:18",
+  "generated_at": "2026-11-23T09:35:14",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 95,
+    "skills": 96,
     "review": 0,
-    "warn": 5,
+    "warn": 3,
     "local_evidence_present": 22,
     "local_evidence_stub": 37,
     "local_evidence_missing": 0,
@@ -19,9 +19,7 @@
   "warn": [
     "crypto-triage",
     "web-info-disclosure",
-    "web-websocket",
-    "ctf-writeup",
-    "security-skill-evaluation"
+    "web-websocket"
   ],
   "skills": [
     {
@@ -1246,13 +1244,11 @@
       "id": "ctf-writeup",
       "layer": "reference",
       "path": "skills/ctf-writeup/SKILL.md",
-      "flags": [
-        "corpus of 72848 tokens with no stop condition"
-      ],
+      "flags": [],
       "score": null,
-      "verdict": "warn",
+      "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 200
+      "lines": 206
     },
     {
       "id": "dfir-parallel-sweep",
@@ -1278,12 +1274,19 @@
       "id": "security-skill-evaluation",
       "layer": "reference",
       "path": "skills/security-skill-evaluation/SKILL.md",
-      "flags": [
-        "corpus of 82731 tokens with no stop condition",
-        "corpus of 82731 tokens with no budget"
-      ],
+      "flags": [],
       "score": null,
-      "verdict": "warn",
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 110
+    },
+    {
+      "id": "target-recon",
+      "layer": "reference",
+      "path": "skills/target-recon/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 104
     },

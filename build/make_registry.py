@@ -16,6 +16,19 @@ TAXONOMY = os.path.join(ROOT, "knowledge", "bug-classes.json")
 
 # Skills that are not bug classes and keep their hand-written routing text.
 PORTED = {
+    "target-recon": {
+        "layer": "reference", "categories": ["*"],
+        "use_when": ["a live target URL, host:port or domain was just supplied and "
+                     "no observations exist yet for classify.py to consume",
+                     "the challenge is black-box and recon must produce the first "
+                     "signals: stack, surface, parameters, oddities"],
+        "do_not_use_when": ["source is supplied: white-box reading precedes any live probe",
+                            "a bug class is already named: open that class's depth skill",
+                            "recon already produced a signal list: classify it instead"],
+        "routes_to": ["web-triage", "pwn-binary-triage", "web-info-disclosure",
+                      "web-source-map", "ai-iot-triage"],
+        "unlock_signals": r"recon|enumerat|fingerprint|robots\.txt|sitemap|banner grab|endpoint discovery|live target|host:port",
+    },
     "web-chromedriver": {
         "layer": "depth", "categories": ["web"],
         "use_when": ["a challenge has an admin bot and a client-side payload needs debugging",
