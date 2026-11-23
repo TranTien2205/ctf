@@ -14,11 +14,28 @@ import html
 def probe(url, timeout):
     started = time.monotonic()
     request = urllib.request.Request(url, headers={"User-Agent": "ctf-web-probe/1.0"})
+    tls_note = None
     try:
         try:
             response = urllib.request.urlopen(request, timeout=timeout)
         except urllib.error.HTTPError as exc:
             response = exc
+        except urllib.error.URLError as exc:
+            # A CTF target on a self-signed or broken-chain cert is still a
+            # target: retry once unverified, and say so in the result so the
+            # observation stays honest about what was checked.
+            if "CERTIFICATE_VERIFY_FAILED" in str(exc) or "certificate verify" in str(exc):
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                tls_note = "certificate did not verify; fetched unverified"
+                try:
+                    response = urllib.request.urlopen(request, timeout=timeout, context=ctx)
+                except urllib.error.HTTPError as exc2:
+                    response = exc2
+            else:
+                raise
         with response:
             body = response.read(65536)
             content_type = response.headers.get("Content-Type", "")
@@ -50,6 +67,7 @@ def probe(url, timeout):
             if forms:
                 signals.append("html-form")
             return {"status": response.status, "content_type": content_type,
+                    "tls": tls_note,
                     "headers": dict(response.headers.items()), "final_url": response.geturl(),
                     "length_sample": len(body), "sha256_sample": hashlib.sha256(body).hexdigest(),
                     "elapsed": round(time.monotonic() - started, 3), "result": "response",

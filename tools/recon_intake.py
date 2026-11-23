@@ -85,6 +85,8 @@ def observations(probe, enum, miner):
                 parts.append("%s: %s" % (name, headers[name]))
         if p.get("final_url") and p["final_url"] != probe.get("url"):
             parts.append("redirects to %s" % p["final_url"])
+        if p.get("tls"):
+            parts.append("TLS: %s" % p["tls"])
         obs.append("; ".join(parts))
         for ep in (p.get("endpoints") or [])[:20]:
             obs.append("page references endpoint %s" % ep)

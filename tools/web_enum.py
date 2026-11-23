@@ -45,8 +45,21 @@ def fetch(url, method="GET", timeout=5, body=None, headers=None):
     data = body.encode() if isinstance(body, str) else body
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
-        with urllib.request.urlopen(req, timeout=timeout, ) as r:
-            return r.status, dict(r.headers), r.read(20000)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, ) as r:
+                return r.status, dict(r.headers), r.read(20000)
+        except urllib.error.URLError as e:
+            # A CTF target on a self-signed or broken-chain cert is still a
+            # target: retry once unverified. The caller sees only the status;
+            # web_probe is the layer that records the cert note as evidence.
+            if "CERTIFICATE_VERIFY_FAILED" in str(e) or "certificate verify" in str(e):
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                    return r.status, dict(r.headers), r.read(20000)
+            raise
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers), e.read(20000)
     except Exception as e:
