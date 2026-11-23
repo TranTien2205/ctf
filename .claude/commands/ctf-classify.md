@@ -23,4 +23,7 @@ Read the output as candidates, never as findings. For each candidate report:
 
 If `classify.py` returns no candidate, say so plainly. It does not guess, and an
 empty result for a non-web challenge is expected: the bug-class taxonomy covers
-web only. Use the router `skill_select.py` names instead.
+web only. Use the router `skill_select.py` names instead. If the argument was a
+bare URL, host:port or domain — not an observation — `classify.py` names the
+recon branch instead: run `python3 tools/recon_intake.py <target>` and classify
+the observation list it emits.

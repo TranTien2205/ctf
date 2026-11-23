@@ -101,7 +101,9 @@ from a supplied challenge artifact during this session.
 5. White-box: read every route, input, sink, authentication boundary, datastore
    query and the flag path before sending anything. Name the file and line for
    each sink you intend to use.
-6. Black-box: minimal recon only. Fetch the entry page, read the front-end
+6. Black-box: minimal recon only. A bare URL, host:port or domain goes through
+   `tools/recon_intake.py` first — its observation list is what
+   `tools/classify.py` consumes. Fetch the entry page, read the front-end
    JavaScript, and enumerate every endpoint it references before guessing hidden
    routes. Do not port-scan a shared host; work only on the supplied port.
 

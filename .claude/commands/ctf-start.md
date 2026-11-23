@@ -24,7 +24,10 @@ Do this in order, and do not skip to a payload:
 
 4. Branch on what the challenge supplies:
    - source code available -> `python3 tools/classify.py --source <dir>`
-   - black box only        -> `python3 tools/classify.py "<observation>"`
+   - a bare URL, host:port or domain and nothing else
+                           -> `python3 tools/recon_intake.py <url>` first —
+                              it emits the observation list classify.py consumes
+   - black-box observations -> `python3 tools/classify.py "<observation>"`
    Then, either way:
    ```bash
    python3 tools/chain_match.py "<observation>" --record <id>   # or --source <dir>

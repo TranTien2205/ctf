@@ -29,6 +29,8 @@ whatever that file happened to describe.
 
 ```
 1 entry     ctf-playbook            classify + time-box          (always, once)
+1b recon    target-recon            bare URL/host:port/domain only — emits the
+                                    observation list that feeds step 2
 2 router    <category>-triage       signal -> class -> probe      (exactly one)
 3 probe     run the cheapest discriminating probe                 (before any depth)
 4 class     one bug-class skill     only after its signal fired
