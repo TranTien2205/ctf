@@ -105,17 +105,20 @@ fresh enumeration - run the matcher before inventing probes.
 
 ## Corpus index
 
-`references/` carries ~2,600 modules: `work-*` pipeline, `type-*` target
+`references/` carries ~2,900 modules: `work-*` pipeline, `type-*` target
 kinds, `sig-*` signals, `probe-*` commands, `finger-*`/`fx-*` fingerprinting,
 `enum-*`/`ex-*`/`ex2-*` enumeration, `js-*` front-end, `scope-*` rules,
-`nonweb-*`/`svc-*` service intake, `out-*`/`obs-*` handoff, `stk-*` stack
-playbooks, `pasv-*` passive recon, `api-*` API recon, `au-*` authenticated
-recon, `pd-*`/`pe-*` param and path depth, `vh-*` vhosts, `cdn-*`/`tls-*`
-edge and transport identity, `erd-*` error depth, `rl-*` rate limits,
-`crawl-*` strategy, `ctf-*` CTF specifics, `neg-*` negatives, `trap-*`
-traps, plus `sx-*`/`rx-*`/`rx2-*` signal x class, `tx-*` type x step,
-`dx-*` discovery x route, `stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*`
-matrices, each with a `-route` companion.
+`nonweb-*`/`svc-*` service intake (web banners through k8s/docker/snmp),
+`iot-*` embedded targets, `wx-*` websocket depth, `word-*` wordlist
+selection, `snap-*` visual/DOM recon, `out-*`/`obs-*` handoff, `stk-*`
+stack playbooks, `pasv-*` passive recon, `api-*` API recon, `au-*`
+authenticated recon, `pd-*`/`pe-*` param and path depth, `vh-*` vhosts,
+`cdn-*`/`tls-*` edge and transport identity, `erd-*` error depth,
+`rl-*` rate limits, `crawl-*` strategy, `ctf-*` CTF specifics,
+`neg-*` negatives, `trap-*` traps, plus `sx-*`/`rx-*`/`rx2-*`/`rx3-*`
+signal x class, `tx-*` type x step, `dx-*`/`dx2-*` discovery x route
+and the `stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*` matrices, each with a
+`-route` companion.
 
 ## Discipline
 
