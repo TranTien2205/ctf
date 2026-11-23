@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-23T17:08:55",
+  "generated_at": "2026-11-23T17:36:20",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -1288,7 +1288,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 143
+      "lines": 145
     },
     {
       "id": "web-parallel-sweep",

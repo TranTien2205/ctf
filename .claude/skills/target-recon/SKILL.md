@@ -131,7 +131,9 @@ strategy, `ctf-*` CTF specifics, `neg-*` negatives, `trap-*`
 traps, plus `sx-*`/`rx-*`/`rx2-*`/`rx3-*` signal x class,
 `tx-*` type x step, `dx-*`/`dx2-*` discovery x route and the
 `stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*/inp-*-*/cld-*-*`
-matrices, each with a `-route` companion.
+matrices, each with a `-route` companion. `agg-index` is the corpus's
+own index file, `tool-inventory` the local tool table, `q-*` the intake
+questions.
 
 ## Discipline
 
