@@ -80,7 +80,9 @@ A timeout is not a success.
 1. Minimal recon, at most three commands. Fetch the entry page, read the
    front-end JavaScript, list every endpoint it calls, note the stack from
    response headers, forms and HTML comments. Do not scan a shared host; work
-   only on the supplied port.
+   only on the supplied port. When the input is only a live target — a URL,
+   host:port or domain — `skills/target-recon/` is this step: its bounded
+   intake emits the observation list step 3 consumes.
 2. White-box first when source exists: routes, inputs, sinks, auth boundaries,
    queries, flag path — with file and line — before any payload.
 3. `tools/classify.py --record <challenge>` names the bug class from the signals

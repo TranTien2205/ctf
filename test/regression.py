@@ -2056,6 +2056,27 @@ class ClassifierTests(unittest.TestCase):
             self.assertTrue(item["first_probe"])
             self.assertTrue(item["falsifier"])
 
+    def test_a_bare_target_no_match_names_recon(self):
+        # classify.py is the documented first command; on a bare live target it
+        # must hand the agent the recon skill instead of a bare "no class".
+        out = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "classify.py"), "--json",
+             "http://target.local:8080"],
+            capture_output=True, text=True)
+        result = json.loads(out.stdout)
+        self.assertEqual(result["candidates"], [])
+        self.assertEqual(result.get("recon"), "skills/target-recon/SKILL.md")
+        self.assertIn("target-recon", result["next_action"])
+
+    def test_a_no_match_observation_keeps_the_miss_message(self):
+        out = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "classify.py"), "--json",
+             "zzzz qqqq unclassifiable"],
+            capture_output=True, text=True)
+        result = json.loads(out.stdout)
+        self.assertNotIn("recon", result)
+        self.assertIn("no class matched", result["next_action"])
+
     def test_only_reviewed_writeup_signals_extend_classification(self):
         with tempfile.TemporaryDirectory() as temp:
             store = Path(temp)
@@ -2379,7 +2400,8 @@ class OrchestratorTests(unittest.TestCase):
         """No state file is the very first decision the controller makes."""
         decision = decide_mod.decide("brand-new")
         self.assertEqual(decision["action"], "start_recon")
-        self.assertEqual(len(decision["recon_rules"]), 3)
+        self.assertEqual(len(decision["recon_rules"]), 4)
+        self.assertTrue(any("target-recon" in r for r in decision["recon_rules"]))
         self.assertTrue(any("classify" in c for c in decision["commands"]))
 
     def test_an_unclassified_hypothesis_blocks_probing(self):

@@ -54,6 +54,18 @@ SIGNAL_STATS = os.path.join(ROOT, "knowledge", "classify-signal-stats.json")
 WORKDIR_NAMES = {"solve.py", "state.json", "anomaly_map.json", "notes.md"}
 
 
+def _bare_live_target(text):
+    """ctf.py owns the shape test; import lazily so a broken ctf.py degrades
+    to the old 'no class matched' message instead of taking classify down."""
+    try:
+        if ROOT not in sys.path:
+            sys.path.insert(0, ROOT)
+        from ctf import bare_live_target  # noqa: E402
+        return bare_live_target(text)
+    except Exception:
+        return False
+
+
 def load_signal_stats(path=SIGNAL_STATS):
     try:
         with open(path, encoding="utf-8") as handle:
@@ -543,8 +555,14 @@ def main():
             result["caution"] = ("top candidate is a catalogue class: this toolkit has never "
                                  "solved one, so its skill is a starting point, not proven knowledge")
     else:
-        result["next_action"] = ("no class matched; the input was appended to "
-                                 "knowledge/classify-misses.log as a gap to close")
+        if kind == "observation" and _bare_live_target(value):
+            result["recon"] = "skills/target-recon/SKILL.md"
+            result["next_action"] = ("a bare live target carries no bug-class signal yet: "
+                                     "run target-recon's bounded intake on it, then re-run "
+                                     "this tool on the observation list it emits")
+        else:
+            result["next_action"] = ("no class matched; the input was appended to "
+                                     "knowledge/classify-misses.log as a gap to close")
     print(json.dumps(result, ensure_ascii=False) if args.json
           else json.dumps(result, ensure_ascii=False, indent=2))
     return 0

@@ -326,6 +326,9 @@ def decide(name, taxonomy_path=None, now=None):
             "from response headers",
             "list every endpoint the front-end calls before any payload",
             "do not scan a shared host; work only on the supplied port",
+            "a bare live target (URL, host:port or domain): run "
+            "skills/target-recon/'s bounded intake; the observation list it "
+            "emits is what classify.py consumes",
         ]
         return result
 

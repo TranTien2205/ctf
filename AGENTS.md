@@ -41,7 +41,7 @@ Then pick exactly one branch:
 | Input | First command |
 |---|---|
 | **White-box, source supplied** | `python3 tools/classify.py --source <dir>` then `python3 tools/chain_match.py --source <dir> --record <name>` |
-| **Black-box** | `python3 tools/classify.py "<obs>"` plus `ctf.py "<obs>"` |
+| **Black-box** | `python3 tools/classify.py "<obs>"` plus `ctf.py "<obs>"`. A bare live target — URL, host:port or domain, nothing else — is not an observation: `skills/target-recon/` runs its bounded intake first, and both tools name it back when one is supplied |
 | **Starting a new challenge** | `python3 tools/state.py <name> --category <cat> --target <url> --challenge-name "<real name>" --event "<event>"` — the last two unlock the controller's writeup-search rule |
 | **Resuming one** | `python3 tools/state.py <name> --show` then `python3 tools/decide.py <name>` |
 | **Attack-defense contest, not jeopardy** | `cat tools/ad/PREFLIGHT.md` the night before, then `cat tools/ad/RUNBOOK.md` on the day, then open `skills/ad-service-triage/SKILL.md`. The sibling loop lives under `tools/ad/`; `tools/decide.py` and `tools/hooks.py` are the jeopardy controller and do not run here |
