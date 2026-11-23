@@ -215,7 +215,8 @@ TAXONOMY = os.path.join(ROOT, "knowledge", "bug-classes.json")
 # that one is proposed by the subagent and executed by the main thread.
 WEB_FAMILIES = [
     {"family": "recon", "agent": "ctf-web-recon", "classes": [],
-     "skills": ["skills/web-info-disclosure/SKILL.md", "skills/web-triage/SKILL.md"],
+     "skills": ["skills/target-recon/SKILL.md",
+                "skills/web-info-disclosure/SKILL.md", "skills/web-triage/SKILL.md"],
      "why_first": "the endpoint inventory every other family probes against; a missed "
                   "endpoint is the most common cause of a stuck web challenge here"},
     {"family": "bundle", "agent": "ctf-web-bundle", "classes": [],

@@ -454,6 +454,7 @@ Prefer it over anything you recall.
 skills rather than by a class, so there is no `evidence_level` and no
 `verified_by` list for it anywhere — do not claim one.
 
+- `skills/target-recon/SKILL.md`
 - `skills/web-info-disclosure/SKILL.md`
 - `skills/web-triage/SKILL.md`
 

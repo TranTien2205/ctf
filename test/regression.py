@@ -3320,6 +3320,14 @@ class KnowledgeScaleTests(unittest.TestCase):
                          "exactly one web family may be write-shaped, and it is the race "
                          "family; got %s" % write_shaped)
 
+        # The recon family's reading list is where the fleet meets target-recon;
+        # without it the sweep's first wave never opens the intake corpus.
+        recon_spec = next(s for s in fan.WEB_FAMILIES if s["family"] == "recon")
+        self.assertIn("skills/target-recon/SKILL.md", recon_spec["skills"])
+        for skill_path in recon_spec["skills"]:
+            self.assertTrue((ROOT / skill_path).is_file(),
+                            "recon family brief names a missing skill: %s" % skill_path)
+
         # with no handout there is no reading list and no short circuit, but the
         # families and their taxonomy fields must still be complete
         bare = fan.web_briefs(None, "http://example.invalid", "t")
