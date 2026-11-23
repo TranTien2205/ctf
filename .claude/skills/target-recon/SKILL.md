@@ -101,24 +101,33 @@ python3 tools/state.py <name> --category <cat> --target <url>
 ```
 
 Recon ends where classification begins. A strong chain card outranks any
-fresh enumeration - run the matcher before inventing probes.
+fresh enumeration - run the matcher before inventing probes. When a class
+is named, `references/cls-<class>.md` lists the exact recon evidence that
+depth skill needs (e.g. cls-sqli wants injectable params + a DBMS prior +
+one oracle) - check the recheck list once before opening the depth skill.
 
 ## Corpus index
 
-`references/` carries ~2,900 modules: `work-*` pipeline, `type-*` target
-kinds, `sig-*` signals, `probe-*` commands, `finger-*`/`fx-*` fingerprinting,
-`enum-*`/`ex-*`/`ex2-*` enumeration, `js-*` front-end, `scope-*` rules,
-`nonweb-*`/`svc-*` service intake (web banners through k8s/docker/snmp),
-`iot-*` embedded targets, `wx-*` websocket depth, `word-*` wordlist
-selection, `snap-*` visual/DOM recon, `out-*`/`obs-*` handoff, `stk-*`
-stack playbooks, `pasv-*` passive recon, `api-*` API recon, `au-*`
-authenticated recon, `pd-*`/`pe-*` param and path depth, `vh-*` vhosts,
-`cdn-*`/`tls-*` edge and transport identity, `erd-*` error depth,
-`rl-*` rate limits, `crawl-*` strategy, `ctf-*` CTF specifics,
-`neg-*` negatives, `trap-*` traps, plus `sx-*`/`rx-*`/`rx2-*`/`rx3-*`
-signal x class, `tx-*` type x step, `dx-*`/`dx2-*` discovery x route
-and the `stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*` matrices, each with a
-`-route` companion.
+`references/` carries ~3,400 modules: `work-*` pipeline, `type-*` target
+kinds, `chk-*` per-type checklists, `sig-*` signals, `probe-*` commands,
+`finger-*`/`fx-*` fingerprinting, `enum-*`/`ex-*`/`ex2-*` enumeration,
+`js-*` front-end, `scope-*` rules, `nonweb-*`/`svc-*` service intake
+(web banners through k8s/docker/snmp), `iot-*` embedded targets,
+`wx-*` websocket depth, `word-*` wordlist selection, `snap-*` visual/
+DOM recon, `out-*`/`obs-*` handoff, `stk-*` stack playbooks (18 + 9
+more incl. coldfusion/tomcat/weblogic/iis/spa), `pasv-*` passive recon,
+`api-*` API recon, `au-*` authenticated recon, `pd-*`/`pe-*` param and
+path depth, `prm-*` per-parameter checks, `inp-*` input-surface
+taxonomy, `cls-*` per-class recheck (what evidence each depth skill
+needs), `rsp-*`/`rdc-*`/`cki-*`/`hdr-*` response, redirect, cookie and
+header depth, `base-*` baselines, `tlx-*` tool-output parsing,
+`prt-*` port priors, `vh-*` vhosts, `cdn-*`/`tls-*` edge and transport
+identity, `erd-*` error depth, `rl-*` rate limits, `crawl-*` strategy,
+`ctf-*` CTF specifics, `neg-*` negatives, `trap-*` traps, plus
+`sx-*`/`rx-*`/`rx2-*`/`rx3-*` signal x class, `tx-*` type x step,
+`dx-*`/`dx2-*` discovery x route and the
+`stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*/inp-*-*` matrices, each with
+a `-route` companion.
 
 ## Discipline
 

@@ -19,8 +19,8 @@ shape has already been solved here.
 
 ## Why the discipline exists
 
-The depth corpus is roughly 9,332,000 tokens across 84058 files. Opening
-`skills/target-recon/` alone is about 347,000. A router is 100–1,300 tokens and a
+The depth corpus is roughly 9,382,000 tokens across 84546 files. Opening
+`skills/target-recon/` alone is about 397,000. A router is 100–1,300 tokens and a
 bug-class skill 500–1,200. Reading a corpus before a probe has produced a signal
 costs a large share of the context window and anchors the next hypothesis on
 whatever that file happened to describe.
@@ -217,7 +217,7 @@ that file and this table would drift.
 | `skills/dfir-parallel-sweep/SKILL.md` | reference | ~3.2k | see registry use_when |
 | `skills/parallel-layer-sweep/SKILL.md` | reference | ~1.4k | see registry use_when |
 | `skills/security-skill-evaluation/SKILL.md` | reference | ~1.2k | a skill is being added, promoted, or removed |
-| `skills/target-recon/SKILL.md` | reference | ~1.5k | see registry use_when |
+| `skills/target-recon/SKILL.md` | reference | ~1.6k | see registry use_when |
 | `skills/web-parallel-sweep/SKILL.md` | reference | ~2.5k | see registry use_when |
 
 ## Skills that are not routed to automatically
