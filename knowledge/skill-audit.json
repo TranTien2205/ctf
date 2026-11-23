@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-23T18:33:51",
+  "generated_at": "2026-11-23T20:05:58",
   "thresholds": {
     "pass": 75,
     "warn": 60,
@@ -30,7 +30,7 @@
       "score": null,
       "verdict": "thin-by-design",
       "local_evidence": "not-applicable",
-      "lines": 136
+      "lines": 137
     },
     {
       "id": "ad-service-triage",
@@ -1288,7 +1288,7 @@
       "score": null,
       "verdict": "reference",
       "local_evidence": "not-applicable",
-      "lines": 147
+      "lines": 149
     },
     {
       "id": "web-parallel-sweep",

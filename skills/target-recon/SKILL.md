@@ -27,6 +27,8 @@ and always inside the supplied scope.
 ## First probe - the three-command intake
 
 ```bash
+python3 tools/recon_intake.py <target>      # the trio in one command, emits
+                                            # the classify-ready obs list
 python3 tools/web_probe.py <url>            # entry page + stack headers
 python3 tools/web_enum.py <url>             # standard-surface enumeration
 python3 tools/web/bundle_miner.py <url>     # front-end: endpoints, maps, secrets

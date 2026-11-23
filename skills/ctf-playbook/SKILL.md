@@ -48,8 +48,9 @@ early both burns context and anchors the next hypothesis.
 When the input is only a live target - a URL, host:port or domain with no
 source and no observations yet - open `../target-recon/` before this table:
 classify.py has nothing to match until recon produces the signal list, and
-the recon intake is bounded to the supplied port. The observation list it
-emits is what this table and the classifier then consume.
+the recon intake is bounded to the supplied port.
+`python3 tools/recon_intake.py <target>` runs the intake trio and emits the
+observation list this table and the classifier then consume.
 
 | Observed | Router | Depth, only after a signal |
 |---|---|---|
