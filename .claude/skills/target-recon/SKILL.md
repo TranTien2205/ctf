@@ -122,12 +122,16 @@ taxonomy, `cls-*` per-class recheck (what evidence each depth skill
 needs), `rsp-*`/`rdc-*`/`cki-*`/`hdr-*` response, redirect, cookie and
 header depth, `base-*` baselines, `tlx-*` tool-output parsing,
 `prt-*` port priors, `vh-*` vhosts, `cdn-*`/`tls-*` edge and transport
-identity, `erd-*` error depth, `rl-*` rate limits, `crawl-*` strategy,
-`ctf-*` CTF specifics, `neg-*` negatives, `trap-*` traps, plus
-`sx-*`/`rx-*`/`rx2-*`/`rx3-*` signal x class, `tx-*` type x step,
-`dx-*`/`dx2-*` discovery x route and the
-`stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*/inp-*-*` matrices, each with
-a `-route` companion.
+identity, `cld-*` cloud-platform recon (provider id, metadata
+surfaces, bucket permutations, cloud error fingerprints),
+`net-*` IPv6/internal addressing, `mob-*` mobile endpoint
+extraction, `prot-*` HTTP/2/3 depth, `surf-*` second-order
+surfaces, `erd-*` error depth, `rl-*` rate limits, `crawl-*`
+strategy, `ctf-*` CTF specifics, `neg-*` negatives, `trap-*`
+traps, plus `sx-*`/`rx-*`/`rx2-*`/`rx3-*` signal x class,
+`tx-*` type x step, `dx-*`/`dx2-*` discovery x route and the
+`stk-*-*/pasv-*-*/svc-*-*/pd-*-*/pe-*-*/inp-*-*/cld-*-*`
+matrices, each with a `-route` companion.
 
 ## Discipline
 
