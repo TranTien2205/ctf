@@ -1712,7 +1712,7 @@ class DispatchTests(unittest.TestCase):
         # returns zero candidates on it. The dispatcher opens target-recon so
         # the signal list exists before any router is chosen.
         for obs in ("http://target.local:8080", "target.local:31337",
-                    "sub.example.com", "[::1]:9000"):
+                    "sub.example.com", "[::1]:9000", "10.0.0.9"):
             with self.subTest(observation=obs):
                 result = self.run_select({"observation": obs})
                 self.assertEqual(result["problems"], [])

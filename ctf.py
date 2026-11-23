@@ -90,6 +90,7 @@ SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 URL_SHAPE = re.compile(r"^(?:https?|wss?|ftp)://\S+$", re.I)
 HOSTPORT_SHAPE = re.compile(r"^(?:\[[0-9a-fA-F:.]+\]|[A-Za-z0-9_][A-Za-z0-9_.-]*):[0-9]{1,5}$")
 DOMAIN_SHAPE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,24}$")
+IPV4_SHAPE = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
 # A dotted token ending in a handout extension is a filename, not a target.
 FILE_EXTS = frozenset(
     "py pyc js php rb go c cpp h hpp java kt cs zip tar gz tgz bz2 xz 7z rar "
@@ -109,7 +110,8 @@ def bare_live_target(text):
     prefix and declines the recon branch when a real signal survives.
     """
     stripped = text.strip()
-    if URL_SHAPE.match(stripped) or HOSTPORT_SHAPE.match(stripped):
+    if (URL_SHAPE.match(stripped) or HOSTPORT_SHAPE.match(stripped)
+            or IPV4_SHAPE.match(stripped)):
         pass
     elif DOMAIN_SHAPE.match(stripped):
         if stripped.rsplit(".", 1)[-1].lower() in FILE_EXTS:
