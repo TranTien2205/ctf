@@ -33,6 +33,13 @@ def probe(url, timeout):
                 forms.append({"action": html.unescape(action.group(1)) if action else "", "method": (method.group(1).upper() if method else "GET"), "parameters": names})
             action_ids = sorted(set(re.findall(r'name=["\'](\$ACTION_ID_[^"\']+)', text, re.I)))
             endpoints.extend(sorted(set(re.findall(r"(?:fetch|axios\.(?:get|post)|XMLHttpRequest)[^\"']{0,120}[\"']([^\"']+)", text, re.I))))
+            if "json" in content_type.lower():
+                # An API response that lists its own routes: HATEOAS _links,
+                # endpoint maps, directory listings. Every entry is verbatim
+                # from the body; reachability is a separate question.
+                endpoints.extend(sorted(set(re.findall(
+                    r"[\"'](/(?:[A-Za-z0-9_~-]+/)*[A-Za-z0-9_~-]{1,64}(?:\?[A-Za-z0-9_~=&%-]{0,64})?)[\"']",
+                    text))))
             params = sorted(set(re.findall(r"name=[\"']([^\"']+)|[?&]([A-Za-z][A-Za-z0-9_-]{1,32})=", text, re.I)))
             params = sorted({a or b for a, b in params if a or b})
             signals = []

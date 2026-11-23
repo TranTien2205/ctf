@@ -174,12 +174,16 @@ def selftest():
     page = ('<html><title>recon-fixture</title>'
             '<script src="/static/app.js"></script></html>')
     bundle = 'fetch("/api/flag?token="); fetch("/api/items/"+id);'
+    meta = ('{"endpoints": ["/api/graphql", "/api/upload?file="],'
+            ' "name": "fixture-api"}')
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "static"))
         with open(os.path.join(tmp, "index.html"), "w") as fh:
             fh.write(page)
         with open(os.path.join(tmp, "static", "app.js"), "w") as fh:
             fh.write(bundle)
+        with open(os.path.join(tmp, "meta.json"), "w") as fh:
+            fh.write(meta)
         class Quiet(http.server.SimpleHTTPRequestHandler):
             def log_message(self, *args):
                 pass  # request logs on stderr would pollute the JSON output
@@ -191,6 +195,11 @@ def selftest():
         thread.start()
         try:
             result = intake("127.0.0.1:%d" % port, timeout=10)
+            import importlib.util
+            spec = importlib.util.spec_from_file_location("web_probe", PROBE)
+            wp = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(wp)
+            json_probe = wp.probe("http://127.0.0.1:%d/meta.json" % port, 10)
         finally:
             server.shutdown()
     checks = {
@@ -202,6 +211,8 @@ def selftest():
         "classify_command_emitted": "tools/classify.py" in
         result.get("next_action", ""),
         "three_commands_bound": len(result.get("commands_run", [])) == 3,
+        "json_body_endpoints": "/api/graphql" in
+        (json_probe.get("endpoints") or []),
     }
     ok = all(checks.values())
     return {"mode": "recon-intake-selftest", "checks": checks, "ok": ok,
