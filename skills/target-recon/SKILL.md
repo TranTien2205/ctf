@@ -108,7 +108,9 @@ one oracle) - check the recheck list once before opening the depth skill.
 
 ## Corpus index
 
-`references/` carries ~3,400 modules: `work-*` pipeline, `type-*` target
+`references/` carries ~3,500 modules. `walk-*` are worked end-to-end
+examples per target type (a URL web target through a websocket
+endpoint) - open one when the intake shape is unfamiliar: `work-*` pipeline, `type-*` target
 kinds, `chk-*` per-type checklists, `sig-*` signals, `probe-*` commands,
 `finger-*`/`fx-*` fingerprinting, `enum-*`/`ex-*`/`ex2-*` enumeration,
 `js-*` front-end, `scope-*` rules, `nonweb-*`/`svc-*` service intake

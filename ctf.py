@@ -83,6 +83,45 @@ SOURCE_RULES = (
 FLAG = re.compile(r"\b[A-Za-z][A-Za-z0-9_-]{1,32}\{[^\r\n}]{1,200}\}")
 SKIP = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build"}
 
+# A bare live target is not an observation: a URL like http://host:8080 hits the
+# web row only through its `https?` token, and a host:port or bare domain hits
+# nothing at all. Either way the classifier has no bug-class signal to match,
+# so the pre-classification recon skill runs instead of a router.
+URL_SHAPE = re.compile(r"^(?:https?|wss?|ftp)://\S+$", re.I)
+HOSTPORT_SHAPE = re.compile(r"^(?:\[[0-9a-fA-F:.]+\]|[A-Za-z0-9_][A-Za-z0-9_.-]*):[0-9]{1,5}$")
+DOMAIN_SHAPE = re.compile(r"^(?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.)+[A-Za-z]{2,24}$")
+# A dotted token ending in a handout extension is a filename, not a target.
+FILE_EXTS = frozenset(
+    "py pyc js php rb go c cpp h hpp java kt cs zip tar gz tgz bz2 xz 7z rar "
+    "pcap pcapng cap txt md json yaml yml xml csv tsv log out bin elf exe dll so "
+    "o a img iso mem dmp raw vmem evtx eml wav mp3 mp4 mov avi png jpg jpeg gif "
+    "bmp pdf doc docx xls xlsx ppt pptx db sqlite sqlite3 jar war wasm dex apk "
+    "class pem crt cer der key pub p12 cfg conf ini html htm css sh bash ps1 "
+    "bat cmd dockerfile lock utc bak old save".split())
+
+
+def bare_live_target(text):
+    """True when the whole observation is only a target spec and nothing else.
+
+    The target token itself may contain a signal word inside its path or
+    hostname (https://x/api/login, http://x/file.pcap); that word was observed,
+    so the input routes normally. The check re-scans the text minus any scheme
+    prefix and declines the recon branch when a real signal survives.
+    """
+    stripped = text.strip()
+    if URL_SHAPE.match(stripped) or HOSTPORT_SHAPE.match(stripped):
+        pass
+    elif DOMAIN_SHAPE.match(stripped):
+        if stripped.rsplit(".", 1)[-1].lower() in FILE_EXTS:
+            return False
+    else:
+        return False
+    body = re.sub(r"^(?:https?|wss?|ftp)://", "", stripped)
+    for _category, pattern in SIGNALS:
+        if re.search(r"(?<!\w)(?:" + pattern + r")(?!\w)", body, re.I):
+            return False
+    return True
+
 
 def files(path):
     if os.path.isfile(path):
@@ -148,10 +187,16 @@ def observation_route(text):
               "ad": "find the flag store and what the checker needs before patching or attacking",
               "ir": "bound the intake so evidence survives; inventory the live estate before answering questions",
               "dfir": "inventory the artifact bundle first, then answer one numbered question at a time"}
-    return {"mode": "blackbox", "route": ranked[0] if ranked else None,
-            "alternates": ranked[1:3],
-            "next": probes.get(ranked[0]["category"] if ranked else "", "classify category manually"),
-            "related_cards": related_cards(text)}
+    result = {"mode": "blackbox", "route": ranked[0] if ranked else None,
+              "alternates": ranked[1:3],
+              "next": probes.get(ranked[0]["category"] if ranked else "", "classify category manually"),
+              "related_cards": related_cards(text)}
+    if bare_live_target(text):
+        result["recon"] = {"skill": "skills/target-recon/SKILL.md",
+                           "why": "a bare live target carries no bug-class signal yet"}
+        result["next"] = ("run target-recon's bounded intake on the target; the "
+                          "observation list it emits is what classify.py consumes")
+    return result
 
 
 def fts_query(text):

@@ -1707,6 +1707,58 @@ class DispatchTests(unittest.TestCase):
                 self.assertEqual(got, want,
                                  "origin: " + case.get("origin", "unknown"))
 
+    def test_a_bare_live_target_routes_to_recon_before_classification(self):
+        # A URL, host:port or domain carries no bug-class signal; classify.py
+        # returns zero candidates on it. The dispatcher opens target-recon so
+        # the signal list exists before any router is chosen.
+        for obs in ("http://target.local:8080", "target.local:31337",
+                    "sub.example.com", "[::1]:9000"):
+            with self.subTest(observation=obs):
+                result = self.run_select({"observation": obs})
+                self.assertEqual(result["problems"], [])
+                self.assertTrue(result.get("recon_required"))
+                opened = [item["id"] for item in result["open_now"]]
+                self.assertEqual(opened, ["ctf-playbook", "target-recon"])
+                self.assertIsNone(result["depth_candidate"])
+
+    def test_a_signal_bearing_url_bypasses_recon(self):
+        # A URL whose path carries a real signal word is an observation, not a
+        # bare target: it routes to that signal's router, not to recon.
+        result = self.run_select({"observation": "http://target.local/api/login"})
+        self.assertFalse(result.get("recon_required"))
+        routers = [item["id"] for item in result["open_now"] if item["layer"] == "router"]
+        self.assertEqual(routers, ["web-triage"])
+        # A URL naming a pcap is not recon either; which router wins the
+        # web-vs-forensics score tie is the router's arbitration, not recon's.
+        result = self.run_select({"observation": "http://target.local/dl/capture.pcap"})
+        self.assertFalse(result.get("recon_required"))
+        routers = [item for item in result["open_now"] if item["layer"] == "router"]
+        self.assertEqual(len(routers), 1)
+        self.assertNotEqual(routers[0]["id"], "target-recon")
+
+    def test_a_filename_is_not_a_live_target(self):
+        result = self.run_select({"observation": "app.py"})
+        self.assertFalse(result.get("recon_required"))
+
+    def test_source_input_never_takes_the_recon_branch(self):
+        reg = registry()
+        target = str(ROOT / "challenges/Weather App/web_weather_app/challenge")
+        text = skill_select.collect_text(target)
+        result = skill_select.select(text, "web", reg, True)
+        self.assertFalse(result.get("recon_required"))
+        self.assertNotIn("target-recon", [item["id"] for item in result["open_now"]])
+
+    def test_target_recon_stays_pre_classification(self):
+        # Recon is upstream of the routers: a reference layer, and no router may
+        # list it as a route or it would be selectable as a depth skill.
+        reg = registry()
+        recon = next(s for s in reg["skills"] if s["id"] == "target-recon")
+        self.assertEqual(recon["layer"], "reference")
+        for skill in reg["skills"]:
+            if skill["layer"] == "router":
+                self.assertNotIn("target-recon", skill.get("routes_to", []),
+                                 skill["id"] + " must not route to target-recon")
+
     def test_entry_skill_is_always_offered(self):
         result = self.run_select({"observation": "something entirely unclassifiable"})
         self.assertEqual(result["open_now"][0]["id"], "ctf-playbook")

@@ -45,6 +45,12 @@ Open the thin router first; it is usually enough. A depth skill is 2,000–10,00
 tokens for its index alone and its directory can exceed 100,000 — opening one
 early both burns context and anchors the next hypothesis.
 
+When the input is only a live target - a URL, host:port or domain with no
+source and no observations yet - open `../target-recon/` before this table:
+classify.py has nothing to match until recon produces the signal list, and
+the recon intake is bounded to the supplied port. The observation list it
+emits is what this table and the classifier then consume.
+
 | Observed | Router | Depth, only after a signal |
 |---|---|---|
 | HTTP target or web source, endpoint, login | `../web-triage/` | one `web-*`, else `../ctf-web/` |

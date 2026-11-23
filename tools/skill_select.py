@@ -13,11 +13,15 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
-from ctf import observation_route, source_route  # noqa: E402
+from ctf import bare_live_target, observation_route, source_route  # noqa: E402
 
 REGISTRY = os.path.join(ROOT, "skills", "registry.json")
 # ctf.py routes SSRF as its own pseudo-category; the registry stores it under web.
 CATEGORY_ALIAS = {"web-ssrf": "web"}
+
+# bare_live_target lives in ctf.py beside observation_route: this file cannot
+# be imported by ctf.py (it already imports SIGNALS), so the shape test and the
+# route that consumes it share one implementation.
 
 
 def load_registry(path=REGISTRY):
@@ -82,7 +86,46 @@ def classify_rank(text, source_mode):
             for position, item in enumerate(ranked)}
 
 
+def recon_result(registry, text):
+    """A bare live target: open the entry playbook and target-recon, nothing else.
+
+    No router is chosen here because no bug-class signal exists yet; recon's
+    observation list is what classify.py and this tool consume afterwards.
+    """
+    index = by_id(registry)
+    open_now, problems = [], []
+    for skill_id, layer in (("ctf-playbook", "entry"), ("target-recon", "reference")):
+        skill = index.get(skill_id)
+        if skill is None:
+            problems.append("registry has no %r entry" % skill_id)
+            continue
+        if not exists(skill):
+            problems.append("registry path missing on disk: " + skill["path"])
+            continue
+        open_now.append({"layer": layer, "id": skill["id"], "path": skill["path"],
+                         "tokens": skill["skill_tokens"]})
+    return {
+        "mode": "skill-select",
+        "category": None,
+        "classified": False,
+        "recon_required": True,
+        "open_now": open_now,
+        "depth_candidate": None,
+        "depth_alternates": [],
+        "locked": [],
+        "next_action": ("a bare live target carries no bug-class signal yet: run "
+                        "target-recon's bounded intake on it, feed the resulting "
+                        "observation list to tools/classify.py, then re-run this "
+                        "tool on the signals"),
+        "estimated_open_tokens": sum(item["tokens"] for item in open_now),
+        "policy": registry["load_policy"]["max_open_at_once"],
+        "problems": problems,
+    }
+
+
 def select(text, category, registry, source_mode=False):
+    if not source_mode and bare_live_target(text):
+        return recon_result(registry, text)
     index = by_id(registry)
     problems = []
     chosen_router = None
