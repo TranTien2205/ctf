@@ -2444,6 +2444,40 @@
       "unlock_signals": "handout|stock app|upstream diff|anomaly|unused (route|field|parameter)|dead code|custom fork|patched vendor|why is this here"
     },
     {
+      "id": "contest-domain-map",
+      "path": "skills/contest-domain-map/SKILL.md",
+      "layer": "reference",
+      "categories": [
+        "*"
+      ],
+      "skill_tokens": 1082,
+      "depth_files": 7,
+      "depth_tokens": 4950,
+      "use_when": [
+        "a multi-domain contest publishes its focus areas in advance and the challenge or event brief names the domain: logs/attack-chain, OSINT identity, AI attack/defense, Linux exploit, embedded/hardware, memory/malware",
+        "the job is to pick the owning router for a named domain, not to guess a bug class"
+      ],
+      "do_not_use_when": [
+        "the input is a bare live target: skills/target-recon runs its intake first",
+        "a bug class or router is already named: open it",
+        "the contest is attack-defense: tools/ad owns that loop"
+      ],
+      "routes_to": [
+        "dfir-sherlock-triage",
+        "osint-triage",
+        "ai-iot-triage",
+        "mcp-agent-security",
+        "pwn-binary-triage",
+        "rev-triage",
+        "forensics-pcap-carve",
+        "forensics-memory-analysis",
+        "ctf-malware",
+        "ctf-pwn",
+        "target-recon"
+      ],
+      "unlock_signals": "focus area|domain map|event brief|contest domain|attack chain|swarm|autonomous|insider|sockpuppet|mavlink|ros2?"
+    },
+    {
       "id": "ctf-writeup",
       "path": "skills/ctf-writeup/SKILL.md",
       "layer": "reference",

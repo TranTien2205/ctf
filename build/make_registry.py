@@ -16,6 +16,25 @@ TAXONOMY = os.path.join(ROOT, "knowledge", "bug-classes.json")
 
 # Skills that are not bug classes and keep their hand-written routing text.
 PORTED = {
+    "contest-domain-map": {
+        "layer": "reference", "categories": ["*"],
+        "use_when": ["a multi-domain contest publishes its focus areas in "
+                     "advance and the challenge or event brief names the "
+                     "domain: logs/attack-chain, OSINT identity, AI "
+                     "attack/defense, Linux exploit, embedded/hardware, "
+                     "memory/malware",
+                     "the job is to pick the owning router for a named "
+                     "domain, not to guess a bug class"],
+        "do_not_use_when": ["the input is a bare live target: "
+                            "skills/target-recon runs its intake first",
+                            "a bug class or router is already named: open it",
+                            "the contest is attack-defense: tools/ad owns that loop"],
+        "routes_to": ["dfir-sherlock-triage", "osint-triage", "ai-iot-triage",
+                      "mcp-agent-security", "pwn-binary-triage", "rev-triage",
+                      "forensics-pcap-carve", "forensics-memory-analysis",
+                      "ctf-malware", "ctf-pwn", "target-recon"],
+        "unlock_signals": r"focus area|domain map|event brief|contest domain|attack chain|swarm|autonomous|insider|sockpuppet|mavlink|ros2?",
+    },
     "target-recon": {
         "layer": "reference", "categories": ["*"],
         "use_when": ["a live target URL, host:port or domain was just supplied and "

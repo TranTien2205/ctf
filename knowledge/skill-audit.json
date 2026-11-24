@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-11-23T20:05:58",
+  "generated_at": "2026-11-24T14:07:01",
   "thresholds": {
     "pass": 75,
     "warn": 60,
     "review_below": 0
   },
   "summary": {
-    "skills": 96,
+    "skills": 97,
     "review": 0,
     "warn": 3,
     "local_evidence_present": 22,
@@ -1239,6 +1239,16 @@
       "verdict": "reference",
       "local_evidence": "not-applicable",
       "lines": 193
+    },
+    {
+      "id": "contest-domain-map",
+      "layer": "reference",
+      "path": "skills/contest-domain-map/SKILL.md",
+      "flags": [],
+      "score": null,
+      "verdict": "reference",
+      "local_evidence": "not-applicable",
+      "lines": 73
     },
     {
       "id": "ctf-writeup",
