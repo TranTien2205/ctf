@@ -37,6 +37,52 @@ TRAVERSAL_PATTERNS = [
     "{pre}..%252f{f}", "{pre}%2e%2e%2f{f}",
 ]
 
+_DEFAULT_PORT = {"http": 80, "https": 443}
+
+
+def _effective_authority(url):
+    p = urllib.parse.urlparse(url)
+    scheme = (p.scheme or "http").lower()
+    return (p.hostname or "").lower(), p.port or _DEFAULT_PORT.get(scheme, 0)
+
+
+class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
+    """target-recon's crawl boundary is same-origin, supplied port only: a
+    Location that crosses host or port surfaces as the 3xx itself instead of
+    being followed into content outside the supplied scope."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _effective_authority(newurl) != _effective_authority(req.full_url):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+# build_opener() constructs an HTTPSHandler, whose __init__ loads the default
+# CA bundle -- on Windows that enumerates the system cert store and can take
+# seconds. urlopen amortises it behind the shared global opener; a bounded
+# tool does the same with a lazy singleton.
+_BOUNDED_OPENER = None
+_INSECURE_OPENER = None
+
+
+def _bounded_opener():
+    global _BOUNDED_OPENER
+    if _BOUNDED_OPENER is None:
+        _BOUNDED_OPENER = urllib.request.build_opener(_SameOriginRedirect())
+    return _BOUNDED_OPENER
+
+
+def _insecure_opener():
+    global _INSECURE_OPENER
+    if _INSECURE_OPENER is None:
+        import ssl
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        _INSECURE_OPENER = urllib.request.build_opener(
+            _SameOriginRedirect(), urllib.request.HTTPSHandler(context=ctx))
+    return _INSECURE_OPENER
+
 
 def fetch(url, method="GET", timeout=5, body=None, headers=None):
     hdrs = {"User-Agent": UA}
@@ -46,18 +92,14 @@ def fetch(url, method="GET", timeout=5, body=None, headers=None):
     req = urllib.request.Request(url, data=data, method=method, headers=hdrs)
     try:
         try:
-            with urllib.request.urlopen(req, timeout=timeout, ) as r:
+            with _bounded_opener().open(req, timeout=timeout, ) as r:
                 return r.status, dict(r.headers), r.read(20000)
         except urllib.error.URLError as e:
             # A CTF target on a self-signed or broken-chain cert is still a
             # target: retry once unverified. The caller sees only the status;
             # web_probe is the layer that records the cert note as evidence.
             if "CERTIFICATE_VERIFY_FAILED" in str(e) or "certificate verify" in str(e):
-                import ssl
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
-                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                with _insecure_opener().open(req, timeout=timeout) as r:
                     return r.status, dict(r.headers), r.read(20000)
             raise
     except urllib.error.HTTPError as e:

@@ -85,6 +85,12 @@ def observations(probe, enum, miner):
                 parts.append("%s: %s" % (name, headers[name]))
         if p.get("final_url") and p["final_url"] != probe.get("url"):
             parts.append("redirects to %s" % p["final_url"])
+        elif p.get("redirect_out_of_scope"):
+            parts.append("redirects off the supplied authority to %s "
+                         "(recorded, not followed -- corpus crawl boundary)"
+                         % p.get("location"))
+        elif p.get("location") and 300 <= (p.get("status") or 0) < 400:
+            parts.append("redirects to %s" % p["location"])
         if p.get("tls"):
             parts.append("TLS: %s" % p["tls"])
         obs.append("; ".join(parts))
@@ -189,8 +195,24 @@ def selftest():
         class Quiet(http.server.SimpleHTTPRequestHandler):
             def log_message(self, *args):
                 pass  # request logs on stderr would pollute the JSON output
+
+            def do_GET(self):
+                if self.path == "/leave":
+                    self.send_response(302)
+                    self.send_header("Location", "http://127.0.0.1:1/x")
+                    self.end_headers()
+                    return
+                if self.path == "/stay":
+                    self.send_response(302)
+                    self.send_header("Location", "/index.html")
+                    self.end_headers()
+                    return
+                super().do_GET()
         import functools
-        server = http.server.HTTPServer(
+        # ThreadingHTTPServer, not HTTPServer: the intake's enum stage runs a
+        # worker pool, and a single-threaded fixture's accept queue wedges on
+        # concurrent connects -- real targets serve concurrently.
+        server = http.server.ThreadingHTTPServer(
             ("127.0.0.1", 0), functools.partial(Quiet, directory=tmp))
         port = server.server_address[1]
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -202,6 +224,8 @@ def selftest():
             wp = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(wp)
             json_probe = wp.probe("http://127.0.0.1:%d/meta.json" % port, 10)
+            leave_probe = wp.probe("http://127.0.0.1:%d/leave" % port, 10)
+            stay_probe = wp.probe("http://127.0.0.1:%d/stay" % port, 10)
         finally:
             server.shutdown()
     checks = {
@@ -215,6 +239,12 @@ def selftest():
         "three_commands_bound": len(result.get("commands_run", [])) == 3,
         "json_body_endpoints": "/api/graphql" in
         (json_probe.get("endpoints") or []),
+        "off_authority_redirect_not_followed":
+        leave_probe.get("redirect_out_of_scope") is True
+        and leave_probe.get("status") == 302,
+        "same_origin_redirect_followed":
+        stay_probe.get("status") == 200
+        and not stay_probe.get("redirect_out_of_scope"),
     }
     ok = all(checks.values())
     return {"mode": "recon-intake-selftest", "checks": checks, "ok": ok,

@@ -11,10 +11,41 @@ import hashlib
 import html
 
 
+_DEFAULT_PORT = {"http": 80, "https": 443, "ftp": 21}
+
+
+def _effective_authority(url):
+    """(hostname, port) with the scheme default filled in."""
+    p = urllib.parse.urlparse(url)
+    scheme = (p.scheme or "http").lower()
+    return (p.hostname or "").lower(), p.port or _DEFAULT_PORT.get(scheme, 0)
+
+
+class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
+    """Follow a redirect only while it stays on the supplied authority.
+
+    target-recon's crawl boundary is same-origin, supplied port only: an
+    outbound Location is recorded as an observation, never followed. A 3xx
+    whose target crosses host or port surfaces as the 3xx itself, with its
+    Location header intact -- which is the honest thing to report.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _effective_authority(newurl) != _effective_authority(req.full_url):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def probe(url, timeout):
     started = time.monotonic()
     request = urllib.request.Request(url, headers={"User-Agent": "ctf-web-probe/1.0"})
     tls_note = None
+    # urlopen is this tool's mockable transport seam (tests patch it). The
+    # redirect policy lives in a guarded opener swapped into the process
+    # global just for this call, so tests keep the seam and production gets
+    # the crawl boundary.
+    saved_opener = urllib.request._opener
+    urllib.request._opener = urllib.request.build_opener(_SameOriginRedirect())
     try:
         try:
             response = urllib.request.urlopen(request, timeout=timeout)
@@ -31,7 +62,9 @@ def probe(url, timeout):
                 ctx.verify_mode = ssl.CERT_NONE
                 tls_note = "certificate did not verify; fetched unverified"
                 try:
-                    response = urllib.request.urlopen(request, timeout=timeout, context=ctx)
+                    insecure = urllib.request.build_opener(
+                        _SameOriginRedirect(), urllib.request.HTTPSHandler(context=ctx))
+                    response = insecure.open(request, timeout=timeout)
                 except urllib.error.HTTPError as exc2:
                     response = exc2
             else:
@@ -66,8 +99,15 @@ def probe(url, timeout):
                 signals.append("react-server-action")
             if forms:
                 signals.append("html-form")
+            location = response.headers.get("Location")
             return {"status": response.status, "content_type": content_type,
                     "tls": tls_note,
+                    "location": location,
+                    "redirect_out_of_scope": bool(
+                        location and 300 <= response.status < 400
+                        and _effective_authority(
+                            urllib.parse.urljoin(response.geturl(), location))
+                        != _effective_authority(url)),
                     "headers": dict(response.headers.items()), "final_url": response.geturl(),
                     "length_sample": len(body), "sha256_sample": hashlib.sha256(body).hexdigest(),
                     "elapsed": round(time.monotonic() - started, 3), "result": "response",
@@ -76,6 +116,8 @@ def probe(url, timeout):
                     "artifact": "pdf" if body.startswith(b"%PDF") or "pdf" in content_type.lower() else "html" if "html" in content_type.lower() else "other"}
     except Exception as exc:
         return {"elapsed": round(time.monotonic() - started, 3), "result": "error", "error": str(exc)}
+    finally:
+        urllib.request._opener = saved_opener
 
 
 def main():
